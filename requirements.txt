@@ -10,6 +10,7 @@ PyYAML>=6.0                   # Configuration files
 
 # Optional: Enhanced functionality (lightweight)
 python-dotenv>=1.0.0          # Environment variable management
+numpy>=1.24.0                 # Numerical computing for monetization engine
 
 # Development/Testing (only if needed)
 # pytest>=7.0.0
