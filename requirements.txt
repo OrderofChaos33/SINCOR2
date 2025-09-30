@@ -1,0 +1,16 @@
+# SINCOR Master Platform Requirements - Optimized for Railway
+# Core Flask framework
+Flask>=3.0.0,<4.0.0
+
+# Essential dependencies only
+requests>=2.31.0              # HTTP requests for API integrations
+PyJWT>=2.8.0                  # JWT authentication
+Jinja2>=3.1.0                 # Template engine
+PyYAML>=6.0                   # Configuration files
+
+# Optional: Enhanced functionality (lightweight)
+python-dotenv>=1.0.0          # Environment variable management
+
+# Development/Testing (only if needed)
+# pytest>=7.0.0
+# pytest-flask>=1.2.0
