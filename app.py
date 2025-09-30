@@ -1,129 +1,428 @@
 #!/usr/bin/env python3
 """
-SINCOR Master Application - Complete AI Business Automation Platform
-Combines professional features, monetization engine, and 42 AI agents
+SINCOR Main Flask Application with Product Showcase and Waitlist System
 """
 
 import os
-from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect, url_for
-import csv, datetime, re, smtplib, logging
-from email.message import EmailMessage
+from flask import Flask, render_template, request, jsonify
 
-# Initialize Flask app with professional configuration
-app = Flask(__name__, static_folder=str(Path(__file__).parent), static_url_path="")
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sincor-master-2025-production')
-app.template_folder = 'templates'
-
-# Professional logging setup
-ROOT = Path(__file__).resolve().parent
-OUT = ROOT / "outputs"
-OUT.mkdir(exist_ok=True)
-LOGDIR = ROOT / "logs"
-LOGDIR.mkdir(exist_ok=True)
-LOGFILE = LOGDIR / "run.log"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOGFILE),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-
-def log(msg):
-    ts = datetime.datetime.now().isoformat(timespec="seconds")
-    logger.info(msg)
-    with open(LOGFILE, "a", encoding="utf-8") as f:
-        f.write(f"[{ts}] {msg}\n")
-
-# Environment configuration
-SMTP_HOST = os.getenv("SMTP_HOST", "") or os.getenv("smtp_host", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587") or os.getenv("smtp_port", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "") or os.getenv("smtp_user", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "") or os.getenv("smtp_pass", "")
-EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@sincor.local")
-EMAIL_TO = [e.strip() for e in os.getenv("EMAIL_TO", "admin@sincor.local").split(",") if e.strip()]
-
-# Import systems with graceful fallbacks
+# Import waitlist system with error handling
 try:
     from waitlist_system import waitlist_manager
     WAITLIST_AVAILABLE = True
 except ImportError as e:
-    log(f"Waitlist system not available: {e}")
+    print(f"Waitlist system not available: {e}")
     WAITLIST_AVAILABLE = False
 
+# Import PayPal integration with error handling
+try:
+    from paypal_integration import PayPalIntegration, PaymentRequest
+    paypal_processor = PayPalIntegration()
+    PAYPAL_AVAILABLE = True
+    print("✅ PayPal Integration Loaded Successfully")
+except ImportError as e:
+    print(f"PayPal integration not available: {e}")
+    PAYPAL_AVAILABLE = False
+    paypal_processor = None
+except Exception as e:
+    print(f"PayPal configuration error: {e}")
+    PAYPAL_AVAILABLE = False
+    paypal_processor = None
+
+# Import monetization engine with error handling
 try:
     from monetization_engine import MonetizationEngine
-    from paypal_integration import SINCORPaymentProcessor, PaymentRequest
+    monetization_engine = MonetizationEngine()
     MONETIZATION_AVAILABLE = True
+    print("✅ Monetization Engine Loaded Successfully")
 except ImportError as e:
-    log(f"Monetization modules not available: {e}")
+    print(f"Monetization engine not available: {e}")
     MONETIZATION_AVAILABLE = False
-
-# Initialize monetization if available
-if MONETIZATION_AVAILABLE:
-    try:
-        monetization_engine = MonetizationEngine()
-        payment_processor = SINCORPaymentProcessor()
-        log("✅ SINCOR Monetization Engine initialized")
-    except Exception as e:
-        log(f"❌ Error initializing monetization: {e}")
-        monetization_engine = None
-        payment_processor = None
-else:
     monetization_engine = None
-    payment_processor = None
+except Exception as e:
+    print(f"Monetization engine error: {e}")
+    MONETIZATION_AVAILABLE = False
+    monetization_engine = None
 
-# PAID ONLY - No free trials or promotional codes
+# Initialize Flask app
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-in-production')
 
-# Main routes
+# Configure template folder
+app.template_folder = 'templates'
+
 @app.route('/')
 def index():
-    """Main landing page with 42 AI agents"""
+    """Main landing page with product showcase"""
     return render_template('index.html')
 
-# API routes
 @app.route('/api/waitlist', methods=['POST'])
-def api_waitlist():
-    """Handle waitlist submissions"""
+def join_waitlist():
+    """Handle waitlist signups"""
     try:
-        data = request.get_json() or {}
-        email = data.get('email', '').strip()
-        name = data.get('name', '').strip()
-        product = data.get('product', 'Complete Suite').strip()
+        if not WAITLIST_AVAILABLE:
+            return jsonify({'success': False, 'error': 'Waitlist system temporarily unavailable'})
+            
+        signup_data = request.get_json()
+        
+        # Validate required fields
+        if not signup_data or not signup_data.get('email'):
+            return jsonify({'success': False, 'error': 'Email address is required'})
+        
+        # Add to waitlist using the waitlist manager
+        result = waitlist_manager.add_to_waitlist(signup_data)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Server error: {str(e)}'})
 
-        if not email or not name:
-            return jsonify({'success': False, 'message': 'Email and name are required'}), 400
+@app.route('/api/products')
+def get_products():
+    """Get information about all SINCOR products"""
+    try:
+        # Return static product information for now
+        product_info = {
+            'growth_engine': {
+                'product_name': 'SINCOR Growth Engine',
+                'tagline': 'Your AI sales org in a box',
+                'color_theme': 'purple',
+                'agent_count': 5
+            },
+            'ops_core': {
+                'product_name': 'SINCOR Ops Core', 
+                'tagline': 'Run leaner, faster, cleaner',
+                'color_theme': 'teal',
+                'agent_count': 6
+            },
+            'creative_forge': {
+                'product_name': 'SINCOR Creative Forge',
+                'tagline': 'Creative firepower, amplified', 
+                'color_theme': 'lime',
+                'agent_count': 5
+            },
+            'intelligence_hub': {
+                'product_name': 'SINCOR Intelligence Hub',
+                'tagline': 'Intelligence that drives decisions',
+                'color_theme': 'red',
+                'agent_count': 5
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'products': product_info
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Error loading products: {str(e)}'})
 
-        # Use waitlist system if available
-        if WAITLIST_AVAILABLE:
-            try:
-                from waitlist_system import waitlist_manager
-                result = waitlist_manager.add_to_waitlist(email, name, product)
-                log(f"Waitlist signup: {name} ({email}) for {product}")
-                return jsonify({'success': True, 'message': 'Successfully joined waitlist!'})
-            except Exception as e:
-                log(f"Waitlist error: {e}")
+@app.route('/api/waitlist/analytics')
+def waitlist_analytics():
+    """Get waitlist analytics (admin endpoint)"""
+    try:
+        if not WAITLIST_AVAILABLE:
+            return jsonify({'success': False, 'error': 'Analytics temporarily unavailable'})
+            
+        analytics = waitlist_manager.get_analytics()
+        return jsonify({
+            'success': True,
+            'analytics': analytics
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Error loading analytics: {str(e)}'})
 
-        # Fallback: log the signup
-        log(f"WAITLIST SIGNUP: {name} ({email}) - Product: {product}")
-        return jsonify({'success': True, 'message': 'Successfully joined waitlist!'})
+@app.route('/admin')
+def admin_panel():
+    """Simple admin panel to view waitlist analytics"""
+    try:
+        if not WAITLIST_AVAILABLE:
+            return """
+            <!DOCTYPE html>
+            <html>
+            <head><title>SINCOR Admin</title></head>
+            <body style="font-family: system-ui; margin: 2rem;">
+                <h1>SINCOR Admin Panel</h1>
+                <p>Waitlist system temporarily unavailable.</p>
+                <p><a href="/">← Back to Main Site</a></p>
+            </body>
+            </html>
+            """
+            
+        analytics = waitlist_manager.get_analytics()
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>SINCOR Admin - Waitlist Analytics</title>
+            <style>
+                body {{ font-family: system-ui; margin: 2rem; }}
+                .stat {{ background: #f0f0f0; padding: 1rem; margin: 1rem 0; border-radius: 8px; }}
+                .product {{ background: #e0f0ff; padding: 0.5rem; margin: 0.5rem 0; }}
+            </style>
+        </head>
+        <body>
+            <h1>SINCOR Waitlist Analytics</h1>
+            
+            <div class="stat">
+                <h2>Total Signups: {analytics['total_signups']}</h2>
+            </div>
+            
+            <div class="stat">
+                <h3>Signups by Product:</h3>
+                {''.join(f'<div class="product">{product}: {count} signups</div>' 
+                        for product, count in analytics['products'].items())}
+            </div>
+            
+            <div class="stat">
+                <h3>High Priority Signups:</h3>
+                {''.join(f'<div class="product">Score {signup[0]}: {signup[1]} - {signup[2]}</div>' 
+                        for signup in analytics['high_priority_signups'][:10])}
+            </div>
+            
+            <p><a href="/">← Back to Main Site</a></p>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        return f"<h1>Error loading analytics</h1><p>{str(e)}</p>"
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint"""
+    import datetime
+
+    # Check if monetization is available based on loaded systems
+    monetization_available = bool(PAYPAL_AVAILABLE and MONETIZATION_AVAILABLE)
+
+    return jsonify({
+        'status': 'healthy',
+        'service': 'SINCOR Master Platform',
+        'ai_agents': 42,
+        'waitlist_available': WAITLIST_AVAILABLE,
+        'monetization_available': monetization_available,
+        'google_api_available': bool(os.environ.get('GOOGLE_API_KEY')),
+        'email_available': bool(os.environ.get('SMTP_HOST') and os.environ.get('SMTP_USER')),
+        'port': os.environ.get('PORT', '5000'),
+        'timestamp': datetime.datetime.now().isoformat()
+    })
+
+@app.route('/discovery-dashboard')
+def discovery_dashboard():
+    """Live Demo page"""
+    return render_template('discovery-dashboard.html')
+
+@app.route('/enterprise-dashboard')
+def enterprise_dashboard():
+    """Enterprise solutions page"""
+    return render_template('enterprise-dashboard.html')
+
+@app.route('/franchise-empire')
+def franchise_empire():
+    """Franchise opportunities page"""
+    return render_template('franchise-empire.html')
+
+@app.route('/affiliate-program')
+def affiliate_program():
+    """Affiliate program page"""
+    return render_template('affiliate-program.html')
+
+@app.route('/media-packs')
+def media_packs():
+    """Media packs and resources page"""
+    return render_template('media-packs.html')
+
+@app.route('/pricing')
+def pricing():
+    """Pricing plans page"""
+    return render_template('pricing.html')
+
+@app.route('/privacy')
+def privacy():
+    """Privacy policy page"""
+    return render_template('privacy.html')
+
+@app.route('/terms')
+def terms():
+    """Terms of service page"""
+    return render_template('terms.html')
+
+@app.route('/security')
+def security():
+    """Security and compliance page"""
+    return render_template('security.html')
+
+@app.route('/api/test/paypal')
+def test_paypal():
+    """Test PayPal environment variables"""
+    paypal_client_id = os.environ.get('PAYPAL_REST_API_ID')
+    paypal_secret = os.environ.get('PAYPAL_REST_API_SECRET')
+    paypal_sandbox = os.environ.get('PAYPAL_SANDBOX', 'true')
+
+    return jsonify({
+        'paypal_configured': bool(paypal_client_id and paypal_secret),
+        'client_id_set': bool(paypal_client_id),
+        'secret_set': bool(paypal_secret),
+        'sandbox_mode': paypal_sandbox.lower() == 'true',
+        'client_id_preview': paypal_client_id[:10] + "..." if paypal_client_id else None
+    })
+
+@app.route('/api/test/google')
+def test_google():
+    """Test Google API environment variables"""
+    google_api_key = os.environ.get('GOOGLE_API_KEY')
+    google_places_key = os.environ.get('GOOGLE_PLACES_API_KEY')
+
+    return jsonify({
+        'google_api_configured': bool(google_api_key),
+        'google_places_configured': bool(google_places_key),
+        'api_key_preview': google_api_key[:10] + "..." if google_api_key else None,
+        'places_key_preview': google_places_key[:10] + "..." if google_places_key else None
+    })
+
+@app.route('/api/test/environment')
+def test_environment():
+    """Test all environment variables for presence and basic validation"""
+
+    # Test core environment variables for SINCOR platform
+    test_vars = [
+        'ANTHROPIC_API_KEY',
+        'GOOGLE_ADS_API_ID',
+        'GOOGLE_ADS_API_KEY',
+        'GOOGLE_API_KEY',
+        'GOOGLE_OAUTH_CLIENT_ID',
+        'GOOGLE_OAUTH_CLIENT_SECRET',
+        'PAYPAL_ENV',
+        'PAYPAL_REST_API_ID',
+        'PAYPAL_REST_API_SECRET',
+        'SECRET_KEY',
+        'SQUARE_APP_ID',
+        'SQUARE_APP_SECRET',
+        'TWILO_AUTH',
+        'TWILO_ID',
+        'TWILO_NUMBER'
+    ]
+
+    results = {}
+    for var_name in test_vars:
+        actual_value = os.environ.get(var_name)
+        if actual_value:
+            # Basic validation for each type
+            is_valid = len(actual_value.strip()) > 10  # All should be longer than 10 chars
+            results[var_name] = {
+                'configured': True,
+                'valid_format': is_valid,
+                'preview': actual_value[:15] + "..." if len(actual_value) > 15 else actual_value,
+                'length': len(actual_value)
+            }
+        else:
+            results[var_name] = {
+                'configured': False,
+                'valid_format': False,
+                'preview': None,
+                'length': 0
+            }
+
+    # Calculate summary
+    total_vars = len(test_vars)
+    configured_vars = sum(1 for r in results.values() if r['configured'])
+    valid_vars = sum(1 for r in results.values() if r['valid_format'])
+
+    # Service readiness based on presence and basic validation
+    paypal_ready = (results.get('PAYPAL_REST_API_ID', {}).get('valid_format', False) and
+                   results.get('PAYPAL_REST_API_SECRET', {}).get('valid_format', False))
+    google_ready = results.get('GOOGLE_API_KEY', {}).get('valid_format', False)
+    anthropic_ready = results.get('ANTHROPIC_API_KEY', {}).get('valid_format', False)
+
+    return jsonify({
+        'total_variables': total_vars,
+        'configured_count': configured_vars,
+        'valid_count': valid_vars,
+        'success_rate': round((valid_vars / total_vars) * 100, 1),
+        'services': {
+            'paypal_integration_ready': paypal_ready,
+            'google_apis_ready': google_ready,
+            'anthropic_ai_ready': anthropic_ready,
+            'monetization_available': paypal_ready
+        },
+        'detailed_results': results
+    })
+
+# PayPal payment processing routes
+@app.route('/api/payment/create', methods=['POST'])
+async def create_payment():
+    """Create a PayPal payment"""
+    if not PAYPAL_AVAILABLE:
+        return jsonify({'error': 'PayPal integration not available'}), 503
+
+    try:
+        payment_data = request.get_json()
+
+        # Validate required fields
+        required_fields = ['amount', 'description']
+        for field in required_fields:
+            if field not in payment_data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        # Create payment request
+        payment_request = PaymentRequest(
+            amount=float(payment_data['amount']),
+            currency=payment_data.get('currency', 'USD'),
+            description=payment_data['description'],
+            customer_email=payment_data.get('customer_email', ''),
+            order_id=payment_data.get('order_id', ''),
+            return_url=payment_data.get('return_url', request.host_url + 'payment/success'),
+            cancel_url=payment_data.get('cancel_url', request.host_url + 'payment/cancel')
+        )
+
+        # Process payment
+        result = await paypal_processor.create_payment(payment_request)
+
+        return jsonify({
+            'success': result.success,
+            'payment_id': result.payment_id,
+            'approval_url': result.approval_url,
+            'amount': result.amount,
+            'status': result.status.value
+        })
 
     except Exception as e:
-        log(f"API waitlist error: {e}")
-        return jsonify({'success': False, 'message': 'Failed to process signup'}), 500
+        return jsonify({'error': f'Payment creation failed: {str(e)}'}), 500
 
-# Removed: No free trials - paid access only
+@app.route('/api/payment/execute', methods=['POST'])
+async def execute_payment():
+    """Execute a PayPal payment after approval"""
+    if not PAYPAL_AVAILABLE:
+        return jsonify({'error': 'PayPal integration not available'}), 503
 
-# Monetization routes
-@app.route('/monetization/start', methods=['POST'])
+    try:
+        payment_data = request.get_json()
+        payment_id = payment_data.get('payment_id')
+        payer_id = payment_data.get('payer_id')
+
+        if not payment_id or not payer_id:
+            return jsonify({'error': 'Missing payment_id or payer_id'}), 400
+
+        # Execute payment
+        result = await paypal_processor.execute_payment(payment_id, payer_id)
+
+        return jsonify({
+            'success': result.success,
+            'payment_id': result.payment_id,
+            'status': result.status.value,
+            'amount': result.amount,
+            'net_amount': result.net_amount,
+            'transaction_fee': result.transaction_fee
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Payment execution failed: {str(e)}'}), 500
+
+@app.route('/api/monetization/start', methods=['POST'])
 async def start_monetization():
     """Start the monetization engine"""
-    if not monetization_engine:
-        return jsonify({'error': 'Monetization engine not available'}), 500
+    if not MONETIZATION_AVAILABLE:
+        return jsonify({'error': 'Monetization engine not available'}), 503
 
     try:
         # Execute monetization strategy
@@ -132,346 +431,24 @@ async def start_monetization():
         )
 
         return jsonify({
-            'status': 'success',
-            'message': 'Monetization engine started',
-            'opportunities_executed': strategy_report['execution_summary']['opportunities_executed'],
-            'total_revenue': strategy_report['execution_summary']['total_revenue'],
-            'success_rate': strategy_report['execution_summary']['success_rate']
+            'success': True,
+            'message': 'Monetization engine started successfully',
+            'strategy_report': strategy_report
         })
 
     except Exception as e:
         return jsonify({'error': f'Failed to start monetization: {str(e)}'}), 500
 
-@app.route('/monetization/dashboard')
-def monetization_dashboard():
-    """Monetization dashboard"""
-    return '''<!DOCTYPE html>
-<html><head><title>SINCOR Monetization Dashboard</title>
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head><body class="bg-gray-900 text-white min-h-screen">
-<div class="container mx-auto px-4 py-8">
-    <div class="text-center mb-8">
-        <h1 class="text-4xl font-bold mb-4 text-green-400">SINCOR Monetization Dashboard</h1>
-        <p class="text-xl text-gray-300">Real-time revenue generation and payment processing</p>
-    </div>
-
-    <div class="grid md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-gray-800 p-6 rounded-lg">
-            <h2 class="text-xl font-bold mb-4 text-blue-400">Revenue Opportunities</h2>
-            <div id="opportunities-count" class="text-3xl font-bold text-blue-400">Loading...</div>
-            <p class="text-gray-400">Active opportunities</p>
-        </div>
-
-        <div class="bg-gray-800 p-6 rounded-lg">
-            <h2 class="text-xl font-bold mb-4 text-green-400">Total Revenue</h2>
-            <div id="total-revenue" class="text-3xl font-bold text-green-400">Loading...</div>
-            <p class="text-gray-400">Generated revenue</p>
-        </div>
-
-        <div class="bg-gray-800 p-6 rounded-lg">
-            <h2 class="text-xl font-bold mb-4 text-purple-400">PayPal Status</h2>
-            <div id="paypal-status" class="text-3xl font-bold text-purple-400">Ready</div>
-            <p class="text-gray-400">API connection</p>
-        </div>
-    </div>
-
-    <div class="bg-gray-800 p-6 rounded-lg">
-        <h2 class="text-2xl font-bold mb-4 text-yellow-400">Quick Actions</h2>
-        <div class="space-y-4">
-            <button onclick="startMonetization()" class="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-semibold">
-                🚀 Start Monetization Engine
-            </button>
-            <button onclick="createTestPayment()" class="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-semibold">
-                💳 Create Test Payment
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-async function startMonetization() {
-    try {
-        const response = await fetch('/monetization/start', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        });
-
-        const result = await response.json();
-        if (result.status === 'success') {
-            alert(`Monetization started: ${result.opportunities_executed} opportunities executed`);
-        } else {
-            alert(`Error: ${result.error}`);
-        }
-    } catch (error) {
-        alert(`Network error: ${error.message}`);
-    }
-}
-
-async function createTestPayment() {
-    alert('Payment system ready - full PayPal integration available');
-}
-</script>
-
-</body></html>'''
-
-# Health check
-@app.route('/health')
-def health():
+@app.route('/api/monetization/status')
+def monetization_status():
+    """Get monetization engine status"""
     return jsonify({
-        'status': 'healthy',
-        'service': 'SINCOR Master Platform',
+        'paypal_available': PAYPAL_AVAILABLE,
         'monetization_available': MONETIZATION_AVAILABLE,
         'waitlist_available': WAITLIST_AVAILABLE,
-        'ai_agents': 42,
-        'timestamp': datetime.datetime.now().isoformat()
+        'environment_configured': bool(os.environ.get('PAYPAL_REST_API_ID')),
+        'production_mode': os.environ.get('PAYPAL_ENV', 'sandbox') == 'live'
     })
-
-# Additional professional routes
-@app.route('/business-setup', methods=['GET', 'POST'])
-def business_setup():
-    if request.method == 'POST':
-        business_data = {
-            "company_name": request.form.get("company_name", "").strip(),
-            "industry": request.form.get("industry", ""),
-            "setup_completed": True,
-            "setup_date": datetime.datetime.now().isoformat()
-        }
-        session['business_profile'] = business_data
-        log(f"Business setup completed: {business_data['company_name']}")
-        return redirect('/admin/executive')
-
-    return render_template('business_setup.html')
-
-@app.route('/admin/executive')
-def executive_dashboard():
-    return render_template('executive_dashboard.html')
-
-@app.route('/discovery-dashboard')
-def discovery_dashboard():
-    return render_template('discovery-dashboard.html')
-
-@app.route('/enterprise-dashboard')
-def enterprise_dashboard():
-    return render_template('enterprise-dashboard.html')
-
-@app.route('/pricing')
-def pricing():
-    return render_template('pricing.html')
-
-@app.route('/agents')
-def agents_dashboard():
-    """Live agent interaction dashboard"""
-    return render_template('agent_selector.html')
-
-@app.route('/agents/chat')
-def agents_chat():
-    """Agent chat interface"""
-    return render_template('admin_chat.html')
-
-@app.route('/api/agents/list')
-def api_agents_list():
-    """List all available agents"""
-    try:
-        import os
-        agents_dir = os.path.join(os.path.dirname(__file__), 'agents')
-
-        if not os.path.exists(agents_dir):
-            return jsonify({'agents': [], 'message': 'No agents directory found'})
-
-        agents = []
-        for filename in os.listdir(agents_dir):
-            if filename.endswith('.py') and not filename.startswith('__'):
-                agent_name = filename.replace('.py', '').replace('_', ' ').title()
-                agents.append({
-                    'name': agent_name,
-                    'file': filename,
-                    'status': 'available'
-                })
-
-        return jsonify({'agents': agents, 'count': len(agents)})
-
-    except Exception as e:
-        log(f"Error listing agents: {e}")
-        return jsonify({'agents': [], 'error': str(e)}), 500
-
-@app.route('/api/agents/demo/<agent_name>')
-def api_agent_demo(agent_name):
-    """Get agent demo output"""
-    demos = {
-        'prospector': {
-            'name': 'Lead Prospector Agent',
-            'status': 'Working',
-            'output': 'Found 47 qualified leads in healthcare sector. Analyzing decision makers...',
-            'metrics': {'leads_found': 47, 'conversion_rate': '12%', 'confidence': '94%'}
-        },
-        'qualifier': {
-            'name': 'Lead Qualifier Agent',
-            'status': 'Working',
-            'output': 'Qualifying 23 prospects. 15 meet enterprise criteria. Scheduling demos...',
-            'metrics': {'qualified': 15, 'rejected': 8, 'pending': 3}
-        },
-        'outreach': {
-            'name': 'Outreach Agent',
-            'status': 'Working',
-            'output': 'Sent 127 personalized emails. 34% open rate. 12 positive responses.',
-            'metrics': {'sent': 127, 'opened': 43, 'responded': 12}
-        }
-    }
-
-    demo = demos.get(agent_name, {
-        'name': f'{agent_name.title()} Agent',
-        'status': 'Working',
-        'output': f'{agent_name.title()} agent is processing tasks...',
-        'metrics': {'tasks': 'processing'}
-    })
-
-    return jsonify(demo)
-
-@app.route('/agents/live-demo')
-def agents_live_demo():
-    """Live agent working demonstration"""
-    return '''<!DOCTYPE html>
-<html><head>
-<title>SINCOR Live Agent Demo</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-<style>
-.agent-output {
-    animation: fadeIn 0.5s ease-in;
-    border-left: 4px solid;
-}
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.status-working { border-color: #10b981; background: linear-gradient(135deg, #ecfdf5, #d1fae5); }
-.status-completed { border-color: #3b82f6; background: linear-gradient(135deg, #eff6ff, #dbeafe); }
-</style>
-</head>
-<body class="bg-gray-900 text-white min-h-screen">
-
-<div class="container mx-auto px-4 py-8">
-    <div class="text-center mb-8">
-        <h1 class="text-4xl font-bold mb-4 text-green-400">🤖 SINCOR Agents Live Demo</h1>
-        <p class="text-xl text-gray-300">Watch 42 AI agents working in real-time</p>
-        <button onclick="startDemo()" class="mt-4 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg font-bold">Start Live Demo</button>
-    </div>
-
-    <div id="agent-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- Agents will be populated here -->
-    </div>
-</div>
-
-<script>
-let demoRunning = false;
-
-async function startDemo() {
-    if (demoRunning) return;
-    demoRunning = true;
-
-    const agents = [
-        {name: 'Achernar', spec: 'Automation Discovery', type: 'builder', status: 'working'},
-        {name: 'Acrux', spec: 'Lead Qualification', type: 'negotiator', status: 'working'},
-        {name: 'Aldebaran', spec: 'Compliance Reporting', type: 'auditor', status: 'working'},
-        {name: 'Altair', spec: 'Data Validation', type: 'scout', status: 'working'},
-        {name: 'Betelgeuse', spec: 'Technical Documentation', type: 'synthesizer', status: 'working'},
-        {name: 'Canopus', spec: 'Market Analysis', type: 'scout', status: 'working'}
-    ];
-
-    const grid = document.getElementById('agent-grid');
-    grid.innerHTML = '';
-
-    agents.forEach((agent, index) => {
-        setTimeout(() => {
-            const agentDiv = document.createElement('div');
-            agentDiv.className = 'agent-output status-working p-6 rounded-lg';
-            agentDiv.innerHTML = `
-                <div class="flex justify-between items-start mb-4">
-                    <h3 class="text-lg font-bold text-gray-800">${agent.name}</h3>
-                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">WORKING</span>
-                </div>
-                <div class="text-sm text-gray-600 mb-2">${agent.spec}</div>
-                <div id="output-${agent.name}" class="text-gray-700 text-sm">
-                    Initializing ${agent.name} agent...
-                </div>
-            `;
-            grid.appendChild(agentDiv);
-
-            // Simulate real-time output
-            simulateAgentWork(agent.name, agent.spec, index);
-        }, index * 500);
-    });
-}
-
-function simulateAgentWork(name, spec, index) {
-    const outputs = {
-        'Achernar': [
-            'Scanning for automation opportunities...',
-            'Found 23 repetitive tasks in workflow',
-            'Analyzing tool integration points...',
-            'Developing automation blueprint',
-            '✅ Automation plan completed - 40% efficiency gain projected'
-        ],
-        'Acrux': [
-            'Processing 47 new leads...',
-            'Applying qualification criteria',
-            'Analyzing company profiles and decision makers',
-            'Scoring leads based on ICP match',
-            '✅ 23 qualified leads ready for outreach'
-        ],
-        'Aldebaran': [
-            'Auditing compliance status...',
-            'Checking GDPR, SOX, HIPAA requirements',
-            'Scanning for policy violations',
-            'Generating risk assessment matrix',
-            '✅ Compliance report generated - 3 minor issues flagged'
-        ],
-        'Altair': [
-            'Validating data sources...',
-            'Checking data integrity across 15 sources',
-            'Running quality assurance protocols',
-            'Identifying data inconsistencies',
-            '✅ Data validation complete - 98.7% accuracy confirmed'
-        ],
-        'Betelgeuse': [
-            'Analyzing system architecture...',
-            'Documenting API endpoints and data flows',
-            'Creating technical specifications',
-            'Generating developer documentation',
-            '✅ Technical docs updated - 127 pages generated'
-        ],
-        'Canopus': [
-            'Scanning market intelligence...',
-            'Analyzing competitor movements',
-            'Tracking industry trends and signals',
-            'Monitoring pricing changes',
-            '✅ Market analysis complete - 5 opportunities identified'
-        ]
-    };
-
-    const agentOutputs = outputs[name] || ['Working on tasks...'];
-    let outputIndex = 0;
-
-    const updateOutput = () => {
-        const outputElement = document.getElementById(`output-${name}`);
-        if (outputElement && outputIndex < agentOutputs.length) {
-            outputElement.innerHTML = agentOutputs[outputIndex];
-            outputIndex++;
-
-            if (outputIndex < agentOutputs.length) {
-                setTimeout(updateOutput, 1500 + Math.random() * 1000);
-            } else {
-                // Mark as completed
-                const agentDiv = outputElement.closest('.agent-output');
-                agentDiv.className = agentDiv.className.replace('status-working', 'status-completed');
-                const statusSpan = agentDiv.querySelector('span');
-                statusSpan.textContent = 'COMPLETED';
-                statusSpan.className = 'px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm';
-            }
-        }
-    };
-
-    setTimeout(updateOutput, 1000 + index * 200);
-}
-</script>
-</body></html>'''
 
 # Error handlers
 @app.errorhandler(404)
@@ -483,19 +460,12 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    host = '0.0.0.0'
-
-    log(f"Starting SINCOR MASTER PLATFORM on {host}:{port}")
-    log("✅ 42 AI Agents Platform")
-    log("✅ Professional Admin System")
-    log("✅ Monetization Engine" if MONETIZATION_AVAILABLE else "⚠️ Monetization Engine Not Available")
-    log("✅ PayPal Integration" if MONETIZATION_AVAILABLE else "⚠️ PayPal Integration Not Available")
-    log("✅ Waitlist System" if WAITLIST_AVAILABLE else "⚠️ Waitlist System Not Available")
-    log("PAID ONLY PLATFORM - No free trials or promotional codes")
-
-    try:
-        app.run(host=host, port=port, debug=False)
-    except Exception as e:
-        logger.error(f"Failed to start SINCOR Master Platform: {e}")
-        print(f"Error starting application: {e}")
+    port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    
+    print(f"Starting SINCOR Product Platform on port {port}")
+    print(f"Debug mode: {debug_mode}")
+    if WAITLIST_AVAILABLE:
+        print(f"Database: {waitlist_manager.db_path}")
+    
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)

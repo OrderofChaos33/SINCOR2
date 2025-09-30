@@ -17,11 +17,11 @@ import numpy as np
 from dynamic_pricing_engine import DynamicPricingEngine, TaskMetrics, PricingResult
 from recursive_value_products import RecursiveValueEngine, ProductType, ValueProduct
 from partnership_framework import PartnershipFramework, PartnerTier, PartnershipType
-from instant_business_intelligence import InstantBIEngine, BITaskMetrics
+from instant_business_intelligence import InstantBusinessIntelligence, RevenueMetrics
 from infinite_scaling_engine import InfiniteScalingEngine, AgentArchetype
-from real_time_intelligence import RealTimeIntelligence, IntelligenceSource
+from real_time_intelligence import RealTimeIntelligenceEngine, IntelligenceSource
 from predictive_analytics_engine import PredictiveAnalyticsEngine, PredictionType
-from quality_scoring_engine import QualityScoringEngine, QualityDimension
+from quality_scoring_engine import SelfImprovingQualityEngine, QualityDimension
 from paypal_integration import SINCORPaymentProcessor, PaymentResult, PaymentStatus
 
 class RevenueStream(Enum):
@@ -70,11 +70,11 @@ class MonetizationEngine:
         self.pricing_engine = DynamicPricingEngine()
         self.value_products_engine = RecursiveValueEngine()
         self.partnership_framework = PartnershipFramework()
-        self.bi_engine = InstantBIEngine()
+        self.bi_engine = None  # InstantBusinessIntelligence requires task_market and cortecs_brain parameters
         self.scaling_engine = InfiniteScalingEngine()
-        self.intelligence_engine = RealTimeIntelligence()
+        self.intelligence_engine = RealTimeIntelligenceEngine()
         self.analytics_engine = PredictiveAnalyticsEngine()
-        self.quality_engine = QualityScoringEngine()
+        self.quality_engine = SelfImprovingQualityEngine()
         
         # Initialize payment processor with your Railway PayPal config
         self.payment_processor = SINCORPaymentProcessor()

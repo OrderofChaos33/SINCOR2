@@ -182,3 +182,10 @@ jinja2.exceptions.TemplateNotFound: index.html
  * Running on http://127.0.0.1:8080
  * Running on http://192.168.0.3:8080
 2025-09-30 00:26:52,037 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-30 11:23:30,809 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:30] "GET / HTTP/1.1" 200 -
+2025-09-30 11:23:31,207 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:31] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 11:23:31,220 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:31] "[33mGET /favicon-32x32.png HTTP/1.1[0m" 404 -
+2025-09-30 11:23:31,230 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:31] "[33mGET /favicon-16x16.png HTTP/1.1[0m" 404 -
+2025-09-30 11:23:52,223 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:52] "[33mGET /admin HTTP/1.1[0m" 404 -
+2025-09-30 11:30:30,184 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:30:30] "[33mGET /admin HTTP/1.1[0m" 404 -
+2025-09-30 11:40:16,931 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:40:16] "[33mGET /admin HTTP/1.1[0m" 404 -
