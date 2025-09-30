@@ -77,27 +77,7 @@ else:
     monetization_engine = None
     payment_processor = None
 
-# PROMO CODES for free trials
-PROMO_CODES = {
-    "PROTOTYPE2025": {
-        "description": "Full free access for prototype testing - friends & select testers",
-        "trial_days": 90,
-        "bypass_payment": True,
-        "max_uses": 50
-    },
-    "COURTTESTER": {
-        "description": "Court's personal testing account",
-        "trial_days": 365,
-        "bypass_payment": True,
-        "max_uses": 10
-    },
-    "FRIENDSTEST": {
-        "description": "Friends and family testing - 3 months free",
-        "trial_days": 90,
-        "bypass_payment": True,
-        "max_uses": 100
-    }
-}
+# PAID ONLY - No free trials or promotional codes
 
 # Main routes
 @app.route('/')
@@ -105,83 +85,7 @@ def index():
     """Main landing page with 42 AI agents"""
     return render_template('index.html')
 
-@app.route('/free-trial/<promo_code>')
-def free_trial_activation(promo_code):
-    """Direct free trial activation via URL."""
-    promo_code = promo_code.upper()
-    log(f"Promo activation attempt: {promo_code}")
-
-    if promo_code not in PROMO_CODES:
-        return f'''<!DOCTYPE html>
-<html><head>
-<title>Invalid Promo Code</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head><body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
-<div class="bg-red-900 p-6 sm:p-8 rounded-lg w-full max-w-md text-center">
-<h1 class="text-xl sm:text-2xl font-bold mb-4">❌ Invalid Code</h1>
-<p class="text-sm sm:text-base mb-4">The promo code "{promo_code}" is not valid.</p>
-<div class="text-xs sm:text-sm text-gray-300 mb-4">
-<p>Try these codes:</p>
-<div class="font-mono text-green-400 space-y-1">
-<div>FRIENDSTEST</div>
-<div>PROTOTYPE2025</div>
-</div>
-</div>
-<a href="/" class="inline-block bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm sm:text-base">← Back to Home</a>
-</div></body></html>'''
-
-    # Set promo session
-    promo_data = PROMO_CODES[promo_code]
-    session['promo_active'] = True
-    session['promo_code'] = promo_code
-    session['promo_trial_days'] = promo_data['trial_days']
-    session['promo_bypass_payment'] = promo_data['bypass_payment']
-    session['promo_activated_at'] = datetime.datetime.now().isoformat()
-
-    log(f"Promo activated successfully: {promo_code}")
-
-    return f'''<!DOCTYPE html>
-<html><head>
-<title>Free Trial Activated!</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head><body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
-<div class="bg-green-900 p-6 sm:p-8 rounded-lg w-full max-w-lg text-center">
-<h1 class="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">🎉 FREE TRIAL ACTIVATED!</h1>
-<div class="bg-black p-4 sm:p-6 rounded-lg mb-4 sm:mb-6">
-<h2 class="text-lg sm:text-xl font-bold text-green-400 mb-3 sm:mb-4">Your SINCOR Access:</h2>
-<div class="space-y-2 text-left text-sm sm:text-base">
-<div class="flex justify-between flex-wrap">
-<span class="font-semibold">Code:</span>
-<span class="font-mono text-green-400 break-all">{promo_code}</span>
-</div>
-<div class="flex justify-between flex-wrap">
-<span class="font-semibold">Trial:</span>
-<span class="text-green-400">{promo_data['trial_days']} days FREE</span>
-</div>
-<div class="flex justify-between flex-wrap">
-<span class="font-semibold">Access:</span>
-<span class="text-green-400">Full System</span>
-</div>
-<div class="flex justify-between flex-wrap">
-<span class="font-semibold">AI Agents:</span>
-<span class="text-green-400">✅ 42 Activated</span>
-</div>
-</div>
-</div>
-<div class="space-y-3 sm:space-y-4">
-<a href="/business-setup" class="block bg-green-600 hover:bg-green-500 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-center">
-🏢 Set Up Your Business Profile
-</a>
-<a href="/admin/executive" class="block bg-blue-600 hover:bg-blue-500 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-center">
-🎯 Executive Dashboard
-</a>
-</div>
-<p class="text-xs sm:text-sm text-gray-300 mt-4 sm:mt-6 leading-relaxed">
-You now have full access to SINCOR's 42-agent AI business automation system. Explore all features - no payment required!
-</p>
-</div></body></html>'''
+# Removed: No free trials - paid access only
 
 # Monetization routes
 @app.route('/monetization/start', methods=['POST'])
@@ -342,7 +246,7 @@ if __name__ == '__main__':
     log("✅ Monetization Engine" if MONETIZATION_AVAILABLE else "⚠️ Monetization Engine Not Available")
     log("✅ PayPal Integration" if MONETIZATION_AVAILABLE else "⚠️ PayPal Integration Not Available")
     log("✅ Waitlist System" if WAITLIST_AVAILABLE else "⚠️ Waitlist System Not Available")
-    log("Promo routes: /free-trial/FRIENDSTEST, /free-trial/PROTOTYPE2025, /free-trial/COURTTESTER")
+    log("PAID ONLY PLATFORM - No free trials or promotional codes")
 
     try:
         app.run(host=host, port=port, debug=False)
