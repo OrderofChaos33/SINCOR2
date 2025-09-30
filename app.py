@@ -19,7 +19,7 @@ try:
     from paypal_integration import PayPalIntegration, PaymentRequest
     paypal_processor = PayPalIntegration()
     PAYPAL_AVAILABLE = True
-    print("✅ PayPal Integration Loaded Successfully")
+    print("PayPal Integration Loaded Successfully")
 except ImportError as e:
     print(f"PayPal integration not available: {e}")
     PAYPAL_AVAILABLE = False
@@ -34,7 +34,7 @@ try:
     from monetization_engine import MonetizationEngine
     monetization_engine = MonetizationEngine()
     MONETIZATION_AVAILABLE = True
-    print("✅ Monetization Engine Loaded Successfully")
+    print("Monetization Engine Loaded Successfully")
 except ImportError as e:
     print(f"Monetization engine not available: {e}")
     MONETIZATION_AVAILABLE = False
