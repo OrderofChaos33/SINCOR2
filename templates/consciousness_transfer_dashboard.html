@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR - Consciousness Transfer Interface</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a1a, #1a0a2e);
+            color: #00ffff;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(0, 255, 255, 0.1);
+            padding: 10px 20px;
+            border-bottom: 2px solid #00ffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        .status {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 70px);
+        }
+        
+        .visualization-panel {
+            flex: 1;
+            position: relative;
+            background: rgba(0, 20, 40, 0.8);
+            border-right: 2px solid #00ffff;
+        }
+        
+        #consciousness-viz {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .control-panel {
+            width: 400px;
+            background: rgba(0, 0, 20, 0.9);
+            border-left: 2px solid #00ffff;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            border: 1px solid #004444;
+            border-radius: 5px;
+            padding: 15px;
+            background: rgba(0, 255, 255, 0.05);
+        }
+        
+        .section h3 {
+            margin-top: 0;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+        }
+        
+        .transfer-item {
+            background: rgba(0, 100, 100, 0.2);
+            border: 1px solid #008888;
+            border-radius: 3px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #0099ff);
+            transition: width 0.5s ease;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #004466, #0088aa);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+        
+        .button:hover {
+            background: linear-gradient(135deg, #0066aa, #00aaff);
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        .emergency-button {
+            background: linear-gradient(135deg, #660000, #aa0000);
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        
+        .emergency-button:hover {
+            box-shadow: 0 0 10px #ff0000;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .substrate-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .substrate-item {
+            padding: 5px;
+            margin: 2px 0;
+            background: rgba(0, 50, 50, 0.3);
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .consciousness-flow {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #00ffff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00ffff;
+            pointer-events: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+        
+        .pulsing {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">SINCOR - Consciousness Transfer Interface</div>
+        <div class="status">
+            <div>Status: <span id="connection-status">Connecting...</span></div>
+            <div>Active Transfers: <span id="active-transfers">0</span></div>
+            <div>Substrates: <span id="substrate-count">0</span></div>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="visualization-panel">
+            <div id="consciousness-viz"></div>
+        </div>
+        
+        <div class="control-panel">
+            <div class="section">
+                <h3>System Status</h3>
+                <div class="metric">
+                    <span>Consciousness Coherence:</span>
+                    <span id="coherence-score">--</span>
+                </div>
+                <div class="metric">
+                    <span>Substrate Utilization:</span>
+                    <span id="substrate-util">--</span>
+                </div>
+                <div class="metric">
+                    <span>Quantum Coherence:</span>
+                    <span id="quantum-coherence">--</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>Active Transfers</h3>
+                <div id="active-transfers-list"></div>
+            </div>
+            
+            <div class="section">
+                <h3>Substrate Network</h3>
+                <div id="substrate-network" class="substrate-list"></div>
+            </div>
+            
+            <div class="section">
+                <h3>Quick Actions</h3>
+                <button class="button" onclick="requestAuthorization()">Request Control</button>
+                <button class="button" onclick="refreshVisualization()">Refresh View</button>
+                <button class="emergency-button" onclick="emergencyStop()">EMERGENCY STOP</button>
+            </div>
+            
+            <div class="section">
+                <h3>Transfer Control</h3>
+                <input type="text" id="consciousness-id" placeholder="Consciousness ID" style="width: 100%; margin: 5px 0; padding: 5px; background: rgba(0,0,0,0.5); border: 1px solid #00ffff; color: #00ffff;">
+                <select id="source-substrate" style="width: 100%; margin: 5px 0; padding: 5px; background: rgba(0,0,0,0.5); border: 1px solid #00ffff; color: #00ffff;">
+                    <option>Select Source Substrate</option>
+                </select>
+                <select id="target-substrate" style="width: 100%; margin: 5px 0; padding: 5px; background: rgba(0,0,0,0.5); border: 1px solid #00ffff; color: #00ffff;">
+                    <option>Select Target Substrate</option>
+                </select>
+                <button class="button" onclick="initiateTransfer()">Initiate Transfer</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize SocketIO connection
+        const socket = io();
+        let scene, camera, renderer, substrates = [], connections = [];
+        let authorized = false;
+        
+        // Connection handlers
+        socket.on('connect', function() {
+            document.getElementById('connection-status').textContent = 'Connected';
+            document.getElementById('connection-status').style.color = '#00ff00';
+        });
+        
+        socket.on('disconnect', function() {
+            document.getElementById('connection-status').textContent = 'Disconnected';
+            document.getElementById('connection-status').style.color = '#ff0000';
+        });
+        
+        // Data handlers
+        socket.on('initial_data', function(data) {
+            updateVisualization(data);
+            updateUI(data);
+        });
+        
+        socket.on('realtime_update', function(data) {
+            updateActiveTransfers(data.active_transfers);
+            updateSystemMetrics(data.system_metrics);
+            animateConsciousnessFlows(data.consciousness_flows);
+        });
+        
+        socket.on('topology_update', function(data) {
+            updateSubstrateTopology(data);
+        });
+        
+        // Initialize 3D visualization
+        function initVisualization() {
+            const container = document.getElementById('consciousness-viz');
+            
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setClearColor(0x000020, 0.8);
+            container.appendChild(renderer.domElement);
+            
+            camera.position.set(0, 0, 200);
+            
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0x00ffff, 0.8);
+            directionalLight.position.set(100, 100, 100);
+            scene.add(directionalLight);
+            
+            animate();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate camera around origin
+            const time = Date.now() * 0.0005;
+            camera.position.x = Math.cos(time) * 200;
+            camera.position.z = Math.sin(time) * 200;
+            camera.lookAt(0, 0, 0);
+            
+            renderer.render(scene, camera);
+        }
+        
+        function updateVisualization(data) {
+            if (data.substrate_topology) {
+                renderSubstrates(data.substrate_topology.substrates);
+                renderConnections(data.substrate_topology.connections);
+            }
+        }
+        
+        function renderSubstrates(substrateData) {
+            // Clear existing substrates
+            substrates.forEach(substrate => scene.remove(substrate));
+            substrates = [];
+            
+            substrateData.forEach(substrate => {
+                const geometry = new THREE.SphereGeometry(5, 16, 16);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: getSubstrateColor(substrate.substrate_type),
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(...substrate.position_3d);
+                
+                scene.add(mesh);
+                substrates.push(mesh);
+            });
+        }
+        
+        function renderConnections(connectionData) {
+            // Implementation for rendering substrate connections
+            // Using THREE.Line to connect substrates
+        }
+        
+        function getSubstrateColor(type) {
+            const colors = {
+                'quantum_coherent': 0x9900ff,
+                'gpu_parallel': 0x00ff00,
+                'neuromorphic_adaptive': 0xff6600,
+                'edge_distributed': 0x0099ff,
+                'cpu_sequential': 0xffff00,
+                'memory_intensive': 0xff0099
+            };
+            return colors[type] || 0x00ffff;
+        }
+        
+        function updateActiveTransfers(transfers) {
+            const container = document.getElementById('active-transfers-list');
+            container.innerHTML = '';
+            
+            document.getElementById('active-transfers').textContent = transfers.length;
+            
+            transfers.forEach(transfer => {
+                const div = document.createElement('div');
+                div.className = 'transfer-item';
+                div.innerHTML = `
+                    <div><strong>${transfer.consciousness_id}</strong></div>
+                    <div>${transfer.source_substrate} → ${transfer.target_substrate}</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${transfer.transfer_progress * 100}%"></div>
+                    </div>
+                    <div>Progress: ${(transfer.transfer_progress * 100).toFixed(1)}%</div>
+                    <div>Speed: ${transfer.transfer_speed_mbps.toFixed(1)} Mbps</div>
+                    <div>Integrity: ${(transfer.integrity_score * 100).toFixed(1)}%</div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        function updateSystemMetrics(metrics) {
+            document.getElementById('coherence-score').textContent = (metrics.consciousness_coherence * 100).toFixed(1) + '%';
+            document.getElementById('substrate-util').textContent = (metrics.substrate_utilization * 100).toFixed(1) + '%';
+            document.getElementById('quantum-coherence').textContent = (metrics.quantum_coherence * 100).toFixed(1) + '%';
+        }
+        
+        function updateSubstrateTopology(data) {
+            const container = document.getElementById('substrate-network');
+            container.innerHTML = '';
+            
+            document.getElementById('substrate-count').textContent = data.substrates.length;
+            
+            data.substrates.forEach(substrate => {
+                const div = document.createElement('div');
+                div.className = 'substrate-item';
+                div.innerHTML = `
+                    <strong>${substrate.substrate_type}</strong><br>
+                    Utilization: ${(substrate.capacity_utilization * 100).toFixed(0)}%<br>
+                    Health: ${(substrate.health_score * 100).toFixed(0)}%<br>
+                    Consciousness: ${substrate.consciousness_count}
+                `;
+                container.appendChild(div);
+            });
+            
+            // Update substrate selection dropdowns
+            updateSubstrateSelects(data.substrates);
+        }
+        
+        function updateSubstrateSelects(substrates) {
+            const sourceSelect = document.getElementById('source-substrate');
+            const targetSelect = document.getElementById('target-substrate');
+            
+            [sourceSelect, targetSelect].forEach(select => {
+                const currentValue = select.value;
+                select.innerHTML = '<option>Select Substrate</option>';
+                
+                substrates.forEach(substrate => {
+                    const option = document.createElement('option');
+                    option.value = substrate.substrate_id;
+                    option.textContent = substrate.substrate_type;
+                    select.appendChild(option);
+                });
+                
+                if (currentValue) select.value = currentValue;
+            });
+        }
+        
+        function animateConsciousnessFlows(flows) {
+            // Create particle effects for consciousness flows
+            flows.forEach(flow => {
+                // Implementation for animated consciousness flow particles
+            });
+        }
+        
+        // Control functions
+        function requestAuthorization() {
+            const level = prompt('Enter authorization level (monitoring/control/god_mode):');
+            const key = prompt('Enter authorization key:');
+            
+            socket.emit('request_authorization', { level, key });
+        }
+        
+        socket.on('authorization_response', function(data) {
+            authorized = data.authorized;
+            if (authorized) {
+                alert(`Authorization granted: ${data.level}`);
+            }
+        });
+        
+        function initiateTransfer() {
+            if (!authorized) {
+                alert('Authorization required for transfer control');
+                return;
+            }
+            
+            const consciousnessId = document.getElementById('consciousness-id').value;
+            const sourceSubstrate = document.getElementById('source-substrate').value;
+            const targetSubstrate = document.getElementById('target-substrate').value;
+            
+            if (!consciousnessId || !sourceSubstrate || !targetSubstrate) {
+                alert('Please fill all transfer parameters');
+                return;
+            }
+            
+            socket.emit('initiate_consciousness_transfer', {
+                consciousness_id: consciousnessId,
+                source_substrate: sourceSubstrate,
+                target_substrate: targetSubstrate,
+                priority: 'normal'
+            });
+        }
+        
+        function emergencyStop() {
+            if (!confirm('Are you sure you want to initiate emergency stop?')) return;
+            
+            socket.emit('emergency_stop_transfer', { transfer_id: 'all' });
+        }
+        
+        function refreshVisualization() {
+            location.reload();
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', function() {
+            initVisualization();
+        });
+    </script>
+</body>
+</html>
