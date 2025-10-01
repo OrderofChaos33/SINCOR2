@@ -58,6 +58,20 @@ except ImportError as e:
     print(f"Monitoring dashboard not available: {e}")
     MONITORING_AVAILABLE = False
 
+# Import validation models
+try:
+    from validation_models import (
+        WaitlistSignup,
+        PaymentCreateRequest,
+        PaymentExecuteRequest,
+        LoginRequest,
+        validate_request
+    )
+    VALIDATION_AVAILABLE = True
+except ImportError as e:
+    print(f"Validation models not available: {e}")
+    VALIDATION_AVAILABLE = False
+
 # Import waitlist system with error handling
 try:
     from waitlist_system import waitlist_manager
@@ -245,7 +259,7 @@ def index():
 @app.route('/api/waitlist', methods=['POST'])
 @limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
 def join_waitlist():
-    """Handle waitlist signups (RATE LIMITED)"""
+    """Handle waitlist signups (RATE LIMITED + VALIDATED)"""
     try:
         if not WAITLIST_AVAILABLE:
             return jsonify({'success': False, 'error': 'Waitlist system temporarily unavailable'})
@@ -255,6 +269,13 @@ def join_waitlist():
         # Validate required fields
         if not signup_data or not signup_data.get('email'):
             return jsonify({'success': False, 'error': 'Email address is required'})
+
+        # SECURITY: Validate input using Pydantic model
+        if VALIDATION_AVAILABLE:
+            validated_data, error = validate_request(WaitlistSignup, signup_data)
+            if error:
+                return jsonify({'success': False, 'error': error}), 400
+            signup_data = validated_data
 
         # Add to waitlist using the waitlist manager
         result = waitlist_manager.add_to_waitlist(signup_data)
@@ -423,6 +444,65 @@ def admin_panel():
         """
     except Exception as e:
         return f"<h1>Error loading analytics</h1><p>{str(e)}</p>"
+
+
+# ==================== DASHBOARD ROUTES ====================
+
+@app.route('/executive')
+@limiter.exempt if limiter else lambda f: f
+def executive_dashboard():
+    """Executive Dashboard - Command center with KPIs"""
+    return render_template('executive_dashboard.html')
+
+
+@app.route('/professional')
+@limiter.exempt if limiter else lambda f: f
+def professional_dashboard():
+    """Professional Dashboard - Advanced analytics"""
+    from datetime import datetime
+
+    # Mock data for demonstration
+    mock_data = {
+        'company_name': 'SINCOR Demo',
+        'industry': 'technology',
+        'current_date': datetime.now().strftime('%B %d, %Y'),
+        'metrics': {
+            'new_leads_today': 42,
+            'appointments_scheduled': 12,
+            'completion_rate': 87,
+            'customer_satisfaction': 4.8,
+            'revenue_today': '$2,450'
+        },
+        'industry_metrics': {
+            'vehicles_completed': 156,
+            'monthly_revenue': '$45,230',
+            'avg_service_value': '$290',
+            'booking_conversion': '78%',
+            'repeat_customers': '45%',
+            'next_available': 'Tomorrow 9AM'
+        },
+        'agents': {
+            'coordination_score': 94,
+            'active_count': 42
+        }
+    }
+
+    return render_template('professional_dashboard.html', **mock_data)
+
+
+@app.route('/consciousness-transfer')
+@limiter.exempt if limiter else lambda f: f
+def consciousness_transfer_dashboard():
+    """Consciousness Transfer Dashboard - Monitoring"""
+    return render_template('consciousness_transfer_dashboard.html')
+
+
+@app.route('/admin-dashboard')
+@jwt_required()
+@limiter.limit(ADMIN_LIMITS) if limiter else lambda f: f
+def admin_dashboard():
+    """Admin Dashboard - Protected control panel"""
+    return render_template('admin_dashboard.html')
 
 
 # ==================== PUBLIC PAGE ROUTES ====================
@@ -606,7 +686,7 @@ def test_environment():
 @jwt_required()
 @limiter.limit(PAYMENT_LIMITS) if limiter else lambda f: f
 def create_payment():
-    """Create a PayPal payment (PROTECTED + RATE LIMITED)"""
+    """Create a PayPal payment (PROTECTED + RATE LIMITED + VALIDATED)"""
     if not PAYPAL_AVAILABLE:
         return jsonify({'error': 'PayPal integration not available'}), 503
 
@@ -614,11 +694,12 @@ def create_payment():
         current_user = get_jwt_identity()
         payment_data = request.get_json()
 
-        # Validate required fields
-        required_fields = ['amount', 'description']
-        for field in required_fields:
-            if field not in payment_data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        # SECURITY: Validate input using Pydantic model
+        if VALIDATION_AVAILABLE:
+            validated_data, error = validate_request(PaymentCreateRequest, payment_data)
+            if error:
+                return jsonify({'error': error}), 400
+            payment_data = validated_data
 
         # Create payment request
         payment_request = PaymentRequest(
@@ -652,18 +733,23 @@ def create_payment():
 @jwt_required()
 @limiter.limit(PAYMENT_LIMITS) if limiter else lambda f: f
 def execute_payment():
-    """Execute a PayPal payment after approval (PROTECTED + RATE LIMITED)"""
+    """Execute a PayPal payment after approval (PROTECTED + RATE LIMITED + VALIDATED)"""
     if not PAYPAL_AVAILABLE:
         return jsonify({'error': 'PayPal integration not available'}), 503
 
     try:
         current_user = get_jwt_identity()
         payment_data = request.get_json()
+
+        # SECURITY: Validate input using Pydantic model
+        if VALIDATION_AVAILABLE:
+            validated_data, error = validate_request(PaymentExecuteRequest, payment_data)
+            if error:
+                return jsonify({'error': error}), 400
+            payment_data = validated_data
+
         payment_id = payment_data.get('payment_id')
         payer_id = payment_data.get('payer_id')
-
-        if not payment_id or not payer_id:
-            return jsonify({'error': 'Missing payment_id or payer_id'}), 400
 
         # Execute payment synchronously
         result = paypal_processor.execute_payment_sync(payment_id, payer_id)

@@ -4,10 +4,14 @@ Comprehensive logging for monitoring, debugging, and security auditing
 """
 
 import os
+import sys
 import logging
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from datetime import datetime
 import json
+
+# Check if running on Windows
+IS_WINDOWS = sys.platform == 'win32'
 
 
 class SINCORLogger:
@@ -45,26 +49,42 @@ class SINCORLogger:
         ))
         app.logger.addHandler(app_handler)
 
-        # 2. Error log (rotating daily)
-        error_handler = TimedRotatingFileHandler(
-            os.path.join(log_dir, 'error.log'),
-            when='midnight',
-            interval=1,
-            backupCount=30
-        )
+        # 2. Error log (rotating by size on Windows, daily on Linux)
+        if IS_WINDOWS:
+            # Use size-based rotation on Windows to avoid file locking issues
+            error_handler = RotatingFileHandler(
+                os.path.join(log_dir, 'error.log'),
+                maxBytes=5 * 1024 * 1024,  # 5MB
+                backupCount=30
+            )
+        else:
+            error_handler = TimedRotatingFileHandler(
+                os.path.join(log_dir, 'error.log'),
+                when='midnight',
+                interval=1,
+                backupCount=30
+            )
         error_handler.setLevel(logging.ERROR)
         error_handler.setFormatter(logging.Formatter(
             '[%(asctime)s] %(levelname)s in %(module)s [%(pathname)s:%(lineno)d]:\n%(message)s\n'
         ))
         app.logger.addHandler(error_handler)
 
-        # 3. Security audit log (rotating daily)
-        security_handler = TimedRotatingFileHandler(
-            os.path.join(log_dir, 'security.log'),
-            when='midnight',
-            interval=1,
-            backupCount=90  # Keep for 90 days
-        )
+        # 3. Security audit log (rotating by size on Windows, daily on Linux)
+        if IS_WINDOWS:
+            # Use size-based rotation on Windows to avoid file locking issues
+            security_handler = RotatingFileHandler(
+                os.path.join(log_dir, 'security.log'),
+                maxBytes=5 * 1024 * 1024,  # 5MB
+                backupCount=90  # Keep 90 files
+            )
+        else:
+            security_handler = TimedRotatingFileHandler(
+                os.path.join(log_dir, 'security.log'),
+                when='midnight',
+                interval=1,
+                backupCount=90  # Keep for 90 days
+            )
         security_handler.setLevel(logging.WARNING)
         security_handler.setFormatter(logging.Formatter(
             '[%(asctime)s] SECURITY: %(message)s'
@@ -73,13 +93,21 @@ class SINCORLogger:
         self.security_logger.addHandler(security_handler)
         self.security_logger.setLevel(logging.WARNING)
 
-        # 4. Access log (rotating daily)
-        access_handler = TimedRotatingFileHandler(
-            os.path.join(log_dir, 'access.log'),
-            when='midnight',
-            interval=1,
-            backupCount=30
-        )
+        # 4. Access log (rotating by size on Windows, daily on Linux)
+        if IS_WINDOWS:
+            # Use size-based rotation on Windows to avoid file locking issues
+            access_handler = RotatingFileHandler(
+                os.path.join(log_dir, 'access.log'),
+                maxBytes=5 * 1024 * 1024,  # 5MB
+                backupCount=30
+            )
+        else:
+            access_handler = TimedRotatingFileHandler(
+                os.path.join(log_dir, 'access.log'),
+                when='midnight',
+                interval=1,
+                backupCount=30
+            )
         access_handler.setLevel(logging.INFO)
         access_handler.setFormatter(logging.Formatter(
             '[%(asctime)s] %(message)s'
