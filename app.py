@@ -157,6 +157,19 @@ if MONITORING_AVAILABLE:
 else:
     print("WARNING: Monitoring Dashboard NOT available!")
 
+# Initialize engine API controller
+try:
+    from api_engine_controller import register_engine_api
+    register_engine_api(app)
+    print("Engine API Controller Enabled")
+    ENGINE_API_AVAILABLE = True
+except ImportError as e:
+    print(f"Engine API controller not available: {e}")
+    ENGINE_API_AVAILABLE = False
+except Exception as e:
+    print(f"Engine API initialization error: {e}")
+    ENGINE_API_AVAILABLE = False
+
 # ==================== AUTHENTICATION ROUTES ====================
 
 @app.route('/api/auth/login', methods=['POST'])

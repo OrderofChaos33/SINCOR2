@@ -1,0 +1,186 @@
+{
+  "report_id": "full_system_report_20251001_084236",
+  "generated_at": "2025-10-01T08:42:36.388311",
+  "system_status": {
+    "status": "operational",
+    "uptime_seconds": 0.109707,
+    "uptime_human": "0h 0m 0s",
+    "agents": {
+      "total": 43,
+      "active": 4,
+      "list": [
+        "E-achernar-16",
+        "E-acrux-23",
+        "E-aldebaran-12",
+        "E-alioth-33",
+        "E-alkaid-28",
+        "E-almaak-40",
+        "E-alphard-37",
+        "E-alpheratz-38",
+        "E-altair-04",
+        "E-antares-13",
+        "E-arcturus-10",
+        "E-auriga-01",
+        "E-bellatrix-17",
+        "E-benetnash-35",
+        "E-betelgeuse-11",
+        "E-canopus-15",
+        "E-capella-07",
+        "E-castor-18",
+        "E-cor-caroli-36",
+        "E-deneb-06",
+        "E-dubhe-29",
+        "E-fomalhaut-22",
+        "E-gacrux-25",
+        "E-hamal-41",
+        "E-kaus-27",
+        "E-meback-34",
+        "E-megrez-32",
+        "E-merak-30",
+        "E-mesarthim-43",
+        "E-mimosa-24",
+        "E-mirach-39",
+        "E-mizar-21",
+        "E-phecda-31",
+        "E-polaris-09",
+        "E-pollux-19",
+        "E-procyon-14",
+        "E-regulus-20",
+        "E-rigel-03",
+        "E-shaula-26",
+        "E-sheratan-42",
+        "E-sirius-08",
+        "E-spica-05",
+        "E-vega-02"
+      ]
+    },
+    "archetypes": {
+      "total": 7,
+      "list": [
+        "Auditor",
+        "Builder",
+        "Caretaker",
+        "Director",
+        "Negotiator",
+        "Scout",
+        "Synthesizer"
+      ]
+    },
+    "metrics": {
+      "tasks_processed": 4,
+      "outputs_generated": 4,
+      "errors_encountered": 0,
+      "total_processing_time_ms": 0
+    },
+    "performance": {
+      "avg_task_time_ms": 0,
+      "success_rate": 100.0
+    }
+  },
+  "agent_utilization": {
+    "total_agents": 43,
+    "active_agents": 3,
+    "idle_agents": 40,
+    "utilization_percentage": 6.98,
+    "agent_details": {
+      "E-alioth-33": {
+        "tasks_assigned": 2,
+        "task_types": [
+          "analysis",
+          "analysis"
+        ]
+      },
+      "E-achernar-16": {
+        "tasks_assigned": 1,
+        "task_types": [
+          "creation"
+        ]
+      },
+      "E-altair-04": {
+        "tasks_assigned": 1,
+        "task_types": [
+          "research"
+        ]
+      }
+    }
+  },
+  "performance_report": {
+    "total_tasks": 4,
+    "processing_times": {
+      "min_ms": 0,
+      "max_ms": 0,
+      "avg_ms": 0,
+      "total_ms": 0
+    },
+    "task_type_distribution": {
+      "analysis": 2,
+      "creation": 1,
+      "research": 1
+    },
+    "priority_distribution": {
+      "high": 2,
+      "medium": 1,
+      "low": 1
+    },
+    "recent_tasks": [
+      {
+        "task_id": "task_1",
+        "type": "analysis",
+        "priority": "high",
+        "processing_time_ms": 0,
+        "agent": "E-alioth-33",
+        "timestamp": "2025-10-01T08:42:36.386899"
+      },
+      {
+        "task_id": "task_2",
+        "type": "analysis",
+        "priority": "medium",
+        "processing_time_ms": 0,
+        "agent": "E-alioth-33",
+        "timestamp": "2025-10-01T08:42:36.387399"
+      },
+      {
+        "task_id": "task_3",
+        "type": "creation",
+        "priority": "high",
+        "processing_time_ms": 0,
+        "agent": "E-achernar-16",
+        "timestamp": "2025-10-01T08:42:36.387835"
+      },
+      {
+        "task_id": "task_4",
+        "type": "research",
+        "priority": "low",
+        "processing_time_ms": 0,
+        "agent": "E-altair-04",
+        "timestamp": "2025-10-01T08:42:36.388199"
+      }
+    ]
+  },
+  "orchestrator_status": {
+    "total_agents": 43,
+    "total_archetypes": 7,
+    "active_tasks": 4,
+    "agents_list": [
+      "E-achernar-16",
+      "E-acrux-23",
+      "E-aldebaran-12",
+      "E-alioth-33",
+      "E-alkaid-28",
+      "E-almaak-40",
+      "E-alphard-37",
+      "E-alpheratz-38",
+      "E-altair-04",
+      "E-antares-13"
+    ],
+    "archetypes_list": [
+      "Auditor",
+      "Builder",
+      "Caretaker",
+      "Director",
+      "Negotiator",
+      "Scout",
+      "Synthesizer"
+    ]
+  }
+}

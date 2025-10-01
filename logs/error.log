@@ -1,0 +1,78 @@
+[2025-10-01 06:01:22,216] ERROR in production_logger [C:\Users\cjay4\OneDrive\Desktop\SINCOR2\production_logger.py:188]:
+Unhandled exception on GET /professional:
+'metrics' is undefined
+Traceback (most recent call last):
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\app.py", line 462, in professional_dashboard
+    return render_template('professional_dashboard.html')
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 150, in render_template
+    return _render(app, template, context)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 131, in _render
+    rv = template.render(context)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\templates\professional_dashboard.html", line 50, in top-level template code
+    <p class="text-2xl font-bold text-blue-600">{{ metrics.new_leads_today }}</p>
+    ^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 490, in getattr
+    return getattr(obj, attribute)
+jinja2.exceptions.UndefinedError: 'metrics' is undefined
+[2025-10-01 06:06:07,753] ERROR in production_logger [C:\Users\cjay4\OneDrive\Desktop\SINCOR2\production_logger.py:188]:
+Unhandled exception on GET /professional:
+'metrics' is undefined
+Traceback (most recent call last):
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\app.py", line 462, in professional_dashboard
+    return render_template('professional_dashboard.html')
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 150, in render_template
+    return _render(app, template, context)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 131, in _render
+    rv = template.render(context)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\templates\professional_dashboard.html", line 50, in top-level template code
+    <p class="text-2xl font-bold text-blue-600">{{ metrics.new_leads_today }}</p>
+    ^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 490, in getattr
+    return getattr(obj, attribute)
+jinja2.exceptions.UndefinedError: 'metrics' is undefined
+[2025-10-01 06:07:10,614] ERROR in production_logger [C:\Users\cjay4\OneDrive\Desktop\SINCOR2\production_logger.py:188]:
+Unhandled exception on GET /professional:
+'agents' is undefined
+Traceback (most recent call last):
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\app.py", line 483, in professional_dashboard
+    return render_template('professional_dashboard.html', **mock_data)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 150, in render_template
+    return _render(app, template, context)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 131, in _render
+    rv = template.render(context)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\templates\professional_dashboard.html", line 125, in top-level template code
+    <div class="text-3xl font-bold text-green-600 mb-2">{{ agents.coordination_score }}/100</div>
+    ^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 490, in getattr
+    return getattr(obj, attribute)
+jinja2.exceptions.UndefinedError: 'agents' is undefined
