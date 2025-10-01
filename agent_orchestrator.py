@@ -128,6 +128,27 @@ class AgentOrchestrator:
         except ImportError:
             pass  # Capability enhancer not available
 
+        # Apply content quality enhancements for creation tasks
+        if task_record.get('task_type') == 'creation':
+            try:
+                from content_quality_engine import ContentQualityEngine
+                quality_engine = ContentQualityEngine()
+
+                # Extract specifications from task data
+                specs = task_record.get('task_data', {})
+                content_type = specs.get('content_type', 'blog_post')
+
+                # Generate quality content
+                quality_content = quality_engine.generate_content(content_type, specs)
+
+                # Merge quality content into output
+                if 'result' not in output_data:
+                    output_data['result'] = {}
+                output_data['result']['generated_content'] = quality_content
+
+            except Exception:
+                pass  # Content engine not available or failed
+
         with open(output_path, 'w') as f:
             json.dump(output_data, f, indent=2)
 
