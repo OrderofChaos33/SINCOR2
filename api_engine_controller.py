@@ -328,6 +328,70 @@ def get_analytics_summary():
         }), 500
 
 
+# ==================== AUTONOMOUS SCHEDULER ====================
+
+@engine_api.route('/scheduler/start', methods=['POST'])
+def start_scheduler():
+    """Start autonomous scheduler"""
+    try:
+        from autonomous_scheduler import start_scheduler as start_sched
+        scheduler = start_sched()
+        status = scheduler.get_status()
+
+        return jsonify({
+            'success': True,
+            'message': 'Autonomous scheduler started',
+            'timestamp': datetime.now().isoformat(),
+            'status': status
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@engine_api.route('/scheduler/stop', methods=['POST'])
+def stop_scheduler():
+    """Stop autonomous scheduler"""
+    try:
+        from autonomous_scheduler import stop_scheduler as stop_sched
+        stop_sched()
+
+        return jsonify({
+            'success': True,
+            'message': 'Autonomous scheduler stopped',
+            'timestamp': datetime.now().isoformat()
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@engine_api.route('/scheduler/status', methods=['GET'])
+def get_scheduler_status():
+    """Get scheduler status"""
+    try:
+        from autonomous_scheduler import get_scheduler_status
+        status = get_scheduler_status()
+
+        return jsonify({
+            'success': True,
+            'timestamp': datetime.now().isoformat(),
+            'scheduler': status
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # ==================== HEALTH CHECK ====================
 
 @engine_api.route('/health', methods=['GET'])

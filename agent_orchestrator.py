@@ -94,7 +94,7 @@ class AgentOrchestrator:
         return task_record
 
     def generate_output(self, task_record: Dict[str, Any]) -> str:
-        """Generate output for a completed task"""
+        """Generate output for a completed task with enhanced capabilities"""
 
         output_filename = f"{task_record['task_id']}_{task_record['task_type']}.json"
         output_path = self.outputs_dir / output_filename
@@ -120,6 +120,13 @@ class AgentOrchestrator:
                 }
             }
         }
+
+        # Enhance output with additional capabilities
+        try:
+            from agent_capability_enhancer import enhance_task_output
+            output_data = enhance_task_output(task_record, output_data)
+        except ImportError:
+            pass  # Capability enhancer not available
 
         with open(output_path, 'w') as f:
             json.dump(output_data, f, indent=2)
