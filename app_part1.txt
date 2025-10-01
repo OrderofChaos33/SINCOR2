@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""
+SINCOR Main Flask Application with Product Showcase and Waitlist System
+FIXED: Removed async/await for Flask compatibility
+"""
+
+import os
+from flask import Flask, render_template, request, jsonify
+
+# Import waitlist system with error handling
+try:
+    from waitlist_system import waitlist_manager
+    WAITLIST_AVAILABLE = True
+except ImportError as e:
+    print(f"Waitlist system not available: {e}")
+    WAITLIST_AVAILABLE = False
+
+# Import PayPal integration with SYNC wrappers
+try:
+    from paypal_integration_sync import PayPalIntegrationSync, SINCORPaymentProcessorSync
+    from paypal_integration import PaymentRequest
+    paypal_processor = PayPalIntegrationSync()
+    PAYPAL_AVAILABLE = True
+    print("PayPal Integration Loaded Successfully (Sync Mode)")
+except ImportError as e:
+    print(f"PayPal integration not available: {e}")
+    PAYPAL_AVAILABLE = False
+    paypal_processor = None
+except Exception as e:
+    print(f"PayPal configuration error: {e}")
+    PAYPAL_AVAILABLE = False
+    paypal_processor = None
+
+# Import monetization engine with error handling
+try:
+    from monetization_engine import MonetizationEngine
+    monetization_engine = MonetizationEngine()
+    MONETIZATION_AVAILABLE = True
+    print("Monetization Engine Loaded Successfully")
+except ImportError as e:
+    print(f"Monetization engine not available: {e}")
+    MONETIZATION_AVAILABLE = False
+    monetization_engine = None
+except Exception as e:
+    print(f"Monetization engine error: {e}")
+    MONETIZATION_AVAILABLE = False
+    monetization_engine = None
+
+# Initialize Flask app
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-in-production')
+
+# Configure template folder
+app.template_folder = 'templates'
+
+@app.route('/')
+def index():
+    """Main landing page with product showcase"""
+    return render_template('index.html')
+
+@app.route('/api/waitlist', methods=['POST'])
+def join_waitlist():
+    """Handle waitlist signups"""
+    try:
+        if not WAITLIST_AVAILABLE:
+            return jsonify({'success': False, 'error': 'Waitlist system temporarily unavailable'})
+
+        signup_data = request.get_json()
+
+        # Validate required fields
+        if not signup_data or not signup_data.get('email'):
+            return jsonify({'success': False, 'error': 'Email address is required'})
+
+        # Add to waitlist using the waitlist manager
+        result = waitlist_manager.add_to_waitlist(signup_data)
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Server error: {str(e)}'})
