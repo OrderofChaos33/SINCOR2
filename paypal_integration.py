@@ -12,6 +12,10 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class PaymentStatus(Enum):
     PENDING = "pending"
@@ -366,33 +370,36 @@ class SINCORPaymentProcessor:
     
     async def process_agent_subscription(self, monthly_amount: float, client_email: str,
                                        agent_type: str = "standard") -> Dict[str, Any]:
-        """Process subscription for agent services"""
-        
-        # Note: This requires pre-created PayPal subscription plans
-        # You would create these in your PayPal dashboard
-        plan_mapping = {
-            'micro_scout': 'P-MICRO-PLAN-ID',
-            'nano_analyzer': 'P-NANO-PLAN-ID', 
-            'standard': 'P-STANDARD-PLAN-ID',
-            'premium': 'P-PREMIUM-PLAN-ID',
-            'swarm_coordinator': 'P-SWARM-PLAN-ID'
-        }
-        
-        plan_id = plan_mapping.get(agent_type, 'P-STANDARD-PLAN-ID')
-        
-        result = await self.paypal.create_subscription(plan_id, client_email)
-        
-        # Log subscription
+        """Process subscription for agent services (annual upfront payment)"""
+
+        # Convert to annual upfront payment (12 months prepaid)
+        annual_amount = monthly_amount * 12
+
+        order_id = f"AGENT-{agent_type.upper()}-ANNUAL-{int(datetime.now().timestamp())}"
+
+        payment_request = PaymentRequest(
+            amount=annual_amount,
+            currency="USD",
+            description=f"SINCOR Agent Service - {agent_type.title()} (12 months prepaid)",
+            customer_email=client_email,
+            order_id=order_id
+        )
+
+        result = await self.paypal.create_payment(payment_request)
+
+        # Log subscription as one-time annual payment
         subscription_log = {
             'timestamp': datetime.now().isoformat(),
-            'service_type': 'agent_subscription',
+            'service_type': 'agent_subscription_annual',
             'monthly_amount': monthly_amount,
+            'annual_amount': annual_amount,
             'agent_type': agent_type,
             'client_email': client_email,
-            'subscription_id': result.get('id', ''),
-            'status': result.get('status', 'pending')
+            'payment_id': result.payment_id,
+            'status': result.status.value,
+            'approval_url': result.approval_url
         }
-        
+
         self.payment_history.append(subscription_log)
         
         return result

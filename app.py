@@ -823,22 +823,6 @@ def monetization_status():
     })
 
 
-# ==================== AUTONOMOUS SALES FUNNEL ====================
-
-# Import autonomous routes
-try:
-    from auto_detailing_autonomous import add_autonomous_routes
-    add_autonomous_routes(app)
-    print("[AUTONOMOUS] Auto Detailing Media Pack routes loaded")
-
-    # Debug: List all routes to verify registration
-    print("[DEBUG] Checking autonomous routes:")
-    for rule in app.url_map.iter_rules():
-        if 'auto-detailing' in str(rule):
-            print(f"  - {rule}")
-except ImportError as e:
-    print(f"[WARN] Autonomous routes not available: {e}")
-
 # ==================== ERROR HANDLERS ====================
 
 @app.errorhandler(404)

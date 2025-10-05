@@ -14,6 +14,8 @@ import signal
 import sys
 
 from agent_orchestrator import AgentOrchestrator
+from monetization_engine import MonetizationEngine
+import asyncio
 
 
 class AutonomousScheduler:
@@ -31,6 +33,7 @@ class AutonomousScheduler:
     def __init__(self, interval_seconds: int = 300):
         self.interval_seconds = interval_seconds
         self.orchestrator = AgentOrchestrator()
+        self.monetization_engine = MonetizationEngine()
         self.running = False
         self.thread = None
 
@@ -39,6 +42,8 @@ class AutonomousScheduler:
             'cycles_completed': 0,
             'total_tasks_generated': 0,
             'total_outputs_created': 0,
+            'total_revenue_generated': 0.0,
+            'total_deals_closed': 0,
             'start_time': None,
             'last_cycle_time': None,
             'errors': 0
@@ -228,6 +233,9 @@ class AutonomousScheduler:
                 print(f"  Tasks: {results['tasks_executed']}")
                 print(f"  Outputs: {results['outputs_generated']}")
                 print(f"  Success rate: {results['success_rate']}%")
+                print(f"  Revenue: ${results.get('revenue_generated', 0):,.2f}")
+                print(f"  Deals: {results.get('deals_closed', 0)}")
+                print(f"  Total revenue: ${self.stats['total_revenue_generated']:,.2f}")
 
                 # Sleep until next cycle
                 sleep_time = max(0, self.interval_seconds - cycle_duration)
@@ -245,6 +253,32 @@ class AutonomousScheduler:
         tasks_executed = 0
         outputs_generated = 0
         successful = 0
+        revenue_generated = 0.0
+        deals_closed = 0
+
+        # Execute monetization strategy first (agents pursue revenue)
+        try:
+            print("\n  [REVENUE] Executing monetization strategy...")
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(
+                self.monetization_engine.execute_monetization_strategy(max_concurrent_opportunities=50)
+            )
+            loop.close()
+
+            revenue_generated = result.get('execution_summary', {}).get('total_revenue', 0.0)
+            deals_closed_count = sum(
+                stream_data.get('deals_closed', 0)
+                for stream_data in result.get('revenue_stream_performance', {}).values()
+            )
+            deals_closed = deals_closed_count
+
+            self.stats['total_revenue_generated'] += revenue_generated
+            self.stats['total_deals_closed'] += deals_closed
+
+            print(f"  [REVENUE] ${revenue_generated:,.2f} generated, {deals_closed} deals closed")
+        except Exception as e:
+            print(f"  [REVENUE ERROR] {e}")
 
         # Select tasks for this cycle (rotate through templates)
         cycle_offset = self.stats['cycles_completed'] % len(self.task_templates)
@@ -283,7 +317,9 @@ class AutonomousScheduler:
         return {
             'tasks_executed': tasks_executed,
             'outputs_generated': outputs_generated,
-            'success_rate': round(success_rate, 1)
+            'success_rate': round(success_rate, 1),
+            'revenue_generated': revenue_generated,
+            'deals_closed': deals_closed
         }
 
     def _save_stats(self):

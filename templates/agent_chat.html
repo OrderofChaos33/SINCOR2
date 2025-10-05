@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Agent Chat Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar - Agent Selector */
+        .sidebar {
+            width: 320px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 30px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-header p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9em;
+        }
+
+        .agent-filter {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .agent-filter select {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+
+        .agent-filter select option {
+            background: #1a1a2e;
+            color: white;
+        }
+
+        .agent-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .agent-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .agent-card:hover {
+            background: rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+
+        .agent-card.active {
+            background: rgba(102, 126, 234, 0.3);
+            border-color: #667eea;
+        }
+
+        .agent-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .agent-name {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #667eea;
+        }
+
+        .agent-badge {
+            background: rgba(102, 126, 234, 0.3);
+            color: #667eea;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+
+        .agent-description {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85em;
+            line-height: 1.4;
+        }
+
+        /* Main Chat Area */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-header h2 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message {
+            display: flex;
+            gap: 15px;
+            max-width: 80%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .message.agent .message-avatar {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+        }
+
+        .message-content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .message-header {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .message-time {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.9em;
+        }
+
+        .message-text {
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 5px;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            width: fit-content;
+        }
+
+        .typing-indicator.active {
+            display: flex;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.6);
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+            30% {
+                opacity: 1;
+                transform: translateY(-10px);
+            }
+        }
+
+        .chat-input-area {
+            padding: 25px 30px;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            color: white;
+            font-size: 1em;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .chat-input:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #667eea;
+        }
+
+        .chat-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .send-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            font-size: 1.3em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .send-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 60px 40px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .welcome-message h3 {
+            font-size: 2em;
+            margin-bottom: 15px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .welcome-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>🤖 SINCOR Agents</h1>
+                <p>43 AI agents ready to assist</p>
+            </div>
+
+            <div class="agent-filter">
+                <select id="archetype-filter" onchange="filterAgents()">
+                    <option value="">All Archetypes</option>
+                    <option value="Director">Director (CEO/Leadership)</option>
+                    <option value="Scout">Scout (Research)</option>
+                    <option value="Synthesizer">Synthesizer (Analysis)</option>
+                    <option value="Builder">Builder (Development)</option>
+                    <option value="Negotiator">Negotiator (Communication)</option>
+                    <option value="Caretaker">Caretaker (Maintenance)</option>
+                    <option value="Auditor">Auditor (Quality)</option>
+                </select>
+            </div>
+
+            <div class="agent-list" id="agent-list">
+                <!-- Agents will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-area">
+            <div class="chat-header">
+                <h2 id="chat-agent-name">Select an Agent</h2>
+                <p id="chat-agent-description">Choose an agent from the sidebar to start chatting</p>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+                <div class="welcome-message">
+                    <div class="welcome-icon">💬</div>
+                    <h3>Welcome to SINCOR Agent Chat</h3>
+                    <p>Select an agent from the sidebar to begin your conversation.<br>
+                    Each agent has unique expertise and personality.</p>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="chat-input-container">
+                    <input
+                        type="text"
+                        class="chat-input"
+                        id="message-input"
+                        placeholder="Type your message..."
+                        onkeypress="handleKeyPress(event)"
+                        disabled
+                    >
+                    <button class="send-button" id="send-button" onclick="sendMessage()" disabled>
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAgent = null;
+        let agents = [];
+        let conversationHistory = [];
+
+        // Load agents on page load
+        async function loadAgents() {
+            try {
+                const response = await fetch('/api/agents/list');
+                const data = await response.json();
+
+                if (data.success) {
+                    agents = data.agents;
+                    renderAgentList(agents);
+                }
+            } catch (error) {
+                console.error('Error loading agents:', error);
+            }
+        }
+
+        // Render agent list
+        function renderAgentList(agentList) {
+            const listEl = document.getElementById('agent-list');
+            listEl.innerHTML = agentList.map(agent => `
+                <div class="agent-card ${currentAgent?.id === agent.id ? 'active' : ''}"
+                     onclick="selectAgent('${agent.id}')">
+                    <div class="agent-card-header">
+                        <span class="agent-name">${agent.name}</span>
+                        <span class="agent-badge">${agent.archetype}</span>
+                    </div>
+                    <div class="agent-description">
+                        ${getAgentDescription(agent)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Get agent description based on archetype
+        function getAgentDescription(agent) {
+            const descriptions = {
+                'Director': 'Strategic leadership and decision-making',
+                'Scout': 'Research and intelligence gathering',
+                'Synthesizer': 'Analysis and summarization',
+                'Builder': 'Development and implementation',
+                'Negotiator': 'Communication and collaboration',
+                'Caretaker': 'Maintenance and organization',
+                'Auditor': 'Quality assurance and validation'
+            };
+            return descriptions[agent.archetype] || 'AI assistant';
+        }
+
+        // Filter agents by archetype
+        function filterAgents() {
+            const filterValue = document.getElementById('archetype-filter').value;
+            const filteredAgents = filterValue
+                ? agents.filter(a => a.archetype === filterValue)
+                : agents;
+            renderAgentList(filteredAgents);
+        }
+
+        // Select an agent
+        async function selectAgent(agentId) {
+            currentAgent = agents.find(a => a.id === agentId);
+
+            if (currentAgent) {
+                // Update header
+                document.getElementById('chat-agent-name').textContent = currentAgent.name;
+                document.getElementById('chat-agent-description').textContent =
+                    `${currentAgent.archetype} • ${getAgentDescription(currentAgent)}`;
+
+                // Clear messages and reset conversation
+                conversationHistory = [];
+                const messagesEl = document.getElementById('chat-messages');
+                messagesEl.innerHTML = '';
+
+                // Enable input
+                document.getElementById('message-input').disabled = false;
+                document.getElementById('message-input').placeholder = `Chat with ${currentAgent.name}...`;
+                document.getElementById('send-button').disabled = false;
+
+                // Update active state
+                renderAgentList(agents.filter(a =>
+                    document.getElementById('archetype-filter').value === '' ||
+                    a.archetype === document.getElementById('archetype-filter').value
+                ));
+
+                // Add welcome message from agent
+                addAgentMessage(`Hello! I'm ${currentAgent.name}, a ${currentAgent.archetype} agent. How can I assist you today?`);
+            }
+        }
+
+        // Send message
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+
+            if (!message || !currentAgent) return;
+
+            // Add user message to UI
+            addUserMessage(message);
+            input.value = '';
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            // Send to backend
+            try {
+                const response = await fetch('/api/agents/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        agent_id: currentAgent.id,
+                        message: message,
+                        conversation_history: conversationHistory
+                    })
+                });
+
+                const data = await response.json();
+
+                hideTypingIndicator();
+
+                if (data.success) {
+                    addAgentMessage(data.response);
+
+                    // Update conversation history
+                    conversationHistory.push({
+                        role: 'user',
+                        content: message
+                    });
+                    conversationHistory.push({
+                        role: 'assistant',
+                        content: data.response
+                    });
+                } else {
+                    addAgentMessage('Sorry, I encountered an error. Please try again.');
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                console.error('Error sending message:', error);
+                addAgentMessage('Sorry, I am having trouble connecting. Please try again.');
+            }
+        }
+
+        // Add user message to chat
+        function addUserMessage(text) {
+            const messagesEl = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message user';
+            messageDiv.innerHTML = `
+                <div class="message-avatar">👤</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        You <span class="message-time">${getCurrentTime()}</span>
+                    </div>
+                    <div class="message-text">${escapeHtml(text)}</div>
+                </div>
+            `;
+            messagesEl.appendChild(messageDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // Add agent message to chat
+        function addAgentMessage(text) {
+            const messagesEl = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message agent';
+            messageDiv.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        ${currentAgent.name} <span class="message-time">${getCurrentTime()}</span>
+                    </div>
+                    <div class="message-text">${formatAgentResponse(text)}</div>
+                </div>
+            `;
+            messagesEl.appendChild(messageDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const messagesEl = document.getElementById('chat-messages');
+            const indicator = document.createElement('div');
+            indicator.id = 'typing-indicator';
+            indicator.className = 'typing-indicator active';
+            indicator.innerHTML = `
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            `;
+            messagesEl.appendChild(indicator);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        // Hide typing indicator
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // Handle Enter key
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Get current time
+        function getCurrentTime() {
+            return new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Format agent response (preserve line breaks, bold, etc.)
+        function formatAgentResponse(text) {
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>')
+                .replace(/`(.*?)`/g, '<code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">$1</code>');
+        }
+
+        // Initialize
+        loadAgents();
+    </script>
+</body>
+</html>
