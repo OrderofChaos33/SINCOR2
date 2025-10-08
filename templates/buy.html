@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Buy SINCOR - Start Making Money Today</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
         * { font-family: 'Inter', sans-serif; }
@@ -288,7 +287,22 @@
         </a>
     </div>
 
+    <!-- Load PayPal SDK -->
+    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD"></script>
+
     <script>
+        // Wait for PayPal SDK to load
+        if (typeof paypal === 'undefined') {
+            console.error('PayPal SDK failed to load!');
+            document.querySelectorAll('[id^="paypal-"]').forEach(el => {
+                el.innerHTML = '<div class="text-center text-red-600 p-4 bg-red-50 rounded">Payment system loading error. Please refresh the page.</div>';
+            });
+        } else {
+            console.log('PayPal SDK loaded successfully');
+            renderButtons();
+        }
+
+        function renderButtons() {
         // Starter - $297/month
         paypal.Buttons({
             createOrder: function(data, actions) {
@@ -390,6 +404,7 @@
                 });
             }
         }).render('#paypal-growth');
+        }
     </script>
 </body>
 </html>
