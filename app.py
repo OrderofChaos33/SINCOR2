@@ -572,26 +572,29 @@ def buy():
 @app.route('/payment/success')
 @limiter.exempt if limiter else lambda f: f
 def payment_success():
-    """Payment success page - handles delivery after PayPal payment"""
-    # Get PayPal payment details from query params
-    payment_id = request.args.get('paymentId') or request.args.get('token')
-    payer_id = request.args.get('PayerID')
+    """Payment success page - handles complete delivery after PayPal payment"""
+    # Get PayPal order ID from query params
+    order_id = request.args.get('token')  # PayPal sends 'token' param with order ID
 
-    if payment_id and payer_id:
-        # Log the successful payment
-        print(f"✅ PAYMENT SUCCESSFUL - ID: {payment_id} - Payer: {payer_id}")
+    if order_id:
+        try:
+            # Import delivery system
+            from payment_delivery import delivery_system
 
-        # TODO: Implement actual delivery:
-        # 1. Verify payment with PayPal API
-        # 2. Create user account / activate subscription
-        # 3. Send welcome email with credentials
-        # 4. Activate AI agents for user's tier
-        # 5. Log to database for tracking
+            # Process complete delivery workflow
+            result = delivery_system.process_delivery(order_id)
 
-        # For now, just log it
-        with open('logs/payments.log', 'a') as f:
-            from datetime import datetime
-            f.write(f"{datetime.now().isoformat()} - Payment: {payment_id} - Payer: {payer_id}\n")
+            if result['success']:
+                print(f"✅ Delivery successful for order: {order_id}")
+                # Could pass customer data to template if needed
+                # return render_template('payment_success.html', customer=result['customer_data'])
+            else:
+                print(f"❌ Delivery failed: {result['message']}")
+
+        except Exception as e:
+            print(f"❌ Error in delivery process: {e}")
+            import traceback
+            traceback.print_exc()
 
     return render_template('payment_success.html')
 
