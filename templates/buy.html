@@ -287,44 +287,10 @@
         </a>
     </div>
 
-    <!-- Load PayPal SDK -->
-    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD"
-            data-sdk-integration-source="button-factory"
-            onload="initPayPalButtons()"
-            onerror="handlePayPalError()"></script>
+    <!-- Load PayPal SDK (SANDBOX MODE for testing) -->
+    <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD"></script>
 
     <script>
-        function handlePayPalError() {
-            console.error('❌ PayPal SDK script failed to load (network error or blocked)');
-            document.querySelectorAll('[id^="paypal-"]').forEach(el => {
-                el.innerHTML = '<div class="text-center text-red-600 p-4 bg-red-50 rounded text-sm">⚠️ Payment system blocked or unavailable.<br>Try: 1) Disable ad blocker 2) Refresh page 3) Use different browser</div>';
-            });
-        }
-
-        function initPayPalButtons() {
-            console.log('✅ PayPal SDK script loaded');
-
-            // Check if paypal object exists
-            if (typeof paypal === 'undefined') {
-                console.error('❌ PayPal SDK script loaded but paypal object is undefined!');
-                handlePayPalError();
-                return;
-            }
-
-            console.log('✅ paypal object exists, rendering buttons...');
-
-            try {
-                renderButtons();
-                console.log('✅ All buttons rendered successfully');
-            } catch (error) {
-                console.error('❌ Error rendering buttons:', error);
-                document.querySelectorAll('[id^="paypal-"]').forEach(el => {
-                    el.innerHTML = '<div class="text-center text-red-600 p-4 bg-red-50 rounded text-sm">Error: ' + error.message + '</div>';
-                });
-            }
-        }
-
-        function renderButtons() {
         // Starter - $297/month
         paypal.Buttons({
             createOrder: function(data, actions) {
@@ -426,7 +392,6 @@
                 });
             }
         }).render('#paypal-growth');
-        }
     </script>
 </body>
 </html>
