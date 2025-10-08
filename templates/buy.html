@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buy SINCOR - Instant Access</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .pulse-glow {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.8); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 min-h-screen">
+    <!-- Header -->
+    <nav class="bg-black bg-opacity-50 backdrop-blur-sm border-b border-blue-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                        <span class="text-white font-bold text-lg">S</span>
+                    </div>
+                    <span class="text-xl font-bold text-white">SINCOR</span>
+                </div>
+                <a href="/" class="text-blue-400 hover:text-blue-300 font-medium">← Back to Home</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <!-- Header -->
+        <div class="text-center mb-16">
+            <h1 class="text-5xl md:text-6xl font-bold text-white mb-6">
+                Get Instant Access to SINCOR
+            </h1>
+            <p class="text-xl text-blue-300 max-w-3xl mx-auto">
+                Choose your plan and start automating your business today. 42 AI agents ready to work for you.
+            </p>
+        </div>
+
+        <!-- Pricing Options -->
+        <div class="grid md:grid-cols-2 gap-8 mb-16">
+            <!-- Monthly Subscriptions -->
+            <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border-2 border-blue-500">
+                <div class="text-center mb-8">
+                    <div class="inline-block px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-bold mb-4">
+                        MONTHLY PLANS
+                    </div>
+                    <h2 class="text-3xl font-bold text-white mb-2">Subscription Access</h2>
+                    <p class="text-blue-300">Cancel anytime, full feature access</p>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Starter Plan -->
+                    <div class="bg-gray-800 rounded-xl p-6 hover:bg-gray-750 transition-all cursor-pointer border-2 border-transparent hover:border-green-500" onclick="buyPlan('starter', 297)">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Starter</h3>
+                                <p class="text-sm text-gray-400">Perfect for small businesses</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold text-green-400">$297</div>
+                                <div class="text-sm text-gray-400">/month</div>
+                            </div>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-300 mb-4">
+                            <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> 10 active agents</li>
+                            <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> 5,000 tasks/month</li>
+                            <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> Email support</li>
+                        </ul>
+                        <button class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors">
+                            Buy Starter Plan
+                        </button>
+                    </div>
+
+                    <!-- Professional Plan -->
+                    <div class="bg-gray-800 rounded-xl p-6 hover:bg-gray-750 transition-all cursor-pointer border-2 border-blue-500 pulse-glow" onclick="buyPlan('professional', 997)">
+                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                            <span class="bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-bold">MOST POPULAR</span>
+                        </div>
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Professional</h3>
+                                <p class="text-sm text-gray-400">For growing businesses</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold text-blue-400">$997</div>
+                                <div class="text-sm text-gray-400">/month</div>
+                            </div>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-300 mb-4">
+                            <li class="flex items-center"><span class="text-blue-400 mr-2">✓</span> 30 active agents</li>
+                            <li class="flex items-center"><span class="text-blue-400 mr-2">✓</span> 50,000 tasks/month</li>
+                            <li class="flex items-center"><span class="text-blue-400 mr-2">✓</span> Priority support</li>
+                            <li class="flex items-center"><span class="text-blue-400 mr-2">✓</span> Advanced integrations</li>
+                        </ul>
+                        <button class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                            Buy Professional Plan
+                        </button>
+                    </div>
+
+                    <!-- Enterprise Plan -->
+                    <div class="bg-gray-800 rounded-xl p-6 hover:bg-gray-750 transition-all cursor-pointer border-2 border-transparent hover:border-purple-500" onclick="buyPlan('enterprise', 2997)">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Enterprise</h3>
+                                <p class="text-sm text-gray-400">Unlimited power</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold text-purple-400">$2,997</div>
+                                <div class="text-sm text-gray-400">/month</div>
+                            </div>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-300 mb-4">
+                            <li class="flex items-center"><span class="text-purple-400 mr-2">✓</span> All 42 agents</li>
+                            <li class="flex items-center"><span class="text-purple-400 mr-2">✓</span> Unlimited tasks</li>
+                            <li class="flex items-center"><span class="text-purple-400 mr-2">✓</span> Dedicated support</li>
+                            <li class="flex items-center"><span class="text-purple-400 mr-2">✓</span> Custom integrations</li>
+                        </ul>
+                        <button class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-colors">
+                            Buy Enterprise Plan
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- One-Time Services -->
+            <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 border-2 border-green-500">
+                <div class="text-center mb-8">
+                    <div class="inline-block px-4 py-2 bg-green-600 text-white rounded-full text-sm font-bold mb-4">
+                        ONE-TIME SERVICES
+                    </div>
+                    <h2 class="text-3xl font-bold text-white mb-2">Instant Delivery</h2>
+                    <p class="text-green-300">Delivered within 24 hours</p>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- BI Report -->
+                    <div class="bg-gray-800 rounded-xl p-6 hover:bg-gray-750 transition-all cursor-pointer border-2 border-transparent hover:border-green-500" onclick="buyService('bi_report', 97)">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Business Intelligence Report</h3>
+                                <p class="text-sm text-gray-400">10-minute delivery</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold text-green-400">$97</div>
+                            </div>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-300 mb-4">
+                            <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> Market analysis</li>
+                            <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> Growth recommendations</li>
+                            <li class="flex items-center"><span class="text-green-400 mr-2">✓</span> PDF report</li>
+                        </ul>
+                        <button class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors">
+                            Buy BI Report - $97
+                        </button>
+                    </div>
+
+                    <!-- Competitive Analysis -->
+                    <div class="bg-gray-800 rounded-xl p-6 hover:bg-gray-750 transition-all cursor-pointer border-2 border-transparent hover:border-yellow-500" onclick="buyService('competitive_analysis', 147)">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Competitive Analysis</h3>
+                                <p class="text-sm text-gray-400">Same-day delivery</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold text-yellow-400">$147</div>
+                            </div>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-300 mb-4">
+                            <li class="flex items-center"><span class="text-yellow-400 mr-2">✓</span> 3 competitors analyzed</li>
+                            <li class="flex items-center"><span class="text-yellow-400 mr-2">✓</span> Strategic positioning</li>
+                            <li class="flex items-center"><span class="text-yellow-400 mr-2">✓</span> Actionable insights</li>
+                        </ul>
+                        <button class="w-full bg-yellow-600 text-white py-3 rounded-lg font-bold hover:bg-yellow-700 transition-colors">
+                            Buy Analysis - $147
+                        </button>
+                    </div>
+
+                    <!-- Growth Forecast -->
+                    <div class="bg-gray-800 rounded-xl p-6 hover:bg-gray-750 transition-all cursor-pointer border-2 border-transparent hover:border-blue-500" onclick="buyService('growth_forecast', 247)">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <h3 class="text-xl font-bold text-white">90-Day Growth Forecast</h3>
+                                <p class="text-sm text-gray-400">24-hour delivery</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-3xl font-bold text-blue-400">$247</div>
+                            </div>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-300 mb-4">
+                            <li class="flex items-center"><span class="text-blue-400 mr-2">✓</span> Revenue projections</li>
+                            <li class="flex items-center"><span class="text-blue-400 mr-2">✓</span> Growth opportunities</li>
+                            <li class="flex items-center"><span class="text-blue-400 mr-2">✓</span> Risk assessment</li>
+                        </ul>
+                        <button class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                            Buy Forecast - $247
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="bg-gray-800 rounded-xl p-8 text-center">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="text-4xl mb-2">🔒</div>
+                    <div class="text-white font-bold">Secure Payment</div>
+                    <div class="text-gray-400 text-sm">PayPal protected</div>
+                </div>
+                <div>
+                    <div class="text-4xl mb-2">⚡</div>
+                    <div class="text-white font-bold">Instant Access</div>
+                    <div class="text-gray-400 text-sm">Start immediately</div>
+                </div>
+                <div>
+                    <div class="text-4xl mb-2">💯</div>
+                    <div class="text-white font-bold">Money-Back</div>
+                    <div class="text-gray-400 text-sm">30-day guarantee</div>
+                </div>
+                <div>
+                    <div class="text-4xl mb-2">🎯</div>
+                    <div class="text-white font-bold">Full Support</div>
+                    <div class="text-gray-400 text-sm">We're here to help</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 border-2 border-blue-500">
+            <h3 class="text-2xl font-bold text-white mb-4" id="modalTitle">Processing Payment...</h3>
+            <div class="mb-6">
+                <div id="paymentInfo" class="text-gray-300"></div>
+            </div>
+            <div id="paymentButtons" class="space-y-4"></div>
+            <button onclick="closeModal()" class="w-full mt-4 bg-gray-700 text-white py-3 rounded-lg font-bold hover:bg-gray-600 transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Product/Service definitions
+        const products = {
+            // Subscriptions
+            starter: { name: 'Starter Plan', price: 297, type: 'subscription', interval: 'monthly' },
+            professional: { name: 'Professional Plan', price: 997, type: 'subscription', interval: 'monthly' },
+            enterprise: { name: 'Enterprise Plan', price: 2997, type: 'subscription', interval: 'monthly' },
+
+            // One-time services
+            bi_report: { name: 'Business Intelligence Report', price: 97, type: 'one-time', delivery: '10 minutes' },
+            competitive_analysis: { name: 'Competitive Analysis', price: 147, type: 'one-time', delivery: 'same day' },
+            growth_forecast: { name: '90-Day Growth Forecast', price: 247, type: 'one-time', delivery: '24 hours' }
+        };
+
+        function buyPlan(planId, price) {
+            const product = products[planId];
+            showPaymentModal(product);
+        }
+
+        function buyService(serviceId, price) {
+            const product = products[serviceId];
+            showPaymentModal(product);
+        }
+
+        function showPaymentModal(product) {
+            const modal = document.getElementById('paymentModal');
+            const title = document.getElementById('modalTitle');
+            const info = document.getElementById('paymentInfo');
+            const buttons = document.getElementById('paymentButtons');
+
+            title.textContent = `Buy ${product.name}`;
+
+            let infoHTML = `
+                <div class="mb-4">
+                    <div class="text-lg font-bold text-white mb-2">${product.name}</div>
+                    <div class="text-3xl font-bold text-green-400 mb-2">$${product.price}</div>
+            `;
+
+            if (product.type === 'subscription') {
+                infoHTML += `<div class="text-gray-400">Billed ${product.interval}</div>`;
+            } else {
+                infoHTML += `<div class="text-gray-400">Delivered in ${product.delivery}</div>`;
+            }
+
+            infoHTML += `</div>`;
+            info.innerHTML = infoHTML;
+
+            // Create payment button
+            buttons.innerHTML = `
+                <button onclick="processPayment('${Object.keys(products).find(key => products[key] === product)}', ${product.price}, '${product.name}')"
+                        class="w-full bg-blue-600 text-white py-4 rounded-lg font-bold hover:bg-blue-700 transition-colors text-lg">
+                    Pay with PayPal - $${product.price}
+                </button>
+                <div class="text-center text-sm text-gray-400 mt-2">
+                    Secure payment processed by PayPal
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('paymentModal').classList.add('hidden');
+        }
+
+        async function processPayment(productId, amount, description) {
+            try {
+                // Get JWT token (you'll need to implement login first, or make this endpoint public)
+                // For now, we'll try without auth - you can add auth later
+
+                const response = await fetch('/api/payment/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        // TODO: Add JWT token: 'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        amount: amount,
+                        currency: 'USD',
+                        description: description,
+                        customer_email: '',  // Can collect this in modal
+                        order_id: productId + '_' + Date.now(),
+                        return_url: window.location.origin + '/payment/success',
+                        cancel_url: window.location.origin + '/payment/cancel'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.approval_url) {
+                    // Redirect to PayPal
+                    window.location.href = result.approval_url;
+                } else {
+                    alert('Payment failed: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Payment error: ' + error.message);
+                console.error('Payment error:', error);
+            }
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - SINCOR</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-green-50 to-blue-50 min-h-screen flex items-center justify-center">
+    <div class="max-w-2xl mx-auto px-4 text-center">
+        <div class="bg-white rounded-2xl shadow-2xl p-12">
+            <!-- Success Icon -->
+            <div class="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+
+            <!-- Success Message -->
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">Payment Successful!</h1>
+            <p class="text-xl text-gray-600 mb-8">
+                Thank you for your purchase. Your payment has been processed successfully.
+            </p>
+
+            <!-- What Happens Next -->
+            <div class="bg-blue-50 rounded-xl p-6 mb-8 text-left">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">What happens next?</h2>
+                <div class="space-y-3">
+                    <div class="flex items-start">
+                        <span class="text-blue-600 font-bold mr-3">1.</span>
+                        <p class="text-gray-700">Check your email for access credentials and setup instructions</p>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-blue-600 font-bold mr-3">2.</span>
+                        <p class="text-gray-700">Your SINCOR agents will be activated within 5 minutes</p>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-blue-600 font-bold mr-3">3.</span>
+                        <p class="text-gray-700">Access your dashboard at /agent-steering to start managing your AI workforce</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-4 justify-center">
+                <a href="/agent-steering" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                    Go to Dashboard
+                </a>
+                <a href="/" class="bg-gray-200 text-gray-700 px-8 py-3 rounded-lg font-bold hover:bg-gray-300 transition-colors">
+                    Return Home
+                </a>
+            </div>
+
+            <!-- Support -->
+            <div class="mt-8 text-sm text-gray-500">
+                Need help? Contact us at <a href="mailto:support@getsincor.com" class="text-blue-600 underline">support@getsincor.com</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

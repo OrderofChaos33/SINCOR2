@@ -562,6 +562,20 @@ def pricing():
     return render_template('pricing.html')
 
 
+@app.route('/buy')
+@limiter.exempt if limiter else lambda f: f
+def buy():
+    """Direct purchase page with instant checkout"""
+    return render_template('buy.html')
+
+
+@app.route('/payment/success')
+@limiter.exempt if limiter else lambda f: f
+def payment_success():
+    """Payment success page"""
+    return render_template('payment_success.html')
+
+
 @app.route('/privacy')
 @limiter.exempt if limiter else lambda f: f
 def privacy():
@@ -696,15 +710,13 @@ def test_environment():
 # ==================== PAYMENT ROUTES (PROTECTED + RATE LIMITED) ====================
 
 @app.route('/api/payment/create', methods=['POST'])
-@jwt_required()
 @limiter.limit(PAYMENT_LIMITS) if limiter else lambda f: f
 def create_payment():
-    """Create a PayPal payment (PROTECTED + RATE LIMITED + VALIDATED)"""
+    """Create a PayPal payment (PUBLIC + RATE LIMITED + VALIDATED) - Removed JWT requirement for public checkout"""
     if not PAYPAL_AVAILABLE:
         return jsonify({'error': 'PayPal integration not available'}), 503
 
     try:
-        current_user = get_jwt_identity()
         payment_data = request.get_json()
 
         # SECURITY: Validate input using Pydantic model
@@ -728,7 +740,7 @@ def create_payment():
         # Process payment synchronously
         result = paypal_processor.create_payment_sync(payment_request)
 
-        print(f"Payment created by: {current_user} - Amount: ${payment_data['amount']}")
+        print(f"Payment created - Amount: ${payment_data['amount']} - Product: {payment_data['description']}")
 
         return jsonify({
             'success': result.success,
