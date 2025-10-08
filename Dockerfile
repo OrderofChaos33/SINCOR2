@@ -17,5 +17,5 @@ RUN mkdir -p logs outputs data
 # Expose Railway port
 EXPOSE 8080
 
-# Run the master SINCOR application
-CMD ["python", "app.py"]
+# Run with production WSGI server (Gunicorn)
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
