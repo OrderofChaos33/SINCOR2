@@ -572,7 +572,27 @@ def buy():
 @app.route('/payment/success')
 @limiter.exempt if limiter else lambda f: f
 def payment_success():
-    """Payment success page"""
+    """Payment success page - handles delivery after PayPal payment"""
+    # Get PayPal payment details from query params
+    payment_id = request.args.get('paymentId') or request.args.get('token')
+    payer_id = request.args.get('PayerID')
+
+    if payment_id and payer_id:
+        # Log the successful payment
+        print(f"✅ PAYMENT SUCCESSFUL - ID: {payment_id} - Payer: {payer_id}")
+
+        # TODO: Implement actual delivery:
+        # 1. Verify payment with PayPal API
+        # 2. Create user account / activate subscription
+        # 3. Send welcome email with credentials
+        # 4. Activate AI agents for user's tier
+        # 5. Log to database for tracking
+
+        # For now, just log it
+        with open('logs/payments.log', 'a') as f:
+            from datetime import datetime
+            f.write(f"{datetime.now().isoformat()} - Payment: {payment_id} - Payer: {payer_id}\n")
+
     return render_template('payment_success.html')
 
 
