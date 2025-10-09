@@ -291,7 +291,6 @@
     <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD"></script>
 
     <script>
-        window.addEventListener('load', function() {
         // Starter - $297/month
         paypal.Buttons({
             createOrder: function(data, actions) {
@@ -393,7 +392,6 @@
                 });
             }
         }).render('#paypal-growth');
-        }); // End window.addEventListener
     </script>
 </body>
 </html>
