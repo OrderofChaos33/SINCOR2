@@ -1,0 +1,38 @@
+name: detailers-run
+on:
+  push:
+  schedule:
+    - cron: "30 3 * * *"  # nightly 03:30 UTC
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r auto_detailers_us/requirements.txt
+      - name: Write credentials file
+        run: |
+          mkdir -p auto_detailers_us/secrets
+          echo "${{ secrets.GOOGLE_SHEETS_CREDENTIALS_JSON }}" > auto_detailers_us/secrets/credentials.json
+      - name: Run pipeline
+        working-directory: auto_detailers_us
+        env:
+          GOOGLE_PLACES_KEY: ${{ secrets.GOOGLE_PLACES_KEY }}
+          YELP_API_KEY: ${{ secrets.YELP_API_KEY }}
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SHEETS_WORKSHEET: ${{ secrets.GOOGLE_SHEETS_WORKSHEET }}
+        run: |
+          python main.py --region us_conus --cells 3500 --radius_m 20000 --max_per_cell 100
+          python tools/push_to_sheets.py --csv output/auto_detailers_us.csv || true
+      - name: Upload CSV artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto_detailers_us_csv
+          path: auto_detailers_us/output/auto_detailers_us.csv
