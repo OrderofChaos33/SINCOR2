@@ -237,6 +237,16 @@ def pricing():
     """Pricing plans page"""
     return render_template('pricing.html')
 
+@app.route('/buy')
+def buy():
+    """Buy SINCOR - checkout page with PayPal integration"""
+    return render_template('buy.html')
+
+@app.route('/success')
+def success():
+    """Purchase success page"""
+    return render_template('success.html')
+
 @app.route('/privacy')
 def privacy():
     """Privacy policy page"""
