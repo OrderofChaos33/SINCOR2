@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR - AI Agent Command Center</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .dashboard-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+        }
+
+        .dashboard-card.primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .dashboard-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .dashboard-description {
+            font-size: 1.05em;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+
+        .dashboard-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .primary .dashboard-badge {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .features {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .primary .features {
+            border-top-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .features ul {
+            list-style: none;
+            font-size: 0.95em;
+        }
+
+        .features li {
+            margin: 8px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .primary .features li:before {
+            color: #fff;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+        }
+
+        .footer a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+
+        .footer a:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 SINCOR</h1>
+            <p>Autonomous AI Agent Command Center</p>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Agent Steering - Primary -->
+            <a href="/agent-steering" class="dashboard-card primary">
+                <div class="dashboard-icon">🎯</div>
+                <div class="dashboard-title">Agent Steering</div>
+                <div class="dashboard-description">
+                    Steer autonomous agents like a CEO. Send strategic directives, control autonomy levels, and guide decisions in real-time.
+                </div>
+                <div class="dashboard-badge">⭐ RECOMMENDED</div>
+                <div class="features">
+                    <ul>
+                        <li>Strategic directive system</li>
+                        <li>Autonomy control (0-100%)</li>
+                        <li>Real-time activity log</li>
+                        <li>Pause/resume/override controls</li>
+                    </ul>
+                </div>
+            </a>
+
+            <!-- Agent Chat -->
+            <a href="/agent-chat" class="dashboard-card">
+                <div class="dashboard-icon">💬</div>
+                <div class="dashboard-title">Agent Chat</div>
+                <div class="dashboard-description">
+                    Have direct conversations with any of the 43 AI agents. Each agent has unique expertise and personality.
+                </div>
+                <div class="dashboard-badge">INTERACTIVE</div>
+                <div class="features">
+                    <ul>
+                        <li>1-on-1 conversations</li>
+                        <li>Filter by archetype</li>
+                        <li>Claude API powered</li>
+                        <li>Context-aware responses</li>
+                    </ul>
+                </div>
+            </a>
+
+            <!-- Agent Observability -->
+            <a href="/agent-observability" class="dashboard-card">
+                <div class="dashboard-icon">📊</div>
+                <div class="dashboard-title">Agent Observability</div>
+                <div class="dashboard-description">
+                    Monitor agent performance, interactions, and analytics. See what your autonomous workforce is doing.
+                </div>
+                <div class="dashboard-badge">ANALYTICS</div>
+                <div class="features">
+                    <ul>
+                        <li>Performance charts</li>
+                        <li>Interaction network graph</li>
+                        <li>24-hour activity timeline</li>
+                        <li>Success rate tracking</li>
+                    </ul>
+                </div>
+            </a>
+
+            <!-- System Dashboard -->
+            <a href="/dashboard" class="dashboard-card">
+                <div class="dashboard-icon">⚙️</div>
+                <div class="dashboard-title">System Dashboard</div>
+                <div class="dashboard-description">
+                    System control center with real-time metrics, security status, and quick action controls.
+                </div>
+                <div class="dashboard-badge">OPERATIONS</div>
+                <div class="features">
+                    <ul>
+                        <li>CPU & memory monitoring</li>
+                        <li>Security status</li>
+                        <li>Quick action buttons</li>
+                        <li>Live activity feed</li>
+                    </ul>
+                </div>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>SINCOR Autonomous AI Platform • 43 Agents • 7 Archetypes</p>
+            <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.7;">
+                <a href="/agent-steering">Agent Steering</a> |
+                <a href="/agent-chat">Agent Chat</a> |
+                <a href="/agent-observability">Observability</a> |
+                <a href="/health">System Health</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

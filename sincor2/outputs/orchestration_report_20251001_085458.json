@@ -1,0 +1,102 @@
+{
+  "report_id": "orchestration_report_20251001_085458",
+  "timestamp": "2025-10-01T08:54:58.250373",
+  "system_status": {
+    "total_agents": 43,
+    "total_archetypes": 7,
+    "total_tasks_processed": 5,
+    "outputs_generated": 11
+  },
+  "agent_summary": {
+    "total_agents": 43,
+    "total_archetypes": 7,
+    "active_tasks": 5,
+    "agents_list": [
+      "E-achernar-16",
+      "E-acrux-23",
+      "E-aldebaran-12",
+      "E-alioth-33",
+      "E-alkaid-28",
+      "E-almaak-40",
+      "E-alphard-37",
+      "E-alpheratz-38",
+      "E-altair-04",
+      "E-antares-13"
+    ],
+    "archetypes_list": [
+      "Auditor",
+      "Builder",
+      "Caretaker",
+      "Director",
+      "Negotiator",
+      "Scout",
+      "Synthesizer"
+    ]
+  },
+  "recent_tasks": [
+    {
+      "task_id": "task_1",
+      "task_type": "analysis",
+      "assigned_agent": "E-alioth-33",
+      "archetype": "Auditor",
+      "status": "assigned",
+      "created_at": "2025-10-01T08:54:58.125253",
+      "task_data": {
+        "target": "customer_engagement",
+        "timeframe": "30d"
+      }
+    },
+    {
+      "task_id": "task_2",
+      "task_type": "creation",
+      "assigned_agent": "E-achernar-16",
+      "archetype": "Builder",
+      "status": "assigned",
+      "created_at": "2025-10-01T08:54:58.151989",
+      "task_data": {
+        "content_type": "marketing_copy",
+        "audience": "B2B"
+      }
+    },
+    {
+      "task_id": "task_3",
+      "task_type": "research",
+      "assigned_agent": "E-altair-04",
+      "archetype": "Scout",
+      "status": "assigned",
+      "created_at": "2025-10-01T08:54:58.173089",
+      "task_data": {
+        "topic": "market_trends",
+        "industry": "AI_automation"
+      }
+    },
+    {
+      "task_id": "task_4",
+      "task_type": "coordination",
+      "assigned_agent": "E-almaak-40",
+      "archetype": "Director",
+      "status": "assigned",
+      "created_at": "2025-10-01T08:54:58.196211",
+      "task_data": {
+        "teams": [
+          "sales",
+          "marketing",
+          "support"
+        ],
+        "goal": "Q4_campaign"
+      }
+    },
+    {
+      "task_id": "task_5",
+      "task_type": "sales",
+      "assigned_agent": "E-acrux-23",
+      "archetype": "Negotiator",
+      "status": "assigned",
+      "created_at": "2025-10-01T08:54:58.224979",
+      "task_data": {
+        "lead_score": 85,
+        "company_size": "enterprise"
+      }
+    }
+  ]
+}

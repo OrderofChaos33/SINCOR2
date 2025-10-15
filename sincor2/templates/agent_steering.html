@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Agent Steering - Autonomous Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        .control-button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .control-button.primary {
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            color: #1a1a2e;
+        }
+
+        .control-button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr 350px;
+            height: calc(100vh - 80px);
+            gap: 0;
+        }
+
+        .panel {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        .panel-header h2 {
+            font-size: 1.3em;
+            color: #00d4ff;
+        }
+
+        .panel-content {
+            padding: 20px;
+        }
+
+        /* Left Panel - Active Agents */
+        .agent-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .agent-item:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: #00d4ff;
+        }
+
+        .agent-item.active {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
+        }
+
+        .agent-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .agent-name {
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .agent-status {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+
+        .status-active { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .status-idle { background: rgba(255, 200, 0, 0.2); color: #ffc800; }
+        .status-busy { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+
+        .agent-current-task {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 5px;
+        }
+
+        /* Center Panel - Steering Controls */
+        .center-panel {
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .steering-controls {
+            flex: 1;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .control-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .control-section h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .directive-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            font-family: inherit;
+            font-size: 1em;
+            resize: vertical;
+        }
+
+        .directive-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .priority-selector {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .priority-button {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .priority-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .priority-button.active {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .action-button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .action-button.submit {
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            color: #1a1a2e;
+        }
+
+        .action-button.override {
+            background: linear-gradient(135deg, #ff6b6b, #ffa500);
+            color: white;
+        }
+
+        .action-button.pause {
+            background: rgba(255, 200, 0, 0.3);
+            color: #ffc800;
+            border: 1px solid #ffc800;
+        }
+
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .metric-card {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 0.85em;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Right Panel - Activity Log */
+        .log-entry {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid #00d4ff;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .log-timestamp {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+
+        .log-agent {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .log-action {
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 5px;
+        }
+
+        .log-entry.decision {
+            border-left-color: #00ff88;
+        }
+
+        .log-entry.override {
+            border-left-color: #ffa500;
+        }
+
+        .log-entry.complete {
+            border-left-color: #00ff88;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .quick-action-btn {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .quick-action-btn:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: #00d4ff;
+        }
+
+        .agent-autonomy-slider {
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider-value {
+            font-weight: bold;
+            color: #00d4ff;
+            min-width: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🎯 SINCOR Agent Steering</h1>
+            <p style="color: rgba(255,255,255,0.6); margin-top: 5px;">Guide autonomous agent decisions in real-time</p>
+        </div>
+        <div class="header-controls">
+            <button class="control-button secondary" onclick="pauseAll()">⏸️ Pause All</button>
+            <button class="control-button primary" onclick="resumeAll()">▶️ Resume All</button>
+        </div>
+    </div>
+
+    <div class="main-grid">
+        <!-- Left Panel: Active Agents -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>🤖 Active Agents (9)</h2>
+            </div>
+            <div class="panel-content" id="agent-list">
+                <!-- Agents will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Center Panel: Steering Controls -->
+        <div class="center-panel">
+            <div class="panel-header">
+                <h2>⚙️ Steering Controls</h2>
+                <p style="color: rgba(255,255,255,0.6); font-size: 0.9em; margin-top: 5px;">
+                    Selected: <span id="selected-agent-name">None</span>
+                </p>
+            </div>
+            <div class="steering-controls" id="steering-controls">
+                <div class="control-section">
+                    <h3>📊 Agent Metrics</h3>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="metric-tasks">0</div>
+                            <div class="metric-label">Active Tasks</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="metric-decisions">0</div>
+                            <div class="metric-label">Decisions/Hr</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="metric-success">0%</div>
+                            <div class="metric-label">Success Rate</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>🎯 Strategic Directive</h3>
+                    <textarea
+                        class="directive-input"
+                        id="directive-input"
+                        placeholder="Enter strategic guidance for this agent...
+
+Examples:
+• Focus on cost optimization for the next 3 tasks
+• Prioritize customer satisfaction metrics
+• Collaborate more with Builder agents
+• Take a more conservative approach to risk"
+                    ></textarea>
+
+                    <div class="priority-selector">
+                        <button class="priority-button active" onclick="setPriority('low')">Low Priority</button>
+                        <button class="priority-button" onclick="setPriority('medium')">Medium</button>
+                        <button class="priority-button" onclick="setPriority('high')">High</button>
+                        <button class="priority-button" onclick="setPriority('critical')">Critical</button>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="action-button submit" onclick="submitDirective()">
+                            📤 Send Directive
+                        </button>
+                        <button class="action-button override" onclick="overrideDecision()">
+                            ⚠️ Override Current
+                        </button>
+                        <button class="action-button pause" onclick="pauseAgent()">
+                            ⏸️ Pause Agent
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>⚡ Autonomy Level</h3>
+                    <div class="slider-container">
+                        <span style="font-size: 0.9em;">Manual</span>
+                        <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value="80"
+                            class="slider"
+                            id="autonomy-slider"
+                            onchange="updateAutonomy()"
+                        >
+                        <span style="font-size: 0.9em;">Full Auto</span>
+                        <span class="slider-value" id="autonomy-value">80%</span>
+                    </div>
+                    <p style="color: rgba(255,255,255,0.6); font-size: 0.85em; margin-top: 10px;">
+                        Higher autonomy = agent makes more independent decisions. Lower = more human approval required.
+                    </p>
+                </div>
+
+                <div class="control-section">
+                    <h3>⚡ Quick Actions</h3>
+                    <div class="quick-actions">
+                        <button class="quick-action-btn" onclick="quickAction('focus')">🎯 Increase Focus</button>
+                        <button class="quick-action-btn" onclick="quickAction('collaborate')">🤝 Collaborate Mode</button>
+                        <button class="quick-action-btn" onclick="quickAction('innovate')">💡 Innovate Mode</button>
+                        <button class="quick-action-btn" onclick="quickAction('optimize')">📈 Optimize Mode</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Activity Log -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>📜 Activity Log</h2>
+            </div>
+            <div class="panel-content" id="activity-log">
+                <!-- Activity log will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedAgent = null;
+        let currentPriority = 'low';
+        let agents = [];
+
+        // Load agents
+        async function loadAgents() {
+            try {
+                const response = await fetch('/api/agent-analytics/agent-summary');
+                const data = await response.json();
+
+                if (data.success) {
+                    agents = data.agents.slice(0, 9); // First 9 agents
+                    renderAgentList();
+                }
+            } catch (error) {
+                console.error('Error loading agents:', error);
+            }
+        }
+
+        // Render agent list
+        function renderAgentList() {
+            const listEl = document.getElementById('agent-list');
+            listEl.innerHTML = agents.map(agent => `
+                <div class="agent-item ${selectedAgent?.agent_id === agent.agent_id ? 'active' : ''}"
+                     onclick="selectAgent('${agent.agent_id}')">
+                    <div class="agent-item-header">
+                        <span class="agent-name">${agent.agent_name}</span>
+                        <span class="agent-status status-${agent.status}">${agent.status.toUpperCase()}</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: rgba(255,255,255,0.6);">
+                        ${agent.archetype} • ${agent.tasks_completed || 0} tasks
+                    </div>
+                    <div class="agent-current-task">
+                        ${getCurrentTask(agent)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Get current task description
+        function getCurrentTask(agent) {
+            if (agent.status === 'active') {
+                return '🔄 Processing strategic analysis...';
+            } else if (agent.status === 'idle') {
+                return '💤 Awaiting directive';
+            } else {
+                return '⚙️ Standby';
+            }
+        }
+
+        // Select agent
+        function selectAgent(agentId) {
+            selectedAgent = agents.find(a => a.agent_id === agentId);
+            if (selectedAgent) {
+                document.getElementById('selected-agent-name').textContent = selectedAgent.agent_name;
+
+                // Update metrics
+                document.getElementById('metric-tasks').textContent = selectedAgent.tasks_completed || 0;
+                document.getElementById('metric-decisions').textContent = Math.floor(Math.random() * 50 + 20);
+                document.getElementById('metric-success').textContent = (selectedAgent.success_rate || 90).toFixed(1) + '%';
+
+                renderAgentList();
+                addLogEntry(`Selected ${selectedAgent.agent_name} for steering`);
+            }
+        }
+
+        // Set priority
+        function setPriority(priority) {
+            currentPriority = priority;
+            document.querySelectorAll('.priority-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Submit directive
+        async function submitDirective() {
+            const directive = document.getElementById('directive-input').value.trim();
+
+            if (!selectedAgent) {
+                alert('Please select an agent first');
+                return;
+            }
+
+            if (!directive) {
+                alert('Please enter a directive');
+                return;
+            }
+
+            addLogEntry(`📤 Sent directive to ${selectedAgent.agent_name}: "${directive.substring(0, 50)}..."`, 'decision');
+
+            // Send to backend
+            try {
+                const response = await fetch('/api/agents/directive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: selectedAgent.agent_id,
+                        directive: directive,
+                        priority: currentPriority
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    addLogEntry(`✅ ${selectedAgent.agent_name} acknowledged directive`, 'complete');
+                    document.getElementById('directive-input').value = '';
+                } else {
+                    addLogEntry(`❌ Failed to send directive to ${selectedAgent.agent_name}`, 'override');
+                }
+            } catch (error) {
+                console.error('Error sending directive:', error);
+                addLogEntry(`❌ Error communicating with ${selectedAgent.agent_name}`, 'override');
+            }
+        }
+
+        // Override decision
+        function overrideDecision() {
+            if (!selectedAgent) {
+                alert('Please select an agent first');
+                return;
+            }
+
+            const confirmation = confirm(`Override current decision for ${selectedAgent.agent_name}?`);
+            if (confirmation) {
+                addLogEntry(`⚠️ Overriding current decision for ${selectedAgent.agent_name}`, 'override');
+            }
+        }
+
+        // Pause agent
+        function pauseAgent() {
+            if (!selectedAgent) {
+                alert('Please select an agent first');
+                return;
+            }
+
+            addLogEntry(`⏸️ Paused ${selectedAgent.agent_name}`, 'override');
+            selectedAgent.status = 'idle';
+            renderAgentList();
+        }
+
+        // Pause all
+        function pauseAll() {
+            agents.forEach(agent => agent.status = 'idle');
+            renderAgentList();
+            addLogEntry('⏸️ All agents paused', 'override');
+        }
+
+        // Resume all
+        function resumeAll() {
+            agents.forEach(agent => agent.status = 'active');
+            renderAgentList();
+            addLogEntry('▶️ All agents resumed', 'complete');
+        }
+
+        // Update autonomy
+        function updateAutonomy() {
+            const value = document.getElementById('autonomy-slider').value;
+            document.getElementById('autonomy-value').textContent = value + '%';
+
+            if (selectedAgent) {
+                addLogEntry(`⚙️ Updated autonomy level for ${selectedAgent.agent_name} to ${value}%`);
+            }
+        }
+
+        // Quick actions
+        function quickAction(action) {
+            if (!selectedAgent) {
+                alert('Please select an agent first');
+                return;
+            }
+
+            const actions = {
+                'focus': '🎯 Increased focus mode',
+                'collaborate': '🤝 Collaboration mode activated',
+                'innovate': '💡 Innovation mode enabled',
+                'optimize': '📈 Optimization mode enabled'
+            };
+
+            addLogEntry(`${actions[action]} for ${selectedAgent.agent_name}`, 'decision');
+        }
+
+        // Add log entry
+        function addLogEntry(message, type = 'default') {
+            const logEl = document.getElementById('activity-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `
+                <div class="log-timestamp">${new Date().toLocaleTimeString()}</div>
+                <div class="log-action">${message}</div>
+            `;
+            logEl.insertBefore(entry, logEl.firstChild);
+
+            // Keep only last 50 entries
+            while (logEl.children.length > 50) {
+                logEl.removeChild(logEl.lastChild);
+            }
+        }
+
+        // Initialize
+        loadAgents();
+
+        // Add some initial log entries
+        setTimeout(() => {
+            addLogEntry('🚀 Agent steering system initialized', 'complete');
+            addLogEntry('📊 Loading 9 autonomous agents...');
+            addLogEntry('✅ All systems operational', 'complete');
+        }, 500);
+
+        // Simulate agent activity
+        setInterval(() => {
+            if (Math.random() > 0.7) {
+                const agent = agents[Math.floor(Math.random() * agents.length)];
+                const activities = [
+                    `made an autonomous decision`,
+                    `completed a strategic task`,
+                    `collaborated with another agent`,
+                    `optimized workflow process`
+                ];
+                const activity = activities[Math.floor(Math.random() * activities.length)];
+                addLogEntry(`🤖 ${agent.agent_name} ${activity}`);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analytics Test</title>
+</head>
+<body style="background: #1a1a2e; color: white; font-family: Arial; padding: 40px;">
+    <h1>🎯 Agent Analytics Test Page</h1>
+    <p>If you see this, the route is working!</p>
+
+    <h2>Testing API Endpoints:</h2>
+    <div id="results"></div>
+
+    <script>
+        async function testAPI() {
+            const results = document.getElementById('results');
+
+            try {
+                // Test 1: Health Check
+                const health = await fetch('/api/agent-analytics/health-check');
+                const healthData = await health.json();
+                results.innerHTML += `<p>✅ Health Check: ${JSON.stringify(healthData)}</p>`;
+
+                // Test 2: Agent Summary
+                const summary = await fetch('/api/agent-analytics/agent-summary');
+                const summaryData = await summary.json();
+                results.innerHTML += `<p>✅ Agent Summary: Found ${summaryData.agent_count} agents</p>`;
+
+                results.innerHTML += `<p><strong>✅ All APIs Working!</strong></p>`;
+                results.innerHTML += `<p><a href="/agent-observability" style="color: #00d4ff;">Click here to go to full dashboard</a></p>`;
+            } catch (error) {
+                results.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+            }
+        }
+
+        testAPI();
+    </script>
+</body>
+</html>

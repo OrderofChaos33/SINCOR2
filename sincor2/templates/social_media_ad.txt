@@ -1,0 +1,17 @@
+🚗 Attention {{ city }} Business Owners! 🚗
+
+Is your company vehicle sending the RIGHT message about {{ business_type | business_type_friendly }}?
+
+{{ hbpc.hooks | select_by_persona(persona) }}
+
+✨ Professional detailing that:
+{{ hbpc.benefits | select_by_persona(persona) }}
+
+🏆 {{ hbpc.proofs | select_by_persona(persona) }}
+
+💼 Special offer for {{ business_name }}:
+15% off first service + FREE assessment
+
+{{ hbpc.ctas | select_by_persona(persona) }}
+
+#{{ city }}Business #AutoDetailing #ProfessionalImage #{{ business_type.replace('_', '') }}

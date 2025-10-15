@@ -1,0 +1,194 @@
+2025-09-29 23:51:57,351 - __main__ - INFO - Waitlist system not available: No module named 'waitlist_system'
+[2025-09-29T23:51:57] Waitlist system not available: No module named 'waitlist_system'
+2025-09-29 23:51:57,351 - __main__ - INFO - Monetization modules not available: No module named 'monetization_engine'
+[2025-09-29T23:51:57] Monetization modules not available: No module named 'monetization_engine'
+2025-09-29 23:51:57,354 - __main__ - INFO - Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-29T23:51:57] Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-29T23:51:57] ✅ 42 AI Agents Platform
+[2025-09-29T23:51:57] ✅ Professional Admin System
+[2025-09-29T23:51:57] ⚠️ Monetization Engine Not Available
+[2025-09-29T23:51:57] ⚠️ PayPal Integration Not Available
+[2025-09-29T23:51:57] ⚠️ Waitlist System Not Available
+2025-09-29 23:51:57,384 - __main__ - INFO - PAID ONLY PLATFORM - No free trials or promotional codes
+[2025-09-29T23:51:57] PAID ONLY PLATFORM - No free trials or promotional codes
+2025-09-29 23:51:57,437 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.3:8080
+2025-09-29 23:51:57,437 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-29 23:55:12,512 - __main__ - INFO - Monetization modules not available: No module named 'dynamic_pricing_engine'
+[2025-09-29T23:55:12] Monetization modules not available: No module named 'dynamic_pricing_engine'
+2025-09-29 23:55:12,515 - __main__ - INFO - Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-29T23:55:12] Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-29T23:55:12] ✅ 42 AI Agents Platform
+[2025-09-29T23:55:12] ✅ Professional Admin System
+[2025-09-29T23:55:12] ⚠️ Monetization Engine Not Available
+[2025-09-29T23:55:12] ⚠️ PayPal Integration Not Available
+[2025-09-29T23:55:12] ✅ Waitlist System
+2025-09-29 23:55:12,522 - __main__ - INFO - PAID ONLY PLATFORM - No free trials or promotional codes
+[2025-09-29T23:55:12] PAID ONLY PLATFORM - No free trials or promotional codes
+2025-09-29 23:55:12,544 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.3:8080
+2025-09-29 23:55:12,545 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-29 23:55:39,207 - __main__ - INFO - Monetization modules not available: No module named 'recursive_value_products'
+[2025-09-29T23:55:39] Monetization modules not available: No module named 'recursive_value_products'
+2025-09-29 23:55:39,210 - __main__ - INFO - Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-29T23:55:39] Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-29T23:55:39] ✅ 42 AI Agents Platform
+[2025-09-29T23:55:39] ✅ Professional Admin System
+[2025-09-29T23:55:39] ⚠️ Monetization Engine Not Available
+[2025-09-29T23:55:39] ⚠️ PayPal Integration Not Available
+[2025-09-29T23:55:39] ✅ Waitlist System
+2025-09-29 23:55:39,216 - __main__ - INFO - PAID ONLY PLATFORM - No free trials or promotional codes
+[2025-09-29T23:55:39] PAID ONLY PLATFORM - No free trials or promotional codes
+2025-09-29 23:55:39,235 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.3:8080
+2025-09-29 23:55:39,235 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-30 00:08:48,330 - app - ERROR - Exception on / [GET]
+Traceback (most recent call last):
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\app.py", line 86, in index
+    return render_template('index.html')
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 149, in render_template
+    template = app.jinja_env.get_or_select_template(template_name_or_list)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 1087, in get_or_select_template
+    return self.get_template(template_name_or_list, parent, globals)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 1016, in get_template
+    return self._load_template(name, globals)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 975, in _load_template
+    template = self.loader.load(self, name, self.make_globals(globals))
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\loaders.py", line 126, in load
+    source, filename, uptodate = self.get_source(environment, name)
+                                 ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 65, in get_source
+    return self._get_source_fast(environment, template)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 99, in _get_source_fast
+    raise TemplateNotFound(template)
+jinja2.exceptions.TemplateNotFound: index.html
+2025-09-30 00:08:48,555 - werkzeug - INFO - 127.0.0.1 - - [30/Sep/2025 00:08:48] "[35m[1mGET / HTTP/1.1[0m" 500 -
+2025-09-30 00:08:48,737 - werkzeug - INFO - 127.0.0.1 - - [30/Sep/2025 00:08:48] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 00:09:16,793 - app - ERROR - Exception on / [GET]
+Traceback (most recent call last):
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\cjay4\OneDrive\Desktop\SINCOR2\app.py", line 86, in index
+    return render_template('index.html')
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 149, in render_template
+    template = app.jinja_env.get_or_select_template(template_name_or_list)
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 1087, in get_or_select_template
+    return self.get_template(template_name_or_list, parent, globals)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 1016, in get_template
+    return self._load_template(name, globals)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\environment.py", line 975, in _load_template
+    template = self.loader.load(self, name, self.make_globals(globals))
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\jinja2\loaders.py", line 126, in load
+    source, filename, uptodate = self.get_source(environment, name)
+                                 ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 65, in get_source
+    return self._get_source_fast(environment, template)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cjay4\AppData\Roaming\Python\Python313\site-packages\flask\templating.py", line 99, in _get_source_fast
+    raise TemplateNotFound(template)
+jinja2.exceptions.TemplateNotFound: index.html
+2025-09-30 00:09:16,806 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:09:16] "[35m[1mGET / HTTP/1.1[0m" 500 -
+2025-09-30 00:09:16,983 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:09:16] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 00:10:41,781 - __main__ - INFO - Monetization modules not available: No module named 'recursive_value_products'
+[2025-09-30T00:10:41] Monetization modules not available: No module named 'recursive_value_products'
+2025-09-30 00:10:41,784 - __main__ - INFO - Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-30T00:10:41] Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-30T00:10:41] ✅ 42 AI Agents Platform
+[2025-09-30T00:10:41] ✅ Professional Admin System
+[2025-09-30T00:10:41] ⚠️ Monetization Engine Not Available
+[2025-09-30T00:10:41] ⚠️ PayPal Integration Not Available
+[2025-09-30T00:10:41] ✅ Waitlist System
+2025-09-30 00:10:41,789 - __main__ - INFO - PAID ONLY PLATFORM - No free trials or promotional codes
+[2025-09-30T00:10:41] PAID ONLY PLATFORM - No free trials or promotional codes
+2025-09-30 00:10:41,815 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.3:8080
+2025-09-30 00:10:41,815 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-30 00:11:59,337 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:11:59] "GET / HTTP/1.1" 200 -
+2025-09-30 00:12:00,551 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:12:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 00:12:00,570 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:12:00] "[33mGET /favicon-32x32.png HTTP/1.1[0m" 404 -
+2025-09-30 00:12:00,578 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:12:00] "[33mGET /favicon-16x16.png HTTP/1.1[0m" 404 -
+2025-09-30 00:12:00,936 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:12:00] "[33mGET /favicon-32x32.png HTTP/1.1[0m" 404 -
+2025-09-30 00:12:00,948 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:12:00] "[33mGET /favicon-16x16.png HTTP/1.1[0m" 404 -
+2025-09-30 00:16:33,770 - __main__ - INFO - Monetization modules not available: No module named 'recursive_value_products'
+[2025-09-30T00:16:33] Monetization modules not available: No module named 'recursive_value_products'
+2025-09-30 00:16:33,774 - __main__ - INFO - Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-30T00:16:33] Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-30T00:16:33] ✅ 42 AI Agents Platform
+[2025-09-30T00:16:33] ✅ Professional Admin System
+[2025-09-30T00:16:33] ⚠️ Monetization Engine Not Available
+[2025-09-30T00:16:33] ⚠️ PayPal Integration Not Available
+[2025-09-30T00:16:33] ✅ Waitlist System
+2025-09-30 00:16:33,780 - __main__ - INFO - PAID ONLY PLATFORM - No free trials or promotional codes
+[2025-09-30T00:16:33] PAID ONLY PLATFORM - No free trials or promotional codes
+2025-09-30 00:16:33,803 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.3:8080
+2025-09-30 00:16:33,803 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-30 00:18:00,235 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:00] "GET / HTTP/1.1" 200 -
+2025-09-30 00:18:00,598 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 00:18:00,612 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:00] "[33mGET /favicon-32x32.png HTTP/1.1[0m" 404 -
+2025-09-30 00:18:00,621 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:00] "[33mGET /favicon-16x16.png HTTP/1.1[0m" 404 -
+2025-09-30 00:18:10,220 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:10] "GET / HTTP/1.1" 200 -
+2025-09-30 00:18:10,371 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:10] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 00:18:10,396 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:10] "[33mGET /favicon-32x32.png HTTP/1.1[0m" 404 -
+2025-09-30 00:18:10,410 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:10] "[33mGET /favicon-16x16.png HTTP/1.1[0m" 404 -
+2025-09-30 00:18:13,534 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:13] "GET / HTTP/1.1" 200 -
+2025-09-30 00:18:13,658 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:13] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 00:18:13,678 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:13] "[33mGET /favicon-32x32.png HTTP/1.1[0m" 404 -
+2025-09-30 00:18:13,688 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 00:18:13] "[33mGET /favicon-16x16.png HTTP/1.1[0m" 404 -
+2025-09-30 00:26:51,976 - __main__ - INFO - Monetization modules not available: No module named 'recursive_value_products'
+[2025-09-30T00:26:51] Monetization modules not available: No module named 'recursive_value_products'
+2025-09-30 00:26:51,987 - __main__ - INFO - Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-30T00:26:51] Starting SINCOR MASTER PLATFORM on 0.0.0.0:8080
+[2025-09-30T00:26:51] ✅ 42 AI Agents Platform
+[2025-09-30T00:26:51] ✅ Professional Admin System
+[2025-09-30T00:26:52] ⚠️ Monetization Engine Not Available
+[2025-09-30T00:26:52] ⚠️ PayPal Integration Not Available
+[2025-09-30T00:26:52] ✅ Waitlist System
+2025-09-30 00:26:52,008 - __main__ - INFO - PAID ONLY PLATFORM - No free trials or promotional codes
+[2025-09-30T00:26:52] PAID ONLY PLATFORM - No free trials or promotional codes
+2025-09-30 00:26:52,037 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.3:8080
+2025-09-30 00:26:52,037 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-09-30 11:23:30,809 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:30] "GET / HTTP/1.1" 200 -
+2025-09-30 11:23:31,207 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:31] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-09-30 11:23:31,220 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:31] "[33mGET /favicon-32x32.png HTTP/1.1[0m" 404 -
+2025-09-30 11:23:31,230 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:31] "[33mGET /favicon-16x16.png HTTP/1.1[0m" 404 -
+2025-09-30 11:23:52,223 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:23:52] "[33mGET /admin HTTP/1.1[0m" 404 -
+2025-09-30 11:30:30,184 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:30:30] "[33mGET /admin HTTP/1.1[0m" 404 -
+2025-09-30 11:40:16,931 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 11:40:16] "[33mGET /admin HTTP/1.1[0m" 404 -
+2025-09-30 21:10:13,144 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 21:10:13] "[33mGET /admin HTTP/1.1[0m" 404 -
+2025-09-30 21:10:22,140 - werkzeug - INFO - 192.168.0.3 - - [30/Sep/2025 21:10:22] "[33mGET /admin HTTP/1.1[0m" 404 -
+2025-10-01 08:39:55,563 - werkzeug - INFO - 192.168.0.3 - - [01/Oct/2025 08:39:55] "[33mGET /admin HTTP/1.1[0m" 404 -
