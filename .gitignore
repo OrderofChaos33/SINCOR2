@@ -160,3 +160,16 @@ unknown/
 !railway.json
 !.gitignore
 sincor/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+.DS_Store
+logs/
+outputs/
+data/
+*.db
+sincor/
+sincor2-backup/
+tatus
