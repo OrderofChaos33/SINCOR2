@@ -8,9 +8,10 @@ requests>=2.31.0              # HTTP requests for API calls
 Jinja2>=3.1.0                # Template engine for content generation
 PyYAML>=6.0                  # YAML configuration files
 schedule>=1.2.0              # Task scheduling for automation
+numpy>=1.24.0                # Numerical computing for analytics
 
 # Payment Processing
-stripe>=7.0.0                 # Stripe payment integration
+# PayPal integration (uses requests library)
 
 # Email handling (built into Python)
 # smtplib - built-in

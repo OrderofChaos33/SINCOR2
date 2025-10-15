@@ -360,7 +360,7 @@ def test_environment():
 
 # PayPal payment processing routes
 @app.route('/api/payment/create', methods=['POST'])
-async def create_payment():
+def create_payment():
     """Create a PayPal payment"""
     if not PAYPAL_AVAILABLE:
         return jsonify({'error': 'PayPal integration not available'}), 503
@@ -386,7 +386,7 @@ async def create_payment():
         )
 
         # Process payment
-        result = await paypal_processor.create_payment(payment_request)
+        result = paypal_processor.create_payment(payment_request)
 
         return jsonify({
             'success': result.success,
@@ -400,7 +400,7 @@ async def create_payment():
         return jsonify({'error': f'Payment creation failed: {str(e)}'}), 500
 
 @app.route('/api/payment/execute', methods=['POST'])
-async def execute_payment():
+def execute_payment():
     """Execute a PayPal payment after approval"""
     if not PAYPAL_AVAILABLE:
         return jsonify({'error': 'PayPal integration not available'}), 503
@@ -414,7 +414,7 @@ async def execute_payment():
             return jsonify({'error': 'Missing payment_id or payer_id'}), 400
 
         # Execute payment
-        result = await paypal_processor.execute_payment(payment_id, payer_id)
+        result = paypal_processor.execute_payment(payment_id, payer_id)
 
         return jsonify({
             'success': result.success,
@@ -429,14 +429,14 @@ async def execute_payment():
         return jsonify({'error': f'Payment execution failed: {str(e)}'}), 500
 
 @app.route('/api/monetization/start', methods=['POST'])
-async def start_monetization():
+def start_monetization():
     """Start the monetization engine"""
     if not MONETIZATION_AVAILABLE:
         return jsonify({'error': 'Monetization engine not available'}), 503
 
     try:
         # Execute monetization strategy
-        strategy_report = await monetization_engine.execute_monetization_strategy(
+        strategy_report = monetization_engine.execute_monetization_strategy(
             max_concurrent_opportunities=10
         )
 
