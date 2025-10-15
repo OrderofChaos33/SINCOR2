@@ -300,7 +300,7 @@
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-purple-900 via-purple-800 to-red-900">
+<body class="bg-gray-50">
     <!-- Navigation -->
     <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -321,8 +321,8 @@
                     <div class="ml-10 flex items-baseline space-x-4">
                         <a href="#agent-clusters" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">AI Agents</a>
                         <a href="#how-it-works" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">How It Works</a>
-                        <a href="/buy" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">Pricing</a>
-                        <a href="/buy" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg">Get Started</a>
+                        <a href="#products" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">Products</a>
+                        <button onclick="showWaitlistModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">Join Waitlist</button>
                     </div>
                 </div>
             </div>
@@ -358,18 +358,18 @@
                 
                 <!-- Above-the-fold Proof Section -->
                 <div class="mb-12 flex flex-col lg:flex-row items-center justify-center gap-8">
-                    <!-- Professional Credentials -->
+                    <!-- Client Proof Stack -->
                     <div class="text-center lg:text-right">
-                        <div class="text-sm text-blue-200 mb-3">Enterprise-Grade Platform</div>
+                        <div class="text-sm text-blue-200 mb-3">Trusted by leading teams</div>
                         <div class="flex flex-wrap justify-center lg:justify-end items-center gap-4 opacity-80">
                             <div class="bg-white bg-opacity-20 rounded-lg px-4 py-2 text-sm font-semibold text-white">
-                                SOC 2 Compliant
+                                ████████ AI
                             </div>
                             <div class="bg-white bg-opacity-20 rounded-lg px-4 py-2 text-sm font-semibold text-white">
-                                Enterprise Ready
+                                ████████ Labs
                             </div>
                             <div class="bg-white bg-opacity-20 rounded-lg px-4 py-2 text-sm font-semibold text-white">
-                                24/7 Support
+                                ████████ Ventures
                             </div>
                             <div class="text-blue-200 text-sm">+47 beta partners</div>
                         </div>
@@ -471,9 +471,12 @@
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
-                    <a href="/buy" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl text-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-2xl">
-                        Get Started - From $97
+                    <a href="/pricing" class="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-4 rounded-xl text-lg font-bold hover:from-green-700 hover:to-green-800 transition-all duration-300 shadow-2xl">
+                        💰 Buy It Now
                     </a>
+                    <button onclick="showWaitlistModal()" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl text-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-2xl">
+                        Join Waitlist
+                    </button>
                     <a href="#agent-clusters" class="border-2 border-white text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white hover:text-blue-900 transition-all duration-300">
                         Explore AI Agents
                     </a>
@@ -1040,7 +1043,7 @@
             <div class="mb-16">
                 <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl p-8 mb-8">
                     <h3 class="text-3xl font-bold mb-4">🎨 Content & Media Cluster (8 Agents)</h3>
-                    <p class="text-xl text-purple-100">Creates, manages, and optimizes all marketing content and media</p>
+                    <p class="text-xl text-purple-200">Creates, manages, and optimizes all marketing content and media</p>
                 </div>
                 
                 <div class="grid lg:grid-cols-2 gap-6">
@@ -1237,9 +1240,9 @@
                         All 42 agents work together seamlessly, handling your business operations 24/7
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                        <a href="/buy" class="bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:bg-blue-700 transition-colors">
-                            Get Started - From $97
-                        </a>
+                        <button onclick="showWaitlistModal()" class="bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:bg-blue-700 transition-colors">
+                            Join Waitlist
+                        </button>
                         <a href="#products" class="border-2 border-white text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white hover:text-gray-900 transition-all duration-300">
                             View Products
                         </a>
@@ -1808,7 +1811,7 @@
                                 <h3 class="font-bold text-lg mb-2">Operations</h3>
                                 <p class="text-sm text-teal-200 mb-4">Ops Core manages outreach & scheduling</p>
                                 <div class="bg-teal-700 rounded-lg p-3">
-                                    <div class="text-xs font-mono text-teal-100">CRMEvents.csv</div>
+                                    <div class="text-xs font-mono text-teal-200">CRMEvents.csv</div>
                                     <div class="text-xs text-gray-300 mt-1">89 meetings booked</div>
                                 </div>
                             </div>
@@ -1903,7 +1906,7 @@
                             <p class="text-purple-200">Lead Generation & Sales Automation Suite</p>
                         </div>
                     </div>
-                    <p class="text-lg mb-6 text-purple-100">"Your AI sales org in a box"</p>
+                    <p class="text-lg mb-6 text-purple-200">"Your AI sales org in a box"</p>
                     
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         <div class="text-center">
@@ -1944,7 +1947,7 @@
                             <p class="text-teal-200">Workflow & Business Automation Suite</p>
                         </div>
                     </div>
-                    <p class="text-lg mb-6 text-teal-100">"Run leaner, faster, cleaner"</p>
+                    <p class="text-lg mb-6 text-teal-200">"Run leaner, faster, cleaner"</p>
                     
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         <div class="text-center">
@@ -1986,7 +1989,7 @@
                             <p class="text-lime-200">Content & Marketing Suite</p>
                         </div>
                     </div>
-                    <p class="text-lg mb-6 text-lime-100">"Creative horsepower at scale"</p>
+                    <p class="text-lg mb-6 text-lime-200">"Creative horsepower at scale"</p>
                     
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         <div class="text-center">
@@ -2040,7 +2043,7 @@
                         </div>
                     </div>
                     
-                    <ul class="space-y-2 mb-6 text-sm">
+                    <ul class="space-y-2 mb-6 text-sm text-red-200">
                         <li>• Market Research: Deep market trends, competitor analysis</li>
                         <li>• Competitor Analysis: Monitors strategies and positioning</li>
                         <li>• Trend Analysis: Identifies emerging opportunities</li>
@@ -2082,9 +2085,9 @@
                 Join the business owners who've automated their way to freedom with SINCOR's AI workforce.
             </p>
             <div class="flex flex-col sm:flex-row gap-6 justify-center">
-                <a href="/buy" class="bg-white text-blue-900 px-8 py-4 rounded-xl text-xl font-bold hover:bg-gray-100 transition-colors">
-                    🚀 Get Started Now
-                </a>
+                <button onclick="showWaitlistModal('Complete Suite')" class="bg-white text-blue-900 px-8 py-4 rounded-xl text-xl font-bold hover:bg-gray-100 transition-colors">
+                    🚀 Join Waitlist Now
+                </button>
                 <a href="#agent-clusters" class="bg-yellow-400 text-black px-8 py-4 rounded-xl text-xl font-bold hover:bg-yellow-300 transition-colors">
                     Explore AI Agents
                 </a>

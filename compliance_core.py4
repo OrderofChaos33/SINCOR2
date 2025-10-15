@@ -1,0 +1,175 @@
+"""
+compliance_core.py
+------------------
+Thin façade ensuring every agent operation flows through:
+- LifecycleManager (token/tool budgets, shifts)
+- MemorySystem (episodic + procedural versioning)
+- SecurityComplianceEngine (auditable compliance log)
+
+Use this to prevent 'freelancing logic' and guarantee
+versioned, auditable, and cost-attributed actions.
+"""
+
+from __future__ import annotations
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+# Existing modules in your repo:
+from lifecycle_system import LifecycleManager
+from memory_system import MemorySystem
+from security_compliance import SecurityComplianceEngine
+
+
+class ComplianceCore:
+    """
+    Central glue for per-agent control & observability.
+
+    Typical usage:
+        core = ComplianceCore(customer_id, agent_id, archetype="content")
+        core.record_provision(plan="starter", tier_agents=10)
+        core.start_mission("generate_mediapax", version="v2", budget_tokens=5000, tool_budget=20)
+        # ...work...
+        core.record_token_usage(tokens=834, tool_calls=3, label="render_phase")
+        core.complete_mission("generate_mediapax", version="v2", output_ref="s3://.../out.json", success=True)
+    """
+
+    def __init__(self, customer_id: str, agent_id: str, archetype: Optional[str] = None):
+        self.customer_id = customer_id
+        self.agent_id = agent_id
+        self.archetype = archetype or "generic"
+
+        # Initialize per-agent subsystems
+        self.lifecycle = LifecycleManager(agent_id=self.agent_id, archetype=self.archetype)
+        self.memory = MemorySystem(agent_id=self.agent_id)
+        self.compliance = SecurityComplianceEngine(context={
+            "customer_id": self.customer_id,
+            "agent_id": self.agent_id,
+            "archetype": self.archetype
+        })
+
+        # Initial audit stamp
+        self.compliance.log_compliance_event(
+            event_type="agent_core_init",
+            action_taken="init_lifecycle_memory_compliance",
+            metadata={
+                "customer_id": self.customer_id,
+                "agent_id": self.agent_id,
+                "archetype": self.archetype,
+                "timestamp": self._now()
+            }
+        )
+
+    # ---------- Provisioning & Missions ----------
+
+    def record_provision(self, plan: str, tier_agents: int, metadata: Optional[Dict[str, Any]] = None) -> None:
+        payload = {
+            "customer_id": self.customer_id,
+            "agent_id": self.agent_id,
+            "archetype": self.archetype,
+            "plan": plan,
+            "tier_agents": tier_agents,
+            "timestamp": self._now()
+        }
+        if metadata:
+            payload.update(metadata)
+
+        # Memory episodic trace
+        self.memory.record_episode(event_type="provision", content=payload)
+
+        # Compliance immutable log
+        self.compliance.log_compliance_event(
+            event_type="agent_provision",
+            action_taken="customer_agent_created",
+            metadata=payload
+        )
+
+    def start_mission(self, mission_name: str, version: str, budget_tokens: int, tool_budget: int = 0) -> None:
+        # Versioned procedural routine registration
+        self.memory.store_routine(
+            name=mission_name,
+            version=version,
+            content={
+                "customer_id": self.customer_id,
+                "agent_id": self.agent_id,
+                "archetype": self.archetype,
+                "budget_tokens": budget_tokens,
+                "tool_budget": tool_budget,
+                "started_at": self._now()
+            }
+        )
+
+        # Touch lifecycle to ensure counters exist (no-op charge)
+        self.lifecycle.consume_budget(tokens=0, tool_calls=0)
+
+        # Compliance record
+        self.compliance.log_compliance_event(
+            event_type="mission_start",
+            action_taken="routine_version_registered",
+            metadata={
+                "mission_name": mission_name,
+                "version": version,
+                "budget_tokens": budget_tokens,
+                "tool_budget": tool_budget,
+                "timestamp": self._now()
+            }
+        )
+
+    def record_token_usage(self, tokens: int, tool_calls: int = 0, label: str = "work_chunk") -> None:
+        # Charge lifecycle budgets
+        self.lifecycle.consume_budget(tokens=tokens, tool_calls=tool_calls)
+
+        # Memory episodic usage
+        self.memory.record_episode(
+            event_type="work_usage",
+            content={
+                "label": label,
+                "tokens": tokens,
+                "tool_calls": tool_calls,
+                "timestamp": self._now()
+            }
+        )
+
+        # Compliance audit
+        self.compliance.log_compliance_event(
+            event_type="usage",
+            action_taken="token_tool_usage",
+            metadata={
+                "label": label,
+                "tokens": tokens,
+                "tool_calls": tool_calls,
+                "timestamp": self._now()
+            }
+        )
+
+    def complete_mission(self, mission_name: str, version: str, output_ref: str, success: bool, notes: str = "") -> None:
+        # Memory episodic completion
+        self.memory.record_episode(
+            event_type="mission_complete",
+            content={
+                "mission_name": mission_name,
+                "version": version,
+                "output_ref": output_ref,
+                "success": success,
+                "notes": notes,
+                "timestamp": self._now()
+            }
+        )
+
+        # Compliance audit
+        self.compliance.log_compliance_event(
+            event_type="mission_complete",
+            action_taken="routine_version_output_recorded",
+            metadata={
+                "mission_name": mission_name,
+                "version": version,
+                "output_ref": output_ref,
+                "success": success,
+                "timestamp": self._now()
+            }
+        )
+
+    # ---------- Helpers ----------
+
+    @staticmethod
+    def _now() -> str:
+        return datetime.utcnow().isoformat()

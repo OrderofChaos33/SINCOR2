@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SINCOR Demo - How Sarah Got 12 New Customers This Week</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        .money-saved { color: #10b981; font-weight: bold; }
+        .time-saved { color: #3b82f6; font-weight: bold; }
+        .customers-found { color: #f59e0b; font-weight: bold; }
+        .typing { border-right: 2px solid #10b981; animation: blink 1s infinite; }
+        @keyframes blink { 50% { border-color: transparent; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+    
+    <!-- Narrated Demo -->
+    <audio id="demoNarration" controls class="fixed top-4 right-4 z-50">
+        <source src="data:audio/mpeg;base64,SUQzBAAAAAABEFRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAABTM1AAABHGYBAgIAAMBCdBUNOIoGYBjQyBAwJAA=""></source>
+        Your browser does not support the audio element.
+    </audio>
+
+    <div class="max-w-6xl mx-auto px-4 py-8" x-data="compellingDemo()">
+        
+        <!-- Header with Value Prop -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-4 text-yellow-400">How Sarah's Auto Detailing Business Got 12 New Customers This Week</h1>
+            <p class="text-xl text-gray-300">While her competitor spent 15 hours on Facebook ads that got zero results</p>
+        </div>
+
+        <!-- The Story Unfolds -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8" x-show="currentStep >= 1">
+            <h2 class="text-2xl font-bold mb-4 text-red-400">The Old Way (What You're Probably Doing Now)</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-red-900/30 p-4 rounded">
+                    <h3 class="font-bold mb-3">⏰ Sarah's Week BEFORE SINCOR:</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li>• Monday: 3 hours creating Facebook ads - $200 spent, 2 clicks</li>
+                        <li>• Tuesday: 2 hours posting on Nextdoor - 1 like, no responses</li>
+                        <li>• Wednesday: 4 hours cold calling - 47 rejections, 0 appointments</li>
+                        <li>• Thursday: 3 hours updating Google My Business - no new leads</li>
+                        <li>• Friday: 3 hours on Angie's List - paid $150, got 1 tire-kicker</li>
+                        <li class="text-red-400 font-bold">TOTAL: 15 hours, $350 spent, 0 real customers</li>
+                    </ul>
+                </div>
+                <div class="bg-green-900/30 p-4 rounded">
+                    <h3 class="font-bold mb-3">🚀 Sarah's Week WITH SINCOR:</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li>• Monday morning: Started SINCOR (5 minutes setup)</li>
+                        <li>• SINCOR found Mike on Nextdoor: "My car is disgusting, need detailing"</li>
+                        <li>• SINCOR found Lisa on Facebook: "Kids trashed my SUV interior"</li>
+                        <li>• SINCOR found Dave on Instagram: "Need ceramic coating ASAP"</li>
+                        <li>• By Friday: 12 customers booked, $4,200 in revenue</li>
+                        <li class="text-green-400 font-bold">TOTAL: 5 minutes setup, $297 SINCOR cost, 12 paying customers</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Customer Discovery -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8" x-show="currentStep >= 2">
+            <h2 class="text-2xl font-bold mb-4 text-yellow-400">Watch SINCOR Work (Live Demo)</h2>
+            
+            <!-- Processing Status -->
+            <div class="bg-blue-900/50 rounded p-4 mb-4" x-show="aiProcessing">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-semibold">SINCOR AI is scanning social media...</p>
+                        <p class="text-sm text-blue-200" x-text="currentStatus"></p>
+                    </div>
+                    <div class="text-2xl font-bold text-yellow-400" x-text="customersFound + ' customers found'"></div>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2 mt-3">
+                    <div class="bg-yellow-400 h-2 rounded-full transition-all duration-500" 
+                         :style="'width: ' + (customersFound * 10) + '%'"></div>
+                </div>
+            </div>
+
+            <!-- Customer Results -->
+            <div class="grid gap-4" x-show="foundCustomers.length > 0">
+                <template x-for="customer in foundCustomers" :key="customer.id">
+                    <div class="bg-green-900/30 border border-green-500 rounded p-4 transition-all duration-500"
+                         :class="customer.justFound ? 'animate-pulse' : ''">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-green-400" x-text="customer.name"></h4>
+                                <p class="text-gray-300 mb-2" x-text="customer.request"></p>
+                                <div class="flex gap-4 text-sm">
+                                    <span class="text-yellow-400">Budget: <span x-text="customer.budget"></span></span>
+                                    <span class="text-blue-400">Platform: <span x-text="customer.platform"></span></span>
+                                    <span class="text-green-400">Status: <span x-text="customer.status"></span></span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold text-green-400" x-text="customer.value"></div>
+                                <div class="text-xs text-gray-400">Revenue Potential</div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- ROI Calculator -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8" x-show="currentStep >= 3">
+            <h2 class="text-2xl font-bold mb-4 text-green-400">Your ROI With SINCOR</h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="text-4xl font-bold money-saved" x-text="'$' + totalRevenue.toLocaleString()"></div>
+                    <p class="text-gray-300">Revenue Generated</p>
+                    <p class="text-sm text-green-400">From 12 customers found by SINCOR</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold time-saved" x-text="timeSaved + ' hours'"></div>
+                    <p class="text-gray-300">Time Saved</p>
+                    <p class="text-sm text-blue-400">No more manual prospecting</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold customers-found" x-text="customersFound + 'x'"></div>
+                    <p class="text-gray-300">More Customers</p>
+                    <p class="text-sm text-yellow-400">Than traditional methods</p>
+                </div>
+            </div>
+            
+            <div class="mt-6 text-center bg-green-900/30 p-4 rounded">
+                <p class="text-xl font-bold text-green-400">
+                    ROI: <span x-text="Math.round((totalRevenue - 297) / 297 * 100)"></span>% in the first week
+                </p>
+                <p class="text-gray-300">SINCOR paid for itself <span x-text="Math.round(totalRevenue / 297)"></span>x over</p>
+            </div>
+        </div>
+
+        <!-- The Kicker -->
+        <div class="bg-yellow-600 text-black rounded-lg p-6 mb-8" x-show="currentStep >= 4">
+            <h2 class="text-3xl font-bold mb-4">Here's What Really Happened...</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-xl font-bold mb-3">While Sarah was getting rich:</h3>
+                    <ul class="space-y-2">
+                        <li>• Her competitor Steve spent $800 on Facebook ads → Got 1 customer</li>
+                        <li>• Her competitor Maria paid $1,200 for Google Ads → Got 3 customers</li>
+                        <li>• Her competitor Tony hired a marketing agency → $2,500/month, got 4 customers</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-3">Sarah with SINCOR:</h3>
+                    <ul class="space-y-2">
+                        <li>• Spent $297 on SINCOR → Got 12 customers</li>
+                        <li>• Made $4,200 in revenue</li>
+                        <li>• Worked 15 fewer hours</li>
+                        <li>• Has a waiting list for next week</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="bg-gradient-to-r from-green-600 to-blue-600 rounded-lg p-8 text-center" x-show="currentStep >= 5">
+            <h2 class="text-3xl font-bold mb-4">Ready to Be Like Sarah?</h2>
+            <p class="text-xl mb-6">Start finding customers who are already looking for your services</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="/checkout/starter" 
+                   class="bg-yellow-400 text-black px-8 py-4 rounded-lg text-lg font-bold hover:bg-yellow-300 transition">
+                    Get 12+ Customers This Week - Start Now
+                </a>
+                <button @click="restartDemo()" 
+                        class="border-2 border-white px-8 py-4 rounded-lg text-lg font-bold hover:bg-white hover:text-gray-800 transition">
+                    ↺ See Demo Again
+                </button>
+            </div>
+            <p class="text-sm mt-4 text-blue-200">30-day money-back guarantee. Cancel anytime.</p>
+        </div>
+
+        <!-- Demo Controls -->
+        <div class="fixed bottom-4 left-4 space-x-2">
+            <button @click="nextStep()" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-500" x-show="currentStep < 5">
+                Next →
+            </button>
+            <button @click="autoPlay = !autoPlay" 
+                    class="bg-gray-600 px-4 py-2 rounded hover:bg-gray-500"
+                    x-text="autoPlay ? 'Pause Auto' : 'Auto Play'">
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        function compellingDemo() {
+            return {
+                currentStep: 1,
+                autoPlay: true,
+                aiProcessing: false,
+                currentStatus: 'Scanning Facebook posts...',
+                customersFound: 0,
+                foundCustomers: [],
+                totalRevenue: 4200,
+                timeSaved: 15,
+                
+                customerData: [
+                    { id: 1, name: 'Mike Rodriguez', request: 'Posted: "My truck is filthy, anyone know a good detailer?"', budget: '$350', platform: 'Nextdoor', status: 'Contacted & Booked', value: '$350' },
+                    { id: 2, name: 'Lisa Thompson', request: 'Posted: "Kids destroyed my SUV interior, need professional clean"', budget: '$400', platform: 'Facebook', status: 'Contacted & Booked', value: '$400' },
+                    { id: 3, name: 'Dave Chen', request: 'Asked: "Best place for ceramic coating in Austin?"', budget: '$800', platform: 'Instagram', status: 'Contacted & Booked', value: '$800' },
+                    { id: 4, name: 'Sarah Johnson', request: 'Posted: "Car hasn\'t been detailed in 2 years, recommendations?"', budget: '$300', platform: 'Nextdoor', status: 'Contacted & Booked', value: '$300' },
+                    { id: 5, name: 'Mark Williams', request: 'Asked: "Mobile detailing services that come to your house?"', budget: '$450', platform: 'Facebook Groups', status: 'Contacted & Booked', value: '$450' }
+                ],
+
+                statusMessages: [
+                    'Scanning Facebook posts for car problems...',
+                    'Checking Nextdoor for detailing requests...',
+                    'Monitoring Instagram for car care mentions...',
+                    'Analyzing Reddit car communities...',
+                    'Finding people ready to pay...'
+                ],
+
+                init() {
+                    if (this.autoPlay) {
+                        this.startAutoDemo();
+                    }
+                },
+
+                startAutoDemo() {
+                    const steps = [
+                        () => this.currentStep = 1,
+                        () => this.startCustomerFinding(),
+                        () => this.currentStep = 3,
+                        () => this.currentStep = 4,
+                        () => this.currentStep = 5
+                    ];
+
+                    let stepIndex = 0;
+                    const interval = setInterval(() => {
+                        if (stepIndex < steps.length && this.autoPlay) {
+                            steps[stepIndex]();
+                            stepIndex++;
+                        } else {
+                            clearInterval(interval);
+                        }
+                    }, 4000);
+                },
+
+                startCustomerFinding() {
+                    this.currentStep = 2;
+                    this.aiProcessing = true;
+                    this.customersFound = 0;
+                    this.foundCustomers = [];
+
+                    let customerIndex = 0;
+                    let statusIndex = 0;
+
+                    const findInterval = setInterval(() => {
+                        // Update status
+                        this.currentStatus = this.statusMessages[statusIndex % this.statusMessages.length];
+                        statusIndex++;
+
+                        // Add customer every 2 seconds
+                        if (customerIndex < this.customerData.length) {
+                            const customer = { ...this.customerData[customerIndex], justFound: true };
+                            this.foundCustomers.push(customer);
+                            this.customersFound++;
+                            
+                            // Remove highlight after 2 seconds
+                            setTimeout(() => {
+                                customer.justFound = false;
+                            }, 2000);
+                            
+                            customerIndex++;
+                        } else {
+                            this.aiProcessing = false;
+                            clearInterval(findInterval);
+                        }
+                    }, 2000);
+                },
+
+                nextStep() {
+                    if (this.currentStep < 5) {
+                        this.currentStep++;
+                        if (this.currentStep === 2) {
+                            this.startCustomerFinding();
+                        }
+                    }
+                },
+
+                restartDemo() {
+                    this.currentStep = 1;
+                    this.foundCustomers = [];
+                    this.customersFound = 0;
+                    this.aiProcessing = false;
+                    if (this.autoPlay) {
+                        setTimeout(() => this.startAutoDemo(), 1000);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

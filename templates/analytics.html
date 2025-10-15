@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Analytics - SINCOR Enterprise{% endblock %}
+
+{% block content %}
+<style>
+    .analytics-hero {
+        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 25%, #2d1b69 50%, #11998e 75%, #38ef7d 100%);
+        background-size: 400% 400%;
+        animation: etherealGradient 20s ease infinite;
+    }
+
+    .analytics-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.6s cubic-bezier(0.23, 1, 0.320, 1);
+    }
+
+    .analytics-card:hover {
+        transform: translateY(-12px) scale(1.02);
+        box-shadow: 0 25px 60px rgba(102, 126, 234, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .data-viz {
+        background: linear-gradient(45deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border: 1px solid rgba(102, 126, 234, 0.2);
+    }
+
+    .metric-pulse {
+        animation: metricPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes metricPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.8; }
+    }
+</style>
+
+<!-- Ultra-Premium Analytics Hero -->
+<section class="min-h-screen analytics-hero relative overflow-hidden flex items-center justify-center">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-6xl mx-auto">
+            <div class="ultra-glass rounded-full px-8 py-4 mb-12 inline-block">
+                <span class="text-emerald-400 font-mono text-sm tracking-wider">SINCOR ADVANCED ANALYTICS</span>
+            </div>
+
+            <h1 class="text-7xl lg:text-8xl font-black text-white mb-8 leading-tight">
+                Deep <span class="morphing-text">Analytics</span>
+            </h1>
+
+            <p class="text-2xl lg:text-3xl mb-16 text-gray-100 max-w-4xl mx-auto leading-relaxed">
+                Uncover hidden patterns, predict future outcomes, and gain strategic insights from every data point in your enterprise.
+            </p>
+
+            <div class="flex flex-col lg:flex-row gap-8 justify-center">
+                <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-12 py-6 rounded-2xl text-xl font-bold transition-all premium-glow shadow-2xl">
+                    Unlock Insights
+                </a>
+                <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all border-2 border-white/20">
+                    Live Analytics Demo
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Analytics Capabilities -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-24">
+                <div class="ultra-glass rounded-full px-8 py-4 mb-8 inline-block">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider">ANALYTICS ENGINE</span>
+                </div>
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Intelligence at Scale
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    Advanced analytics that process millions of data points to deliver actionable business intelligence.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-16">
+                <!-- Predictive Analytics -->
+                <div class="analytics-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Predictive Models</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Machine learning algorithms that forecast business trends, customer behavior, and market opportunities with unprecedented accuracy.
+                    </p>
+
+                    <!-- Mock Data Visualization -->
+                    <div class="data-viz rounded-2xl p-6 mb-8">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-white font-mono text-sm">Revenue Forecast</span>
+                            <span class="text-emerald-400 font-mono text-sm">97.3% Accuracy</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Q4 2024</span>
+                                <div class="flex items-center">
+                                    <div class="w-32 h-2 bg-gray-700 rounded-full mr-3">
+                                        <div class="w-24 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full metric-pulse"></div>
+                                    </div>
+                                    <span class="text-white font-mono text-sm">+23%</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Q1 2025</span>
+                                <div class="flex items-center">
+                                    <div class="w-32 h-2 bg-gray-700 rounded-full mr-3">
+                                        <div class="w-28 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full metric-pulse"></div>
+                                    </div>
+                                    <span class="text-white font-mono text-sm">+31%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <div class="ultra-glass rounded-full px-6 py-2 inline-block">
+                            <span class="text-purple-400 font-mono text-sm">97.3% forecast accuracy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Analytics -->
+                <div class="analytics-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Real-Time Processing</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Live data streaming and instant analysis that delivers insights as events happen across your business.
+                    </p>
+
+                    <!-- Real-time Metrics -->
+                    <div class="data-viz rounded-2xl p-6 mb-8">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-white font-mono text-sm">Live Metrics</span>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 bg-emerald-400 rounded-full mr-2 animate-pulse"></div>
+                                <span class="text-emerald-400 font-mono text-sm">LIVE</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-cyan-400 mb-1">2.4M</div>
+                                <div class="text-gray-400 text-xs">Points/sec</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-blue-400 mb-1">&lt;50ms</div>
+                                <div class="text-gray-400 text-xs">Latency</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <div class="ultra-glass rounded-full px-6 py-2 inline-block">
+                            <span class="text-cyan-400 font-mono text-sm">&lt;50ms response time</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Intelligence -->
+                <div class="analytics-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Customer Intelligence</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Deep behavioral analysis and segmentation that reveals customer lifetime value and churn predictions.
+                    </p>
+
+                    <!-- Customer Segments -->
+                    <div class="data-viz rounded-2xl p-6 mb-8">
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">High Value</span>
+                                <div class="flex items-center">
+                                    <div class="w-24 h-2 bg-gray-700 rounded-full mr-3">
+                                        <div class="w-16 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
+                                    </div>
+                                    <span class="text-emerald-400 font-mono text-sm">23%</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">At Risk</span>
+                                <div class="flex items-center">
+                                    <div class="w-24 h-2 bg-gray-700 rounded-full mr-3">
+                                        <div class="w-8 h-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
+                                    </div>
+                                    <span class="text-orange-400 font-mono text-sm">12%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <div class="ultra-glass rounded-full px-6 py-2 inline-block">
+                            <span class="text-emerald-400 font-mono text-sm">94.7% churn prediction</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Intelligence -->
+                <div class="analytics-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Market Intelligence</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Comprehensive market analysis that identifies trends, opportunities, and competitive advantages.
+                    </p>
+
+                    <!-- Market Trends -->
+                    <div class="data-viz rounded-2xl p-6 mb-8">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-white font-mono text-sm">Market Opportunities</span>
+                            <span class="text-orange-400 font-mono text-sm">$2.4M Potential</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="text-center">
+                                <div class="text-xl font-black text-orange-400 mb-1">73%</div>
+                                <div class="text-gray-400 text-xs">Growth Sector A</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <div class="ultra-glass rounded-full px-6 py-2 inline-block">
+                            <span class="text-orange-400 font-mono text-sm">$2.4M opportunity identified</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Analytics Performance -->
+<section class="py-32 bg-white relative overflow-hidden">
+    <div class="container mx-auto px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-black text-gray-900 mb-8">
+                    Analytics <span class="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Performance</span>
+                </h2>
+                <p class="text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    Enterprise-grade analytics infrastructure delivering insights at unprecedented speed and accuracy.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-4 gap-8">
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-purple-600 mb-4">2.4M</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Data Points</h3>
+                    <p class="text-gray-600">Processed per second</p>
+                </div>
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-blue-600 mb-4">&lt;50ms</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Response</h3>
+                    <p class="text-gray-600">Average query time</p>
+                </div>
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-emerald-600 mb-4">97.3%</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Accuracy</h3>
+                    <p class="text-gray-600">Predictive model precision</p>
+                </div>
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-cyan-600 mb-4">24/7</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Monitoring</h3>
+                    <p class="text-gray-600">Continuous analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Premium CTA Section -->
+<section class="py-32 analytics-hero relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="ultra-glass rounded-3xl p-16">
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Ready for Deep Insights?
+                </h2>
+                <p class="text-2xl text-gray-100 mb-12 leading-relaxed max-w-3xl mx-auto">
+                    Unlock the hidden value in your data with analytics that reveal what others miss.
+                </p>
+
+                <div class="flex flex-col lg:flex-row gap-8 justify-center mb-12">
+                    <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white px-16 py-8 rounded-2xl text-2xl font-bold transition-all premium-glow shadow-2xl group">
+                        <span class="flex items-center justify-center">
+                            Discover Insights
+                            <svg class="w-8 h-8 ml-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </span>
+                    </a>
+                    <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-16 py-8 rounded-2xl text-2xl font-semibold transition-all border-2 border-white/20">
+                        Live Analytics Demo
+                    </a>
+                </div>
+
+                <!-- Analytics Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-white/20">
+                    <div class="text-center">
+                        <div class="text-emerald-400 font-mono text-sm mb-2">PROCESSING</div>
+                        <div class="text-white font-bold">2.4M Points/Second</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-cyan-400 font-mono text-sm mb-2">ACCURACY</div>
+                        <div class="text-white font-bold">97.3% Prediction Rate</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-pink-400 font-mono text-sm mb-2">LATENCY</div>
+                        <div class="text-white font-bold">&lt;50ms Response</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

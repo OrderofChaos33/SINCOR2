@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}SINCOR Test Page{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-16">
+    <div class="max-w-4xl mx-auto px-6">
+        <h1 class="text-3xl font-bold mb-8">SINCOR Connection Test</h1>
+        
+        <!-- Dashboard Access Tests -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <h2 class="text-xl font-bold mb-4">Dashboard Access Tests</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <a href="/demo/access" class="block bg-blue-600 text-white text-center py-4 px-6 rounded-lg hover:bg-blue-700">
+                    Test Member Dashboard Access
+                </a>
+                <a href="/admin/access" class="block bg-purple-600 text-white text-center py-4 px-6 rounded-lg hover:bg-purple-700">
+                    Test Admin Dashboard Access
+                </a>
+                <a href="/dashboard/public" class="block bg-green-600 text-white text-center py-4 px-6 rounded-lg hover:bg-green-700">
+                    Test Public Dashboard
+                </a>
+                <a href="/dashboard" class="block bg-indigo-600 text-white text-center py-4 px-6 rounded-lg hover:bg-indigo-700">
+                    Direct Member Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Form Test -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <h2 class="text-xl font-bold mb-4">Contact Form Test</h2>
+            <form class="signup-form space-y-4">
+                <div>
+                    <input type="text" name="firstName" placeholder="First Name" class="w-full p-3 border rounded-lg">
+                </div>
+                <div>
+                    <input type="email" name="email" placeholder="Email" required class="w-full p-3 border rounded-lg">
+                </div>
+                <div>
+                    <input type="text" name="company" placeholder="Company" class="w-full p-3 border rounded-lg">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">
+                    Test Form Submission
+                </button>
+            </form>
+        </div>
+
+        <!-- API Test -->
+        <div class="bg-white rounded-lg shadow-lg p-8">
+            <h2 class="text-xl font-bold mb-4">API Tests</h2>
+            <div class="space-y-2">
+                <button onclick="testAuth('member')" class="block w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
+                    Test Member Auth API
+                </button>
+                <button onclick="testAuth('admin')" class="block w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700">
+                    Test Admin Auth API
+                </button>
+                <button onclick="testContact()" class="block w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">
+                    Test Contact API
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function testAuth(level) {
+    fetch('/api/authenticate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            admin: level === 'admin',
+            user_level: level
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert('Auth response: ' + JSON.stringify(data));
+        if (data.status === 'success') {
+            window.location.href = data.redirect;
+        }
+    })
+    .catch(error => alert('Error: ' + error));
+}
+
+function testContact() {
+    fetch('/api/contact', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            email: 'test@example.com',
+            firstName: 'Test',
+            company: 'Test Company'
+        })
+    })
+    .then(response => response.json())
+    .then(data => alert('Contact response: ' + JSON.stringify(data)))
+    .catch(error => alert('Error: ' + error));
+}
+</script>
+{% endblock %}

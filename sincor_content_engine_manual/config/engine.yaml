@@ -1,0 +1,55 @@
+# Canonical engine configuration
+paths:
+  assets: assets
+  assets_sorted: assets/sorted
+  assets_raw: assets/raw
+  assets_fb: assets/pulls/facebook
+  outputs: outputs
+  outputs_master: outputs/master_doc
+  outputs_sub: outputs/sub_exports
+
+brand:
+  company: "SINCOR"
+  website: "https://getsincor.com"
+  phone: "555-555-0157"
+  slogan: "Automate value. Compound wins."
+  guarantee: "Zero-risk satisfaction guarantee. We redo or refund eligible work."
+  testimonials:
+    - "Transformed our pipeline in 48 hours — measurable lift."
+    - "Clean, fast, compliant. Exactly what we needed."
+
+tone_variants:
+  - professional
+  - hype
+  - technical
+  - poetic
+  - local_pride
+
+modules:
+  blogs: true
+  flyers: true
+  adsets: true
+  scripts: true
+  email_drips: true
+  sops: true
+  whitepapers: true
+
+page_count: 200
+section_weights:
+  authority_whitepapers: 0.15
+  case_studies: 0.10
+  blogs_pillars_clusters: 0.20
+  flyers_packs: 0.10
+  adsets_google_meta: 0.10
+  email_drips_sequences: 0.10
+  scripts_video_audio: 0.10
+  sops_internal: 0.10
+  faq_objections: 0.05
+
+seed: 42
+compliance:
+  terms_version: "v1.0"
+  disclaimers:
+    - "No guarantees of earnings. Results vary."
+    - "No medical or financial advice."
+  claim_guardrails: strict

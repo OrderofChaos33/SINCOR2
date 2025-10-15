@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+
+{% block title %}System Integration - SINCOR Enterprise{% endblock %}
+
+{% block content %}
+<style>
+    .integration-hero {
+        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 25%, #2d1b69 50%, #11998e 75%, #38ef7d 100%);
+        background-size: 400% 400%;
+        animation: etherealGradient 20s ease infinite;
+    }
+
+    .integration-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.6s cubic-bezier(0.23, 1, 0.320, 1);
+    }
+
+    .integration-card:hover {
+        transform: translateY(-12px) scale(1.02);
+        box-shadow: 0 25px 60px rgba(102, 126, 234, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .data-flow {
+        animation: dataFlow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes dataFlow {
+        0% { transform: translateX(0) scale(1); }
+        100% { transform: translateX(10px) scale(1.1); }
+    }
+</style>
+
+<!-- Ultra-Premium Integration Hero -->
+<section class="min-h-screen integration-hero relative overflow-hidden flex items-center justify-center">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-6xl mx-auto">
+            <div class="ultra-glass rounded-full px-8 py-4 mb-12 inline-block">
+                <span class="text-emerald-400 font-mono text-sm tracking-wider">SINCOR UNIVERSAL INTEGRATION</span>
+            </div>
+
+            <h1 class="text-7xl lg:text-8xl font-black text-white mb-8 leading-tight">
+                Seamless <span class="morphing-text">Integration</span>
+            </h1>
+
+            <p class="text-2xl lg:text-3xl mb-16 text-gray-100 max-w-4xl mx-auto leading-relaxed">
+                Connect every system, platform, and data source into one unified intelligence layer that speaks every protocol.
+            </p>
+
+            <div class="flex flex-col lg:flex-row gap-8 justify-center">
+                <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-12 py-6 rounded-2xl text-xl font-bold transition-all premium-glow shadow-2xl">
+                    Connect Everything
+                </a>
+                <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all border-2 border-white/20">
+                    See Integrations
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Integration Architecture -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-24">
+                <div class="ultra-glass rounded-full px-8 py-4 mb-8 inline-block">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider">INTEGRATION ARCHITECTURE</span>
+                </div>
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Universal Connectivity
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    Advanced integration layer that connects 500+ enterprise systems through intelligent API orchestration.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-12">
+                <!-- API Gateway -->
+                <div class="integration-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white data-flow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">API Gateway</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Intelligent API orchestration that manages authentication, rate limiting, and data transformation across all connected systems.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>REST, GraphQL, SOAP protocols</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-cyan-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Real-time data streaming</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-indigo-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Intelligent load balancing</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Harmonization -->
+                <div class="integration-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white data-flow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Data Harmonization</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Intelligent data transformation that automatically maps, cleans, and standardizes data from disparate sources.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Automatic schema mapping</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-pink-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Data quality validation</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-red-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Conflict resolution AI</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Processing -->
+                <div class="integration-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white data-flow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Event Processing</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Real-time event streaming and processing that ensures immediate data synchronization across all systems.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-emerald-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Event-driven architecture</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-teal-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Stream processing engine</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-green-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Guaranteed delivery</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Enterprise Integrations -->
+<section class="py-32 bg-white relative overflow-hidden">
+    <div class="container mx-auto px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-black text-gray-900 mb-8">
+                    Enterprise <span class="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Ecosystem</span>
+                </h2>
+                <p class="text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    Pre-built connectors for 500+ enterprise systems, with custom integration capabilities for any unique requirements.
+                </p>
+            </div>
+
+            <!-- Integration Categories -->
+            <div class="grid lg:grid-cols-4 gap-12 mb-20">
+                <!-- CRM Systems -->
+                <div class="text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-3xl flex items-center justify-center mx-auto mb-8 hover:scale-110 transition-all duration-300">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">CRM Systems</h3>
+                    <div class="space-y-2 text-gray-600">
+                        <p>Salesforce</p>
+                        <p>HubSpot</p>
+                        <p>Microsoft Dynamics</p>
+                        <p>Pipedrive</p>
+                        <p class="text-sm text-gray-500">+47 more</p>
+                    </div>
+                </div>
+
+                <!-- ERP Platforms -->
+                <div class="text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center mx-auto mb-8 hover:scale-110 transition-all duration-300">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">ERP Platforms</h3>
+                    <div class="space-y-2 text-gray-600">
+                        <p>SAP</p>
+                        <p>Oracle</p>
+                        <p>NetSuite</p>
+                        <p>Microsoft 365</p>
+                        <p class="text-sm text-gray-500">+73 more</p>
+                    </div>
+                </div>
+
+                <!-- Cloud Services -->
+                <div class="text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-3xl flex items-center justify-center mx-auto mb-8 hover:scale-110 transition-all duration-300">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Cloud Services</h3>
+                    <div class="space-y-2 text-gray-600">
+                        <p>AWS</p>
+                        <p>Microsoft Azure</p>
+                        <p>Google Cloud</p>
+                        <p>IBM Cloud</p>
+                        <p class="text-sm text-gray-500">+89 more</p>
+                    </div>
+                </div>
+
+                <!-- Databases -->
+                <div class="text-center">
+                    <div class="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8 hover:scale-110 transition-all duration-300">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Databases</h3>
+                    <div class="space-y-2 text-gray-600">
+                        <p>PostgreSQL</p>
+                        <p>MySQL</p>
+                        <p>MongoDB</p>
+                        <p>Snowflake</p>
+                        <p class="text-sm text-gray-500">+134 more</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Integration Benefits -->
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-12">
+                <h3 class="text-3xl font-bold text-gray-900 text-center mb-12">Integration Impact</h3>
+
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <div class="text-center">
+                        <div class="text-5xl font-black text-blue-600 mb-4">73%</div>
+                        <h4 class="text-xl font-bold text-gray-900 mb-2">Time Savings</h4>
+                        <p class="text-gray-600">Reduction in manual data entry and synchronization</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-5xl font-black text-purple-600 mb-4">99.9%</div>
+                        <h4 class="text-xl font-bold text-gray-900 mb-2">Data Accuracy</h4>
+                        <p class="text-gray-600">Automated validation and conflict resolution</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-5xl font-black text-emerald-600 mb-4">&lt;5min</div>
+                        <h4 class="text-xl font-bold text-gray-900 mb-2">Setup Time</h4>
+                        <p class="text-gray-600">Average time to connect new systems</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Custom Integration -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-black text-white mb-8 morphing-text">
+                    Custom Integration Services
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    Expert integration engineers who build bespoke connectors for unique systems and legacy platforms.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-16">
+                <!-- Integration Process -->
+                <div class="integration-card rounded-3xl p-12">
+                    <h3 class="text-3xl font-bold text-white mb-8">Integration Process</h3>
+                    <div class="space-y-8">
+                        <div class="flex items-start space-x-6">
+                            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span class="text-white font-bold text-lg">1</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">System Analysis</h4>
+                                <p class="text-gray-300">Deep analysis of your existing systems, APIs, and data structures to understand integration requirements.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start space-x-6">
+                            <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span class="text-white font-bold text-lg">2</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">Custom Connector Development</h4>
+                                <p class="text-gray-300">Build tailored integration solutions that preserve data integrity and maintain performance standards.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start space-x-6">
+                            <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span class="text-white font-bold text-lg">3</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-white mb-2">Testing & Deployment</h4>
+                                <p class="text-gray-300">Comprehensive testing in staging environments before seamless production deployment with zero downtime.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Integration Support -->
+                <div class="integration-card rounded-3xl p-12">
+                    <h3 class="text-3xl font-bold text-white mb-8">Enterprise Support</h3>
+                    <div class="space-y-6">
+                        <div class="flex items-center text-gray-300">
+                            <svg class="w-6 h-6 text-emerald-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>24/7 integration monitoring</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <svg class="w-6 h-6 text-emerald-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Automatic failover and recovery</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <svg class="w-6 h-6 text-emerald-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Performance optimization</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <svg class="w-6 h-6 text-emerald-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Security compliance monitoring</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <svg class="w-6 h-6 text-emerald-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Version management and updates</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <svg class="w-6 h-6 text-emerald-400 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Dedicated integration engineers</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Premium CTA Section -->
+<section class="py-32 integration-hero relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="ultra-glass rounded-3xl p-16">
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Ready to Connect Everything?
+                </h2>
+                <p class="text-2xl text-gray-100 mb-12 leading-relaxed max-w-3xl mx-auto">
+                    Break down data silos and create a unified enterprise intelligence layer that connects every system seamlessly.
+                </p>
+
+                <div class="flex flex-col lg:flex-row gap-8 justify-center mb-12">
+                    <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white px-16 py-8 rounded-2xl text-2xl font-bold transition-all premium-glow shadow-2xl group">
+                        <span class="flex items-center justify-center">
+                            Start Integration
+                            <svg class="w-8 h-8 ml-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </span>
+                    </a>
+                    <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-16 py-8 rounded-2xl text-2xl font-semibold transition-all border-2 border-white/20">
+                        See Integrations Demo
+                    </a>
+                </div>
+
+                <!-- Integration Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-white/20">
+                    <div class="text-center">
+                        <div class="text-emerald-400 font-mono text-sm mb-2">SYSTEMS</div>
+                        <div class="text-white font-bold">500+ Pre-built Connectors</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-cyan-400 font-mono text-sm mb-2">SETUP</div>
+                        <div class="text-white font-bold">&lt;5min Average Time</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-pink-400 font-mono text-sm mb-2">RELIABILITY</div>
+                        <div class="text-white font-bold">99.9% Uptime</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

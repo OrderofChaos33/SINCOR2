@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}AI Solutions Portfolio - SINCOR{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative overflow-hidden">
+    <!-- Neural Network Background -->
+    <div class="absolute inset-0 opacity-20">
+        <div class="neural-network"></div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto text-center">
+            <div class="glassmorphism p-12 rounded-3xl mb-16">
+                <h1 class="text-7xl lg:text-8xl font-black text-white mb-8 leading-tight">
+                    AI <span class="morphing-text">Solutions</span> Portfolio
+                </h1>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed mb-8">
+                    Comprehensive suite of AI-powered solutions designed to revolutionize every aspect of your business operations.
+                </p>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <a href="{{ url_for('demo') }}" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-12 py-4 rounded-full text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 glow-effect">
+                        Explore Solutions
+                    </a>
+                    <a href="{{ url_for('contact') }}" class="glassmorphism text-white px-12 py-4 rounded-full text-lg font-semibold hover:bg-white/20 transition-all duration-300">
+                        Custom Solutions
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solution Categories -->
+    <section class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-5xl font-bold text-white mb-6">Complete Solution Categories</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    From predictive analytics to intelligent automation, discover solutions tailored for every industry and use case.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Customer Intelligence -->
+                <div class="glassmorphism p-8 rounded-2xl hover:bg-white/10 transition-all duration-300 group">
+                    <div class="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-4">Customer Intelligence</h3>
+                    <p class="text-gray-300 mb-6">
+                        360-degree customer insights with predictive behavior analysis and personalization engines.
+                    </p>
+                    <ul class="text-sm text-gray-400 space-y-2 mb-6">
+                        <li>• Behavioral prediction models</li>
+                        <li>• Real-time sentiment analysis</li>
+                        <li>• Churn prevention algorithms</li>
+                        <li>• Lifetime value optimization</li>
+                    </ul>
+                    <a href="{{ url_for('analytics') }}" class="text-blue-400 hover:text-blue-300 font-semibold">Learn More →</a>
+                </div>
+
+                <!-- Operations Automation -->
+                <div class="glassmorphism p-8 rounded-2xl hover:bg-white/10 transition-all duration-300 group">
+                    <div class="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-4">Operations Automation</h3>
+                    <p class="text-gray-300 mb-6">
+                        End-to-end workflow automation with intelligent decision-making and adaptive processing.
+                    </p>
+                    <ul class="text-sm text-gray-400 space-y-2 mb-6">
+                        <li>• Workflow orchestration</li>
+                        <li>• Document processing AI</li>
+                        <li>• Quality control automation</li>
+                        <li>• Supply chain optimization</li>
+                    </ul>
+                    <a href="{{ url_for('automation') }}" class="text-green-400 hover:text-green-300 font-semibold">Learn More →</a>
+                </div>
+
+                <!-- Financial Intelligence -->
+                <div class="glassmorphism p-8 rounded-2xl hover:bg-white/10 transition-all duration-300 group">
+                    <div class="w-16 h-16 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-4">Financial Intelligence</h3>
+                    <p class="text-gray-300 mb-6">
+                        Advanced financial modeling with risk assessment and revenue optimization algorithms.
+                    </p>
+                    <ul class="text-sm text-gray-400 space-y-2 mb-6">
+                        <li>• Fraud detection systems</li>
+                        <li>• Credit risk modeling</li>
+                        <li>• Market trend analysis</li>
+                        <li>• Portfolio optimization</li>
+                    </ul>
+                    <a href="{{ url_for('intelligence') }}" class="text-yellow-400 hover:text-yellow-300 font-semibold">Learn More →</a>
+                </div>
+
+                <!-- HR & Talent Solutions -->
+                <div class="glassmorphism p-8 rounded-2xl hover:bg-white/10 transition-all duration-300 group">
+                    <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m8 0V6a2 2 0 002 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2V6"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-4">HR & Talent Solutions</h3>
+                    <p class="text-gray-300 mb-6">
+                        Intelligent talent management with performance prediction and culture optimization.
+                    </p>
+                    <ul class="text-sm text-gray-400 space-y-2 mb-6">
+                        <li>• Candidate matching algorithms</li>
+                        <li>• Performance prediction</li>
+                        <li>• Skills gap analysis</li>
+                        <li>• Employee engagement AI</li>
+                    </ul>
+                    <a href="{{ url_for('automation') }}" class="text-purple-400 hover:text-purple-300 font-semibold">Learn More →</a>
+                </div>
+
+                <!-- Sales Intelligence -->
+                <div class="glassmorphism p-8 rounded-2xl hover:bg-white/10 transition-all duration-300 group">
+                    <div class="w-16 h-16 bg-gradient-to-r from-red-500 to-pink-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-4">Sales Intelligence</h3>
+                    <p class="text-gray-300 mb-6">
+                        AI-powered sales acceleration with lead scoring and revenue forecasting capabilities.
+                    </p>
+                    <ul class="text-sm text-gray-400 space-y-2 mb-6">
+                        <li>• Lead scoring algorithms</li>
+                        <li>• Revenue forecasting</li>
+                        <li>• Opportunity analysis</li>
+                        <li>• Competitive intelligence</li>
+                    </ul>
+                    <a href="{{ url_for('analytics') }}" class="text-red-400 hover:text-red-300 font-semibold">Learn More →</a>
+                </div>
+
+                <!-- Cybersecurity AI -->
+                <div class="glassmorphism p-8 rounded-2xl hover:bg-white/10 transition-all duration-300 group">
+                    <div class="w-16 h-16 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-4">Cybersecurity AI</h3>
+                    <p class="text-gray-300 mb-6">
+                        Advanced threat detection with behavioral analysis and automated incident response.
+                    </p>
+                    <ul class="text-sm text-gray-400 space-y-2 mb-6">
+                        <li>• Threat detection AI</li>
+                        <li>• Behavioral anomaly analysis</li>
+                        <li>• Automated response systems</li>
+                        <li>• Zero-day vulnerability detection</li>
+                    </ul>
+                    <a href="{{ url_for('security') }}" class="text-indigo-400 hover:text-indigo-300 font-semibold">Learn More →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Industry Solutions -->
+    <section class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-5xl font-bold text-white mb-6">Industry-Specific Solutions</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Tailored AI solutions designed for the unique challenges and opportunities of your industry.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Healthcare</h3>
+                    <p class="text-sm text-gray-400">Patient care optimization and diagnostic assistance</p>
+                </div>
+
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Financial Services</h3>
+                    <p class="text-sm text-gray-400">Risk management and fraud detection systems</p>
+                </div>
+
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Retail & E-commerce</h3>
+                    <p class="text-sm text-gray-400">Personalization and inventory optimization</p>
+                </div>
+
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Manufacturing</h3>
+                    <p class="text-sm text-gray-400">Predictive maintenance and quality control</p>
+                </div>
+
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-teal-500 to-green-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Technology</h3>
+                    <p class="text-sm text-gray-400">DevOps automation and code optimization</p>
+                </div>
+
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-yellow-500 to-orange-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Energy & Utilities</h3>
+                    <p class="text-sm text-gray-400">Grid optimization and demand forecasting</p>
+                </div>
+
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Education</h3>
+                    <p class="text-sm text-gray-400">Personalized learning and performance analytics</p>
+                </div>
+
+                <div class="glassmorphism p-6 rounded-xl text-center hover:bg-white/10 transition-all duration-300">
+                    <div class="w-12 h-12 bg-gradient-to-r from-pink-500 to-red-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">Logistics</h3>
+                    <p class="text-sm text-gray-400">Route optimization and supply chain intelligence</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Implementation Process -->
+    <section class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-5xl font-bold text-white mb-6">Solution Implementation Process</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Our proven methodology ensures successful AI solution deployment with measurable results.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span class="text-2xl font-bold text-white">1</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-4">Discovery & Assessment</h3>
+                    <p class="text-gray-300">
+                        Comprehensive analysis of your current systems, data infrastructure, and business objectives.
+                    </p>
+                </div>
+
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span class="text-2xl font-bold text-white">2</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-4">Solution Design</h3>
+                    <p class="text-gray-300">
+                        Custom AI solution architecture tailored to your specific requirements and scalability needs.
+                    </p>
+                </div>
+
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span class="text-2xl font-bold text-white">3</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-4">Implementation</h3>
+                    <p class="text-gray-300">
+                        Phased deployment with continuous testing, validation, and performance optimization.
+                    </p>
+                </div>
+
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-gradient-to-r from-orange-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span class="text-2xl font-bold text-white">4</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-white mb-4">Optimization</h3>
+                    <p class="text-gray-300">
+                        Ongoing monitoring, refinement, and enhancement to maximize ROI and performance.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Performance Metrics -->
+    <section class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-12 rounded-3xl">
+                <div class="text-center mb-12">
+                    <h2 class="text-5xl font-bold text-white mb-6">Proven Solution Performance</h2>
+                    <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                        Real-world results from our AI solutions across diverse industries and use cases.
+                    </p>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div class="text-center">
+                        <div class="text-5xl font-black bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent mb-2">
+                            89%
+                        </div>
+                        <p class="text-gray-300 text-lg">Average Efficiency Gain</p>
+                        <p class="text-sm text-gray-400 mt-2">Across all solution categories</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-5xl font-black bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent mb-2">
+                            73%
+                        </div>
+                        <p class="text-gray-300 text-lg">Cost Reduction</p>
+                        <p class="text-sm text-gray-400 mt-2">In operational expenses</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-5xl font-black bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent mb-2">
+                            12x
+                        </div>
+                        <p class="text-gray-300 text-lg">ROI Multiplier</p>
+                        <p class="text-sm text-gray-400 mt-2">Within 18 months</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-5xl font-black bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent mb-2">
+                            500+
+                        </div>
+                        <p class="text-gray-300 text-lg">Successful Deployments</p>
+                        <p class="text-sm text-gray-400 mt-2">Enterprise solutions delivered</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="relative py-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="glassmorphism p-12 rounded-3xl">
+                <h2 class="text-5xl font-bold text-white mb-6">Ready to Transform Your Business?</h2>
+                <p class="text-xl text-gray-300 mb-8">
+                    Discover how our AI solutions can revolutionize your operations and drive unprecedented growth.
+                </p>
+                <div class="flex flex-wrap justify-center gap-6">
+                    <a href="{{ url_for('demo') }}" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-12 py-4 rounded-full text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 glow-effect">
+                        Explore Solutions
+                    </a>
+                    <a href="{{ url_for('contact') }}" class="glassmorphism text-white px-12 py-4 rounded-full text-lg font-semibold hover:bg-white/20 transition-all duration-300">
+                        Custom Consultation
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

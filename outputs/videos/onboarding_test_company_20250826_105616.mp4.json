@@ -1,0 +1,44 @@
+{
+  "output_path": "outputs\\videos\\onboarding_test_company_20250826_105616.mp4",
+  "scenes": [
+    {
+      "id": 1,
+      "text": "Welcome to SINCOR, Test Company! I'm CORTEX, your AI business automation assistant.",
+      "visuals": "logo_animation.mp4",
+      "duration": 30
+    },
+    {
+      "id": 2,
+      "text": "You now have access to 42 specialized AI agents designed to transform technology operations.",
+      "visuals": "agent_network.mp4",
+      "duration": 30
+    },
+    {
+      "id": 3,
+      "text": "Your command center where you control all agents and monitor performance in real-time.",
+      "visuals": "dashboard_tour.mp4",
+      "duration": 30
+    },
+    {
+      "id": 4,
+      "text": "Automated market research, competitor analysis, and growth opportunities specific to your market.",
+      "visuals": "analytics_charts.mp4",
+      "duration": 30
+    },
+    {
+      "id": 5,
+      "text": "Automated lead discovery and qualification for technology prospects in your target market.",
+      "visuals": "lead_pipeline.mp4",
+      "duration": 30
+    },
+    {
+      "id": 6,
+      "text": "Ready to begin? Access your admin panel to start configuring your agents for maximum impact.",
+      "visuals": "cta_animation.mp4",
+      "duration": 30
+    }
+  ],
+  "total_duration": 180,
+  "resolution": "1920x1080",
+  "format": "mp4"
+}

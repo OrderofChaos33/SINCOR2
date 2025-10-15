@@ -1,0 +1,45 @@
+{
+  "content_unit_emitted": {
+    "required": [
+      "timestamp",
+      "run_id",
+      "unit_id",
+      "family",
+      "tone",
+      "score_Q",
+      "template_key",
+      "cta_id"
+    ],
+    "optional": [
+      "similarity",
+      "assets",
+      "seed"
+    ]
+  },
+  "syndication_published": {
+    "required": [
+      "timestamp",
+      "run_id",
+      "channel",
+      "payload_ref",
+      "target_url",
+      "campaign_id"
+    ],
+    "optional": [
+      "creative_id"
+    ]
+  },
+  "conversion_signal": {
+    "required": [
+      "timestamp",
+      "channel",
+      "creative_id",
+      "clicks",
+      "leads",
+      "revenue"
+    ],
+    "optional": [
+      "bookings"
+    ]
+  }
+}

@@ -1,62 +1,45 @@
-# SINCOR Master Platform
+# SINCOR Agent Swarm Architecture
 
-The complete AI Business Automation Platform with 42 specialized agents.
+A persistent multi-agent system with cryptographic identity, composable skills, multi-tier memory, and evolving persona vectors.
 
-## Features
+## Architecture Overview
 
-✅ **42 AI Agents** - Complete business automation workforce
-✅ **Professional Dashboard** - Executive-level control interface
-✅ **Monetization Engine** - Real revenue generation system
-✅ **PayPal Integration** - Live payment processing
-✅ **Premium Access Only** - Professional paid platform
-✅ **Business Intelligence** - Instant strategic insights
-✅ **Agent Coordination** - Swarm intelligence coordination
+- **43 Persistent Entities** with unique identities and evolving personalities
+- **Swarm Coordination** via lightweight market/contract-net protocols  
+- **Health & Rhythm** cycles that boost creativity and prevent mode collapse
+- **Continuity Controls** with checksums and logs aligned with CTP-v1 Acheron
+
+## Directory Structure
+
+```
+sincor/
+├── agents/           # Entity identity & persona configs (E-*.yaml)
+├── memory/           # Multi-tier memory architecture
+│   ├── semantic/     # Graph snapshots & fact stores
+│   ├── procedural/   # Tool & prompt registries
+│   └── autobiographical/ # Self-narrative documents
+├── market/           # Task coordination & contract-net
+├── constitution/     # Governance & value frameworks
+├── tools/            # Tool registry & auth scopes
+└── audits/           # Compliance reports & metrics
+```
 
 ## Quick Start
 
-### Access URLs
-- Main Site: `/`
-- Executive Dashboard: `/admin/executive`
-- Monetization Dashboard: `/monetization/dashboard`
-- Business Setup: `/business-setup`
-- Pricing: `/pricing`
+1. Review archetype templates in `agents/archetypes/`
+2. Customize agent configs in `agents/E-*.yaml` 
+3. Define global constitution in `constitution/global.md`
+4. Configure tools registry in `tools/registry.yaml`
+5. Launch swarm coordination via market system
 
-## Architecture
+## The 7 Archetypes
 
-This master platform combines:
-- Professional SINCOR application
-- Complete monetization engine
-- All 42 AI agent definitions
-- PayPal payment processing
-- Executive dashboard system
-- Business intelligence engine
-
-## Deployment
-
-Optimized for Railway deployment with:
-- Lightweight requirements
-- Professional logging
-- Health check endpoints
-- Environment variable configuration
-- Graceful fallbacks for missing components
-
-## Revenue Streams
-
-1. **Instant BI Services** - $2,500-$15,000
-2. **Agent Subscriptions** - $500-$5,000/month
-3. **Predictive Analytics** - $6,000-$25,000
-4. **Enterprise Partnerships** - $50,000-$200,000
-5. **Custom Solutions** - Variable pricing
-
-## System Status
-
-The platform includes full monitoring and metrics:
-- Real-time performance tracking
-- Revenue generation analytics
-- Agent utilization metrics
-- Client satisfaction scoring
-- Business impact measurement
-
----
-
-**SINCOR Master Platform** - The definitive AI business automation solution.
+1. **Scout** - Discovery, prospecting, intelligence gathering
+2. **Synthesizer** - Summaries, briefs, deduplication, deconfliction  
+3. **Builder** - Code, automations, infrastructure
+4. **Negotiator** - Outreach, replies, offers, follow-ups
+5. **Caretaker** - Data hygiene, labeling, redaction, backups
+6. **Auditor** - Evaluations, tests, safety, compliance
+7. **Director** - Prioritization, market clearing, escalation# Railway deployment trigger Tue, Sep 30, 2025  8:51:29 AM
+# Environment variables configured: Tue, Sep 30, 2025  8:57:20 AM
+# Monetization engine deployed: Tue, Sep 30, 2025  9:51:36 AM

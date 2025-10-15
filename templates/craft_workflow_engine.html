@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}Workflow Engine - SINCOR Craft{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative overflow-hidden">
+    <!-- Neural Network Background -->
+    <div class="absolute inset-0 opacity-20">
+        <div class="neural-network"></div>
+    </div>
+
+    <!-- Header -->
+    <section class="relative pt-32 pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-3xl mb-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-5xl font-black text-white mb-4">
+                            Workflow <span class="morphing-text">Engine</span>
+                        </h1>
+                        <p class="text-xl text-gray-300">
+                            Intelligent automation and process orchestration platform
+                        </p>
+                    </div>
+                    <div class="flex space-x-4">
+                        <button class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all duration-300">
+                            Create Workflow
+                        </button>
+                        <button class="glassmorphism text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/20 transition-all duration-300">
+                            View All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow Stats -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-6">
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-blue-400 mb-2">47</div>
+                    <p class="text-gray-300">Active Workflows</p>
+                </div>
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-green-400 mb-2">2,847</div>
+                    <p class="text-gray-300">Tasks Completed</p>
+                </div>
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-purple-400 mb-2">94.2%</div>
+                    <p class="text-gray-300">Success Rate</p>
+                </div>
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-orange-400 mb-2">312h</div>
+                    <p class="text-gray-300">Time Saved</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Active Workflows -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-2xl mb-8">
+                <h3 class="text-2xl font-bold text-white mb-6">Active Workflows</h3>
+                <div class="space-y-4">
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                                <h4 class="text-lg font-semibold text-white">Customer Onboarding Process</h4>
+                                <span class="bg-green-900 text-green-300 px-2 py-1 rounded text-xs">Running</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-gray-400 text-sm">Last run: 5 min ago</span>
+                                <button class="text-blue-400 hover:text-blue-300">Configure</button>
+                            </div>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Trigger:</span>
+                                <span class="text-white ml-2">New user registration</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Steps:</span>
+                                <span class="text-white ml-2">7 automated actions</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Completion Rate:</span>
+                                <span class="text-green-400 ml-2">96.8%</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-green-400 h-2 rounded-full" style="width: 96.8%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+                                <h4 class="text-lg font-semibold text-white">Lead Qualification Pipeline</h4>
+                                <span class="bg-blue-900 text-blue-300 px-2 py-1 rounded text-xs">Processing</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-gray-400 text-sm">Last run: 12 min ago</span>
+                                <button class="text-blue-400 hover:text-blue-300">Configure</button>
+                            </div>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Trigger:</span>
+                                <span class="text-white ml-2">Form submission</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Steps:</span>
+                                <span class="text-white ml-2">5 automated actions</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Completion Rate:</span>
+                                <span class="text-blue-400 ml-2">89.3%</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-blue-400 h-2 rounded-full" style="width: 89.3%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                <h4 class="text-lg font-semibold text-white">Invoice Processing System</h4>
+                                <span class="bg-yellow-900 text-yellow-300 px-2 py-1 rounded text-xs">Paused</span>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-gray-400 text-sm">Last run: 2 hours ago</span>
+                                <button class="text-blue-400 hover:text-blue-300">Configure</button>
+                            </div>
+                        </div>
+                        <div class="grid md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Trigger:</span>
+                                <span class="text-white ml-2">Email attachment</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Steps:</span>
+                                <span class="text-white ml-2">9 automated actions</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Completion Rate:</span>
+                                <span class="text-yellow-400 ml-2">92.1%</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-yellow-400 h-2 rounded-full" style="width: 92.1%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow Builder -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Workflow Canvas -->
+                <div class="glassmorphism p-8 rounded-2xl">
+                    <h3 class="text-2xl font-bold text-white mb-6">Workflow Builder</h3>
+                    <div class="bg-gray-800 rounded-lg p-6 min-h-[400px] relative">
+                        <div class="absolute inset-4 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center">
+                            <div class="text-center">
+                                <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                                </svg>
+                                <p class="text-gray-400 mb-2">Drag components to build your workflow</p>
+                                <button class="text-blue-400 hover:text-blue-300 font-medium">Start with Template</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex space-x-3">
+                        <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                            Save Workflow
+                        </button>
+                        <button class="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors">
+                            Test Run
+                        </button>
+                        <button class="px-4 bg-gray-600 text-white py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Component Library -->
+                <div class="glassmorphism p-8 rounded-2xl">
+                    <h3 class="text-2xl font-bold text-white mb-6">Component Library</h3>
+                    <div class="space-y-4">
+                        <div class="space-y-3">
+                            <h4 class="text-lg font-semibold text-gray-300">Triggers</h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Schedule</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Email</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Form</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-orange-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2M7 4h10l2 16H5l2-16z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Webhook</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <h4 class="text-lg font-semibold text-gray-300">Actions</h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-red-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Send Email</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-yellow-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Update DB</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Notification</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-teal-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">API Call</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <h4 class="text-lg font-semibold text-gray-300">Logic</h4>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-pink-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Condition</span>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 rounded-lg p-3 cursor-pointer hover:bg-gray-700 transition-colors">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-8 h-8 bg-cyan-600 rounded flex items-center justify-center">
+                                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <span class="text-white text-sm">Delay</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recent Executions -->
+    <section class="relative pb-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-2xl">
+                <h3 class="text-2xl font-bold text-white mb-6">Recent Executions</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-white font-medium">Customer Onboarding Process</p>
+                                <p class="text-gray-400 text-sm">Completed successfully • 7 steps • 2m 34s</p>
+                            </div>
+                        </div>
+                        <span class="text-gray-400 text-sm">5 min ago</span>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-white font-medium">Lead Qualification Pipeline</p>
+                                <p class="text-gray-400 text-sm">Completed successfully • 5 steps • 1m 12s</p>
+                            </div>
+                        </div>
+                        <span class="text-gray-400 text-sm">12 min ago</span>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-white font-medium">Invoice Processing System</p>
+                                <p class="text-gray-400 text-sm">Failed at step 4 • API timeout error</p>
+                            </div>
+                        </div>
+                        <span class="text-gray-400 text-sm">1 hour ago</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

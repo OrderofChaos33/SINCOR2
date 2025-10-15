@@ -3,395 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buy SINCOR - Start Making Money Today</title>
+    <title>Buy SINCOR - AI Business Automation Platform</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .card-hover { transition: transform 0.3s, box-shadow 0.3s; }
-        .card-hover:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        .popular-badge {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .paypal-button-container { min-height: 45px; }
     </style>
 </head>
-<body class="bg-gray-50">
-
-    <!-- Hero Section -->
-    <div class="gradient-bg text-white py-20">
-        <div class="max-w-6xl mx-auto px-4 text-center">
-            <h1 class="text-5xl md:text-7xl font-black mb-6">
-                Start Automating Your Business Today
-            </h1>
-            <p class="text-2xl mb-4 opacity-90">
-                42 AI agents working for you 24/7. No setup. Instant access.
-            </p>
-            <p class="text-xl opacity-80 mb-8">
-                ⚡ Instant Setup • 💰 Money-Back Guarantee • 🔒 Secure Payment
-            </p>
-            <div class="inline-block bg-yellow-400 text-gray-900 px-6 py-3 rounded-full font-bold text-lg">
-                🔥 Limited Time: 30% OFF First Month
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                        <span class="text-white font-bold text-lg">S</span>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900">SINCOR</span>
+                </div>
+                <a href="/" class="text-blue-600 hover:text-blue-700 font-medium">← Back to Home</a>
             </div>
         </div>
-    </div>
+    </nav>
 
-    <!-- Monthly Plans -->
-    <div class="max-w-7xl mx-auto px-4 py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <!-- Header -->
         <div class="text-center mb-16">
-            <h2 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-                Choose Your Plan
-            </h2>
-            <p class="text-xl text-gray-600">
-                Cancel anytime. No contracts. Full refund within 30 days.
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Get Started with SINCOR</h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Choose your plan and start automating your business today. 30-day money-back guarantee.
             </p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-8 mb-20">
-
-            <!-- Starter -->
-            <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border-2 border-gray-200">
+        <!-- Pricing Cards with PayPal -->
+        <div class="grid md:grid-cols-3 gap-8 mb-16">
+            <!-- Starter Plan -->
+            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-100 hover:border-green-200 transition-colors">
                 <div class="text-center mb-8">
-                    <div class="text-sm font-bold text-blue-600 uppercase mb-2">Starter</div>
-                    <div class="text-6xl font-black text-gray-900 mb-2">$297</div>
-                    <div class="text-gray-500 text-lg">/month</div>
-                </div>
-
-                <div class="space-y-4 mb-8">
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>10 AI Agents</b> - Scout, Synthesizer, Builder</span>
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-2xl">🚀</span>
                     </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Basic lead generation & outreach</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Email support (24h response)</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Monthly performance reports</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Cancel anytime</span>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Starter</h3>
+                    <p class="text-gray-600 mb-6">Perfect for small businesses getting started</p>
+                    <div class="mb-6">
+                        <div class="text-5xl font-bold text-gray-900 mb-2">$297</div>
+                        <div class="text-sm text-gray-500">per month</div>
                     </div>
                 </div>
 
-                <div id="paypal-starter" class="mb-4"></div>
-                <p class="text-center text-xs text-gray-500">Secure payment via PayPal</p>
+                <div class="space-y-3 mb-8">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">10 AI agent instances</span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">5,000 tasks/month</span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">Lead generation suite</span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">Email support</span>
+                    </div>
+                </div>
+
+                <div id="paypal-starter" class="paypal-button-container"></div>
             </div>
 
-            <!-- Professional (MOST POPULAR) -->
-            <div class="bg-white rounded-3xl shadow-2xl p-8 card-hover border-4 border-purple-500 relative transform scale-105">
-                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 popular-badge text-white px-6 py-2 rounded-full font-bold text-sm">
-                    🔥 MOST POPULAR
+            <!-- Professional Plan -->
+            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-blue-500 relative">
+                <!-- Popular Badge -->
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div class="bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold">Most Popular</div>
                 </div>
 
                 <div class="text-center mb-8 mt-4">
-                    <div class="text-sm font-bold text-purple-600 uppercase mb-2">Professional</div>
-                    <div class="text-6xl font-black text-gray-900 mb-2">$997</div>
-                    <div class="text-gray-500 text-lg">/month</div>
-                    <div class="text-green-600 font-bold mt-2">Save $200/mo vs Starter</div>
-                </div>
-
-                <div class="space-y-4 mb-8">
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>25 AI Agents</b> - Full automation suite</span>
+                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-2xl">👥</span>
                     </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Advanced lead gen + content creation</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>Priority support</b> (2h response)</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Weekly reports + insights dashboard</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Custom automation workflows</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>1-on-1 onboarding call</b></span>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Professional</h3>
+                    <p class="text-gray-600 mb-6">For growing businesses scaling operations</p>
+                    <div class="mb-6">
+                        <div class="text-5xl font-bold text-gray-900 mb-2">$597</div>
+                        <div class="text-sm text-gray-500">per month</div>
                     </div>
                 </div>
 
-                <div id="paypal-professional" class="mb-4"></div>
-                <p class="text-center text-xs text-gray-500">Secure payment via PayPal</p>
+                <div class="space-y-3 mb-8">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700"><strong>50 AI agent instances</strong></span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700"><strong>50,000 tasks/month</strong></span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">Full agent suite</span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">Priority support</span>
+                    </div>
+                </div>
+
+                <div id="paypal-professional" class="paypal-button-container"></div>
             </div>
 
-            <!-- Enterprise -->
-            <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border-2 border-gray-200">
+            <!-- Enterprise Plan -->
+            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-100 hover:border-purple-200 transition-colors">
                 <div class="text-center mb-8">
-                    <div class="text-sm font-bold text-purple-600 uppercase mb-2">Enterprise</div>
-                    <div class="text-6xl font-black text-gray-900 mb-2">$2,997</div>
-                    <div class="text-gray-500 text-lg">/month</div>
-                    <div class="text-green-600 font-bold mt-2">Best value per agent</div>
-                </div>
-
-                <div class="space-y-4 mb-8">
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>All 42 AI Agents</b> - Complete system</span>
+                    <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-2xl">🏢</span>
                     </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Full automation: sales, ops, content, intel</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>Dedicated success manager</b></span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">24/7 priority support (30min response)</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Daily reports + real-time analytics</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>White-label options</b> for agencies</span>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Enterprise</h3>
+                    <p class="text-gray-600 mb-6">For large organizations at scale</p>
+                    <div class="mb-6">
+                        <div class="text-5xl font-bold text-gray-900 mb-2">$1,497</div>
+                        <div class="text-sm text-gray-500">per month</div>
                     </div>
                 </div>
 
-                <div id="paypal-enterprise" class="mb-4"></div>
-                <p class="text-center text-xs text-gray-500">Secure payment via PayPal</p>
+                <div class="space-y-3 mb-8">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700"><strong>Unlimited agents</strong></span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700"><strong>Unlimited tasks</strong></span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">Custom integrations</span>
+                    </div>
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-gray-700">Dedicated success manager</span>
+                    </div>
+                </div>
+
+                <div id="paypal-enterprise" class="paypal-button-container"></div>
             </div>
         </div>
 
-        <!-- One-Time Services -->
-        <div class="border-t-4 border-gray-200 pt-20">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-                    Or Try a One-Time Report
-                </h2>
-                <p class="text-xl text-gray-600">
-                    Get instant insights without a subscription. Delivered in 48 hours.
-                </p>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-8">
-
-                <!-- BI Report -->
-                <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-8 shadow-lg card-hover">
-                    <div class="mb-6">
-                        <div class="text-4xl mb-4">📊</div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Business Intelligence Report</h3>
-                        <div class="text-4xl font-black text-blue-600 mb-2">$97</div>
-                        <p class="text-gray-600">Comprehensive analysis of your business metrics, opportunities, and blind spots</p>
-                    </div>
-
-                    <div class="space-y-2 mb-6 text-sm text-gray-700">
-                        <div>✓ Revenue analysis & forecasting</div>
-                        <div>✓ Growth opportunities identified</div>
-                        <div>✓ Competitive positioning</div>
-                        <div>✓ 20+ page detailed report</div>
-                    </div>
-
-                    <div id="paypal-bi-report" class="mb-3"></div>
-                    <p class="text-center text-xs text-gray-500">One-time payment</p>
+        <!-- Trust Badges -->
+        <div class="bg-white rounded-2xl p-8 shadow-xl text-center mb-8">
+            <div class="flex flex-col md:flex-row justify-center items-center gap-8">
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-gray-700 font-semibold">30-Day Money-Back Guarantee</span>
                 </div>
-
-                <!-- Competitive Analysis -->
-                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 shadow-lg card-hover">
-                    <div class="mb-6">
-                        <div class="text-4xl mb-4">🎯</div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Competitive Analysis</h3>
-                        <div class="text-4xl font-black text-purple-600 mb-2">$147</div>
-                        <p class="text-gray-600">Deep dive into your competitors' strategies, pricing, and market positioning</p>
-                    </div>
-
-                    <div class="space-y-2 mb-6 text-sm text-gray-700">
-                        <div>✓ Top 5 competitors analyzed</div>
-                        <div>✓ Pricing strategy breakdown</div>
-                        <div>✓ Market gaps identified</div>
-                        <div>✓ Actionable recommendations</div>
-                    </div>
-
-                    <div id="paypal-competitive" class="mb-3"></div>
-                    <p class="text-center text-xs text-gray-500">One-time payment</p>
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-gray-700 font-semibold">Secure Payment Processing</span>
                 </div>
-
-                <!-- Growth Forecast -->
-                <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-8 shadow-lg card-hover">
-                    <div class="mb-6">
-                        <div class="text-4xl mb-4">📈</div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">90-Day Growth Forecast</h3>
-                        <div class="text-4xl font-black text-green-600 mb-2">$247</div>
-                        <p class="text-gray-600">Predictive analytics and growth projections with specific action steps</p>
-                    </div>
-
-                    <div class="space-y-2 mb-6 text-sm text-gray-700">
-                        <div>✓ Revenue projections (3 months)</div>
-                        <div>✓ Growth strategy roadmap</div>
-                        <div>✓ Resource allocation plan</div>
-                        <div>✓ Risk assessment & mitigation</div>
-                    </div>
-
-                    <div id="paypal-growth" class="mb-3"></div>
-                    <p class="text-center text-xs text-gray-500">One-time payment</p>
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-purple-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                    </svg>
+                    <span class="text-gray-700 font-semibold">Cancel Anytime</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Trust Section -->
-    <div class="bg-gray-900 text-white py-16">
-        <div class="max-w-6xl mx-auto px-4">
-            <div class="grid md:grid-cols-4 gap-8 text-center">
-                <div>
-                    <div class="text-4xl mb-3">🔒</div>
-                    <div class="font-bold mb-2">100% Secure</div>
-                    <div class="text-sm text-gray-400">PayPal encrypted checkout</div>
-                </div>
-                <div>
-                    <div class="text-4xl mb-3">⚡</div>
-                    <div class="font-bold mb-2">Instant Access</div>
-                    <div class="text-sm text-gray-400">Setup in under 5 minutes</div>
-                </div>
-                <div>
-                    <div class="text-4xl mb-3">💰</div>
-                    <div class="font-bold mb-2">Money Back</div>
-                    <div class="text-sm text-gray-400">30-day full refund guarantee</div>
-                </div>
-                <div>
-                    <div class="text-4xl mb-3">🏆</div>
-                    <div class="font-bold mb-2">Cancel Anytime</div>
-                    <div class="text-sm text-gray-400">No contracts or commitments</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer CTA -->
-    <div class="gradient-bg text-white py-16 text-center">
-        <h3 class="text-3xl font-bold mb-4">Ready to automate your business?</h3>
-        <p class="text-xl mb-8">Join 500+ businesses using SINCOR AI agents</p>
-        <a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" class="bg-white text-purple-600 px-10 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition inline-block">
-            Choose Your Plan ↑
-        </a>
-    </div>
-
-    <!-- Load PayPal SDK (SANDBOX MODE for testing) -->
-    <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD"></script>
+    <!-- PayPal SDK -->
+    <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD&vault=true&intent=subscription"></script>
 
     <script>
-        // Starter - $297/month
-        paypal.Buttons({
-            createOrder: function(data, actions) {
-                return actions.order.create({
-                    purchase_units: [{
-                        amount: { value: '297.00', currency_code: 'USD' },
-                        description: 'SINCOR Starter Plan - Monthly Subscription'
-                    }]
-                });
-            },
-            onApprove: function(data, actions) {
-                return actions.order.capture().then(function(details) {
-                    window.location.href = '/payment/success';
-                });
-            }
-        }).render('#paypal-starter');
+        // PayPal button configurations
+        const plans = {
+            starter: { amount: '297.00', name: 'SINCOR Starter Plan' },
+            professional: { amount: '597.00', name: 'SINCOR Professional Plan' },
+            enterprise: { amount: '1497.00', name: 'SINCOR Enterprise Plan' }
+        };
 
-        // Professional - $997/month
-        paypal.Buttons({
-            createOrder: function(data, actions) {
-                return actions.order.create({
-                    purchase_units: [{
-                        amount: { value: '997.00', currency_code: 'USD' },
-                        description: 'SINCOR Professional Plan - Monthly Subscription'
-                    }]
-                });
-            },
-            onApprove: function(data, actions) {
-                return actions.order.capture().then(function(details) {
-                    window.location.href = '/payment/success';
-                });
-            }
-        }).render('#paypal-professional');
+        function createPayPalButton(planType, containerId) {
+            const plan = plans[planType];
 
-        // Enterprise - $2,997/month
-        paypal.Buttons({
-            createOrder: function(data, actions) {
-                return actions.order.create({
-                    purchase_units: [{
-                        amount: { value: '2997.00', currency_code: 'USD' },
-                        description: 'SINCOR Enterprise Plan - Monthly Subscription'
-                    }]
-                });
-            },
-            onApprove: function(data, actions) {
-                return actions.order.capture().then(function(details) {
-                    window.location.href = '/payment/success';
-                });
-            }
-        }).render('#paypal-enterprise');
+            paypal.Buttons({
+                style: {
+                    shape: 'rect',
+                    color: planType === 'starter' ? 'green' : planType === 'professional' ? 'blue' : 'black',
+                    layout: 'vertical',
+                    label: 'subscribe'
+                },
+                createSubscription: function(data, actions) {
+                    // For demo: create order instead of subscription
+                    return actions.order.create({
+                        purchase_units: [{
+                            amount: {
+                                value: plan.amount,
+                                currency_code: 'USD'
+                            },
+                            description: plan.name + ' - Monthly Subscription'
+                        }]
+                    });
+                },
+                onApprove: function(data, actions) {
+                    return actions.order.capture().then(function(details) {
+                        // Redirect to success page
+                        window.location.href = '/success?plan=' + planType + '&order=' + data.orderID;
+                    });
+                },
+                onError: function(err) {
+                    console.error('PayPal Error:', err);
+                    alert('Payment processing error. Please try again or contact support.');
+                }
+            }).render('#' + containerId);
+        }
 
-        // BI Report - $97
-        paypal.Buttons({
-            createOrder: function(data, actions) {
-                return actions.order.create({
-                    purchase_units: [{
-                        amount: { value: '97.00', currency_code: 'USD' },
-                        description: 'Business Intelligence Report'
-                    }]
-                });
-            },
-            onApprove: function(data, actions) {
-                return actions.order.capture().then(function(details) {
-                    window.location.href = '/payment/success';
-                });
-            }
-        }).render('#paypal-bi-report');
-
-        // Competitive Analysis - $147
-        paypal.Buttons({
-            createOrder: function(data, actions) {
-                return actions.order.create({
-                    purchase_units: [{
-                        amount: { value: '147.00', currency_code: 'USD' },
-                        description: 'Competitive Analysis Report'
-                    }]
-                });
-            },
-            onApprove: function(data, actions) {
-                return actions.order.capture().then(function(details) {
-                    window.location.href = '/payment/success';
-                });
-            }
-        }).render('#paypal-competitive');
-
-        // Growth Forecast - $247
-        paypal.Buttons({
-            createOrder: function(data, actions) {
-                return actions.order.create({
-                    purchase_units: [{
-                        amount: { value: '247.00', currency_code: 'USD' },
-                        description: '90-Day Growth Forecast'
-                    }]
-                });
-            },
-            onApprove: function(data, actions) {
-                return actions.order.capture().then(function(details) {
-                    window.location.href = '/payment/success';
-                });
-            }
-        }).render('#paypal-growth');
+        // Initialize all PayPal buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            createPayPalButton('starter', 'paypal-starter');
+            createPayPalButton('professional', 'paypal-professional');
+            createPayPalButton('enterprise', 'paypal-enterprise');
+        });
     </script>
 </body>
 </html>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORTEX Chat Widget Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #00ff41;
+            font-family: 'Monaco', monospace;
+            min-height: 100vh;
+        }
+        
+        .test-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 20px #00ff41;
+            margin-bottom: 30px;
+        }
+        
+        .instructions {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-button {
+            background: linear-gradient(45deg, #00ff41, #00aa00);
+            border: none;
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        .test-button:hover {
+            background: linear-gradient(45deg, #00aa00, #008800);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-content">
+        <h1>🧠 CORTEX Chat Widget Test</h1>
+        
+        <div class="instructions">
+            <h2>✅ Test Instructions:</h2>
+            <ol>
+                <li><strong>Look for the floating brain icon (🧠)</strong> in the bottom-right corner</li>
+                <li><strong>Click the brain icon</strong> to open the CORTEX chat window</li>
+                <li><strong>Try sending messages</strong> like "Get me 100 leads" or click quick action buttons</li>
+                <li><strong>Watch for responses</strong> and check that scrolling works properly</li>
+                <li><strong>Test the agent panel</strong> by clicking the 🤖 Agents button</li>
+                <li><strong>Minimize/close</strong> the chat to test all functionality</li>
+            </ol>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Sample Test Messages</h3>
+            <p>Try copying and pasting these into the chat:</p>
+            <button class="test-button" onclick="testMessage('Get me 100 leads for my auto detailing business')">Test Lead Generation</button>
+            <button class="test-button" onclick="testMessage('How is my business performing this month?')">Test Business Report</button>
+            <button class="test-button" onclick="testMessage('Launch a marketing campaign for my HVAC service')">Test Campaign Launch</button>
+            <button class="test-button" onclick="testMessage('help')">Test Help Command</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📱 Responsive Test</h3>
+            <p>Resize your browser window to test mobile responsiveness. The chat should adapt to smaller screens.</p>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔄 Connection Status</h3>
+            <p id="connection-status">Checking CORTEX backend connection...</p>
+        </div>
+        
+        <div style="height: 200vh; padding: 20px; text-align: center;">
+            <p>⬇️ Scroll down to test chat positioning ⬇️</p>
+            <br><br><br><br><br><br><br><br><br><br>
+            <p>🧠 The CORTEX chat widget should stay fixed in the bottom-right corner</p>
+            <br><br><br><br><br><br><br><br><br><br>
+            <p>✅ Chat widget positioning test complete!</p>
+        </div>
+    </div>
+
+    <!-- CORTEX Chat Widget -->
+    <script src="/static/cortex_chat_widget.js"></script>
+    
+    <script>
+        function testMessage(message) {
+            alert(`Copy this message into the CORTEX chat:\n\n"${message}"`);
+        }
+        
+        // Check backend connection
+        setTimeout(() => {
+            const status = document.getElementById('connection-status');
+            try {
+                fetch('http://localhost:5001/admin/chat')
+                    .then(response => {
+                        if (response.ok) {
+                            status.innerHTML = '✅ CORTEX backend connected (localhost:5001)';
+                            status.style.color = '#00ff41';
+                        } else {
+                            status.innerHTML = '⚠️ CORTEX backend not responding - chat will work in demo mode';
+                            status.style.color = '#ff8800';
+                        }
+                    })
+                    .catch(error => {
+                        status.innerHTML = '💡 CORTEX backend not connected - chat will work in demo mode';
+                        status.style.color = '#ff8800';
+                    });
+            } catch (error) {
+                status.innerHTML = '💡 Running in demo mode';
+                status.style.color = '#00aa00';
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+[
+  {
+    "timestamp": "2025-08-28T21:40:39.049741",
+    "persona": {
+      "openness": 0.858,
+      "conscientiousness": 0.65,
+      "extraversion": 0.4,
+      "agreeableness": 0.7,
+      "neuroticism": 0.3,
+      "risk_tolerance": 0.604,
+      "humor_level": 0.35,
+      "directness": 0.746,
+      "code_preference": 0.3,
+      "table_preference": 0.85,
+      "story_preference": 0.45,
+      "archetype": "Scout",
+      "last_updated": "2025-08-28T21:40:39.049280",
+      "version": 2
+    },
+    "continuity_index": 1.0,
+    "checkpoint_type": "scheduled"
+  },
+  {
+    "timestamp": "2025-08-28T21:40:39.066525",
+    "persona": {
+      "openness": 0.864,
+      "conscientiousness": 0.65,
+      "extraversion": 0.4,
+      "agreeableness": 0.7,
+      "neuroticism": 0.3,
+      "risk_tolerance": 0.598,
+      "humor_level": 0.35,
+      "directness": 0.742,
+      "code_preference": 0.3,
+      "table_preference": 0.85,
+      "story_preference": 0.45,
+      "archetype": "Scout",
+      "last_updated": "2025-08-28T21:40:39.065974",
+      "version": 5
+    },
+    "continuity_index": 1.0,
+    "checkpoint_type": "scheduled"
+  },
+  {
+    "timestamp": "2025-08-28T21:40:39.082132",
+    "persona": {
+      "openness": 0.878,
+      "conscientiousness": 0.65,
+      "extraversion": 0.4,
+      "agreeableness": 0.7,
+      "neuroticism": 0.3,
+      "risk_tolerance": 0.596,
+      "humor_level": 0.35,
+      "directness": 0.748,
+      "code_preference": 0.3,
+      "table_preference": 0.85,
+      "story_preference": 0.45,
+      "archetype": "Scout",
+      "last_updated": "2025-08-28T21:40:39.081511",
+      "version": 8
+    },
+    "continuity_index": 1.0,
+    "checkpoint_type": "scheduled"
+  },
+  {
+    "timestamp": "2025-08-28T21:40:39.102046",
+    "persona": {
+      "openness": 0.884,
+      "conscientiousness": 0.65,
+      "extraversion": 0.4,
+      "agreeableness": 0.7,
+      "neuroticism": 0.3,
+      "risk_tolerance": 0.588,
+      "humor_level": 0.35,
+      "directness": 0.754,
+      "code_preference": 0.3,
+      "table_preference": 0.85,
+      "story_preference": 0.45,
+      "archetype": "Scout",
+      "last_updated": "2025-08-28T21:40:39.100885",
+      "version": 11
+    },
+    "continuity_index": 1.0,
+    "checkpoint_type": "scheduled"
+  },
+  {
+    "timestamp": "2025-08-28T21:40:39.119579",
+    "persona": {
+      "openness": 0.904,
+      "conscientiousness": 0.65,
+      "extraversion": 0.4,
+      "agreeableness": 0.7,
+      "neuroticism": 0.3,
+      "risk_tolerance": 0.596,
+      "humor_level": 0.35,
+      "directness": 0.76,
+      "code_preference": 0.3,
+      "table_preference": 0.85,
+      "story_preference": 0.45,
+      "archetype": "Scout",
+      "last_updated": "2025-08-28T21:40:39.118762",
+      "version": 14
+    },
+    "continuity_index": 1.0,
+    "checkpoint_type": "scheduled"
+  }
+]

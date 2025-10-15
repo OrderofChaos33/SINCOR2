@@ -1,0 +1,29 @@
+# Exclude Flask apps that conflict with FastAPI
+index.py
+main.py
+railway_app.py
+run.py
+run_clean.py
+simple.py
+simple_broken.py
+test_*.py
+
+# Standard ignores
+.git
+.venv
+__pycache__
+*.pyc
+.env
+.DS_Store
+node_modules
+.gitignore
+README.md
+*.md
+*.zip
+*.db
+*.png
+*.pdf
+*.log
+
+# Keep requirements.txt - it's needed for Docker build
+!requirements.txt

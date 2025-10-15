@@ -1,0 +1,29 @@
+{
+  "Flyer_A4_V1": {
+    "template_id": "REPLACE_WITH_YOUR_CANVA_TEMPLATE_ID",
+    "slots": {
+      "Headline": "{{headline}}",
+      "Subhead": "{{subhead}}",
+      "Testimonial": "{{testimonial}}",
+      "CTA": "{{cta}}",
+      "Phone": "{{brand.phone}}",
+      "URL": "{{brand.website}}",
+      "HeroImage": "{{asset.hero}}"
+    },
+    "export": [
+      "PDF",
+      "PNG"
+    ]
+  },
+  "IG_Square_V1": {
+    "template_id": "REPLACE_WITH_IG_SQUARE_TEMPLATE_ID",
+    "slots": {
+      "Hook": "{{headline}}",
+      "CTA": "{{cta}}",
+      "Logo": "{{asset.logo}}"
+    },
+    "export": [
+      "PNG"
+    ]
+  }
+}

@@ -1,0 +1,101 @@
+from flask import Flask, render_template
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return render_template('home.html')
+
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
+
+@app.route('/features')
+def features():
+    return render_template('features.html')
+
+@app.route('/pricing')
+def pricing():
+    return render_template('pricing.html')
+
+@app.route('/demo')
+def demo():
+    return render_template('demo.html')
+
+@app.route('/demo/access')
+def demo_access():
+    return render_template('demo_access.html')
+
+# Automated System Pages
+@app.route('/automation')
+def automation():
+    return render_template('automation.html')
+
+@app.route('/analytics')
+def analytics():
+    return render_template('analytics.html')
+
+@app.route('/intelligence')
+def intelligence():
+    return render_template('intelligence.html')
+
+@app.route('/integration')
+def integration():
+    return render_template('integration.html')
+
+@app.route('/security')
+def security():
+    return render_template('security.html')
+
+@app.route('/enterprise')
+def enterprise():
+    return render_template('enterprise.html')
+
+@app.route('/solutions')
+def solutions():
+    return render_template('solutions.html')
+
+# Craft System Pages
+@app.route('/craft/media-processor')
+def craft_media_processor():
+    return render_template('craft_media_processor.html')
+
+@app.route('/craft/content-generator')
+def craft_content_generator():
+    return render_template('craft_content_generator.html')
+
+@app.route('/craft/workflow-engine')
+def craft_workflow_engine():
+    return render_template('craft_workflow_engine.html')
+
+@app.route('/craft/data-pipeline')
+def craft_data_pipeline():
+    return render_template('craft_data_pipeline.html')
+
+@app.route('/craft/model-trainer')
+def craft_model_trainer():
+    return render_template('craft_model_trainer.html')
+
+@app.route('/craft/deployment-manager')
+def craft_deployment_manager():
+    return render_template('craft_deployment_manager.html')
+
+@app.route('/craft/service-automation')
+def craft_service_automation():
+    return render_template('craft_service_automation.html')
+
+# Admin Control Panel
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    return render_template('admin_dashboard.html')
+
+@app.route('/admin/analytics')
+def analytics_dashboard():
+    return render_template('analytics_dashboard.html')
+
+@app.route('/admin/monitor')
+def system_monitor():
+    return render_template('system_monitor.html')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=9000, debug=True)

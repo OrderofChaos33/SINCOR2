@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}SINCOR Debug - System Status{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100 py-8">
+    <div class="max-w-6xl mx-auto px-4">
+        <h1 class="text-3xl font-bold mb-8 text-center">SINCOR System Debug</h1>
+        
+        <!-- Server Status -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-green-600">✅ Server Status - Working</h2>
+            <ul class="space-y-2 text-sm">
+                <li>✅ Flask server running</li>
+                <li>✅ Templates loading</li>
+                <li>✅ Static files accessible</li>
+                <li>✅ Routing functional</li>
+            </ul>
+        </div>
+
+        <!-- Navigation Test -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">🔗 Navigation Test</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <a href="/" class="block p-3 bg-blue-100 rounded hover:bg-blue-200 text-center">Home</a>
+                <a href="/features" class="block p-3 bg-blue-100 rounded hover:bg-blue-200 text-center">Features</a>
+                <a href="/pricing" class="block p-3 bg-blue-100 rounded hover:bg-blue-200 text-center">Pricing</a>
+                <a href="/demo" class="block p-3 bg-blue-100 rounded hover:bg-blue-200 text-center">Demo</a>
+                <a href="/contact" class="block p-3 bg-blue-100 rounded hover:bg-blue-200 text-center">Contact</a>
+                <a href="/about" class="block p-3 bg-blue-100 rounded hover:bg-blue-200 text-center">About</a>
+            </div>
+        </div>
+
+        <!-- Dashboard Access Test -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">📊 Dashboard Access Test</h2>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded">
+                    <span>Public Dashboard:</span>
+                    <a href="/dashboard/public" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Test Access</a>
+                </div>
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded">
+                    <span>Member Dashboard (via demo access):</span>
+                    <a href="/demo/access" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Test Access</a>
+                </div>
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded">
+                    <span>Admin Dashboard (via admin access):</span>
+                    <a href="/admin/access" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">Test Access</a>
+                </div>
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded">
+                    <span>Direct Member Dashboard:</span>
+                    <a href="/dashboard" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Test Direct</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Test -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">🔌 API Test</h2>
+            <div class="space-y-4">
+                <button onclick="testAPI('contact')" class="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600">
+                    Test Contact API
+                </button>
+                <button onclick="testAPI('auth-member')" class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+                    Test Member Auth API
+                </button>
+                <button onclick="testAPI('auth-admin')" class="w-full bg-purple-500 text-white py-2 px-4 rounded hover:bg-purple-600">
+                    Test Admin Auth API
+                </button>
+                <div id="api-results" class="mt-4 p-4 bg-gray-50 rounded min-h-16">
+                    <em>API results will appear here...</em>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Test -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4">📝 Form Test</h2>
+            <form class="signup-form space-y-4" onsubmit="return testForm(event)">
+                <input type="email" name="email" placeholder="test@example.com" required 
+                       class="w-full p-3 border rounded-lg focus:border-blue-500 focus:outline-none">
+                <input type="text" name="firstName" placeholder="Test Name" 
+                       class="w-full p-3 border rounded-lg focus:border-blue-500 focus:outline-none">
+                <input type="text" name="company" placeholder="Test Company" 
+                       class="w-full p-3 border rounded-lg focus:border-blue-500 focus:outline-none">
+                <button type="submit" class="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600">
+                    Test Form Submission
+                </button>
+            </form>
+            <div id="form-results" class="mt-4 p-4 bg-gray-50 rounded min-h-16">
+                <em>Form results will appear here...</em>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function testAPI(type) {
+    const resultsDiv = document.getElementById('api-results');
+    resultsDiv.innerHTML = '<em>Testing...</em>';
+    
+    let url = '';
+    let data = {};
+    
+    switch(type) {
+        case 'contact':
+            url = '/api/contact';
+            data = {email: 'test@example.com', firstName: 'Test', company: 'Test Co'};
+            break;
+        case 'auth-member':
+            url = '/api/authenticate';
+            data = {user_level: 'member'};
+            break;
+        case 'auth-admin':
+            url = '/api/authenticate';
+            data = {admin: true, user_level: 'admin'};
+            break;
+    }
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        resultsDiv.innerHTML = `<strong>✅ Success:</strong><br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+    })
+    .catch(error => {
+        resultsDiv.innerHTML = `<strong>❌ Error:</strong><br>${error.message}`;
+    });
+}
+
+function testForm(event) {
+    event.preventDefault();
+    const resultsDiv = document.getElementById('form-results');
+    resultsDiv.innerHTML = '<em>Testing form submission...</em>';
+    
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
+    
+    resultsDiv.innerHTML = `<strong>📝 Form Data Collected:</strong><br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+    
+    // Test if SINCOR functions are available
+    if (window.SINCOR && window.SINCOR.submitContactForm) {
+        resultsDiv.innerHTML += '<br><strong>✅ SINCOR.submitContactForm found - calling...</strong>';
+        window.SINCOR.submitContactForm(data);
+    } else {
+        resultsDiv.innerHTML += '<br><strong>❌ SINCOR.submitContactForm not found</strong>';
+    }
+    
+    return false;
+}
+
+// Test JavaScript loading
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Debug page loaded');
+    if (window.SINCOR) {
+        console.log('SINCOR object found:', Object.keys(window.SINCOR));
+    } else {
+        console.log('SINCOR object not found');
+    }
+});
+</script>
+{% endblock %}

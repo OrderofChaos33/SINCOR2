@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Content Generator - SINCOR Craft{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative overflow-hidden">
+    <!-- Neural Network Background -->
+    <div class="absolute inset-0 opacity-20">
+        <div class="neural-network"></div>
+    </div>
+
+    <!-- Header -->
+    <section class="relative pt-32 pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-3xl mb-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-5xl font-black text-white mb-4">
+                            Content <span class="morphing-text">Generator</span>
+                        </h1>
+                        <p class="text-xl text-gray-300">
+                            AI-powered content creation and optimization platform
+                        </p>
+                    </div>
+                    <div class="flex space-x-4">
+                        <button class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-300">
+                            Generate Content
+                        </button>
+                        <button class="glassmorphism text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/20 transition-all duration-300">
+                            Templates
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Generation Stats -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-6">
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-purple-400 mb-2">342</div>
+                    <p class="text-gray-300">Articles Generated</p>
+                </div>
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-blue-400 mb-2">1.2M</div>
+                    <p class="text-gray-300">Words Created</p>
+                </div>
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-green-400 mb-2">89%</div>
+                    <p class="text-gray-300">Quality Score</p>
+                </div>
+                <div class="glassmorphism p-6 rounded-xl text-center">
+                    <div class="text-3xl font-bold text-orange-400 mb-2">12</div>
+                    <p class="text-gray-300">Active Projects</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Content Generation Interface -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Generation Form -->
+                <div class="glassmorphism p-8 rounded-2xl">
+                    <h3 class="text-2xl font-bold text-white mb-6">Create New Content</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Content Type</label>
+                            <select class="w-full bg-gray-800 text-white rounded-lg p-3 border border-gray-600">
+                                <option>Blog Article</option>
+                                <option>Social Media Post</option>
+                                <option>Product Description</option>
+                                <option>Email Campaign</option>
+                                <option>Press Release</option>
+                                <option>Marketing Copy</option>
+                                <option>Technical Documentation</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Topic/Subject</label>
+                            <input type="text" placeholder="Enter the main topic or subject" class="w-full bg-gray-800 text-white rounded-lg p-3 border border-gray-600">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Target Audience</label>
+                            <select class="w-full bg-gray-800 text-white rounded-lg p-3 border border-gray-600">
+                                <option>General Public</option>
+                                <option>Business Professionals</option>
+                                <option>Technical Experts</option>
+                                <option>Students/Academics</option>
+                                <option>Marketing Teams</option>
+                                <option>C-Level Executives</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Tone & Style</label>
+                            <select class="w-full bg-gray-800 text-white rounded-lg p-3 border border-gray-600">
+                                <option>Professional</option>
+                                <option>Conversational</option>
+                                <option>Technical</option>
+                                <option>Persuasive</option>
+                                <option>Informative</option>
+                                <option>Creative</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Word Count</label>
+                            <select class="w-full bg-gray-800 text-white rounded-lg p-3 border border-gray-600">
+                                <option>Short (300-500 words)</option>
+                                <option>Medium (800-1200 words)</option>
+                                <option>Long (1500-2500 words)</option>
+                                <option>Extended (3000+ words)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Additional Instructions</label>
+                            <textarea rows="4" placeholder="Include specific requirements, keywords, or guidelines..." class="w-full bg-gray-800 text-white rounded-lg p-3 border border-gray-600"></textarea>
+                        </div>
+
+                        <button class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-300">
+                            Generate Content
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Generated Content Preview -->
+                <div class="glassmorphism p-8 rounded-2xl">
+                    <h3 class="text-2xl font-bold text-white mb-6">Content Preview</h3>
+                    <div class="bg-gray-800 rounded-lg p-6 min-h-[400px]">
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-gray-400 text-sm">Generated: 2 minutes ago</span>
+                                <span class="text-green-400 text-sm">Quality: 94%</span>
+                            </div>
+                            <h4 class="text-xl font-semibold text-white mb-4">AI-Driven Business Intelligence: Transforming Data into Strategic Advantage</h4>
+                        </div>
+
+                        <div class="text-gray-300 space-y-4 text-sm">
+                            <p>In today's rapidly evolving business landscape, organizations are generating unprecedented amounts of data. The ability to transform this raw information into actionable insights has become a critical differentiator for successful enterprises.</p>
+
+                            <p>AI-powered business intelligence platforms are revolutionizing how companies approach data analysis, offering sophisticated algorithms that can identify patterns, predict trends, and recommend strategic actions with remarkable accuracy.</p>
+
+                            <p>Key benefits include enhanced decision-making capabilities, improved operational efficiency, and the ability to identify new revenue opportunities through data-driven insights...</p>
+
+                            <div class="mt-6 pt-4 border-t border-gray-600">
+                                <div class="flex justify-between text-xs text-gray-400">
+                                    <span>Word Count: 1,247</span>
+                                    <span>Reading Time: 5 min</span>
+                                    <span>SEO Score: 87/100</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex space-x-3">
+                        <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                            Edit Content
+                        </button>
+                        <button class="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition-colors">
+                            Export
+                        </button>
+                        <button class="px-4 bg-gray-600 text-white py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors">
+                            ↻
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Content Templates -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-2xl">
+                <h3 class="text-2xl font-bold text-white mb-6">Popular Templates</h3>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-colors cursor-pointer">
+                        <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <h4 class="text-lg font-semibold text-white mb-2">Product Launch</h4>
+                        <p class="text-gray-400 text-sm mb-4">Comprehensive product announcement with features, benefits, and call-to-action</p>
+                        <button class="text-blue-400 hover:text-blue-300 font-medium">Use Template</button>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-colors cursor-pointer">
+                        <div class="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                        <h4 class="text-lg font-semibold text-white mb-2">Case Study</h4>
+                        <p class="text-gray-400 text-sm mb-4">Detailed success story with problem, solution, and measurable results</p>
+                        <button class="text-green-400 hover:text-green-300 font-medium">Use Template</button>
+                    </div>
+
+                    <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-colors cursor-pointer">
+                        <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
+                            </svg>
+                        </div>
+                        <h4 class="text-lg font-semibold text-white mb-2">Social Campaign</h4>
+                        <p class="text-gray-400 text-sm mb-4">Multi-platform social media content with engaging hooks and hashtags</p>
+                        <button class="text-purple-400 hover:text-purple-300 font-medium">Use Template</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recent Generations -->
+    <section class="relative pb-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-2xl">
+                <h3 class="text-2xl font-bold text-white mb-6">Recent Generations</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-white font-medium">AI in Healthcare: Future Trends</p>
+                                <p class="text-gray-400 text-sm">Blog Article • 1,845 words • Quality: 92%</p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="text-blue-400 hover:text-blue-300 font-medium">Edit</button>
+                            <button class="text-green-400 hover:text-green-300 font-medium">Export</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-white font-medium">Q4 Product Launch Campaign</p>
+                                <p class="text-gray-400 text-sm">Marketing Copy • 756 words • Quality: 89%</p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="text-blue-400 hover:text-blue-300 font-medium">Edit</button>
+                            <button class="text-green-400 hover:text-green-300 font-medium">Export</button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-gray-800 rounded-lg p-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-white font-medium">Customer Success Story: TechCorp</p>
+                                <p class="text-gray-400 text-sm">Case Study • 1,234 words • Quality: 95%</p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="text-blue-400 hover:text-blue-300 font-medium">Edit</button>
+                            <button class="text-green-400 hover:text-green-300 font-medium">Export</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+paths:
+  assets: assets
+  outputs: outputs
+  canva: canva
+
+brand:
+  company: "SINCOR"
+  website: "https://getsincor.com"
+  phone: "555-555-0157"
+  slogan: "Automate value. Compound wins."
+  guarantee: "Zero-risk satisfaction. Redo or refund on eligible work."
+
+tones:
+  - professional
+  - hype
+  - technical
+  - local_pride
+  - poetic
+
+modules:
+  flyers: true
+  socials: true
+  adsets: true
+  scripts: true
+  email_drips: true
+  blogs: true
+  whitepapers: true
+  sops: true
+
+quality:
+  mode: strict
+  readability_band: "7-10"
+  min_keypoints_per_section: 3
+  require_evidence: true
+  cta_every_n_sections: 3
+  max_near_duplicate_rate: 0.05
+  threshold_Q: 0.92
+
+swarm:
+  shards: 6
+  roles:
+    - ingestor
+    - planner
+    - drafter
+    - scorer
+    - repairer
+    - reducer
+    - packager
+    - exporter
+    - syndicator
+    - telemetry
+
+canva:
+  export_formats: ["PNG", "PDF"]
+  # Replace with your real template IDs & slot names
+  templates_manifest: "canva/manifest.json"
+
+syndication:
+  wordpress:
+    enabled: false
+    endpoint: "https://example.com/wp-json/wp/v2/posts"
+    auth: "app_password_or_oauth"
+  meta_ads:
+    enabled: false
+    account_id: "act_XXXX"
+    pixel_id: "XXXX"
+  google_ads:
+    enabled: false
+    sheet_id: "XXXX"
+
+telemetry:
+  sink: "bi/events.csv"
+  include_run_metadata: true

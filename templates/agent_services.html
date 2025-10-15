@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Constellation - SINCOR's 47 Elite AI Agents{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="bg-gradient-to-br from-blue-600 to-purple-700 text-white py-16">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">SINCOR Agent Constellation™</h1>
+            <p class="text-xl md:text-2xl mb-8 text-blue-100">47 Elite AI Agents specialized across Lead Generation, Sales, Analysis, Marketing, Operations & Industries</p>
+            <div class="inline-flex items-center bg-green-500 text-black px-8 py-4 rounded-full text-lg font-bold shadow-2xl mb-6">
+                <span class="w-4 h-4 bg-green-300 rounded-full mr-3 animate-pulse"></span>
+                Professional Enterprise Agents Ready for Deployment
+            </div>
+            <a href="{{ url_for('contact') }}" class="inline-block bg-yellow-500 text-black px-8 py-4 rounded-lg text-lg font-semibold hover:bg-yellow-400 transition duration-200 transform hover:scale-105">Deploy Your Agent Team</a>
+        </div>
+    </div>
+</section>
+
+<!-- Agent Categories Overview -->
+<section class="py-20 bg-gray-50">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Complete Agent Constellation</h2>
+
+            <div class="grid md:grid-cols-3 gap-8 mb-16">
+                <div class="bg-white rounded-xl p-8 shadow-lg text-center">
+                    <div class="text-4xl font-bold text-blue-600 mb-2">47</div>
+                    <p class="text-gray-600 font-medium">Professional AI Agents</p>
+                    <p class="text-sm text-gray-500">Enterprise specialists</p>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-lg text-center">
+                    <div class="text-4xl font-bold text-purple-600 mb-2">6</div>
+                    <p class="text-gray-600 font-medium">Business Categories</p>
+                    <p class="text-sm text-gray-500">Complete coverage</p>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-lg text-center">
+                    <div class="text-4xl font-bold text-green-600 mb-2">Enterprise</div>
+                    <p class="text-gray-600 font-medium">Grade Platform</p>
+                    <p class="text-sm text-gray-500">Professional deployment</p>
+                </div>
+            </div>
+
+            <!-- Agent Categories -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Lead Generation -->
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                    <h3 class="text-xl font-bold text-blue-800 mb-4">🎯 Lead Generation & Prospecting</h3>
+                    <p class="text-blue-700 mb-4">12 specialized agents for market intelligence and lead discovery</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Agents:</span>
+                            <span class="font-bold">12</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Specialties:</span>
+                            <span class="font-bold">Intelligence, Prospecting</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales & Negotiation -->
+                <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+                    <h3 class="text-xl font-bold text-green-800 mb-4">💼 Sales & Negotiation</h3>
+                    <p class="text-green-700 mb-4">8 expert agents for deal closure and relationship management</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Agents:</span>
+                            <span class="font-bold">8</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Specialties:</span>
+                            <span class="font-bold">Enterprise Sales</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis & Intelligence -->
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+                    <h3 class="text-xl font-bold text-purple-800 mb-4">📊 Analysis & Intelligence</h3>
+                    <p class="text-purple-700 mb-4">9 analytical agents for business intelligence and insights</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Agents:</span>
+                            <span class="font-bold">9</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Specialties:</span>
+                            <span class="font-bold">Data Science, Analytics</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Marketing & Content -->
+                <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200">
+                    <h3 class="text-xl font-bold text-orange-800 mb-4">🎨 Marketing & Content</h3>
+                    <p class="text-orange-700 mb-4">7 creative agents for brand strategy and content creation</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Agents:</span>
+                            <span class="font-bold">7</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Specialties:</span>
+                            <span class="font-bold">Brand, Digital Marketing</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operations & Management -->
+                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200">
+                    <h3 class="text-xl font-bold text-indigo-800 mb-4">⚙️ Operations & Management</h3>
+                    <p class="text-indigo-700 mb-4">6 operational agents for process optimization and automation</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Agents:</span>
+                            <span class="font-bold">6</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Specialties:</span>
+                            <span class="font-bold">Process Excellence</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Specialized Industries -->
+                <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+                    <h3 class="text-xl font-bold text-red-800 mb-4">🏭 Specialized Industries</h3>
+                    <p class="text-red-700 mb-4">5 industry-specific agents for vertical market expertise</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Agents:</span>
+                            <span class="font-bold">5</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Specialties:</span>
+                            <span class="font-bold">Industry Verticals</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Elite Agents -->
+<section class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Featured Elite Agents</h2>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Auriga Scout -->
+                <div class="bg-gradient-to-br from-blue-900 to-blue-800 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-blue-500 rounded-xl flex items-center justify-center text-2xl font-bold mr-4">⭐</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-blue-300">Auriga Scout</h3>
+                            <p class="text-blue-200 text-sm">Market Intelligence Specialist</p>
+                        </div>
+                    </div>
+                    <p class="text-blue-100 mb-4">Market Intelligence Specialist designed for uncovering business opportunities through comprehensive data analysis and market research.</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-blue-300">Specialization:</span>
+                            <span class="text-blue-200">Market Intelligence</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-blue-300">Focus:</span>
+                            <span class="text-blue-200">Lead Generation</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-blue-300">Status:</span>
+                            <span class="text-green-400 font-bold">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fomalhaut Strategic Closer -->
+                <div class="bg-gradient-to-br from-green-900 to-green-800 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-green-500 rounded-xl flex items-center justify-center text-2xl font-bold mr-4">💼</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-green-300">Fomalhaut Strategic Closer</h3>
+                            <p class="text-green-200 text-sm">Enterprise Deal Architect</p>
+                        </div>
+                    </div>
+                    <p class="text-green-100 mb-4">Enterprise Deal Architect built for complex negotiations and strategic partnership development within SINCOR's sales automation platform.</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-green-300">Specialization:</span>
+                            <span class="text-green-200">Enterprise Sales</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-green-300">Focus:</span>
+                            <span class="text-green-200">Deal Closure</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-green-300">Status:</span>
+                            <span class="text-green-400 font-bold">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Polaris Executive Analyst -->
+                <div class="bg-gradient-to-br from-purple-900 to-purple-800 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-purple-500 rounded-xl flex items-center justify-center text-2xl font-bold mr-4">📊</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-purple-300">Polaris Executive Analyst</h3>
+                            <p class="text-purple-200 text-sm">Executive Intelligence Synthesizer</p>
+                        </div>
+                    </div>
+                    <p class="text-purple-100 mb-4">Executive Intelligence Synthesizer engineered for comprehensive business analysis and strategic insights within SINCOR's analytics platform.</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-purple-300">Specialization:</span>
+                            <span class="text-purple-200">Business Analytics</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-purple-300">Focus:</span>
+                            <span class="text-purple-200">Executive Intelligence</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-purple-300">Status:</span>
+                            <span class="text-green-400 font-bold">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Betelgeuse Creative Director -->
+                <div class="bg-gradient-to-br from-orange-900 to-orange-800 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-orange-500 rounded-xl flex items-center justify-center text-2xl font-bold mr-4">🎨</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-orange-300">Betelgeuse Creative Director</h3>
+                            <p class="text-orange-200 text-sm">Technical Content & Creative Strategy</p>
+                        </div>
+                    </div>
+                    <p class="text-orange-100 mb-4">Technical Content & Creative Strategy Specialist designed for professional content creation and brand strategy within SINCOR's marketing suite.</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-orange-300">Specialization:</span>
+                            <span class="text-orange-200">Content Strategy</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-orange-300">Focus:</span>
+                            <span class="text-orange-200">Brand Development</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-orange-300">Status:</span>
+                            <span class="text-green-400 font-bold">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alphard Operations Director -->
+                <div class="bg-gradient-to-br from-indigo-900 to-indigo-800 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-indigo-500 rounded-xl flex items-center justify-center text-2xl font-bold mr-4">⚙️</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-indigo-300">Alphard Operations Director</h3>
+                            <p class="text-indigo-200 text-sm">Strategic Operations & Partnership</p>
+                        </div>
+                    </div>
+                    <p class="text-indigo-100 mb-4">Strategic Operations & Partnership Director built for enterprise workflow optimization and strategic alliance management within SINCOR's platform.</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-indigo-300">Specialization:</span>
+                            <span class="text-indigo-200">Operations</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-indigo-300">Focus:</span>
+                            <span class="text-indigo-200">Process Excellence</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-indigo-300">Status:</span>
+                            <span class="text-green-400 font-bold">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PropertyPro Realty Expert -->
+                <div class="bg-gradient-to-br from-red-900 to-red-800 rounded-2xl p-8 text-white">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-red-500 rounded-xl flex items-center justify-center text-2xl font-bold mr-4">🏢</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-red-300">PropertyPro Realty Expert</h3>
+                            <p class="text-red-200 text-sm">Real Estate Market Specialist</p>
+                        </div>
+                    </div>
+                    <p class="text-red-100 mb-4">Real Estate Market Specialist designed for commercial and residential property analysis within SINCOR's industry-specific agent suite.</p>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-red-300">Specialization:</span>
+                            <span class="text-red-200">Real Estate</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-red-300">Focus:</span>
+                            <span class="text-red-200">Market Analysis</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-red-300">Status:</span>
+                            <span class="text-green-400 font-bold">Ready</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Agent Deployment Process -->
+<section class="py-20 bg-gray-50">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Agent Deployment Process</h2>
+
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">1</div>
+                    <h3 class="text-xl font-bold mb-2">Assessment</h3>
+                    <p class="text-gray-600">Analyze your business needs and identify optimal agent configuration</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">2</div>
+                    <h3 class="text-xl font-bold mb-2">Selection</h3>
+                    <p class="text-gray-600">Choose from 47 specialized agents based on your industry and requirements</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">3</div>
+                    <h3 class="text-xl font-bold mb-2">Integration</h3>
+                    <p class="text-gray-600">Seamless deployment with your existing systems and workflows</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">4</div>
+                    <h3 class="text-xl font-bold mb-2">Optimization</h3>
+                    <p class="text-gray-600">Continuous learning and performance improvement for maximum ROI</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Agent Performance Metrics -->
+<section class="py-20 bg-black text-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Enterprise Performance Metrics</h2>
+
+            <div class="grid md:grid-cols-4 gap-8 mb-12">
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-cyan-400 mb-2">47</div>
+                    <p class="text-gray-300">Professional AI Agents</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-green-400 mb-2">6</div>
+                    <p class="text-gray-300">Business Categories</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-purple-400 mb-2">7</div>
+                    <p class="text-gray-300">Premium Products</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-yellow-400 mb-2">Enterprise</div>
+                    <p class="text-gray-300">Grade Platform</p>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-blue-900 to-purple-900 rounded-2xl p-8 text-center">
+                <h3 class="text-2xl font-bold mb-4">Ready to Deploy Your Agent Constellation?</h3>
+                <p class="text-blue-200 mb-6">Transform your business with 47 elite AI agents designed for enterprise success</p>
+                <div class="flex flex-col md:flex-row gap-4 justify-center">
+                    <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-8 py-4 rounded-xl text-lg font-bold hover:from-cyan-400 hover:to-blue-400 transition duration-300 transform hover:scale-105 shadow-lg">
+                        💼 Get Enterprise Quote
+                    </a>
+                    <a href="/demo/access" class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:from-purple-500 hover:to-pink-500 transition duration-300 transform hover:scale-105 shadow-lg">
+                        🚀 Try Agent Demo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

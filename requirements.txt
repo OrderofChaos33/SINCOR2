@@ -1,36 +1,70 @@
-# SINCOR Master Platform Requirements - Production Ready
-# Core Flask framework
-Flask>=3.0.0,<4.0.0
-
-# Essential dependencies
-requests>=2.32.4              # HTTP requests for API integrations
-PyJWT>=2.8.0                  # JWT authentication
-Jinja2>=3.1.0                 # Template engine
-PyYAML>=6.0                   # Configuration files
-python-dotenv>=1.0.0          # Environment variable management
-numpy>=1.24.0                 # Numerical computing for monetization engine
-
-# Security & Authentication (Fix #3)
-flask-jwt-extended>=4.7.0     # JWT authentication with refresh tokens
-
-# Input Validation (Fix #4)
-pydantic[email]>=2.0.0        # Data validation and settings management
-email-validator>=2.0.0        # Email validation for Pydantic
-
-# Rate Limiting (Fix #5)
-flask-limiter>=3.8.0          # Rate limiting for DDoS protection
-
 # AI Integration (Fix #2)
-anthropic>=0.69.0             # Claude 4.5 Sonnet API
-
-# Production Server
-gunicorn>=21.0.0              # Production WSGI server
-
+# Business Intelligence and Automation
+# CSV handling
+# Core Flask framework
+# Database (built into Python)
+# Date and time
+# Development/Testing dependencies
+# Email handling (built into Python)
+# Essential dependencies
+# File handling and paths
+# Flask web framework for lead capture and product platform
+# Input Validation (Fix #4)
+# JSON handling
 # Monitoring
-psutil>=5.9.0                 # System and process monitoring
-
+# Operating system interface
+# Optional: Enhanced functionality
+# Optional: For better development experience
 # Optional: Redis for production rate limiting
+# PayPal integration (uses requests library)
+# Payment Processing
+# Production Server
+# Rate Limiting (Fix #5)
+# Regular expressions
+# SINCOR Master Platform Requirements - Production Ready
+# SINCOR Requirements - Full Monetization Platform
+# Security & Authentication (Fix #3)
+# Threading and multiprocessing
+# csv - built-in
+# datetime - built-in
+# email - built-in
+# json - built-in
+# os - built-in
+# pathlib - built-in (Python 3.4+)
+# re - built-in
 # redis>=5.0.0
+# smtplib - built-in
+# sqlite3 - built-in
+# threading - built-in
+# time - built-in
+Flask>=2.3.0,<4.0.0
+Flask>=3.0.0,<4.0.0
+Jinja2>=3.1.0                 # Template engine
+Jinja2>=3.1.0                # Template engine for content generation
+PyJWT>=2.8.0
+PyJWT>=2.8.0                  # JWT authentication
+PyYAML>=6.0                   # Configuration files
+PyYAML>=6.0                  # YAML configuration files
+anthropic>=0.69.0             # Claude 4.5 Sonnet API
+beautifulsoup4>=4.12.0       # Web scraping for email extraction
 dnspython>=2.6.1 # not directly required, pinned by Snyk to avoid a vulnerability
+email-validator>=2.0.0        # Email validation for Pydantic
+flask-jwt-extended>=4.7.0     # JWT authentication with refresh tokens
+flask-limiter>=3.8.0          # Rate limiting for DDoS protection
+gunicorn>=21.0.0              # Production WSGI server
+lxml>=4.9.0                  # XML/HTML parsing
+numpy>=1.24.0                 # Numerical computing for monetization engine
+numpy>=1.24.0                # Numerical computing for analytics
+pandas>=2.0.0                # Data analysis and manipulation
+psutil>=5.9.0                 # System and process monitoring
+pydantic[email]>=2.0.0        # Data validation and settings management
+pytest-flask>=1.2.0
+pytest>=7.0.0
+python-dotenv>=1.0.0
+python-dotenv>=1.0.0          # Environment variable management
+requests>=2.31.0              # HTTP requests for API calls
+requests>=2.32.4              # HTTP requests for API integrations
+schedule>=1.2.0              # Task scheduling for automation
+selenium>=4.15.0             # Browser automation (if needed)
 urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
 zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability

@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "agent_id": "CUST-9BA51B4EAA2E5E4D-AG-01",
+  "routines": {
+    "boot:v1": {
+      "name": "boot",
+      "version": "v1",
+      "routine_type": "mission",
+      "definition": {
+        "customer_id": "CUST-9BA51B4EAA2E5E4D",
+        "agent_id": "CUST-9BA51B4EAA2E5E4D-AG-01",
+        "budget_tokens": 0,
+        "tool_budget": 0,
+        "started_at": "2025-10-13T15:59:22.823055"
+      },
+      "metadata": {
+        "archetype": "default"
+      },
+      "created": "2025-10-13T15:59:22.823138",
+      "agent_id": "CUST-9BA51B4EAA2E5E4D-AG-01"
+    }
+  },
+  "created": "2025-10-13T10:59:22.775031"
+}

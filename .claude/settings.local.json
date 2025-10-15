@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git revert:*)",
+      "Read(//c/Users/cjay4/OneDrive/Desktop/SINCOR/sincor/**)",
+      "Read(//c/Users/cjay4/OneDrive/Desktop/**)",
+      "Bash(git clone:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

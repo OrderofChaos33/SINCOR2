@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Constellation Monitor - SINCOR Dashboard{% endblock %}
+
+{% block content %}
+<!-- Dashboard Navigation -->
+<nav class="bg-gray-800 text-white py-4 shadow-lg">
+    <div class="container mx-auto px-6">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold">Agent Constellation Monitor</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-gray-300">Real-time Agent Status</span>
+                <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Dashboard Sidebar -->
+<div class="flex min-h-screen bg-gray-100">
+    <aside class="w-64 bg-gray-800 text-white">
+        <div class="p-6">
+            <nav class="space-y-2">
+                <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0"></path>
+                    </svg>
+                    <span>Overview</span>
+                </a>
+                
+                <a href="{{ url_for('agent_constellation') }}" class="flex items-center space-x-3 p-3 bg-blue-600 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    <span>Agent Constellation</span>
+                </a>
+                
+                <a href="{{ url_for('bi_reporting') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <span>BI Reporting</span>
+                </a>
+                
+                <a href="{{ url_for('system_health') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>System Health</span>
+                </a>
+                
+                <a href="{{ url_for('revenue_metrics') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    <span>Revenue Metrics</span>
+                </a>
+                
+                <hr class="my-4 border-gray-700">
+                
+                <a href="{{ url_for('home') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m0 0h6m0 0h3a1 1 0 001-1V10M9 21h6"></path>
+                    </svg>
+                    <span>Back to Website</span>
+                </a>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- Main Dashboard Content -->
+    <main class="flex-1 p-8">
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Agent Constellation Monitor</h2>
+            <p class="text-gray-600">Monitor and manage your deployed AI agents across all systems</p>
+        </div>
+
+        <!-- Agent Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="dashboard-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm">Total Agents</p>
+                        <p class="dashboard-metric">24</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-400 text-sm">All operational</span>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm">Active Agents</p>
+                        <p class="dashboard-metric">23</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-400 text-sm">95.8% uptime</span>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm">In Maintenance</p>
+                        <p class="dashboard-metric">1</p>
+                    </div>
+                    <div class="w-12 h-12 bg-yellow-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-yellow-400 text-sm">Scheduled update</span>
+                </div>
+            </div>
+
+            <div class="dashboard-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-400 text-sm">Alerts Today</p>
+                        <p class="dashboard-metric">3</p>
+                    </div>
+                    <div class="w-12 h-12 bg-red-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.382 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-red-400 text-sm">2 resolved</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Categories -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Performance Agents -->
+            <div class="dashboard-card">
+                <h3 class="text-xl font-bold mb-4">Performance Agents</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                            <div>
+                                <p class="text-white font-semibold">CPU Monitor Alpha</p>
+                                <p class="text-gray-400 text-sm">Server cluster monitoring</p>
+                            </div>
+                        </div>
+                        <div class="text-green-400 text-sm">98% efficiency</div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                            <div>
+                                <p class="text-white font-semibold">Memory Guardian Beta</p>
+                                <p class="text-gray-400 text-sm">Memory leak detection</p>
+                            </div>
+                        </div>
+                        <div class="text-green-400 text-sm">94% efficiency</div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                            <div>
+                                <p class="text-white font-semibold">Disk Sentinel Gamma</p>
+                                <p class="text-gray-400 text-sm">Storage optimization</p>
+                            </div>
+                        </div>
+                        <div class="text-yellow-400 text-sm">Maintenance mode</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Agents -->
+            <div class="dashboard-card">
+                <h3 class="text-xl font-bold mb-4">Security Agents</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                            <div>
+                                <p class="text-white font-semibold">Threat Hunter Delta</p>
+                                <p class="text-gray-400 text-sm">Intrusion detection</p>
+                            </div>
+                        </div>
+                        <div class="text-green-400 text-sm">96% efficiency</div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                            <div>
+                                <p class="text-white font-semibold">Access Guardian Epsilon</p>
+                                <p class="text-gray-400 text-sm">Login monitoring</p>
+                            </div>
+                        </div>
+                        <div class="text-green-400 text-sm">99% efficiency</div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                            <div>
+                                <p class="text-white font-semibold">Data Protector Zeta</p>
+                                <p class="text-gray-400 text-sm">Data loss prevention</p>
+                            </div>
+                        </div>
+                        <div class="text-green-400 text-sm">97% efficiency</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Activity Chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="dashboard-card lg:col-span-2">
+                <h3 class="text-xl font-bold mb-4">Agent Activity Timeline</h3>
+                <div class="chart-container">
+                    <div class="flex items-center justify-center h-full">
+                        <div class="text-center">
+                            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                            <p class="text-gray-400">Agent activity timeline would display here</p>
+                            <p class="text-gray-500 text-sm mt-2">Shows deployment, alerts, and maintenance events</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Agent Events -->
+            <div class="dashboard-card">
+                <h3 class="text-xl font-bold mb-4">Recent Events</h3>
+                <div class="space-y-4">
+                    <div class="border-l-4 border-green-400 pl-4">
+                        <p class="text-white text-sm font-semibold">Agent Deployed</p>
+                        <p class="text-gray-400 text-xs">Network Scanner Eta deployed to production</p>
+                        <p class="text-gray-500 text-xs">5 minutes ago</p>
+                    </div>
+                    
+                    <div class="border-l-4 border-yellow-400 pl-4">
+                        <p class="text-white text-sm font-semibold">Maintenance Started</p>
+                        <p class="text-gray-400 text-xs">Disk Sentinel Gamma entering maintenance mode</p>
+                        <p class="text-gray-500 text-xs">2 hours ago</p>
+                    </div>
+                    
+                    <div class="border-l-4 border-blue-400 pl-4">
+                        <p class="text-white text-sm font-semibold">Performance Optimization</p>
+                        <p class="text-gray-400 text-xs">CPU Monitor Alpha auto-tuned parameters</p>
+                        <p class="text-gray-500 text-xs">4 hours ago</p>
+                    </div>
+                    
+                    <div class="border-l-4 border-red-400 pl-4">
+                        <p class="text-white text-sm font-semibold">Alert Resolved</p>
+                        <p class="text-gray-400 text-xs">Memory threshold alert automatically resolved</p>
+                        <p class="text-gray-500 text-xs">6 hours ago</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-8 flex space-x-4">
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                Deploy New Agent
+            </button>
+            <button class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                Agent Configuration
+            </button>
+            <button class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                Export Agent Report
+            </button>
+        </div>
+    </main>
+</div>
+{% endblock %}

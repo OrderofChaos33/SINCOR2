@@ -1,0 +1,156 @@
+Dispatch Protocol Template (God-Mode Agent Swarms)
+1. Macro-Goal Definition
+
+Express intent in one line, e.g. “Secure X by Y with Z constraints.”
+
+Encode success metrics upfront: 
+Success
+=
+𝑓
+(
+time
+,
+resources
+,
+impact
+)
+Success=f(time,resources,impact)
+
+2. Seed Agent Instantiation
+
+One agent takes the macro-goal.
+
+Functions as orchestrator, not worker.
+
+Assigns priorities: 70% effort on core, 20% on expansion, 10% on wildcards.
+
+3. Pod Cloning & Role Assignment
+
+Spawn containerized pods, each with a narrow domain.
+
+Each pod = [Input context] + [Execution module] + [Feedback channel].
+
+Pods self-report to the Seed but also cross-signal laterally.
+
+4. Communication & Control Protocol
+
+All pods use a common ontology (shared definitions + tokens).
+
+Events encoded as:
+
+ALERT: risk or obstacle.
+
+SUCCESS: subgoal achieved.
+
+REQUEST: needs reinforcement.
+
+REPORT: metrics dump.
+
+5. Supervision & Integrity Mesh
+
+Audit pods run in parallel, checking for drift, waste, or contradictions.
+
+Kill-switch hierarchy: pod → swarm → seed.
+
+Redundancy: N+1 pods for mission-critical ops.
+
+6. Termination & Re-Cloning
+
+Conditions to dissolve:
+
+KPI threshold reached (goal satisfied).
+
+KPI bleed (failure or diminishing returns).
+
+Time/energy budget exceeded.
+
+Dissolved pods feed into a Memory Ledger (reusable heuristics).
+
+Success → spawn clone swarms for scale.
+
+Advanced Dispatch Examples
+A. Financial Arbitrage Swarm
+
+Goal: Capture short-term arbitrage in crypto + equities simultaneously.
+
+Seed Agent: Defines “profit > 5% ROI/day.”
+
+Pods:
+
+Market Scrapers → APIs across Binance, NYSE, CME.
+
+Signal Filters → cut noise, detect >σ anomalies.
+
+Execution Pods → auto-trade under rate-limit aware logic.
+
+Hedging Pods → simulate risk scenarios.
+
+Advanced Move: When execution pod signals a repeating anomaly, seed spawns a meta-swarm dedicated only to exploiting that anomaly until it collapses.
+
+B. Cultural Saturation Swarm
+
+Goal: Dominate a meme or cultural trend within 72 hours.
+
+Seed Agent: “Trend lifecycle < 96 hours; maximize impressions per cost.”
+
+Pods:
+
+Trend Scouts → scrape TikTok/Twitter/Reddit for spikes.
+
+Content Generators → flood 1000 assets/day in variant styles.
+
+Amplifiers → auto-post, adjust tone by platform.
+
+Sentiment Monitors → if backlash > 20%, pivot narrative.
+
+Advanced Move: If a meme hits escape velocity, spawn a Productization Swarm: agents package it into merch, music hooks, or NFTs overnight.
+
+C. Dark-Room Research Swarm
+
+Goal: Explore uncharted biotech compound families.
+
+Seed Agent: Defines “novelty > 80% + low toxicity < threshold.”
+
+Pods:
+
+Text-miners → crawl arXiv, PubMed, patents.
+
+Generative Chemists → propose new molecules.
+
+Sim Pods → run folding + metabolic sims.
+
+Safety Pods → flag anything legally/ethically risky.
+
+Advanced Move: If a cluster of promising compounds emerges, seed spawns a Funding Swarm to draft papers, apply for grants, and position IP filings.
+
+D. Multi-Swarm Symbiosis
+
+Sometimes the goal is cross-domain synergy.
+
+Scenario: Build a self-growing enterprise.
+
+Swarm 1: Lead-Gen Swarm → captures clients.
+
+Swarm 2: Content Swarm → produces deliverables.
+
+Swarm 3: Finance Swarm → optimizes billing, reinvests profits.
+
+Swarm 4: Recruitment Swarm → identifies gaps, spawns new pods.
+
+Advanced Move: Each swarm feeds surplus data and profit into a Core Ledger Agent that constantly reallocates resources between swarms like an internal VC fund.
+
+E. Reality-Bending Simulation Swarm
+
+Goal: Run futures until you find a survivable or optimal timeline.
+
+Seed Agent: Encodes the “anchor self” (your intent + ethics + continuity checksum).
+
+Pods:
+
+World-Builders → simulate economic, ecological, and technological models.
+
+Narrative Pods → explore cultural + memetic outcomes.
+
+Continuity Pods → check if “you” (identity vector) persists across scenarios.
+
+Advanced Move: When a simulation shows high-fidelity resonance with intent, seed spawns a Reality-Engagement Swarm to push memes, tech, or protocols into the real world to start bending toward that future.

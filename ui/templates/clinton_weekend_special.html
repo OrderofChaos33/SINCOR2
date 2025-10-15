@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>$25 OFF Weekend Detail - Clinton's Licensed & Insured Auto Detail Pro</title>
+    
+    <!-- Urgency-driven meta for instant conversions -->
+    <meta name="description" content="Licensed & Insured Auto Detailing in Clinton, IA. $25 OFF this weekend only! Most experienced, highest rated. Mobile service. Book now - 6 slots left!">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Arial', sans-serif; 
+            line-height: 1.6; 
+            color: #333;
+            background: #f4f4f4;
+        }
+        
+        /* URGENT BANNER - ChatGPT recommendation */
+        .urgent-banner {
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            color: white;
+            text-align: center;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 18px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .urgent-banner .blink {
+            animation: blink 1s linear infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.7; }
+        }
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .hero {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .hero h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .hero .subtitle {
+            font-size: 1.4em;
+            margin-bottom: 30px;
+            color: #ffdd44;
+        }
+        
+        /* Competitive advantage badges */
+        .badges {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        /* HUGE phone number - ChatGPT recommendation */
+        .phone-cta {
+            text-align: center;
+            margin: 40px 0;
+            padding: 30px;
+            background: #ffdd44;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        
+        .phone-number {
+            font-size: 3em;
+            font-weight: bold;
+            color: #cc0000;
+            text-decoration: none;
+            display: block;
+            margin: 20px 0;
+        }
+        
+        .phone-number:hover {
+            color: #990000;
+            text-decoration: underline;
+        }
+        
+        /* Book now button - ChatGPT recommendation */
+        .book-now {
+            text-align: center;
+            margin: 40px 0;
+        }
+        
+        .book-btn {
+            display: inline-block;
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            color: white;
+            font-size: 2em;
+            font-weight: bold;
+            padding: 20px 40px;
+            text-decoration: none;
+            border-radius: 50px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .book-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px rgba(0,0,0,0.4);
+        }
+        
+        /* Services pricing */
+        .services {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+        
+        .service {
+            background: white;
+            border: 3px solid #ddd;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .service:hover {
+            border-color: #28a745;
+            transform: translateY(-5px);
+        }
+        
+        .service.featured {
+            border-color: #ff4444;
+            background: linear-gradient(135deg, #fff5f5, #ffffff);
+        }
+        
+        .service h3 {
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .original-price {
+            text-decoration: line-through;
+            color: #999;
+            font-size: 1.2em;
+        }
+        
+        .sale-price {
+            color: #cc0000;
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        /* Trust signals */
+        .trust-signals {
+            background: #f8f9fa;
+            padding: 40px;
+            margin: 40px 0;
+            border-radius: 15px;
+        }
+        
+        .trust-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            text-align: center;
+        }
+        
+        .trust-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Availability today */
+        .availability {
+            background: #28a745;
+            color: white;
+            padding: 30px;
+            text-align: center;
+            margin: 40px 0;
+            border-radius: 15px;
+        }
+        
+        .availability h2 {
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2em; }
+            .phone-number { font-size: 2em; }
+            .book-btn { font-size: 1.5em; padding: 15px 30px; }
+            .badges { flex-direction: column; align-items: center; }
+        }
+        
+        /* Countdown timer */
+        .countdown {
+            background: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin: 30px 0;
+            border-radius: 10px;
+            font-size: 1.2em;
+        }
+        
+        .countdown-timer {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffdd44;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- URGENT BANNER -->
+    <div class="urgent-banner">
+        <span class="blink">⚡ WEEKEND SPECIAL</span> - $25 OFF Auto Detailing - Licensed & Insured - Only 6 Slots Left! 
+        <span class="blink">⚡ ENDS SUNDAY</span>
+    </div>
+
+    <div class="container">
+        <!-- HERO SECTION -->
+        <div class="hero">
+            <h1>Weekend Detail Special</h1>
+            <div class="subtitle">$25 OFF — Limited to 6 Slots Only</div>
+            <p style="font-size: 1.2em;">Clinton's ONLY Licensed & Insured Auto Detail Professional</p>
+        </div>
+
+        <!-- COMPETITIVE ADVANTAGE BADGES -->
+        <div class="badges">
+            <div class="badge">🏆 Licensed & Insured</div>
+            <div class="badge">⭐ Highest Rated in Clinton</div>
+            <div class="badge">👨‍🔧 Most Experienced Pro</div>
+            <div class="badge">🚗 Mobile Service Available</div>
+            <div class="badge">💯 Only 2 Competitors - We're #1</div>
+        </div>
+
+        <!-- HUGE PHONE CTA -->
+        <div class="phone-cta">
+            <h2 style="margin-bottom: 15px;">CALL NOW - Response in 15 Minutes!</h2>
+            <a href="tel:+18157188936" class="phone-number">(815) 718-8936</a>
+            <p style="font-size: 1.1em; font-weight: bold;">Click to call on mobile • We answer fast!</p>
+        </div>
+
+        <!-- BOOK NOW BUTTON -->
+        <div class="book-now">
+            <a href="https://clintondetailing.com/booking" class="book-btn">
+                📅 BOOK NOW - Response in 15 MIN
+            </a>
+            <p style="margin-top: 15px; font-size: 1.1em;">Secure online booking • Instant confirmation</p>
+        </div>
+
+        <!-- AVAILABILITY TODAY -->
+        <div class="availability">
+            <h2>🗓️ TODAY AVAILABILITY</h2>
+            <p style="font-size: 1.3em;">6 slots remaining this weekend • Book now to secure yours</p>
+            <p>We come to you in Clinton, Bettendorf, Davenport & Quad Cities area</p>
+        </div>
+
+        <!-- COUNTDOWN TIMER -->
+        <div class="countdown">
+            <div>⏰ Weekend Special Ends In:</div>
+            <div class="countdown-timer" id="countdown">
+                <!-- JavaScript countdown will go here -->
+                Sunday 11:59 PM
+            </div>
+            <div>Don't miss out on $25 OFF savings!</div>
+        </div>
+
+        <!-- SERVICES WITH PRICING -->
+        <h2 style="text-align: center; margin: 40px 0 30px; font-size: 2.5em;">Services & Pricing</h2>
+        
+        <div class="services">
+            <div class="service">
+                <h3>Basic Wash</h3>
+                <p>Exterior wash, dry, and basic interior cleaning</p>
+                <div class="sale-price">$40</div>
+                <p>⏱️ 1 hour • Perfect for regular maintenance</p>
+            </div>
+
+            <div class="service featured">
+                <h3>🔥 Full Detail (POPULAR)</h3>
+                <p>Complete interior & exterior detailing</p>
+                <div class="original-price">Regular: $150</div>
+                <div class="sale-price">Weekend Special: $125</div>
+                <div style="color: #cc0000; font-weight: bold; font-size: 1.2em;">SAVE $25!</div>
+                <p>⏱️ 3-4 hours • Most popular choice</p>
+            </div>
+
+            <div class="service">
+                <h3>Premium Detail</h3>
+                <p>Full detail + paint correction + protection</p>
+                <div class="original-price">Regular: $250</div>
+                <div class="sale-price">Weekend Special: $225</div>
+                <div style="color: #cc0000; font-weight: bold;">SAVE $25!</div>
+                <p>⏱️ 5-6 hours • Show car quality</p>
+            </div>
+
+            <div class="service">
+                <h3>Ceramic Coating</h3>
+                <p>Ultimate protection & shine for 2+ years</p>
+                <div class="sale-price">$800</div>
+                <div style="color: #28a745; font-weight: bold;">Ask about special pricing!</div>
+                <p>⏱️ Full day • Professional grade</p>
+            </div>
+        </div>
+
+        <!-- TRUST SIGNALS -->
+        <div class="trust-signals">
+            <h2 style="text-align: center; margin-bottom: 30px;">Why Choose Court's Auto Detailing?</h2>
+            
+            <div class="trust-grid">
+                <div class="trust-item">
+                    <h3>🏆 Licensed & Insured</h3>
+                    <p>Clinton's ONLY licensed and insured auto detail professional. Your car and property are fully protected.</p>
+                </div>
+
+                <div class="trust-item">
+                    <h3>⭐ 5-Star Rated</h3>
+                    <p>500+ cars detailed in Clinton area. Highest rated service with verified customer reviews.</p>
+                </div>
+
+                <div class="trust-item">
+                    <h3>👨‍🔧 Most Experienced</h3>
+                    <p>Professional training and years of experience. We know how to handle all vehicle types safely.</p>
+                </div>
+
+                <div class="trust-item">
+                    <h3>🚗 Mobile Service</h3>
+                    <p>We come to you! Your home, office, or anywhere in the Clinton/Quad Cities area.</p>
+                </div>
+
+                <div class="trust-item">
+                    <h3>💯 Satisfaction Guaranteed</h3>
+                    <p>Not happy? We'll make it right or your money back. Your satisfaction is guaranteed.</p>
+                </div>
+
+                <div class="trust-item">
+                    <h3>⚡ Fast Response</h3>
+                    <p>15-minute response time. Professional communication. No hassle scheduling.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- FINAL CTA SECTION -->
+        <div style="background: linear-gradient(135deg, #1e3c72, #2a5298); color: white; padding: 40px; text-align: center; border-radius: 15px; margin: 40px 0;">
+            <h2 style="font-size: 2.5em; margin-bottom: 20px;">Don't Wait - Book Today!</h2>
+            <p style="font-size: 1.3em; margin-bottom: 30px;">Only 6 weekend slots available • Licensed & Insured Professional • $25 OFF ends Sunday</p>
+            
+            <div style="margin: 30px 0;">
+                <a href="tel:+18157188936" style="display: inline-block; background: #ffdd44; color: #333; font-size: 1.5em; font-weight: bold; padding: 15px 30px; text-decoration: none; border-radius: 10px; margin: 10px;">
+                    📞 Call: (815) 718-8936
+                </a>
+                
+                <a href="https://clintondetailing.com/booking" style="display: inline-block; background: #ff4444; color: white; font-size: 1.5em; font-weight: bold; padding: 15px 30px; text-decoration: none; border-radius: 10px; margin: 10px;">
+                    📅 Book Online Now
+                </a>
+            </div>
+
+            <p style="margin-top: 20px; font-size: 1.1em;">
+                <strong>Gift Cards Available!</strong><br>
+                Can't book this weekend? Purchase a gift card and lock in the $25 discount for later use.
+            </p>
+        </div>
+
+        <!-- FOOTER -->
+        <div style="text-align: center; padding: 30px; color: #666; border-top: 2px solid #ddd; margin-top: 40px;">
+            <h3>Court's Auto Detailing</h3>
+            <p>Clinton's Licensed & Insured Detail Professional</p>
+            <p>📞 (815) 718-8936 | 📍 Serving Clinton, IA & Quad Cities | 🌐 clintondetailing.com</p>
+            <p style="margin-top: 15px; font-size: 0.9em;">
+                Licensed • Insured • Professional • Mobile Service Available<br>
+                Weekend Special: $25 OFF • Offer expires Sunday 11:59 PM
+            </p>
+        </div>
+    </div>
+
+    <!-- Conversion tracking -->
+    <script>
+        // Track page views and interactions
+        console.log('Clinton Auto Detailing - Weekend Special Page Loaded');
+        
+        // Track phone clicks
+        document.querySelectorAll('a[href^="tel:"]').forEach(link => {
+            link.addEventListener('click', () => {
+                console.log('Phone call initiated');
+                // Add Facebook Pixel or Google Analytics tracking here
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'phone_call', {
+                        'campaign': 'clinton_weekend_special',
+                        'source': 'landing_page'
+                    });
+                }
+            });
+        });
+        
+        // Track booking clicks  
+        document.querySelectorAll('a[href*="booking"]').forEach(link => {
+            link.addEventListener('click', () => {
+                console.log('Booking link clicked');
+                if (typeof gtag !== 'undefined') {
+                    gtag('event', 'booking_click', {
+                        'campaign': 'clinton_weekend_special', 
+                        'source': 'landing_page'
+                    });
+                }
+            });
+        });
+
+        // Simple countdown (could be enhanced with real-time countdown)
+        function updateCountdown() {
+            const now = new Date();
+            const sunday = new Date();
+            sunday.setDate(now.getDate() + (7 - now.getDay())); // Next Sunday
+            sunday.setHours(23, 59, 59); // 11:59 PM
+            
+            const timeLeft = sunday.getTime() - now.getTime();
+            
+            if (timeLeft > 0) {
+                const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                
+                document.getElementById('countdown').textContent = 
+                    `${days}d ${hours}h ${minutes}m`;
+            } else {
+                document.getElementById('countdown').textContent = 'Offer Expired';
+            }
+        }
+        
+        // Update countdown every minute
+        updateCountdown();
+        setInterval(updateCountdown, 60000);
+    </script>
+</body>
+</html>

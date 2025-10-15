@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Plans - SINCOR AI Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                        <span class="text-white font-bold text-lg">S</span>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900">SINCOR</span>
+                </div>
+                <a href="/" class="text-blue-600 hover:text-blue-700 font-medium">← Back to Home</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <!-- Header -->
+        <div class="text-center mb-16">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Choose Your SINCOR Plan</h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Scale your business automation with our flexible pricing tiers. All plans include enterprise-grade security and 24/7 support.
+            </p>
+        </div>
+
+        <!-- Pricing Cards -->
+        <div class="grid md:grid-cols-3 gap-8 mb-16">
+            <!-- Builder Plan -->
+            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-100 hover:border-blue-200 transition-colors">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-2xl">🚀</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Builder</h3>
+                    <p class="text-gray-600 mb-6">Perfect for individuals and small teams getting started</p>
+                    <div class="mb-6">
+                        <div class="text-4xl font-bold text-gray-900 mb-2">Request Pricing</div>
+                        <div class="text-sm text-gray-500">Custom configuration</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4 mb-8">
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Growth Engine (Lead Gen Suite)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Up to 10 agent instances</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">5,000 tasks/month included</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Standard integrations</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Email support</span>
+                    </div>
+                </div>
+                
+                <button onclick="requestPricing('Builder')" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-green-700 transition-colors">
+                    Request Builder Pricing
+                </button>
+            </div>
+
+            <!-- Team Plan -->
+            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-blue-500 relative hover:border-blue-600 transition-colors">
+                <!-- Popular Badge -->
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <div class="bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold">Most Popular</div>
+                </div>
+                
+                <div class="text-center mb-8 mt-4">
+                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-2xl">👥</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Team</h3>
+                    <p class="text-gray-600 mb-6">Ideal for growing businesses and departments</p>
+                    <div class="mb-6">
+                        <div class="text-4xl font-bold text-gray-900 mb-2">Request Pricing</div>
+                        <div class="text-sm text-gray-500">Volume discounts available</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4 mb-8">
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">All Builder features</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Ops Core + Creative Forge</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Up to 50 agent instances</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">50,000 tasks/month included</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Advanced integrations</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Priority support</span>
+                    </div>
+                </div>
+                
+                <button onclick="requestPricing('Team')" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors">
+                    Request Team Pricing
+                </button>
+            </div>
+
+            <!-- Enterprise Plan -->
+            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-100 hover:border-purple-200 transition-colors">
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-2xl">🏢</span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Enterprise</h3>
+                    <p class="text-gray-600 mb-6">Full-scale deployment for large organizations</p>
+                    <div class="mb-6">
+                        <div class="text-4xl font-bold text-gray-900 mb-2">Custom Pricing</div>
+                        <div class="text-sm text-gray-500">Tailored solutions</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4 mb-8">
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">All Team features</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Intelligence Hub included</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Unlimited agent instances</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Unlimited tasks</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Custom integrations</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-white text-xs">✓</span>
+                        </div>
+                        <span class="text-gray-700">Dedicated success manager</span>
+                    </div>
+                </div>
+                
+                <button onclick="requestPricing('Enterprise')" class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition-colors">
+                    Contact Enterprise Sales
+                </button>
+            </div>
+        </div>
+
+        <!-- FAQ Section -->
+        <div class="bg-white rounded-2xl p-12 shadow-xl">
+            <h2 class="text-3xl font-bold text-gray-900 text-center mb-12">Frequently Asked Questions</h2>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">What's included in all plans?</h3>
+                    <p class="text-gray-600">Enterprise-grade security, audit trails, human quality gates, and 24/7 platform monitoring.</p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">How does agent scaling work?</h3>
+                    <p class="text-gray-600">Our orchestration system automatically scales from 1 to 500+ agent instances based on your workload needs.</p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">What integrations are supported?</h3>
+                    <p class="text-gray-600">HubSpot, Salesforce, Google Workspace, Microsoft 365, Slack, and 50+ other business tools with read/write capabilities.</p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">Is there a free trial?</h3>
+                    <p class="text-gray-600">We offer custom pilot programs for qualified prospects. Contact our team to discuss your specific use case.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function requestPricing(plan) {
+            // Redirect to main page waitlist with plan context
+            window.location.href = '/?plan=' + plan + '#waitlist';
+        }
+    </script>
+</body>
+</html>

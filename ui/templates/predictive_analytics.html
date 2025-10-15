@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Predictive Analytics - SINCOR AI-Powered Forecasting{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="bg-gradient-to-br from-blue-600 to-purple-700 text-white py-16">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">AI-Powered Predictive Analytics</h1>
+            <p class="text-xl md:text-2xl mb-8 text-blue-100">Harness the power of artificial intelligence to predict future trends, identify opportunities, and make data-driven decisions with 95% accuracy.</p>
+            <a href="{{ url_for('signup') }}" class="inline-block bg-yellow-500 text-black px-8 py-4 rounded-lg text-lg font-semibold hover:bg-yellow-400 transition duration-200 transform hover:scale-105">Get Started Today</a>
+        </div>
+    </div>
+</section>
+
+<!-- Key Benefits -->
+<section class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Transform Data Into Future Insights</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h3 class="text-2xl font-bold mb-6">Revenue Forecasting</h3>
+                    <p class="text-gray-600 mb-6">Predict future revenue with unprecedented accuracy. Our AI analyzes historical patterns, market trends, and external factors to deliver forecasts you can trust.</p>
+                    
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold">95% Accuracy Rate</h4>
+                                <p class="text-gray-600">Industry-leading prediction accuracy backed by advanced machine learning models.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold">Real-Time Updates</h4>
+                                <p class="text-gray-600">Forecasts update automatically as new data comes in, keeping predictions fresh.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold">Scenario Planning</h4>
+                                <p class="text-gray-600">Model different business scenarios to understand potential outcomes.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-lg">
+                    <div class="aspect-square flex items-center justify-center">
+                        <div class="text-center">
+                            <svg class="w-24 h-24 text-blue-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <h4 class="text-xl font-bold text-blue-800 mb-2">Revenue Forecast Chart</h4>
+                            <p class="text-blue-600">Interactive visualization would appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Customer Analytics -->
+<section class="py-16 bg-gray-50">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-lg">
+                    <div class="aspect-square flex items-center justify-center">
+                        <div class="text-center">
+                            <svg class="w-24 h-24 text-purple-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                            </svg>
+                            <h4 class="text-xl font-bold text-purple-800 mb-2">Customer Insights</h4>
+                            <p class="text-purple-600">Churn prediction dashboard</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-2xl font-bold mb-6">Customer Behavior Prediction</h3>
+                    <p class="text-gray-600 mb-6">Understand your customers like never before. Predict which customers are likely to churn, identify high-value prospects, and optimize your customer journey.</p>
+                    
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold">Churn Prevention</h4>
+                                <p class="text-gray-600">Identify at-risk customers 90 days before they churn with actionable retention strategies.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold">Lifetime Value Prediction</h4>
+                                <p class="text-gray-600">Calculate customer lifetime value to focus resources on your most valuable segments.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold">Purchase Propensity</h4>
+                                <p class="text-gray-600">Score leads by their likelihood to convert and when they're ready to buy.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Market Intelligence -->
+<section class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">Market Intelligence & Risk Assessment</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Market Trend Analysis</h3>
+                    <p class="text-gray-600">Identify emerging trends and market opportunities before your competitors. Our AI analyzes millions of data points to spot patterns early.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.382 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Risk Assessment</h3>
+                    <p class="text-gray-600">Proactively identify and mitigate business risks. Get early warnings about potential threats to your revenue and operations.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Opportunity Detection</h3>
+                    <p class="text-gray-600">Discover untapped market segments and revenue opportunities. Our AI finds patterns that humans miss in complex data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ROI Case Study -->
+<section class="py-16 bg-blue-50">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-8">Real Results from Real Customers</h2>
+            
+            <div class="bg-white p-8 rounded-lg shadow-lg">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center mb-8">
+                    <div>
+                        <div class="text-4xl font-bold text-blue-600 mb-2">300%</div>
+                        <p class="text-gray-600">Average ROI increase within 90 days</p>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold text-purple-600 mb-2">45%</div>
+                        <p class="text-gray-600">Reduction in customer churn rate</p>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold text-yellow-600 mb-2">60%</div>
+                        <p class="text-gray-600">Improvement in forecast accuracy</p>
+                    </div>
+                </div>
+                
+                <blockquote class="text-center">
+                    <p class="text-xl text-gray-700 mb-4">"SINCOR's predictive analytics helped us identify a 20% drop in customer satisfaction 3 months before it would have impacted revenue. We took action and not only prevented the loss but increased satisfaction by 15%."</p>
+                    <cite class="font-semibold">Jennifer Martinez, VP of Operations at TechFlow Inc.</cite>
+                </blockquote>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works -->
+<section class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12">How SINCOR Predictive Analytics Works</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-xl font-bold">1</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Data Integration</h3>
+                    <p class="text-gray-600">Connect all your data sources - CRM, ERP, marketing platforms, and external data feeds.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-xl font-bold">2</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">AI Analysis</h3>
+                    <p class="text-gray-600">Our advanced machine learning algorithms analyze patterns and relationships in your data.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-xl font-bold">3</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Predictive Models</h3>
+                    <p class="text-gray-600">Generate accurate forecasts and predictions tailored to your specific business context.</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-white text-xl font-bold">4</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Actionable Insights</h3>
+                    <p class="text-gray-600">Receive clear, actionable recommendations to optimize your business decisions.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-20 bg-gradient-to-r from-blue-600 to-purple-700 text-white">
+    <div class="container mx-auto px-6 text-center">
+        <h2 class="text-4xl font-bold mb-6">Ready to Predict Your Success?</h2>
+        <p class="text-xl mb-8 text-blue-100">Join thousands of businesses making smarter decisions with AI-powered predictions</p>
+        <div class="space-y-4 md:space-y-0 md:space-x-4 md:flex md:justify-center">
+            <a href="{{ url_for('signup') }}" class="inline-block bg-yellow-500 text-black px-8 py-4 rounded-lg text-lg font-semibold hover:bg-yellow-400 transition duration-200 transform hover:scale-105">Get Started Today</a>
+            <a href="{{ url_for('demo') }}" class="inline-block border-2 border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-blue-600 transition duration-200">See Live Demo</a>
+        </div>
+        <p class="text-blue-200 mt-6">Start making data-driven predictions in minutes</p>
+    </div>
+</section>
+{% endblock %}

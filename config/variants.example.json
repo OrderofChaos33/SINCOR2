@@ -1,0 +1,18 @@
+{
+  "cities": [
+    "Clinton, IA",
+    "Davenport, IA",
+    "Rock Island, IL"
+  ],
+  "niches": [
+    "auto_detailing",
+    "plumbing",
+    "hvac"
+  ],
+  "tones": [
+    "professional",
+    "hype",
+    "technical",
+    "local_pride"
+  ]
+}

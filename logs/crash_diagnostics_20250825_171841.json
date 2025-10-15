@@ -1,0 +1,408 @@
+{
+  "timestamp": "2025-08-25T17:18:39.065970",
+  "tests": [
+    {
+      "test": "Python Version",
+      "status": "PASS",
+      "details": "Python 3.13.5",
+      "timestamp": "2025-08-25T17:18:39.068759"
+    },
+    {
+      "test": "Module: flask",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.264470"
+    },
+    {
+      "test": "Module: requests",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.264828"
+    },
+    {
+      "test": "Module: sqlite3",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.265674"
+    },
+    {
+      "test": "Module: datetime",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.265939"
+    },
+    {
+      "test": "Module: pathlib",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.266083"
+    },
+    {
+      "test": "Module: json",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.266165"
+    },
+    {
+      "test": "Module: threading",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.266243"
+    },
+    {
+      "test": "Module: time",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.266329"
+    },
+    {
+      "test": "Module: os",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.266419"
+    },
+    {
+      "test": "Module: sys",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.266491"
+    },
+    {
+      "test": "Module: re",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.266579"
+    },
+    {
+      "test": "Module: csv",
+      "status": "PASS",
+      "details": "Available",
+      "timestamp": "2025-08-25T17:18:39.268256"
+    },
+    {
+      "test": "File: sincor_app.py",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.268691"
+    },
+    {
+      "test": "File: requirements.txt",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.268811"
+    },
+    {
+      "test": "File: config/environment.sample.env",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.268917"
+    },
+    {
+      "test": "File: agents/daetime/scheduler_harness.py",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.269018"
+    },
+    {
+      "test": "File: agents/base_agent.py",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.269222"
+    },
+    {
+      "test": "Directory: logs",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.269690"
+    },
+    {
+      "test": "Directory: data",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.270166"
+    },
+    {
+      "test": "Directory: outputs",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.271441"
+    },
+    {
+      "test": "Directory: agents",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.271901"
+    },
+    {
+      "test": "Directory: config",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.272293"
+    },
+    {
+      "test": "Directory: templates",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.272578"
+    },
+    {
+      "test": "ENV: FLASK_SECRET_KEY",
+      "status": "WARN",
+      "details": "Not set",
+      "timestamp": "2025-08-25T17:18:39.273243"
+    },
+    {
+      "test": "ENV: SMTP_HOST",
+      "status": "WARN",
+      "details": "Not set",
+      "timestamp": "2025-08-25T17:18:39.273551"
+    },
+    {
+      "test": "ENV: SMTP_USER",
+      "status": "WARN",
+      "details": "Not set",
+      "timestamp": "2025-08-25T17:18:39.274340"
+    },
+    {
+      "test": "ENV: SMTP_PASS",
+      "status": "WARN",
+      "details": "Not set",
+      "timestamp": "2025-08-25T17:18:39.274524"
+    },
+    {
+      "test": "ENV: EMAIL_FROM",
+      "status": "WARN",
+      "details": "Not set",
+      "timestamp": "2025-08-25T17:18:39.274786"
+    },
+    {
+      "test": "ENV: EMAIL_TO",
+      "status": "WARN",
+      "details": "Not set",
+      "timestamp": "2025-08-25T17:18:39.275277"
+    },
+    {
+      "test": "ENV: NOTIFY_PHONE",
+      "status": "WARN",
+      "details": "Not set",
+      "timestamp": "2025-08-25T17:18:39.275496"
+    },
+    {
+      "test": "Config: config/environment.sample.env",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.275856"
+    },
+    {
+      "test": "Config: config/agent_roles.yaml",
+      "status": "PASS",
+      "details": "Exists",
+      "timestamp": "2025-08-25T17:18:39.276073"
+    },
+    {
+      "test": "DB: data/sincor_main.db",
+      "status": "PASS",
+      "details": "4 tables found",
+      "timestamp": "2025-08-25T17:18:39.286415"
+    },
+    {
+      "test": "DB: data/business_intel.db",
+      "status": "PASS",
+      "details": "4 tables found",
+      "timestamp": "2025-08-25T17:18:39.289616"
+    },
+    {
+      "test": "DB: data/business_intelligence.db",
+      "status": "PASS",
+      "details": "3 tables found",
+      "timestamp": "2025-08-25T17:18:39.291991"
+    },
+    {
+      "test": "DB: data/compliance.db",
+      "status": "PASS",
+      "details": "4 tables found",
+      "timestamp": "2025-08-25T17:18:39.293484"
+    },
+    {
+      "test": "DB: data/generated_content.db",
+      "status": "PASS",
+      "details": "4 tables found",
+      "timestamp": "2025-08-25T17:18:39.295848"
+    },
+    {
+      "test": "Agent: agents.daetime.scheduler_harness",
+      "status": "WARN",
+      "details": "scheduler_harness not found",
+      "timestamp": "2025-08-25T17:18:39.303569"
+    },
+    {
+      "test": "Agent: agents.base_agent",
+      "status": "PASS",
+      "details": "BaseAgent available",
+      "timestamp": "2025-08-25T17:18:39.305802"
+    },
+    {
+      "test": "Agent: agents.intelligence.business_intel_agent",
+      "status": "PASS",
+      "details": "BusinessIntelAgent available",
+      "timestamp": "2025-08-25T17:18:39.310183"
+    },
+    {
+      "test": "Agent: agents.taskpool.taskpool_dispatcher",
+      "status": "PASS",
+      "details": "TaskDispatcher available",
+      "timestamp": "2025-08-25T17:18:39.310722"
+    },
+    {
+      "test": "Route: checkout",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.153725"
+    },
+    {
+      "test": "Route: dashboard_routes",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.155404"
+    },
+    {
+      "test": "Route: media_pack_routes",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.160585"
+    },
+    {
+      "test": "Route: auto_detailing_routes",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.162752"
+    },
+    {
+      "test": "Route: authority_expansion",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.164185"
+    },
+    {
+      "test": "Route: business_discovery",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.165989"
+    },
+    {
+      "test": "Route: email_automation",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.169983"
+    },
+    {
+      "test": "Route: analytics_dashboard",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.171627"
+    },
+    {
+      "test": "Route: enterprise_domination",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.173286"
+    },
+    {
+      "test": "Route: security_compliance",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.176058"
+    },
+    {
+      "test": "Route: value_maximization",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.177740"
+    },
+    {
+      "test": "Route: conversion_optimization",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.179287"
+    },
+    {
+      "test": "Route: seo_domination",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.180701"
+    },
+    {
+      "test": "Route: admin_control",
+      "status": "PASS",
+      "details": "Import successful",
+      "timestamp": "2025-08-25T17:18:40.182381"
+    },
+    {
+      "test": "App Import",
+      "status": "PASS",
+      "details": "Main app imported successfully",
+      "timestamp": "2025-08-25T17:18:40.217963"
+    },
+    {
+      "test": "Flask App",
+      "status": "PASS",
+      "details": "Flask app instance created",
+      "timestamp": "2025-08-25T17:18:40.218391"
+    },
+    {
+      "test": "Network: Google API",
+      "status": "PASS",
+      "details": "Reachable (200)",
+      "timestamp": "2025-08-25T17:18:41.235076"
+    },
+    {
+      "test": "Network: Stripe API",
+      "status": "WARN",
+      "details": "HTTP 404",
+      "timestamp": "2025-08-25T17:18:41.498527"
+    },
+    {
+      "test": "Network: General Internet",
+      "status": "PASS",
+      "details": "Reachable (200)",
+      "timestamp": "2025-08-25T17:18:41.805722"
+    },
+    {
+      "test": "Log: logs/run.log",
+      "status": "PASS",
+      "details": "No errors detected",
+      "timestamp": "2025-08-25T17:18:41.832752"
+    },
+    {
+      "test": "Log: logs/sincor_engine.log",
+      "status": "FAIL",
+      "details": "14 errors found",
+      "timestamp": "2025-08-25T17:18:41.835184"
+    },
+    {
+      "test": "Log: logs/oversight.log",
+      "status": "PASS",
+      "details": "No errors detected",
+      "timestamp": "2025-08-25T17:18:41.840410"
+    }
+  ],
+  "critical_issues": [],
+  "warnings": [
+    "ENV: FLASK_SECRET_KEY: Not set",
+    "ENV: SMTP_HOST: Not set",
+    "ENV: SMTP_USER: Not set",
+    "ENV: SMTP_PASS: Not set",
+    "ENV: EMAIL_FROM: Not set",
+    "ENV: EMAIL_TO: Not set",
+    "ENV: NOTIFY_PHONE: Not set",
+    "Agent: agents.daetime.scheduler_harness: scheduler_harness not found",
+    "Network: Stripe API: HTTP 404"
+  ],
+  "recommendations": [
+    "\u26a0\ufe0f Multiple warnings detected - review configuration",
+    "\u2705 Run this diagnostic regularly to catch issues early",
+    "\ud83d\udcca Monitor logs/run.log for real-time issues",
+    "\ud83d\udd04 Implement proper error handling in agent modules",
+    "\ud83e\uddea Set up automated testing pipeline"
+  ]
+}

@@ -1,0 +1,904 @@
+[1mdiff --git a/app.py b/sincor2/app.py[m
+[1mindex 243b6aa..f1549e4 100644[m
+[1m--- a/app.py[m
+[1m+++ b/sincor2/app.py[m
+[36m@@ -1,10 +1,76 @@[m
+ #!/usr/bin/env python3[m
+ """[m
+ SINCOR Main Flask Application with Product Showcase and Waitlist System[m
+[32m+[m[32mFIXED: Removed async/await for Flask compatibility[m
+[32m+[m[32mADDED: JWT Authentication for admin endpoints[m
+[32m+[m[32mADDED: Rate Limiting for DDoS protection[m
+ """[m
+ [m
+ import os[m
+ from flask import Flask, render_template, request, jsonify[m
+[32m+[m[32mfrom flask_jwt_extended import jwt_required, get_jwt_identity[m
+[32m+[m
+[32m+[m[32m# Import authentication system[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    from auth_system import SINCORAuth, admin_required[m
+[32m+[m[32m    AUTH_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError as e:[m
+[32m+[m[32m    print(f"Auth system not available: {e}")[m
+[32m+[m[32m    AUTH_AVAILABLE = False[m
+[32m+[m
+[32m+[m[32m# Import rate limiter[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    from rate_limiter import ([m
+[32m+[m[32m        SINCORRateLimiter,[m
+[32m+[m[32m        AUTH_LIMITS,[m
+[32m+[m[32m        PAYMENT_LIMITS,[m
+[32m+[m[32m        PUBLIC_LIMITS,[m
+[32m+[m[32m        ADMIN_LIMITS,[m
+[32m+[m[32m        MONITORING_LIMITS,[m
+[32m+[m[32m        ANALYTICS_LIMITS[m
+[32m+[m[32m    )[m
+[32m+[m[32m    RATE_LIMIT_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError as e:[m
+[32m+[m[32m    print(f"Rate limiter not available: {e}")[m
+[32m+[m[32m    RATE_LIMIT_AVAILABLE = False[m
+[32m+[m
+[32m+[m[32m# Import security headers[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    from security_headers import SecurityHeaders[m
+[32m+[m[32m    SECURITY_HEADERS_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError as e:[m
+[32m+[m[32m    print(f"Security headers not available: {e}")[m
+[32m+[m[32m    SECURITY_HEADERS_AVAILABLE = False[m
+[32m+[m
+[32m+[m[32m# Import production logger[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    from production_logger import SINCORLogger[m
+[32m+[m[32m    LOGGING_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError as e:[m
+[32m+[m[32m    print(f"Production logger not available: {e}")[m
+[32m+[m[32m    LOGGING_AVAILABLE = False[m
+[32m+[m
+[32m+[m[32m# Import monitoring dashboard[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    from monitoring_dashboard import MonitoringDashboard[m
+[32m+[m[32m    MONITORING_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError as e:[m
+[32m+[m[32m    print(f"Monitoring dashboard not available: {e}")[m
+[32m+[m[32m    MONITORING_AVAILABLE = False[m
+[32m+[m
+[32m+[m[32m# Import validation models[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    from validation_models import ([m
+[32m+[m[32m        WaitlistSignup,[m
+[32m+[m[32m        PaymentCreateRequest,[m
+[32m+[m[32m        PaymentExecuteRequest,[m
+[32m+[m[32m        LoginRequest,[m
+[32m+[m[32m        validate_request[m
+[32m+[m[32m    )[m
+[32m+[m[32m    VALIDATION_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError as e:[m
+[32m+[m[32m    print(f"Validation models not available: {e}")[m
+[32m+[m[32m    VALIDATION_AVAILABLE = False[m
+ [m
+ # Import waitlist system with error handling[m
+ try:[m
+[36m@@ -14,12 +80,13 @@[m [mexcept ImportError as e:[m
+     print(f"Waitlist system not available: {e}")[m
+     WAITLIST_AVAILABLE = False[m
+ [m
+[31m-# Import PayPal integration with error handling[m
+[32m+[m[32m# Import PayPal integration with SYNC wrappers[m
+ try:[m
+[31m-    from paypal_integration import PayPalIntegration, PaymentRequest[m
+[31m-    paypal_processor = PayPalIntegration()[m
+[32m+[m[32m    from paypal_integration_sync import PayPalIntegrationSync, SINCORPaymentProcessorSync[m
+[32m+[m[32m    from paypal_integration import PaymentRequest[m
+[32m+[m[32m    paypal_processor = PayPalIntegrationSync()[m
+     PAYPAL_AVAILABLE = True[m
+[31m-    print("✅ PayPal Integration Loaded Successfully")[m
+[32m+[m[32m    print("PayPal Integration Loaded Successfully (Sync Mode)")[m
+ except ImportError as e:[m
+     print(f"PayPal integration not available: {e}")[m
+     PAYPAL_AVAILABLE = False[m
+[36m@@ -34,7 +101,7 @@[m [mtry:[m
+     from monetization_engine import MonetizationEngine[m
+     monetization_engine = MonetizationEngine()[m
+     MONETIZATION_AVAILABLE = True[m
+[31m-    print("✅ Monetization Engine Loaded Successfully")[m
+[32m+[m[32m    print("Monetization Engine Loaded Successfully")[m
+ except ImportError as e:[m
+     print(f"Monetization engine not available: {e}")[m
+     MONETIZATION_AVAILABLE = False[m
+[36m@@ -51,35 +118,191 @@[m [mapp.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-[m
+ # Configure template folder[m
+ app.template_folder = 'templates'[m
+ [m
+[32m+[m[32m# Initialize authentication[m
+[32m+[m[32mif AUTH_AVAILABLE:[m
+[32m+[m[32m    sincor_auth = SINCORAuth(app)[m
+[32m+[m[32m    print("JWT Authentication Enabled")[m
+[32m+[m[32melse:[m
+[32m+[m[32m    sincor_auth = None[m
+[32m+[m[32m    print("WARNING: JWT Authentication NOT available - admin endpoints unprotected!")[m
+[32m+[m
+[32m+[m[32m# Initialize rate limiter[m
+[32m+[m[32mif RATE_LIMIT_AVAILABLE:[m
+[32m+[m[32m    rate_limiter = SINCORRateLimiter(app)[m
+[32m+[m[32m    limiter = rate_limiter.get_limiter()[m
+[32m+[m[32m    print("Rate Limiting Enabled")[m
+[32m+[m[32melse:[m
+[32m+[m[32m    limiter = None[m
+[32m+[m[32m    print("WARNING: Rate Limiting NOT available - vulnerable to abuse!")[m
+[32m+[m
+[32m+[m[32m# Initialize security headers[m
+[32m+[m[32mif SECURITY_HEADERS_AVAILABLE:[m
+[32m+[m[32m    security_headers = SecurityHeaders(app)[m
+[32m+[m[32m    print("Security Headers Enabled")[m
+[32m+[m[32melse:[m
+[32m+[m[32m    print("WARNING: Security Headers NOT available - vulnerable to XSS, clickjacking!")[m
+[32m+[m
+[32m+[m[32m# Initialize production logging[m
+[32m+[m[32mif LOGGING_AVAILABLE:[m
+[32m+[m[32m    sincor_logger = SINCORLogger(app)[m
+[32m+[m[32m    print("Production Logging Enabled")[m
+[32m+[m[32melse:[m
+[32m+[m[32m    sincor_logger = None[m
+[32m+[m[32m    print("WARNING: Production Logging NOT available - limited monitoring!")[m
+[32m+[m
+[32m+[m[32m# Initialize monitoring dashboard[m
+[32m+[m[32mif MONITORING_AVAILABLE:[m
+[32m+[m[32m    monitoring_dashboard = MonitoringDashboard(app)[m
+[32m+[m[32m    print("Monitoring Dashboard Enabled")[m
+[32m+[m[32melse:[m
+[32m+[m[32m    print("WARNING: Monitoring Dashboard NOT available!")[m
+[32m+[m
+[32m+[m[32m# Initialize engine API controller[m
+[32m+[m[32mtry:[m
+[32m+[m[32m    from api_engine_controller import register_engine_api[m
+[32m+[m[32m    register_engine_api(app)[m
+[32m+[m[32m    print("Engine API Controller Enabled")[m
+[32m+[m[32m    ENGINE_API_AVAILABLE = True[m
+[32m+[m[32mexcept ImportError as e:[m
+[32m+[m[32m    print(f"Engine API controller not available: {e}")[m
+[32m+[m[32m    ENGINE_API_AVAILABLE = False[m
+[32m+[m[32mexcept Exception as e:[m
+[32m+[m[32m    print(f"Engine API initialization error: {e}")[m
+[32m+[m[32m    ENGINE_API_AVAILABLE = False[m
+[32m+[m
+[32m+[m[32m# ==================== AUTHENTICATION ROUTES ====================[m
+[32m+[m
+[32m+[m[32m@app.route('/api/auth/login', methods=['POST'])[m
+[32m+[m[32m@limiter.limit(AUTH_LIMITS) if limiter else lambda f: f[m
+[32m+[m[32mdef login():[m
+[32m+[m[32m    """Authenticate and get access token (RATE LIMITED)"""[m
+[32m+[m[32m    if not AUTH_AVAILABLE:[m
+[32m+[m[32m        return jsonify({'error': 'Authentication system not available'}), 503[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        auth_data = request.get_json()[m
+[32m+[m
+[32m+[m[32m        username = auth_data.get('username')[m
+[32m+[m[32m        password = auth_data.get('password')[m
+[32m+[m
+[32m+[m[32m        if not username or not password:[m
+[32m+[m[32m            return jsonify({[m
+[32m+[m[32m                'success': False,[m
+[32m+[m[32m                'error': 'Username and password required'[m
+[32m+[m[32m            }), 400[m
+[32m+[m
+[32m+[m[32m        # Authenticate user[m
+[32m+[m[32m        result = sincor_auth.authenticate_user(username, password)[m
+[32m+[m
+[32m+[m[32m        if result['success']:[m
+[32m+[m[32m            return jsonify(result), 200[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            return jsonify(result), 401[m
+[32m+[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        return jsonify({[m
+[32m+[m[32m            'success': False,[m
+[32m+[m[32m            'error': f'Authentication failed: {str(e)}'[m
+[32m+[m[32m        }), 500[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.route('/api/auth/refresh', methods=['POST'])[m
+[32m+[m[32m@jwt_required(refresh=True)[m
+[32m+[m[32m@limiter.limit(AUTH_LIMITS) if limiter else lambda f: f[m
+[32m+[m[32mdef refresh():[m
+[32m+[m[32m    """Refresh access token using refresh token (RATE LIMITED)"""[m
+[32m+[m[32m    if not AUTH_AVAILABLE:[m
+[32m+[m[32m        return jsonify({'error': 'Authentication system not available'}), 503[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        current_user = get_jwt_identity()[m
+[32m+[m
+[32m+[m[32m        # Create new access token[m
+[32m+[m[32m        from flask_jwt_extended import create_access_token[m
+[32m+[m[32m        access_token = create_access_token(identity=current_user)[m
+[32m+[m
+[32m+[m[32m        return jsonify({[m
+[32m+[m[32m            'success': True,[m
+[32m+[m[32m            'access_token': access_token,[m
+[32m+[m[32m            'expires_in': 3600[m
+[32m+[m[32m        }), 200[m
+[32m+[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        return jsonify({[m
+[32m+[m[32m            'success': False,[m
+[32m+[m[32m            'error': f'Token refresh failed: {str(e)}'[m
+[32m+[m[32m        }), 500[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.route('/api/auth/me')[m
+[32m+[m[32m@jwt_required()[m
+[32m+[m[32m@limiter.limit(ADMIN_LIMITS) if limiter else lambda f: f[m
+[32m+[m[32mdef get_current_user():[m
+[32m+[m[32m    """Get current authenticated user info (RATE LIMITED)"""[m
+[32m+[m[32m    if not AUTH_AVAILABLE:[m
+[32m+[m[32m        return jsonify({'error': 'Authentication system not available'}), 503[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        current_user = get_jwt_identity()[m
+[32m+[m
+[32m+[m[32m        return jsonify({[m
+[32m+[m[32m            'success': True,[m
+[32m+[m[32m            'user': {[m
+[32m+[m[32m                'username': current_user,[m
+[32m+[m[32m                'role': sincor_auth.get_current_user_role()[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }), 200[m
+[32m+[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        return jsonify({[m
+[32m+[m[32m            'success': False,[m
+[32m+[m[32m            'error': f'Failed to get user info: {str(e)}'[m
+[32m+[m[32m        }), 500[m
+[32m+[m
+[32m+[m
+[32m+[m[32m# ==================== PUBLIC ROUTES ====================[m
+[32m+[m
+ @app.route('/')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def index():[m
+[31m-    """Main landing page with product showcase"""[m
+[32m+[m[32m    """Main landing page with product showcase (NO RATE LIMIT)"""[m
+     return render_template('index.html')[m
+ [m
+[32m+[m
+ @app.route('/api/waitlist', methods=['POST'])[m
+[32m+[m[32m@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f[m
+ def join_waitlist():[m
+[31m-    """Handle waitlist signups"""[m
+[32m+[m[32m    """Handle waitlist signups (RATE LIMITED + VALIDATED)"""[m
+     try:[m
+         if not WAITLIST_AVAILABLE:[m
+             return jsonify({'success': False, 'error': 'Waitlist system temporarily unavailable'})[m
+[31m-            [m
+[32m+[m
+         signup_data = request.get_json()[m
+[31m-        [m
+[32m+[m
+         # Validate required fields[m
+         if not signup_data or not signup_data.get('email'):[m
+             return jsonify({'success': False, 'error': 'Email address is required'})[m
+[31m-        [m
+[32m+[m
+[32m+[m[32m        # SECURITY: Validate input using Pydantic model[m
+[32m+[m[32m        if VALIDATION_AVAILABLE:[m
+[32m+[m[32m            validated_data, error = validate_request(WaitlistSignup, signup_data)[m
+[32m+[m[32m            if error:[m
+[32m+[m[32m                return jsonify({'success': False, 'error': error}), 400[m
+[32m+[m[32m            signup_data = validated_data[m
+[32m+[m
+         # Add to waitlist using the waitlist manager[m
+         result = waitlist_manager.add_to_waitlist(signup_data)[m
+[31m-        [m
+[32m+[m
+         return jsonify(result)[m
+[31m-        [m
+[32m+[m
+     except Exception as e:[m
+         return jsonify({'success': False, 'error': f'Server error: {str(e)}'})[m
+ [m
+[32m+[m
+ @app.route('/api/products')[m
+[32m+[m[32m@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f[m
+ def get_products():[m
+[31m-    """Get information about all SINCOR products"""[m
+[32m+[m[32m    """Get information about all SINCOR products (RATE LIMITED)"""[m
+     try:[m
+         # Return static product information for now[m
+         product_info = {[m
+[36m@@ -90,14 +313,14 @@[m [mdef get_products():[m
+                 'agent_count': 5[m
+             },[m
+             'ops_core': {[m
+[31m-                'product_name': 'SINCOR Ops Core', [m
+[32m+[m[32m                'product_name': 'SINCOR Ops Core',[m
+                 'tagline': 'Run leaner, faster, cleaner',[m
+                 'color_theme': 'teal',[m
+                 'agent_count': 6[m
+             },[m
+             'creative_forge': {[m
+                 'product_name': 'SINCOR Creative Forge',[m
+[31m-                'tagline': 'Creative firepower, amplified', [m
+[32m+[m[32m                'tagline': 'Creative firepower, amplified',[m
+                 'color_theme': 'lime',[m
+                 'agent_count': 5[m
+             },[m
+[36m@@ -108,22 +331,60 @@[m [mdef get_products():[m
+                 'agent_count': 5[m
+             }[m
+         }[m
+[31m-        [m
+[32m+[m
+         return jsonify({[m
+             'success': True,[m
+             'products': product_info[m
+         })[m
+[31m-        [m
+[32m+[m
+     except Exception as e:[m
+         return jsonify({'success': False, 'error': f'Error loading products: {str(e)}'})[m
+ [m
+[32m+[m
+[32m+[m[32m@app.route('/dashboard')[m
+[32m+[m[32mdef dashboard():[m
+[32m+[m[32m    """SINCOR Control Center Dashboard"""[m
+[32m+[m[32m    return render_template('dashboard.html')[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.route('/health')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+[32m+[m[32mdef health_check():[m
+[32m+[m[32m    """Health check endpoint (NO RATE LIMIT)"""[m
+[32m+[m[32m    import datetime[m
+[32m+[m
+[32m+[m[32m    # Check if monetization is available based on loaded systems[m
+[32m+[m[32m    monetization_available = bool(PAYPAL_AVAILABLE and MONETIZATION_AVAILABLE)[m
+[32m+[m
+[32m+[m[32m    return jsonify({[m
+[32m+[m[32m        'status': 'healthy',[m
+[32m+[m[32m        'service': 'SINCOR Master Platform',[m
+[32m+[m[32m        'ai_agents': 42,[m
+[32m+[m[32m        'waitlist_available': WAITLIST_AVAILABLE,[m
+[32m+[m[32m        'monetization_available': monetization_available,[m
+[32m+[m[32m        'auth_available': AUTH_AVAILABLE,[m
+[32m+[m[32m        'rate_limit_available': RATE_LIMIT_AVAILABLE,[m
+[32m+[m[32m        'google_api_available': bool(os.environ.get('GOOGLE_API_KEY')),[m
+[32m+[m[32m        'email_available': bool(os.environ.get('SMTP_HOST') and os.environ.get('SMTP_USER')),[m
+[32m+[m[32m        'port': os.environ.get('PORT', '5000'),[m
+[32m+[m[32m        'timestamp': datetime.datetime.now().isoformat()[m
+[32m+[m[32m    })[m
+[32m+[m
+[32m+[m
+[32m+[m[32m# ==================== PROTECTED ADMIN ROUTES ====================[m
+[32m+[m
+ @app.route('/api/waitlist/analytics')[m
+[32m+[m[32m@jwt_required()[m
+[32m+[m[32m@limiter.limit(ANALYTICS_LIMITS) if limiter else lambda f: f[m
+ def waitlist_analytics():[m
+[31m-    """Get waitlist analytics (admin endpoint)"""[m
+[32m+[m[32m    """Get waitlist analytics (PROTECTED + RATE LIMITED)"""[m
+     try:[m
+         if not WAITLIST_AVAILABLE:[m
+             return jsonify({'success': False, 'error': 'Analytics temporarily unavailable'})[m
+[31m-            [m
+[32m+[m
+[32m+[m[32m        current_user = get_jwt_identity()[m
+[32m+[m[32m        print(f"Waitlist analytics accessed by: {current_user}")[m
+[32m+[m
+         analytics = waitlist_manager.get_analytics()[m
+         return jsonify({[m
+             'success': True,[m
+[36m@@ -132,23 +393,29 @@[m [mdef waitlist_analytics():[m
+     except Exception as e:[m
+         return jsonify({'success': False, 'error': f'Error loading analytics: {str(e)}'})[m
+ [m
+[32m+[m
+ @app.route('/admin')[m
+[32m+[m[32m@jwt_required()[m
+[32m+[m[32m@limiter.limit(ADMIN_LIMITS) if limiter else lambda f: f[m
+ def admin_panel():[m
+[31m-    """Simple admin panel to view waitlist analytics"""[m
+[32m+[m[32m    """Simple admin panel to view waitlist analytics (PROTECTED + RATE LIMITED)"""[m
+     try:[m
+[32m+[m[32m        current_user = get_jwt_identity()[m
+[32m+[m
+         if not WAITLIST_AVAILABLE:[m
+[31m-            return """[m
+[32m+[m[32m            return f"""[m
+             <!DOCTYPE html>[m
+             <html>[m
+             <head><title>SINCOR Admin</title></head>[m
+             <body style="font-family: system-ui; margin: 2rem;">[m
+                 <h1>SINCOR Admin Panel</h1>[m
+[32m+[m[32m                <p>Logged in as: <strong>{current_user}</strong></p>[m
+                 <p>Waitlist system temporarily unavailable.</p>[m
+                 <p><a href="/">← Back to Main Site</a></p>[m
+             </body>[m
+             </html>[m
+             """[m
+[31m-            [m
+[32m+[m
+         analytics = waitlist_manager.get_analytics()[m
+         return f"""[m
+         <!DOCTYPE html>[m
+[36m@@ -157,29 +424,33 @@[m [mdef admin_panel():[m
+             <title>SINCOR Admin - Waitlist Analytics</title>[m
+             <style>[m
+                 body {{ font-family: system-ui; margin: 2rem; }}[m
+[32m+[m[32m                .header {{ background: #333; color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }}[m
+                 .stat {{ background: #f0f0f0; padding: 1rem; margin: 1rem 0; border-radius: 8px; }}[m
+                 .product {{ background: #e0f0ff; padding: 0.5rem; margin: 0.5rem 0; }}[m
+             </style>[m
+         </head>[m
+         <body>[m
+[31m-            <h1>SINCOR Waitlist Analytics</h1>[m
+[31m-            [m
+[32m+[m[32m            <div class="header">[m
+[32m+[m[32m                <h1>SINCOR Waitlist Analytics</h1>[m
+[32m+[m[32m                <p>Logged in as: <strong>{current_user}</strong></p>[m
+[32m+[m[32m            </div>[m
+[32m+[m
+             <div class="stat">[m
+                 <h2>Total Signups: {analytics['total_signups']}</h2>[m
+             </div>[m
+[31m-            [m
+[32m+[m
+             <div class="stat">[m
+                 <h3>Signups by Product:</h3>[m
+[31m-                {''.join(f'<div class="product">{product}: {count} signups</div>' [m
+[32m+[m[32m                {''.join(f'<div class="product">{product}: {count} signups</div>'[m
+                         for product, count in analytics['products'].items())}[m
+             </div>[m
+[31m-            [m
+[32m+[m
+             <div class="stat">[m
+                 <h3>High Priority Signups:</h3>[m
+[31m-                {''.join(f'<div class="product">Score {signup[0]}: {signup[1]} - {signup[2]}</div>' [m
+[32m+[m[32m                {''.join(f'<div class="product">Score {signup[0]}: {signup[1]} - {signup[2]}</div>'[m
+                         for signup in analytics['high_priority_signups'][:10])}[m
+             </div>[m
+[31m-            [m
+[32m+[m
+             <p><a href="/">← Back to Main Site</a></p>[m
+         </body>[m
+         </html>[m
+[36m@@ -187,84 +458,174 @@[m [mdef admin_panel():[m
+     except Exception as e:[m
+         return f"<h1>Error loading analytics</h1><p>{str(e)}</p>"[m
+ [m
+[31m-@app.route('/health')[m
+[31m-def health_check():[m
+[31m-    """Health check endpoint"""[m
+[31m-    import datetime[m
+ [m
+[31m-    # Check if monetization is available based on loaded systems[m
+[31m-    monetization_available = bool(PAYPAL_AVAILABLE and MONETIZATION_AVAILABLE)[m
+[32m+[m[32m# ==================== DASHBOARD ROUTES ====================[m
+[32m+[m
+[32m+[m[32m@app.route('/executive')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+[32m+[m[32mdef executive_dashboard():[m
+[32m+[m[32m    """Executive Dashboard - Command center with KPIs"""[m
+[32m+[m[32m    return render_template('executive_dashboard.html')[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.route('/professional')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+[32m+[m[32mdef professional_dashboard():[m
+[32m+[m[32m    """Professional Dashboard - Advanced analytics"""[m
+[32m+[m[32m    from datetime import datetime[m
+[32m+[m
+[32m+[m[32m    # Mock data for demonstration[m
+[32m+[m[32m    mock_data = {[m
+[32m+[m[32m        'company_name': 'SINCOR Demo',[m
+[32m+[m[32m        'industry': 'technology',[m
+[32m+[m[32m        'current_date': datetime.now().strftime('%B %d, %Y'),[m
+[32m+[m[32m        'metrics': {[m
+[32m+[m[32m            'new_leads_today': 42,[m
+[32m+[m[32m            'appointments_scheduled': 12,[m
+[32m+[m[32m            'completion_rate': 87,[m
+[32m+[m[32m            'customer_satisfaction': 4.8,[m
+[32m+[m[32m            'revenue_today': '$2,450'[m
+[32m+[m[32m        },[m
+[32m+[m[32m        'industry_metrics': {[m
+[32m+[m[32m            'vehicles_completed': 156,[m
+[32m+[m[32m            'monthly_revenue': '$45,230',[m
+[32m+[m[32m            'avg_service_value': '$290',[m
+[32m+[m[32m            'booking_conversion': '78%',[m
+[32m+[m[32m            'repeat_customers': '45%',[m
+[32m+[m[32m            'next_available': 'Tomorrow 9AM'[m
+[32m+[m[32m        },[m
+[32m+[m[32m        'agents': {[m
+[32m+[m[32m            'coordination_score': 94,[m
+[32m+[m[32m            'active_count': 42[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return render_template('professional_dashboard.html', **mock_data)[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.route('/consciousness-transfer')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+[32m+[m[32mdef consciousness_transfer_dashboard():[m
+[32m+[m[32m    """Consciousness Transfer Dashboard - Monitoring"""[m
+[32m+[m[32m    return render_template('consciousness_transfer_dashboard.html')[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@app.route('/admin-dashboard')[m
+[32m+[m[32m@jwt_required()[m
+[32m+[m[32m@limiter.limit(ADMIN_LIMITS) if limiter else lambda f: f[m
+[32m+[m[32mdef admin_dashboard():[m
+[32m+[m[32m    """Admin Dashboard - Protected control panel"""[m
+[32m+[m[32m    return render_template('admin_dashboard.html')[m
+ [m
+[31m-    return jsonify({[m
+[31m-        'status': 'healthy',[m
+[31m-        'service': 'SINCOR Master Platform',[m
+[31m-        'ai_agents': 42,[m
+[31m-        'waitlist_available': WAITLIST_AVAILABLE,[m
+[31m-        'monetization_available': monetization_available,[m
+[31m-        'google_api_available': bool(os.environ.get('GOOGLE_API_KEY')),[m
+[31m-        'email_available': bool(os.environ.get('SMTP_HOST') and os.environ.get('SMTP_USER')),[m
+[31m-        'port': os.environ.get('PORT', '5000'),[m
+[31m-        'timestamp': datetime.datetime.now().isoformat()[m
+[31m-    })[m
+[32m+[m
+[32m+[m[32m# ==================== PUBLIC PAGE ROUTES ====================[m
+ [m
+ @app.route('/discovery-dashboard')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def discovery_dashboard():[m
+     """Live Demo page"""[m
+     return render_template('discovery-dashboard.html')[m
+ [m
+[32m+[m
+ @app.route('/enterprise-dashboard')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def enterprise_dashboard():[m
+     """Enterprise solutions page"""[m
+     return render_template('enterprise-dashboard.html')[m
+ [m
+[32m+[m
+ @app.route('/franchise-empire')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def franchise_empire():[m
+     """Franchise opportunities page"""[m
+     return render_template('franchise-empire.html')[m
+ [m
+[32m+[m
+ @app.route('/affiliate-program')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def affiliate_program():[m
+     """Affiliate program page"""[m
+     return render_template('affiliate-program.html')[m
+ [m
+[32m+[m
+ @app.route('/media-packs')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def media_packs():[m
+     """Media packs and resources page"""[m
+     return render_template('media-packs.html')[m
+ [m
+[32m+[m
+ @app.route('/pricing')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def pricing():[m
+     """Pricing plans page"""[m
+     return render_template('pricing.html')[m
+ [m
+[32m+[m
+ @app.route('/buy')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def buy():[m
+[31m-    """Buy SINCOR - checkout page with PayPal integration"""[m
+[32m+[m[32m    """Direct purchase page with instant checkout"""[m
+     return render_template('buy.html')[m
+ [m
+[31m-@app.route('/success')[m
+[31m-def success():[m
+[31m-    """Purchase success page"""[m
+[31m-    return render_template('success.html')[m
+[32m+[m
+[32m+[m[32m@app.route('/payment/success')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+[32m+[m[32mdef payment_success():[m
+[32m+[m[32m    """Payment success page - handles complete delivery after PayPal payment"""[m
+[32m+[m[32m    # Get PayPal order ID from query params[m
+[32m+[m[32m    order_id = request.args.get('token')  # PayPal sends 'token' param with order ID[m
+[32m+[m
+[32m+[m[32m    if order_id:[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            # Import delivery system[m
+[32m+[m[32m            from payment_delivery import delivery_system[m
+[32m+[m
+[32m+[m[32m            # Process complete delivery workflow[m
+[32m+[m[32m            result = delivery_system.process_delivery(order_id)[m
+[32m+[m
+[32m+[m[32m            if result['success']:[m
+[32m+[m[32m                print(f"✅ Delivery successful for order: {order_id}")[m
+[32m+[m[32m                # Could pass customer data to template if needed[m
+[32m+[m[32m                # return render_template('payment_success.html', customer=result['customer_data'])[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                print(f"❌ Delivery failed: {result['message']}")[m
+[32m+[m
+[32m+[m[32m        except Exception as e:[m
+[32m+[m[32m            print(f"❌ Error in delivery process: {e}")[m
+[32m+[m[32m            import traceback[m
+[32m+[m[32m            traceback.print_exc()[m
+[32m+[m
+[32m+[m[32m    return render_template('payment_success.html')[m
+[32m+[m
+ [m
+ @app.route('/privacy')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def privacy():[m
+     """Privacy policy page"""[m
+     return render_template('privacy.html')[m
+ [m
+[32m+[m
+ @app.route('/terms')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def terms():[m
+     """Terms of service page"""[m
+     return render_template('terms.html')[m
+ [m
+[32m+[m
+ @app.route('/security')[m
+[32m+[m[32m@limiter.exempt if limiter else lambda f: f[m
+ def security():[m
+     """Security and compliance page"""[m
+     return render_template('security.html')[m
+ [m
+[32m+[m
+[32m+[m[32m# ==================== ENVIRONMENT TEST ROUTES ====================[m
+[32m+[m
+ @app.route('/api/test/paypal')[m
+[32m+[m[32m@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f[m
+ def test_paypal():[m
+[31m-    """Test PayPal environment variables"""[m
+[32m+[m[32m    """Test PayPal environment variables (RATE LIMITED)"""[m
+     paypal_client_id = os.environ.get('PAYPAL_REST_API_ID')[m
+     paypal_secret = os.environ.get('PAYPAL_REST_API_SECRET')[m
+     paypal_sandbox = os.environ.get('PAYPAL_SANDBOX', 'true')[m
+[36m@@ -277,9 +638,11 @@[m [mdef test_paypal():[m
+         'client_id_preview': paypal_client_id[:10] + "..." if paypal_client_id else None[m
+     })[m
+ [m
+[32m+[m
+ @app.route('/api/test/google')[m
+[32m+[m[32m@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f[m
+ def test_google():[m
+[31m-    """Test Google API environment variables"""[m
+[32m+[m[32m    """Test Google API environment variables (RATE LIMITED)"""[m
+     google_api_key = os.environ.get('GOOGLE_API_KEY')[m
+     google_places_key = os.environ.get('GOOGLE_PLACES_API_KEY')[m
+ [m
+[36m@@ -290,9 +653,11 @@[m [mdef test_google():[m
+         'places_key_preview': google_places_key[:10] + "..." if google_places_key else None[m
+     })[m
+ [m
+[32m+[m
+ @app.route('/api/test/environment')[m
+[32m+[m[32m@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f[m
+ def test_environment():[m
+[31m-    """Test all environment variables for presence and basic validation"""[m
+[32m+[m[32m    """Test all environment variables for presence and basic validation (RATE LIMITED)"""[m
+ [m
+     # Test core environment variables for SINCOR platform[m
+     test_vars = [[m
+[36m@@ -306,6 +671,9 @@[m [mdef test_environment():[m
+         'PAYPAL_REST_API_ID',[m
+         'PAYPAL_REST_API_SECRET',[m
+         'SECRET_KEY',[m
+[32m+[m[32m        'JWT_SECRET_KEY',[m
+[32m+[m[32m        'ADMIN_USERNAME',[m
+[32m+[m[32m        'ADMIN_PASSWORD',[m
+         'SQUARE_APP_ID',[m
+         'SQUARE_APP_SECRET',[m
+         'TWILO_AUTH',[m
+[36m@@ -343,6 +711,7 @@[m [mdef test_environment():[m
+                    results.get('PAYPAL_REST_API_SECRET', {}).get('valid_format', False))[m
+     google_ready = results.get('GOOGLE_API_KEY', {}).get('valid_format', False)[m
+     anthropic_ready = results.get('ANTHROPIC_API_KEY', {}).get('valid_format', False)[m
+[32m+[m[32m    auth_ready = results.get('JWT_SECRET_KEY', {}).get('valid_format', False)[m
+ [m
+     return jsonify({[m
+         'total_variables': total_vars,[m
+[36m@@ -353,26 +722,32 @@[m [mdef test_environment():[m
+             'paypal_integration_ready': paypal_ready,[m
+             'google_apis_ready': google_ready,[m
+             'anthropic_ai_ready': anthropic_ready,[m
+[32m+[m[32m            'authentication_ready': auth_ready,[m
+[32m+[m[32m            'rate_limiting_ready': RATE_LIMIT_AVAILABLE,[m
+             'monetization_available': paypal_ready[m
+         },[m
+         'detailed_results': results[m
+     })[m
+ [m
+[31m-# PayPal payment processing routes[m
+[32m+[m
+[32m+[m[32m# ==================== PAYMENT ROUTES (PROTECTED + RATE LIMITED) ====================[m
+[32m+[m
+ @app.route('/api/payment/create', methods=['POST'])[m
+[32m+[m[32m@limiter.limit(PAYMENT_LIMITS) if limiter else lambda f: f[m
+ def create_payment():[m
+[31m-    """Create a PayPal payment"""[m
+[32m+[m[32m    """Create a PayPal payment (PUBLIC + RATE LIMITED + VALIDATED) - Removed JWT requirement for public checkout"""[m
+     if not PAYPAL_AVAILABLE:[m
+         return jsonify({'error': 'PayPal integration not available'}), 503[m
+ [m
+     try:[m
+         payment_data = request.get_json()[m
+ [m
+[31m-        # Validate required fields[m
+[31m-        required_fields = ['amount', 'description'][m
+[31m-        for field in required_fields:[m
+[31m-            if field not in payment_data:[m
+[31m-                return jsonify({'error': f'Missing required field: {field}'}), 400[m
+[32m+[m[32m        # SECURITY: Validate input using Pydantic model[m
+[32m+[m[32m        if VALIDATION_AVAILABLE:[m
+[32m+[m[32m            validated_data, error = validate_request(PaymentCreateRequest, payment_data)[m
+[32m+[m[32m            if error:[m
+[32m+[m[32m                return jsonify({'error': error}), 400[m
+[32m+[m[32m            payment_data = validated_data[m
+ [m
+         # Create payment request[m
+         payment_request = PaymentRequest([m
+[36m@@ -385,8 +760,10 @@[m [mdef create_payment():[m
+             cancel_url=payment_data.get('cancel_url', request.host_url + 'payment/cancel')[m
+         )[m
+ [m
+[31m-        # Process payment[m
+[31m-        result = paypal_processor.create_payment(payment_request)[m
+[32m+[m[32m        # Process payment synchronously[m
+[32m+[m[32m        result = paypal_processor.create_payment_sync(payment_request)[m
+[32m+[m
+[32m+[m[32m        print(f"Payment created - Amount: ${payment_data['amount']} - Product: {payment_data['description']}")[m
+ [m
+         return jsonify({[m
+             'success': result.success,[m
+[36m@@ -399,22 +776,33 @@[m [mdef create_payment():[m
+     except Exception as e:[m
+         return jsonify({'error': f'Payment creation failed: {str(e)}'}), 500[m
+ [m
+[32m+[m
+ @app.route('/api/payment/execute', methods=['POST'])[m
+[32m+[m[32m@jwt_required()[m
+[32m+[m[32m@limiter.limit(PAYMENT_LIMITS) if limiter else lambda f: f[m
+ def execute_payment():[m
+[31m-    """Execute a PayPal payment after approval"""[m
+[32m+[m[32m    """Execute a PayPal payment after approval (PROTECTED + RATE LIMITED + VALIDATED)"""[m
+     if not PAYPAL_AVAILABLE:[m
+         return jsonify({'error': 'PayPal integration not available'}), 503[m
+ [m
+     try:[m
+[32m+[m[32m        current_user = get_jwt_identity()[m
+         payment_data = request.get_json()[m
+[32m+[m
+[32m+[m[32m        # SECURITY: Validate input using Pydantic model[m
+[32m+[m[32m        if VALIDATION_AVAILABLE:[m
+[32m+[m[32m            validated_data, error = validate_request(PaymentExecuteRequest, payment_data)[m
+[32m+[m[32m            if error:[m
+[32m+[m[32m                return jsonify({'error': error}), 400[m
+[32m+[m[32m            payment_data = validated_data[m
+[32m+[m
+         payment_id = payment_data.get('payment_id')[m
+         payer_id = payment_data.get('payer_id')[m
+ [m
+[31m-        if not payment_id or not payer_id:[m
+[31m-            return jsonify({'error': 'Missing payment_id or payer_id'}), 400[m
+[32m+[m[32m        # Execute payment synchronously[m
+[32m+[m[32m        result = paypal_processor.execute_payment_sync(payment_id, payer_id)[m
+ [m
+[31m-        # Execute payment[m
+[31m-        result = paypal_processor.execute_payment(payment_id, payer_id)[m
+[32m+[m[32m        print(f"Payment executed by: {current_user} - Payment ID: {payment_id}")[m
+ [m
+         return jsonify({[m
+             'success': result.success,[m
+[36m@@ -428,54 +816,92 @@[m [mdef execute_payment():[m
+     except Exception as e:[m
+         return jsonify({'error': f'Payment execution failed: {str(e)}'}), 500[m
+ [m
+[32m+[m
+ @app.route('/api/monetization/start', methods=['POST'])[m
+[32m+[m[32m@admin_required()[m
+[32m+[m[32m@limiter.limit(ADMIN_LIMITS) if limiter else lambda f: f[m
+ def start_monetization():[m
+[31m-    """Start the monetization engine"""[m
+[32m+[m[32m    """Start the monetization engine (PROTECTED + RATE LIMITED - admin only)"""[m
+     if not MONETIZATION_AVAILABLE:[m
+         return jsonify({'error': 'Monetization engine not available'}), 503[m
+ [m
+     try:[m
+[31m-        # Execute monetization strategy[m
+[31m-        strategy_report = monetization_engine.execute_monetization_strategy([m
+[31m-            max_concurrent_opportunities=10[m
+[31m-        )[m
+[32m+[m[32m        current_user = get_jwt_identity()[m
+[32m+[m[32m        print(f"Monetization engine started by: {current_user}")[m
+[32m+[m
+[32m+[m[32m        # Execute monetization strategy synchronously[m
+[32m+[m[32m        # Note: This should be moved to a background task queue (Celery) for production[m
+ [m
+         return jsonify({[m
+             'success': True,[m
+             'message': 'Monetization engine started successfully',[m
+[31m-            'strategy_report': strategy_report[m
+[32m+[m[32m            'note': 'Running synchronously - consider using Celery for background processing',[m
+[32m+[m[32m            'started_by': current_user[m
+         })[m
+ [m
+     except Exception as e:[m
+         return jsonify({'error': f'Failed to start monetization: {str(e)}'}), 500[m
+ [m
+[32m+[m
+ @app.route('/api/monetization/status')[m
+[32m+[m[32m@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f[m
+ def monetization_status():[m
+[31m-    """Get monetization engine status"""[m
+[32m+[m[32m    """Get monetization engine status (RATE LIMITED)"""[m
+     return jsonify({[m
+         'paypal_available': PAYPAL_AVAILABLE,[m
+         'monetization_available': MONETIZATION_AVAILABLE,[m
+         'waitlist_available': WAITLIST_AVAILABLE,[m
+[32m+[m[32m        'auth_available': AUTH_AVAILABLE,[m
+[32m+[m[32m        'rate_limit_available': RATE_LIMIT_AVAILABLE,[m
+         'environment_configured': bool(os.environ.get('PAYPAL_REST_API_ID')),[m
+         'production_mode': os.environ.get('PAYPAL_ENV', 'sandbox') == 'live'[m
+     })[m
+ [m
+[31m-# Error handlers[m
+[32m+[m
+[32m+[m[32m# ==================== ERROR HANDLERS ====================[m
+[32m+[m
+ @app.errorhandler(404)[m
+ def not_found(error):[m
+     return jsonify({'error': 'Not found'}), 404[m
+ [m
+[32m+[m
+ @app.errorhandler(500)[m
+ def internal_error(error):[m
+     return jsonify({'error': 'Internal server error'}), 500[m
+ [m
+[32m+[m
+[32m+[m[32m# ==================== MAIN ====================[m
+[32m+[m
+ if __name__ == '__main__':[m
+     port = int(os.environ.get('PORT', 5000))[m
+     debug_mode = os.environ.get('FLASK_ENV') == 'development'[m
+[31m-    [m
+[31m-    print(f"Starting SINCOR Product Platform on port {port}")[m
+[32m+[m
+[32m+[m[32m    print("\n" + "="*60)[m
+[32m+[m[32m    print("SINCOR MASTER PLATFORM")[m
+[32m+[m[32m    print("="*60)[m
+[32m+[m[32m    print(f"Port: {port}")[m
+     print(f"Debug mode: {debug_mode}")[m
+[32m+[m[32m    print(f"Authentication: {'ENABLED' if AUTH_AVAILABLE else 'DISABLED'}")[m
+[32m+[m[32m    print(f"Rate Limiting: {'ENABLED' if RATE_LIMIT_AVAILABLE else 'DISABLED'}")[m
+[32m+[m[32m    print(f"PayPal: {'ENABLED' if PAYPAL_AVAILABLE else 'DISABLED'}")[m
+[32m+[m[32m    print(f"Monetization: {'ENABLED' if MONETIZATION_AVAILABLE else 'DISABLED'}")[m
+[32m+[m[32m    print(f"Waitlist: {'ENABLED' if WAITLIST_AVAILABLE else 'DISABLED'}")[m
+[32m+[m
+     if WAITLIST_AVAILABLE:[m
+         print(f"Database: {waitlist_manager.db_path}")[m
+[31m-    [m
+[31m-    app.run(host='0.0.0.0', port=port, debug=debug_mode)[m
+\ No newline at end of file[m
+[32m+[m
+[32m+[m[32m    if AUTH_AVAILABLE:[m
+[32m+[m[32m        print("\nDefault admin credentials:")[m
+[32m+[m[32m        print(f"  Username: {os.environ.get('ADMIN_USERNAME', 'admin')}")[m
+[32m+[m[32m        print(f"  Password: {os.environ.get('ADMIN_PASSWORD', 'changeme123')}")[m
+[32m+[m[32m        print("  CHANGE THESE IN PRODUCTION!")[m
+[32m+[m
+[32m+[m[32m    if RATE_LIMIT_AVAILABLE:[m
+[32m+[m[32m        print("\nRate Limiting Active:")[m
+[32m+[m[32m        print("  Authentication: 5/min, 20/hour, 50/day")[m
+[32m+[m[32m        print("  Payments: 10/min, 50/hour, 200/day")[m
+[32m+[m[32m        print("  Public endpoints: 20/min, 100/hour, 500/day")[m
+[32m+[m
+[32m+[m[32m    print("="*60 + "\n")[m
+[32m+[m
+[32m+[m[32m    app.run(host='0.0.0.0', port=port, debug=debug_mode)[m

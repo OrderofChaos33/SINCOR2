@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Login - AI Business Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .login-gradient {
+            background: linear-gradient(135deg, #0c1426 0%, #1a237e 25%, #283593 50%, #3949ab 75%, #3f51b5 100%);
+        }
+        
+        .brand-text {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4, #10b981);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .input-field {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .floating {
+            animation: floating 6s ease-in-out infinite;
+        }
+        
+        @keyframes floating {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+    </style>
+</head>
+
+<body class="login-gradient min-h-screen text-white overflow-hidden">
+    <!-- Background Elements -->
+    <div class="absolute top-20 left-10 w-64 h-64 bg-blue-500 rounded-full opacity-10 floating"></div>
+    <div class="absolute bottom-20 right-10 w-48 h-48 bg-purple-500 rounded-full opacity-10 floating" style="animation-delay: -3s;"></div>
+    <div class="absolute top-40 right-20 w-32 h-32 bg-cyan-500 rounded-full opacity-10 floating" style="animation-delay: -1.5s;"></div>
+
+    <!-- Navigation Header -->
+    <nav class="relative z-10 px-6 py-4">
+        <div class="flex items-center justify-between max-w-6xl mx-auto">
+            <a href="/" class="flex items-center space-x-3">
+                <img src="/static/sincor_business_logo.png" alt="SINCOR" class="h-10 w-auto">
+                <div>
+                    <h1 class="text-xl font-bold brand-text">SINCOR</h1>
+                    <p class="text-xs text-blue-300">AI Business Engine</p>
+                </div>
+            </a>
+            
+            <a href="/" class="text-blue-300 hover:text-blue-100 transition-colors">← Back to Home</a>
+        </div>
+    </nav>
+
+    <!-- Login Form -->
+    <div class="flex items-center justify-center min-h-screen relative z-10 px-6 -mt-20">
+        <div class="login-card rounded-2xl p-8 w-full max-w-md">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold mb-2">Welcome Back</h2>
+                <p class="text-blue-300">Sign in to your SINCOR command center</p>
+                
+                <!-- Error Message -->
+                {% if error %}
+                <div class="mt-4 p-3 bg-red-900 bg-opacity-50 border border-red-500 rounded-lg">
+                    <p class="text-red-300 text-sm">{{ error }}</p>
+                </div>
+                {% endif %}
+                
+                <!-- Demo Credentials -->
+                <div class="mt-4 p-3 bg-blue-900 bg-opacity-30 border border-blue-500 border-opacity-30 rounded-lg">
+                    <p class="text-blue-300 text-xs font-semibold mb-1">Demo Credentials:</p>
+                    <p class="text-blue-200 text-xs">demo@sincor.com / demo123</p>
+                    <p class="text-blue-200 text-xs">admin@sincor.com / admin123</p>
+                </div>
+            </div>
+
+            <!-- Login Form -->
+            <form action="/login" method="POST" class="space-y-6">
+                <div>
+                    <label for="email" class="block text-sm font-semibold mb-2">Email Address</label>
+                    <input type="email" id="email" name="email" required
+                           class="input-field w-full px-4 py-3 rounded-lg text-white placeholder-gray-300 focus:outline-none"
+                           placeholder="your@company.com">
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-semibold mb-2">Password</label>
+                    <input type="password" id="password" name="password" required
+                           class="input-field w-full px-4 py-3 rounded-lg text-white placeholder-gray-300 focus:outline-none"
+                           placeholder="Enter your password">
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="remember" class="rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-gray-300">Remember me</span>
+                    </label>
+                    <a href="/forgot-password" class="text-sm text-blue-400 hover:text-blue-300">Forgot password?</a>
+                </div>
+
+                <button type="submit" 
+                        class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 rounded-lg transition-all duration-300 transform hover:scale-105">
+                    Sign In to SINCOR
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-600"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-4 bg-transparent text-gray-400">Or continue with</span>
+                </div>
+            </div>
+
+            <!-- Free Trial Options -->
+            <div class="space-y-3">
+                <a href="/free-trial/PROTOTYPE2025" 
+                   class="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-3 rounded-lg transition-all duration-300 text-center block">
+                    🎉 Start 90-Day Free Trial
+                </a>
+                
+                <a href="/business-setup" 
+                   class="w-full border border-blue-400 hover:border-blue-300 hover:bg-blue-900 hover:bg-opacity-20 text-blue-300 font-semibold py-3 rounded-lg transition-all duration-300 text-center block">
+                    🏢 New Business Setup
+                </a>
+            </div>
+
+            <!-- Demo Access -->
+            <div class="mt-6 p-4 bg-purple-900 bg-opacity-30 rounded-lg border border-purple-500 border-opacity-30">
+                <h4 class="font-semibold text-purple-300 mb-2">🎯 Quick Demo Access</h4>
+                <p class="text-sm text-purple-200 mb-3">Want to see SINCOR in action first?</p>
+                <a href="/admin/executive" 
+                   class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-lg transition-all duration-300 text-center block text-sm">
+                    View Executive Dashboard
+                </a>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-8 text-center text-sm text-gray-400">
+                <p>Don't have an account? <a href="/business-setup" class="text-blue-400 hover:text-blue-300">Sign up for free</a></p>
+                <p class="mt-2">© 2025 SINCOR - AI Business Automation</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status Indicator -->
+    <div class="fixed bottom-6 right-6 bg-green-900 bg-opacity-80 backdrop-blur-sm border border-green-500 border-opacity-30 rounded-lg px-4 py-2 text-sm">
+        <div class="flex items-center space-x-2">
+            <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span class="text-green-300">System Online</span>
+        </div>
+    </div>
+</body>
+</html>

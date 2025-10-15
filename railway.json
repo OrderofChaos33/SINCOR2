@@ -1,12 +1,26 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "DOCKERFILE"
+    "builder": "NIXPACKS"
   },
   "deploy": {
+    "startCommand": "python app.py",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "FLASK_ENV": "production",
+        "RAILWAY_ENVIRONMENT": "production",
+        "PORT": "$PORT",
+        "GOOGLE_API_KEY": "$GOOGLE_API_KEY",
+        "GOOGLE_PLACES_API_KEY": "$GOOGLE_API_KEY",
+        "GOOGLE_CALENDAR_API_KEY": "$GOOGLE_API_KEY",
+        "GOOGLE_OAUTH_CLIENT_ID": "$GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "$GOOGLE_OAUTH_CLIENT_SECRET"
+      }
+    }
   }
 }

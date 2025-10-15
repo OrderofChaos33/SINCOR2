@@ -1,0 +1,528 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Dashboard - SINCOR Intelligence{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative overflow-hidden">
+    <!-- Neural Network Background -->
+    <div class="absolute inset-0 opacity-20">
+        <div class="neural-network"></div>
+    </div>
+
+    <!-- Dashboard Header -->
+    <section class="relative pt-32 pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-3xl mb-8">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-6">
+                        <div class="w-16 h-16 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-6xl lg:text-7xl font-black text-white mb-2 leading-tight">
+                                Analytics <span class="morphing-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">Dashboard</span>
+                            </h1>
+                            <p class="text-2xl text-gray-300">Advanced Business Intelligence & Performance Analytics</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="bg-green-900/50 text-green-300 px-4 py-2 rounded-xl border border-green-500/30">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                <span class="font-semibold">Real-time Data</span>
+                            </div>
+                        </div>
+                        <select class="bg-gray-800 text-white rounded-lg px-4 py-2 border border-gray-600">
+                            <option>Last 24 Hours</option>
+                            <option>Last 7 Days</option>
+                            <option>Last 30 Days</option>
+                            <option>Last 90 Days</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Performance Indicators -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+                <div class="glassmorphism p-8 rounded-2xl text-center hover:bg-white/10 transition-all duration-300 group">
+                    <div class="text-4xl font-black text-green-400 mb-3 group-hover:scale-110 transition-transform">$2.4M</div>
+                    <p class="text-gray-300 text-lg font-medium">Monthly Revenue</p>
+                    <div class="flex items-center justify-center space-x-2 mt-3">
+                        <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+                        </svg>
+                        <span class="text-green-400 font-semibold">+23.5%</span>
+                    </div>
+                </div>
+                <div class="glassmorphism p-8 rounded-2xl text-center hover:bg-white/10 transition-all duration-300 group">
+                    <div class="text-4xl font-black text-blue-400 mb-3 group-hover:scale-110 transition-transform">847K</div>
+                    <p class="text-gray-300 text-lg font-medium">Total Users</p>
+                    <div class="flex items-center justify-center space-x-2 mt-3">
+                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+                        </svg>
+                        <span class="text-blue-400 font-semibold">+12.8%</span>
+                    </div>
+                </div>
+                <div class="glassmorphism p-8 rounded-2xl text-center hover:bg-white/10 transition-all duration-300 group">
+                    <div class="text-4xl font-black text-purple-400 mb-3 group-hover:scale-110 transition-transform">94.2%</div>
+                    <p class="text-gray-300 text-lg font-medium">User Satisfaction</p>
+                    <div class="flex items-center justify-center space-x-2 mt-3">
+                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+                        </svg>
+                        <span class="text-purple-400 font-semibold">+2.1%</span>
+                    </div>
+                </div>
+                <div class="glassmorphism p-8 rounded-2xl text-center hover:bg-white/10 transition-all duration-300 group">
+                    <div class="text-4xl font-black text-orange-400 mb-3 group-hover:scale-110 transition-transform">23ms</div>
+                    <p class="text-gray-300 text-lg font-medium">Avg Response</p>
+                    <div class="flex items-center justify-center space-x-2 mt-3">
+                        <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6"></path>
+                        </svg>
+                        <span class="text-green-400 font-semibold">-15.2%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Analytics Grid -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Revenue Analytics -->
+                <div class="lg:col-span-2 glassmorphism p-10 rounded-3xl shadow-2xl">
+                    <div class="flex items-center justify-between mb-8">
+                        <h3 class="text-3xl font-bold text-white">Revenue Analytics</h3>
+                        <div class="flex items-center space-x-2">
+                            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                Daily
+                            </button>
+                            <button class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
+                                Weekly
+                            </button>
+                            <button class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
+                                Monthly
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Chart -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <div class="h-64 bg-black/30 rounded-lg flex items-end justify-between p-6 border border-gray-700/50">
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-8 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 45%"></div>
+                                <span class="text-xs text-gray-400">Mon</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-8 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 67%"></div>
+                                <span class="text-xs text-gray-400">Tue</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-8 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 89%"></div>
+                                <span class="text-xs text-gray-400">Wed</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-8 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 72%"></div>
+                                <span class="text-xs text-gray-400">Thu</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-8 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 95%"></div>
+                                <span class="text-xs text-gray-400">Fri</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-8 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 88%"></div>
+                                <span class="text-xs text-gray-400">Sat</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-8 bg-gradient-to-t from-cyan-500 to-cyan-400 rounded-t shadow-lg animate-pulse" style="height: 100%"></div>
+                                <span class="text-xs text-cyan-400 font-semibold">Today</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Today's Revenue</span>
+                                <p class="text-green-400 font-semibold text-lg">$127,850</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Weekly Average</span>
+                                <p class="text-blue-400 font-semibold text-lg">$98,420</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Monthly Target</span>
+                                <p class="text-purple-400 font-semibold text-lg">$2.8M</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Breakdown -->
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                            <h4 class="text-xl font-semibold text-white mb-4">Revenue by Service</h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex justify-between text-sm mb-2">
+                                        <span class="text-gray-300">Enterprise Plans</span>
+                                        <span class="text-green-400 font-semibold">$1.8M (75%)</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-green-400 h-2 rounded-full" style="width: 75%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-sm mb-2">
+                                        <span class="text-gray-300">Professional Plans</span>
+                                        <span class="text-blue-400 font-semibold">$480K (20%)</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-blue-400 h-2 rounded-full" style="width: 20%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-sm mb-2">
+                                        <span class="text-gray-300">Basic Plans</span>
+                                        <span class="text-purple-400 font-semibold">$120K (5%)</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 rounded-full h-2">
+                                        <div class="bg-purple-400 h-2 rounded-full" style="width: 5%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                            <h4 class="text-xl font-semibold text-white mb-4">Growth Metrics</h4>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-300 text-sm">Monthly Recurring Revenue</span>
+                                    <div class="text-right">
+                                        <span class="text-green-400 font-semibold">$2.4M</span>
+                                        <div class="text-xs text-green-400">+23.5%</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-300 text-sm">Annual Contract Value</span>
+                                    <div class="text-right">
+                                        <span class="text-blue-400 font-semibold">$28.8M</span>
+                                        <div class="text-xs text-blue-400">+18.7%</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-300 text-sm">Customer Lifetime Value</span>
+                                    <div class="text-right">
+                                        <span class="text-purple-400 font-semibold">$47K</span>
+                                        <div class="text-xs text-purple-400">+12.3%</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-300 text-sm">Churn Rate</span>
+                                    <div class="text-right">
+                                        <span class="text-orange-400 font-semibold">2.1%</span>
+                                        <div class="text-xs text-green-400">-0.8%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Analytics -->
+                <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                    <h3 class="text-3xl font-bold text-white mb-8">User Analytics</h3>
+
+                    <!-- User Growth -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <h4 class="text-xl font-semibold text-white mb-4">User Growth</h4>
+                        <div class="h-32 bg-black/30 rounded-lg flex items-end justify-between p-4 border border-gray-700/50 mb-4">
+                            <div class="w-4 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t shadow-lg" style="height: 35%"></div>
+                            <div class="w-4 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t shadow-lg" style="height: 45%"></div>
+                            <div class="w-4 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t shadow-lg" style="height: 60%"></div>
+                            <div class="w-4 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t shadow-lg" style="height: 78%"></div>
+                            <div class="w-4 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t shadow-lg" style="height: 85%"></div>
+                            <div class="w-4 bg-gradient-to-t from-cyan-500 to-cyan-400 rounded-t shadow-lg animate-pulse" style="height: 100%"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">New Users</span>
+                                <p class="text-cyan-400 font-semibold">2,847</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Active Users</span>
+                                <p class="text-blue-400 font-semibold">47,392</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Segments -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <h4 class="text-xl font-semibold text-white mb-4">User Segments</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                                    <span class="text-white text-sm">Enterprise</span>
+                                </div>
+                                <span class="text-green-400 font-semibold">12,847</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-3 h-3 bg-blue-400 rounded-full"></div>
+                                    <span class="text-white text-sm">Professional</span>
+                                </div>
+                                <span class="text-blue-400 font-semibold">28,920</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-3 h-3 bg-purple-400 rounded-full"></div>
+                                    <span class="text-white text-sm">Basic</span>
+                                </div>
+                                <span class="text-purple-400 font-semibold">5,625</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Engagement Metrics -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <h4 class="text-xl font-semibold text-white mb-4">Engagement</h4>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Daily Active Users</span>
+                                    <span class="text-cyan-400 font-semibold">89%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-cyan-400 h-2 rounded-full" style="width: 89%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Session Duration</span>
+                                    <span class="text-green-400 font-semibold">47min</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-green-400 h-2 rounded-full" style="width: 78%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Feature Adoption</span>
+                                    <span class="text-purple-400 font-semibold">72%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-purple-400 h-2 rounded-full" style="width: 72%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Performance & Infrastructure -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- System Performance -->
+                <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                    <h3 class="text-3xl font-bold text-white mb-8">System Performance</h3>
+
+                    <!-- Performance Metrics -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <h4 class="text-xl font-semibold text-white mb-6">Infrastructure Health</h4>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">CPU Utilization</span>
+                                    <span class="text-blue-400 font-semibold">67%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-blue-500 to-cyan-400 h-3 rounded-full shadow-lg" style="width: 67%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Memory Usage</span>
+                                    <span class="text-green-400 font-semibold">72%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-green-500 to-emerald-400 h-3 rounded-full shadow-lg" style="width: 72%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Storage I/O</span>
+                                    <span class="text-yellow-400 font-semibold">84%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-yellow-500 to-orange-400 h-3 rounded-full shadow-lg" style="width: 84%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Network Bandwidth</span>
+                                    <span class="text-purple-400 font-semibold">45%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-purple-500 to-pink-400 h-3 rounded-full shadow-lg" style="width: 45%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- API Performance -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <h4 class="text-xl font-semibold text-white mb-6">API Performance</h4>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-green-400 mb-2">99.97%</div>
+                                <p class="text-gray-300 text-sm">Uptime</p>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-blue-400 mb-2">23ms</div>
+                                <p class="text-gray-300 text-sm">Avg Response</p>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-purple-400 mb-2">15.8K</div>
+                                <p class="text-gray-300 text-sm">Requests/min</p>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-orange-400 mb-2">0.03%</div>
+                                <p class="text-gray-300 text-sm">Error Rate</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Geographic Analytics -->
+                <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                    <h3 class="text-3xl font-bold text-white mb-8">Geographic Analytics</h3>
+
+                    <!-- Top Regions -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <h4 class="text-xl font-semibold text-white mb-6">Top Regions</h4>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-6 h-4 bg-blue-500 rounded-sm"></div>
+                                    <span class="text-white">North America</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-blue-400 font-semibold">42.3%</span>
+                                    <div class="text-xs text-gray-400">357K users</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-6 h-4 bg-green-500 rounded-sm"></div>
+                                    <span class="text-white">Europe</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-green-400 font-semibold">31.7%</span>
+                                    <div class="text-xs text-gray-400">268K users</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-6 h-4 bg-purple-500 rounded-sm"></div>
+                                    <span class="text-white">Asia Pacific</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-purple-400 font-semibold">18.9%</span>
+                                    <div class="text-xs text-gray-400">160K users</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-6 h-4 bg-orange-500 rounded-sm"></div>
+                                    <span class="text-white">Other</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-orange-400 font-semibold">7.1%</span>
+                                    <div class="text-xs text-gray-400">62K users</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Traffic Sources -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <h4 class="text-xl font-semibold text-white mb-6">Traffic Sources</h4>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Direct</span>
+                                    <span class="text-cyan-400 font-semibold">45.2%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-cyan-400 h-2 rounded-full" style="width: 45.2%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Organic Search</span>
+                                    <span class="text-green-400 font-semibold">28.7%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-green-400 h-2 rounded-full" style="width: 28.7%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Referrals</span>
+                                    <span class="text-blue-400 font-semibold">15.3%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-blue-400 h-2 rounded-full" style="width: 15.3%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Social Media</span>
+                                    <span class="text-purple-400 font-semibold">10.8%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-purple-400 h-2 rounded-full" style="width: 10.8%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Export & Actions -->
+    <section class="relative pb-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-3xl font-bold text-white mb-2">Data Export & Reports</h3>
+                        <p class="text-gray-300">Generate comprehensive analytics reports and export data for further analysis.</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all duration-300">
+                            Export PDF Report
+                        </button>
+                        <button class="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all duration-300">
+                            Export CSV Data
+                        </button>
+                        <button class="glassmorphism text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/20 transition-all duration-300">
+                            Schedule Reports
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

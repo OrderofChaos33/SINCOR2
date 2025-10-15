@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "agent_id": "E-auriga-01",
+  "routines": {
+    "prospect_workflow:1.0": {
+      "name": "prospect_workflow",
+      "version": "1.0",
+      "routine_type": "workflow",
+      "definition": {
+        "steps": [
+          "search",
+          "validate",
+          "enrich",
+          "report"
+        ],
+        "tools": [
+          "web_scraping",
+          "data_validation"
+        ]
+      },
+      "metadata": {
+        "created_by": "E-auriga-01",
+        "tested": true
+      },
+      "created": "2025-08-28T21:38:05.683617",
+      "agent_id": "E-auriga-01"
+    }
+  },
+  "created": "2025-08-28T21:38:05.668889"
+}

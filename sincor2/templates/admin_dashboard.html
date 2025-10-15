@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Admin Council - Business Command Center</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/friendly_help.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+        }
+        .neon-text {
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        .neon-border {
+            border: 1px solid #00ff41;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+        .panel-card {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+        }
+        .metric-card {
+            background: linear-gradient(135deg, rgba(0, 255, 65, 0.1) 0%, rgba(0, 255, 65, 0.05) 100%);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            transition: all 0.3s ease;
+        }
+        .metric-card:hover {
+            border-color: #00ff41;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+        }
+        .action-btn {
+            background: linear-gradient(45deg, #00ff41, #00aa00);
+            color: #000;
+            transition: all 0.3s ease;
+        }
+        .action-btn:hover {
+            background: linear-gradient(45deg, #00aa00, #008800);
+            transform: translateY(-2px);
+        }
+        .status-online {
+            color: #00ff41;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-black bg-opacity-70 backdrop-blur-sm border-b border-green-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <img src="/static/sincor_business_logo.png" alt="SINCOR Business Solutions" class="h-10 w-auto mr-3">
+                    <div>
+                        <h1 class="text-xl font-bold neon-text">SINCOR Admin Council</h1>
+                        <span class="text-xs text-green-300">Business Command Center</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse mr-2"></div>
+                        <span class="text-green-400 text-sm">System Online</span>
+                    </div>
+                    <div class="text-green-300 text-sm">
+                        Court's Admin Session
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Dashboard -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Quick Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 metrics-grid" data-help="metrics-section">
+            <div class="metric-card p-6 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">Total Leads</p>
+                        <p class="text-3xl font-bold neon-text">{{ metrics.total_leads if metrics else '0' }}</p>
+                        <p class="text-green-400 text-xs">Generated leads</p>
+                    </div>
+                    <div class="text-green-400 text-3xl">💰</div>
+                </div>
+            </div>
+            
+            <div class="metric-card p-6 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">Active Clients</p>
+                        <p class="text-3xl font-bold neon-text">{{ metrics.active_clients if metrics else '0' }}</p>
+                        <p class="text-green-400 text-xs">System records</p>
+                    </div>
+                    <div class="text-green-400 text-3xl">👥</div>
+                </div>
+            </div>
+            
+            <div class="metric-card p-6 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">System Uptime</p>
+                        <p class="text-3xl font-bold neon-text">{{ "%.2f"|format(metrics.uptime_percentage) if metrics else '0' }}%</p>
+                        <p class="text-green-400 text-xs">{{ metrics.uptime_days if metrics else '0' }} days running</p>
+                    </div>
+                    <div class="text-green-400 text-3xl">⚡</div>
+                </div>
+            </div>
+            
+            <div class="metric-card p-6 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">Agent Tasks</p>
+                        <p class="text-3xl font-bold neon-text">{{ metrics.agent_tasks_completed if metrics else '0' }}</p>
+                        <p class="text-green-400 text-xs">Completed tasks</p>
+                    </div>
+                    <div class="text-green-400 text-3xl">🤖</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Center -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Quick Actions -->
+            <div class="panel-card rounded-lg p-6">
+                <h2 class="text-xl font-bold neon-text mb-6">Quick Actions</h2>
+                <div class="space-y-3">
+                    <button onclick="openCortexChat()" class="w-full action-btn px-4 py-3 rounded-lg font-semibold" data-help="cortex-chat-btn">
+                        🧠 Open CORTEX Chat
+                    </button>
+                    <button onclick="generateReport()" class="w-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-3 rounded-lg font-semibold">
+                        📊 Generate Business Report
+                    </button>
+                    <button onclick="viewClients()" class="w-full bg-purple-600 hover:bg-purple-500 text-white px-4 py-3 rounded-lg font-semibold">
+                        👥 Manage Clients
+                    </button>
+                    <button onclick="systemSettings()" class="w-full bg-gray-600 hover:bg-gray-500 text-white px-4 py-3 rounded-lg font-semibold">
+                        ⚙️ System Settings
+                    </button>
+                    <button onclick="openMediaStudio()" class="w-full bg-red-600 hover:bg-red-500 text-white px-4 py-3 rounded-lg font-semibold" data-help="media-studio-btn">
+                        🎬 Media Studio
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="panel-card rounded-lg p-6">
+                <h2 class="text-xl font-bold neon-text mb-6">Recent Activity</h2>
+                <div class="space-y-4">
+                    {% if activity and activity|length > 0 %}
+                        {% for item in activity[:5] %}
+                        <div class="flex items-center justify-between p-3 {% if item.category == 'success' %}bg-green-900{% elif item.category == 'info' %}bg-blue-900{% else %}bg-yellow-900{% endif %} bg-opacity-20 rounded">
+                            <div>
+                                <p class="{% if item.category == 'success' %}text-green-300{% elif item.category == 'info' %}text-blue-300{% else %}text-yellow-300{% endif %} font-semibold">{{ item.title }}</p>
+                                <p class="{% if item.category == 'success' %}text-green-400{% elif item.category == 'info' %}text-blue-400{% else %}text-yellow-400{% endif %} text-sm">{{ item.description[:60] }}{% if item.description|length > 60 %}...{% endif %}</p>
+                            </div>
+                            <div class="{% if item.category == 'success' %}text-green-400{% elif item.category == 'info' %}text-blue-400{% else %}text-yellow-400{% endif %} text-sm">Recent</div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="flex items-center justify-between p-3 bg-green-900 bg-opacity-20 rounded">
+                        <div>
+                            <p class="text-green-300 font-semibold">System Initialized</p>
+                            <p class="text-green-400 text-sm">SINCOR system is running</p>
+                        </div>
+                        <div class="text-green-400 text-sm">Active</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="panel-card rounded-lg p-6">
+                <h2 class="text-xl font-bold neon-text mb-6">System Status</h2>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-green-300">CORTEX Core</span>
+                        <span class="status-online">● ONLINE</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-green-300">42 Agent Network</span>
+                        <span class="status-online">● OPERATIONAL</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-green-300">Database</span>
+                        <span class="status-online">● CONNECTED</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-green-300">API Gateway</span>
+                        <span class="status-online">● ACTIVE</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-green-300">Backup Systems</span>
+                        <span class="status-online">● READY</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="panel-card rounded-lg p-6">
+                <h2 class="text-xl font-bold neon-text mb-6">Revenue Trend</h2>
+                <canvas id="revenueChart" width="400" height="200"></canvas>
+            </div>
+            <div class="panel-card rounded-lg p-6">
+                <h2 class="text-xl font-bold neon-text mb-6">Agent Performance</h2>
+                <canvas id="agentChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Agent Network Overview -->
+        <div class="panel-card rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-bold neon-text mb-6">42-Agent Network Status</h2>
+            <div class="mb-4 text-center">
+                <div class="text-4xl font-bold neon-text">{{ agents.coordination_score if agents else '0' }}/100</div>
+                <div class="text-green-300">Coordination Score</div>
+                <div class="text-green-400 text-sm">{{ agents.total_agents if agents else '0' }} of 42 agents {{ 'online' if agents and agents.all_online else 'detected' }}</div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                {% if agents and agents.categories %}
+                    {% for category, info in agents.categories.items() %}
+                    <div class="text-center">
+                        <div class="{% if category == 'Business Operations' %}text-green-400{% elif category == 'Intelligence & Analytics' %}text-blue-400{% elif category == 'Marketing & Content' %}text-purple-400{% elif category == 'Compliance & Legal' %}text-yellow-400{% else %}text-cyan-400{% endif %} text-2xl mb-2">
+                            {% if category == 'Business Operations' %}🏢
+                            {% elif category == 'Intelligence & Analytics' %}🧠
+                            {% elif category == 'Marketing & Content' %}📢
+                            {% elif category == 'Compliance & Legal' %}⚖️
+                            {% else %}⚙️{% endif %}
+                        </div>
+                        <div class="{% if category == 'Business Operations' %}text-green-300{% elif category == 'Intelligence & Analytics' %}text-blue-300{% elif category == 'Marketing & Content' %}text-purple-300{% elif category == 'Compliance & Legal' %}text-yellow-300{% else %}text-cyan-300{% endif %} font-semibold text-xs">{{ category }}</div>
+                        <div class="{% if category == 'Business Operations' %}text-green-400{% elif category == 'Intelligence & Analytics' %}text-blue-400{% elif category == 'Marketing & Content' %}text-purple-400{% elif category == 'Compliance & Legal' %}text-yellow-400{% else %}text-cyan-400{% endif %} text-xs">{{ info.count }} agents • {{ info.status }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="col-span-5 text-center text-green-300">Loading agent network status...</div>
+                {% endif %}
+            </div>
+            
+            {% if agents and agents.categories %}
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                {% for category, info in agents.categories.items() %}
+                <div class="bg-black bg-opacity-30 p-3 rounded">
+                    <h4 class="font-semibold text-green-300 mb-2">{{ category }}</h4>
+                    <div class="space-y-1">
+                        {% for agent in info.agents[:3] %}
+                        <div class="flex justify-between">
+                            <span class="text-gray-300">{{ agent }}</span>
+                            <span class="text-green-400 text-xs">●</span>
+                        </div>
+                        {% endfor %}
+                        {% if info.agents|length > 3 %}
+                        <div class="text-green-500 text-xs">+ {{ info.agents|length - 3 }} more agents</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- CORTEX Integration -->
+        <div class="panel-card rounded-lg p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="text-green-400 text-4xl mr-6">🧠</div>
+                    <div>
+                        <h2 class="text-2xl font-bold neon-text">CORTEX Natural Language Interface</h2>
+                        <p class="text-green-300 mt-2">Admin-exclusive access to communicate with your entire 42-agent ecosystem.</p>
+                        <p class="text-green-400 text-sm mt-1">Talk naturally to coordinate complex business operations in real-time.</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <button onclick="openCortexChat()" class="bg-gradient-to-r from-green-600 to-green-500 text-black px-8 py-4 rounded-lg font-bold hover:from-green-500 hover:to-green-400 transition-all duration-300 text-lg">
+                        💬 Launch CORTEX
+                    </button>
+                    <div class="text-green-400 text-xs mt-2">Private admin access only</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Chart initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            // Revenue Chart
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'Revenue',
+                        data: [32000, 35000, 28000, 42000, 38000, 47293],
+                        borderColor: '#00ff41',
+                        backgroundColor: 'rgba(0, 255, 65, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true, color: '#00ff41' },
+                        x: { color: '#00ff41' }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#00ff41' } }
+                    }
+                }
+            });
+
+            // Agent Performance Chart
+            const agentCtx = document.getElementById('agentChart').getContext('2d');
+            new Chart(agentCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Business Ops', 'Intelligence', 'Marketing', 'Compliance'],
+                    datasets: [{
+                        data: [12, 4, 6, 20],
+                        backgroundColor: ['#00ff41', '#0088ff', '#8800ff', '#ffaa00']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: '#00ff41' } }
+                    }
+                }
+            });
+        });
+
+        // Action Functions
+        function openCortexChat() {
+            // Use current domain but with CORTEX port - will work on Railway too
+            const currentDomain = window.location.hostname;
+            let cortexUrl;
+            
+            if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
+                cortexUrl = 'http://localhost:5001/admin/chat';
+            } else {
+                // For Railway deployment, CORTEX should be on same domain with different service
+                cortexUrl = `https://${currentDomain}/cortex/chat`;
+            }
+            
+            window.open(cortexUrl, '_blank', 'width=1200,height=800');
+        }
+
+        function generateReport() {
+            alert('📊 Business Report Generation\n\nGenerating comprehensive business intelligence report...\n\nThis would compile:\n• Revenue analytics\n• Client performance\n• Agent coordination metrics\n• Growth opportunities\n\nReport will be ready in 2-3 minutes.');
+        }
+
+        function viewClients() {
+            alert('👥 Client Management\n\nAccessing client database...\n\n127 active clients\n8 new signups this week\n94% retention rate\n\nWould redirect to client management dashboard.');
+        }
+
+        function systemSettings() {
+            alert('⚙️ System Settings\n\nAdmin configuration panel:\n• Agent parameters\n• Security settings\n• Performance tuning\n• Backup management\n\nWould open system configuration interface.');
+        }
+
+        function openMediaStudio() {
+            window.open('/media-studio', '_blank', 'width=1400,height=900');
+        }
+    </script>
+</body>
+</html>

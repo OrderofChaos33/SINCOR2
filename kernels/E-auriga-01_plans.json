@@ -1,0 +1,76 @@
+{
+  "plan_15ad2dbc": {
+    "plan_id": "plan_15ad2dbc",
+    "goal_id": "goal_001",
+    "steps": [
+      {
+        "step_id": "scout_1",
+        "action_type": "search",
+        "description": "Search for relevant information sources",
+        "inputs": {
+          "query": "Research competitive landscape in AI market",
+          "scope": "broad"
+        },
+        "expected_outputs": [
+          "source_list",
+          "initial_data"
+        ],
+        "dependencies": [],
+        "tools_required": [
+          "web_search",
+          "data_scraping"
+        ],
+        "confidence_estimate": 0.9192
+      },
+      {
+        "step_id": "scout_2",
+        "action_type": "validation",
+        "description": "Validate and cross-reference sources",
+        "inputs": {
+          "sources": "scout_1.source_list"
+        },
+        "expected_outputs": [
+          "validated_sources",
+          "confidence_scores"
+        ],
+        "dependencies": [
+          "scout_1"
+        ],
+        "tools_required": [
+          "validation",
+          "cross_reference"
+        ],
+        "confidence_estimate": 0.7595999999999999
+      },
+      {
+        "step_id": "scout_3",
+        "action_type": "analysis",
+        "description": "Analyze and summarize findings",
+        "inputs": {
+          "data": "scout_2.validated_sources"
+        },
+        "expected_outputs": [
+          "summary_report",
+          "actionable_insights"
+        ],
+        "dependencies": [
+          "scout_2"
+        ],
+        "tools_required": [
+          "analysis",
+          "summarization"
+        ],
+        "confidence_estimate": 0.75
+      }
+    ],
+    "estimated_effort": 2.0712,
+    "risk_assessment": {
+      "total_risk": 0.1904,
+      "dependency_risk": 0.06666666666666667,
+      "complexity_risk": 0.15000000000000002,
+      "acceptable": true
+    },
+    "created": "2025-08-28T21:43:48.230679",
+    "planner_notes": "Plan created for Scout with 3 steps"
+  }
+}

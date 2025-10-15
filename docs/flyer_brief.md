@@ -1,0 +1,1 @@
+Objective: drive bookings. Elements: bold headline, 5★ badge, services (Full/Interior/Exterior), 3–6 hrs, big QR, strong CTA.

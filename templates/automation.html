@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}AI Automation - SINCOR Enterprise{% endblock %}
+
+{% block content %}
+<style>
+    .automation-hero {
+        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 25%, #2d1b69 50%, #11998e 75%, #38ef7d 100%);
+        background-size: 400% 400%;
+        animation: etherealGradient 20s ease infinite;
+    }
+
+    .automation-flow {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.6s cubic-bezier(0.23, 1, 0.320, 1);
+    }
+
+    .automation-flow:hover {
+        transform: translateY(-12px) scale(1.02);
+        box-shadow: 0 25px 60px rgba(102, 126, 234, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .process-step {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .process-step::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.2), transparent);
+        animation: processFlow 3s infinite;
+    }
+
+    @keyframes processFlow {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+</style>
+
+<!-- Ultra-Premium Automation Hero -->
+<section class="min-h-screen automation-hero relative overflow-hidden flex items-center justify-center">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-6xl mx-auto">
+            <div class="ultra-glass rounded-full px-8 py-4 mb-12 inline-block">
+                <span class="text-emerald-400 font-mono text-sm tracking-wider">SINCOR INTELLIGENT AUTOMATION</span>
+            </div>
+
+            <h1 class="text-7xl lg:text-8xl font-black text-white mb-8 leading-tight">
+                AI-Powered <span class="morphing-text">Automation</span>
+            </h1>
+
+            <p class="text-2xl lg:text-3xl mb-16 text-gray-100 max-w-4xl mx-auto leading-relaxed">
+                Transform manual processes into intelligent, self-optimizing systems that work 24/7 with zero human intervention.
+            </p>
+
+            <div class="flex flex-col lg:flex-row gap-8 justify-center">
+                <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-12 py-6 rounded-2xl text-xl font-bold transition-all premium-glow shadow-2xl">
+                    Deploy Automation
+                </a>
+                <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all border-2 border-white/20">
+                    Watch Demo
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Automation Workflows -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-24">
+                <div class="ultra-glass rounded-full px-8 py-4 mb-8 inline-block">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider">AUTOMATED WORKFLOWS</span>
+                </div>
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Intelligent Process Automation
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    AI agents that learn, adapt, and optimize your business processes in real-time.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-12">
+                <!-- Data Processing Automation -->
+                <div class="automation-flow rounded-3xl p-12 process-step">
+                    <div class="w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Data Processing</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Automated data ingestion, cleaning, and transformation from multiple sources with intelligent error handling.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-cyan-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Real-time data validation</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Automated ETL pipelines</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Self-healing processes</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Business Intelligence Automation -->
+                <div class="automation-flow rounded-3xl p-12 process-step">
+                    <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Report Generation</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Intelligent report creation and distribution with automated insights and anomaly detection.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Dynamic dashboard updates</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-pink-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Automated insight generation</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-red-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Smart alert distribution</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Decision Automation -->
+                <div class="automation-flow rounded-3xl p-12 process-step">
+                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Smart Decisions</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        AI-driven decision making with predictive models and automated response systems.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-emerald-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Predictive recommendations</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-teal-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Automated escalations</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-green-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Self-optimizing algorithms</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Automation Benefits -->
+<section class="py-32 bg-white relative overflow-hidden">
+    <div class="container mx-auto px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-black text-gray-900 mb-8">
+                    Automation <span class="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Impact</span>
+                </h2>
+                <p class="text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    Measurable business transformation through intelligent automation deployment.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-4 gap-8">
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-purple-600 mb-4">89%</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Time Savings</h3>
+                    <p class="text-gray-600">Average reduction in manual processing time</p>
+                </div>
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-blue-600 mb-4">24/7</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Operation</h3>
+                    <p class="text-gray-600">Continuous automated processing</p>
+                </div>
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-emerald-600 mb-4">99.8%</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">Accuracy</h3>
+                    <p class="text-gray-600">Automated process reliability rate</p>
+                </div>
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-cyan-600 mb-4">ROI</div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">3.2x Return</h3>
+                    <p class="text-gray-600">Average return on automation investment</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Premium CTA Section -->
+<section class="py-32 automation-hero relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="ultra-glass rounded-3xl p-16">
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Ready to Automate Everything?
+                </h2>
+                <p class="text-2xl text-gray-100 mb-12 leading-relaxed max-w-3xl mx-auto">
+                    Transform your enterprise with intelligent automation that learns, adapts, and optimizes 24/7.
+                </p>
+
+                <div class="flex flex-col lg:flex-row gap-8 justify-center mb-12">
+                    <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white px-16 py-8 rounded-2xl text-2xl font-bold transition-all premium-glow shadow-2xl group">
+                        <span class="flex items-center justify-center">
+                            Start Automation
+                            <svg class="w-8 h-8 ml-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </span>
+                    </a>
+                    <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-16 py-8 rounded-2xl text-2xl font-semibold transition-all border-2 border-white/20">
+                        See It Working
+                    </a>
+                </div>
+
+                <!-- Automation Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-white/20">
+                    <div class="text-center">
+                        <div class="text-emerald-400 font-mono text-sm mb-2">PROCESSES</div>
+                        <div class="text-white font-bold">500+ Automated Daily</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-cyan-400 font-mono text-sm mb-2">EFFICIENCY</div>
+                        <div class="text-white font-bold">89% Time Reduction</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-pink-400 font-mono text-sm mb-2">RELIABILITY</div>
+                        <div class="text-white font-bold">99.8% Success Rate</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

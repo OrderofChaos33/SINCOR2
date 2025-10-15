@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Contact SINCOR - Begin Your AI Transformation{% endblock %}
+
+{% block content %}
+<style>
+    .contact-hero {
+        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 25%, #2d1b69 50%, #11998e 75%, #38ef7d 100%);
+        background-size: 400% 400%;
+        animation: etherealGradient 20s ease infinite;
+    }
+
+    .floating-form {
+        transform: translateY(20px);
+        animation: floatForm 6s ease-in-out infinite;
+    }
+
+    @keyframes floatForm {
+        0%, 100% { transform: translateY(20px); }
+        50% { transform: translateY(-10px); }
+    }
+
+    .premium-input {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .premium-input:focus {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(102, 126, 234, 0.5);
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+        outline: none;
+    }
+
+    .premium-input::placeholder {
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    .contact-grid-item {
+        backdrop-filter: blur(40px);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: all 0.6s cubic-bezier(0.23, 1, 0.320, 1);
+    }
+
+    .contact-grid-item:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.2);
+        background: rgba(255, 255, 255, 0.06);
+    }
+</style>
+
+<!-- Ultra-Premium Contact Hero -->
+<section class="contact-hero relative overflow-hidden py-32">
+    <!-- Particle System -->
+    <div class="absolute inset-0">
+        <div class="particle" style="left: 15%; animation-delay: 0s;"></div>
+        <div class="particle" style="left: 35%; animation-delay: 2s;"></div>
+        <div class="particle" style="left: 55%; animation-delay: 4s;"></div>
+        <div class="particle" style="left: 75%; animation-delay: 1s;"></div>
+        <div class="particle" style="left: 85%; animation-delay: 3s;"></div>
+    </div>
+
+    <!-- Neural Network -->
+    <div class="neural-network"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="ultra-glass rounded-full px-8 py-4 mb-12 inline-block">
+                <span class="text-emerald-400 font-mono text-sm tracking-wider">SINCOR AI • CONTACT INITIATED</span>
+            </div>
+
+            <h1 class="text-6xl lg:text-8xl font-black text-white mb-8 leading-tight">
+                Begin Your
+                <span class="block morphing-text text-glow">AI Journey</span>
+            </h1>
+
+            <p class="text-2xl text-gray-100 mb-16 max-w-4xl mx-auto leading-relaxed">
+                Transform your business with enterprise-grade AI that delivers insights at the speed of thought. Our team of AI engineers is ready to architect your competitive advantage.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Premium Contact Section -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid lg:grid-cols-2 gap-16">
+                <!-- AI-Powered Contact Form -->
+                <div class="floating-form">
+                    <div class="ultra-glass rounded-3xl p-12 holographic-card">
+                        <div class="flex items-center mb-8">
+                            <div class="w-4 h-4 bg-emerald-400 rounded-full mr-4 pulse-glow"></div>
+                            <span class="text-white font-mono text-lg">AI Contact Interface</span>
+                        </div>
+
+                        <h2 class="text-4xl font-black text-white mb-8 morphing-text">Start Your Transformation</h2>
+
+                        <form class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-gray-300 font-medium mb-3">First Name</label>
+                                    <input type="text" class="premium-input w-full px-6 py-4 rounded-xl text-lg" placeholder="Enter your first name">
+                                </div>
+                                <div>
+                                    <label class="block text-gray-300 font-medium mb-3">Last Name</label>
+                                    <input type="text" class="premium-input w-full px-6 py-4 rounded-xl text-lg" placeholder="Enter your last name">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-gray-300 font-medium mb-3">Business Email</label>
+                                <input type="email" class="premium-input w-full px-6 py-4 rounded-xl text-lg" placeholder="your.email@company.com">
+                            </div>
+
+                            <div>
+                                <label class="block text-gray-300 font-medium mb-3">Company Name</label>
+                                <input type="text" class="premium-input w-full px-6 py-4 rounded-xl text-lg" placeholder="Your company name">
+                            </div>
+
+                            <div>
+                                <label class="block text-gray-300 font-medium mb-3">Phone Number</label>
+                                <input type="tel" class="premium-input w-full px-6 py-4 rounded-xl text-lg" placeholder="+1 (555) 123-4567">
+                            </div>
+
+                            <div>
+                                <label class="block text-gray-300 font-medium mb-3">Business Challenge</label>
+                                <select class="premium-input w-full px-6 py-4 rounded-xl text-lg">
+                                    <option value="">Select your primary challenge</option>
+                                    <option value="analytics">Need better data analytics</option>
+                                    <option value="automation">Require process automation</option>
+                                    <option value="prediction">Want predictive insights</option>
+                                    <option value="integration">Need system integration</option>
+                                    <option value="custom">Custom AI solution</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-gray-300 font-medium mb-3">Project Details</label>
+                                <textarea rows="4" class="premium-input w-full px-6 py-4 rounded-xl text-lg resize-none" placeholder="Tell us about your vision, current challenges, and expected outcomes..."></textarea>
+                            </div>
+
+                            <button type="submit" class="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white py-6 px-8 rounded-2xl text-xl font-bold transition-all premium-glow shadow-2xl group">
+                                <span class="flex items-center justify-center">
+                                    Launch AI Consultation
+                                    <svg class="w-6 h-6 ml-3 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                                    </svg>
+                                </span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Contact Information Grid -->
+                <div class="space-y-8">
+                    <!-- Direct Contact -->
+                    <div class="contact-grid-item rounded-3xl p-8">
+                        <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
+                            <div class="w-8 h-8 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-lg mr-4 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            Direct Contact
+                        </h3>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="text-gray-300 font-mono text-sm mb-1">Enterprise Email</div>
+                                <div class="text-white text-lg">ai@sincor.com</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-300 font-mono text-sm mb-1">AI Hotline</div>
+                                <div class="text-white text-lg">+1 (800) AI-SINCOR</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Response Times -->
+                    <div class="contact-grid-item rounded-3xl p-8">
+                        <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
+                            <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg mr-4 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            Response Times
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-300">Initial Response</span>
+                                <span class="text-emerald-400 font-mono">&lt; 2 hours</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-300">Technical Assessment</span>
+                                <span class="text-cyan-400 font-mono">&lt; 24 hours</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-300">Proposal Delivery</span>
+                                <span class="text-purple-400 font-mono">&lt; 48 hours</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Engineering Team -->
+                    <div class="contact-grid-item rounded-3xl p-8">
+                        <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
+                            <div class="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg mr-4 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                            </div>
+                            AI Engineering Team
+                        </h3>
+                        <div class="text-gray-300 leading-relaxed">
+                            Connect directly with our team of AI engineers, data scientists, and business intelligence architects. Available 24/7 for enterprise consultations.
+                        </div>
+                        <div class="mt-4 flex items-center">
+                            <div class="w-3 h-3 bg-emerald-400 rounded-full mr-3 pulse-glow"></div>
+                            <span class="text-emerald-400 font-mono text-sm">TEAM ONLINE • READY TO ARCHITECT YOUR SOLUTION</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Neural Network -->
+<section class="py-32 contact-hero relative overflow-hidden">
+    <div class="neural-network"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-20">
+                <div class="ultra-glass rounded-full px-8 py-4 mb-8 inline-block">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider">FREQUENTLY ASKED QUESTIONS</span>
+                </div>
+                <h2 class="text-5xl font-black text-white mb-8 morphing-text">
+                    Everything You Need to Know
+                </h2>
+            </div>
+
+            <div class="space-y-6">
+                <div class="ultra-glass rounded-2xl p-8 premium-glow interactive-card">
+                    <h3 class="text-2xl font-bold text-white mb-4">How quickly can we deploy SINCOR AI?</h3>
+                    <p class="text-gray-300 text-lg leading-relaxed">Enterprise deployments typically complete within 24-48 hours. Our AI engineering team handles the entire setup process, from data integration to custom dashboard configuration. Complex enterprise architectures may require 1-2 weeks for full optimization.</p>
+                </div>
+
+                <div class="ultra-glass rounded-2xl p-8 premium-glow interactive-card">
+                    <h3 class="text-2xl font-bold text-white mb-4">Do you provide custom AI model development?</h3>
+                    <p class="text-gray-300 text-lg leading-relaxed">Absolutely. Our Enterprise tier includes bespoke AI model development, custom neural network architectures, and proprietary algorithm development tailored to your specific business challenges and data patterns.</p>
+                </div>
+
+                <div class="ultra-glass rounded-2xl p-8 premium-glow interactive-card">
+                    <h3 class="text-2xl font-bold text-white mb-4">What level of support do you provide?</h3>
+                    <p class="text-gray-300 text-lg leading-relaxed">All plans include AI-powered support. Professional plans add dedicated engineers, while Enterprise clients receive 24/7 access to our AI architecture team, custom integration support, and priority neural network optimization.</p>
+                </div>
+
+                <div class="ultra-glass rounded-2xl p-8 premium-glow interactive-card">
+                    <h3 class="text-2xl font-bold text-white mb-4">How does SINCOR integrate with existing systems?</h3>
+                    <p class="text-gray-300 text-lg leading-relaxed">SINCOR features universal API connectivity with 200+ enterprise systems out-of-the-box. Our AI integration engine automatically maps data schemas and establishes real-time connections with your existing infrastructure.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Command Cockpit</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+
+<style>
+/* ===== CORE STYLES ===== */
+html, body {
+  height: 100%;
+  margin: 0;
+  background: #000 url('YOUR_DALLE_IMAGE_URL_HERE') center/cover no-repeat fixed;
+  color: #0ff;
+  font-family: monospace;
+  overflow: hidden;
+}
+nav, main, footer {
+  background: rgba(0,0,0,0.6);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+h2, h3 {
+  color: #0ff;
+}
+
+/* ===== PARALLAX ===== */
+#parallax {
+  position: absolute;
+  top:0; left:0;
+  width:100%; height:100%;
+  pointer-events: none;
+}
+.layer {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  opacity: 0.3;
+}
+.layer.glow {
+  mix-blend-mode: screen;
+  opacity: 0.6;
+}
+
+/* ===== RADAR ===== */
+.radar-wrapper {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 2px solid #0ff;
+  background: radial-gradient(circle, rgba(0,255,255,0.1) 0%, transparent 70%);
+  position: relative;
+  overflow: hidden;
+  margin: auto;
+}
+.radar-sweep {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: conic-gradient(rgba(0,255,255,0.3), transparent 60%);
+  border-radius: 50%;
+  animation: sweep 3s linear infinite;
+}
+@keyframes sweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.blip {
+  width: 8px;
+  height: 8px;
+  background: #f0f;
+  border-radius: 50%;
+  position: absolute;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* ===== GAUGES ===== */
+.gauge {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  border: 2px solid #0ff;
+  position: relative;
+  margin: auto;
+  background: radial-gradient(circle at center, rgba(0,255,255,0.05) 0%, transparent 70%);
+}
+.needle {
+  width: 4px;
+  height: 90px;
+  background: #f90;
+  position: absolute;
+  top: 20px;
+  left: 98px;
+  transform-origin: bottom center;
+  transition: transform 0.8s ease-out;
+}
+
+/* ===== ALERTS ===== */
+.alert-lock {
+  width: 150px;
+  height: 150px;
+  border: 2px solid #f00;
+  border-radius: 50%;
+  position: relative;
+  margin: auto;
+  animation: targetPulse 1.5s infinite;
+}
+@keyframes targetPulse {
+  0%, 100% { box-shadow: 0 0 20px #f00; }
+  50% { box-shadow: 0 0 40px #f00; }
+}
+
+/* ===== SWITCHES ===== */
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(0,255,255,0.05);
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- Navigation -->
+<nav class="container-fluid">
+  <ul><li><strong>AGENT COMMAND COCKPIT</strong></li></ul>
+  <ul>
+    <li><a href="#">Dashboard</a></li>
+    <li><a href="#">Agents</a></li>
+    <li><a href="#" role="button">Override</a></li>
+  </ul>
+</nav>
+
+<!-- Main Cockpit -->
+<main class="container">
+<div class="grid">
+
+  <!-- Radar -->
+  <section>
+    <hgroup>
+      <h2>Lead Gen Radar</h2>
+      <h3>Live Scanning</h3>
+    </hgroup>
+    <div class="radar-wrapper">
+      <div class="radar-sweep"></div>
+    </div>
+  </section>
+
+  <!-- Gauge -->
+  <section>
+    <hgroup>
+      <h2>Cashflow Gauge</h2>
+      <h3>Real-Time Metrics</h3>
+    </hgroup>
