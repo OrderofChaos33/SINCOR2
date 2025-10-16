@@ -1,0 +1,25 @@
+# SINCOR AI Business Automation Platform
+# https://getsincor.com
+
+User-agent: *
+Allow: /
+
+# Disallow admin and internal dashboards
+Disallow: /admin
+Disallow: /api/
+Disallow: /admin-dashboard
+Disallow: /agent-steering
+Disallow: /agent-observability
+
+# Allow public pages
+Allow: /
+Allow: /pricing
+Allow: /buy
+Allow: /dashboard
+Allow: /professional
+Allow: /executive
+Allow: /enterprise-dashboard
+Allow: /discovery-dashboard
+
+# Sitemap location
+Sitemap: https://getsincor.com/sitemap.xml

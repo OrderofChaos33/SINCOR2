@@ -1,8 +1,395 @@
 <!DOCTYPE html>
-<html><head><title>Terms of Service - SINCOR</title><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-8">
-<div class="bg-white rounded-2xl p-12 shadow-xl text-center max-w-2xl">
-<h1 class="text-3xl font-bold mb-4">Terms of Service</h1>
-<p class="text-xl text-gray-600 mb-8">Service terms, usage policies, and legal agreements. Coming soon.</p>
-<a href="/" class="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors">← Back to Home</a>
-</div></body></html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - SINCOR AI Business Automation Platform</title>
+    <meta name="description" content="SINCOR Terms of Service - Legal terms, service agreements, and usage policies for our AI business automation platform.">
+    <meta name="robots" content="index, follow">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold text-blue-600">SINCOR</a>
+            <a href="/" class="text-gray-600 hover:text-gray-900 font-medium">← Back to Home</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto px-4 py-12">
+        <div class="bg-white rounded-2xl p-8 md:p-12 shadow-sm">
+            <!-- Header Section -->
+            <div class="border-b border-gray-200 pb-6 mb-8">
+                <h1 class="text-4xl font-bold text-gray-900 mb-4">Terms of Service</h1>
+                <p class="text-lg text-gray-600">
+                    Last Updated: October 15, 2025
+                </p>
+                <p class="text-sm text-gray-500 mt-4">
+                    These Terms of Service ("Terms") govern your access to and use of the SINCOR AI business automation platform and related services (collectively, the "Service") provided by SINCOR ("we," "us," or "our").
+                </p>
+                <p class="text-sm font-semibold text-red-600 mt-4">
+                    BY ACCESSING OR USING THE SERVICE, YOU AGREE TO BE BOUND BY THESE TERMS. IF YOU DO NOT AGREE, DO NOT USE THE SERVICE.
+                </p>
+            </div>
+
+            <!-- Table of Contents -->
+            <div class="bg-blue-50 rounded-lg p-6 mb-8">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">Table of Contents</h2>
+                <ol class="list-decimal list-inside space-y-2 text-blue-600">
+                    <li><a href="#acceptance" class="hover:underline">Acceptance of Terms</a></li>
+                    <li><a href="#service-description" class="hover:underline">Service Description</a></li>
+                    <li><a href="#accounts" class="hover:underline">Account Registration and Responsibilities</a></li>
+                    <li><a href="#payment" class="hover:underline">Payment and Billing</a></li>
+                    <li><a href="#ai-usage" class="hover:underline">AI Service Usage and Limitations</a></li>
+                    <li><a href="#intellectual-property" class="hover:underline">Intellectual Property</a></li>
+                    <li><a href="#prohibited" class="hover:underline">Prohibited Activities</a></li>
+                    <li><a href="#service-availability" class="hover:underline">Service Availability and Modifications</a></li>
+                    <li><a href="#termination" class="hover:underline">Termination</a></li>
+                    <li><a href="#warranties" class="hover:underline">Warranties and Disclaimers</a></li>
+                    <li><a href="#limitation-liability" class="hover:underline">Limitation of Liability</a></li>
+                    <li><a href="#indemnification" class="hover:underline">Indemnification</a></li>
+                    <li><a href="#dispute-resolution" class="hover:underline">Dispute Resolution</a></li>
+                    <li><a href="#general" class="hover:underline">General Provisions</a></li>
+                    <li><a href="#contact" class="hover:underline">Contact Information</a></li>
+                </ol>
+            </div>
+
+            <!-- Section 1: Acceptance -->
+            <section id="acceptance" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">1. Acceptance of Terms</h2>
+                <p class="text-gray-700 mb-4">
+                    By creating an account, accessing, or using the SINCOR Service, you acknowledge that you have read, understood, and agree to be bound by these Terms, as well as our Privacy Policy. If you are using the Service on behalf of an organization, you represent and warrant that you have the authority to bind that organization to these Terms.
+                </p>
+                <p class="text-gray-700">
+                    We reserve the right to modify these Terms at any time. We will provide notice of material changes through email or a prominent notice on our Service. Your continued use after such changes constitutes acceptance of the modified Terms.
+                </p>
+            </section>
+
+            <!-- Section 2: Service Description -->
+            <section id="service-description" class="mb-12 bg-blue-50 rounded-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">2. Service Description</h2>
+                <p class="text-gray-700 mb-4">
+                    SINCOR provides an AI-powered business automation platform featuring 42 specialized AI agents organized into the following categories:
+                </p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li><strong>Scout Agents:</strong> Discovery, prospecting, and intelligence gathering</li>
+                    <li><strong>Synthesizer Agents:</strong> Data analysis, summaries, and deduplication</li>
+                    <li><strong>Builder Agents:</strong> Code generation, automation, and infrastructure</li>
+                    <li><strong>Negotiator Agents:</strong> Communication, outreach, and relationship management</li>
+                    <li><strong>Caretaker Agents:</strong> Data hygiene, organization, and maintenance</li>
+                    <li><strong>Auditor Agents:</strong> Evaluation, testing, and compliance</li>
+                    <li><strong>Director Agents:</strong> Prioritization, coordination, and escalation</li>
+                </ul>
+                <p class="text-gray-700 mt-4">
+                    The Service includes business intelligence, predictive analytics, monetization systems, and enterprise-grade automation capabilities.
+                </p>
+            </section>
+
+            <!-- Section 3: Accounts -->
+            <section id="accounts" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">3. Account Registration and Responsibilities</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">3.1 Eligibility</h3>
+                <p class="text-gray-700 mb-4">
+                    You must be at least 18 years old and have the legal capacity to enter into contracts to use the Service. The Service is intended for business use only.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">3.2 Account Security</h3>
+                <p class="text-gray-700 mb-2">You are responsible for:</p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li>Maintaining the confidentiality of your account credentials</li>
+                    <li>All activities that occur under your account</li>
+                    <li>Immediately notifying us of any unauthorized access</li>
+                    <li>Ensuring your account information is accurate and current</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">3.3 Account Types</h3>
+                <p class="text-gray-700 mb-2">We offer the following subscription tiers:</p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li><strong>Starter ($297):</strong> 15 AI agents, 1,000 tasks/month, 5 team members</li>
+                    <li><strong>Professional ($997):</strong> 42 AI agents, 10,000 tasks/month, 25 team members</li>
+                    <li><strong>Enterprise ($2,997):</strong> Unlimited agents and tasks, unlimited team members, white-label capabilities</li>
+                </ul>
+            </section>
+
+            <!-- Section 4: Payment -->
+            <section id="payment" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">4. Payment and Billing</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">4.1 Fees and Billing</h3>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li>All fees are stated in USD and are non-refundable except as required by law</li>
+                    <li>Subscriptions are billed monthly or annually in advance</li>
+                    <li>We use PayPal for payment processing; you must comply with their terms</li>
+                    <li>Prices are subject to change with 30 days' notice to existing subscribers</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">4.2 Automatic Renewal</h3>
+                <p class="text-gray-700 mb-4">
+                    Subscriptions automatically renew at the end of each billing period unless you cancel before the renewal date. You authorize us to charge your payment method for renewal fees.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">4.3 Late Payment</h3>
+                <p class="text-gray-700">
+                    If payment fails, we may suspend or terminate your access to the Service until payment is received. We reserve the right to charge late fees of 1.5% per month on overdue amounts.
+                </p>
+            </section>
+
+            <!-- Section 5: AI Usage -->
+            <section id="ai-usage" class="mb-12 bg-yellow-50 rounded-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">5. AI Service Usage and Limitations</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">5.1 AI-Generated Content</h3>
+                <p class="text-gray-700 mb-4">
+                    Our AI agents generate content, analysis, and recommendations. You acknowledge that:
+                </p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li>AI-generated content may contain errors, inaccuracies, or biases</li>
+                    <li>You are solely responsible for reviewing and verifying all AI outputs</li>
+                    <li>We do not guarantee the accuracy, completeness, or suitability of AI-generated content</li>
+                    <li>You must not rely on AI outputs for medical, legal, financial, or safety-critical decisions without professional review</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">5.2 Usage Limits</h3>
+                <p class="text-gray-700 mb-2">Your subscription includes specific usage limits:</p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li>Task limits are calculated based on agent actions and API calls</li>
+                    <li>Exceeding limits may result in overage charges or service throttling</li>
+                    <li>We reserve the right to impose fair use limits to prevent abuse</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">5.3 Data Input Responsibilities</h3>
+                <p class="text-gray-700">
+                    You are responsible for the legality, accuracy, and appropriateness of all data you provide to our AI agents. You must not input personal data of individuals without proper legal basis, or any illegal, harmful, or infringing content.
+                </p>
+            </section>
+
+            <!-- Section 6: IP -->
+            <section id="intellectual-property" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">6. Intellectual Property</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">6.1 Our IP</h3>
+                <p class="text-gray-700 mb-4">
+                    The Service, including all software, algorithms, AI models, design, text, graphics, and other content (excluding Your Content), is owned by SINCOR and protected by copyright, trademark, and other intellectual property laws. You are granted a limited, non-exclusive, non-transferable license to access and use the Service subject to these Terms.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">6.2 Your Content</h3>
+                <p class="text-gray-700 mb-4">
+                    You retain all ownership rights to data and content you submit to the Service ("Your Content"). You grant us a limited license to process, store, and analyze Your Content solely to provide the Service. We will not use Your Content to train public AI models without your consent.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">6.3 AI-Generated Outputs</h3>
+                <p class="text-gray-700">
+                    You own the outputs generated by our AI agents in response to your inputs, subject to our rights in the underlying Service. You are responsible for ensuring your use of AI-generated outputs complies with applicable laws and does not infringe third-party rights.
+                </p>
+            </section>
+
+            <!-- Section 7: Prohibited -->
+            <section id="prohibited" class="mb-12 bg-red-50 rounded-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">7. Prohibited Activities</h2>
+                <p class="text-gray-700 mb-4">
+                    You agree not to:
+                </p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li>Use the Service for any illegal purpose or in violation of any laws</li>
+                    <li>Reverse engineer, decompile, or attempt to extract source code from the Service</li>
+                    <li>Interfere with or disrupt the Service or servers</li>
+                    <li>Circumvent usage limits, security measures, or authentication mechanisms</li>
+                    <li>Share account credentials or resell access to the Service without authorization</li>
+                    <li>Submit malicious code, viruses, or harmful data</li>
+                    <li>Use the Service to generate spam, phishing, or fraudulent content</li>
+                    <li>Infringe intellectual property rights of others</li>
+                    <li>Engage in automated scraping or data harvesting without permission</li>
+                    <li>Use the Service to harass, abuse, or harm others</li>
+                    <li>Attempt to gain unauthorized access to other users' accounts or data</li>
+                    <li>Use the Service for high-risk activities (medical diagnosis, nuclear facilities, aviation, etc.) without appropriate safeguards</li>
+                </ul>
+            </section>
+
+            <!-- Section 8: Availability -->
+            <section id="service-availability" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">8. Service Availability and Modifications</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">8.1 Uptime and Availability</h3>
+                <p class="text-gray-700 mb-4">
+                    We strive to maintain high Service availability but do not guarantee uninterrupted access. The Service may be temporarily unavailable due to maintenance, updates, or factors beyond our control.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">8.2 Modifications</h3>
+                <p class="text-gray-700 mb-4">
+                    We reserve the right to modify, suspend, or discontinue any aspect of the Service at any time, with or without notice. We are not liable for any modification, suspension, or discontinuation.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">8.3 Beta Features</h3>
+                <p class="text-gray-700">
+                    We may offer beta or experimental features. These are provided "as is" without warranties and may be changed or discontinued without notice.
+                </p>
+            </section>
+
+            <!-- Section 9: Termination -->
+            <section id="termination" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">9. Termination</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">9.1 Termination by You</h3>
+                <p class="text-gray-700 mb-4">
+                    You may cancel your subscription at any time through your account settings. Cancellation takes effect at the end of the current billing period. No refunds are provided for partial months.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">9.2 Termination by Us</h3>
+                <p class="text-gray-700 mb-4">
+                    We may suspend or terminate your account immediately if you violate these Terms, fail to pay fees, or engage in conduct harmful to the Service or other users. We will provide notice when reasonably possible.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">9.3 Effect of Termination</h3>
+                <p class="text-gray-700">
+                    Upon termination, your right to access the Service ceases immediately. We will delete Your Content within 30 days unless retention is required by law. Provisions that by their nature should survive termination (including IP rights, disclaimers, and limitations of liability) will survive.
+                </p>
+            </section>
+
+            <!-- Section 10: Warranties -->
+            <section id="warranties" class="mb-12 bg-gray-100 rounded-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">10. Warranties and Disclaimers</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">10.1 Service Warranty</h3>
+                <p class="text-gray-700 mb-4">
+                    We warrant that the Service will perform substantially as described in our documentation. This warranty does not cover issues caused by misuse, modifications, or factors beyond our control.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">10.2 Disclaimer</h3>
+                <p class="text-gray-700 font-semibold uppercase mb-4">
+                    EXCEPT AS EXPRESSLY PROVIDED, THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+                </p>
+                <p class="text-gray-700">
+                    We do not warrant that the Service will be uninterrupted, error-free, or secure, or that defects will be corrected. We do not warrant the accuracy, completeness, or reliability of AI-generated content.
+                </p>
+            </section>
+
+            <!-- Section 11: Limitation -->
+            <section id="limitation-liability" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">11. Limitation of Liability</h2>
+                <p class="text-gray-700 font-semibold uppercase mb-4">
+                    TO THE MAXIMUM EXTENT PERMITTED BY LAW, SINCOR AND ITS AFFILIATES, OFFICERS, EMPLOYEES, AND AGENTS WILL NOT BE LIABLE FOR:
+                </p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li>INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES</li>
+                    <li>LOSS OF PROFITS, REVENUE, DATA, OR BUSINESS OPPORTUNITIES</li>
+                    <li>DAMAGES ARISING FROM USE OR INABILITY TO USE THE SERVICE</li>
+                    <li>DAMAGES ARISING FROM ERRORS, INACCURACIES, OR HARMFUL CONTENT IN AI OUTPUTS</li>
+                    <li>UNAUTHORIZED ACCESS TO OR ALTERATION OF YOUR CONTENT</li>
+                </ul>
+                <p class="text-gray-700 mt-4 font-semibold uppercase">
+                    IN NO EVENT SHALL OUR TOTAL LIABILITY EXCEED THE AMOUNT YOU PAID US IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR $100 USD, WHICHEVER IS GREATER.
+                </p>
+            </section>
+
+            <!-- Section 12: Indemnification -->
+            <section id="indemnification" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">12. Indemnification</h2>
+                <p class="text-gray-700 mb-4">
+                    You agree to indemnify, defend, and hold harmless SINCOR and its affiliates from and against all claims, liabilities, damages, and expenses (including reasonable attorneys' fees) arising from:
+                </p>
+                <ul class="list-disc list-inside space-y-2 text-gray-700 ml-4">
+                    <li>Your use of the Service</li>
+                    <li>Your violation of these Terms</li>
+                    <li>Your violation of any rights of another party</li>
+                    <li>Your Content and use of AI-generated outputs</li>
+                    <li>Your violation of applicable laws or regulations</li>
+                </ul>
+            </section>
+
+            <!-- Section 13: Dispute -->
+            <section id="dispute-resolution" class="mb-12 bg-blue-50 rounded-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">13. Dispute Resolution</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">13.1 Informal Resolution</h3>
+                <p class="text-gray-700 mb-4">
+                    Before filing a claim, you agree to contact us at legal@getsincor.com to attempt to resolve the dispute informally. We will attempt to resolve disputes through good-faith negotiations.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">13.2 Arbitration</h3>
+                <p class="text-gray-700 mb-4">
+                    If informal resolution fails, disputes will be resolved through binding arbitration in accordance with the American Arbitration Association's Commercial Arbitration Rules. Arbitration will be conducted in English. You waive the right to participate in class actions or class arbitrations.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">13.3 Exceptions</h3>
+                <p class="text-gray-700">
+                    Either party may seek injunctive relief in court for intellectual property infringement or misuse of confidential information.
+                </p>
+            </section>
+
+            <!-- Section 14: General -->
+            <section id="general" class="mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">14. General Provisions</h2>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">14.1 Governing Law</h3>
+                <p class="text-gray-700 mb-4">
+                    These Terms are governed by the laws of the United States, without regard to conflict of law principles.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">14.2 Entire Agreement</h3>
+                <p class="text-gray-700 mb-4">
+                    These Terms, together with our Privacy Policy and any additional terms you agree to, constitute the entire agreement between you and SINCOR regarding the Service.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">14.3 Severability</h3>
+                <p class="text-gray-700 mb-4">
+                    If any provision of these Terms is found to be unenforceable, the remaining provisions will remain in full effect.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">14.4 Waiver</h3>
+                <p class="text-gray-700 mb-4">
+                    Our failure to enforce any right or provision of these Terms will not constitute a waiver of that right or provision.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">14.5 Assignment</h3>
+                <p class="text-gray-700 mb-4">
+                    You may not assign or transfer these Terms without our written consent. We may assign these Terms without restriction.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mb-3 mt-4">14.6 Export Compliance</h3>
+                <p class="text-gray-700">
+                    You agree to comply with all applicable export and import laws and regulations. You represent that you are not located in an embargoed country or on any government restricted party list.
+                </p>
+            </section>
+
+            <!-- Section 15: Contact -->
+            <section id="contact" class="mb-8 bg-blue-50 rounded-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">15. Contact Information</h2>
+                <p class="text-gray-700 mb-4">
+                    For questions about these Terms, please contact us:
+                </p>
+                <div class="space-y-2 text-gray-700">
+                    <p><strong>Legal Inquiries:</strong> <a href="mailto:legal@getsincor.com" class="text-blue-600 hover:underline">legal@getsincor.com</a></p>
+                    <p><strong>Support:</strong> <a href="mailto:support@getsincor.com" class="text-blue-600 hover:underline">support@getsincor.com</a></p>
+                    <p><strong>General:</strong> <a href="mailto:hello@getsincor.com" class="text-blue-600 hover:underline">hello@getsincor.com</a></p>
+                    <p><strong>Website:</strong> <a href="https://getsincor.com" class="text-blue-600 hover:underline">https://getsincor.com</a></p>
+                </div>
+            </section>
+
+            <!-- Footer Navigation -->
+            <div class="border-t border-gray-200 pt-6 mt-8 text-center">
+                <p class="text-gray-600 mb-4">Related Legal Documents</p>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <a href="/privacy" class="text-blue-600 hover:underline font-medium">Privacy Policy</a>
+                    <a href="/security" class="text-blue-600 hover:underline font-medium">Security</a>
+                    <a href="/" class="text-gray-600 hover:text-gray-900 font-medium">Home</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-12">
+        <div class="max-w-5xl mx-auto px-4 py-8 text-center text-gray-600 text-sm">
+            <p>&copy; 2025 SINCOR. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

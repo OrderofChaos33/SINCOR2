@@ -1,0 +1,418 @@
+/**
+ * SINCOR Custom Styles
+ * Complements TailwindCSS with brand-specific customizations
+ */
+
+/* ============================================================================
+   CSS Custom Properties (Design Tokens)
+   ============================================================================ */
+
+:root {
+  /* Brand Colors */
+  --sincor-primary: #3b82f6;
+  --sincor-primary-dark: #2563eb;
+  --sincor-primary-light: #60a5fa;
+  --sincor-secondary: #8b5cf6;
+  --sincor-accent: #06b6d4;
+
+  /* Neutrals */
+  --sincor-dark: #0f172a;
+  --sincor-dark-lighter: #1e293b;
+  --sincor-gray: #64748b;
+  --sincor-gray-light: #cbd5e1;
+  --sincor-white: #ffffff;
+
+  /* Semantic Colors */
+  --sincor-success: #10b981;
+  --sincor-warning: #f59e0b;
+  --sincor-error: #ef4444;
+  --sincor-info: #3b82f6;
+
+  /* Spacing */
+  --sincor-header-height: 64px;
+  --sincor-footer-height: 200px;
+  --sincor-max-width: 1280px;
+
+  /* Typography */
+  --sincor-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --sincor-font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Shadows */
+  --sincor-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --sincor-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --sincor-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --sincor-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  --sincor-shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+
+  /* Transitions */
+  --sincor-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sincor-transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --sincor-transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Border Radius */
+  --sincor-radius-sm: 0.25rem;
+  --sincor-radius-md: 0.5rem;
+  --sincor-radius-lg: 0.75rem;
+  --sincor-radius-xl: 1rem;
+  --sincor-radius-full: 9999px;
+}
+
+/* ============================================================================
+   Global Overrides & Enhancements
+   ============================================================================ */
+
+/* Smooth scrolling for anchor links */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Improved focus visibility for accessibility */
+:focus-visible {
+  outline: 2px solid var(--sincor-primary);
+  outline-offset: 2px;
+}
+
+/* Remove focus ring for mouse users, keep for keyboard users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Selection styling */
+::selection {
+  background-color: var(--sincor-primary);
+  color: var(--sincor-white);
+}
+
+::-moz-selection {
+  background-color: var(--sincor-primary);
+  color: var(--sincor-white);
+}
+
+/* ============================================================================
+   Custom Animations
+   ============================================================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Utility classes for animations */
+.animate-fade-in {
+  animation: fadeIn var(--sincor-transition-base) ease-out;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp var(--sincor-transition-slow) ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight var(--sincor-transition-slow) ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* ============================================================================
+   Custom Components
+   ============================================================================ */
+
+/* Gradient text effect */
+.text-gradient {
+  background: linear-gradient(135deg, var(--sincor-primary), var(--sincor-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass morphism effect */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: transform var(--sincor-transition-base),
+              box-shadow var(--sincor-transition-base);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--sincor-shadow-xl);
+}
+
+/* Button glow effect on hover */
+.btn-glow {
+  transition: box-shadow var(--sincor-transition-base);
+}
+
+.btn-glow:hover {
+  box-shadow: var(--sincor-shadow-glow);
+}
+
+/* Loading spinner */
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin-slow 1s linear infinite;
+}
+
+/* ============================================================================
+   Accessibility Enhancements
+   ============================================================================ */
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Skip to main content link */
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+  padding: 1em;
+  background-color: var(--sincor-primary);
+  color: var(--sincor-white);
+  text-decoration: none;
+}
+
+.skip-to-main:focus {
+  left: 50%;
+  transform: translateX(-50%);
+  top: 1rem;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --sincor-primary: #0066ff;
+    --sincor-dark: #000000;
+    --sincor-white: #ffffff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   Print Styles
+   ============================================================================ */
+
+@media print {
+  /* Hide non-essential elements */
+  nav,
+  footer,
+  .no-print,
+  button {
+    display: none !important;
+  }
+
+  /* Optimize colors for print */
+  body {
+    background: white;
+    color: black;
+  }
+
+  /* Ensure links are visible */
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+
+  /* Prevent page breaks inside elements */
+  h1, h2, h3, h4, h5, h6,
+  p, blockquote, pre,
+  ul, ol, dl,
+  tr, img {
+    page-break-inside: avoid;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 2cm;
+  }
+}
+
+/* ============================================================================
+   Responsive Utilities
+   ============================================================================ */
+
+/* Container with consistent padding */
+.container-custom {
+  width: 100%;
+  max-width: var(--sincor-max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-custom {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-custom {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* ============================================================================
+   Form Enhancements
+   ============================================================================ */
+
+/* Custom focus styles for form inputs */
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--sincor-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Invalid input styling */
+input:invalid:not(:focus),
+textarea:invalid:not(:focus),
+select:invalid:not(:focus) {
+  border-color: var(--sincor-error);
+}
+
+/* Disabled input styling */
+input:disabled,
+textarea:disabled,
+select:disabled,
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Dark Mode Support
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sincor-dark: #ffffff;
+    --sincor-white: #0f172a;
+    --sincor-gray: #94a3b8;
+    --sincor-gray-light: #334155;
+  }
+}
+
+/* ============================================================================
+   Performance Optimizations
+   ============================================================================ */
+
+/* GPU acceleration for animations */
+.gpu-accelerated {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Lazy loading images */
+img[loading="lazy"] {
+  opacity: 0;
+  transition: opacity var(--sincor-transition-base);
+}
+
+img[loading="lazy"].loaded {
+  opacity: 1;
+}
+
+/* ============================================================================
+   Browser-Specific Fixes
+   ============================================================================ */
+
+/* Safari input zoom fix */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Edge button styling fix */
+button::-moz-focus-inner {
+  border: 0;
+}
