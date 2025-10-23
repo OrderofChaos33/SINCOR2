@@ -1,0 +1,69 @@
+PAYPAL PRODUCT SETUP - SUPER SIMPLE STEPS
+==========================================
+
+STEP 1: Open PayPal
+-------------------
+1. Go to: https://www.paypal.com/businessmanage/products/subscriptions
+2. Log in if needed
+3. Keep this window open
+
+
+STEP 2: Enable Your App Features
+---------------------------------
+1. Open a NEW tab
+2. Go to: https://developer.paypal.com/dashboard/applications/live
+3. Find your app (starts with: Ac0_uwVrey...)
+4. Click EDIT button
+5. Scroll down to "Features"
+6. Check these boxes:
+   ☑ Accept payments
+   ☑ Advanced Credit and Debit Card Payments
+   ☑ Subscriptions
+7. Click SAVE
+8. Wait 2 minutes
+9. Close this tab
+
+
+STEP 3: Add Products (Start with BI Report)
+--------------------------------------------
+1. Go back to the PayPal tab from Step 1
+2. Click "Create a product" button
+3. Open the file: "1-BI-REPORT.txt" (I'll create this)
+4. Copy EVERYTHING from that file
+5. Paste into PayPal form
+6. Click Save
+
+Repeat for all 10 products (I'll create 10 files for you)
+
+
+STEP 4: Test Payment
+--------------------
+1. Go to: http://localhost:5000/buy
+2. Click the $0.01 button
+3. Complete payment
+4. IT SHOULD WORK NOW!
+
+
+FILES I'M CREATING FOR YOU:
+===========================
+1-BI-REPORT.txt         (Copy/paste #1)
+2-COMPETITIVE.txt       (Copy/paste #2)
+3-GROWTH-FORECAST.txt   (Copy/paste #3)
+4-STARTER-PLAN.txt      (Copy/paste #4)
+5-PROFESSIONAL-PLAN.txt (Copy/paste #5)
+6-ENTERPRISE-PLAN.txt   (Copy/paste #6)
+7-CONTENT-MICRO.txt     (Copy/paste #7)
+8-CONTENT-STANDARD.txt  (Copy/paste #8)
+9-CONTENT-PRO.txt       (Copy/paste #9)
+10-CONTENT-ENTERPRISE.txt (Copy/paste #10)
+
+
+WHAT YOU NEED TO DO:
+====================
+☐ Step 1: Open PayPal website
+☐ Step 2: Enable app features (one-time, 2 minutes)
+☐ Step 3: Create 10 products (just copy/paste from my files)
+☐ Step 4: Test the $0.01 payment
+
+
+THAT'S IT! I'M DOING EVERYTHING ELSE.

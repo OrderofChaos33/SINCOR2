@@ -1,0 +1,44 @@
+PRODUCT NAME:
+SINCOR Starter Plan - Monthly Subscription
+
+PRODUCT TYPE:
+Recurring subscription
+
+BILLING:
+Monthly
+
+PRICE:
+$297.00
+
+SKU:
+SINCOR-STARTER-MONTHLY
+
+CATEGORY:
+Software Subscriptions
+
+DESCRIPTION:
+SINCOR Starter Plan - AI Business Automation Platform
+
+Your AI sales organization in a box. Automate lead generation, outreach, and business operations with 10 specialized AI agents working 24/7.
+
+Features:
+- 10 AI Agents (Scout, Synthesizer, Builder)
+- Basic lead generation and outreach automation
+- Email support with 24-hour response time
+- Monthly performance reports
+- Cancel anytime, no long-term contracts
+
+Includes:
+- Instant access to AI agent dashboard
+- Automated prospecting and lead qualification
+- Intelligent email campaigns and follow-ups
+- Task automation and workflow optimization
+- Customer onboarding documentation
+- Video tutorials and knowledge base
+
+Ideal for: Small businesses and startups looking to automate their sales pipeline and operations without hiring additional staff.
+
+Industry: Business Software & Services
+
+Instant digital access upon payment.
+Cancel anytime. 30-day money-back guarantee.

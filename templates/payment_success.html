@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - SINCOR</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        @keyframes checkmark {
+            0% { transform: scale(0) rotate(0deg); }
+            50% { transform: scale(1.2) rotate(180deg); }
+            100% { transform: scale(1) rotate(360deg); }
+        }
+        .checkmark { animation: checkmark 0.6s ease-in-out; }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fade-in 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Success Hero -->
+    <div class="min-h-screen flex items-center justify-center px-4 py-12">
+        <div class="max-w-3xl w-full">
+
+            <!-- Success Card -->
+            <div class="bg-white rounded-3xl shadow-2xl p-12 text-center fade-in">
+
+                <!-- Success Icon -->
+                <div class="checkmark mb-8">
+                    <div class="w-32 h-32 bg-green-500 rounded-full mx-auto flex items-center justify-center">
+                        <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Success Message -->
+                <h1 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+                    Payment Successful!
+                </h1>
+                <p class="text-xl text-gray-600 mb-8">
+                    Welcome to SINCOR. Your AI automation is being set up now.
+                </p>
+
+                <!-- Order Details -->
+                <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-8 mb-8 text-left">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Order Details</h2>
+
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="text-gray-600 font-medium">Order ID:</span>
+                            <span id="order-id" class="text-gray-900 font-bold">Loading...</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="text-gray-600 font-medium">Plan:</span>
+                            <span id="plan-name" class="text-purple-600 font-bold">Loading...</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3 border-b border-gray-200">
+                            <span class="text-gray-600 font-medium">Amount:</span>
+                            <span id="amount" class="text-green-600 font-bold text-2xl">$0.00</span>
+                        </div>
+                        <div class="flex justify-between items-center py-3">
+                            <span class="text-gray-600 font-medium">Email:</span>
+                            <span id="email" class="text-gray-900 font-mono text-sm">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- What's Next Section -->
+                <div class="bg-gray-50 rounded-2xl p-8 mb-8 text-left">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">What Happens Next?</h2>
+
+                    <div class="space-y-6">
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold mr-4 flex-shrink-0">
+                                1
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 mb-1">📧 Check Your Email</h3>
+                                <p class="text-gray-600">You'll receive a confirmation email with your login credentials and next steps within 5 minutes.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold mr-4 flex-shrink-0">
+                                2
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 mb-1">🚀 Access Your Dashboard</h3>
+                                <p class="text-gray-600">Log in to your personalized SINCOR dashboard and meet your AI agents.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start">
+                            <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold mr-4 flex-shrink-0">
+                                3
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 mb-1">🎯 Start Automating</h3>
+                                <p class="text-gray-600">Your agents will begin working on your business goals immediately. Results start flowing within 24 hours.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="/dashboard" class="bg-gradient-to-r from-purple-600 to-purple-500 text-white px-10 py-4 rounded-xl font-bold text-lg hover:from-purple-700 hover:to-purple-600 transition shadow-lg">
+                        Go to Dashboard →
+                    </a>
+                    <a href="/" class="bg-gray-200 text-gray-700 px-10 py-4 rounded-xl font-bold text-lg hover:bg-gray-300 transition">
+                        Back to Home
+                    </a>
+                </div>
+
+                <!-- Support Notice -->
+                <div class="mt-8 pt-8 border-t border-gray-200">
+                    <p class="text-gray-600">
+                        Need help? Contact us at <a href="mailto:support@getsincor.com" class="text-purple-600 font-bold hover:underline">support@getsincor.com</a>
+                    </p>
+                    <p class="text-sm text-gray-500 mt-2">
+                        Your receipt has been sent to your email address.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Trust Badges -->
+            <div class="mt-8 flex justify-center items-center gap-8 text-gray-400">
+                <div class="text-center">
+                    <div class="text-3xl mb-2">🔒</div>
+                    <div class="text-xs">256-bit SSL</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl mb-2">💰</div>
+                    <div class="text-xs">Money-back Guarantee</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl mb-2">⚡</div>
+                    <div class="text-xs">Instant Setup</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load order details from sessionStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            const orderDetails = sessionStorage.getItem('orderDetails');
+
+            if (orderDetails) {
+                const data = JSON.parse(orderDetails);
+
+                // Populate order details
+                document.getElementById('order-id').textContent = data.id || 'N/A';
+                document.getElementById('plan-name').textContent = data.plan || 'N/A';
+                document.getElementById('amount').textContent = '$' + (data.amount || '0.00');
+                document.getElementById('email').textContent = data.email || 'N/A';
+
+                // Clear sessionStorage after loading
+                // sessionStorage.removeItem('orderDetails');
+            } else {
+                // Try to get from URL parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                const orderId = urlParams.get('order_id');
+
+                if (orderId) {
+                    document.getElementById('order-id').textContent = orderId;
+                } else {
+                    document.getElementById('order-id').textContent = 'Check your email';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
