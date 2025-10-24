@@ -1,0 +1,184 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+.virtualenv
+
+# Environment Variables & Secrets
+.env
+.env.*
+*.env
+!.env.example
+secrets/
+secrets_local/
+secrets.txt
+PAYPAL_VAR.txt
+*.pem
+*.key
+*.cert
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Flask
+instance/
+.webassets-cache
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Local Development
+*.local.json
+.claude/settings.local.json
+
+# Data & Output Directories
+data/
+output/
+logs/
+enrich/
+ingest/
+util/
+
+# Temporary & Cache
+*.tmp
+*.temp
+tmp/
+temp/
+cache/
+.cache/
+
+# Build & Deploy
+*.zip
+*.tar.gz
+*.rar
+sincor_railway_build.zip*
+*.lnk
+
+# Assets (images for detailing business - not needed in version control)
+assets/*.jpg
+assets/*.jpeg
+assets/*.png
+assets/*.gif
+assets/*.bmp
+!assets/logo.png
+!assets/sincor-logo.jpg
+
+# Prevent nested copies
+sincor/sincor/
+sincor-deploy-fresh/
+
+# Conflict Files
+_incoming_conflicts/
+*.orig
+*.rej
+
+# Large/Generated Documentation
+docs/detailing_training.pdf
+docs/flyer.pdf
+docs/reality_bending_market_models.pdf
+
+# Backup Files
+*.bak
+*.backup
+*_backup.py
+*.py.bak
+
+# Archives & Links (Windows)
+*.lnk
+*.zip
+*.tar
+*.gz
+
+# Specific Directories
+CLINTON-MONETIZATION-ENGINE_PRO/
+code/
+unknown/
+
+# Keep Important Files (override above patterns)
+!README*.md
+!LICENSE
+!requirements.txt
+!Dockerfile
+!Procfile
+!railway.json
+!.gitignore
+sincor/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+.DS_Store
+logs/
+outputs/
+data/
+*.db
+sincor/
+sincor2-backup/
+tatus
+
+# Windows system files
+desktop.ini
+Desktop.ini
+Thumbs.db
+
+# Security System
+security_checksums.json
