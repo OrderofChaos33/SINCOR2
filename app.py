@@ -371,6 +371,44 @@ def health_check():
     })
 
 
+@app.route('/healthz')
+@limiter.exempt if limiter else lambda f: f
+def healthz_check():
+    """Kubernetes-style health check endpoint alias (NO RATE LIMIT)"""
+    return health_check()
+
+
+@app.route('/api/version')
+@limiter.exempt if limiter else lambda f: f
+def api_version():
+    """API version information endpoint (NO RATE LIMIT)"""
+    return jsonify({
+        'version': '2.0.0',
+        'api_version': 'v1',
+        'platform': 'SINCOR',
+        'agents': 42,
+        'description': 'Swarm Intelligence Network for Cognitive Operations and Recursive Optimization'
+    })
+
+
+@app.route('/api/engine/routes')
+@limiter.exempt if limiter else lambda f: f
+def engine_routes():
+    """List all available API routes (NO RATE LIMIT)"""
+    routes = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint != 'static':
+            routes.append({
+                'endpoint': rule.endpoint,
+                'methods': list(rule.methods - {'HEAD', 'OPTIONS'}),
+                'path': str(rule)
+            })
+    return jsonify({
+        'total_routes': len(routes),
+        'routes': sorted(routes, key=lambda x: x['path'])
+    })
+
+
 # ==================== PROTECTED ADMIN ROUTES ====================
 
 @app.route('/api/waitlist/analytics')
@@ -392,6 +430,41 @@ def waitlist_analytics():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': f'Error loading analytics: {str(e)}'})
+
+
+@app.route('/api/admin/dashboard')
+@jwt_required()
+@limiter.limit(ADMIN_LIMITS) if limiter else lambda f: f
+def admin_dashboard_api():
+    """Admin dashboard API endpoint (PROTECTED + RATE LIMITED)"""
+    import datetime
+    try:
+        current_user = get_jwt_identity()
+
+        dashboard_data = {
+            'success': True,
+            'user': current_user,
+            'timestamp': datetime.datetime.now().isoformat(),
+            'system_status': {
+                'agents': 42,
+                'waitlist_available': WAITLIST_AVAILABLE,
+                'paypal_available': PAYPAL_AVAILABLE,
+                'monetization_available': MONETIZATION_AVAILABLE,
+                'auth_available': AUTH_AVAILABLE
+            }
+        }
+
+        # Add waitlist analytics if available
+        if WAITLIST_AVAILABLE:
+            try:
+                analytics = waitlist_manager.get_analytics()
+                dashboard_data['waitlist_analytics'] = analytics
+            except Exception as e:
+                dashboard_data['waitlist_error'] = str(e)
+
+        return jsonify(dashboard_data)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Dashboard error: {str(e)}'}), 500
 
 
 @app.route('/admin')
@@ -553,6 +626,13 @@ def affiliate_program():
 def media_packs():
     """Media packs and resources page"""
     return render_template('media-packs.html')
+
+
+@app.route('/auto-detailing-mediapack')
+@limiter.exempt if limiter else lambda f: f
+def auto_detailing_mediapack():
+    """Auto detailing industry media pack"""
+    return render_template('media-packs.html', industry='auto_detailing')
 
 
 @app.route('/pricing')
@@ -737,7 +817,11 @@ def test_environment():
 def create_payment():
     """Create a PayPal payment (PUBLIC + RATE LIMITED + VALIDATED) - Removed JWT requirement for public checkout"""
     if not PAYPAL_AVAILABLE:
-        return jsonify({'error': 'PayPal integration not available'}), 503
+        return jsonify({
+            'error': 'Payment processing not configured. Please set PAYPAL_REST_API_ID and PAYPAL_REST_API_SECRET environment variables in Railway.',
+            'contact': 'support@getsincor.com',
+            'documentation': 'See RAILWAY_SETUP.md for PayPal configuration instructions'
+        }), 503
 
     try:
         payment_data = request.get_json()
