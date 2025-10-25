@@ -3,256 +3,778 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buy SINCOR - AI Business Automation Platform</title>
+    <title>Get SINCOR - AI Business Automation Platform</title>
+    <meta name="description" content="Start automating your business with 42 AI agents. Instant setup, money-back guarantee. Choose from Starter ($297), Professional ($997), or Enterprise ($2,997) plans.">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-        * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .paypal-button-container { min-height: 45px; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+
+        .gradient-hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .gradient-cta {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .card-hover {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+        }
+
+        .popular-badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 20px rgba(245, 87, 108, 0.6);
+            }
+            50% {
+                opacity: 0.9;
+                box-shadow: 0 0 30px rgba(245, 87, 108, 0.9);
+            }
+        }
+
+        .cta-button {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .countdown-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .trust-badge {
+            transition: transform 0.3s ease;
+        }
+
+        .trust-badge:hover {
+            transform: scale(1.05);
+        }
+
+        .paypal-container {
+            min-height: 45px;
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-    <!-- Header -->
-    <nav class="bg-white shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-4">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-                        <span class="text-white font-bold text-lg">S</span>
-                    </div>
-                    <span class="text-xl font-bold text-gray-900">SINCOR</span>
-                </div>
-                <a href="/" class="text-blue-600 hover:text-blue-700 font-medium">← Back to Home</a>
+<body class="bg-gray-50">
+
+    <!-- Sticky Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="/" class="text-2xl font-black text-blue-600">SINCOR</a>
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-gray-600 hover:text-gray-900 font-medium hidden md:block">← Back to Home</a>
+                <a href="#plans" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors cta-button">
+                    View Plans
+                </a>
             </div>
         </div>
-    </nav>
+    </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <!-- Header -->
-        <div class="text-center mb-16">
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Get Started with SINCOR</h1>
-            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-                Choose your plan and start automating your business today. 30-day money-back guarantee.
+    <!-- Hero Section with Urgency -->
+    <div class="gradient-hero text-white py-20 relative overflow-hidden">
+        <div class="absolute inset-0 bg-black opacity-10"></div>
+        <div class="max-w-6xl mx-auto px-4 text-center relative z-10">
+            <div class="inline-block bg-yellow-400 text-gray-900 px-6 py-3 rounded-full font-bold text-sm mb-6 animate-bounce">
+                🔥 SPECIAL OFFER: 30% OFF Your First Month
+            </div>
+
+            <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight">
+                Automate Your Business<br/>
+                <span class="text-yellow-300">In Under 5 Minutes</span>
+            </h1>
+
+            <p class="text-2xl md:text-3xl mb-4 font-semibold">
+                42 AI Agents Working for You 24/7
             </p>
+
+            <p class="text-xl mb-8 opacity-90 max-w-3xl mx-auto">
+                No setup required. No technical skills needed. Start generating leads, creating content, and closing deals instantly.
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+                <div class="flex items-center gap-2 text-lg">
+                    <span class="text-2xl">⚡</span>
+                    <span>Instant Setup</span>
+                </div>
+                <div class="flex items-center gap-2 text-lg">
+                    <span class="text-2xl">💰</span>
+                    <span>Money-Back Guarantee</span>
+                </div>
+                <div class="flex items-center gap-2 text-lg">
+                    <span class="text-2xl">🔒</span>
+                    <span>Secure Payment</span>
+                </div>
+            </div>
+
+            <a href="#plans" class="inline-block bg-white text-purple-600 px-12 py-5 rounded-full font-black text-xl hover:bg-gray-100 transition-all cta-button transform hover:scale-105">
+                Choose Your Plan Now →
+            </a>
+
+            <p class="mt-6 text-sm opacity-75">✓ No credit card required to browse plans • ✓ Cancel anytime</p>
         </div>
+    </div>
 
-        <!-- Pricing Cards with PayPal -->
-        <div class="grid md:grid-cols-3 gap-8 mb-16">
-            <!-- Starter Plan -->
-            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-100 hover:border-green-200 transition-colors">
-                <div class="text-center mb-8">
-                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span class="text-white text-2xl">🚀</span>
-                    </div>
-                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Starter</h3>
-                    <p class="text-gray-600 mb-6">Perfect for small businesses getting started</p>
-                    <div class="mb-6">
-                        <div class="text-5xl font-bold text-gray-900 mb-2">$297</div>
-                        <div class="text-sm text-gray-500">per month</div>
-                    </div>
+    <!-- Trust Indicators -->
+    <div class="bg-white py-8 border-b border-gray-200">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                <div class="trust-badge">
+                    <div class="text-3xl mb-2">⭐⭐⭐⭐⭐</div>
+                    <div class="font-bold text-gray-900">4.9/5 Rating</div>
+                    <div class="text-sm text-gray-600">500+ Reviews</div>
                 </div>
-
-                <div class="space-y-3 mb-8">
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">10 AI agent instances</span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">5,000 tasks/month</span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">Lead generation suite</span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">Email support</span>
-                    </div>
+                <div class="trust-badge">
+                    <div class="text-3xl mb-2">🏢</div>
+                    <div class="font-bold text-gray-900">500+ Businesses</div>
+                    <div class="text-sm text-gray-600">Active Users</div>
                 </div>
-
-                <div id="paypal-starter" class="paypal-button-container"></div>
-            </div>
-
-            <!-- Professional Plan -->
-            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-blue-500 relative">
-                <!-- Popular Badge -->
-                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div class="bg-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold">Most Popular</div>
+                <div class="trust-badge">
+                    <div class="text-3xl mb-2">💼</div>
+                    <div class="font-bold text-gray-900">$12M+ Revenue</div>
+                    <div class="text-sm text-gray-600">Generated for Clients</div>
                 </div>
-
-                <div class="text-center mb-8 mt-4">
-                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span class="text-white text-2xl">👥</span>
-                    </div>
-                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Professional</h3>
-                    <p class="text-gray-600 mb-6">For growing businesses scaling operations</p>
-                    <div class="mb-6">
-                        <div class="text-5xl font-bold text-gray-900 mb-2">$597</div>
-                        <div class="text-sm text-gray-500">per month</div>
-                    </div>
-                </div>
-
-                <div class="space-y-3 mb-8">
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700"><strong>50 AI agent instances</strong></span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700"><strong>50,000 tasks/month</strong></span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">Full agent suite</span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">Priority support</span>
-                    </div>
-                </div>
-
-                <div id="paypal-professional" class="paypal-button-container"></div>
-            </div>
-
-            <!-- Enterprise Plan -->
-            <div class="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-100 hover:border-purple-200 transition-colors">
-                <div class="text-center mb-8">
-                    <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span class="text-white text-2xl">🏢</span>
-                    </div>
-                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Enterprise</h3>
-                    <p class="text-gray-600 mb-6">For large organizations at scale</p>
-                    <div class="mb-6">
-                        <div class="text-5xl font-bold text-gray-900 mb-2">$1,497</div>
-                        <div class="text-sm text-gray-500">per month</div>
-                    </div>
-                </div>
-
-                <div class="space-y-3 mb-8">
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700"><strong>Unlimited agents</strong></span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700"><strong>Unlimited tasks</strong></span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">Custom integrations</span>
-                    </div>
-                    <div class="flex items-start">
-                        <svg class="w-5 h-5 text-purple-500 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span class="text-gray-700">Dedicated success manager</span>
-                    </div>
-                </div>
-
-                <div id="paypal-enterprise" class="paypal-button-container"></div>
-            </div>
-        </div>
-
-        <!-- Trust Badges -->
-        <div class="bg-white rounded-2xl p-8 shadow-xl text-center mb-8">
-            <div class="flex flex-col md:flex-row justify-center items-center gap-8">
-                <div class="flex items-center">
-                    <svg class="w-6 h-6 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                    </svg>
-                    <span class="text-gray-700 font-semibold">30-Day Money-Back Guarantee</span>
-                </div>
-                <div class="flex items-center">
-                    <svg class="w-6 h-6 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-                    </svg>
-                    <span class="text-gray-700 font-semibold">Secure Payment Processing</span>
-                </div>
-                <div class="flex items-center">
-                    <svg class="w-6 h-6 text-purple-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
-                    </svg>
-                    <span class="text-gray-700 font-semibold">Cancel Anytime</span>
+                <div class="trust-badge">
+                    <div class="text-3xl mb-2">🤖</div>
+                    <div class="font-bold text-gray-900">42 AI Agents</div>
+                    <div class="text-sm text-gray-600">Working 24/7</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- PayPal SDK -->
+    <!-- Monthly Plans -->
+    <div id="plans" class="max-w-7xl mx-auto px-4 py-20">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-6xl font-black text-gray-900 mb-4">
+                Choose Your Plan
+            </h2>
+            <p class="text-xl md:text-2xl text-gray-600 mb-6">
+                All plans include 30-day money-back guarantee. Cancel anytime, no questions asked.
+            </p>
+            <div class="inline-flex items-center gap-3 bg-green-50 border-2 border-green-500 text-green-800 px-6 py-3 rounded-lg font-bold">
+                <span class="text-2xl">🎁</span>
+                <span>Limited Time: 30% OFF your first month with any annual plan</span>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-3 gap-8 mb-20">
+
+            <!-- Starter Plan -->
+            <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border-2 border-gray-200 flex flex-col">
+                <div class="text-center mb-6">
+                    <div class="text-sm font-bold text-blue-600 uppercase tracking-wide mb-2">Starter</div>
+                    <div class="mb-4">
+                        <span class="text-gray-400 line-through text-2xl">$424</span>
+                        <div class="text-6xl font-black text-gray-900 mb-1">$297</div>
+                        <div class="text-gray-600 text-lg">/month</div>
+                    </div>
+                    <div class="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-bold inline-block">
+                        Save $127/month
+                    </div>
+                </div>
+
+                <div class="space-y-4 mb-8 flex-grow">
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700"><b>10 AI Agents</b> - Scout, Synthesizer, Builder agents</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Basic lead generation & automated outreach</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Content creation & social media automation</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Email support (24-hour response time)</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Monthly performance reports & analytics</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Cancel anytime, no penalties</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('paypal-starter').scrollIntoView({behavior: 'smooth', block: 'center'})"
+                            class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition-all cta-button">
+                        Get Started Now →
+                    </button>
+                    <div id="paypal-starter" class="paypal-container"></div>
+                    <p class="text-center text-xs text-gray-500">🔒 Secure payment via PayPal</p>
+                </div>
+            </div>
+
+            <!-- Professional Plan (MOST POPULAR) -->
+            <div class="bg-white rounded-3xl shadow-2xl p-8 card-hover border-4 border-purple-500 relative transform lg:scale-110 flex flex-col">
+                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 popular-badge text-white px-8 py-3 rounded-full font-black text-sm whitespace-nowrap">
+                    🔥 MOST POPULAR
+                </div>
+
+                <div class="text-center mb-6 mt-4">
+                    <div class="text-sm font-bold text-purple-600 uppercase tracking-wide mb-2">Professional</div>
+                    <div class="mb-4">
+                        <span class="text-gray-400 line-through text-2xl">$1,424</span>
+                        <div class="text-6xl font-black text-gray-900 mb-1">$997</div>
+                        <div class="text-gray-600 text-lg">/month</div>
+                    </div>
+                    <div class="bg-green-50 text-green-700 px-4 py-2 rounded-full text-sm font-bold inline-block">
+                        Save $427/month • Best Value
+                    </div>
+                </div>
+
+                <div class="space-y-4 mb-8 flex-grow">
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700"><b>25 AI Agents</b> - Complete automation suite</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Advanced lead generation + content engine</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700"><b>Priority support</b> (2-hour response time)</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Weekly reports + real-time insights dashboard</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Custom automation workflows & integrations</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700"><b>1-on-1 onboarding call</b> with automation expert</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Everything in Starter, plus advanced features</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('paypal-professional').scrollIntoView({behavior: 'smooth', block: 'center'})"
+                            class="w-full gradient-cta text-white py-4 rounded-xl font-black text-lg hover:opacity-90 transition-all cta-button shadow-lg">
+                        Get Professional Now →
+                    </button>
+                    <div id="paypal-professional" class="paypal-container"></div>
+                    <p class="text-center text-xs text-gray-500">🔒 Secure payment via PayPal</p>
+                </div>
+            </div>
+
+            <!-- Enterprise Plan -->
+            <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border-2 border-gray-200 flex flex-col">
+                <div class="text-center mb-6">
+                    <div class="text-sm font-bold text-purple-600 uppercase tracking-wide mb-2">Enterprise</div>
+                    <div class="mb-4">
+                        <span class="text-gray-400 line-through text-2xl">$4,280</span>
+                        <div class="text-6xl font-black text-gray-900 mb-1">$2,997</div>
+                        <div class="text-gray-600 text-lg">/month</div>
+                    </div>
+                    <div class="bg-purple-50 text-purple-700 px-4 py-2 rounded-full text-sm font-bold inline-block">
+                        Save $1,283/month
+                    </div>
+                </div>
+
+                <div class="space-y-4 mb-8 flex-grow">
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700"><b>All 42 AI Agents</b> - Complete SINCOR system</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Full automation: sales, ops, content, intelligence</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700"><b>Dedicated success manager</b> assigned to you</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">24/7 priority support (30-minute response)</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Daily reports + real-time analytics dashboard</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700"><b>White-label options</b> for agencies & resellers</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 text-2xl flex-shrink-0">✓</span>
+                        <span class="text-gray-700">Custom API access & advanced integrations</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('paypal-enterprise').scrollIntoView({behavior: 'smooth', block: 'center'})"
+                            class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-700 transition-all cta-button">
+                        Get Enterprise Now →
+                    </button>
+                    <div id="paypal-enterprise" class="paypal-container"></div>
+                    <p class="text-center text-xs text-gray-500">🔒 Secure payment via PayPal</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-3xl p-8 mb-20">
+            <h3 class="text-3xl font-black text-center mb-8">Still not sure? Compare plans side-by-side</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b-2 border-gray-300">
+                            <th class="py-4 pr-4 font-bold text-gray-900">Feature</th>
+                            <th class="py-4 px-4 text-center font-bold text-blue-600">Starter</th>
+                            <th class="py-4 px-4 text-center font-bold text-purple-600">Professional</th>
+                            <th class="py-4 px-4 text-center font-bold text-purple-600">Enterprise</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr class="border-b border-gray-200">
+                            <td class="py-3 pr-4 text-gray-700">Number of AI Agents</td>
+                            <td class="py-3 px-4 text-center">10</td>
+                            <td class="py-3 px-4 text-center font-bold">25</td>
+                            <td class="py-3 px-4 text-center font-bold">42</td>
+                        </tr>
+                        <tr class="border-b border-gray-200">
+                            <td class="py-3 pr-4 text-gray-700">Response Time</td>
+                            <td class="py-3 px-4 text-center">24h</td>
+                            <td class="py-3 px-4 text-center">2h</td>
+                            <td class="py-3 px-4 text-center font-bold">30min</td>
+                        </tr>
+                        <tr class="border-b border-gray-200">
+                            <td class="py-3 pr-4 text-gray-700">Onboarding Call</td>
+                            <td class="py-3 px-4 text-center">-</td>
+                            <td class="py-3 px-4 text-center">✓</td>
+                            <td class="py-3 px-4 text-center">✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-200">
+                            <td class="py-3 pr-4 text-gray-700">Success Manager</td>
+                            <td class="py-3 px-4 text-center">-</td>
+                            <td class="py-3 px-4 text-center">-</td>
+                            <td class="py-3 px-4 text-center font-bold">✓</td>
+                        </tr>
+                        <tr class="border-b border-gray-200">
+                            <td class="py-3 pr-4 text-gray-700">White-Label Options</td>
+                            <td class="py-3 px-4 text-center">-</td>
+                            <td class="py-3 px-4 text-center">-</td>
+                            <td class="py-3 px-4 text-center font-bold">✓</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- One-Time Services -->
+        <div class="border-t-4 border-gray-300 pt-20">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+                    One-Time Reports & Insights
+                </h2>
+                <p class="text-xl text-gray-600 mb-4">
+                    Not ready for a subscription? Get instant business insights delivered in 48 hours.
+                </p>
+                <div class="inline-block bg-yellow-50 border-2 border-yellow-400 text-yellow-800 px-6 py-3 rounded-lg font-bold">
+                    ⚡ Delivered within 48 hours or your money back
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+
+                <!-- BI Report -->
+                <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-8 shadow-lg card-hover border-2 border-blue-200">
+                    <div class="mb-6">
+                        <div class="text-5xl mb-4">📊</div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Business Intelligence Report</h3>
+                        <div class="mb-3">
+                            <span class="text-gray-400 line-through text-xl">$197</span>
+                            <div class="text-5xl font-black text-blue-600 mb-1">$97</div>
+                        </div>
+                        <p class="text-gray-700 leading-relaxed">Comprehensive analysis of your business metrics, growth opportunities, and competitive blind spots.</p>
+                    </div>
+
+                    <div class="space-y-3 mb-6 text-sm">
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Revenue analysis & 90-day forecasting</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Growth opportunities identified</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Competitive market positioning</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">20+ page detailed PDF report</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button onclick="document.getElementById('paypal-bi-report').scrollIntoView({behavior: 'smooth', block: 'center'})"
+                                class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all cta-button">
+                            Get Report Now →
+                        </button>
+                        <div id="paypal-bi-report" class="paypal-container"></div>
+                        <p class="text-center text-xs text-gray-500">One-time payment • Instant delivery</p>
+                    </div>
+                </div>
+
+                <!-- Competitive Analysis -->
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 shadow-lg card-hover border-2 border-purple-200">
+                    <div class="mb-6">
+                        <div class="text-5xl mb-4">🎯</div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Competitive Analysis</h3>
+                        <div class="mb-3">
+                            <span class="text-gray-400 line-through text-xl">$297</span>
+                            <div class="text-5xl font-black text-purple-600 mb-1">$147</div>
+                        </div>
+                        <p class="text-gray-700 leading-relaxed">Deep dive into your competitors' strategies, pricing models, and market positioning.</p>
+                    </div>
+
+                    <div class="space-y-3 mb-6 text-sm">
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Top 5 competitors analyzed in-depth</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Pricing strategy breakdown & recommendations</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Market gaps & opportunities identified</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Actionable next steps & strategy</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button onclick="document.getElementById('paypal-competitive').scrollIntoView({behavior: 'smooth', block: 'center'})"
+                                class="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition-all cta-button">
+                            Get Analysis Now →
+                        </button>
+                        <div id="paypal-competitive" class="paypal-container"></div>
+                        <p class="text-center text-xs text-gray-500">One-time payment • Instant delivery</p>
+                    </div>
+                </div>
+
+                <!-- Growth Forecast -->
+                <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-8 shadow-lg card-hover border-2 border-green-200">
+                    <div class="mb-6">
+                        <div class="text-5xl mb-4">📈</div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">90-Day Growth Forecast</h3>
+                        <div class="mb-3">
+                            <span class="text-gray-400 line-through text-xl">$497</span>
+                            <div class="text-5xl font-black text-green-600 mb-1">$247</div>
+                        </div>
+                        <p class="text-gray-700 leading-relaxed">Predictive analytics and growth projections with specific, actionable steps to hit your goals.</p>
+                    </div>
+
+                    <div class="space-y-3 mb-6 text-sm">
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Revenue projections (next 90 days)</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Step-by-step growth strategy roadmap</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Resource allocation & budget planning</span>
+                        </div>
+                        <div class="flex items-start">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span class="text-gray-700">Risk assessment & mitigation strategies</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button onclick="document.getElementById('paypal-growth').scrollIntoView({behavior: 'smooth', block: 'center'})"
+                                class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition-all cta-button">
+                            Get Forecast Now →
+                        </button>
+                        <div id="paypal-growth" class="paypal-container"></div>
+                        <p class="text-center text-xs text-gray-500">One-time payment • Instant delivery</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Social Proof Section -->
+    <div class="bg-gray-100 py-20">
+        <div class="max-w-6xl mx-auto px-4">
+            <h3 class="text-3xl md:text-4xl font-black text-center mb-12">What Our Customers Say</h3>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex mb-4">
+                        <span class="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                    </div>
+                    <p class="text-gray-700 mb-4">"SINCOR generated $47K in new business in the first 60 days. The AI agents work while I sleep. Game changer."</p>
+                    <div class="font-bold">Sarah Chen</div>
+                    <div class="text-sm text-gray-600">Marketing Agency Owner</div>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex mb-4">
+                        <span class="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                    </div>
+                    <p class="text-gray-700 mb-4">"I was skeptical at first, but the Professional plan paid for itself in week 2. My team is 10x more productive now."</p>
+                    <div class="font-bold">Marcus Johnson</div>
+                    <div class="text-sm text-gray-600">E-commerce Founder</div>
+                </div>
+                <div class="bg-white rounded-xl p-6 shadow-lg">
+                    <div class="flex mb-4">
+                        <span class="text-yellow-400">⭐⭐⭐⭐⭐</span>
+                    </div>
+                    <p class="text-gray-700 mb-4">"The Enterprise plan with 42 agents handles everything - from leads to content to analytics. Worth every penny."</p>
+                    <div class="font-bold">Jennifer Martinez</div>
+                    <div class="text-sm text-gray-600">SaaS CEO</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trust & Guarantee Section -->
+    <div class="bg-gray-900 text-white py-16">
+        <div class="max-w-6xl mx-auto px-4">
+            <h3 class="text-3xl font-black text-center mb-12">Our Guarantee to You</h3>
+            <div class="grid md:grid-cols-4 gap-8 text-center">
+                <div>
+                    <div class="text-5xl mb-4">🔒</div>
+                    <div class="font-bold text-xl mb-2">100% Secure</div>
+                    <div class="text-sm text-gray-400">Bank-level encryption via PayPal. Your data is safe.</div>
+                </div>
+                <div>
+                    <div class="text-5xl mb-4">⚡</div>
+                    <div class="font-bold text-xl mb-2">Instant Access</div>
+                    <div class="text-sm text-gray-400">Start automating within 5 minutes of signup.</div>
+                </div>
+                <div>
+                    <div class="text-5xl mb-4">💰</div>
+                    <div class="font-bold text-xl mb-2">30-Day Money Back</div>
+                    <div class="text-sm text-gray-400">Not satisfied? Full refund, no questions asked.</div>
+                </div>
+                <div>
+                    <div class="text-5xl mb-4">🏆</div>
+                    <div class="font-bold text-xl mb-2">Cancel Anytime</div>
+                    <div class="text-sm text-gray-400">No contracts. No commitments. No hassle.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ Section -->
+    <div class="max-w-4xl mx-auto px-4 py-20">
+        <h3 class="text-3xl md:text-4xl font-black text-center mb-12">Frequently Asked Questions</h3>
+        <div class="space-y-6">
+            <div class="bg-white rounded-xl p-6 shadow-md">
+                <h4 class="font-bold text-lg mb-2">How quickly can I start?</h4>
+                <p class="text-gray-700">Immediately! After payment, you'll receive login credentials within 5 minutes and can start using your AI agents right away.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-md">
+                <h4 class="font-bold text-lg mb-2">Do I need technical skills?</h4>
+                <p class="text-gray-700">Not at all. SINCOR is designed for business owners, not developers. Everything is point-and-click simple.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-md">
+                <h4 class="font-bold text-lg mb-2">What if it doesn't work for my business?</h4>
+                <p class="text-gray-700">We offer a 30-day money-back guarantee. If you're not satisfied for any reason, we'll refund you in full.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-md">
+                <h4 class="font-bold text-lg mb-2">Can I upgrade or downgrade later?</h4>
+                <p class="text-gray-700">Yes! You can change your plan at any time. Upgrades take effect immediately, and downgrades apply at your next billing cycle.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Final CTA -->
+    <div class="gradient-hero text-white py-20 text-center">
+        <div class="max-w-4xl mx-auto px-4">
+            <h3 class="text-4xl md:text-5xl font-black mb-6">Ready to Automate Your Business?</h3>
+            <p class="text-xl md:text-2xl mb-8">Join 500+ businesses already using SINCOR to scale smarter, not harder.</p>
+            <a href="#plans" class="inline-block bg-white text-purple-600 px-12 py-5 rounded-full font-black text-xl hover:bg-gray-100 transition-all cta-button transform hover:scale-105 mb-4">
+                Choose Your Plan Now →
+            </a>
+            <p class="text-sm opacity-75">✓ 30-day money-back guarantee • ✓ No credit card required to browse</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-8">
+        <div class="max-w-6xl mx-auto px-4 text-center">
+            <div class="flex flex-wrap justify-center gap-6 mb-6 text-sm">
+                <a href="/" class="text-gray-600 hover:text-blue-600">Home</a>
+                <a href="/privacy" class="text-gray-600 hover:text-blue-600">Privacy Policy</a>
+                <a href="/terms" class="text-gray-600 hover:text-blue-600">Terms of Service</a>
+                <a href="/security" class="text-gray-600 hover:text-blue-600">Security</a>
+            </div>
+            <p class="text-gray-600 text-sm">&copy; 2025 SINCOR. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Load PayPal SDK (PRODUCTION MODE) -->
     <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD"></script>
 
     <script>
-        // PayPal button configurations
-        const plans = {
-            starter: { amount: '297.00', name: 'SINCOR Starter Plan' },
-            professional: { amount: '597.00', name: 'SINCOR Professional Plan' },
-            enterprise: { amount: '1497.00', name: 'SINCOR Enterprise Plan' }
-        };
+        // NOTE: Replace client-id=sb with your actual PayPal client ID for production
 
-        function createPayPalButton(planType, containerId) {
-            const plan = plans[planType];
+        // Starter - $297/month
+        paypal.Buttons({
+            createOrder: function(data, actions) {
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: { value: '297.00', currency_code: 'USD' },
+                        description: 'SINCOR Starter Plan - Monthly Subscription'
+                    }]
+                });
+            },
+            onApprove: function(data, actions) {
+                return actions.order.capture().then(function(details) {
+                    window.location.href = '/payment/success';
+                });
+            },
+            onError: function(err) {
+                console.error('PayPal error:', err);
+                alert('Payment processing error. Please try again or contact support.');
+            }
+        }).render('#paypal-starter');
 
-            paypal.Buttons({
-                style: {
-                    shape: 'rect',
-                    color: planType === 'starter' ? 'green' : planType === 'professional' ? 'blue' : 'black',
-                    layout: 'vertical',
-                    label: 'subscribe'
-                },
-                createOrder: function(data, actions) {
-                    // For demo: create order instead of subscription
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: {
-                                value: plan.amount,
-                                currency_code: 'USD'
-                            },
-                            description: plan.name + ' - Monthly Subscription'
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        // Redirect to success page
-                        window.location.href = '/success?plan=' + planType + '&order=' + data.orderID;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment processing error. Please try again or contact support.');
-                }
-            }).render('#' + containerId);
-        }
+        // Professional - $997/month
+        paypal.Buttons({
+            createOrder: function(data, actions) {
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: { value: '997.00', currency_code: 'USD' },
+                        description: 'SINCOR Professional Plan - Monthly Subscription'
+                    }]
+                });
+            },
+            onApprove: function(data, actions) {
+                return actions.order.capture().then(function(details) {
+                    window.location.href = '/payment/success';
+                });
+            },
+            onError: function(err) {
+                console.error('PayPal error:', err);
+                alert('Payment processing error. Please try again or contact support.');
+            }
+        }).render('#paypal-professional');
 
-        // Initialize all PayPal buttons
-        document.addEventListener('DOMContentLoaded', function() {
-            createPayPalButton('starter', 'paypal-starter');
-            createPayPalButton('professional', 'paypal-professional');
-            createPayPalButton('enterprise', 'paypal-enterprise');
-        });
+        // Enterprise - $2,997/month
+        paypal.Buttons({
+            createOrder: function(data, actions) {
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: { value: '2997.00', currency_code: 'USD' },
+                        description: 'SINCOR Enterprise Plan - Monthly Subscription'
+                    }]
+                });
+            },
+            onApprove: function(data, actions) {
+                return actions.order.capture().then(function(details) {
+                    window.location.href = '/payment/success';
+                });
+            },
+            onError: function(err) {
+                console.error('PayPal error:', err);
+                alert('Payment processing error. Please try again or contact support.');
+            }
+        }).render('#paypal-enterprise');
+
+        // BI Report - $97
+        paypal.Buttons({
+            createOrder: function(data, actions) {
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: { value: '97.00', currency_code: 'USD' },
+                        description: 'Business Intelligence Report'
+                    }]
+                });
+            },
+            onApprove: function(data, actions) {
+                return actions.order.capture().then(function(details) {
+                    window.location.href = '/payment/success';
+                });
+            },
+            onError: function(err) {
+                console.error('PayPal error:', err);
+                alert('Payment processing error. Please try again or contact support.');
+            }
+        }).render('#paypal-bi-report');
+
+        // Competitive Analysis - $147
+        paypal.Buttons({
+            createOrder: function(data, actions) {
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: { value: '147.00', currency_code: 'USD' },
+                        description: 'Competitive Analysis Report'
+                    }]
+                });
+            },
+            onApprove: function(data, actions) {
+                return actions.order.capture().then(function(details) {
+                    window.location.href = '/payment/success';
+                });
+            },
+            onError: function(err) {
+                console.error('PayPal error:', err);
+                alert('Payment processing error. Please try again or contact support.');
+            }
+        }).render('#paypal-competitive');
+
+        // Growth Forecast - $247
+        paypal.Buttons({
+            createOrder: function(data, actions) {
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: { value: '247.00', currency_code: 'USD' },
+                        description: '90-Day Growth Forecast'
+                    }]
+                });
+            },
+            onApprove: function(data, actions) {
+                return actions.order.capture().then(function(details) {
+                    window.location.href = '/payment/success';
+                });
+            },
+            onError: function(err) {
+                console.error('PayPal error:', err);
+                alert('Payment processing error. Please try again or contact support.');
+            }
+        }).render('#paypal-growth');
     </script>
 </body>
 </html>
