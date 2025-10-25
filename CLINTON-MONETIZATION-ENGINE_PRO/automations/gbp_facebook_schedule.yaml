@@ -1,0 +1,9 @@
+channels:
+  GBP: {type: google_business_profile}
+  FacebookPage: {type: facebook_page}
+  FB_Groups: {type: facebook_groups}
+
+schedule:
+  monday: ScarcityAgent
+  wednesday: ReviewAgent
+  friday: BeforeAfterAgent

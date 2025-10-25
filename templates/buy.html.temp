@@ -1,0 +1,3 @@
+        } else {
+            console.error("PayPal SDK not loaded");
+        }

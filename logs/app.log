@@ -203,3 +203,69 @@ jinja2.exceptions.UndefinedError: 'agents' is undefined
 [2025-10-01 06:16:36,919] INFO in production_logger: Log Level: INFO
 [2025-10-01 06:16:36,919] INFO in production_logger: Environment: production
 [2025-10-01 06:16:36,919] INFO in production_logger: ============================================================
+[2025-10-24 22:05:29,743] INFO in production_logger: ============================================================
+[2025-10-24 22:05:29,744] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 22:05:29,744] INFO in production_logger: Log Level: INFO
+[2025-10-24 22:05:29,744] INFO in production_logger: Environment: development
+[2025-10-24 22:05:29,744] INFO in production_logger: ============================================================
+[2025-10-24 22:07:54,356] INFO in production_logger: ============================================================
+[2025-10-24 22:07:54,356] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 22:07:54,356] INFO in production_logger: Log Level: INFO
+[2025-10-24 22:07:54,356] INFO in production_logger: Environment: development
+[2025-10-24 22:07:54,356] INFO in production_logger: ============================================================
+[2025-10-24 22:07:56,204] INFO in production_logger: ============================================================
+[2025-10-24 22:07:56,204] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 22:07:56,204] INFO in production_logger: Log Level: INFO
+[2025-10-24 22:07:56,204] INFO in production_logger: Environment: development
+[2025-10-24 22:07:56,204] INFO in production_logger: ============================================================
+[2025-10-24 22:10:06,496] INFO in production_logger: ============================================================
+[2025-10-24 22:10:06,496] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 22:10:06,496] INFO in production_logger: Log Level: INFO
+[2025-10-24 22:10:06,496] INFO in production_logger: Environment: development
+[2025-10-24 22:10:06,496] INFO in production_logger: ============================================================
+[2025-10-24 22:10:08,226] INFO in production_logger: ============================================================
+[2025-10-24 22:10:08,226] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 22:10:08,226] INFO in production_logger: Log Level: INFO
+[2025-10-24 22:10:08,226] INFO in production_logger: Environment: development
+[2025-10-24 22:10:08,226] INFO in production_logger: ============================================================
+[2025-10-24 23:51:25,860] INFO in production_logger: ============================================================
+[2025-10-24 23:51:25,860] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:51:25,860] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:51:25,860] INFO in production_logger: Environment: development
+[2025-10-24 23:51:25,860] INFO in production_logger: ============================================================
+[2025-10-24 23:51:27,605] INFO in production_logger: ============================================================
+[2025-10-24 23:51:27,606] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:51:27,606] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:51:27,606] INFO in production_logger: Environment: development
+[2025-10-24 23:51:27,606] INFO in production_logger: ============================================================
+[2025-10-24 23:52:49,222] INFO in production_logger: ============================================================
+[2025-10-24 23:52:49,222] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:52:49,222] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:52:49,222] INFO in production_logger: Environment: development
+[2025-10-24 23:52:49,222] INFO in production_logger: ============================================================
+[2025-10-24 23:53:10,893] INFO in production_logger: ============================================================
+[2025-10-24 23:53:10,893] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:53:10,893] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:53:10,893] INFO in production_logger: Environment: development
+[2025-10-24 23:53:10,893] INFO in production_logger: ============================================================
+[2025-10-24 23:54:59,800] INFO in production_logger: ============================================================
+[2025-10-24 23:54:59,800] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:54:59,800] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:54:59,800] INFO in production_logger: Environment: development
+[2025-10-24 23:54:59,800] INFO in production_logger: ============================================================
+[2025-10-24 23:55:14,321] INFO in production_logger: ============================================================
+[2025-10-24 23:55:14,321] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:55:14,321] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:55:14,321] INFO in production_logger: Environment: development
+[2025-10-24 23:55:14,321] INFO in production_logger: ============================================================
+[2025-10-24 23:55:32,405] INFO in production_logger: ============================================================
+[2025-10-24 23:55:32,405] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:55:32,405] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:55:32,406] INFO in production_logger: Environment: development
+[2025-10-24 23:55:32,406] INFO in production_logger: ============================================================
+[2025-10-24 23:56:32,515] INFO in production_logger: ============================================================
+[2025-10-24 23:56:32,515] INFO in production_logger: SINCOR Platform Starting
+[2025-10-24 23:56:32,516] INFO in production_logger: Log Level: INFO
+[2025-10-24 23:56:32,516] INFO in production_logger: Environment: development
+[2025-10-24 23:56:32,516] INFO in production_logger: ============================================================
+[2025-10-24 23:56:32,667] WARNING in production_logger: GET /api/admin/dashboard - 401

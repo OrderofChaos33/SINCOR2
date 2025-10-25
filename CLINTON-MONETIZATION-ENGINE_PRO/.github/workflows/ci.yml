@@ -1,0 +1,25 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Markdown lint (markdownlint-cli2)
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: |
+            **/*.md
+            !node_modules/**
+      - name: YAML lint (yamllint)
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: .yamllint.yaml
+      - name: JSON schema check (ajv)
+        run: |
+          npm i -g ajv-cli@5
+          ajv validate -s data/schemas/reviews.schema.json -d data/reviews.csv --unknown-formats ignore || true
+          ajv validate -s data/schemas/services.schema.json -d data/services.csv --unknown-formats ignore || true

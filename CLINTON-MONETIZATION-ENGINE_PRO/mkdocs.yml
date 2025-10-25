@@ -1,0 +1,19 @@
+site_name: Clinton Auto Detailing — Monetization Engine
+theme:
+  name: material
+nav:
+  - Home: docs/index.md
+  - Monetization Engine: notion/Monetization Engine.md
+  - Revenue Streams:
+      - Index: notion/Revenue Streams/00_INDEX.md
+      - Core Detailing: notion/Revenue Streams/Core Detailing.md
+      - Upsells & Add-ons: notion/Revenue Streams/Upsells & Add-ons.md
+      - Subscriptions & Maintenance Plans: notion/Revenue Streams/Subscriptions & Maintenance Plans.md
+      - Fleet & B2B: notion/Revenue Streams/Fleet & B2B.md
+      - Gift Cards & Bundles: notion/Revenue Streams/Gift Cards & Bundles.md
+      - Seasonal Campaigns: notion/Revenue Streams/Seasonal Campaigns.md
+      - Referral & Loyalty: notion/Revenue Streams/Referral & Loyalty.md
+  - Operations:
+      - Capacity & Scheduling: notion/Operations/Capacity & Scheduling.md
+      - Quality Standards: notion/Operations/Quality Standards.md
+      - Policies: notion/Operations/Policies (Cancellation, Payment, Warranty).md

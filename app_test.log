@@ -1,0 +1,184 @@
+[INFO] ============================================================
+[INFO] SINCOR Platform Starting
+[INFO] Log Level: INFO
+[INFO] Environment: development
+[INFO] ============================================================
+PayPal Integration Loaded Successfully (Sync Mode)
+Monetization Engine Loaded Successfully
+JWT Authentication Enabled
+Rate Limiting Enabled
+Security Headers Enabled
+Production Logging Enabled
+Monitoring Dashboard Enabled
+Loaded 43 agents
+Loaded 7 archetypes
+[ENGINE API] Registered 15 endpoints
+Engine API Controller Enabled
+
+============================================================
+SINCOR MASTER PLATFORM
+============================================================
+Port: 5000
+Debug mode: True
+Authentication: ENABLED
+Rate Limiting: ENABLED
+PayPal: ENABLED
+Monetization: ENABLED
+Waitlist: ENABLED
+Database: data/waitlist.db
+
+Default admin credentials:
+  Username: admin
+  Password: changeme123
+  CHANGE THESE IN PRODUCTION!
+
+Rate Limiting Active:
+  Authentication: 5/min, 20/hour, 50/day
+  Payments: 10/min, 50/hour, 200/day
+  Public endpoints: 20/min, 100/hour, 500/day
+============================================================
+
+ * Serving Flask app 'app'
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.3:5000
+Press CTRL+C to quit
+ * Restarting with stat
+[INFO] ============================================================
+[INFO] SINCOR Platform Starting
+[INFO] Log Level: INFO
+[INFO] Environment: development
+[INFO] ============================================================
+ * Debugger is active!
+ * Debugger PIN: 118-477-506
+ * Detected change in 'C:\\Users\\cjay4\\OneDrive\\Desktop\\0-$\\SINCOR2\\app.py', reloading
+PayPal Integration Loaded Successfully (Sync Mode)
+Monetization Engine Loaded Successfully
+JWT Authentication Enabled
+Rate Limiting Enabled
+Security Headers Enabled
+Production Logging Enabled
+Monitoring Dashboard Enabled
+Loaded 43 agents
+Loaded 7 archetypes
+[ENGINE API] Registered 15 endpoints
+Engine API Controller Enabled
+
+============================================================
+SINCOR MASTER PLATFORM
+============================================================
+Port: 5000
+Debug mode: True
+Authentication: ENABLED
+Rate Limiting: ENABLED
+PayPal: ENABLED
+Monetization: ENABLED
+Waitlist: ENABLED
+Database: data/waitlist.db
+
+Default admin credentials:
+  Username: admin
+  Password: changeme123
+  CHANGE THESE IN PRODUCTION!
+
+Rate Limiting Active:
+  Authentication: 5/min, 20/hour, 50/day
+  Payments: 10/min, 50/hour, 200/day
+  Public endpoints: 20/min, 100/hour, 500/day
+============================================================
+
+ * Restarting with stat
+[INFO] ============================================================
+[INFO] SINCOR Platform Starting
+[INFO] Log Level: INFO
+[INFO] Environment: development
+[INFO] ============================================================
+ * Debugger is active!
+ * Debugger PIN: 118-477-506
+ * Detected change in 'C:\\Users\\cjay4\\OneDrive\\Desktop\\0-$\\SINCOR2\\app.py', reloading
+PayPal Integration Loaded Successfully (Sync Mode)
+Monetization Engine Loaded Successfully
+JWT Authentication Enabled
+Rate Limiting Enabled
+Security Headers Enabled
+Production Logging Enabled
+Monitoring Dashboard Enabled
+Loaded 43 agents
+Loaded 7 archetypes
+[ENGINE API] Registered 15 endpoints
+Engine API Controller Enabled
+
+============================================================
+SINCOR MASTER PLATFORM
+============================================================
+Port: 5000
+Debug mode: True
+Authentication: ENABLED
+Rate Limiting: ENABLED
+PayPal: ENABLED
+Monetization: ENABLED
+Waitlist: ENABLED
+Database: data/waitlist.db
+
+Default admin credentials:
+  Username: admin
+  Password: changeme123
+  CHANGE THESE IN PRODUCTION!
+
+Rate Limiting Active:
+  Authentication: 5/min, 20/hour, 50/day
+  Payments: 10/min, 50/hour, 200/day
+  Public endpoints: 20/min, 100/hour, 500/day
+============================================================
+
+ * Restarting with stat
+[INFO] ============================================================
+[INFO] SINCOR Platform Starting
+[INFO] Log Level: INFO
+[INFO] Environment: development
+[INFO] ============================================================
+ * Debugger is active!
+ * Debugger PIN: 118-477-506
+ * Detected change in 'C:\\Users\\cjay4\\OneDrive\\Desktop\\0-$\\SINCOR2\\app.py', reloading
+PayPal Integration Loaded Successfully (Sync Mode)
+Monetization Engine Loaded Successfully
+JWT Authentication Enabled
+Rate Limiting Enabled
+Security Headers Enabled
+Production Logging Enabled
+Monitoring Dashboard Enabled
+Loaded 43 agents
+Loaded 7 archetypes
+[ENGINE API] Registered 15 endpoints
+Engine API Controller Enabled
+
+============================================================
+SINCOR MASTER PLATFORM
+============================================================
+Port: 5000
+Debug mode: True
+Authentication: ENABLED
+Rate Limiting: ENABLED
+PayPal: ENABLED
+Monetization: ENABLED
+Waitlist: ENABLED
+Database: data/waitlist.db
+
+Default admin credentials:
+  Username: admin
+  Password: changeme123
+  CHANGE THESE IN PRODUCTION!
+
+Rate Limiting Active:
+  Authentication: 5/min, 20/hour, 50/day
+  Payments: 10/min, 50/hour, 200/day
+  Public endpoints: 20/min, 100/hour, 500/day
+============================================================
+
+ * Restarting with stat
+  File "C:\Users\cjay4\OneDrive\Desktop\0-$\SINCOR2\app.py", line 746
+    <<<<<<< HEAD
+    ^^
+IndentationError: expected an indented block after function definition on line 745

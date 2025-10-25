@@ -1,0 +1,1 @@
+3 posts/week: Mon scarcity, Wed review, Fri before/after. Always include CTA + booking link/QR.
