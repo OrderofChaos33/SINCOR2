@@ -13,19 +13,19 @@
             --gold: #d97706; --gold-light: #f59e0b; --cyan: #06b6d4; --cyan-light: #0891b2;
         }
         .premium-header { background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 100%); border-bottom: 3px solid var(--gold); }
-        .hero-section { background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 50%, var(--navy-light) 100%); position: relative; }
+        .hero-section { background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 50%, var(--navy-light) 100%); }
         .swarm-title { background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-light) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .product-card { transition: all 0.4s; background: white; border: 2px solid #e5e7eb; }
         .product-card:hover { transform: translateY(-12px); box-shadow: 0 20px 60px rgba(6,182,212,0.3); border-color: var(--cyan); }
         .cta-cyan { background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-light) 100%); }
         .cta-gold { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%); }
+        .cta-navy { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); }
         .demo-box { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid var(--cyan); }
         .featured-badge { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%); animation: glow 2s infinite; }
         @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(217,151,6,0.6); } 50% { box-shadow: 0 0 30px rgba(217,151,6,0.9); } }
     </style>
 </head>
 <body class="bg-gray-50">
-    <!-- Header -->
     <header class="premium-header text-white sticky top-0 z-50 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -39,7 +39,6 @@
         </div>
     </header>
 
-    <!-- Hero - SWARM DOMINATION -->
     <div class="hero-section text-white py-24">
         <div class="max-w-6xl mx-auto px-4 text-center">
             <div class="inline-block mb-6 px-6 py-3 rounded-full font-bold text-sm" style="background: rgba(6,182,212,0.2); border: 2px solid var(--cyan); color: var(--cyan-light);">🤖 THOUSANDS OF AI AGENTS AT ONCE</div>
@@ -52,61 +51,388 @@
         </div>
     </div>
 
-    <!-- Trust Metrics -->
     <div class="bg-white py-12 border-b-4" style="border-color: var(--gold);">
         <div class="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div><div class="text-5xl mb-2">💼</div><div class="font-black text-3xl" style="color: var(--navy);">$12M+</div><div class="text-sm text-gray-600 font-semibold">Revenue</div></div>
-            <div><div class="text-5xl mb-2">🏢</div><div class="font-black text-3xl" style="color: var(--navy);">500+</div><div class="text-sm text-gray-600 font-semibold">Clients</div></div>
-            <div><div class="text-5xl mb-2">🤖</div><div class="font-black text-3xl" style="color: var(--navy);">42</div><div class="text-sm text-gray-600 font-semibold">AI Agents</div></div>
-            <div><div class="text-5xl mb-2">⭐</div><div class="font-black text-3xl" style="color: var(--navy);">4.9/5</div><div class="text-sm text-gray-600 font-semibold">Rating</div></div>
+            <div><div class="text-5xl mb-2">💼</div><div class="font-black text-3xl" style="color: var(--navy);">$12M+</div><div class="text-sm text-gray-600 font-semibold">Revenue Generated</div></div>
+            <div><div class="text-5xl mb-2">🏢</div><div class="font-black text-3xl" style="color: var(--navy);">500+</div><div class="text-sm text-gray-600 font-semibold">Active Clients</div></div>
+            <div><div class="text-5xl mb-2">🤖</div><div class="font-black text-3xl" style="color: var(--navy);">42</div><div class="text-sm text-gray-600 font-semibold">AI Agents 24/7</div></div>
+            <div><div class="text-5xl mb-2">⭐</div><div class="font-black text-3xl" style="color: var(--navy);">4.9/5</div><div class="text-sm text-gray-600 font-semibold">Client Rating</div></div>
         </div>
     </div>
 
     <div id="products" class="max-w-7xl mx-auto px-4 py-20">
         <div class="text-center mb-16">
-            <h2 class="text-5xl font-black mb-4" style="color: var(--navy);">Choose Your Solution</h2>
-            <p class="text-xl text-gray-600">All products activate our 42-agent AI swarm</p>
+            <h2 class="text-5xl font-black mb-4" style="color: var(--navy);">Premium AI Solutions</h2>
+            <p class="text-xl text-gray-600">All purchases activate our 42-agent swarm to deliver your results</p>
         </div>
 
-        <!-- Products Grid -->
         <div class="grid md:grid-cols-3 gap-8">
-            <!-- BI Report $97 -->
-            <div class="product-card rounded-2xl p-8">
+<div class="product-card rounded-2xl p-8 shadow-lg">
+                
                 <div class="text-5xl mb-4">📊</div>
-                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">BI Report</h3>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Business Intelligence Report</h3>
                 <div class="mb-4"><div class="text-5xl font-black" style="color: var(--cyan);">$97</div></div>
-                <p class="text-gray-700 mb-6">20+ page analysis with 90-day forecasting</p>
+                <p class="text-gray-700 mb-6">Comprehensive 20+ page analysis with 90-day revenue forecasting</p>
                 <div class="demo-box p-4 rounded-lg mb-6">
-                    <div class="font-bold mb-3" style="color: var(--navy);">📦 Deliverables:</div>
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
                     <ul class="space-y-2 text-sm">
-                        <li class="flex items-start"><span style="color: var(--cyan);" class="mr-2">✓</span><span>Revenue analysis</span></li>
-                        <li class="flex items-start"><span style="color: var(--cyan);" class="mr-2">✓</span><span>Growth opportunities</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Revenue analysis & 90-day forecasts</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Top 5 growth opportunities identified</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Competitive market positioning map</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>20+ page detailed PDF report</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Actionable ROI projections</span></li>
                     </ul>
                 </div>
-                <button onclick="document.getElementById('pp-bi').scrollIntoView({behavior:'smooth'})" class="w-full cta-cyan text-white py-3 rounded-xl font-bold mb-3">Get Now →</button>
-                <div id="pp-bi" class="paypal-container" style="min-height:45px"></div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-bi-report').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-cyan text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-bi-report" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg">
+                
+                <div class="text-5xl mb-4">🎯</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Competitive Analysis Report</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--cyan);">$149</div></div>
+                <p class="text-gray-700 mb-6">Deep-dive analysis of your top 5 competitors' strategies and market positioning</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Top 5 competitors analyzed in-depth</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Pricing strategy breakdown & gaps</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Market opportunities identified</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Competitive advantage strategies</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>30+ page competitor profiles</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-competitive-analysis').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-cyan text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-competitive-analysis" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg border-4" style="border-color: var(--gold);">
+                <div class="featured-badge text-white px-4 py-2 rounded-full font-black text-xs inline-block mb-3">⭐ MOST POPULAR</div>
+                <div class="text-5xl mb-4">🧠</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Intelligence Hub</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--gold);">$2500</div></div>
+                <p class="text-gray-700 mb-6">Complete business intelligence suite with market research, competitive analysis, and strategic planning</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Full market analysis with projections</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>10+ competitors mapped</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Customer persona development</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Strategic 12-month roadmap</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>100+ page intelligence report</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>1-hour strategy consultation</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-intelligence-hub').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-gold text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-intelligence-hub" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg">
+                
+                <div class="text-5xl mb-4">📝</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Content Package - Micro</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--cyan);">$500</div></div>
+                <p class="text-gray-700 mb-6">Perfect starter package for small businesses with blog posts, social media, and email campaigns</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>5 blog posts (800-1200 words, SEO)</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>20 social media posts</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>3 email campaigns with CTAs</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Content calendar & schedule</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>1 revision round included</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-content-micro').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-cyan text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-content-micro" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg border-4" style="border-color: var(--gold);">
+                <div class="featured-badge text-white px-4 py-2 rounded-full font-black text-xs inline-block mb-3">🔥 BEST VALUE</div>
+                <div class="text-5xl mb-4">📚</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Content Package - Standard</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--gold);">$2500</div></div>
+                <p class="text-gray-700 mb-6">Comprehensive content suite for growing businesses with complete content marketing ecosystem</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>20 blog posts (1200-1800 words, SEO)</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>60 social media posts all platforms</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>10 email campaigns with A/B tests</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>3 white papers or case studies</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Landing page copy for 2 products</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>90-day strategic content calendar</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Unlimited revisions 30 days</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-content-standard').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-gold text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-content-standard" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg">
+                
+                <div class="text-5xl mb-4">🏢</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Content Package - Enterprise</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--navy);">$15000</div></div>
+                <p class="text-gray-700 mb-6">Enterprise-grade content solution with all 42 AI agents creating complete content ecosystem</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>100+ blog posts (1500-2500 words)</span></li>
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>200+ social posts with visuals</span></li>
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>30 email automation sequences</span></li>
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>10 white papers/eBooks/reports</span></li>
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>Complete website copy (10+ pages)</span></li>
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>Video scripts for 20+ videos</span></li>
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>12-month content strategy</span></li>
+<li class="flex items-start"><span style="color: var(--navy);" class="mr-2 font-bold">✓</span><span>Dedicated account manager</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-content-enterprise').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-navy text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-content-enterprise" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg">
+                
+                <div class="text-5xl mb-4">🎨</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Creative Forge</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--cyan);">$5000</div></div>
+                <p class="text-gray-700 mb-6">Complete creative automation system delivering professional brand identity and campaign concepts</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Brand identity development</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>5 complete campaign concepts</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Visual direction & mood boards</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>50+ headline and tagline options</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Creative brief templates</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Brand guidelines</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>2 strategy consultation calls</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-creative-forge').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-cyan text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-creative-forge" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg">
+                
+                <div class="text-5xl mb-4">⚙️</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Ops Core</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--cyan);">$9500</div></div>
+                <p class="text-gray-700 mb-6">Operational automation system optimizing your business processes and workflows with AI insights</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Complete operational audit</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>10 automated workflow implementations</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Resource optimization recommendations</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Process documentation & SOPs</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>Performance dashboard setup</span></li>
+<li class="flex items-start"><span style="color: var(--cyan);" class="mr-2 font-bold">✓</span><span>30 days post-implementation support</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-ops-core').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-cyan text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-ops-core" class="paypal-container" style="min-height:45px"></div>
+                </div>
+            </div>
+<div class="product-card rounded-2xl p-8 shadow-lg border-4" style="border-color: var(--gold);">
+                <div class="featured-badge text-white px-4 py-2 rounded-full font-black text-xs inline-block mb-3">👑 PREMIUM</div>
+                <div class="text-5xl mb-4">🚀</div>
+                <h3 class="text-2xl font-bold mb-3" style="color: var(--navy);">Growth Engine - AI Sales System</h3>
+                <div class="mb-4"><div class="text-5xl font-black" style="color: var(--gold);">$15000</div></div>
+                <p class="text-gray-700 mb-6">Complete AI-powered sales system with all 42 agents driving revenue and closing deals</p>
+                <div class="demo-box p-4 rounded-lg mb-6">
+                    <div class="font-bold mb-3" style="color: var(--navy);">📦 What You Get:</div>
+                    <ul class="space-y-2 text-sm">
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Automated lead gen (1000+ leads/mo)</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>AI-powered omnichannel outreach</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Sales funnel optimization & A/B testing</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>CRM integration & follow-ups</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Predictive analytics & forecasting</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Custom sales playbooks & scripts</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Real-time performance dashboard</span></li>
+<li class="flex items-start"><span style="color: var(--gold);" class="mr-2 font-bold">✓</span><span>Dedicated success manager 90 days</span></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="document.getElementById('pp-growth-engine').scrollIntoView({behavior:'smooth',block:'center'})" class="w-full cta-gold text-white py-3 rounded-xl font-bold hover:opacity-90">Get Now →</button>
+                    <div id="pp-growth-engine" class="paypal-container" style="min-height:45px"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- PayPal SDK -->
+    <div class="bg-gray-50 py-20">
+        <div class="max-w-6xl mx-auto px-4">
+            <h3 class="text-4xl font-black text-center mb-12" style="color: var(--navy);">Real Results from Real Businesses</h3>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-white rounded-xl p-8 shadow-lg border-t-4" style="border-color: var(--cyan);">
+                    <div class="text-yellow-400 text-2xl mb-4">⭐⭐⭐⭐⭐</div>
+                    <div class="inline-block px-4 py-2 rounded-full font-bold text-sm mb-4" style="background: var(--navy-dark); color: var(--gold-light); border: 2px solid var(--gold);">$47K Revenue in 60 Days</div>
+                    <p class="text-gray-700 mb-6 italic">"Intelligence Hub gave us insights we never would have found. Within 60 days we generated $47K in new business. The ROI was insane."</p>
+                    <div class="font-bold" style="color: var(--navy);">Sarah Chen</div>
+                    <div class="text-sm text-gray-600">Marketing Agency Owner</div>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-lg border-t-4" style="border-color: var(--cyan);">
+                    <div class="text-yellow-400 text-2xl mb-4">⭐⭐⭐⭐⭐</div>
+                    <div class="inline-block px-4 py-2 rounded-full font-bold text-sm mb-4" style="background: var(--navy-dark); color: var(--gold-light); border: 2px solid var(--gold);">10x Productivity</div>
+                    <p class="text-gray-700 mb-6 italic">"Content Package - Standard paid for itself in week two. My team went from struggling to 10x more productive. Quality is exceptional."</p>
+                    <div class="font-bold" style="color: var(--navy);">Marcus Johnson</div>
+                    <div class="text-sm text-gray-600">E-commerce Founder</div>
+                </div>
+                <div class="bg-white rounded-xl p-8 shadow-lg border-t-4" style="border-color: var(--cyan);">
+                    <div class="text-yellow-400 text-2xl mb-4">⭐⭐⭐⭐⭐</div>
+                    <div class="inline-block px-4 py-2 rounded-full font-bold text-sm mb-4" style="background: var(--navy-dark); color: var(--gold-light); border: 2px solid var(--gold);">3x Lead Generation</div>
+                    <p class="text-gray-700 mb-6 italic">"Growth Engine is worth every penny. We tripled lead generation in month one and closed 5 major deals. Game-changing."</p>
+                    <div class="font-bold" style="color: var(--navy);">Jennifer Martinez</div>
+                    <div class="text-sm text-gray-600">SaaS CEO</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="py-16" style="background: var(--navy-dark);">
+        <div class="max-w-6xl mx-auto px-4 text-center text-white">
+            <h3 class="text-4xl font-black mb-12">30-Day Money-Back Guarantee</h3>
+            <div class="grid md:grid-cols-4 gap-8">
+                <div><div class="text-6xl mb-4">🔒</div><div class="font-bold text-xl mb-2" style="color: var(--gold-light);">100% Secure</div><div class="text-sm text-gray-300">Bank-level encryption via PayPal</div></div>
+                <div><div class="text-6xl mb-4">⚡</div><div class="font-bold text-xl mb-2" style="color: var(--gold-light);">Fast Delivery</div><div class="text-sm text-gray-300">Most products within 48 hours</div></div>
+                <div><div class="text-6xl mb-4">💰</div><div class="font-bold text-xl mb-2" style="color: var(--gold-light);">Money Back</div><div class="text-sm text-gray-300">Full refund, no questions asked</div></div>
+                <div><div class="text-6xl mb-4">🏆</div><div class="font-bold text-xl mb-2" style="color: var(--gold-light);">Premium Quality</div><div class="text-sm text-gray-300">42 AI agents ensure excellence</div></div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD"></script>
     <script>
-        if (window.paypal) {
-            paypal.Buttons({
-                style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{ amount: { value: '97.00' }, description: 'SINCOR BI Report' }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function() {
-                        window.location.href = '/payment/success?product=bi-report&amount=97&order=' + data.orderID;
-                    });
-                }
-            }).render('#pp-bi');
+if (window.paypal) {
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '97.00' }, description: 'SINCOR Business Intelligence Report' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=bi-report&amount=97&order=' + data.orderID;
+            });
         }
+    }).render('#pp-bi-report');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '149.00' }, description: 'SINCOR Competitive Analysis Report' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=competitive-analysis&amount=149&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-competitive-analysis');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'gold', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '2500.00' }, description: 'SINCOR Intelligence Hub' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=intelligence-hub&amount=2500&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-intelligence-hub');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '500.00' }, description: 'SINCOR Content Package - Micro' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=content-micro&amount=500&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-content-micro');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'gold', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '2500.00' }, description: 'SINCOR Content Package - Standard' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=content-standard&amount=2500&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-content-standard');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '15000.00' }, description: 'SINCOR Content Package - Enterprise' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=content-enterprise&amount=15000&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-content-enterprise');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '5000.00' }, description: 'SINCOR Creative Forge' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=creative-forge&amount=5000&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-creative-forge');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '9500.00' }, description: 'SINCOR Ops Core' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=ops-core&amount=9500&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-ops-core');
+paypal.Buttons({
+        style: { layout: 'vertical', color: 'gold', label: 'pay', height: 45 },
+        createOrder: function(data, actions) {
+            return actions.order.create({
+                purchase_units: [{ amount: { value: '15000.00' }, description: 'SINCOR Growth Engine - AI Sales System' }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function() {
+                window.location.href = '/payment/success?product=growth-engine&amount=15000&order=' + data.orderID;
+            });
+        }
+    }).render('#pp-growth-engine');
+}
     </script>
 </body>
 </html>
