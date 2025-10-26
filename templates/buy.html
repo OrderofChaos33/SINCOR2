@@ -49,7 +49,6 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            text-shadow: 0 0 40px rgba(6, 182, 212, 0.3);
         }
 
         .product-card {
@@ -70,69 +69,21 @@
         }
 
         @keyframes glow {
-            0%, 100% {
-                box-shadow: 0 0 20px rgba(217, 151, 6, 0.6);
-            }
-            50% {
-                box-shadow: 0 0 30px rgba(217, 151, 6, 0.9);
-            }
+            0%, 100% { box-shadow: 0 0 20px rgba(217, 151, 6, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(217, 151, 6, 0.9); }
         }
 
-        .cta-button {
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-        }
-
-        .cta-primary {
-            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
-        }
-
-        .cta-gold {
-            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
-        }
-
-        .cta-cyan {
-            background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-light) 100%);
-        }
-
-        .demo-box {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border-left: 4px solid var(--cyan);
-        }
-
-        .trust-badge {
-            transition: transform 0.3s ease;
-        }
-
-        .trust-badge:hover {
-            transform: scale(1.05);
-        }
-
-        .metric-badge {
-            background: var(--navy-dark);
-            color: var(--gold-light);
-            border: 2px solid var(--gold);
-        }
-
-        .testimonial-card {
-            background: white;
-            border-top: 4px solid var(--cyan);
-        }
-
-        .paypal-container {
-            min-height: 45px;
-        }
-
-        .section-divider {
-            border-top: 3px solid var(--gold);
-            margin: 60px 0;
-        }
+        .cta-button { transition: all 0.3s ease; }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); }
+        .cta-primary { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); }
+        .cta-gold { background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%); }
+        .cta-cyan { background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-light) 100%); }
+        .demo-box { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-left: 4px solid var(--cyan); }
+        .trust-badge:hover { transform: scale(1.05); }
+        .metric-badge { background: var(--navy-dark); color: var(--gold-light); border: 2px solid var(--gold); }
+        .testimonial-card { background: white; border-top: 4px solid var(--cyan); }
+        .paypal-container { min-height: 45px; }
+        .section-divider { border-top: 3px solid var(--gold); margin: 60px 0; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -146,9 +97,7 @@
             </div>
             <div class="flex items-center gap-6">
                 <a href="/" class="text-gray-200 hover:text-white font-medium hidden md:block transition-colors">← Back to Home</a>
-                <a href="#products" class="cta-gold text-white px-6 py-2 rounded-lg font-bold hover:opacity-90 transition-all cta-button">
-                    View Solutions
-                </a>
+                <a href="#products" class="cta-gold text-white px-6 py-2 rounded-lg font-bold hover:opacity-90 transition-all cta-button">View Solutions</a>
             </div>
         </div>
     </header>
@@ -159,40 +108,13 @@
             <div class="inline-block mb-6 px-6 py-3 rounded-full font-bold text-sm" style="background: rgba(6, 182, 212, 0.2); border: 2px solid var(--cyan); color: var(--cyan-light);">
                 🤖 THOUSANDS OF AI AGENTS AT ONCE
             </div>
-
             <h1 class="text-6xl md:text-8xl font-black mb-6 leading-tight">
                 <div class="swarm-title mb-4">SWARM DOMINATION</div>
                 <div class="text-white text-4xl md:text-5xl">AI BUSINESS SOLUTIONS</div>
             </h1>
-
-            <p class="text-2xl md:text-3xl mb-4 font-semibold" style="color: var(--gold-light);">
-                42 Specialized AI Agents • Proven Results • Enterprise-Grade
-            </p>
-
-            <p class="text-xl mb-8 opacity-90 max-w-3xl mx-auto">
-                From instant business intelligence to complete enterprise automation.
-                SINCOR's AI swarm delivers measurable results in hours, not months.
-            </p>
-
-            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
-                <div class="flex items-center gap-2 text-lg">
-                    <span class="text-2xl">⚡</span>
-                    <span>48-Hour Delivery</span>
-                </div>
-                <div class="flex items-center gap-2 text-lg">
-                    <span class="text-2xl">💎</span>
-                    <span>Premium Quality</span>
-                </div>
-                <div class="flex items-center gap-2 text-lg">
-                    <span class="text-2xl">🔒</span>
-                    <span>100% Secure</span>
-                </div>
-            </div>
-
-            <a href="#products" class="inline-block cta-gold text-white px-12 py-5 rounded-full font-black text-xl hover:opacity-90 transition-all cta-button transform hover:scale-105">
-                Explore Solutions →
-            </a>
-
+            <p class="text-2xl md:text-3xl mb-4 font-semibold" style="color: var(--gold-light);">42 Specialized AI Agents • Proven Results • Enterprise-Grade</p>
+            <p class="text-xl mb-8 opacity-90 max-w-3xl mx-auto">From instant business intelligence to complete enterprise automation. SINCOR's AI swarm delivers measurable results in hours, not months.</p>
+            <a href="#products" class="inline-block cta-gold text-white px-12 py-5 rounded-full font-black text-xl hover:opacity-90 transition-all cta-button transform hover:scale-105">Explore Solutions →</a>
             <p class="mt-6 text-sm opacity-75">✓ 30-Day Money-Back Guarantee • ✓ Trusted by 500+ Businesses</p>
         </div>
     </div>
@@ -201,36 +123,16 @@
     <div class="bg-white py-12 border-b-4" style="border-color: var(--gold);">
         <div class="max-w-6xl mx-auto px-4">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-                <div class="trust-badge">
-                    <div class="text-5xl mb-2">💼</div>
-                    <div class="font-black text-3xl" style="color: var(--navy);">$12M+</div>
-                    <div class="text-sm text-gray-600 font-semibold">Revenue Generated</div>
-                </div>
-                <div class="trust-badge">
-                    <div class="text-5xl mb-2">🏢</div>
-                    <div class="font-black text-3xl" style="color: var(--navy);">500+</div>
-                    <div class="text-sm text-gray-600 font-semibold">Active Clients</div>
-                </div>
-                <div class="trust-badge">
-                    <div class="text-5xl mb-2">🤖</div>
-                    <div class="font-black text-3xl" style="color: var(--navy);">42</div>
-                    <div class="text-sm text-gray-600 font-semibold">AI Agents 24/7</div>
-                </div>
-                <div class="trust-badge">
-                    <div class="text-5xl mb-2">⭐</div>
-                    <div class="font-black text-3xl" style="color: var(--navy);">4.9/5</div>
-                    <div class="text-sm text-gray-600 font-semibold">Client Rating</div>
-                </div>
+                <div><div class="text-5xl mb-2">💼</div><div class="font-black text-3xl" style="color: var(--navy);">$12M+</div><div class="text-sm text-gray-600 font-semibold">Revenue Generated</div></div>
+                <div><div class="text-5xl mb-2">🏢</div><div class="font-black text-3xl" style="color: var(--navy);">500+</div><div class="text-sm text-gray-600 font-semibold">Active Clients</div></div>
+                <div><div class="text-5xl mb-2">🤖</div><div class="font-black text-3xl" style="color: var(--navy);">42</div><div class="text-sm text-gray-600 font-semibold">AI Agents 24/7</div></div>
+                <div><div class="text-5xl mb-2">⭐</div><div class="font-black text-3xl" style="color: var(--navy);">4.9/5</div><div class="text-sm text-gray-600 font-semibold">Client Rating</div></div>
             </div>
         </div>
     </div>
 
-    <!-- Load PayPal SDK (PRODUCTION MODE) -->
+    <!-- Load PayPal SDK -->
     <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD"></script>
 
-    <script>
-        // PayPal buttons will be added here
-        console.log('SINCOR Premium Buy Page Loaded - PayPal SDK Ready');
-    </script>
 </body>
 </html>
