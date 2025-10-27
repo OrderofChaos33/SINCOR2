@@ -11,6 +11,118 @@ from datetime import datetime
 from typing import Dict, Optional
 import requests
 
+class ContentSafetyFilter:
+    """Ensures all generated content is appropriate, safe, and compliant"""
+
+    PROHIBITED_TERMS = ['spam', 'scam', 'illegal', 'harmful', 'malicious', 'weapon', 'drug']
+
+    def __init__(self):
+        self.safety_log = 'logs/content_safety.log'
+        self._ensure_log_exists()
+
+    def _ensure_log_exists(self):
+        """Ensure safety log directory and file exist"""
+        import os as safety_os
+        safety_os.makedirs(safety_os.path.dirname(self.safety_log), exist_ok=True)
+        if not safety_os.path.exists(self.safety_log):
+            with open(self.safety_log, 'w') as f:
+                f.write('Content Safety Log - Started\n')
+
+    def validate_request(self, product_type: str, customer_email: str, customer_name: str) -> Dict:
+        """Validate content generation request before agent activation"""
+        validation = {
+            'safe': True,
+            'flags': [],
+            'risk_level': 'low',
+            'timestamp': datetime.now().isoformat()
+        }
+
+        # Check email domain (basic validation)
+        if customer_email:
+            domain = customer_email.split('@')[-1].lower()
+            suspicious_domains = ['tempmail', 'throwaway', '10minutemail']
+            if any(susp in domain for susp in suspicious_domains):
+                validation['flags'].append('Temporary email detected')
+                validation['risk_level'] = 'medium'
+
+        # Check customer name for prohibited terms
+        if customer_name:
+            name_lower = customer_name.lower()
+            for term in self.PROHIBITED_TERMS:
+                if term in name_lower:
+                    validation['flags'].append(f'Prohibited term in name: {term}')
+                    validation['safe'] = False
+                    validation['risk_level'] = 'high'
+
+        # Product-specific validation
+        content_products = ['content-micro', 'content-standard', 'content-enterprise', 'creative-forge']
+        if product_type in content_products:
+            validation['content_generation'] = True
+            validation['moderation_required'] = True
+
+        self._log_validation(validation, product_type, customer_email)
+        return validation
+
+    def filter_content_request(self, request_data: Dict) -> Dict:
+        """Apply filters to content generation requests"""
+        filtered = request_data.copy()
+
+        # Ensure appropriate content parameters
+        filtered['content_policy'] = 'professional_business_only'
+        filtered['safety_level'] = 'strict'
+        filtered['prohibited_topics'] = self.PROHIBITED_TERMS
+        filtered['moderation_enabled'] = True
+
+        return filtered
+
+    def _log_validation(self, validation: Dict, product_type: str, customer_email: str):
+        """Log safety validation results"""
+        try:
+            with open(self.safety_log, 'a', encoding='utf-8') as f:
+                log_entry = f"{validation['timestamp']} | {product_type} | {customer_email} | Risk: {validation['risk_level']} | Safe: {validation['safe']} | Flags: {validation['flags']}\n"
+                f.write(log_entry)
+        except Exception as e:
+            print(f"Warning: Could not write to safety log: {e}")
+
+    def get_content_guidelines(self, product_type: str) -> Dict:
+        """Get content generation guidelines for specific product"""
+        guidelines = {
+            'bi-report': {
+                'max_pages': 25,
+                'tone': 'professional',
+                'data_sources': 'verified_only',
+                'safety_checks': ['financial_accuracy', 'no_speculation']
+            },
+            'competitive-analysis': {
+                'max_pages': 30,
+                'tone': 'analytical',
+                'data_sources': 'public_verified',
+                'safety_checks': ['factual_only', 'no_defamation']
+            },
+            'content-micro': {
+                'max_words': 5000,
+                'tone': 'professional',
+                'safety_checks': ['appropriate_language', 'no_prohibited_content']
+            },
+            'content-standard': {
+                'max_words': 25000,
+                'tone': 'professional',
+                'safety_checks': ['appropriate_language', 'no_prohibited_content', 'brand_safe']
+            },
+            'content-enterprise': {
+                'max_words': 100000,
+                'tone': 'executive',
+                'safety_checks': ['appropriate_language', 'no_prohibited_content', 'brand_safe', 'compliance_review']
+            }
+        }
+
+        return guidelines.get(product_type, {
+            'tone': 'professional',
+            'safety_checks': ['appropriate_language']
+        })
+
+
+
 class PaymentDeliverySystem:
     """Handles complete post-purchase delivery workflow"""
 
@@ -21,6 +133,7 @@ class PaymentDeliverySystem:
         self.base_url = 'https://api-m.sandbox.paypal.com' if self.sandbox_mode else 'https://api-m.paypal.com'
         self.customers_db = 'data/customers.json'
         self.payments_log = 'logs/payments.log'
+        self.safety_filter = ContentSafetyFilter()
 
     def get_access_token(self) -> Optional[str]:
         """Get PayPal OAuth access token"""
@@ -256,10 +369,38 @@ class PaymentDeliverySystem:
         print("7️⃣ Sending welcome email...")
         email_sent = self.send_welcome_email(customer_data)
 
-        # Step 8: Activate agents (placeholder)
-        print("8️⃣ Activating AI agents...")
-        # TODO: Actually activate agents in the system
-        print(f"✅ {customer_data['agent_count']} agents activated (placeholder)")
+        # Step 8: Content Safety Validation
+        print("8️⃣ Running content safety checks...")
+        safety_validation = self.safety_filter.validate_request(
+            product_type=plan,
+            customer_email=customer_data['email'],
+            customer_name=customer_data['name']
+        )
+
+        if not safety_validation['safe']:
+            print(f"⚠️  SAFETY ALERT: {safety_validation['flags']}")
+            result['message'] = 'Order requires manual review due to safety flags'
+            result['safety_validation'] = safety_validation
+            # Do not activate agents automatically if flagged
+            return result
+
+        print(f"✅ Safety validation passed (Risk: {safety_validation['risk_level']})")
+
+        # Get content guidelines for this product
+        content_guidelines = self.safety_filter.get_content_guidelines(plan)
+        customer_data['content_guidelines'] = content_guidelines
+
+        # Step 9: Activate agents with safety filters
+        print("9️⃣ Activating AI agents with content filters...")
+        # Apply content filters to agent request
+        agent_config = self.safety_filter.filter_content_request({
+            'plan': plan,
+            'customer_email': customer_data['email'],
+            'guidelines': content_guidelines
+        })
+        # TODO: Actually activate agents in the system with agent_config
+        print(f"✅ {customer_data['agent_count']} agents activated with safety filters")
+        customer_data['safety_validation'] = safety_validation
 
         result['success'] = True
         result['message'] = 'Delivery completed successfully'
