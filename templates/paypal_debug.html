@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PayPal Button Diagnostic</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+        .log { margin: 5px 0; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .info { color: #ff0; }
+        #pp-test { min-height: 50px; background: #333; padding: 10px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>PayPal SDK Diagnostic</h1>
+    <div id="logs"></div>
+    <div id="pp-test"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = 'log ' + type;
+            div.textContent = new Date().toISOString() + ' - ' + message;
+            document.getElementById('logs').appendChild(div);
+            console.log(message);
+        }
+
+        log('Starting diagnostic...', 'info');
+        log('Current URL: ' + window.location.href, 'info');
+        log('User Agent: ' + navigator.userAgent, 'info');
+
+        // Check if script tag exists
+        const scripts = document.querySelectorAll('script[src*="paypal"]');
+        log('PayPal script tags found: ' + scripts.length, scripts.length > 0 ? 'success' : 'error');
+
+        // Load PayPal SDK
+        const script = document.createElement('script');
+        script.src = 'https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD';
+        script.onload = function() {
+            log('PayPal SDK loaded successfully!', 'success');
+            log('window.paypal exists: ' + (typeof window.paypal !== 'undefined'), typeof window.paypal !== 'undefined' ? 'success' : 'error');
+
+            if (window.paypal) {
+                log('PayPal object methods: ' + Object.keys(window.paypal).join(', '), 'info');
+                log('Attempting to render button...', 'info');
+
+                try {
+                    window.paypal.Buttons({
+                        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+                        createOrder: function(data, actions) {
+                            log('createOrder called', 'success');
+                            return actions.order.create({
+                                purchase_units: [{
+                                    amount: { value: '97.00' },
+                                    description: 'Test Product'
+                                }]
+                            });
+                        },
+                        onApprove: function(data, actions) {
+                            log('onApprove called - OrderID: ' + data.orderID, 'success');
+                            return actions.order.capture().then(function(details) {
+                                log('Payment captured: ' + JSON.stringify(details), 'success');
+                                alert('Test payment successful! OrderID: ' + data.orderID);
+                            });
+                        },
+                        onError: function(err) {
+                            log('PayPal button error: ' + JSON.stringify(err), 'error');
+                        }
+                    }).render('#pp-test').then(function() {
+                        log('Button rendered successfully!', 'success');
+                    }).catch(function(err) {
+                        log('Render failed: ' + err.message, 'error');
+                    });
+                } catch(err) {
+                    log('Exception during button creation: ' + err.message, 'error');
+                    log('Stack: ' + err.stack, 'error');
+                }
+            } else {
+                log('window.paypal not available after SDK load!', 'error');
+            }
+        };
+        script.onerror = function() {
+            log('Failed to load PayPal SDK!', 'error');
+            log('Possible causes: CORS, network, blocked script', 'error');
+        };
+
+        log('Inserting PayPal SDK script...', 'info');
+        document.head.appendChild(script);
+
+        // Global error handler
+        window.onerror = function(msg, url, line, col, error) {
+            log('Global error: ' + msg + ' at ' + url + ':' + line, 'error');
+        };
+    </script>
+</body>
+</html>
