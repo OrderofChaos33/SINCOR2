@@ -1023,9 +1023,18 @@
         </div>
     </div>
 
-    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD" data-sdk-integration-source="button-factory"></script>
     <script>
-if (window.paypal) {
+// Wait for PayPal SDK to fully load
+function initPayPalButtons() {
+    if (!window.paypal) {
+        console.error('PayPal SDK not loaded!');
+        alert('Payment system unavailable. Please refresh the page.');
+        return;
+    }
+    
+    console.log('PayPal SDK loaded - rendering 9 buttons...');
+    try {
     console.log('PayPal SDK loaded successfully - rendering 9 buttons');
     try {
         paypal.Buttons({
@@ -1156,10 +1165,29 @@ paypal.Buttons({
         console.log('Button 9/9 rendered: growth-engine');
     } catch(err) {
         console.error('PayPal button rendering error:', err);
+        alert('Error rendering payment buttons: ' + err.message);
     }
+}
+
+// Try to initialize immediately
+if (window.paypal) {
+    initPayPalButtons();
 } else {
-    console.error('PayPal SDK failed to load');
-    setTimeout(() => alert('Payment system unavailable. Please refresh the page.'), 1000);
+    // Wait for SDK to load (max 10 seconds)
+    console.log('Waiting for PayPal SDK...');
+    let attempts = 0;
+    const checkPayPal = setInterval(function() {
+        attempts++;
+        if (window.paypal) {
+            console.log('PayPal SDK ready after ' + (attempts * 100) + 'ms');
+            clearInterval(checkPayPal);
+            initPayPalButtons();
+        } else if (attempts > 100) {
+            clearInterval(checkPayPal);
+            console.error('PayPal SDK failed to load after 10 seconds');
+            alert('Payment system failed to load. Please refresh the page or try again later.');
+        }
+    }, 100);
 }
     </script>
 </body>
