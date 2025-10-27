@@ -1484,197 +1484,208 @@
         </div>
     </div>
 
-    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD&components=buttons" data-sdk-integration-source="developer-studio"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD&components=buttons"></script>
     <script>
-// Wait for PayPal SDK to fully load
-function initPayPalButtons() {
-    if (!window.paypal) {
-        console.error('PayPal SDK not loaded!');
-        alert('Payment system unavailable. Please refresh the page.');
-        return;
-    }
-    
-    console.log('PayPal SDK loaded - rendering 9 buttons...');
-    try {
-        paypal.Buttons({
-        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+    // Simple, clean PayPal button rendering - no complex detection needed
+
+    // Button 1: Business Intelligence Report - $97
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '97.00' }, description: 'SINCOR Business Intelligence Report' }]
+                purchase_units: [{
+                    amount: { value: '97.00' },
+                    description: 'SINCOR Business Intelligence Report'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=bi-report&amount=97&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (bi-report):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-bi-report');
-        console.log('Button 1/9 rendered: bi-report');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+
+    // Button 2: Competitive Analysis - $149
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '149.00' }, description: 'SINCOR Competitive Analysis Report' }]
+                purchase_units: [{
+                    amount: { value: '149.00' },
+                    description: 'SINCOR Competitive Analysis Report'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=competitive-analysis&amount=149&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (competitive-analysis):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-competitive-analysis');
-        console.log('Button 2/9 rendered: competitive-analysis');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'gold', label: 'pay', height: 45 },
+
+    // Button 3: Intelligence Hub - $2,500 (MOST POPULAR)
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '2500.00' }, description: 'SINCOR Intelligence Hub' }]
+                purchase_units: [{
+                    amount: { value: '2500.00' },
+                    description: 'SINCOR Intelligence Hub (90-day service)'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=intelligence-hub&amount=2500&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (intelligence-hub):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-intelligence-hub');
-        console.log('Button 3/9 rendered: intelligence-hub');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+
+    // Button 4: Content Package - Micro - $500
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '500.00' }, description: 'SINCOR Content Package - Micro' }]
+                purchase_units: [{
+                    amount: { value: '500.00' },
+                    description: 'SINCOR Content Package - Micro'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=content-micro&amount=500&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (content-micro):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-content-micro');
-        console.log('Button 4/9 rendered: content-micro');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'gold', label: 'pay', height: 45 },
+
+    // Button 5: Content Package - Standard - $2,500 (BEST VALUE)
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '2500.00' }, description: 'SINCOR Content Package - Standard' }]
+                purchase_units: [{
+                    amount: { value: '2500.00' },
+                    description: 'SINCOR Content Package - Standard'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=content-standard&amount=2500&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (content-standard):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-content-standard');
-        console.log('Button 5/9 rendered: content-standard');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+
+    // Button 6: Content Package - Enterprise - $15,000
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '15000.00' }, description: 'SINCOR Content Package - Enterprise' }]
+                purchase_units: [{
+                    amount: { value: '15000.00' },
+                    description: 'SINCOR Content Package - Enterprise'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=content-enterprise&amount=15000&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (content-enterprise):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-content-enterprise');
-        console.log('Button 6/9 rendered: content-enterprise');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+
+    // Button 7: Creative Forge - $5,000
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '5000.00' }, description: 'SINCOR Creative Forge' }]
+                purchase_units: [{
+                    amount: { value: '5000.00' },
+                    description: 'SINCOR Creative Forge - Multi-channel Campaign'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=creative-forge&amount=5000&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (creative-forge):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-creative-forge');
-        console.log('Button 7/9 rendered: creative-forge');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
+
+    // Button 8: Ops Core - $9,500
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '9500.00' }, description: 'SINCOR Ops Core' }]
+                purchase_units: [{
+                    amount: { value: '9500.00' },
+                    description: 'SINCOR Ops Core - Operations Automation'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=ops-core&amount=9500&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (ops-core):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-ops-core');
-        console.log('Button 8/9 rendered: ops-core');
-paypal.Buttons({
-        style: { layout: 'vertical', color: 'gold', label: 'pay', height: 45 },
+
+    // Button 9: Growth Engine - $15,000 (PREMIUM)
+    paypal.Buttons({
+        style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
-                purchase_units: [{ amount: { value: '15000.00' }, description: 'SINCOR Growth Engine - AI Sales System' }]
+                purchase_units: [{
+                    amount: { value: '15000.00' },
+                    description: 'SINCOR Growth Engine - AI Sales System'
+                }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function() {
+            return actions.order.capture().then(function(details) {
                 window.location.href = '/payment/success?product=growth-engine&amount=15000&order=' + data.orderID;
             });
         },
         onError: function(err) {
-            console.error('PayPal error (growth-engine):', err);
+            console.error('PayPal error:', err);
+            alert('Payment error occurred. Please try again.');
         }
     }).render('#pp-growth-engine');
-        console.log('Button 9/9 rendered: growth-engine');
-    } catch(err) {
-        console.error('PayPal button rendering error:', err);
-        alert('Error rendering payment buttons: ' + err.message);
-    }
-}
-
-// Try to initialize immediately
-if (window.paypal) {
-    initPayPalButtons();
-} else {
-    // Wait for SDK to load (max 10 seconds)
-    console.log('Waiting for PayPal SDK...');
-    let attempts = 0;
-    const checkPayPal = setInterval(function() {
-        attempts++;
-        if (window.paypal) {
-            console.log('PayPal SDK ready after ' + (attempts * 100) + 'ms');
-            clearInterval(checkPayPal);
-            initPayPalButtons();
-        } else if (attempts > 100) {
-            clearInterval(checkPayPal);
-            console.error('PayPal SDK failed to load after 10 seconds');
-            alert('Payment system failed to load. Please refresh the page or try again later.');
-        }
-    }, 100);
-}
     </script>
+
 </body>
 </html>
