@@ -1484,7 +1484,7 @@
         </div>
     </div>
 
-    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD" data-sdk-integration-source="button-factory"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&currency=USD&components=buttons" data-sdk-integration-source="developer-studio"></script>
     <script>
 // Wait for PayPal SDK to fully load
 function initPayPalButtons() {
@@ -1495,8 +1495,6 @@ function initPayPalButtons() {
     }
     
     console.log('PayPal SDK loaded - rendering 9 buttons...');
-    try {
-    console.log('PayPal SDK loaded successfully - rendering 9 buttons');
     try {
         paypal.Buttons({
         style: { layout: 'vertical', color: 'blue', label: 'pay', height: 45 },
@@ -1509,6 +1507,9 @@ function initPayPalButtons() {
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=bi-report&amount=97&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (bi-report):', err);
         }
     }).render('#pp-bi-report');
         console.log('Button 1/9 rendered: bi-report');
@@ -1523,6 +1524,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=competitive-analysis&amount=149&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (competitive-analysis):', err);
         }
     }).render('#pp-competitive-analysis');
         console.log('Button 2/9 rendered: competitive-analysis');
@@ -1537,6 +1541,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=intelligence-hub&amount=2500&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (intelligence-hub):', err);
         }
     }).render('#pp-intelligence-hub');
         console.log('Button 3/9 rendered: intelligence-hub');
@@ -1551,6 +1558,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=content-micro&amount=500&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (content-micro):', err);
         }
     }).render('#pp-content-micro');
         console.log('Button 4/9 rendered: content-micro');
@@ -1565,6 +1575,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=content-standard&amount=2500&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (content-standard):', err);
         }
     }).render('#pp-content-standard');
         console.log('Button 5/9 rendered: content-standard');
@@ -1579,6 +1592,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=content-enterprise&amount=15000&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (content-enterprise):', err);
         }
     }).render('#pp-content-enterprise');
         console.log('Button 6/9 rendered: content-enterprise');
@@ -1593,6 +1609,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=creative-forge&amount=5000&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (creative-forge):', err);
         }
     }).render('#pp-creative-forge');
         console.log('Button 7/9 rendered: creative-forge');
@@ -1607,6 +1626,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=ops-core&amount=9500&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (ops-core):', err);
         }
     }).render('#pp-ops-core');
         console.log('Button 8/9 rendered: ops-core');
@@ -1621,6 +1643,9 @@ paypal.Buttons({
             return actions.order.capture().then(function() {
                 window.location.href = '/payment/success?product=growth-engine&amount=15000&order=' + data.orderID;
             });
+        },
+        onError: function(err) {
+            console.error('PayPal error (growth-engine):', err);
         }
     }).render('#pp-growth-engine');
         console.log('Button 9/9 rendered: growth-engine');
