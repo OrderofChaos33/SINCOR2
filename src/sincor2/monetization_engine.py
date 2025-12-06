@@ -14,15 +14,15 @@ from enum import Enum
 import numpy as np
 
 # Import our custom engines
-from dynamic_pricing_engine import DynamicPricingEngine, TaskMetrics, PricingResult
-from recursive_value_products import RecursiveValueEngine, ProductType, ValueProduct
-from partnership_framework import PartnershipFramework, PartnerTier, PartnershipType
-from instant_business_intelligence import InstantBusinessIntelligence, RevenueMetrics
-from infinite_scaling_engine import InfiniteScalingEngine, AgentArchetype
-from real_time_intelligence import RealTimeIntelligenceEngine, IntelligenceSource
-from predictive_analytics_engine import PredictiveAnalyticsEngine, PredictionType
-from quality_scoring_engine import SelfImprovingQualityEngine, QualityDimension
-from paypal_integration import SINCORPaymentProcessor, PaymentResult, PaymentStatus
+from sincor2.dynamic_pricing_engine import DynamicPricingEngine, TaskMetrics, PricingResult
+from sincor2.recursive_value_products import RecursiveValueEngine, ProductType, ValueProduct
+from sincor2.partnership_framework import PartnershipFramework, PartnerTier, PartnershipType
+from sincor2.instant_business_intelligence import InstantBusinessIntelligence, RevenueMetrics
+from sincor2.infinite_scaling_engine import InfiniteScalingEngine, AgentArchetype
+from sincor2.real_time_intelligence import RealTimeIntelligenceEngine, IntelligenceSource
+from sincor2.predictive_analytics_engine import PredictiveAnalyticsEngine, PredictionType
+from sincor2.quality_scoring_engine import SelfImprovingQualityEngine, QualityDimension
+from sincor2.paypal_integration import SINCORPaymentProcessor, PaymentResult, PaymentStatus
 
 class RevenueStream(Enum):
     INSTANT_BI = "instant_bi"

@@ -25,7 +25,7 @@ from enum import Enum
 import uuid
 from collections import deque, defaultdict
 
-from real_time_intelligence import IntelligenceDataPoint, IntelligenceSource
+from sincor2.real_time_intelligence import IntelligenceDataPoint, IntelligenceSource
 
 class PredictionType(Enum):
     """Types of predictions the engine can make"""

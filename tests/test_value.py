@@ -6,7 +6,7 @@ Tests if features actually create value (not just pass tests)
 
 import sys
 import os
-sys.path.insert(0, '.')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 print('='*70)
 print('SINCOR VALUE VERIFICATION')
@@ -16,7 +16,7 @@ print('='*70)
 # Test 1: Can we actually validate data?
 print('\n[1] INPUT VALIDATION - Does it actually block attacks?')
 print('-'*60)
-from validation_models import validate_request, WaitlistSignup, PaymentCreateRequest
+from sincor2.validation_models import validate_request, WaitlistSignup, PaymentCreateRequest
 
 # Test with REAL malicious input
 attacks_blocked = 0
@@ -73,8 +73,8 @@ print(f'\nResult: {fraud_blocked}/{len(fraud_attempts)} fraud attempts blocked')
 # Test 3: Can we actually generate JWT tokens?
 print('\n[3] AUTHENTICATION - Does it create real tokens?')
 print('-'*60)
-from auth_system import SINCORAuth
-from app import app
+from sincor2.auth_system import SINCORAuth
+from sincor2.app import app
 
 os.environ['ADMIN_USERNAME'] = 'testuser'
 os.environ['ADMIN_PASSWORD'] = 'testpass123'
@@ -105,7 +105,7 @@ with app.app_context():
 # Test 4: Rate limiting config
 print('\n[4] RATE LIMITING - Real enforcement config?')
 print('-'*60)
-from rate_limiter import AUTH_LIMITS, PAYMENT_LIMITS, PUBLIC_LIMITS
+from sincor2.rate_limiter import AUTH_LIMITS, PAYMENT_LIMITS, PUBLIC_LIMITS
 
 limits_config = {
     'Authentication': AUTH_LIMITS,
@@ -122,7 +122,7 @@ for name, limit in limits_config.items():
 # Test 5: Security headers
 print('\n[5] SECURITY HEADERS - Real protection?')
 print('-'*60)
-from security_headers import get_security_headers_config
+from sincor2.security_headers import get_security_headers_config
 
 headers = get_security_headers_config()
 critical_headers = [
@@ -145,7 +145,7 @@ print(f'\nResult: {headers_set}/{len(critical_headers)} critical headers configu
 # Test 6: Logging
 print('\n[6] LOGGING - Actual file creation?')
 print('-'*60)
-from production_logger import SINCORLogger
+from sincor2.production_logger import SINCORLogger
 from flask import Flask
 
 test_app = Flask(__name__)
@@ -170,7 +170,7 @@ else:
 # Test 7: Monitoring metrics
 print('\n[7] MONITORING - Real system data?')
 print('-'*60)
-from monitoring_dashboard import get_health_summary
+from sincor2.monitoring_dashboard import get_health_summary
 
 health = get_health_summary()
 if 'cpu_percent' in health:

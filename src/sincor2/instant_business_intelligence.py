@@ -20,8 +20,8 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import uuid
 
-from swarm_coordination import TaskMarket, TaskContract, TaskStatus
-from cortecs_core import CortecsBrain, NestedLearningTask
+from sincor2.swarm_coordination import TaskMarket, TaskContract, TaskStatus
+from sincor2.cortecs_core import CortecsBrain, NestedLearningTask
 
 class DeliverableType(Enum):
     """Types of business intelligence deliverables"""

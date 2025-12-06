@@ -4,7 +4,7 @@ Adds sync methods for use with Flask (non-async framework)
 """
 
 import asyncio
-from paypal_integration import (
+from sincor2.paypal_integration import (
     PayPalIntegration,
     SINCORPaymentProcessor,
     PaymentRequest,
