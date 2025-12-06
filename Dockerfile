@@ -18,4 +18,4 @@ RUN mkdir -p logs outputs data
 EXPOSE 8080
 
 # Run the master SINCOR application
-CMD ["python", "app.py"]
+CMD ["python", "run.py"]
