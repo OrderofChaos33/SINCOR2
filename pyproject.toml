@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "OrderofChaos33", email = ""}
+    {name = "OrderofChaos33"}
 ]
 keywords = ["commerce", "monetization", "ai", "flask", "ecommerce"]
 classifiers = [

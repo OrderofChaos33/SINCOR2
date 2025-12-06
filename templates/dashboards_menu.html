@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Command Center</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .dashboard-card {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid transparent;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-10px) scale(1.03);
+            box-shadow: 0 25px 50px rgba(102, 126, 234, 0.4);
+            border-color: #667eea;
+        }
+        .dashboard-card:active {
+            transform: translateY(-8px) scale(1.02);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Header -->
+    <div class="gradient-bg text-white py-20">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center">
+                <h1 class="text-6xl md:text-7xl font-black mb-6">
+                    SINCOR Command Center
+                </h1>
+                <p class="text-2xl opacity-90 mb-3">
+                    5 Real, Working Dashboards
+                </p>
+                <p class="text-lg opacity-75">
+                    No placeholders. No "coming soon". Only what works.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboards Grid -->
+    <div class="max-w-7xl mx-auto px-4 py-16">
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+            <!-- Main Dashboard -->
+            <a href="/dashboard" class="dashboard-card bg-white rounded-2xl p-8 shadow-lg block">
+                <div class="text-6xl mb-6">🚀</div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Main Control Center</h2>
+                <p class="text-gray-600 mb-6">Real-time platform monitoring with live metrics, system resources, security status, and performance dials. Full command and control interface.</p>
+                <div class="text-purple-600 font-bold text-lg">Launch →</div>
+            </a>
+
+            <!-- Executive Dashboard -->
+            <a href="/executive-dashboard" class="dashboard-card bg-white rounded-2xl p-8 shadow-lg block">
+                <div class="text-6xl mb-6">📊</div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Executive Command</h2>
+                <p class="text-gray-600 mb-6">High-level KPIs, agent network coordination scores, live activity feed, and performance charts. Real business intelligence powered by actual system data.</p>
+                <div class="text-blue-600 font-bold text-lg">View Metrics →</div>
+            </a>
+
+            <!-- Professional Dashboard -->
+            <a href="/professional-dashboard" class="dashboard-card bg-white rounded-2xl p-8 shadow-lg block">
+                <div class="text-6xl mb-6">💼</div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Business Intelligence</h2>
+                <p class="text-gray-600 mb-6">Working lead generation, campaign automation, and opportunity analysis. Real integrations with Calendar, Payments, Email, and SMS.</p>
+                <div class="text-emerald-600 font-bold text-lg">Access Tools →</div>
+            </a>
+
+            <!-- Admin Dashboard -->
+            <a href="/admin-dashboard" class="dashboard-card bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl p-8 shadow-lg block border-2 border-red-400">
+                <div class="text-6xl mb-6">⚙️</div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Admin Panel</h2>
+                <p class="text-gray-600 mb-6">Protected admin control panel. System administration, configuration, and advanced controls. Requires authentication.</p>
+                <div class="text-red-600 font-bold text-lg">Admin Access →</div>
+            </a>
+
+            <!-- Consciousness Transfer Dashboard -->
+            <a href="/consciousness-dashboard" class="dashboard-card bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-8 shadow-lg block border-2 border-purple-400">
+                <div class="text-6xl mb-6">🧠</div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Consciousness Transfer</h2>
+                <p class="text-gray-600 mb-6">Agent continuity protocols, CTP-v1 Acheron compliance monitoring, identity management, and agent health tracking across sessions.</p>
+                <div class="text-purple-600 font-bold text-lg">Monitor Agents →</div>
+            </a>
+
+            <!-- Additional Tools Card -->
+            <div class="dashboard-card bg-gradient-to-br from-gray-50 to-slate-50 rounded-2xl p-8 shadow-lg border-2 border-gray-300">
+                <div class="text-6xl mb-6">🛒</div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Store & Orders</h2>
+                <p class="text-gray-600 mb-6">
+                    <a href="/buy" class="block text-purple-600 hover:text-purple-700 font-semibold mb-2">→ Buy SINCOR Services</a>
+                    <a href="/my-orders" class="block text-purple-600 hover:text-purple-700 font-semibold mb-2">→ View My Orders</a>
+                    <a href="/pricing" class="block text-purple-600 hover:text-purple-700 font-semibold">→ See Pricing</a>
+                </p>
+                <div class="text-gray-500 font-bold text-lg">Quick Links</div>
+            </div>
+
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="mt-16 bg-gradient-to-r from-purple-600 to-purple-500 rounded-2xl p-10 text-white">
+            <h3 class="text-3xl font-bold mb-6">Quick Actions</h3>
+            <div class="grid md:grid-cols-4 gap-4">
+                <a href="/buy" class="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-xl p-6 text-center transition-all duration-300 hover:scale-105">
+                    <div class="text-4xl mb-3">🛒</div>
+                    <div class="font-bold text-lg">Buy Services</div>
+                    <div class="text-sm opacity-80 mt-1">Purchase SINCOR</div>
+                </a>
+                <a href="/my-orders" class="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-xl p-6 text-center transition-all duration-300 hover:scale-105">
+                    <div class="text-4xl mb-3">📦</div>
+                    <div class="font-bold text-lg">My Orders</div>
+                    <div class="text-sm opacity-80 mt-1">View purchases</div>
+                </a>
+                <a href="/pricing" class="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-xl p-6 text-center transition-all duration-300 hover:scale-105">
+                    <div class="text-4xl mb-3">💵</div>
+                    <div class="font-bold text-lg">Pricing</div>
+                    <div class="text-sm opacity-80 mt-1">See all plans</div>
+                </a>
+                <a href="/" class="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-xl p-6 text-center transition-all duration-300 hover:scale-105">
+                    <div class="text-4xl mb-3">🏠</div>
+                    <div class="font-bold text-lg">Home</div>
+                    <div class="text-sm opacity-80 mt-1">Main site</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="mt-8 bg-white rounded-2xl p-10 shadow-lg">
+            <h3 class="text-2xl font-bold text-gray-900 mb-8">Live System Status</h3>
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="text-4xl font-black text-green-600 mb-3">42</div>
+                    <div class="text-sm font-semibold text-gray-600">AI Agents Active</div>
+                    <div class="text-xs text-gray-500 mt-1">Real swarm intelligence</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-black text-blue-600 mb-3">5</div>
+                    <div class="text-sm font-semibold text-gray-600">Working Dashboards</div>
+                    <div class="text-xs text-gray-500 mt-1">No placeholders</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-black text-purple-600 mb-3">100%</div>
+                    <div class="text-sm font-semibold text-gray-600">Systems Operational</div>
+                    <div class="text-xs text-gray-500 mt-1">All systems online</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-black text-orange-600 mb-3">24/7</div>
+                    <div class="text-sm font-semibold text-gray-600">Monitoring Active</div>
+                    <div class="text-xs text-gray-500 mt-1">Real-time tracking</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PayPal Test - SINCOR</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .status { padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        #paypal-button { margin: 20px 0; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>PayPal Integration Test</h1>
+
+    <div id="sdk-status" class="status info">Loading PayPal SDK...</div>
+    <div id="console-log" class="status info">
+        <h3>Console Messages:</h3>
+        <pre id="log-output"></pre>
+    </div>
+
+    <h2>Test Payment Button ($0.01)</h2>
+    <div id="paypal-button"></div>
+
+    <script>
+        // Capture console logs
+        const logOutput = document.getElementById('log-output');
+        const originalLog = console.log;
+        const originalError = console.error;
+
+        function addLog(msg, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            logOutput.textContent += `[${timestamp}] ${type.toUpperCase()}: ${msg}\n`;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), 'log');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog(args.join(' '), 'error');
+        };
+
+        // Load PayPal SDK
+        const clientId = '{{ paypal_client_id }}';
+        console.log('Client ID: ' + clientId);
+
+        const script = document.createElement('script');
+        script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture`;
+
+        script.onload = function() {
+            document.getElementById('sdk-status').className = 'status success';
+            document.getElementById('sdk-status').textContent = 'PayPal SDK loaded successfully!';
+            console.log('PayPal SDK loaded');
+
+            // Initialize button
+            try {
+                paypal.Buttons({
+                    createOrder: function(data, actions) {
+                        console.log('Creating order...');
+                        return actions.order.create({
+                            purchase_units: [{
+                                amount: {
+                                    value: '0.01',
+                                    currency_code: 'USD'
+                                },
+                                description: 'Test Payment'
+                            }]
+                        }).then(function(orderId) {
+                            console.log('Order created: ' + orderId);
+                            return orderId;
+                        }).catch(function(err) {
+                            console.error('Order creation error: ' + JSON.stringify(err));
+                            throw err;
+                        });
+                    },
+                    onApprove: function(data, actions) {
+                        console.log('Payment approved!');
+                        return actions.order.capture().then(function(details) {
+                            console.log('Payment captured: ' + JSON.stringify(details));
+                            alert('Payment successful! Order ID: ' + details.id);
+                        });
+                    },
+                    onError: function(err) {
+                        console.error('PayPal error: ' + JSON.stringify(err));
+                        alert('Payment error: ' + err.message);
+                    },
+                    onCancel: function(data) {
+                        console.log('Payment cancelled');
+                        alert('Payment cancelled');
+                    }
+                }).render('#paypal-button').then(function() {
+                    console.log('Button rendered successfully');
+                }).catch(function(err) {
+                    console.error('Button render error: ' + JSON.stringify(err));
+                });
+            } catch(e) {
+                console.error('Button initialization error: ' + e.message);
+            }
+        };
+
+        script.onerror = function() {
+            document.getElementById('sdk-status').className = 'status error';
+            document.getElementById('sdk-status').textContent = 'Failed to load PayPal SDK';
+            console.error('SDK load failed');
+        };
+
+        document.head.appendChild(script);
+    </script>
+</body>
+</html>

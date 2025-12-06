@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders - SINCOR</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Header -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-gradient-to-r from-purple-600 to-purple-500 rounded-lg flex items-center justify-center mr-3">
+                        <span class="text-white font-bold text-lg">S</span>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900">SINCOR</span>
+                </div>
+                <div class="flex gap-4">
+                    <a href="/buy" class="text-purple-600 hover:text-purple-700 font-medium">Buy More</a>
+                    <a href="/dashboard" class="text-purple-600 hover:text-purple-700 font-medium">Dashboard</a>
+                    <a href="/" class="text-gray-600 hover:text-gray-700 font-medium">Home</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 py-12">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-black text-gray-900 mb-2">My Orders</h1>
+            <p class="text-xl text-gray-600">View and download your purchased products</p>
+        </div>
+
+        <!-- Email Input -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-8">
+            <label for="email" class="block text-lg font-bold text-gray-900 mb-3">Enter your email to view orders:</label>
+            <div class="flex gap-4">
+                <input
+                    type="email"
+                    id="email"
+                    placeholder="your@email.com"
+                    class="flex-1 px-6 py-4 border-2 border-gray-300 rounded-xl focus:border-purple-600 focus:outline-none text-lg"
+                />
+                <button
+                    onclick="loadOrders()"
+                    class="bg-gradient-to-r from-purple-600 to-purple-500 text-white px-10 py-4 rounded-xl font-bold text-lg hover:from-purple-700 hover:to-purple-600 transition shadow-lg"
+                >
+                    Load Orders
+                </button>
+            </div>
+        </div>
+
+        <!-- Orders Container -->
+        <div id="orders-container">
+            <!-- Orders will be loaded here -->
+            <div class="bg-white rounded-2xl shadow-lg p-12 text-center">
+                <div class="text-6xl mb-4">📦</div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Enter your email to view orders</h2>
+                <p class="text-gray-600">We'll show you all your SINCOR purchases and downloads</p>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div class="animate-spin w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p class="text-xl text-gray-600">Loading your orders...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden bg-white rounded-2xl shadow-lg p-12 text-center">
+            <div class="text-6xl mb-4">🛒</div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">No orders found</h2>
+            <p class="text-xl text-gray-600 mb-8">Looks like you haven't purchased anything yet</p>
+            <a href="/buy" class="inline-block bg-gradient-to-r from-purple-600 to-purple-500 text-white px-10 py-4 rounded-xl font-bold text-lg hover:from-purple-700 hover:to-purple-600 transition shadow-lg">
+                Shop Now
+            </a>
+        </div>
+
+        <!-- Orders List -->
+        <div id="orders-list" class="hidden space-y-6">
+            <!-- Orders will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <script>
+        async function loadOrders() {
+            const email = document.getElementById('email').value.trim();
+
+            if (!email) {
+                alert('Please enter your email address');
+                return;
+            }
+
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email address');
+                return;
+            }
+
+            // Show loading state
+            document.getElementById('orders-container').classList.add('hidden');
+            document.getElementById('empty-state').classList.add('hidden');
+            document.getElementById('orders-list').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+
+            try {
+                const response = await fetch(`/api/orders/${encodeURIComponent(email)}`);
+                const data = await response.json();
+
+                document.getElementById('loading').classList.add('hidden');
+
+                if (data.success && data.orders.length > 0) {
+                    displayOrders(data.orders);
+                } else {
+                    document.getElementById('empty-state').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('loading').classList.add('hidden');
+                alert('Error loading orders. Please try again.');
+            }
+        }
+
+        function displayOrders(orders) {
+            const ordersList = document.getElementById('orders-list');
+            ordersList.innerHTML = '';
+
+            orders.forEach(order => {
+                const orderCard = createOrderCard(order);
+                ordersList.appendChild(orderCard);
+            });
+
+            ordersList.classList.remove('hidden');
+        }
+
+        function createOrderCard(order) {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition';
+
+            const statusColors = {
+                'delivered': 'bg-green-100 text-green-800',
+                'processing': 'bg-yellow-100 text-yellow-800',
+                'pending': 'bg-blue-100 text-blue-800',
+                'failed': 'bg-red-100 text-red-800'
+            };
+
+            const statusColor = statusColors[order.delivery_status] || 'bg-gray-100 text-gray-800';
+
+            const date = new Date(order.created_at).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            card.innerHTML = `
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">${order.product_name}</h3>
+                        <p class="text-gray-600">Order ID: <span class="font-mono text-sm">${order.order_id}</span></p>
+                        <p class="text-gray-600">Purchased: ${date}</p>
+                    </div>
+                    <div class="mt-4 md:mt-0 text-right">
+                        <div class="text-3xl font-black text-purple-600 mb-2">$${order.amount.toFixed(2)}</div>
+                        <span class="inline-block px-4 py-2 rounded-full text-sm font-bold ${statusColor}">
+                            ${order.delivery_status.toUpperCase()}
+                        </span>
+                    </div>
+                </div>
+
+                ${order.delivery_status === 'delivered' && order.delivery_url ? `
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-4">
+                        <div class="flex items-center mb-3">
+                            <span class="text-2xl mr-3">✅</span>
+                            <h4 class="text-lg font-bold text-gray-900">Your product is ready!</h4>
+                        </div>
+                        <a href="${order.delivery_url}" target="_blank" class="inline-block bg-gradient-to-r from-green-600 to-green-500 text-white px-8 py-3 rounded-xl font-bold hover:from-green-700 hover:to-green-600 transition shadow-lg">
+                            Access Product →
+                        </a>
+                    </div>
+                ` : ''}
+
+                ${order.delivery_status === 'processing' ? `
+                    <div class="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-6">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">⏳</span>
+                            <div>
+                                <h4 class="text-lg font-bold text-gray-900 mb-1">Processing your order</h4>
+                                <p class="text-gray-600">You'll receive an email when it's ready (usually within 24 hours)</p>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${order.delivery_status === 'failed' ? `
+                    <div class="bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-6">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">❌</span>
+                            <div>
+                                <h4 class="text-lg font-bold text-gray-900 mb-1">Delivery failed</h4>
+                                <p class="text-gray-600 mb-3">Please contact support: support@getsincor.com</p>
+                                <a href="mailto:support@getsincor.com?subject=Order ${order.order_id} Issue" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-red-700 transition">
+                                    Contact Support
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+
+            return card;
+        }
+
+        // Check for email in URL or session
+        window.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const emailParam = urlParams.get('email');
+            const sessionEmail = sessionStorage.getItem('orderEmail');
+
+            if (emailParam) {
+                document.getElementById('email').value = emailParam;
+                loadOrders();
+            } else if (sessionEmail) {
+                document.getElementById('email').value = sessionEmail;
+            }
+        });
+
+        // Allow Enter key to submit
+        document.getElementById('email').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadOrders();
+            }
+        });
+    </script>
+</body>
+</html>

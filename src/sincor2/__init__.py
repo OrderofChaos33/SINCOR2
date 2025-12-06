@@ -15,10 +15,8 @@ __author__ = "OrderofChaos33"
 __description__ = "SINCOR Master Platform - Production Ready"
 
 # Public API exports (optional, for convenience imports)
-try:
-    from sincor2.app import create_app
-except ImportError:
-    pass  # app.py may not be importable at package level
+# Note: Avoid importing app.py at package level to prevent circular dependencies
+# Import create_app directly when needed: from sincor2.app import create_app
 
 __all__ = [
     "__version__",
