@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR2 MVP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .hero { display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .card { background: white; border-radius: 10px; padding: 2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="card max-w-lg text-center">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">SINCOR2 MVP</h1>
+            <p class="text-gray-600 text-lg mb-8">Minimal viable product with authentication, checkout, and payments</p>
+            
+            <div class="space-y-4">
+                <a href="/buy" class="block bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+                    Start Checkout
+                </a>
+                <a href="/health" class="block bg-gray-200 text-gray-900 px-8 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
+                    Health Status
+                </a>
+            </div>
+
+            <div class="mt-8 pt-8 border-t border-gray-300">
+                <h3 class="text-lg font-semibold mb-4 text-gray-900">Available Endpoints</h3>
+                <ul class="text-left text-sm text-gray-600 space-y-2">
+                    <li><code class="bg-gray-100 px-2 py-1 rounded">GET /health</code> - Service status</li>
+                    <li><code class="bg-gray-100 px-2 py-1 rounded">POST /api/auth/login</code> - Get JWT token</li>
+                    <li><code class="bg-gray-100 px-2 py-1 rounded">GET /api/protected</code> - Protected endpoint</li>
+                    <li><code class="bg-gray-100 px-2 py-1 rounded">GET /buy</code> - Checkout form</li>
+                    <li><code class="bg-gray-100 px-2 py-1 rounded">POST /api/checkout</code> - Create order</li>
+                    <li><code class="bg-gray-100 px-2 py-1 rounded">POST /api/process-payment</code> - Process payment</li>
+                </ul>
+            </div>
+
+            <div class="mt-8 pt-8 border-t border-gray-300 text-xs text-gray-500">
+                <p>Version 1.0.0 • Status: <span class="text-green-600 font-semibold">Operational</span></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

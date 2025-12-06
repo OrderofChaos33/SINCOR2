@@ -3,6 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - SINCOR2 MVP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 40px 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 40px; }
+        .header h1 { font-size: 2em; margin-bottom: 10px; }
+        .checkout-box { background: white; border-radius: 12px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .product-info { border-bottom: 2px solid #f0f0f0; padding-bottom: 30px; margin-bottom: 30px; }
+        .product-name { font-size: 1.5em; color: #333; margin-bottom: 10px; }
+        .product-price { font-size: 2.5em; color: #667eea; font-weight: bold; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; color: #333; font-weight: 600; margin-bottom: 8px; }
+        input, select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1em; }
+        input:focus, select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        .btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 1.1em; font-weight: 600; cursor: pointer; margin-top: 20px; transition: all 0.3s ease; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .message { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .success { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #4caf50; }
+        .error { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
+        .loading { text-align: center; color: #667eea; }
+        .order-id { font-weight: bold; color: #667eea; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛒 Checkout</h1>
+            <p>Complete your purchase securely</p>
+        </div>
+        
+        <div class="checkout-box">
+            <div class="product-info">
+                <div class="product-name">{{ product_name }}</div>
+                <div class="product-price">${{ product_price }}</div>
+            </div>
+            
+            <div id="message"></div>
+            
+            <form id="checkoutForm">
+                <div class="form-group">
+                    <label for="email">Email Address *</label>
+                    <input type="email" id="email" name="email" placeholder="user@example.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cardName">Card Name *</label>
+                    <input type="text" id="cardName" name="cardName" placeholder="John Doe" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cardNumber">Card Number (Demo: Any valid format) *</label>
+                    <input type="text" id="cardNumber" name="cardNumber" placeholder="4111 1111 1111 1111" required>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="expiry">Expiry *</label>
+                        <input type="text" id="expiry" name="expiry" placeholder="MM/YY" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="cvv">CVV *</label>
+                        <input type="text" id="cvv" name="cvv" placeholder="123" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn" id="submitBtn">Complete Payment (${{ product_price }})</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('checkoutForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const btn = document.getElementById('submitBtn');
+            const msgDiv = document.getElementById('message');
+            
+            // Show loading state
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            msgDiv.innerHTML = '<div class="message loading">Creating order...</div>';
+            
+            try {
+                // Step 1: Create order
+                const checkoutRes = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, amount: {{ product_price }} })
+                });
+                
+                if (!checkoutRes.ok) throw new Error('Failed to create order');
+                const order = await checkoutRes.json();
+                
+                // Step 2: Process payment
+                const paymentRes = await fetch('/api/process-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: order.order_id, payment_method: 'card' })
+                });
+                
+                const payment = await paymentRes.json();
+                
+                if (paymentRes.ok && payment.status === 'success') {
+                    msgDiv.innerHTML = `<div class="message success">
+                        ✓ Payment successful!<br>
+                        Order ID: <span class="order-id">${order.order_id}</span><br>
+                        Transaction: ${payment.transaction_id}
+                    </div>`;
+                    document.getElementById('checkoutForm').style.display = 'none';
+                } else {
+                    msgDiv.innerHTML = `<div class="message error">
+                        ✗ Payment failed: ${payment.error || 'Unknown error'}<br>
+                        Please try again.
+                    </div>`;
+                }
+            } catch (err) {
+                msgDiv.innerHTML = `<div class="message error">Error: ${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Complete Payment (${{ product_price }})';
+            }
+        });
+    </script>
+</body>
+</html>
     <title>Buy SINCOR - Start Making Money Today</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
