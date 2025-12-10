@@ -31,3 +31,4 @@ psutil>=5.9.0                 # System and process monitoring
 
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
+urllib3>=2.6.0 # not directly required, pinned by Snyk to avoid a vulnerability
