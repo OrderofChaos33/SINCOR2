@@ -3,7 +3,7 @@
 Flask>=3.0.0,<4.0.0
 
 # Essential dependencies
-requests>=2.31.0              # HTTP requests for API integrations
+requests>=2.32.2              # HTTP requests for API integrations
 PyJWT>=2.8.0                  # JWT authentication
 Jinja2>=3.1.0                 # Template engine
 PyYAML>=6.0                   # Configuration files
@@ -31,3 +31,6 @@ psutil>=5.9.0                 # System and process monitoring
 
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
+urllib3>=1.26.19 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
+dnspython>=2.6.1 # not directly required, pinned by Snyk to avoid a vulnerability
