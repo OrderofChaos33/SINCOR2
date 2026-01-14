@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade $SINC | SINCOR</title>
+    <meta name="description" content="Trade SINCOR ($SINC) on Base. Swap ETH for SINC using your favorite DEX.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 30% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 2rem;
+            background: rgba(7, 7, 20, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+        }
+
+        .logo-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+        }
+
+        .trade-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8rem 2rem 4rem;
+        }
+
+        .trade-content {
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .trade-info h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .trade-info h1 .gradient {
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .trade-info p {
+            color: var(--text-secondary);
+            font-size: 1.125rem;
+            margin-bottom: 2rem;
+        }
+
+        .price-display {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .price-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .price-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .price-change {
+            color: var(--success);
+        }
+
+        .price-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .price-stat {
+            text-align: center;
+        }
+
+        .price-stat .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .price-stat .value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+        }
+
+        .dex-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .dex-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .dex-btn:hover {
+            background: var(--card-hover);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        /* Swap Widget */
+        .swap-widget {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem;
+            backdrop-filter: blur(20px);
+        }
+
+        .swap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .swap-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .swap-settings {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .swap-settings:hover {
+            background: var(--card-hover);
+            color: var(--text);
+        }
+
+        .swap-input-group {
+            background: var(--darker);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .swap-input-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .swap-input-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .swap-balance {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .swap-balance span {
+            color: var(--primary);
+            cursor: pointer;
+        }
+
+        .swap-input-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .swap-input {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 600;
+            outline: none;
+            width: 100%;
+        }
+
+        .swap-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .token-select {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0.5rem 1rem 0.5rem 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .token-select:hover {
+            background: var(--card-hover);
+        }
+
+        .token-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .token-icon.eth {
+            background: linear-gradient(135deg, #627eea, #8a9cff);
+        }
+
+        .token-icon.sinc {
+            background: var(--gradient-1);
+        }
+
+        .token-symbol {
+            font-weight: 600;
+        }
+
+        .swap-arrow {
+            display: flex;
+            justify-content: center;
+            margin: -0.5rem 0;
+            position: relative;
+            z-index: 10;
+        }
+
+        .swap-arrow button {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border: 4px solid var(--darker);
+            border-radius: 12px;
+            color: white;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .swap-arrow button:hover {
+            transform: rotate(180deg);
+            background: var(--primary-dark);
+        }
+
+        .swap-details {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: var(--darker);
+            border-radius: 12px;
+        }
+
+        .swap-detail-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .swap-detail-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .swap-detail-row .label {
+            color: var(--text-muted);
+        }
+
+        .swap-btn {
+            width: 100%;
+            padding: 1rem;
+            background: var(--gradient-1);
+            border: none;
+            border-radius: 16px;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .swap-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.4);
+        }
+
+        .swap-btn:disabled {
+            background: var(--card);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .powered-by {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .powered-by a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        @media (max-width: 1024px) {
+            .trade-content {
+                grid-template-columns: 1fr;
+                gap: 3rem;
+            }
+
+            .trade-info {
+                text-align: center;
+            }
+
+            .dex-buttons {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .trade-info h1 {
+                font-size: 2rem;
+            }
+
+            .price-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .swap-widget {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+
+    <nav>
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">S</div>
+                <span class="logo-text">SINCOR</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#features">Features</a>
+                <a href="index.html#tokenomics">Tokenomics</a>
+                <a href="trade.html" class="active">Trade</a>
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank">Explorer</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="trade-container">
+        <div class="trade-content">
+            <div class="trade-info">
+                <h1>Trade <span class="gradient">$SINC</span></h1>
+                <p>Swap ETH for SINCOR instantly on your preferred decentralized exchange. Low fees, deep liquidity, no registration required.</p>
+
+                <div class="price-display">
+                    <div class="price-row">
+                        <span class="price-label">SINC Price</span>
+                        <span class="price-value">$1.05</span>
+                    </div>
+                    <div class="price-stats">
+                        <div class="price-stat">
+                            <div class="label">24h Volume</div>
+                            <div class="value">$--</div>
+                        </div>
+                        <div class="price-stat">
+                            <div class="label">Liquidity</div>
+                            <div class="value">$--</div>
+                        </div>
+                        <div class="price-stat">
+                            <div class="label">Market Cap</div>
+                            <div class="value">$105M</div>
+                        </div>
+                    </div>
+                </div>
+
+                <p style="font-size: 0.95rem; margin-bottom: 1rem;">Trade on your preferred DEX:</p>
+                <div class="dex-buttons">
+                    <a href="https://aerodrome.finance/swap?from=eth&to=0xd10D86D09ee4316CdD3585fd6486537b7119A073" class="dex-btn" target="_blank">
+                        🔵 Aerodrome
+                    </a>
+                    <a href="https://baseswap.fi/swap?outputCurrency=0xd10D86D09ee4316CdD3585fd6486537b7119A073" class="dex-btn" target="_blank">
+                        🟢 BaseSwap
+                    </a>
+                    <a href="https://app.1inch.io/#/8453/simple/swap/ETH/0xd10D86D09ee4316CdD3585fd6486537b7119A073" class="dex-btn" target="_blank">
+                        🔴 1inch
+                    </a>
+                    <a href="https://kyberswap.com/swap/base/eth-to-0xd10D86D09ee4316CdD3585fd6486537b7119A073" class="dex-btn" target="_blank">
+                        🟣 KyberSwap
+                    </a>
+                </div>
+            </div>
+
+            <div class="swap-widget">
+                <div class="swap-header">
+                    <h2>Swap</h2>
+                    <button class="swap-settings">⚙️</button>
+                </div>
+
+                <div class="swap-input-group">
+                    <div class="swap-input-header">
+                        <span class="swap-input-label">You pay</span>
+                        <span class="swap-balance">Balance: <span id="ethBalance">0.00</span></span>
+                    </div>
+                    <div class="swap-input-row">
+                        <input type="number" class="swap-input" placeholder="0.0" id="inputAmount">
+                        <div class="token-select">
+                            <div class="token-icon eth">Ξ</div>
+                            <span class="token-symbol">ETH</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="swap-arrow">
+                    <button id="swapDirection">↓</button>
+                </div>
+
+                <div class="swap-input-group">
+                    <div class="swap-input-header">
+                        <span class="swap-input-label">You receive</span>
+                        <span class="swap-balance">Balance: <span id="sincBalance">0.00</span></span>
+                    </div>
+                    <div class="swap-input-row">
+                        <input type="number" class="swap-input" placeholder="0.0" id="outputAmount" readonly>
+                        <div class="token-select">
+                            <div class="token-icon sinc">S</div>
+                            <span class="token-symbol">SINC</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="swap-details">
+                    <div class="swap-detail-row">
+                        <span class="label">Rate</span>
+                        <span>1 ETH = ~2,380 SINC</span>
+                    </div>
+                    <div class="swap-detail-row">
+                        <span class="label">Network</span>
+                        <span>Base</span>
+                    </div>
+                    <div class="swap-detail-row">
+                        <span class="label">Estimated Gas</span>
+                        <span>~$0.01</span>
+                    </div>
+                </div>
+
+                <button class="swap-btn" id="swapBtn" onclick="redirectToSwap()">
+                    Swap on Aerodrome
+                </button>
+
+                <div class="powered-by">
+                    Powered by <a href="https://aerodrome.finance" target="_blank">Aerodrome Finance</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SINC_CONTRACT = '0xd10D86D09ee4316CdD3585fd6486537b7119A073';
+        const WETH_CONTRACT = '0x4200000000000000000000000000000000000006';
+
+        // Calculate output amount based on input
+        document.getElementById('inputAmount').addEventListener('input', function(e) {
+            const ethAmount = parseFloat(e.target.value) || 0;
+            // Approximate rate: 1 ETH = 2380 SINC (based on $2500 ETH / $1.05 SINC)
+            const sincAmount = ethAmount * 2380.95;
+            document.getElementById('outputAmount').value = sincAmount.toFixed(2);
+        });
+
+        // Swap direction toggle
+        let isBuying = true;
+        document.getElementById('swapDirection').addEventListener('click', function() {
+            isBuying = !isBuying;
+            const btn = document.getElementById('swapBtn');
+            if (isBuying) {
+                btn.textContent = 'Swap on Aerodrome';
+            } else {
+                btn.textContent = 'Sell SINC on Aerodrome';
+            }
+        });
+
+        // Redirect to Aerodrome with prefilled amounts
+        function redirectToSwap() {
+            const amount = document.getElementById('inputAmount').value;
+            let url;
+            if (isBuying) {
+                url = `https://aerodrome.finance/swap?from=eth&to=${SINC_CONTRACT}`;
+            } else {
+                url = `https://aerodrome.finance/swap?from=${SINC_CONTRACT}&to=eth`;
+            }
+            window.open(url, '_blank');
+        }
+
+        // Check if Web3 is available
+        if (typeof window.ethereum !== 'undefined') {
+            // Could implement wallet connection here
+            console.log('Web3 detected');
+        }
+    </script>
+</body>
+</html>

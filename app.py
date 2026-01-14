@@ -61,8 +61,18 @@ app.template_folder = 'templates'
 
 @app.route('/')
 def index():
-    """Main landing page with product showcase"""
+    """Main landing page - SINC Token"""
     return render_template('index.html')
+
+@app.route('/trade')
+def trade():
+    """Trade SINC token page"""
+    return render_template('trade.html')
+
+@app.route('/dashboard')
+def dashboard():
+    """Token analytics dashboard"""
+    return render_template('dashboard.html')
 
 # Legal compliance routes
 @app.route('/privacy')

@@ -1,257 +1,718 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | SINCOR</title>
+    <meta name="description" content="SINCOR token analytics dashboard. Track price, volume, holders, and more.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+        }
 
-{% block title %}Dashboard - SINCOR Analytics{% endblock %}
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+        }
 
-{% block content %}
-<!-- Dashboard Navigation -->
-<nav class="bg-gray-800 text-white py-4 shadow-lg">
-    <div class="container mx-auto px-6">
-        <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold">SINCOR Dashboard</h1>
-            <div class="flex items-center space-x-4">
-                <span class="text-gray-300">Welcome back, Admin</span>
-                <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 2rem;
+            background: rgba(7, 7, 20, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+        }
+
+        .logo-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text);
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 6rem 2rem 2rem;
+        }
+
+        .dashboard-header {
+            margin-bottom: 2rem;
+        }
+
+        .dashboard-header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .dashboard-header p {
+            color: var(--text-muted);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            background: var(--card-hover);
+            transform: translateY(-2px);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-change {
+            padding: 0.25rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .stat-change.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-change.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .chart-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chart-tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .chart-tab:hover, .chart-tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .chart-area {
+            height: 300px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 4px;
+            padding: 1rem 0;
+        }
+
+        .chart-bar {
+            flex: 1;
+            background: var(--gradient-1);
+            border-radius: 4px 4px 0 0;
+            min-height: 10px;
+            transition: all 0.3s ease;
+            opacity: 0.7;
+        }
+
+        .chart-bar:hover {
+            opacity: 1;
+        }
+
+        /* Token Distribution */
+        .distribution-list {
+            list-style: none;
+        }
+
+        .distribution-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .distribution-item:last-child {
+            border-bottom: none;
+        }
+
+        .distribution-rank {
+            width: 32px;
+            height: 32px;
+            background: var(--card-hover);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .distribution-info {
+            flex: 1;
+        }
+
+        .distribution-address {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.875rem;
+            color: var(--primary);
+        }
+
+        .distribution-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .distribution-amount {
+            text-align: right;
+        }
+
+        .distribution-tokens {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+        }
+
+        .distribution-percent {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Transactions Table */
+        .transactions-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .transactions-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .transactions-table th {
+            text-align: left;
+            padding: 1rem;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .transactions-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .transactions-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .tx-type {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tx-type.buy {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .tx-type.sell {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .tx-address {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.875rem;
+            color: var(--primary);
+        }
+
+        .tx-amount {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+        }
+
+        .tx-time {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Contract Info */
+        .contract-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .contract-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .contract-card h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .contract-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .contract-row:last-child {
+            border-bottom: none;
+        }
+
+        .contract-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .contract-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+        }
+
+        .contract-value.mono {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.8rem;
+            color: var(--primary);
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .transactions-table {
+                font-size: 0.875rem;
+            }
+
+            .transactions-table th,
+            .transactions-table td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+
+    <nav>
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">S</div>
+                <span class="logo-text">SINCOR</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="trade.html">Trade</a>
+                <a href="dashboard.html" class="active">Dashboard</a>
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank">Explorer</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1>📊 SINC Analytics Dashboard</h1>
+            <p>Real-time token metrics and analytics</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">💰</div>
+                    <span class="stat-change positive">+0.00%</span>
+                </div>
+                <div class="stat-value" id="price">$1.05</div>
+                <div class="stat-label">Current Price</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">📈</div>
+                </div>
+                <div class="stat-value" id="marketCap">$105M</div>
+                <div class="stat-label">Market Cap</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">💎</div>
+                </div>
+                <div class="stat-value" id="totalSupply">100M</div>
+                <div class="stat-label">Total Supply</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">👥</div>
+                </div>
+                <div class="stat-value" id="holders">--</div>
+                <div class="stat-label">Token Holders</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">🔄</div>
+                </div>
+                <div class="stat-value" id="volume">$--</div>
+                <div class="stat-label">24h Volume</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">💧</div>
+                </div>
+                <div class="stat-value" id="liquidity">$--</div>
+                <div class="stat-label">Total Liquidity</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Price History</h3>
+                    <div class="chart-tabs">
+                        <button class="chart-tab">24H</button>
+                        <button class="chart-tab active">7D</button>
+                        <button class="chart-tab">30D</button>
+                        <button class="chart-tab">ALL</button>
+                    </div>
+                </div>
+                <div class="chart-area" id="priceChart">
+                    <!-- Bars will be generated by JS -->
                 </div>
             </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Top Holders</h3>
+                </div>
+                <ul class="distribution-list">
+                    <li class="distribution-item">
+                        <div class="distribution-rank">1</div>
+                        <div class="distribution-info">
+                            <div class="distribution-address">0x25cA...90aa</div>
+                            <div class="distribution-label">Bonding Curve</div>
+                        </div>
+                        <div class="distribution-amount">
+                            <div class="distribution-tokens">50M SINC</div>
+                            <div class="distribution-percent">50%</div>
+                        </div>
+                    </li>
+                    <li class="distribution-item">
+                        <div class="distribution-rank">2</div>
+                        <div class="distribution-info">
+                            <div class="distribution-address">0xF915...09f1</div>
+                            <div class="distribution-label">Treasury</div>
+                        </div>
+                        <div class="distribution-amount">
+                            <div class="distribution-tokens">50M SINC</div>
+                            <div class="distribution-percent">50%</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Contract Info -->
+        <div class="contract-info">
+            <div class="contract-card">
+                <h3>Token Information</h3>
+                <div class="contract-row">
+                    <span class="contract-label">Name</span>
+                    <span class="contract-value">SINCOR</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Symbol</span>
+                    <span class="contract-value">SINC</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Decimals</span>
+                    <span class="contract-value">18</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Network</span>
+                    <span class="contract-value">Base Mainnet</span>
+                </div>
+            </div>
+            <div class="contract-card">
+                <h3>Smart Contracts</h3>
+                <div class="contract-row">
+                    <span class="contract-label">SINC Token</span>
+                    <span class="contract-value mono">0xd10D...A073</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Bonding Curve</span>
+                    <span class="contract-value mono">0x25cA...90aa</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">AMM Router</span>
+                    <span class="contract-value mono">0x7949...DaB7</span>
+                </div>
+            </div>
+            <div class="contract-card">
+                <h3>Quick Links</h3>
+                <div class="contract-row">
+                    <span class="contract-label">Block Explorer</span>
+                    <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" class="contract-value" style="color: var(--primary); text-decoration: none;">Basescan ↗</a>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">DEX Screener</span>
+                    <a href="https://dexscreener.com/base/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" class="contract-value" style="color: var(--primary); text-decoration: none;">DEXScreener ↗</a>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Trade</span>
+                    <a href="https://aerodrome.finance" target="_blank" class="contract-value" style="color: var(--primary); text-decoration: none;">Aerodrome ↗</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="transactions-card">
+            <div class="chart-header">
+                <h3 class="chart-title">Recent Transactions</h3>
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" style="color: var(--primary); text-decoration: none; font-size: 0.875rem;">View All →</a>
+            </div>
+            <table class="transactions-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Address</th>
+                        <th>Amount</th>
+                        <th>Value</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsBody">
+                    <tr>
+                        <td><span class="tx-type buy">↑ Buy</span></td>
+                        <td class="tx-address">0xF915...09f1</td>
+                        <td class="tx-amount">100,000,000 SINC</td>
+                        <td>$105M</td>
+                        <td class="tx-time">Just now</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
-</nav>
 
-<!-- Dashboard Sidebar -->
-<div class="flex min-h-screen bg-gray-100">
-    <aside class="w-64 bg-gray-800 text-white">
-        <div class="p-6">
-            <nav class="space-y-2">
-                <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 p-3 bg-blue-600 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0"></path>
-                    </svg>
-                    <span>Overview</span>
-                </a>
+    <script>
+        // Generate mock price chart bars
+        function generateChart() {
+            const chart = document.getElementById('priceChart');
+            chart.innerHTML = '';
+            
+            for (let i = 0; i < 30; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                // Generate varied heights for visual interest
+                const height = 30 + Math.random() * 70;
+                bar.style.height = height + '%';
+                chart.appendChild(bar);
+            }
+        }
+        generateChart();
+
+        // Fetch real data from APIs (placeholder)
+        async function fetchTokenData() {
+            try {
+                // Could integrate with:
+                // - DEXScreener API
+                // - CoinGecko API
+                // - The Graph
+                // - Direct RPC calls
                 
-                <a href="{{ url_for('agent_constellation') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                    </svg>
-                    <span>Agent Constellation</span>
-                </a>
-                
-                <a href="{{ url_for('bi_reporting') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    <span>BI Reporting</span>
-                </a>
-                
-                <a href="{{ url_for('system_health') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span>System Health</span>
-                </a>
-                
-                <a href="{{ url_for('revenue_metrics') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                    </svg>
-                    <span>Revenue Metrics</span>
-                </a>
-                
-                <hr class="my-4 border-gray-700">
-                
-                <a href="{{ url_for('home') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m0 0h6m0 0h3a1 1 0 001-1V10M9 21h6"></path>
-                    </svg>
-                    <span>Back to Website</span>
-                </a>
-            </nav>
-        </div>
-    </aside>
-
-    <!-- Main Dashboard Content -->
-    <main class="flex-1 p-8">
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h2>
-            <p class="text-gray-600">Welcome to your SINCOR analytics dashboard</p>
-        </div>
-
-        <!-- Key Metrics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="dashboard-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-400 text-sm">Active Agents</p>
-                        <p class="dashboard-metric">24</p>
-                    </div>
-                    <div class="w-12 h-12 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center">
-                    <span class="text-green-400 text-sm">+12% this week</span>
-                </div>
-            </div>
-
-            <div class="dashboard-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-400 text-sm">System Uptime</p>
-                        <p class="dashboard-metric">99.97%</p>
-                    </div>
-                    <div class="w-12 h-12 bg-green-500 bg-opacity-20 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center">
-                    <span class="text-green-400 text-sm">Above SLA target</span>
-                </div>
-            </div>
-
-            <div class="dashboard-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-400 text-sm">Monthly Revenue</p>
-                        <p class="dashboard-metric">$2.4M</p>
-                    </div>
-                    <div class="w-12 h-12 bg-yellow-500 bg-opacity-20 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center">
-                    <span class="text-green-400 text-sm">+8.2% vs last month</span>
-                </div>
-            </div>
-
-            <div class="dashboard-card">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-400 text-sm">Data Processed</p>
-                        <p class="dashboard-metric">847GB</p>
-                    </div>
-                    <div class="w-12 h-12 bg-purple-500 bg-opacity-20 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center">
-                    <span class="text-blue-400 text-sm">Today's volume</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Revenue Trend Chart -->
-            <div class="dashboard-card">
-                <h3 class="text-xl font-bold mb-4">Revenue Trend</h3>
-                <div class="chart-container">
-                    <div class="flex items-center justify-center h-full">
-                        <div class="text-center">
-                            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                            </svg>
-                            <p class="text-gray-400">Revenue trend chart would display here</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- System Performance Chart -->
-            <div class="dashboard-card">
-                <h3 class="text-xl font-bold mb-4">System Performance</h3>
-                <div class="chart-container">
-                    <div class="flex items-center justify-center h-full">
-                        <div class="text-center">
-                            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
-                            <p class="text-gray-400">Performance metrics chart would display here</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Activity -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Recent Alerts -->
-            <div class="dashboard-card">
-                <h3 class="text-xl font-bold mb-4">Recent Alerts</h3>
-                <div class="space-y-4">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-3 h-3 bg-green-400 rounded-full"></div>
-                        <div>
-                            <p class="text-white text-sm">System health check passed</p>
-                            <p class="text-gray-400 text-xs">2 minutes ago</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                        <div>
-                            <p class="text-white text-sm">High memory usage detected</p>
-                            <p class="text-gray-400 text-xs">15 minutes ago</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <div class="w-3 h-3 bg-green-400 rounded-full"></div>
-                        <div>
-                            <p class="text-white text-sm">Agent deployment completed</p>
-                            <p class="text-gray-400 text-xs">1 hour ago</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Active Agents Summary -->
-            <div class="dashboard-card">
-                <h3 class="text-xl font-bold mb-4">Active Agents</h3>
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <span class="text-gray-300">Performance Monitors</span>
-                        <span class="text-green-400 font-semibold">8 active</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-gray-300">Security Agents</span>
-                        <span class="text-green-400 font-semibold">6 active</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-gray-300">BI Processors</span>
-                        <span class="text-green-400 font-semibold">5 active</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-gray-300">Data Collectors</span>
-                        <span class="text-green-400 font-semibold">5 active</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="dashboard-card">
-                <h3 class="text-xl font-bold mb-4">Quick Actions</h3>
-                <div class="space-y-3">
-                    <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition duration-200">
-                        Deploy New Agent
-                    </button>
-                    <button class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition duration-200">
-                        Generate Report
-                    </button>
-                    <button class="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition duration-200">
-                        System Settings
-                    </button>
-                </div>
-            </div>
-        </div>
-    </main>
-</div>
-{% endblock %}
+                console.log('Fetching token data...');
+            } catch (e) {
+                console.log('Could not fetch data:', e);
+            }
+        }
+        
+        fetchTokenData();
+        setInterval(fetchTokenData, 30000);
+    </script>
+</body>
+</html>
