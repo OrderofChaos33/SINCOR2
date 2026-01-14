@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Demo Dashboard - SINCOR Live Preview{% endblock %}
+
+{% block content %}
+<!-- Public Dashboard Header -->
+<section class="bg-gradient-to-br from-blue-600 to-purple-700 text-white py-8">
+    <div class="container mx-auto px-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">SINCOR Demo Dashboard</h1>
+                <p class="text-blue-100">Experience the power of intelligent business analytics</p>
+            </div>
+            <div class="text-center">
+                <a href="{{ url_for('signup') }}" class="bg-yellow-500 text-black px-6 py-3 rounded-lg font-semibold hover:bg-yellow-400 transition duration-200 transform hover:scale-105">
+                    Get Started
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Demo Dashboard Content -->
+<div class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-6 py-8">
+        
+        <!-- Demo Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Monthly Revenue</p>
+                        <p class="text-3xl font-bold text-blue-600">$847K</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-500 text-sm font-semibold">↗ +12.5%</span>
+                    <span class="text-gray-500 text-sm ml-2">vs last month</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Active Users</p>
+                        <p class="text-3xl font-bold text-green-600">24,892</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-500 text-sm font-semibold">↗ +8.2%</span>
+                    <span class="text-gray-500 text-sm ml-2">this week</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Conversion Rate</p>
+                        <p class="text-3xl font-bold text-purple-600">3.24%</p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-500 text-sm font-semibold">↗ +0.4%</span>
+                    <span class="text-gray-500 text-sm ml-2">improvement</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg relative">
+                <div class="absolute inset-0 bg-gray-200 bg-opacity-50 rounded-lg flex items-center justify-center">
+                    <div class="text-center">
+                        <svg class="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                        <p class="text-gray-600 text-xs font-semibold">PREMIUM</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Customer LTV</p>
+                        <p class="text-3xl font-bold text-yellow-600">$4,250</p>
+                    </div>
+                    <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-500 text-sm font-semibold">↗ +15.3%</span>
+                    <span class="text-gray-500 text-sm ml-2">predicted</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Revenue Chart -->
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-900">Revenue Trends</h3>
+                    <span class="text-sm text-gray-500">Last 6 months</span>
+                </div>
+                <div class="h-64 flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 text-blue-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        <p class="text-blue-600 font-semibold">Interactive Revenue Chart</p>
+                        <p class="text-blue-500 text-sm">Upgrade to access real-time data</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Growth -->
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-900">User Growth</h3>
+                    <span class="text-sm text-gray-500">This month</span>
+                </div>
+                <div class="h-64 flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
+                    <div class="text-center">
+                        <svg class="w-16 h-16 text-green-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <p class="text-green-600 font-semibold">User Growth Analytics</p>
+                        <p class="text-green-500 text-sm">See detailed breakdowns with premium</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Features Showcase -->
+        <div class="bg-white p-8 rounded-lg shadow-lg mb-8">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">Experience SINCOR's Full Power</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center p-6 bg-gray-50 rounded-lg">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">AI-Powered Insights</h4>
+                    <p class="text-gray-600">Get intelligent recommendations and predictions based on your data patterns.</p>
+                </div>
+                
+                <div class="text-center p-6 bg-gray-50 rounded-lg">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">Real-Time Analytics</h4>
+                    <p class="text-gray-600">Monitor your business metrics as they happen with live data updates.</p>
+                </div>
+                
+                <div class="text-center p-6 bg-gray-50 rounded-lg">
+                    <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                        </svg>
+                    </div>
+                    <h4 class="font-bold text-lg mb-2">Custom Dashboards</h4>
+                    <p class="text-gray-600">Build personalized dashboards tailored to your specific business needs.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upgrade CTA -->
+        <div class="bg-gradient-to-br from-blue-600 to-purple-700 text-white p-8 rounded-lg shadow-lg text-center">
+            <h3 class="text-3xl font-bold mb-4">Ready for the Full Experience?</h3>
+            <p class="text-xl mb-6 text-blue-100">This is just a preview. Unlock advanced analytics, custom reports, and AI-powered insights.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div class="bg-white bg-opacity-10 p-4 rounded-lg">
+                    <h4 class="font-bold mb-2">✓ Advanced Analytics</h4>
+                    <p class="text-blue-100 text-sm">Deep insights and predictive models</p>
+                </div>
+                <div class="bg-white bg-opacity-10 p-4 rounded-lg">
+                    <h4 class="font-bold mb-2">✓ Real-Time Data</h4>
+                    <p class="text-blue-100 text-sm">Live updates and monitoring</p>
+                </div>
+                <div class="bg-white bg-opacity-10 p-4 rounded-lg">
+                    <h4 class="font-bold mb-2">✓ Custom Reports</h4>
+                    <p class="text-blue-100 text-sm">Tailored to your business needs</p>
+                </div>
+            </div>
+            
+            <div class="space-y-4 md:space-y-0 md:space-x-4 md:flex md:justify-center">
+                <a href="{{ url_for('signup') }}" class="inline-block bg-yellow-500 text-black px-8 py-4 rounded-lg text-lg font-semibold hover:bg-yellow-400 transition duration-200 transform hover:scale-105">
+                    Get Started Today
+                </a>
+                <a href="{{ url_for('demo') }}" class="inline-block border-2 border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-blue-600 transition duration-200">
+                    Schedule Demo
+                </a>
+            </div>
+            <p class="text-blue-200 mt-4">Professional plans starting at $49/month</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORTEX - Choose Your Plan</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+        }
+        .neon-text {
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        .neon-border {
+            border: 1px solid #00ff41;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <!-- Header -->
+    <header class="bg-black bg-opacity-50 backdrop-blur-sm border-b border-green-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center">
+                    <img src="/static/SINCOR_logo_transparent.png" alt="CORTEX" class="h-12 w-auto mr-3">
+                    <div>
+                        <h1 class="text-2xl font-bold neon-text">CORTEX</h1>
+                        <span class="text-xs text-green-300">42-Agent Business Orchestrator</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div class="text-center mb-16">
+            <h1 class="text-5xl font-bold neon-text mb-6">Choose Your CORTEX Plan</h1>
+            <p class="text-xl text-green-300 max-w-3xl mx-auto">
+                Get Fortune 500-level AI automation with 42 specialized agents working together for your business.
+            </p>
+        </div>
+
+        <!-- Pricing Plans -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <!-- Starter Plan -->
+            <div class="bg-black bg-opacity-30 rounded-lg neon-border p-8 text-center">
+                <div class="text-2xl font-bold neon-text mb-4">Starter</div>
+                <div class="text-4xl font-bold text-white mb-2">$297</div>
+                <div class="text-green-300 mb-8">per month</div>
+                
+                <ul class="text-left space-y-3 mb-8 text-green-300">
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Up to 500 businesses discovered/month
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Personalized email campaigns
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        3-step follow-up sequences
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Basic agent coordination
+                    </li>
+                </ul>
+                
+                <button onclick="selectPlan('starter')" class="w-full bg-gradient-to-r from-green-600 to-green-500 text-black py-3 rounded-lg hover:from-green-500 hover:to-green-400 font-semibold">
+                    Start with CORTEX
+                </button>
+            </div>
+
+            <!-- Professional Plan -->
+            <div class="bg-green-900 bg-opacity-20 border-2 border-green-400 rounded-lg p-8 text-center relative">
+                <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                    <span class="bg-green-400 text-black px-4 py-1 rounded-full text-sm font-bold">MOST POPULAR</span>
+                </div>
+                
+                <div class="text-2xl font-bold neon-text mb-4">Professional</div>
+                <div class="text-4xl font-bold text-white mb-2">$597</div>
+                <div class="text-green-300 mb-8">per month</div>
+                
+                <ul class="text-left space-y-3 mb-8 text-green-300">
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Up to 1,500 businesses/month
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Multi-industry campaigns
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        5-step follow-up sequences
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Full 42-agent coordination
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Priority support + phone
+                    </li>
+                </ul>
+                
+                <button onclick="selectPlan('professional')" class="w-full bg-gradient-to-r from-green-400 to-green-300 text-black py-3 rounded-lg hover:from-green-300 hover:to-green-200 font-semibold">
+                    Upgrade to Pro
+                </button>
+            </div>
+
+            <!-- Enterprise Plan -->
+            <div class="bg-black bg-opacity-30 rounded-lg neon-border p-8 text-center">
+                <div class="text-2xl font-bold neon-text mb-4">Enterprise</div>
+                <div class="text-4xl font-bold text-white mb-2">$1,497</div>
+                <div class="text-green-300 mb-8">per month</div>
+                
+                <ul class="text-left space-y-3 mb-8 text-green-300">
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Up to 5,000 businesses/month
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Unlimited industries
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        10-step sequences
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Custom agent development
+                    </li>
+                    <li class="flex items-center">
+                        <span class="text-green-400 mr-3">✓</span>
+                        Dedicated success manager
+                    </li>
+                </ul>
+                
+                <button onclick="selectPlan('enterprise')" class="w-full bg-gradient-to-r from-green-600 to-green-500 text-black py-3 rounded-lg hover:from-green-500 hover:to-green-400 font-semibold">
+                    Go Enterprise
+                </button>
+            </div>
+        </div>
+
+        <!-- Demo Notice -->
+        <div class="mt-16 bg-green-900 bg-opacity-20 border border-green-500 rounded-lg p-8 text-center">
+            <h3 class="text-2xl font-bold neon-text mb-4">🚀 Live Demo Available</h3>
+            <p class="text-green-300 mb-6">
+                Want to see CORTEX in action first? Try our interactive demo and watch 42 AI agents coordinate your business tasks in real-time.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="startDemo()" class="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-8 py-4 rounded-lg font-semibold hover:from-blue-500 hover:to-blue-400">
+                    🧠 Try CORTEX Demo
+                </button>
+                <button onclick="talkToSales()" class="bg-gradient-to-r from-purple-600 to-purple-500 text-white px-8 py-4 rounded-lg font-semibold hover:from-purple-500 hover:to-purple-400">
+                    💬 Talk to Sales
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- No chat widget on checkout pages -->
+    
+    <script>
+        function selectPlan(planType) {
+            // Show plan selection
+            alert(`🚀 CORTEX ${planType.toUpperCase()} PLAN SELECTED!
+
+This is currently a demo. In production, this would:
+• Process payment via Stripe
+• Activate your 42-agent system  
+• Provide instant access to CORTEX
+• Begin business automation immediately
+
+Contact sales to activate your CORTEX system:
+📧 sales@cortex.ai (demo email)
+📞 555-CORTEX (demo number)
+
+Try the CORTEX chat widget (brain icon) to experience the 42-agent system!`);
+        }
+        
+        function startDemo() {
+            // Show demo info
+            alert(`🧠 CORTEX LIVE DEMO
+
+The chat widget in the bottom-right corner IS your live demo!
+
+Try these commands:
+• "Get me 100 leads for my business"
+• "How's my business performing?"
+• "Launch a marketing campaign"
+• "Help me optimize operations"
+
+Watch as 42 AI agents coordinate to fulfill your requests!`);
+            
+            // Auto-open chat widget if available
+            if (window.cortexWidget) {
+                window.cortexWidget.showNotification();
+            }
+        }
+        
+        function talkToSales() {
+            // In production, this would open a sales chat or form
+            alert(`💬 TALK TO SALES
+
+Use the CORTEX chat widget to speak with our sales team!
+
+Just type: "I want to talk to sales about CORTEX"
+
+Our AI will connect you with a human sales representative who can:
+• Customize a plan for your business
+• Provide pricing for your specific needs
+• Schedule a personal demo
+• Answer technical questions`);
+            
+            // Auto-open chat widget
+            if (window.cortexWidget) {
+                window.cortexWidget.toggleChat();
+            }
+        }
+    </script>
+</body>
+</html>

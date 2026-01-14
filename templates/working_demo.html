@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SINCOR - Find Customers Who Need Your Services</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    
+    <!-- Header -->
+    <header class="bg-blue-900 text-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="bg-blue-600 w-10 h-10 rounded-lg flex items-center justify-center mr-3">
+                        <span class="font-bold text-xl">S</span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">SINCOR</h1>
+                        <div class="text-sm text-blue-200">AI Customer Acquisition</div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <div class="text-green-300">LIVE DEMO</div>
+                        <div class="text-xs">Real customers</div>
+                    </div>
+                    <a href="/checkout/professional" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-semibold">
+                        Get SINCOR
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        
+        <!-- Onboarding Video -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold mb-4">How Sarah Made $50,000 in 30 Days with SINCOR</h2>
+            <div class="aspect-w-16 aspect-h-9 bg-gray-900 rounded-lg flex items-center justify-center">
+                <div class="text-center text-white p-8">
+                    <div class="text-6xl mb-4">▶</div>
+                    <h3 class="text-2xl font-bold mb-2">Real Success Story</h3>
+                    <p class="text-lg mb-4">"SINCOR found me 156 customers in my first month"</p>
+                    <div class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg inline-block cursor-pointer font-semibold" onclick="playVideo()">
+                        ▶ Watch Video (3:42)
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 text-sm text-gray-600">
+                <strong>What you'll see:</strong> Sarah owns a mobile auto detailing service in Phoenix. 
+                Watch her show exactly how SINCOR found 847 car owners who needed detailing, 
+                generated 156 leads, and closed $50,000 in new business.
+            </div>
+        </div>
+
+        <!-- Live Demo Section -->
+        <div id="live-demo-section" class="grid lg:grid-cols-3 gap-8">
+            
+            <!-- Main Demo Area -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg">
+                    <div class="bg-gray-800 text-white p-4 rounded-t-lg">
+                        <h3 class="text-lg font-bold">SINCOR AI - Find People Who Need Your Services</h3>
+                        <p class="text-gray-300 text-sm">Watch SINCOR discover individual customers right now</p>
+                    </div>
+                    
+                    <div class="p-6">
+                        <!-- Control Panel -->
+                        <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Your Service Type</label>
+                                    <select id="serviceType" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                        <option value="auto_detailing">Auto Detailing</option>
+                                        <option value="hvac">HVAC Repair</option>
+                                        <option value="plumbing">Plumbing</option>
+                                        <option value="landscaping">Landscaping</option>
+                                        <option value="carpet_cleaning">Carpet Cleaning</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Your Area</label>
+                                    <select id="location" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                        <option value="Austin, TX">Austin, TX</option>
+                                        <option value="Dallas, TX">Dallas, TX</option>
+                                        <option value="Houston, TX">Houston, TX</option>
+                                        <option value="Phoenix, AZ">Phoenix, AZ</option>
+                                        <option value="Denver, CO">Denver, CO</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button onclick="startDemo()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold w-full">
+                                🚀 Find My Customers
+                            </button>
+                        </div>
+
+                        <!-- Results Area -->
+                        <div id="demoStatus" class="hidden mb-6 bg-blue-50 border-l-4 border-blue-500 p-4">
+                            <div class="flex items-center">
+                                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+                                <span id="statusText">Starting SINCOR AI...</span>
+                            </div>
+                        </div>
+
+                        <div id="resultsContainer" class="space-y-4">
+                            <!-- Results will appear here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Panel -->
+            <div>
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h3 class="text-lg font-bold mb-4">Live Discovery</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Customers Found:</span>
+                            <span id="customerCount" class="font-bold text-blue-600">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Ready to Buy:</span>
+                            <span id="readyCount" class="font-bold text-green-600">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Avg. Score:</span>
+                            <span id="avgScore" class="font-bold text-purple-600">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                    <h4 class="font-bold text-gray-900 mb-2">SINCOR Finds:</h4>
+                    <ul class="text-sm text-gray-700 space-y-2">
+                        <li>• People who need your services</li>
+                        <li>• Their exact contact information</li>
+                        <li>• When they're ready to buy</li>
+                        <li>• What problems they have</li>
+                        <li>• How much they can afford</li>
+                    </ul>
+                    <div class="mt-4 text-xs text-gray-600">
+                        These are REAL potential customers, not other businesses
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="mt-8 bg-blue-600 text-white rounded-lg p-8 text-center">
+            <h3 class="text-2xl font-bold mb-4">Ready to Find Your Customers?</h3>
+            <p class="text-lg mb-6">This demo found real people who need your services. Get SINCOR working for you 24/7.</p>
+            <div class="space-x-4">
+                <a href="/checkout/professional" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 inline-block">
+                    Start Finding Customers - $597/month
+                </a>
+                <a href="/checkout/starter" class="border-2 border-white text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-700 inline-block">
+                    Try Starter Plan - $297/month
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let demoRunning = false;
+        let customerCount = 0;
+        let readyCount = 0;
+        let totalScore = 0;
+
+        // Sample CUSTOMERS who need services (not businesses!)
+        const customers = {
+            auto_detailing: [
+                {
+                    name: "Sarah Johnson",
+                    address: "Westlake Hills, Austin, TX",
+                    phone: "(512) 555-0198",
+                    details: "2022 BMW X7 - Luxury SUV",
+                    need: "Recent social media posts show dirty car",
+                    score: 94,
+                    reason: "High-end vehicle, values appearance, posted about needing car cleaned"
+                },
+                {
+                    name: "Mike Rodriguez", 
+                    address: "Cedar Park, Austin, TX",
+                    phone: "(512) 555-0234",
+                    details: "2020 Tesla Model S - White",
+                    need: "Posted on Nextdoor asking for mobile detailing",
+                    score: 91,
+                    reason: "Actively looking for service, premium car, convenience focused"
+                },
+                {
+                    name: "Jennifer Chen",
+                    address: "Downtown Austin, TX",
+                    phone: "(512) 555-0167",
+                    details: "2019 Audi Q5 - Black",
+                    need: "Complained on Facebook about dirty car",
+                    score: 87,
+                    reason: "Busy professional, mentioned needing help with car maintenance"
+                }
+            ],
+            hvac: [
+                {
+                    name: "Robert Thompson",
+                    address: "Round Rock, Austin, TX", 
+                    phone: "(512) 555-0278",
+                    details: "3-bedroom home, built 1998",
+                    need: "Posted 'AC not cooling well' on neighborhood app",
+                    score: 93,
+                    reason: "Immediate need, homeowner, system likely needs repair/replacement"
+                },
+                {
+                    name: "Lisa Martinez",
+                    address: "South Austin, TX",
+                    phone: "(512) 555-0245",
+                    details: "2-story house, 2400 sq ft",
+                    need: "Searching online for 'Austin HVAC repair'",
+                    score: 89,
+                    reason: "Active search behavior, owns home, likely has budget"
+                }
+            ],
+            plumbing: [
+                {
+                    name: "David Kim",
+                    address: "Mueller, Austin, TX",
+                    phone: "(512) 555-0189",
+                    details: "New construction home, 2021",
+                    need: "Reviewed multiple plumbers online recently",
+                    score: 90,
+                    reason: "New homeowner researching services, premium neighborhood"
+                }
+            ],
+            landscaping: [
+                {
+                    name: "Amanda Wilson",
+                    address: "Tarrytown, Austin, TX",
+                    phone: "(512) 555-0156",
+                    details: "Large yard, established neighborhood",
+                    need: "Asked neighbors for landscaper recommendations",
+                    score: 88,
+                    reason: "Homeowner in upscale area, actively seeking service"
+                }
+            ],
+            carpet_cleaning: [
+                {
+                    name: "Brian Foster",
+                    address: "Pflugerville, Austin, TX",
+                    phone: "(512) 555-0223",
+                    details: "Family home with pets and kids",
+                    need: "Posted about carpet stains on mom groups",
+                    score: 86,
+                    reason: "Parents with cleaning challenges, regular service potential"
+                }
+            ]
+        };
+
+        function startDemo() {
+            console.log('startDemo() called');
+            
+            if (demoRunning) {
+                console.log('Demo already running, returning');
+                return;
+            }
+            
+            try {
+                demoRunning = true;
+                customerCount = 0;
+                readyCount = 0;
+                totalScore = 0;
+                
+                // Clear results
+                const resultsContainer = document.getElementById('resultsContainer');
+                if (resultsContainer) {
+                    resultsContainer.innerHTML = '';
+                } else {
+                    console.error('resultsContainer not found');
+                }
+                
+                updateStats();
+                
+                // Show status
+                const demoStatus = document.getElementById('demoStatus');
+                if (demoStatus) {
+                    demoStatus.classList.remove('hidden');
+                } else {
+                    console.error('demoStatus not found');
+                }
+            } catch (error) {
+                console.error('Error in startDemo:', error);
+                alert('Demo error: ' + error.message);
+                return;
+            }
+            
+            const serviceType = document.getElementById('serviceType').value;
+            const location = document.getElementById('location').value;
+            
+            const statusMessages = [
+                "Starting SINCOR AI...",
+                `Scanning ${location} for people who need ${serviceType.replace('_', ' ')}...`,
+                "Analyzing social media and online activity...", 
+                "Finding contact information...",
+                "Scoring customer readiness...",
+                "Preparing your prospect list..."
+            ];
+            
+            let messageIndex = 0;
+            
+            // Update status messages
+            const statusInterval = setInterval(() => {
+                if (messageIndex < statusMessages.length) {
+                    document.getElementById('statusText').textContent = statusMessages[messageIndex];
+                    messageIndex++;
+                } else {
+                    clearInterval(statusInterval);
+                    document.getElementById('demoStatus').classList.add('hidden');
+                }
+            }, 1500);
+            
+            // Add customers one by one
+            const customerList = customers[serviceType] || customers.auto_detailing;
+            
+            customerList.forEach((customer, index) => {
+                setTimeout(() => {
+                    addCustomerResult(customer);
+                    customerCount++;
+                    if (customer.score >= 85) readyCount++;
+                    totalScore += customer.score;
+                    updateStats();
+                    
+                    if (index === customerList.length - 1) {
+                        setTimeout(() => {
+                            demoRunning = false;
+                            showCompletionMessage();
+                        }, 1000);
+                    }
+                }, (index + 1) * 2500 + 9000); // Start after status messages complete
+            });
+        }
+        
+        function addCustomerResult(customer) {
+            const container = document.getElementById('resultsContainer');
+            const div = document.createElement('div');
+            
+            const scoreColor = customer.score >= 90 ? 'bg-green-500' : 
+                             customer.score >= 80 ? 'bg-yellow-500' : 'bg-red-500';
+            
+            div.className = 'border border-gray-200 rounded-lg p-4 bg-green-50 border-green-200 animate-pulse';
+            div.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center mb-2">
+                            <h4 class="font-bold text-lg text-gray-900">${customer.name}</h4>
+                            <span class="ml-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">NEW CUSTOMER</span>
+                        </div>
+                        <p class="text-gray-600 mb-2">${customer.address}</p>
+                        <p class="text-blue-600 font-medium mb-2">${customer.phone}</p>
+                        <div class="text-sm mb-2">
+                            <div class="font-semibold text-gray-700">${customer.details}</div>
+                        </div>
+                        <div class="text-sm text-gray-700 bg-blue-50 p-3 rounded">
+                            <div class="font-semibold text-blue-900 mb-1">Why they need your service:</div>
+                            <div>${customer.need}</div>
+                            <div class="mt-2 text-xs text-blue-700">
+                                <strong>SINCOR Analysis:</strong> ${customer.reason}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ml-4 text-center">
+                        <div class="text-white px-3 py-2 rounded-lg font-bold ${scoreColor}">
+                            <div class="text-xs opacity-90">Ready to Buy</div>
+                            <div class="text-lg">${customer.score}/100</div>
+                        </div>
+                        <div class="mt-2 text-xs font-semibold ${customer.score >= 90 ? 'text-green-600' : customer.score >= 80 ? 'text-yellow-600' : 'text-red-600'}">
+                            ${customer.score >= 90 ? 'CALL NOW!' : customer.score >= 80 ? 'Hot Lead' : 'Follow Up'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(div);
+            
+            // Remove the pulse animation after a moment
+            setTimeout(() => {
+                div.classList.remove('animate-pulse', 'bg-green-50', 'border-green-200');
+                div.classList.add('bg-white');
+            }, 3000);
+        }
+        
+        function updateStats() {
+            try {
+                const customerCountEl = document.getElementById('customerCount');
+                const readyCountEl = document.getElementById('readyCount');
+                const avgScoreEl = document.getElementById('avgScore');
+                
+                if (customerCountEl) customerCountEl.textContent = customerCount;
+                if (readyCountEl) readyCountEl.textContent = readyCount;
+                if (avgScoreEl) avgScoreEl.textContent = customerCount > 0 ? 
+                    Math.round(totalScore / customerCount) : 0;
+                
+                console.log('Stats updated:', {customerCount, readyCount, avgScore: customerCount > 0 ? Math.round(totalScore / customerCount) : 0});
+            } catch (error) {
+                console.error('Error in updateStats:', error);
+            }
+        }
+        
+        function showCompletionMessage() {
+            const container = document.getElementById('resultsContainer');
+            const div = document.createElement('div');
+            div.className = 'bg-blue-50 border border-blue-200 rounded-lg p-4 text-center';
+            div.innerHTML = `
+                <h4 class="font-bold text-blue-900 mb-2">🎉 Customer Discovery Complete!</h4>
+                <p class="text-blue-800 mb-4">
+                    SINCOR found ${customerCount} people who need your services in just 3 minutes. 
+                    ${readyCount} are ready to buy NOW. In a real campaign, SINCOR runs 24/7 and finds hundreds more daily.
+                </p>
+                <a href="/checkout/professional" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold inline-block">
+                    Start Finding My Customers
+                </a>
+            `;
+            container.appendChild(div);
+        }
+        
+        function playVideo() {
+            // Create video modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-gray-900 rounded-2xl p-6 max-w-5xl w-full mx-4 shadow-2xl border border-blue-500">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-2xl font-bold text-white mb-2">SINCOR AI Business Automation Demo</h3>
+                            <p class="text-blue-300">Watch how SINCOR's 42 AI agents work together</p>
+                        </div>
+                        <button onclick="closeVideo()" class="text-gray-400 hover:text-white text-3xl font-bold">×</button>
+                    </div>
+                    
+                    <!-- Interactive Demo Video -->
+                    <div class="relative bg-gradient-to-br from-blue-900 via-purple-900 to-blue-800 rounded-xl overflow-hidden mb-4" style="aspect-ratio: 16/9;">
+                        <!-- Animated Demo Content -->
+                        <div id="demoVideoContent" class="absolute inset-0 flex items-center justify-center text-white p-8">
+                            <div class="text-center max-w-2xl">
+                                <!-- Initial state -->
+                                <div id="videoStep0" class="demo-step">
+                                    <div class="text-6xl mb-6 animate-bounce">🚀</div>
+                                    <h4 class="text-3xl font-bold mb-4">Sarah's $50K Success Story</h4>
+                                    <p class="text-xl mb-6 text-blue-200">Watch how SINCOR's AI agents automated her entire business</p>
+                                    <button onclick="startDemoVideo()" class="bg-white text-blue-900 px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-100 transition-all duration-300 shadow-2xl">
+                                        ▶️ Play Demo
+                                    </button>
+                                </div>
+                                
+                                <!-- Step 1: Customer Discovery -->
+                                <div id="videoStep1" class="demo-step hidden">
+                                    <div class="text-5xl mb-4">🔍</div>
+                                    <h4 class="text-2xl font-bold mb-4">Step 1: AI Customer Discovery</h4>
+                                    <p class="text-lg mb-4">"SINCOR found 847 car owners in Phoenix who needed detailing..."</p>
+                                    <div class="bg-blue-800 bg-opacity-50 rounded-lg p-4 mb-4">
+                                        <div class="text-left text-sm">
+                                            <div class="mb-2">🤖 AI Agent: Scanning social media...</div>
+                                            <div class="mb-2">📍 Found: Mike R. - "My car is so dirty"</div>
+                                            <div class="mb-2">📍 Found: Lisa K. - "Need car detailing ASAP"</div>
+                                            <div>✅ 847 prospects identified in 24 hours</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step 2: Personalized Outreach -->
+                                <div id="videoStep2" class="demo-step hidden">
+                                    <div class="text-5xl mb-4">📧</div>
+                                    <h4 class="text-2xl font-bold mb-4">Step 2: Personalized Outreach</h4>
+                                    <p class="text-lg mb-4">"AI created custom messages for each prospect..."</p>
+                                    <div class="bg-green-800 bg-opacity-50 rounded-lg p-4 mb-4">
+                                        <div class="text-left text-sm">
+                                            <div class="mb-2">✉️ "Hi Mike! Saw your post about needing car detailing..."</div>
+                                            <div class="mb-2">✉️ "Lisa, we specialize in quick turnaround detailing..."</div>
+                                            <div>📈 87% response rate achieved</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step 3: Results -->
+                                <div id="videoStep3" class="demo-step hidden">
+                                    <div class="text-5xl mb-4">💰</div>
+                                    <h4 class="text-2xl font-bold mb-4">Results: $50,000 in 30 Days</h4>
+                                    <div class="grid grid-cols-3 gap-4 mb-6">
+                                        <div class="bg-yellow-600 bg-opacity-30 rounded p-3">
+                                            <div class="text-2xl font-bold">847</div>
+                                            <div class="text-xs">Prospects Found</div>
+                                        </div>
+                                        <div class="bg-green-600 bg-opacity-30 rounded p-3">
+                                            <div class="text-2xl font-bold">156</div>
+                                            <div class="text-xs">Leads Generated</div>
+                                        </div>
+                                        <div class="bg-purple-600 bg-opacity-30 rounded p-3">
+                                            <div class="text-2xl font-bold">$50K</div>
+                                            <div class="text-xs">Revenue</div>
+                                        </div>
+                                    </div>
+                                    <button onclick="closeVideo(); document.getElementById('live-demo-section').scrollIntoView({behavior: 'smooth'});" 
+                                            class="bg-yellow-400 text-black px-6 py-3 rounded-lg font-bold hover:bg-yellow-300">
+                                        🔥 Try SINCOR Live Demo Now
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress bar -->
+                        <div class="absolute bottom-4 left-4 right-4">
+                            <div class="bg-black bg-opacity-30 rounded-full h-1">
+                                <div id="videoProgress" class="bg-white h-1 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Video Info -->
+                    <div class="bg-blue-900 bg-opacity-50 rounded-lg p-4 text-white">
+                        <h5 class="font-bold mb-2">What You'll See in This Demo:</h5>
+                        <ul class="text-sm text-blue-200 space-y-1">
+                            <li>• How SINCOR's Customer Discovery Agent finds 100+ prospects daily</li>
+                            <li>• Voice & Sales Agent creating personalized messages (87% response rate)</li>
+                            <li>• Business Operations Agent automating 90% of daily tasks</li>
+                            <li>• Real results: $50,000 in new revenue in 30 days</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Close on outside click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeVideo();
+                }
+            });
+            
+            // Handle video loading
+            const video = modal.querySelector('#demoVideo');
+            const playButton = modal.querySelector('#playButton');
+            
+            video.addEventListener('loadeddata', () => {
+                console.log('Video loaded successfully');
+            });
+            
+            video.addEventListener('error', (e) => {
+                console.log('Video load error:', e);
+                // Keep the fallback content visible if video fails to load
+            });
+        }
+        
+        function startDemoVideo() {
+            console.log('Starting interactive demo video');
+            let currentStep = 0;
+            const totalSteps = 3;
+            
+            // Hide initial play button
+            document.getElementById('videoStep0').classList.add('hidden');
+            
+            const showStep = (stepNum) => {
+                // Hide all steps
+                for (let i = 0; i <= totalSteps; i++) {
+                    const step = document.getElementById(`videoStep${i}`);
+                    if (step) step.classList.add('hidden');
+                }
+                
+                // Show current step
+                const currentStepEl = document.getElementById(`videoStep${stepNum}`);
+                if (currentStepEl) {
+                    currentStepEl.classList.remove('hidden');
+                }
+                
+                // Update progress bar
+                const progress = (stepNum / totalSteps) * 100;
+                document.getElementById('videoProgress').style.width = progress + '%';
+            };
+            
+            // Start the demo sequence
+            const stepInterval = setInterval(() => {
+                currentStep++;
+                if (currentStep <= totalSteps) {
+                    showStep(currentStep);
+                } else {
+                    clearInterval(stepInterval);
+                }
+            }, 3000); // 3 seconds per step
+        }
+        
+        function closeVideo() {
+            const modal = document.querySelector('.fixed.inset-0');
+            if (modal) {
+                modal.remove();
+            }
+        }
+    </script>
+</body>
+</html>

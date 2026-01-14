@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+
+{% block title %}System Monitor - SINCOR Oversight{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative overflow-hidden">
+    <!-- Neural Network Background -->
+    <div class="absolute inset-0 opacity-20">
+        <div class="neural-network"></div>
+    </div>
+
+    <!-- Monitor Header -->
+    <section class="relative pt-32 pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-3xl mb-8">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-6">
+                        <div class="w-16 h-16 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-6xl lg:text-7xl font-black text-white mb-2 leading-tight">
+                                System <span class="morphing-text bg-gradient-to-r from-green-400 via-emerald-500 to-teal-600 bg-clip-text text-transparent">Monitor</span>
+                            </h1>
+                            <p class="text-2xl text-gray-300">Real-time Infrastructure Monitoring & Oversight</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="bg-green-900/50 text-green-300 px-4 py-2 rounded-xl border border-green-500/30">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                <span class="font-semibold">All Systems Operational</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-400">Last Updated</div>
+                            <div class="text-white font-semibold">2 seconds ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Critical Alerts -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-8 rounded-3xl mb-8 border border-yellow-500/20">
+                <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
+                    <svg class="w-6 h-6 text-yellow-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.704-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    Active Alerts & Notifications
+                </h3>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-yellow-400 font-semibold text-sm">HIGH STORAGE</span>
+                            <span class="text-yellow-400 text-xs">5 min ago</span>
+                        </div>
+                        <p class="text-white font-medium">Server-03 storage at 84%</p>
+                        <p class="text-gray-300 text-sm">Recommended action: Archive old logs</p>
+                        <button class="mt-3 bg-yellow-600 text-white px-4 py-1 rounded text-xs font-medium hover:bg-yellow-700 transition-colors">
+                            Acknowledge
+                        </button>
+                    </div>
+
+                    <div class="bg-blue-900/30 border border-blue-500/30 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-blue-400 font-semibold text-sm">INFO</span>
+                            <span class="text-blue-400 text-xs">12 min ago</span>
+                        </div>
+                        <p class="text-white font-medium">Database backup completed</p>
+                        <p class="text-gray-300 text-sm">Full snapshot: 2.4TB processed</p>
+                        <button class="mt-3 bg-blue-600 text-white px-4 py-1 rounded text-xs font-medium hover:bg-blue-700 transition-colors">
+                            View Details
+                        </button>
+                    </div>
+
+                    <div class="bg-green-900/30 border border-green-500/30 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-green-400 font-semibold text-sm">SUCCESS</span>
+                            <span class="text-green-400 text-xs">23 min ago</span>
+                        </div>
+                        <p class="text-white font-medium">Auto-scaling triggered</p>
+                        <p class="text-gray-300 text-sm">Added 2 instances to handle traffic</p>
+                        <button class="mt-3 bg-green-600 text-white px-4 py-1 rounded text-xs font-medium hover:bg-green-700 transition-colors">
+                            Monitor
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Infrastructure Overview -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Server Cluster -->
+                <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                    <h3 class="text-3xl font-bold text-white mb-8">Server Cluster</h3>
+
+                    <!-- Cluster Status -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <h4 class="text-xl font-semibold text-white mb-6">Cluster Health</h4>
+                        <div class="space-y-6">
+                            <!-- Server-01 -->
+                            <div class="bg-gray-900/50 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                                        <span class="text-white font-medium">Server-01</span>
+                                    </div>
+                                    <span class="text-green-400 text-sm font-semibold">HEALTHY</span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-3 text-xs">
+                                    <div>
+                                        <span class="text-gray-400">CPU</span>
+                                        <div class="text-blue-400 font-semibold">52%</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Memory</span>
+                                        <div class="text-green-400 font-semibold">68%</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Load</span>
+                                        <div class="text-purple-400 font-semibold">0.84</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Server-02 -->
+                            <div class="bg-gray-900/50 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                                        <span class="text-white font-medium">Server-02</span>
+                                    </div>
+                                    <span class="text-green-400 text-sm font-semibold">HEALTHY</span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-3 text-xs">
+                                    <div>
+                                        <span class="text-gray-400">CPU</span>
+                                        <div class="text-blue-400 font-semibold">71%</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Memory</span>
+                                        <div class="text-green-400 font-semibold">82%</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Load</span>
+                                        <div class="text-purple-400 font-semibold">1.23</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Server-03 -->
+                            <div class="bg-gray-900/50 rounded-lg p-4 border border-yellow-500/30">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                        <span class="text-white font-medium">Server-03</span>
+                                    </div>
+                                    <span class="text-yellow-400 text-sm font-semibold">WARNING</span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-3 text-xs">
+                                    <div>
+                                        <span class="text-gray-400">CPU</span>
+                                        <div class="text-blue-400 font-semibold">89%</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Memory</span>
+                                        <div class="text-yellow-400 font-semibold">91%</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-400">Storage</span>
+                                        <div class="text-red-400 font-semibold">84%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Load Balancers -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <h4 class="text-lg font-semibold text-white mb-4">Load Balancers</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span class="text-white text-sm">LB-Primary</span>
+                                </div>
+                                <span class="text-green-400 text-sm">Active</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span class="text-white text-sm">LB-Secondary</span>
+                                </div>
+                                <span class="text-green-400 text-sm">Standby</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
+                                    <span class="text-white text-sm">Traffic Distribution</span>
+                                </div>
+                                <span class="text-blue-400 text-sm">Balanced</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database Systems -->
+                <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                    <h3 class="text-3xl font-bold text-white mb-8">Database Systems</h3>
+
+                    <!-- PostgreSQL Cluster -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <div class="flex items-center justify-between mb-6">
+                            <h4 class="text-xl font-semibold text-white">PostgreSQL Cluster</h4>
+                            <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Primary Node</span>
+                                <span class="text-green-400 font-semibold">Online</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Read Replicas</span>
+                                <span class="text-blue-400 font-semibold">3/3 Active</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Connections</span>
+                                <span class="text-purple-400 font-semibold">847/1000</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Query Response</span>
+                                <span class="text-cyan-400 font-semibold">2.3ms avg</span>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">Connection Pool</span>
+                                    <span class="text-blue-400">84.7%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-blue-400 h-2 rounded-full" style="width: 84.7%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MongoDB Cluster -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <div class="flex items-center justify-between mb-6">
+                            <h4 class="text-xl font-semibold text-white">MongoDB Cluster</h4>
+                            <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Replica Set</span>
+                                <span class="text-green-400 font-semibold">Healthy</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Shards</span>
+                                <span class="text-blue-400 font-semibold">4/4 Online</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Collections</span>
+                                <span class="text-purple-400 font-semibold">247 active</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Index Usage</span>
+                                <span class="text-green-400 font-semibold">98.7%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Layer -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <div class="flex items-center justify-between mb-6">
+                            <h4 class="text-xl font-semibold text-white">Redis Cache</h4>
+                            <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Hit Rate</span>
+                                <span class="text-green-400 font-semibold">97.2%</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Memory Usage</span>
+                                <span class="text-blue-400 font-semibold">6.8GB / 8GB</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-300 text-sm">Operations/sec</span>
+                                <span class="text-purple-400 font-semibold">15,847</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network & Security -->
+                <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                    <h3 class="text-3xl font-bold text-white mb-8">Network & Security</h3>
+
+                    <!-- Network Traffic -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <h4 class="text-xl font-semibold text-white mb-6">Network Traffic</h4>
+                        <div class="h-32 bg-black/30 rounded-lg flex items-end justify-between p-4 border border-gray-700/50 mb-4">
+                            <div class="w-3 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t shadow-lg" style="height: 45%"></div>
+                            <div class="w-3 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t shadow-lg" style="height: 67%"></div>
+                            <div class="w-3 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t shadow-lg" style="height: 89%"></div>
+                            <div class="w-3 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t shadow-lg" style="height: 72%"></div>
+                            <div class="w-3 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t shadow-lg" style="height: 95%"></div>
+                            <div class="w-3 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t shadow-lg" style="height: 88%"></div>
+                            <div class="w-3 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t shadow-lg" style="height: 100%"></div>
+                            <div class="w-3 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t shadow-lg animate-pulse" style="height: 93%"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Inbound</span>
+                                <p class="text-cyan-400 font-semibold">247 Mbps</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Outbound</span>
+                                <p class="text-blue-400 font-semibold">189 Mbps</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Status -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50 mb-8">
+                        <h4 class="text-xl font-semibold text-white mb-6">Security Status</h4>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span class="text-white text-sm">Firewall</span>
+                                </div>
+                                <span class="text-green-400 text-sm">Active</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span class="text-white text-sm">DDoS Protection</span>
+                                </div>
+                                <span class="text-green-400 text-sm">Enabled</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span class="text-white text-sm">SSL Certificates</span>
+                                </div>
+                                <span class="text-green-400 text-sm">Valid</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <span class="text-white text-sm">Intrusion Detection</span>
+                                </div>
+                                <span class="text-green-400 text-sm">Monitoring</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                                    <span class="text-white text-sm">Threat Level</span>
+                                </div>
+                                <span class="text-green-400 text-sm">Low</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Events -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <h4 class="text-xl font-semibold text-white mb-6">Security Events</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-start space-x-3 bg-gray-900/50 rounded-lg p-3">
+                                <div class="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-white font-medium text-sm">Successful authentication</p>
+                                    <p class="text-gray-400 text-xs">admin@sincor.ai from 192.168.1.100</p>
+                                    <p class="text-gray-500 text-xs">2 minutes ago</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start space-x-3 bg-gray-900/50 rounded-lg p-3">
+                                <div class="w-6 h-6 bg-yellow-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.704-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-white font-medium text-sm">Rate limit triggered</p>
+                                    <p class="text-gray-400 text-xs">IP: 203.0.113.1 exceeded 1000 req/min</p>
+                                    <p class="text-gray-500 text-xs">15 minutes ago</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start space-x-3 bg-gray-900/50 rounded-lg p-3">
+                                <div class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-white font-medium text-sm">Certificate renewal</p>
+                                    <p class="text-gray-400 text-xs">SSL cert renewed for *.sincor.ai</p>
+                                    <p class="text-gray-500 text-xs">32 minutes ago</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Performance Metrics -->
+    <section class="relative pb-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-10 rounded-3xl shadow-2xl">
+                <h3 class="text-3xl font-bold text-white mb-8">Performance Metrics</h3>
+                <div class="grid lg:grid-cols-2 gap-8">
+                    <!-- Response Times -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <h4 class="text-xl font-semibold text-white mb-6">Response Times (24h)</h4>
+                        <div class="h-48 bg-black/30 rounded-lg flex items-end justify-between p-6 border border-gray-700/50">
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-6 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 85%"></div>
+                                <span class="text-xs text-gray-400">00:00</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-6 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 78%"></div>
+                                <span class="text-xs text-gray-400">04:00</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-6 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 92%"></div>
+                                <span class="text-xs text-gray-400">08:00</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-6 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 95%"></div>
+                                <span class="text-xs text-gray-400">12:00</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-6 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 88%"></div>
+                                <span class="text-xs text-gray-400">16:00</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-6 bg-gradient-to-t from-green-600 to-green-400 rounded-t shadow-lg" style="height: 90%"></div>
+                                <span class="text-xs text-gray-400">20:00</span>
+                            </div>
+                            <div class="flex flex-col items-center space-y-2">
+                                <div class="w-6 bg-gradient-to-t from-cyan-500 to-cyan-400 rounded-t shadow-lg animate-pulse" style="height: 100%"></div>
+                                <span class="text-xs text-cyan-400 font-semibold">Now</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Average</span>
+                                <p class="text-green-400 font-semibold">23ms</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">95th Percentile</span>
+                                <p class="text-blue-400 font-semibold">47ms</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Max</span>
+                                <p class="text-purple-400 font-semibold">89ms</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Rates -->
+                    <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-600/50">
+                        <h4 class="text-xl font-semibold text-white mb-6">Error Rates & Status Codes</h4>
+                        <div class="space-y-4 mb-6">
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">2xx Success</span>
+                                    <span class="text-green-400 font-semibold">99.97%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-green-400 h-2 rounded-full" style="width: 99.97%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">4xx Client Error</span>
+                                    <span class="text-yellow-400 font-semibold">0.02%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-yellow-400 h-2 rounded-full" style="width: 0.02%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-2">
+                                    <span class="text-gray-300">5xx Server Error</span>
+                                    <span class="text-red-400 font-semibold">0.01%</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-2">
+                                    <div class="bg-red-400 h-2 rounded-full" style="width: 0.01%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Total Requests</span>
+                                <p class="text-cyan-400 font-semibold">847M</p>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Error Rate</span>
+                                <p class="text-green-400 font-semibold">0.03%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Emergency Actions -->
+    <section class="relative pb-20 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="glassmorphism p-10 rounded-3xl shadow-2xl border border-red-500/20">
+                <h3 class="text-3xl font-bold text-white mb-8 flex items-center">
+                    <svg class="w-8 h-8 text-red-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.704-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                    Emergency Response Center
+                </h3>
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <button class="bg-gradient-to-r from-orange-600 to-red-600 text-white p-6 rounded-xl font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg border border-orange-500/30">
+                        <svg class="w-8 h-8 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        Scale Resources
+                    </button>
+
+                    <button class="bg-gradient-to-r from-yellow-600 to-orange-600 text-white p-6 rounded-xl font-semibold hover:from-yellow-700 hover:to-orange-700 transition-all duration-300 shadow-lg border border-yellow-500/30">
+                        <svg class="w-8 h-8 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Restart Services
+                    </button>
+
+                    <button class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-6 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 shadow-lg border border-blue-500/30">
+                        <svg class="w-8 h-8 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                        Security Lockdown
+                    </button>
+
+                    <button class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg border border-purple-500/30">
+                        <svg class="w-8 h-8 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                        </svg>
+                        Contact Support
+                    </button>
+                </div>
+                <div class="mt-8 bg-red-900/20 border border-red-500/30 rounded-xl p-4">
+                    <p class="text-red-300 text-sm">
+                        <strong>Critical System Monitoring:</strong> This dashboard provides real-time oversight of all infrastructure components. Emergency actions require confirmation and will trigger immediate alerts to the operations team.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Constellation Monitor - SINCOR{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="bg-white shadow">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center">
+                <h1 class="text-3xl font-bold text-gray-900">Agent Constellation Monitor</h1>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <div id="system-status" class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                        <span class="text-sm font-medium text-gray-700" id="status-text">All Systems Operational</span>
+                    </div>
+                    <button onclick="refreshAgents()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                        🔄 Refresh Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <!-- Real-time Agent Status -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-medium text-gray-900">Active Agents</h3>
+                            <p id="active-agents" class="text-2xl font-bold text-green-600">12</p>
+                            <p class="text-xs text-gray-500">Currently processing</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-medium text-gray-900">Tasks Completed</h3>
+                            <p id="completed-tasks" class="text-2xl font-bold text-blue-600">1,247</p>
+                            <p class="text-xs text-green-500">↑ +23 this hour</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2L3 7v11a2 2 0 002 2h10a2 2 0 002-2V7l-7-5z"/>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-medium text-gray-900">Queue Length</h3>
+                            <p id="queue-length" class="text-2xl font-bold text-yellow-600">43</p>
+                            <p class="text-xs text-gray-500">Avg wait: 2.3s</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                            <svg class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-medium text-gray-900">Errors</h3>
+                            <p id="error-count" class="text-2xl font-bold text-red-600">3</p>
+                            <p class="text-xs text-red-500">Last: 5m ago</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Agent List -->
+        <div class="bg-white shadow rounded-lg mb-8">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-900">Live Agent Status</h3>
+                <div class="flex space-x-2">
+                    <button onclick="startNewAgent()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                        ▶️ Start New Agent
+                    </button>
+                    <button onclick="stopAllAgents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                        ⏹️ Stop All
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div id="agent-list" class="space-y-4">
+                    <!-- Agents will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Query Engine Interface -->
+        <div class="bg-white shadow rounded-lg mb-8">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">Query Engine</h3>
+            </div>
+            <div class="p-6">
+                <div class="flex space-x-4 mb-4">
+                    <input type="text" id="query-input" placeholder="Enter your query... (e.g., 'show active agents', 'agent performance last hour')" 
+                           class="flex-1 p-3 border rounded-lg focus:border-blue-500 focus:outline-none">
+                    <button onclick="executeQuery()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+                        🔍 Query
+                    </button>
+                </div>
+                <div id="query-results" class="bg-gray-50 p-4 rounded-lg min-h-24">
+                    <em>Query results will appear here...</em>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spending Tracker -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">Agent Spending Tracker</h3>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600" id="hourly-cost">$12.47</div>
+                        <div class="text-sm text-gray-600">This Hour</div>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600" id="daily-cost">$284.50</div>
+                        <div class="text-sm text-gray-600">Today</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600" id="monthly-cost">$8,920.15</div>
+                        <div class="text-sm text-gray-600">This Month</div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Budget Alert Threshold</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="budget-slider" min="100" max="2000" value="500" 
+                               class="flex-1" onchange="updateBudget(this.value)">
+                        <span id="budget-value" class="text-sm font-medium">$500/day</span>
+                    </div>
+                </div>
+                
+                <div id="budget-status" class="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-green-700">Within budget - 43% of daily limit used</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Simulated agent data
+let agents = [
+    {id: 'agent-001', name: 'DataProcessor-Alpha', status: 'active', cpu: 45, memory: 67, tasks: 23, cost: 1.25},
+    {id: 'agent-002', name: 'AnalyticsBot-Beta', status: 'active', cpu: 78, memory: 82, tasks: 41, cost: 2.10},
+    {id: 'agent-003', name: 'ReportGen-Gamma', status: 'active', cpu: 32, memory: 45, tasks: 18, cost: 0.95},
+    {id: 'agent-004', name: 'QueryEngine-Delta', status: 'idle', cpu: 12, memory: 23, tasks: 7, cost: 0.35},
+    {id: 'agent-005', name: 'MLPredictor-Echo', status: 'active', cpu: 89, memory: 91, tasks: 67, cost: 3.45}
+];
+
+// Update agent display
+function updateAgentDisplay() {
+    const container = document.getElementById('agent-list');
+    container.innerHTML = agents.map(agent => `
+        <div class="flex items-center justify-between p-4 border rounded-lg ${
+            agent.status === 'active' ? 'border-green-200 bg-green-50' : 'border-gray-200'
+        }">
+            <div class="flex items-center space-x-4">
+                <div class="w-3 h-3 ${agent.status === 'active' ? 'bg-green-500' : 'bg-gray-400'} rounded-full ${
+                    agent.status === 'active' ? 'animate-pulse' : ''
+                }"></div>
+                <div>
+                    <h4 class="font-medium">${agent.name}</h4>
+                    <p class="text-sm text-gray-600">Status: ${agent.status} | Tasks: ${agent.tasks} | Cost: $${agent.cost}/hr</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-xs">
+                    <div>CPU: ${agent.cpu}%</div>
+                    <div>RAM: ${agent.memory}%</div>
+                </div>
+                <button onclick="toggleAgent('${agent.id}')" class="${
+                    agent.status === 'active' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                } px-3 py-1 rounded text-xs">
+                    ${agent.status === 'active' ? 'Stop' : 'Start'}
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Query engine functionality
+function executeQuery() {
+    const query = document.getElementById('query-input').value.toLowerCase();
+    const results = document.getElementById('query-results');
+    
+    if (!query.trim()) {
+        results.innerHTML = '<em>Please enter a query</em>';
+        return;
+    }
+    
+    results.innerHTML = '<em>Processing query...</em>';
+    
+    setTimeout(() => {
+        if (query.includes('active agents')) {
+            const activeCount = agents.filter(a => a.status === 'active').length;
+            results.innerHTML = `<strong>Query Results:</strong><br>Found ${activeCount} active agents:<br>` +
+                agents.filter(a => a.status === 'active').map(a => `• ${a.name} - ${a.tasks} tasks completed`).join('<br>');
+        } else if (query.includes('performance') || query.includes('cpu')) {
+            const avgCpu = agents.reduce((sum, a) => sum + a.cpu, 0) / agents.length;
+            results.innerHTML = `<strong>Performance Metrics:</strong><br>Average CPU usage: ${avgCpu.toFixed(1)}%<br>` +
+                `Highest performing agent: ${agents.sort((a,b) => b.cpu - a.cpu)[0].name} (${agents[0].cpu}% CPU)`;
+        } else if (query.includes('cost') || query.includes('spending')) {
+            const totalCost = agents.reduce((sum, a) => sum + a.cost, 0);
+            results.innerHTML = `<strong>Cost Analysis:</strong><br>Total hourly cost: $${totalCost.toFixed(2)}/hr<br>` +
+                `Daily projection: $${(totalCost * 24).toFixed(2)}<br>Most expensive: ${agents.sort((a,b) => b.cost - a.cost)[0].name}`;
+        } else {
+            results.innerHTML = `<strong>Search Results:</strong><br>No specific matches for "${query}"<br><br>` +
+                `Try queries like:<br>• "show active agents"<br>• "agent performance"<br>• "cost analysis"<br>• "cpu usage"`;
+        }
+    }, 1000);
+}
+
+// Agent management
+function toggleAgent(agentId) {
+    const agent = agents.find(a => a.id === agentId);
+    if (agent) {
+        agent.status = agent.status === 'active' ? 'idle' : 'active';
+        if (agent.status === 'active') {
+            agent.cpu = Math.floor(Math.random() * 80) + 10;
+            agent.memory = Math.floor(Math.random() * 70) + 20;
+        } else {
+            agent.cpu = Math.floor(Math.random() * 20) + 5;
+            agent.memory = Math.floor(Math.random() * 30) + 10;
+        }
+        updateAgentDisplay();
+        updateMetrics();
+    }
+}
+
+function startNewAgent() {
+    const newAgent = {
+        id: `agent-${String(agents.length + 1).padStart(3, '0')}`,
+        name: `AutoAgent-${String.fromCharCode(65 + agents.length)}`,
+        status: 'active',
+        cpu: Math.floor(Math.random() * 60) + 20,
+        memory: Math.floor(Math.random() * 50) + 30,
+        tasks: 0,
+        cost: (Math.random() * 2 + 0.5).toFixed(2)
+    };
+    agents.push(newAgent);
+    updateAgentDisplay();
+    updateMetrics();
+}
+
+function stopAllAgents() {
+    agents.forEach(agent => {
+        agent.status = 'idle';
+        agent.cpu = Math.floor(Math.random() * 20) + 5;
+        agent.memory = Math.floor(Math.random() * 30) + 10;
+    });
+    updateAgentDisplay();
+    updateMetrics();
+}
+
+function refreshAgents() {
+    // Simulate data refresh
+    agents.forEach(agent => {
+        if (agent.status === 'active') {
+            agent.cpu = Math.floor(Math.random() * 80) + 10;
+            agent.memory = Math.floor(Math.random() * 70) + 20;
+            agent.tasks += Math.floor(Math.random() * 5);
+        }
+    });
+    updateAgentDisplay();
+    updateMetrics();
+    
+    // Show refresh feedback
+    const statusText = document.getElementById('status-text');
+    statusText.textContent = 'Data Updated';
+    setTimeout(() => {
+        statusText.textContent = 'All Systems Operational';
+    }, 2000);
+}
+
+function updateMetrics() {
+    const activeAgents = agents.filter(a => a.status === 'active').length;
+    const totalTasks = agents.reduce((sum, a) => sum + a.tasks, 0);
+    const totalCost = agents.reduce((sum, a) => sum + parseFloat(a.cost), 0);
+    
+    document.getElementById('active-agents').textContent = activeAgents;
+    document.getElementById('completed-tasks').textContent = totalTasks;
+    document.getElementById('hourly-cost').textContent = `$${totalCost.toFixed(2)}`;
+    document.getElementById('daily-cost').textContent = `$${(totalCost * 24).toFixed(2)}`;
+    document.getElementById('queue-length').textContent = Math.floor(Math.random() * 50) + 10;
+    document.getElementById('error-count').textContent = Math.floor(Math.random() * 8);
+}
+
+function updateBudget(value) {
+    document.getElementById('budget-value').textContent = `$${value}/day`;
+    const currentDaily = parseFloat(document.getElementById('daily-cost').textContent.replace('$', ''));
+    const percentage = (currentDaily / value * 100).toFixed(0);
+    const status = document.getElementById('budget-status');
+    
+    if (percentage > 90) {
+        status.className = 'p-3 bg-red-50 border border-red-200 rounded-lg';
+        status.innerHTML = `<div class="flex items-center"><svg class="w-4 h-4 text-red-600 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg><span class="text-red-700">⚠️ BUDGET ALERT - ${percentage}% of daily limit used!</span></div>`;
+    } else if (percentage > 75) {
+        status.className = 'p-3 bg-yellow-50 border border-yellow-200 rounded-lg';
+        status.innerHTML = `<div class="flex items-center"><svg class="w-4 h-4 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg><span class="text-yellow-700">Approaching budget limit - ${percentage}% used</span></div>`;
+    } else {
+        status.className = 'p-3 bg-green-50 border border-green-200 rounded-lg';
+        status.innerHTML = `<div class="flex items-center"><svg class="w-4 h-4 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg><span class="text-green-700">Within budget - ${percentage}% of daily limit used</span></div>`;
+    }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+    updateAgentDisplay();
+    updateMetrics();
+    
+    // Simulate real-time updates
+    setInterval(() => {
+        agents.forEach(agent => {
+            if (agent.status === 'active') {
+                agent.tasks += Math.floor(Math.random() * 3);
+                agent.cpu = Math.max(10, Math.min(95, agent.cpu + (Math.random() - 0.5) * 20));
+                agent.memory = Math.max(10, Math.min(95, agent.memory + (Math.random() - 0.5) * 15));
+            }
+        });
+        updateAgentDisplay();
+        updateMetrics();
+    }, 5000);
+    
+    // Query input enter key support
+    document.getElementById('query-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            executeQuery();
+        }
+    });
+});
+</script>
+{% endblock %}

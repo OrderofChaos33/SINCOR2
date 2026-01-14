@@ -1,0 +1,126 @@
+A good Square app integration file (let’s call it square_integration.py) is the sibling to your paypal_integration.py. It should cover three pillars:
+
+1. Configuration
+
+Secrets from env/manifest:
+
+SQUARE_ACCESS_TOKEN (OAuth or personal access token)
+
+SQUARE_LOCATION_ID (the store/location you’re operating from)
+
+Optional: SQUARE_WEBHOOK_SIGNATURE_KEY (to verify webhook payloads)
+
+
+Webhook Receiver
+
+Square pushes events like:
+
+customer.created, customer.updated
+
+booking.created, booking.updated
+
+invoice.created, invoice.paid
+
+The app file needs a Flask/FastAPI/Django route like:
+
+from flask import Blueprint, request, jsonify
+import hashlib, hmac, os, logging
+
+bp = Blueprint("square_webhooks", __name__)
+
+SQUARE_SIGNATURE_KEY = os.getenv("SQUARE_WEBHOOK_SIGNATURE_KEY")
+
+def verify_square_signature(payload, signature, url):
+    computed = hmac.new(
+        SQUARE_SIGNATURE_KEY.encode("utf-8"),
+        (url + payload.decode("utf-8")).encode("utf-8"),
+        hashlib.sha1
+    ).hexdigest()
+    return hmac.compare_digest(computed, signature)
+
+@bp.route("/webhook/square", methods=["POST"])
+def handle_square_webhook():
+    sig = request.headers.get("x-square-hmacsha256-signature")
+    if not verify_square_signature(request.data, sig, request.url):
+        return "Invalid signature", 401
+    
+    event = request.json
+    logging.info(f"Square webhook: {event}")
+    # Dispatch into your engine (appointments, invoices, customers)
+    return jsonify({"ok": True})
+
+3. Outbound Actions
+
+So your agents can do things in Square without you touching the UI:
+
+Create/Update Customer
+
+import requests, os
+
+SQUARE_BASE = "https://connect.squareup.com/v2"
+TOKEN = os.getenv("SQUARE_ACCESS_TOKEN")
+
+def square_request(path, method="GET", data=None):
+    headers = {
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
+    url = f"{SQUARE_BASE}/{path}"
+    r = requests.request(method, url, headers=headers, json=data)
+    r.raise_for_status()
+    return r.json()
+
+def create_customer(given_name, phone, email):
+    data = {"given_name": given_name, "phone_number": phone, "email_address": email}
+    return square_request("customers", "POST", data)
+
+
+Book Appointment
+
+def create_appointment(customer_id, start_at, duration_minutes=60):
+    data = {
+        "appointment_segments": [
+            {"duration_minutes": duration_minutes, "service_variation_id": "SERVICE-ID-HERE"}
+        ],
+        "customer_id": customer_id,
+        "start_at": start_at,
+        "location_id": os.getenv("SQUARE_LOCATION_ID")
+    }
+    return square_request("bookings", "POST", data)
+
+
+Create Invoice
+
+def create_invoice(customer_id, amount, currency="USD"):
+    data = {
+        "invoice": {
+            "location_id": os.getenv("SQUARE_LOCATION_ID"),
+            "primary_recipient": {"customer_id": customer_id},
+            "payment_requests": [{"request_type": "BALANCE", "amount_money": {"amount": amount, "currency": currency}}],
+        }
+    }
+    return square_request("invoices", "POST", data)
+
+4. Event Dispatch → Your Engine
+
+When Square webhook says “invoice.paid”, your integration file should call your monetization engine:
+
+from ga4_integration import send_event
+
+def on_invoice_paid(invoice):
+    amount = invoice["payment_requests"][0]["amount_money"]["amount"] / 100
+    currency = invoice["payment_requests"][0]["amount_money"]["currency"]
+    # Send to GA4
+    send_event("purchase", {"value": amount, "currency": currency, "source": "square"})
+    # Notify Twilio
+    # Update customer lifetime value in DB
+
+TL;DR — square_integration.py should include:
+
+Secrets & config (access token, location ID, webhook secret).
+
+Webhook route to receive Square events (customers, bookings, invoices).
+
+Utility functions to create/update customers, book appointments, and send invoices.
+
+Dispatcher that translates Square events into your engine’s universal format (so PayPal + Square events are treated the same downstream).

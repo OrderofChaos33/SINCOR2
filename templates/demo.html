@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Live Demo - SINCOR AI Enterprise{% endblock %}
+
+{% block content %}
+<style>
+    .demo-hero {
+        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 25%, #2d1b69 50%, #11998e 75%, #38ef7d 100%);
+        background-size: 400% 400%;
+        animation: etherealGradient 20s ease infinite;
+    }
+
+    .demo-interface {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+    }
+
+    .demo-interface:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 25px 60px rgba(102, 126, 234, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .ai-terminal {
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .terminal-line {
+        opacity: 0;
+        animation: typeIn 1s ease-in-out forwards;
+    }
+
+    @keyframes typeIn {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+
+    .demo-metric {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+</style>
+
+<!-- Ultra-Premium Demo Hero -->
+<section class="min-h-screen demo-hero relative overflow-hidden flex items-center justify-center">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-6xl mx-auto">
+            <div class="ultra-glass rounded-full px-8 py-4 mb-12 inline-block">
+                <span class="text-emerald-400 font-mono text-sm tracking-wider">SINCOR AI LIVE DEMONSTRATION</span>
+            </div>
+
+            <h1 class="text-7xl lg:text-8xl font-black text-white mb-8 leading-tight">
+                Experience <span class="morphing-text">Intelligence</span>
+            </h1>
+
+            <p class="text-2xl lg:text-3xl mb-16 text-gray-100 max-w-4xl mx-auto leading-relaxed">
+                Watch SINCOR transform raw data into strategic insights in real-time. See the future of business intelligence.
+            </p>
+
+            <div class="flex flex-col lg:flex-row gap-8 justify-center">
+                <button onclick="startAIDemo()" class="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-12 py-6 rounded-2xl text-xl font-bold transition-all premium-glow shadow-2xl group">
+                    <span class="flex items-center justify-center">
+                        Launch AI Demo
+                        <svg class="w-6 h-6 ml-3 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                        </svg>
+                    </span>
+                </button>
+                <a href="{{ url_for('contact') }}" class="ultra-glass hover:bg-white/20 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all border-2 border-white/20">
+                    Schedule Personal Demo
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- AI Demo Interface -->
+<div id="ai-demo-modal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 hidden">
+    <div class="ultra-glass p-12 rounded-3xl max-w-6xl w-full mx-4 relative">
+        <button onclick="closeAIDemo()" class="absolute top-6 right-6 text-white hover:text-gray-300 transition-colors">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+
+        <div class="text-center mb-8">
+            <div class="w-4 h-4 bg-emerald-400 rounded-full mx-auto mb-4 pulse-glow"></div>
+            <h3 class="text-3xl font-bold text-white mb-4">SINCOR AI Processing Live Data</h3>
+            <p class="text-gray-300">Watch real-time business intelligence generation</p>
+        </div>
+
+        <!-- AI Terminal Interface -->
+        <div class="ai-terminal rounded-2xl p-8 mb-8">
+            <div class="flex items-center mb-6">
+                <div class="flex space-x-2">
+                    <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                </div>
+                <div class="ml-4 text-gray-400 font-mono text-sm">SINCOR AI Terminal v3.0</div>
+            </div>
+
+            <div id="terminal-content" class="space-y-2 text-sm">
+                <div class="terminal-line text-emerald-400" style="animation-delay: 0.5s;">$ sincor --initialize --data-sources=all</div>
+                <div class="terminal-line text-gray-300" style="animation-delay: 1s;">Connecting to 47 data sources...</div>
+                <div class="terminal-line text-cyan-400" style="animation-delay: 1.5s;">✓ Salesforce CRM connected</div>
+                <div class="terminal-line text-cyan-400" style="animation-delay: 2s;">✓ Google Analytics connected</div>
+                <div class="terminal-line text-cyan-400" style="animation-delay: 2.5s;">✓ Financial systems connected</div>
+                <div class="terminal-line text-emerald-400" style="animation-delay: 3s;">$ sincor --analyze --predictive-models</div>
+                <div class="terminal-line text-gray-300" style="animation-delay: 3.5s;">Processing 2.4M data points...</div>
+                <div class="terminal-line text-purple-400" style="animation-delay: 4s;">✓ Revenue forecast: +23% Q4 growth</div>
+                <div class="terminal-line text-purple-400" style="animation-delay: 4.5s;">✓ Customer churn risk identified: 342 accounts</div>
+                <div class="terminal-line text-purple-400" style="animation-delay: 5s;">✓ Market opportunity detected: $1.2M potential</div>
+                <div class="terminal-line text-emerald-400" style="animation-delay: 5.5s;">Analysis complete. Insights ready.</div>
+            </div>
+        </div>
+
+        <!-- Demo Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="text-center">
+                <div class="text-4xl font-black demo-metric mb-2">2.4M</div>
+                <div class="text-gray-300 font-mono text-sm">Data Points Processed</div>
+            </div>
+            <div class="text-center">
+                <div class="text-4xl font-black demo-metric mb-2">&lt;3s</div>
+                <div class="text-gray-300 font-mono text-sm">Processing Time</div>
+            </div>
+            <div class="text-center">
+                <div class="text-4xl font-black demo-metric mb-2">97.3%</div>
+                <div class="text-gray-300 font-mono text-sm">Prediction Accuracy</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI Capabilities Showcase -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-24">
+                <div class="ultra-glass rounded-full px-8 py-4 mb-8 inline-block">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider">LIVE AI DEMONSTRATION</span>
+                </div>
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Watch Intelligence Unfold
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    Experience real-time AI processing of enterprise data streams and predictive model generation.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-16">
+                <!-- Real-Time Processing -->
+                <div class="demo-interface rounded-3xl p-12">
+                    <div class="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Neural Data Processing</h3>
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-cyan-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>2.4M data points processed per second</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Real-time stream ingestion from 50+ sources</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Instant pattern recognition and analysis</span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="ultra-glass rounded-full px-6 py-2 inline-block">
+                            <span class="text-cyan-400 font-mono text-sm">&lt;100ms latency</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Predictive Intelligence -->
+                <div class="demo-interface rounded-3xl p-12">
+                    <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Advanced Forecasting</h3>
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Revenue predictions with 97.3% accuracy</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-pink-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Customer behavior pattern analysis</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-red-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Market opportunity identification</span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="ultra-glass rounded-full px-6 py-2 inline-block">
+                            <span class="text-purple-400 font-mono text-sm">97.3% accuracy</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+<!-- Premium CTA Section -->
+<section class="py-32 demo-hero relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="ultra-glass rounded-3xl p-16">
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Ready to Deploy AI Intelligence?
+                </h2>
+                <p class="text-2xl text-gray-100 mb-12 leading-relaxed max-w-3xl mx-auto">
+                    Experience the transformation. Watch your business data become strategic intelligence in real-time.
+                </p>
+
+                <div class="flex flex-col lg:flex-row gap-8 justify-center mb-12">
+                    <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white px-16 py-8 rounded-2xl text-2xl font-bold transition-all premium-glow shadow-2xl group">
+                        <span class="flex items-center justify-center">
+                            Start Your Journey
+                            <svg class="w-8 h-8 ml-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </span>
+                    </a>
+                    <button onclick="startAIDemo()" class="ultra-glass hover:bg-white/20 text-white px-16 py-8 rounded-2xl text-2xl font-semibold transition-all border-2 border-white/20">
+                        Watch AI Demo Again
+                    </button>
+                </div>
+
+                <!-- Demo Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-white/20">
+                    <div class="text-center">
+                        <div class="text-emerald-400 font-mono text-sm mb-2">PROCESSING</div>
+                        <div class="text-white font-bold">2.4M Data Points/Second</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-cyan-400 font-mono text-sm mb-2">ACCURACY</div>
+                        <div class="text-white font-bold">97.3% Prediction Rate</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-pink-400 font-mono text-sm mb-2">RESPONSE</div>
+                        <div class="text-white font-bold">&lt;100ms Latency</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+function startAIDemo() {
+    document.getElementById('ai-demo-modal').classList.remove('hidden');
+    // Reset terminal animation
+    const terminalLines = document.querySelectorAll('.terminal-line');
+    terminalLines.forEach(line => {
+        line.style.opacity = '0';
+        line.style.animation = 'none';
+        setTimeout(() => {
+            line.style.animation = 'typeIn 1s ease-in-out forwards';
+        }, 100);
+    });
+}
+
+function closeAIDemo() {
+    document.getElementById('ai-demo-modal').classList.add('hidden');
+}
+</script>
+{% endblock %}

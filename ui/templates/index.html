@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }} · v{{ version }}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>{{ app_name }} <small>v{{ version }}</small></h1>
+      <section class="panel">
+        <h2>Status</h2>
+        <ul>
+          <li><a href="/health" target="_blank">Health endpoint</a></li>
+        </ul>
+      </section>
+      <section class="panel">
+        <h2>Agents</h2>
+        <ul>
+          {% for name, agent in agents.items() %}
+            <li><code>{{ name }}</code></li>
+          {% endfor %}
+        </ul>
+        <p>POST <code>/run</code> JSON: <code>{"agent":"pricing","payload":{"base_price":199,"demand":1.2}}</code></p>
+      </section>
+    </main>
+  </body>
+</html>

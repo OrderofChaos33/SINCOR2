@@ -1,0 +1,781 @@
+{% extends "base.html" %}
+
+{% block title %}MediaPax - Professional Media Packs - SINCOR{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="bg-gradient-to-br from-purple-600 to-pink-700 text-white py-20">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6">MediaPax</h1>
+            <h2 class="text-2xl md:text-3xl font-semibold mb-6">Professional Media Packs That Sell For You</h2>
+            <p class="text-xl md:text-2xl mb-8 text-purple-100">We research your business, create professional media presentations, and deploy them to prospects who didn't even know they needed you.</p>
+            <div class="space-y-4 md:space-y-0 md:space-x-4 md:flex md:justify-center">
+                <a href="#pricing" class="inline-block bg-yellow-500 text-black px-8 py-4 rounded-lg text-lg font-semibold hover:bg-yellow-400 transition duration-200 transform hover:scale-105">Get Your Media Pack</a>
+                <a href="#how-it-works" class="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition duration-200">See Examples</a>
+            </div>
+            <p class="text-purple-200 mt-4">One-time payment • No subscriptions • Delivered in 3-5 days</p>
+        </div>
+    </div>
+</section>
+
+<!-- What is MediaPax -->
+<section class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">What is a MediaPax?</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">A MediaPax is a professional business presentation that showcases your services, expertise, and value proposition. Unlike generic brochures, each MediaPax is researched, customized, and strategically designed to convert prospects into customers.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h3 class="text-2xl font-bold mb-6">Traditional Marketing vs MediaPax</h3>
+                    <div class="space-y-6">
+                        <div class="flex items-start">
+                            <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-1">Traditional Brochures</h4>
+                                <p class="text-gray-600 text-sm">Generic, one-size-fits-all materials that prospects throw away</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-1">MediaPax Presentations</h4>
+                                <p class="text-gray-600 text-sm">Researched, personalized presentations that address specific prospect needs</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-1">Wait for Customers</h4>
+                                <p class="text-gray-600 text-sm">Hope prospects find you and understand your value</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-4 mt-1">
+                                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-1">Active Prospect Engagement</h4>
+                                <p class="text-gray-600 text-sm">We present your MediaPax to qualified prospects proactively</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 p-8 rounded-lg">
+                    <h4 class="font-bold mb-4">MediaPax Includes:</h4>
+                    <ul class="space-y-3 text-gray-700">
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Professional business research & analysis
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Custom-designed presentation materials
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Service portfolio & capability showcase
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Customer testimonials & case studies
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Competitive advantage positioning
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            Clear calls-to-action & contact info
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How MediaPax Works -->
+<section id="how-it-works" class="py-20 bg-gray-50">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">How MediaPax Works</h2>
+                <p class="text-xl text-gray-600">From business research to prospect delivery in 5 simple steps</p>
+            </div>
+            
+            <div class="space-y-16">
+                <!-- Step 1 -->
+                <div class="flex flex-col md:flex-row items-center">
+                    <div class="md:w-1/2 mb-8 md:mb-0">
+                        <div class="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                            <span class="text-2xl font-bold text-purple-600">1</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">Deep Business Research</h3>
+                        <p class="text-gray-600 mb-4">Our research team gathers comprehensive information about your business, services, market position, and competitive advantages.</p>
+                        <ul class="text-gray-600 space-y-2">
+                            <li>• Service catalog analysis</li>
+                            <li>• Customer review mining</li>
+                            <li>• Competitive landscape assessment</li>
+                            <li>• Unique value proposition identification</li>
+                            <li>• Pricing strategy evaluation</li>
+                        </ul>
+                    </div>
+                    <div class="md:w-1/2 md:pl-12">
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h4 class="font-bold mb-3">Research Sources:</h4>
+                            <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
+                                    Website content
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
+                                    Google My Business
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
+                                    Customer reviews
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
+                                    Social media
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
+                                    Industry data
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-2 h-2 bg-purple-400 rounded-full mr-2"></div>
+                                    Competitor analysis
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="flex flex-col md:flex-row-reverse items-center">
+                    <div class="md:w-1/2 mb-8 md:mb-0">
+                        <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                            <span class="text-2xl font-bold text-blue-600">2</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">Professional Design & Copywriting</h3>
+                        <p class="text-gray-600 mb-4">Expert designers and copywriters create compelling presentations that highlight your strengths and address customer pain points.</p>
+                        <ul class="text-gray-600 space-y-2">
+                            <li>• Professional visual design</li>
+                            <li>• Persuasive copywriting</li>
+                            <li>• Industry-specific messaging</li>
+                            <li>• Customer-focused benefits</li>
+                            <li>• Strong call-to-action elements</li>
+                        </ul>
+                    </div>
+                    <div class="md:w-1/2 md:pr-12">
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h4 class="font-bold mb-3">Design Elements:</h4>
+                            <div class="space-y-3">
+                                <div class="border-l-4 border-blue-500 pl-3">
+                                    <p class="font-semibold text-sm">Professional Branding</p>
+                                    <p class="text-xs text-gray-600">Logo integration, brand colors, consistent styling</p>
+                                </div>
+                                <div class="border-l-4 border-green-500 pl-3">
+                                    <p class="font-semibold text-sm">Visual Hierarchy</p>
+                                    <p class="text-xs text-gray-600">Clear information flow, easy scanning, key points highlighted</p>
+                                </div>
+                                <div class="border-l-4 border-yellow-500 pl-3">
+                                    <p class="font-semibold text-sm">Social Proof</p>
+                                    <p class="text-xs text-gray-600">Customer testimonials, ratings, certifications</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="flex flex-col md:flex-row items-center">
+                    <div class="md:w-1/2 mb-8 md:mb-0">
+                        <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                            <span class="text-2xl font-bold text-green-600">3</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">Template Auto-Population</h3>
+                        <p class="text-gray-600 mb-4">Your business information is automatically populated into professional templates optimized for your specific industry.</p>
+                        <ul class="text-gray-600 space-y-2">
+                            <li>• Industry-specific templates</li>
+                            <li>• Automated data insertion</li>
+                            <li>• Quality assurance checks</li>
+                            <li>• Format optimization</li>
+                            <li>• Multi-device compatibility</li>
+                        </ul>
+                    </div>
+                    <div class="md:w-1/2 md:pl-12">
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h4 class="font-bold mb-3">Template Categories:</h4>
+                            <div class="grid grid-cols-1 gap-3 text-sm">
+                                <div class="bg-gray-50 p-3 rounded">
+                                    <span class="font-semibold">Service Overview</span>
+                                    <p class="text-xs text-gray-600 mt-1">Complete service portfolio with descriptions</p>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded">
+                                    <span class="font-semibold">Process Explanation</span>
+                                    <p class="text-xs text-gray-600 mt-1">How you work, what to expect</p>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded">
+                                    <span class="font-semibold">Value Proposition</span>
+                                    <p class="text-xs text-gray-600 mt-1">Why choose you over competitors</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 4 -->
+                <div class="flex flex-col md:flex-row-reverse items-center">
+                    <div class="md:w-1/2 mb-8 md:mb-0">
+                        <div class="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                            <span class="text-2xl font-bold text-yellow-600">4</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">Strategic Prospect Targeting</h3>
+                        <p class="text-gray-600 mb-4">We identify ideal prospects in your service area who are most likely to need and value your services.</p>
+                        <ul class="text-gray-600 space-y-2">
+                            <li>• Ideal customer profiling</li>
+                            <li>• Geographic targeting</li>
+                            <li>• Behavioral trigger identification</li>
+                            <li>• Decision-maker research</li>
+                            <li>• Contact verification</li>
+                        </ul>
+                    </div>
+                    <div class="md:w-1/2 md:pr-12">
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h4 class="font-bold mb-3">Targeting Criteria:</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span>Geographic Range</span>
+                                    <span class="text-purple-600 font-semibold">Service Area</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Business Type</span>
+                                    <span class="text-purple-600 font-semibold">Ideal Customers</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Size/Budget</span>
+                                    <span class="text-purple-600 font-semibold">Qualified Prospects</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Timing</span>
+                                    <span class="text-purple-600 font-semibold">Active Need</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 5 -->
+                <div class="flex flex-col md:flex-row items-center">
+                    <div class="md:w-1/2 mb-8 md:mb-0">
+                        <div class="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mb-6">
+                            <span class="text-2xl font-bold text-red-600">5</span>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">Direct Prospect Presentation</h3>
+                        <p class="text-gray-600 mb-4">Your MediaPax is presented to prospects as a custom solution created specifically for their needs, not as generic marketing.</p>
+                        <ul class="text-gray-600 space-y-2">
+                            <li>• Personalized presentation approach</li>
+                            <li>• Multi-channel delivery</li>
+                            <li>• Follow-up sequence automation</li>
+                            <li>• Response tracking & analytics</li>
+                            <li>• Lead qualification & handoff</li>
+                        </ul>
+                    </div>
+                    <div class="md:w-1/2 md:pl-12">
+                        <div class="bg-white p-6 rounded-lg shadow-lg">
+                            <h4 class="font-bold mb-3">Presentation Channels:</h4>
+                            <div class="grid grid-cols-2 gap-3 text-sm">
+                                <div class="text-center p-3 bg-gray-50 rounded">
+                                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                        </svg>
+                                    </div>
+                                    <span class="font-semibold">Email</span>
+                                </div>
+                                <div class="text-center p-3 bg-gray-50 rounded">
+                                    <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path>
+                                        </svg>
+                                    </div>
+                                    <span class="font-semibold">Social</span>
+                                </div>
+                                <div class="text-center p-3 bg-gray-50 rounded">
+                                    <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                                        </svg>
+                                    </div>
+                                    <span class="font-semibold">Direct</span>
+                                </div>
+                                <div class="text-center p-3 bg-gray-50 rounded">
+                                    <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"></path>
+                                        </svg>
+                                    </div>
+                                    <span class="font-semibold">Web</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- MediaPax Pricing -->
+<section id="pricing" class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">MediaPax Packages</h2>
+                <p class="text-xl text-gray-600">One-time investment, lifetime value. Choose the package that fits your business needs.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Basic MediaPax -->
+                <div class="bg-white border-2 border-gray-200 rounded-lg p-8 relative">
+                    <div class="text-center mb-8">
+                        <h3 class="text-2xl font-bold mb-2 text-purple-600">Basic MediaPax</h3>
+                        <div class="text-4xl font-bold text-gray-900 mb-2">$175<span class="text-lg text-gray-500"> one-time</span></div>
+                        <p class="text-gray-600">Essential media pack for small businesses</p>
+                        <div class="text-sm text-green-600 font-semibold mt-2">Most Popular for Startups</div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Comprehensive business research</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Professional media pack creation</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Template auto-population</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Direct prospect presentation</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Basic performance tracking</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Email delivery format</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>3-5 business day delivery</span>
+                        </div>
+                    </div>
+                    
+                    <a href="/contact" class="block w-full bg-purple-600 text-white text-center py-3 rounded-lg font-semibold hover:bg-purple-700 transition">Order Basic MediaPax</a>
+                </div>
+                
+                <!-- Premium MediaPax -->
+                <div class="bg-white border-2 border-yellow-500 rounded-lg p-8 relative transform scale-105">
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-black px-4 py-1 rounded-full text-sm font-bold">Best Value</div>
+                    <div class="text-center mb-8">
+                        <h3 class="text-2xl font-bold mb-2 text-yellow-600">Premium MediaPax</h3>
+                        <div class="text-4xl font-bold text-gray-900 mb-2">$275<span class="text-lg text-gray-500"> one-time</span></div>
+                        <p class="text-gray-600">Enhanced features for growing businesses</p>
+                        <div class="text-sm text-green-600 font-semibold mt-2">Includes Follow-up Automation</div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>Everything in Basic MediaPax</strong></span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Advanced incentive strategies</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Automated follow-up sequences</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Upsell & cross-sell campaigns</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Multi-channel deployment</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Detailed analytics & reporting</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Priority 2-3 day delivery</span>
+                        </div>
+                    </div>
+                    
+                    <a href="/contact" class="block w-full bg-yellow-500 text-black text-center py-3 rounded-lg font-semibold hover:bg-yellow-400 transition transform hover:scale-105">Order Premium MediaPax</a>
+                </div>
+                
+                <!-- Enterprise MediaPax -->
+                <div class="bg-white border-2 border-blue-500 rounded-lg p-8 relative">
+                    <div class="text-center mb-8">
+                        <h3 class="text-2xl font-bold mb-2 text-blue-600">Enterprise MediaPax</h3>
+                        <div class="text-4xl font-bold text-gray-900 mb-2">$400<span class="text-lg text-gray-500"> one-time</span></div>
+                        <p class="text-gray-600">Complete system for established businesses</p>
+                        <div class="text-sm text-green-600 font-semibold mt-2">Includes Lead Gen Plan</div>
+                    </div>
+                    
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span><strong>Everything in Premium MediaPax</strong></span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Lead generation plan setup</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Competitive market analysis</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Ongoing campaign optimization</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Custom prospect targeting</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>White-label deployment options</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Rush 1-2 day delivery</span>
+                        </div>
+                    </div>
+                    
+                    <a href="/contact" class="block w-full bg-blue-600 text-white text-center py-3 rounded-lg font-semibold hover:bg-blue-700 transition">Order Enterprise MediaPax</a>
+                </div>
+            </div>
+            
+            <div class="text-center mt-12">
+                <p class="text-gray-600 mb-4">Need something custom? We can create bespoke MediaPax solutions for unique business requirements.</p>
+                <a href="/contact" class="inline-block text-purple-600 font-semibold hover:underline">Contact us for custom pricing →</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- MediaPax Examples -->
+<section class="py-20 bg-gray-50">
+    <div class="container mx-auto px-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">MediaPax Examples by Industry</h2>
+                <p class="text-xl text-gray-600">See how MediaPax presentations are customized for different service businesses</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-12">
+                <!-- HVAC Example -->
+                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 text-red-600">HVAC Services MediaPax</h3>
+                    <div class="space-y-4 mb-6">
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <h4 class="font-semibold mb-1">Seasonal Positioning</h4>
+                            <p class="text-sm text-gray-600">Emphasizes energy efficiency, comfort, and reliability during peak seasons</p>
+                        </div>
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold mb-1">Service Showcase</h4>
+                            <p class="text-sm text-gray-600">Installation, repair, maintenance, and emergency services with clear pricing</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold mb-1">Trust Builders</h4>
+                            <p class="text-sm text-gray-600">Certifications, warranties, insurance coverage, and customer testimonials</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded text-sm">
+                        <strong>Sample Headline:</strong> "Is Your 12-Year-Old HVAC System Costing You Money? Our Energy Audit Shows Most Homeowners Save $200+ Monthly After Our Upgrade Service"
+                    </div>
+                </div>
+                
+                <!-- Auto Detailing Example -->
+                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 text-blue-600">Auto Detailing MediaPax</h3>
+                    <div class="space-y-4 mb-6">
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold mb-1">Visual Portfolio</h4>
+                            <p class="text-sm text-gray-600">Before/after photos, luxury vehicle specializations, mobile convenience</p>
+                        </div>
+                        <div class="border-l-4 border-yellow-500 pl-4">
+                            <h4 class="font-semibold mb-1">Package Options</h4>
+                            <p class="text-sm text-gray-600">Basic wash, full detail, paint correction, ceramic coating with clear pricing</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold mb-1">Convenience Factor</h4>
+                            <p class="text-sm text-gray-600">Mobile service, flexible scheduling, eco-friendly products, satisfaction guarantee</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded text-sm">
+                        <strong>Sample Headline:</strong> "Your BMW Deserves Better Than A Gas Station Car Wash - Mobile Luxury Detailing That Comes to You, Starting $89"
+                    </div>
+                </div>
+                
+                <!-- Plumbing Example -->
+                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 text-green-600">Plumbing Services MediaPax</h3>
+                    <div class="space-y-4 mb-6">
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <h4 class="font-semibold mb-1">Emergency Response</h4>
+                            <p class="text-sm text-gray-600">24/7 availability, rapid response times, emergency contact information</p>
+                        </div>
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold mb-1">Full Service Range</h4>
+                            <p class="text-sm text-gray-600">Repairs, installations, remodeling, drain cleaning, leak detection</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold mb-1">Quality Assurance</h4>
+                            <p class="text-sm text-gray-600">Licensed, bonded, insured with work guarantees and upfront pricing</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded text-sm">
+                        <strong>Sample Headline:</strong> "Plumbing Emergency? We're 20 Minutes Away - Licensed Master Plumbers with 15+ Years Experience and Upfront Pricing"
+                    </div>
+                </div>
+                
+                <!-- Pest Control Example -->
+                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 text-yellow-600">Pest Control MediaPax</h3>
+                    <div class="space-y-4 mb-6">
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <h4 class="font-semibold mb-1">Problem-Solution Focus</h4>
+                            <p class="text-sm text-gray-600">Identifies pest issues, health risks, and provides targeted solutions</p>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <h4 class="font-semibold mb-1">Prevention Programs</h4>
+                            <p class="text-sm text-gray-600">Quarterly treatments, ongoing monitoring, seasonal pest protection plans</p>
+                        </div>
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <h4 class="font-semibold mb-1">Safety & Compliance</h4>
+                            <p class="text-sm text-gray-600">EPA-approved treatments, pet-safe options, state licensing information</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded text-sm">
+                        <strong>Sample Headline:</strong> "Seeing Ants in Your Kitchen Again? Our 90-Day Pest Elimination Guarantee Covers 15+ Common Pests for $79/Quarterly"
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ROI Calculator -->
+<section class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">MediaPax ROI Calculator</h2>
+                <p class="text-xl text-gray-600">See how MediaPax pays for itself with just one or two new customers</p>
+            </div>
+            
+            <div class="bg-gray-50 p-8 rounded-lg">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="text-center">
+                        <div class="text-4xl font-bold text-purple-600 mb-2">$275</div>
+                        <div class="text-lg font-semibold mb-2">Premium MediaPax Investment</div>
+                        <p class="text-sm text-gray-600">One-time cost, lifetime use</p>
+                    </div>
+                    
+                    <div class="text-center">
+                        <div class="text-4xl font-bold text-green-600 mb-2">2-5</div>
+                        <div class="text-lg font-semibold mb-2">New Customers Needed</div>
+                        <p class="text-sm text-gray-600">To break even on investment</p>
+                    </div>
+                    
+                    <div class="text-center">
+                        <div class="text-4xl font-bold text-blue-600 mb-2">30-90</div>
+                        <div class="text-lg font-semibold mb-2">Days to ROI</div>
+                        <p class="text-sm text-gray-600">Typical payback period</p>
+                    </div>
+                </div>
+                
+                <div class="mt-8 p-6 bg-white rounded border">
+                    <h4 class="font-bold mb-4">Example ROI Calculation:</h4>
+                    <div class="grid md:grid-cols-2 gap-6 text-sm">
+                        <div>
+                            <p class="mb-2"><strong>HVAC Company Example:</strong></p>
+                            <p>• Average job value: $850</p>
+                            <p>• MediaPax generates 3 new customers</p>
+                            <p>• Total new revenue: $2,550</p>
+                            <p>• MediaPax cost: $275</p>
+                            <p class="font-bold text-green-600 mt-2">Net ROI: $2,275 (827% return)</p>
+                        </div>
+                        <div>
+                            <p class="mb-2"><strong>Auto Detailing Example:</strong></p>
+                            <p>• Average job value: $125</p>
+                            <p>• MediaPax generates 8 new customers</p>
+                            <p>• Total new revenue: $1,000</p>
+                            <p>• MediaPax cost: $275</p>
+                            <p class="font-bold text-green-600 mt-2">Net ROI: $725 (264% return)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Section -->
+<section class="py-20 bg-gray-50">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">MediaPax FAQ</h2>
+                <p class="text-xl text-gray-600">Common questions about our media pack service</p>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">What information do you need from me to create my MediaPax?</h3>
+                    <p class="text-gray-600">We gather most information automatically from your website, Google My Business, and public sources. You'll receive a brief questionnaire covering any gaps and specific preferences for positioning and messaging.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">How do you ensure my MediaPax stands out from competitors?</h3>
+                    <p class="text-gray-600">We research your competitive landscape and identify unique differentiators, customer pain points, and positioning opportunities. Each MediaPax emphasizes what makes your business unique and valuable.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">Can I see examples of MediaPax presentations before ordering?</h3>
+                    <p class="text-gray-600">Due to client confidentiality, we can't share actual MediaPax presentations. However, we can provide industry-specific mockups and discuss how your presentation would be structured during a consultation call.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">What if I need revisions to my MediaPax?</h3>
+                    <p class="text-gray-600">Each package includes one round of revisions based on your feedback. Additional revisions can be made for $50 each. We work with you to ensure the final product meets your expectations.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">How do you target and present MediaPax to prospects?</h3>
+                    <p class="text-gray-600">We identify ideal prospects in your service area using demographic data, business triggers, and behavioral indicators. The MediaPax is then presented through personalized email campaigns, social media outreach, and direct contact methods.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">Do you provide the prospect list or handle outreach yourself?</h3>
+                    <p class="text-gray-600">We handle the complete process - from prospect identification to MediaPax presentation. You receive qualified leads and interested prospects ready for your sales process. No prospect lists or manual outreach required.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">Can I use my MediaPax for my own marketing efforts?</h3>
+                    <p class="text-gray-600">Absolutely! Your MediaPax becomes your property and can be used for website content, sales presentations, trade shows, email marketing, and any other business development activities.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold mb-2">What's the typical response rate from MediaPax presentations?</h3>
+                    <p class="text-gray-600">Response rates vary by industry and market, but typically range from 8-15% for initial interest, with 20-35% of those converting to qualified leads. This is significantly higher than traditional cold outreach methods.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-20 bg-gradient-to-r from-purple-600 to-pink-700 text-white">
+    <div class="container mx-auto px-6 text-center">
+        <h2 class="text-4xl font-bold mb-6">Ready to Get Your MediaPax?</h2>
+        <p class="text-xl mb-8 text-purple-100">Join hundreds of businesses already using MediaPax to attract and convert more customers</p>
+        <div class="space-y-4 md:space-y-0 md:space-x-4 md:flex md:justify-center">
+            <a href="/contact" class="inline-block bg-yellow-500 text-black px-8 py-4 rounded-lg text-lg font-semibold hover:bg-yellow-400 transition duration-200 transform hover:scale-105">Order Your MediaPax</a>
+            <a href="/demo" class="inline-block border-2 border-white text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white hover:text-purple-600 transition duration-200">Schedule Consultation</a>
+        </div>
+        <p class="text-purple-200 mt-6">One-time investment • No monthly fees • 3-5 day delivery</p>
+    </div>
+</section>
+{% endblock %}

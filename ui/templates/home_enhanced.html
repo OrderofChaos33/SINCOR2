@@ -1,0 +1,462 @@
+{% extends "base_enhanced.html" %}
+
+{% block title %}SINCOR - Premium Enterprise AI Solutions | Transform Your Business{% endblock %}
+
+{% block description %}Transform your business with SINCOR's premium AI solutions. 47 specialized agents, 7 enterprise products, proven ROI. The future of intelligent business automation.{% endblock %}
+
+{% block content %}
+
+<!-- Hero Section with 3D Effects -->
+<section class="hero-3d min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div class="container mx-auto px-6 text-center text-white relative z-10">
+        <div class="max-w-4xl mx-auto">
+            <!-- Main Headline -->
+            <h1 class="text-5xl md:text-7xl font-bold mb-6" style="font-family: 'Playfair Display', serif;">
+                Transform Your Business with
+                <span class="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    Premium AI Solutions
+                </span>
+            </h1>
+
+            <!-- Subheading -->
+            <p class="text-xl md:text-2xl mb-8 text-gray-200 font-light max-w-3xl mx-auto">
+                47 specialized AI agents and 7 revolutionary products designed for enterprise excellence.
+                Achieve unprecedented ROI and competitive advantage.
+            </p>
+
+            <!-- Key Value Props -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 max-w-4xl mx-auto">
+                <div class="stat-counter-3d">
+                    <div class="stat-number">47</div>
+                    <div class="text-gray-600 font-medium">Specialized AI Agents</div>
+                </div>
+                <div class="stat-counter-3d">
+                    <div class="stat-number">$2.8M</div>
+                    <div class="text-gray-600 font-medium">Average Annual ROI</div>
+                </div>
+                <div class="stat-counter-3d">
+                    <div class="stat-number">98.2%</div>
+                    <div class="text-gray-600 font-medium">Client Satisfaction</div>
+                </div>
+            </div>
+
+            <!-- CTA Buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <a href="{{ url_for('demo') }}" class="btn-3d text-lg px-8 py-4">
+                    <i class="fas fa-rocket mr-2"></i>
+                    Request Enterprise Demo
+                </a>
+                <a href="{{ url_for('agents_gallery') }}" class="inline-flex items-center px-8 py-4 border-2 border-white text-white hover:bg-white hover:text-blue-900 rounded-lg font-semibold transition duration-300">
+                    <i class="fas fa-users mr-2"></i>
+                    Explore 47 AI Agents
+                </a>
+            </div>
+
+            <!-- Trust Indicators -->
+            <div class="mt-16 pt-8 border-t border-white/20">
+                <p class="text-gray-300 mb-6">Trusted by Fortune 500 Companies</p>
+                <div class="flex justify-center items-center space-x-8 opacity-60">
+                    <div class="text-2xl font-bold">Enterprise Client 1</div>
+                    <div class="text-2xl font-bold">Enterprise Client 2</div>
+                    <div class="text-2xl font-bold">Enterprise Client 3</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Background Elements -->
+    <div class="absolute inset-0 opacity-20">
+        <div class="absolute top-20 left-20 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+        <div class="absolute top-40 right-20 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
+        <div class="absolute bottom-20 left-1/2 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-2000"></div>
+    </div>
+</section>
+
+<!-- Featured Products Section -->
+<section class="py-20 bg-gray-50">
+    <div class="container mx-auto px-6">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-bold mb-4" style="font-family: 'Playfair Display', serif;">
+                <span class="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                    Revolutionary Products
+                </span>
+            </h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Seven enterprise-grade solutions that transform business operations and drive exceptional results
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            <!-- Agent Constellation Product Card -->
+            <div class="product-card p-8 group cursor-pointer" onclick="window.location.href='{{ url_for('product_agent_constellation') }}'">
+                <div class="feature-icon-3d group-hover:scale-110 transition-transform duration-300">
+                    <i class="fas fa-network-wired text-white text-2xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-gray-900">Agent Constellation™</h3>
+                <p class="text-gray-600 mb-6">AI Agent Marketplace & Orchestration Platform with 500+ pre-built agents</p>
+                <div class="space-y-2 mb-6">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Unlimited AI agents
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Real-time monitoring
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Enterprise security
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl font-bold text-blue-600">$15K-$125K/mo</span>
+                    <i class="fas fa-arrow-right text-blue-600 group-hover:translate-x-2 transition-transform duration-200"></i>
+                </div>
+            </div>
+
+            <!-- Hunter Pro Product Card -->
+            <div class="product-card p-8 group cursor-pointer" onclick="window.location.href='{{ url_for('product_hunter_pro') }}'">
+                <div class="feature-icon-3d group-hover:scale-110 transition-transform duration-300" style="background: linear-gradient(135deg, #059669, #0d9488, #0891b2);">
+                    <i class="fas fa-search text-white text-2xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-gray-900">Hunter Pro™</h3>
+                <p class="text-gray-600 mb-6">Advanced Lead Generation & Intelligence System with 89% accuracy</p>
+                <div class="space-y-2 mb-6">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        AI-powered targeting
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Multi-channel automation
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Predictive analytics
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl font-bold text-emerald-600">$2.5K-$25K/mo</span>
+                    <i class="fas fa-arrow-right text-emerald-600 group-hover:translate-x-2 transition-transform duration-200"></i>
+                </div>
+            </div>
+
+            <!-- Cor-Tec's AI Platform Product Card -->
+            <div class="product-card p-8 group cursor-pointer" onclick="window.location.href='{{ url_for('product_cortecs_ai_platform') }}'">
+                <div class="feature-icon-3d group-hover:scale-110 transition-transform duration-300" style="background: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);">
+                    <i class="fas fa-brain text-white text-2xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-gray-900">Cor-Tec's AI Platform™</h3>
+                <p class="text-gray-600 mb-6">Complete AI Business Automation Ecosystem for enterprise transformation</p>
+                <div class="space-y-2 mb-6">
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Modular AI components
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Custom model training
+                    </div>
+                    <div class="flex items-center text-sm text-gray-600">
+                        <i class="fas fa-check text-green-500 mr-2"></i>
+                        Enterprise integration
+                    </div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl font-bold text-purple-600">$25K-$200K/mo</span>
+                    <i class="fas fa-arrow-right text-purple-600 group-hover:translate-x-2 transition-transform duration-200"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <a href="{{ url_for('products_overview') }}" class="btn-3d text-lg px-8 py-4">
+                <i class="fas fa-th-large mr-2"></i>
+                View All 7 Products
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Agents Section -->
+<section class="py-20 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-bold mb-4" style="font-family: 'Playfair Display', serif;">
+                <span class="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                    Elite AI Agent Portfolio
+                </span>
+            </h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                47 specialized AI agents engineered for maximum performance across every business function
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            <!-- Top Performing Agents Preview -->
+            <div class="agent-card p-6 group cursor-pointer" onclick="window.location.href='{{ url_for('agent_detail', agent_id='E-fomalhaut-13') }}'">
+                <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform duration-300">
+                    <i class="fas fa-handshake text-white text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2 text-center">Fomalhaut Strategic Closer</h3>
+                <p class="text-gray-600 text-sm text-center mb-4">Enterprise Deal Architect</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Revenue:</span>
+                        <span class="font-semibold text-green-600">$8.9M</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">ROI:</span>
+                        <span class="font-semibold text-blue-600">1,247%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Accuracy:</span>
+                        <span class="font-semibold text-purple-600">94.2%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="agent-card p-6 group cursor-pointer" onclick="window.location.href='{{ url_for('agent_detail', agent_id='E-vega-02') }}'">
+                <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform duration-300">
+                    <i class="fas fa-search text-white text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2 text-center">Vega Hunter</h3>
+                <p class="text-gray-600 text-sm text-center mb-4">Lead Prospecting Virtuoso</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Revenue:</span>
+                        <span class="font-semibold text-green-600">$3.4M</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">ROI:</span>
+                        <span class="font-semibold text-blue-600">923%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Accuracy:</span>
+                        <span class="font-semibold text-purple-600">92.3%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="agent-card p-6 group cursor-pointer" onclick="window.location.href='{{ url_for('agent_detail', agent_id='E-polaris-21') }}'">
+                <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform duration-300">
+                    <i class="fas fa-chart-line text-white text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2 text-center">Polaris Executive Analyst</h3>
+                <p class="text-gray-600 text-sm text-center mb-4">Executive Intelligence Synthesizer</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Revenue:</span>
+                        <span class="font-semibold text-green-600">$4.2M</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">ROI:</span>
+                        <span class="font-semibold text-blue-600">892%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Accuracy:</span>
+                        <span class="font-semibold text-purple-600">96.8%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="agent-card p-6 group cursor-pointer" onclick="window.location.href='{{ url_for('agent_detail', agent_id='E-alphard-37') }}'">
+                <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform duration-300">
+                    <i class="fas fa-cogs text-white text-xl"></i>
+                </div>
+                <h3 class="text-xl font-bold mb-2 text-center">Alphard Operations Director</h3>
+                <p class="text-gray-600 text-sm text-center mb-4">Strategic Operations Director</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Revenue:</span>
+                        <span class="font-semibold text-green-600">$5.6M</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">ROI:</span>
+                        <span class="font-semibold text-blue-600">1,034%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Accuracy:</span>
+                        <span class="font-semibold text-purple-600">95.1%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Categories Overview -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
+            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600">12</div>
+                <div class="text-sm text-gray-600">Lead Generation</div>
+            </div>
+            <div class="text-center p-4 bg-green-50 rounded-lg">
+                <div class="text-2xl font-bold text-green-600">8</div>
+                <div class="text-sm text-gray-600">Sales & Negotiation</div>
+            </div>
+            <div class="text-center p-4 bg-purple-50 rounded-lg">
+                <div class="text-2xl font-bold text-purple-600">9</div>
+                <div class="text-sm text-gray-600">Analysis & Intelligence</div>
+            </div>
+            <div class="text-center p-4 bg-orange-50 rounded-lg">
+                <div class="text-2xl font-bold text-orange-600">7</div>
+                <div class="text-sm text-gray-600">Marketing & Content</div>
+            </div>
+            <div class="text-center p-4 bg-indigo-50 rounded-lg">
+                <div class="text-2xl font-bold text-indigo-600">6</div>
+                <div class="text-sm text-gray-600">Operations</div>
+            </div>
+            <div class="text-center p-4 bg-teal-50 rounded-lg">
+                <div class="text-2xl font-bold text-teal-600">5</div>
+                <div class="text-sm text-gray-600">Industry Specialists</div>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <a href="{{ url_for('agents_gallery') }}" class="btn-3d text-lg px-8 py-4">
+                <i class="fas fa-users mr-2"></i>
+                Explore All 47 Agents
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Results & ROI Section -->
+<section class="py-20 bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 text-white">
+    <div class="container mx-auto px-6">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-bold mb-4" style="font-family: 'Playfair Display', serif;">
+                Proven Enterprise Results
+            </h2>
+            <p class="text-xl text-blue-100 max-w-3xl mx-auto">
+                Our clients achieve extraordinary outcomes through our premium AI solutions
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+            <div class="text-center">
+                <div class="text-5xl font-bold mb-2 text-cyan-400">$150M+</div>
+                <div class="text-lg text-blue-200">Total Client Revenue Generated</div>
+            </div>
+            <div class="text-center">
+                <div class="text-5xl font-bold mb-2 text-emerald-400">340%</div>
+                <div class="text-lg text-blue-200">Average ROI Improvement</div>
+            </div>
+            <div class="text-center">
+                <div class="text-5xl font-bold mb-2 text-purple-400">67%</div>
+                <div class="text-lg text-blue-200">Operational Cost Reduction</div>
+            </div>
+            <div class="text-center">
+                <div class="text-5xl font-bold mb-2 text-orange-400">99.2%</div>
+                <div class="text-lg text-blue-200">Client Retention Rate</div>
+            </div>
+        </div>
+
+        <!-- Featured Testimonial -->
+        <div class="testimonial-3d max-w-4xl mx-auto">
+            <div class="text-center">
+                <div class="text-2xl mb-6 text-gray-700 italic" style="font-family: 'Playfair Display', serif;">
+                    "SINCOR's AI solutions transformed our entire operation. We achieved $23M in additional revenue within the first year, with their Agent Constellation platform handling complex tasks that previously required dozens of specialists."
+                </div>
+                <div class="flex items-center justify-center space-x-4">
+                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <span class="text-white font-bold text-xl">JD</span>
+                    </div>
+                    <div class="text-left">
+                        <div class="font-semibold text-gray-900">James Davidson</div>
+                        <div class="text-gray-600">CEO, Fortune 500 Manufacturing</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-20 bg-gray-50">
+    <div class="container mx-auto px-6 text-center">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-4xl md:text-5xl font-bold mb-6" style="font-family: 'Playfair Display', serif;">
+                Ready to Transform Your Business?
+            </h2>
+            <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+                Join the world's most successful enterprises. Get started with a personalized demo and see how our AI solutions can revolutionize your operations.
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+                <a href="{{ url_for('demo') }}" class="btn-3d text-lg px-8 py-4">
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    Schedule Executive Demo
+                </a>
+                <a href="{{ url_for('contact') }}" class="inline-flex items-center px-8 py-4 border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg font-semibold transition duration-300">
+                    <i class="fas fa-phone mr-2"></i>
+                    Speak with Specialist
+                </a>
+            </div>
+
+            <div class="text-center text-gray-500">
+                <p>✓ No commitment required  ✓ 30-day trial available  ✓ Enterprise security certified</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Add intersection observer for animations
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+
+    // Observe all cards and elements
+    document.querySelectorAll('.product-card, .agent-card, .testimonial-3d').forEach(el => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(30px)';
+        el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(el);
+    });
+
+    // Counter animation
+    function animateCounter(element, target) {
+        let current = 0;
+        const increment = target / 100;
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+                current = target;
+                clearInterval(timer);
+            }
+            element.textContent = Math.floor(current).toLocaleString();
+        }, 20);
+    }
+
+    // Trigger counter animations when visible
+    const counterObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const counters = entry.target.querySelectorAll('.stat-number');
+                counters.forEach(counter => {
+                    const target = parseFloat(counter.textContent.replace(/[^0-9.]/g, ''));
+                    animateCounter(counter, target);
+                });
+                counterObserver.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.stat-counter-3d').forEach(el => {
+        counterObserver.observe(el);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Intelligence Engine - SINCOR Enterprise{% endblock %}
+
+{% block content %}
+<style>
+    .intelligence-hero {
+        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 25%, #2d1b69 50%, #11998e 75%, #38ef7d 100%);
+        background-size: 400% 400%;
+        animation: etherealGradient 20s ease infinite;
+    }
+
+    .intelligence-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.6s cubic-bezier(0.23, 1, 0.320, 1);
+    }
+
+    .intelligence-card:hover {
+        transform: translateY(-12px) scale(1.02);
+        box-shadow: 0 25px 60px rgba(102, 126, 234, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .ai-brain {
+        animation: brainPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes brainPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.8; }
+    }
+</style>
+
+<!-- Ultra-Premium Intelligence Hero -->
+<section class="min-h-screen intelligence-hero relative overflow-hidden flex items-center justify-center">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-6xl mx-auto">
+            <div class="ultra-glass rounded-full px-8 py-4 mb-12 inline-block">
+                <span class="text-emerald-400 font-mono text-sm tracking-wider">SINCOR INTELLIGENCE ENGINE</span>
+            </div>
+
+            <h1 class="text-7xl lg:text-8xl font-black text-white mb-8 leading-tight">
+                Cognitive <span class="morphing-text">Intelligence</span>
+            </h1>
+
+            <p class="text-2xl lg:text-3xl mb-16 text-gray-100 max-w-4xl mx-auto leading-relaxed">
+                AI that doesn't just analyze—it thinks, learns, and evolves with your business to deliver strategic intelligence beyond human capability.
+            </p>
+
+            <div class="flex flex-col lg:flex-row gap-8 justify-center">
+                <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-12 py-6 rounded-2xl text-xl font-bold transition-all premium-glow shadow-2xl">
+                    Activate Intelligence
+                </a>
+                <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all border-2 border-white/20">
+                    See AI in Action
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Intelligence Capabilities -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-24">
+                <div class="ultra-glass rounded-full px-8 py-4 mb-8 inline-block">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider">COGNITIVE CAPABILITIES</span>
+                </div>
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Beyond Traditional AI
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    Multi-layered intelligence that combines machine learning, deep learning, and cognitive computing for unprecedented insights.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-12">
+                <!-- Deep Learning Engine -->
+                <div class="intelligence-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-8 ai-brain">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Deep Learning Engine</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Multi-layered neural networks that understand context, nuance, and complex relationships in your business data.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Pattern recognition across dimensions</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-pink-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Contextual understanding</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-red-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Self-improving algorithms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Predictive Intelligence -->
+                <div class="intelligence-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8 ai-brain">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Predictive Intelligence</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Forward-looking AI that doesn't just predict outcomes—it understands probability cascades and scenario planning.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-cyan-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Multi-horizon forecasting</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Scenario simulation</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-indigo-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Risk probability modeling</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cognitive Reasoning -->
+                <div class="intelligence-card rounded-3xl p-12">
+                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-8 ai-brain">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Cognitive Reasoning</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Human-like reasoning capabilities that understand causation, correlation, and strategic implications.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-emerald-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Causal inference</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-teal-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Strategic recommendation</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-green-400 rounded-full mr-4 animate-pulse"></div>
+                            <span>Logical deduction</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Intelligence in Action -->
+<section class="py-32 bg-white relative overflow-hidden">
+    <div class="container mx-auto px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-black text-gray-900 mb-8">
+                    Intelligence <span class="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Applications</span>
+                </h2>
+                <p class="text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    See how cognitive intelligence transforms complex business challenges into strategic opportunities.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-16">
+                <!-- Strategic Decision Making -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-12">
+                    <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-8">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-gray-900 mb-6">Strategic Decision Intelligence</h3>
+                    <p class="text-gray-600 text-lg mb-8 leading-relaxed">
+                        AI that evaluates complex business scenarios, weighs multiple variables, and recommends optimal strategies with confidence levels and risk assessments.
+                    </p>
+
+                    <div class="bg-white rounded-2xl p-6 border border-gray-200">
+                        <h4 class="font-bold text-gray-900 mb-4">Example: Market Expansion Decision</h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700">Southeast Asia Expansion</span>
+                                <div class="flex items-center">
+                                    <div class="w-16 h-2 bg-gray-200 rounded-full mr-3">
+                                        <div class="w-14 h-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full"></div>
+                                    </div>
+                                    <span class="text-emerald-600 font-mono text-sm">87% Rec.</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700">European Market Entry</span>
+                                <div class="flex items-center">
+                                    <div class="w-16 h-2 bg-gray-200 rounded-full mr-3">
+                                        <div class="w-10 h-2 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full"></div>
+                                    </div>
+                                    <span class="text-orange-600 font-mono text-sm">62% Rec.</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-gray-500 text-sm mt-4">Based on 47 market factors, regulatory analysis, and competitive landscape assessment</p>
+                    </div>
+                </div>
+
+                <!-- Risk Intelligence -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-12">
+                    <div class="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center mb-8">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-gray-900 mb-6">Risk Intelligence System</h3>
+                    <p class="text-gray-600 text-lg mb-8 leading-relaxed">
+                        Proactive risk identification and mitigation strategies that protect your business before issues become problems.
+                    </p>
+
+                    <div class="bg-white rounded-2xl p-6 border border-gray-200">
+                        <h4 class="font-bold text-gray-900 mb-4">Current Risk Assessment</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-green-600 mb-1">Low</div>
+                                <div class="text-gray-500 text-sm">Operational Risk</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-yellow-600 mb-1">Med</div>
+                                <div class="text-gray-500 text-sm">Market Risk</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
+                            <p class="text-yellow-800 text-sm"><strong>Alert:</strong> Supply chain disruption probability increased 23% - recommend diversification strategy</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Intelligence Performance -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20">
+                <h2 class="text-5xl font-black text-white mb-8 morphing-text">
+                    Intelligence Metrics
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    Measurable cognitive performance that delivers tangible business outcomes.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-4 gap-8">
+                <div class="intelligence-card rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-purple-400 mb-4">97.3%</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Prediction Accuracy</h3>
+                    <p class="text-gray-400">Cross-validated model performance</p>
+                </div>
+                <div class="intelligence-card rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-cyan-400 mb-4">15x</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Faster Insights</h3>
+                    <p class="text-gray-400">Compared to traditional analysis</p>
+                </div>
+                <div class="intelligence-card rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-emerald-400 mb-4">2.4M</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Variables</h3>
+                    <p class="text-gray-400">Simultaneous processing capacity</p>
+                </div>
+                <div class="intelligence-card rounded-3xl p-8 text-center">
+                    <div class="text-5xl font-black text-orange-400 mb-4">24/7</div>
+                    <h3 class="text-xl font-bold text-white mb-2">Learning</h3>
+                    <p class="text-gray-400">Continuous model improvement</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Premium CTA Section -->
+<section class="py-32 intelligence-hero relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="ultra-glass rounded-3xl p-16">
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Ready for Cognitive Intelligence?
+                </h2>
+                <p class="text-2xl text-gray-100 mb-12 leading-relaxed max-w-3xl mx-auto">
+                    Experience AI that thinks strategically, reasons logically, and delivers insights beyond human capability.
+                </p>
+
+                <div class="flex flex-col lg:flex-row gap-8 justify-center mb-12">
+                    <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white px-16 py-8 rounded-2xl text-2xl font-bold transition-all premium-glow shadow-2xl group">
+                        <span class="flex items-center justify-center">
+                            Activate Intelligence
+                            <svg class="w-8 h-8 ml-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </span>
+                    </a>
+                    <a href="{{ url_for('demo') }}" class="ultra-glass hover:bg-white/20 text-white px-16 py-8 rounded-2xl text-2xl font-semibold transition-all border-2 border-white/20">
+                        See Intelligence Demo
+                    </a>
+                </div>
+
+                <!-- Intelligence Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-white/20">
+                    <div class="text-center">
+                        <div class="text-emerald-400 font-mono text-sm mb-2">ACCURACY</div>
+                        <div class="text-white font-bold">97.3% Prediction Rate</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-cyan-400 font-mono text-sm mb-2">PROCESSING</div>
+                        <div class="text-white font-bold">2.4M Variables/sec</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-pink-400 font-mono text-sm mb-2">IMPROVEMENT</div>
+                        <div class="text-white font-bold">15x Faster Insights</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

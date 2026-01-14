@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+
+{% block title %}FAQ - SINCOR Frequently Asked Questions{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="bg-gradient-to-br from-blue-600 to-purple-700 text-white py-16">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Frequently Asked Questions</h1>
+            <p class="text-xl md:text-2xl mb-8 text-blue-100">Everything you need to know about our products and services</p>
+        </div>
+    </div>
+</section>
+
+<!-- Navigation Tabs -->
+<section class="py-8 bg-gray-50 sticky top-0 z-40">
+    <div class="container mx-auto px-6">
+        <div class="flex flex-wrap justify-center space-x-4 text-sm">
+            <button onclick="showSection('general')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 faq-tab active">General</button>
+            <button onclick="showSection('products')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">Products</button>
+            <button onclick="showSection('detailing')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">Detailing</button>
+            <button onclick="showSection('pest')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">Pest Control</button>
+            <button onclick="showSection('hvac')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">HVAC</button>
+            <button onclick="showSection('plumbing')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">Plumbing</button>
+            <button onclick="showSection('electrical')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">Electrical</button>
+            <button onclick="showSection('landscaping')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">Landscaping</button>
+            <button onclick="showSection('roofing')" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 faq-tab">Roofing</button>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Sections -->
+<section class="py-16 bg-white">
+    <div class="container mx-auto px-6">
+        <div class="max-w-4xl mx-auto">
+            
+            <!-- General FAQ -->
+            <div id="general-section" class="faq-section">
+                <h2 class="text-3xl font-bold mb-8 text-center">General Questions</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">What is SINCOR and what do you do?</h3>
+                        <p class="text-gray-700">SINCOR is a comprehensive business intelligence and lead generation platform. We build professional media packs for businesses, deploy AI-powered lead generation systems, and provide advanced business intelligence tools to help companies grow their revenue automatically.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How is SINCOR different from other lead generation companies?</h3>
+                        <p class="text-gray-700">Unlike traditional lead gen companies that wait for customers to find you, we proactively research businesses, create professional media packs using their information, and present these packs to prospects who didn't even know they needed those services. We don't cold call - we dangle opportunities in front of decision-makers.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">What industries do you work with?</h3>
+                        <p class="text-gray-700">We specialize in service-based businesses including auto detailing, pest control, HVAC, plumbing, electrical, landscaping, roofing, and many other trades. Our system works for any business that needs consistent lead flow.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How quickly can I expect to see results?</h3>
+                        <p class="text-gray-700">Media packs are typically built and deployed within 3-5 business days. Lead generation campaigns begin showing results within the first week, with full momentum typically achieved within 2-3 weeks of campaign launch.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you guarantee results?</h3>
+                        <p class="text-gray-700">While we cannot guarantee specific numbers due to market variables, our media pack and lead generation systems have a proven track record. We provide detailed analytics and continuously optimize campaigns based on performance data.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">What's included in your pricing?</h3>
+                        <p class="text-gray-700">All pricing includes setup, deployment, monitoring, and basic optimization. Premium plans include advanced analytics, multiple campaign types, and dedicated account management. No hidden fees or surprise charges.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can I cancel anytime?</h3>
+                        <p class="text-gray-700">Media packs are one-time purchases. Subscription services like Hunter and Cor-Tec's AI can be cancelled with 30 days notice. All data and assets created remain yours even after cancellation.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you work with competitors in the same area?</h3>
+                        <p class="text-gray-700">We maintain territorial exclusivity for direct competitors in the same service area. However, we may work with businesses in different markets or complementary service categories within the same geographic region.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products FAQ -->
+            <div id="products-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">Products & Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-blue-50 p-6 rounded-lg border-l-4 border-blue-500">
+                        <h3 class="text-xl font-bold mb-4 text-blue-800">MediaPax - Professional Media Packs</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold mb-2">What exactly is a media pack?</h4>
+                                <p class="text-gray-700">A media pack is a professional presentation that showcases a business's services, capabilities, and value proposition. We research your business information, create compelling content, and format it into a presentation that gets shown to prospects as if it were created specifically for them.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">How do you gather my business information?</h4>
+                                <p class="text-gray-700">We use automated research tools to gather publicly available information about your business, services, reviews, and market positioning. We then organize this into professional templates that highlight your unique value propositions.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">What's the difference between Basic ($175), Premium ($275), and Enterprise ($400) media packs?</h4>
+                                <p class="text-gray-700"><strong>Basic ($175):</strong> Business research, template creation, direct prospect presentation<br>
+                                <strong>Premium ($275):</strong> Everything in Basic plus incentive strategies, follow-up sequences, upsell campaigns<br>
+                                <strong>Enterprise ($400):</strong> Everything in Premium plus lead generation plan setup, competitive analysis, ongoing optimization</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-6 rounded-lg border-l-4 border-green-500">
+                        <h3 class="text-xl font-bold mb-4 text-green-800">Hunter - Lead Generation Service</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold mb-2">What is Hunter and how is it different from MediaPax?</h4>
+                                <p class="text-gray-700">Hunter is our ongoing lead generation membership service (formerly AutoAuto). While MediaPax creates professional presentations, Hunter continuously finds and qualifies prospects, automates outreach campaigns, and delivers qualified leads to your pipeline on an ongoing basis.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">How many leads can I expect with Hunter?</h4>
+                                <p class="text-gray-700">Lead volume varies by market, competition, and service type. Typically, businesses see 15-50 qualified leads per month in the first tier, with higher tiers delivering proportionally more leads plus better qualification and faster follow-up.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">What's included in the Hunter service?</h4>
+                                <p class="text-gray-700">Unlimited prospect discovery, automated outreach campaigns, lead qualification and scoring, multi-channel follow-up sequences, performance analytics, and monthly strategy optimization.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-6 rounded-lg border-l-4 border-purple-500">
+                        <h3 class="text-xl font-bold mb-4 text-purple-800">Cor-Tec's AI - Advanced Agent System</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold mb-2">What is Cor-Tec's AI and why is it premium priced?</h4>
+                                <p class="text-gray-700">Cor-Tec's AI is our flagship SaaS platform featuring advanced AI agents that can handle complex business processes, predictive analytics, customer behavior analysis, and automated decision-making. It's premium-priced (triple standard market rates) because of its sophisticated capabilities and proven ROI.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">What makes it worth triple the standard pricing?</h4>
+                                <p class="text-gray-700">While standard AI tools are generic, Cor-Tec's AI agents are specifically trained for service businesses, understand industry nuances, can make strategic decisions, and provide predictive insights that typically require human expertise. The ROI typically justifies the premium within 60-90 days.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">How many agents are included?</h4>
+                                <p class="text-gray-700">Standard Cor-Tec's AI includes 12 core agents. Premium includes access to all 43 specialized agents covering everything from lead qualification to project management to customer retention optimization.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-yellow-50 p-6 rounded-lg border-l-4 border-yellow-500">
+                        <h3 class="text-xl font-bold mb-4 text-yellow-800">Business Intelligence & Reporting</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold mb-2">What's included in BI Premium reports?</h4>
+                                <p class="text-gray-700">BI Premium includes advanced analytics dashboards, predictive forecasting, competitor analysis, market opportunity identification, customer behavior insights, revenue optimization recommendations, and custom report generation.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">How is Business-in-a-Box different from other products?</h4>
+                                <p class="text-gray-700">Business-in-a-Box is our comprehensive solution that includes all 43 AI agents, complete automation workflows, business process optimization, and everything needed to run a modern, automated service business. It's essentially a complete business operating system.</p>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold mb-2">What is Cortex and how does it relate to other products?</h4>
+                                <p class="text-gray-700">Cortex is the premium version of our complete platform, combining Hunter, Cor-Tec's AI, MediaPax, and BI Premium into one comprehensive system. It's designed for businesses ready to fully automate and optimize their operations at enterprise level.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailing FAQ -->
+            <div id="detailing-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">Auto Detailing Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How does SINCOR understand the auto detailing business?</h3>
+                        <p class="text-gray-700">Our system is specifically trained on auto detailing business models, seasonal patterns, customer behavior, pricing strategies, and common service packages. We understand mobile vs fixed location operations, commercial accounts, and luxury vehicle specializations.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">What types of leads work best for detailing businesses?</h3>
+                        <p class="text-gray-700">We focus on high-value prospects: luxury car owners, commercial fleet managers, dealerships, real estate agencies, and busy professionals who value convenience. Our AI identifies prospects based on vehicle ownership data, income levels, and lifestyle indicators.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you help with seasonal fluctuations in detailing business?</h3>
+                        <p class="text-gray-700">Yes, our system adjusts lead generation strategies based on seasonal patterns, weather data, and local events. We increase intensity during peak seasons and pivot to interior services, maintenance packages, and commercial accounts during slower periods.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you help with pricing strategies for detailing services?</h3>
+                        <p class="text-gray-700">Our BI Premium includes market-based pricing analysis, competitor pricing intelligence, and profit optimization recommendations specific to detailing services. We analyze local market rates and help position your services competitively.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you help find commercial detailing contracts?</h3>
+                        <p class="text-gray-700">Absolutely. Our Hunter service specifically targets dealerships, car rental companies, fleet managers, and corporate accounts. These higher-value contracts often provide steady monthly revenue and better profit margins than individual customers.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle mobile vs fixed location detailing marketing?</h3>
+                        <p class="text-gray-700">Our media packs and lead generation strategies are customized based on your business model. Mobile operations focus on convenience and flexibility, while fixed locations emphasize facility quality, equipment advantages, and specialized services.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pest Control FAQ -->
+            <div id="pest-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">Pest Control Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How does SINCOR handle the urgency factor in pest control marketing?</h3>
+                        <p class="text-gray-700">Our system recognizes that pest control often involves urgent situations. We prioritize fast response campaigns, emergency service positioning, and immediate availability messaging. Our AI agents can handle urgent inquiries 24/7 and escalate appropriately.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you differentiate between residential and commercial pest control needs?</h3>
+                        <p class="text-gray-700">Yes, our lead generation separates residential (homeowners, apartment managers) from commercial prospects (restaurants, warehouses, offices). Each receives tailored messaging about relevant services, compliance requirements, and business-specific pest challenges.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle seasonal pest control marketing?</h3>
+                        <p class="text-gray-700">Our system adjusts campaigns based on seasonal pest patterns, weather conditions, and regional pest cycles. Spring focuses on preventive treatments, summer on active infestations, fall on winterization, and winter on rodent control and indoor pests.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you help with recurring service contract marketing?</h3>
+                        <p class="text-gray-700">Absolutely. Our system emphasizes the value of preventive maintenance plans, quarterly treatments, and ongoing monitoring services. We focus on converting one-time treatments into recurring revenue streams with consistent monthly billing.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target specific pest problems or service types?</h3>
+                        <p class="text-gray-700">Yes, our AI can identify prospects likely to need specific services: termite inspections for real estate transactions, bed bug treatments for hospitality, rodent control for restaurants, or specialty services like wildlife removal or fumigation.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle licensing and regulatory compliance in marketing?</h3>
+                        <p class="text-gray-700">Our media packs automatically include appropriate licensing information, certifications, and compliance statements required in your state. We ensure all marketing materials meet regulatory standards for pest control advertising.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HVAC FAQ -->
+            <div id="hvac-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">HVAC Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How does SINCOR handle emergency HVAC calls vs planned installations?</h3>
+                        <p class="text-gray-700">Our system creates separate lead flows for emergency repairs (immediate response, 24/7 availability) and planned projects (installation, replacement, upgrades). Each receives appropriate messaging and urgency levels to maximize conversion rates.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target both residential and commercial HVAC prospects?</h3>
+                        <p class="text-gray-700">Yes, our lead generation distinguishes between homeowners needing residential systems and commercial property managers, building owners, and facilities managers requiring commercial HVAC services. Each receives industry-specific messaging and service offerings.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle seasonal HVAC marketing patterns?</h3>
+                        <p class="text-gray-700">Our AI adjusts campaigns based on weather patterns and seasonal demand. Spring focuses on AC tune-ups and installations, summer on emergency cooling repairs, fall on heating system preparation, and winter on heating repairs and emergency services.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you help with high-value installation leads vs service calls?</h3>
+                        <p class="text-gray-700">Our system prioritizes high-value installation and replacement opportunities while maintaining steady service call flow. We identify prospects with aging systems, home additions, or efficiency upgrade interests for maximum revenue potential.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target specific HVAC specializations like ductwork or indoor air quality?</h3>
+                        <p class="text-gray-700">Absolutely. Our AI can focus on specialized services: ductwork for new construction, indoor air quality for health-conscious homeowners, energy efficiency upgrades, smart thermostat installations, or commercial refrigeration systems.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle maintenance contract marketing for HVAC?</h3>
+                        <p class="text-gray-700">Our system emphasizes preventive maintenance plans, yearly service contracts, and priority service memberships. We focus on converting one-time repairs into recurring revenue through scheduled maintenance and priority customer programs.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plumbing FAQ -->
+            <div id="plumbing-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">Plumbing Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How does SINCOR differentiate between emergency plumbing and planned projects?</h3>
+                        <p class="text-gray-700">Our lead generation creates separate funnels for emergency calls (burst pipes, clogs, leaks) requiring immediate response and planned projects (remodeling, fixture upgrades, water heater replacement) allowing for consultative selling and higher margins.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target both residential and commercial plumbing prospects?</h3>
+                        <p class="text-gray-700">Yes, our system identifies residential homeowners for service calls and renovations, plus commercial prospects like restaurants, office buildings, retail spaces, and industrial facilities requiring specialized commercial plumbing services and maintenance contracts.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibent mb-2">How do you handle seasonal plumbing marketing?</h3>
+                        <p class="text-gray-700">Our campaigns adjust for seasonal patterns: winter focuses on frozen pipe prevention and water heater issues, spring on outdoor plumbing and sprinkler systems, summer on sewer line problems, and fall on winterization services.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you help target high-value plumbing projects vs service calls?</h3>
+                        <p class="text-gray-700">Our AI prioritizes high-margin opportunities: bathroom remodels, kitchen plumbing upgrades, slab leak repairs, whole-house repiping, and commercial installations while maintaining steady service call volume for immediate revenue.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target specific plumbing specialties?</h3>
+                        <p class="text-gray-700">Absolutely. Our system can focus on specializations: drain cleaning services, water heater specialists, leak detection experts, bathroom remodeling, commercial plumbing, or green plumbing solutions based on your expertise and profit margins.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle plumbing maintenance contracts?</h3>
+                        <p class="text-gray-700">Our system promotes preventive maintenance plans, annual inspections, and commercial maintenance contracts. We focus on converting emergency calls into ongoing relationships through scheduled maintenance and priority service programs.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Electrical FAQ -->
+            <div id="electrical-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">Electrical Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How does SINCOR handle emergency electrical calls vs planned electrical projects?</h3>
+                        <p class="text-gray-700">Our system separates emergency electrical issues (power outages, electrical hazards, urgent repairs) from planned projects (panel upgrades, rewiring, installations). Each receives appropriate urgency messaging and response expectations.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target residential vs commercial electrical prospects?</h3>
+                        <p class="text-gray-700">Yes, our lead generation identifies residential homeowners needing electrical repairs and upgrades, plus commercial prospects like office buildings, retail spaces, warehouses, and industrial facilities requiring specialized commercial electrical services.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you target high-value electrical projects?</h3>
+                        <p class="text-gray-700">Our AI identifies prospects likely to need high-margin services: electrical panel upgrades, whole-house rewiring, EV charger installations, solar panel connections, smart home wiring, and commercial electrical system upgrades.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target specific electrical specializations?</h3>
+                        <p class="text-gray-700">Absolutely. Our system can focus on specialties: residential service calls, commercial electrical, industrial electrical, solar installations, EV charging stations, smart home automation, or electrical safety inspections based on your expertise.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle electrical safety and compliance in marketing?</h3>
+                        <p class="text-gray-700">Our media packs automatically include licensing information, safety certifications, insurance coverage, and code compliance statements. We ensure all marketing materials emphasize safety, professionalism, and regulatory compliance.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you help with electrical maintenance contracts?</h3>
+                        <p class="text-gray-700">Our system promotes electrical maintenance agreements, safety inspections, and commercial electrical service contracts. We focus on converting service calls into recurring relationships through scheduled maintenance and priority service programs.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Landscaping FAQ -->
+            <div id="landscaping-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">Landscaping Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How does SINCOR handle seasonal landscaping business fluctuations?</h3>
+                        <p class="text-gray-700">Our system adjusts campaigns throughout the year: spring focuses on cleanup and planting, summer on maintenance and irrigation, fall on leaf removal and winterization, and winter on hardscaping and planning for next season.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you differentiate between maintenance and design/installation projects?</h3>
+                        <p class="text-gray-700">Yes, our lead generation separates weekly maintenance prospects (consistent recurring revenue) from high-value design and installation projects (landscaping, hardscaping, outdoor living spaces) requiring different approaches and pricing strategies.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you target residential vs commercial landscaping prospects?</h3>
+                        <p class="text-gray-700">Our system identifies residential homeowners for lawn care and garden services, plus commercial prospects like office complexes, retail centers, hotels, and property management companies requiring professional landscape maintenance contracts.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you help with recurring maintenance contract marketing?</h3>
+                        <p class="text-gray-700">Absolutely. Our system emphasizes the value of weekly/bi-weekly maintenance contracts, seasonal cleanup services, and year-round landscape management agreements for predictable recurring revenue and customer retention.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you target specific landscaping specializations?</h3>
+                        <p class="text-gray-700">Yes, our AI can focus on specialties: lawn care, landscape design, hardscaping, irrigation systems, tree services, organic landscaping, or commercial property maintenance based on your capabilities and profit margins.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle high-value landscaping project leads?</h3>
+                        <p class="text-gray-700">Our system identifies prospects likely to invest in major projects: new homeowners, luxury property owners, commercial developments, and properties undergoing renovations that typically require significant landscaping investments.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roofing FAQ -->
+            <div id="roofing-section" class="faq-section hidden">
+                <h2 class="text-3xl font-bold mb-8 text-center">Roofing Services</h2>
+                
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How does SINCOR handle emergency roof repairs vs planned replacements?</h3>
+                        <p class="text-gray-700">Our system creates urgent response campaigns for emergency repairs (leaks, storm damage, immediate hazards) and consultative approaches for planned replacements and major roofing projects with longer sales cycles.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target both residential and commercial roofing prospects?</h3>
+                        <p class="text-gray-700">Yes, our lead generation identifies residential homeowners needing roof repairs and replacements, plus commercial prospects like property managers, building owners, and industrial facilities requiring commercial roofing services and maintenance contracts.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you help with insurance claim roofing leads?</h3>
+                        <p class="text-gray-700">Our system identifies properties with recent storm damage, insurance claims, and hail damage reports. We provide appropriate messaging about insurance claim assistance, inspection services, and working with insurance adjusters.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Do you target high-value roofing projects?</h3>
+                        <p class="text-gray-700">Our AI prioritizes high-margin opportunities: complete roof replacements, commercial roofing projects, luxury home roofing, solar-ready installations, and specialty roofing materials while maintaining steady repair call volume.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Can you target specific roofing specializations?</h3>
+                        <p class="text-gray-700">Absolutely. Our system can focus on specialties: asphalt shingle, metal roofing, tile roofing, flat commercial roofing, solar installations, gutter services, or roof maintenance based on your expertise and equipment.</p>
+                    </div>
+                    
+                    <div class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">How do you handle roofing maintenance contracts?</h3>
+                        <p class="text-gray-700">Our system promotes roof maintenance agreements, annual inspections, gutter cleaning services, and commercial roofing maintenance contracts. We focus on converting one-time repairs into ongoing maintenance relationships.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<script>
+function showSection(sectionName) {
+    // Hide all sections
+    const sections = document.querySelectorAll('.faq-section');
+    sections.forEach(section => section.classList.add('hidden'));
+    
+    // Show selected section
+    const selectedSection = document.getElementById(sectionName + '-section');
+    if (selectedSection) {
+        selectedSection.classList.remove('hidden');
+    }
+    
+    // Update tab styles
+    const tabs = document.querySelectorAll('.faq-tab');
+    tabs.forEach(tab => {
+        tab.classList.remove('bg-blue-600', 'text-white');
+        tab.classList.add('bg-gray-300', 'text-gray-700');
+    });
+    
+    // Highlight active tab
+    event.target.classList.remove('bg-gray-300', 'text-gray-700');
+    event.target.classList.add('bg-blue-600', 'text-white');
+    
+    // Scroll to top of FAQ section
+    document.querySelector('.faq-section:not(.hidden)').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+{% endblock %}

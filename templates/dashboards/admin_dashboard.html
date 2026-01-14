@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - SINCOR System Control{% endblock %}
+
+{% block content %}
+<!-- Admin Dashboard Header -->
+<nav class="bg-gray-900 text-white py-4 shadow-lg">
+    <div class="container mx-auto px-6">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold">SINCOR Admin Control Center</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-red-300">ADMIN ACCESS</span>
+                <div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Dashboard Layout -->
+<div class="flex min-h-screen bg-gray-100">
+    <!-- Admin Sidebar -->
+    <aside class="w-64 bg-gray-900 text-white">
+        <div class="p-6">
+            <nav class="space-y-2">
+                <a href="{{ url_for('admin_dashboard') }}" class="flex items-center space-x-3 p-3 bg-red-600 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0"></path>
+                    </svg>
+                    <span>Admin Overview</span>
+                </a>
+                
+                <a href="{{ url_for('agent_constellation') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    <span>Agent Constellation</span>
+                </a>
+                
+                <a href="{{ url_for('bi_reporting') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <span>BI Reporting</span>
+                </a>
+                
+                <a href="{{ url_for('system_health') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>System Health</span>
+                </a>
+                
+                <a href="{{ url_for('revenue_metrics') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    <span>Revenue Metrics</span>
+                </a>
+                
+                <hr class="my-4 border-gray-700">
+                
+                <a href="{{ url_for('dashboard') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                    <span>Member Dashboard</span>
+                </a>
+                
+                <a href="{{ url_for('home') }}" class="flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-800 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m0 0h6m0 0h3a1 1 0 001-1V10M9 21h6"></path>
+                    </svg>
+                    <span>Back to Website</span>
+                </a>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- Main Admin Content -->
+    <main class="flex-1 p-8">
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">System Administration</h2>
+            <p class="text-gray-600">Complete control center for SINCOR platform management</p>
+        </div>
+
+        <!-- Critical System Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-red-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">System Load</p>
+                        <p class="text-3xl font-bold text-red-600">87%</p>
+                    </div>
+                    <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-red-500 text-sm font-semibold">↗ HIGH</span>
+                    <span class="text-gray-500 text-sm ml-2">Needs attention</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-green-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Active Users</p>
+                        <p class="text-3xl font-bold text-green-600">24,847</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-500 text-sm font-semibold">↗ +12.4%</span>
+                    <span class="text-gray-500 text-sm ml-2">vs last hour</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Data Processing</p>
+                        <p class="text-3xl font-bold text-blue-600">2.4TB</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-blue-500 text-sm font-semibold">Today</span>
+                    <span class="text-gray-500 text-sm ml-2">processing volume</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-lg border-l-4 border-yellow-500">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Revenue/Hour</p>
+                        <p class="text-3xl font-bold text-yellow-600">$8,247</p>
+                    </div>
+                    <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center">
+                    <span class="text-green-500 text-sm font-semibold">↗ +18.2%</span>
+                    <span class="text-gray-500 text-sm ml-2">vs last hour</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Control Panel -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Infrastructure Control -->
+            <div class="bg-gray-900 text-white p-6 rounded-lg shadow-lg">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    Infrastructure Control
+                </h3>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="bg-red-600 hover:bg-red-700 p-4 rounded-lg font-semibold transition duration-200">
+                        Emergency Stop
+                    </button>
+                    <button class="bg-yellow-600 hover:bg-yellow-700 p-4 rounded-lg font-semibold transition duration-200">
+                        Maintenance Mode
+                    </button>
+                    <button class="bg-blue-600 hover:bg-blue-700 p-4 rounded-lg font-semibold transition duration-200">
+                        Scale Resources
+                    </button>
+                    <button class="bg-green-600 hover:bg-green-700 p-4 rounded-lg font-semibold transition duration-200">
+                        Health Check
+                    </button>
+                </div>
+            </div>
+
+            <!-- User Management -->
+            <div class="bg-white p-6 rounded-lg shadow-lg">
+                <h3 class="text-xl font-bold text-gray-900 mb-6">User Management</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-semibold">Total Users</p>
+                            <p class="text-2xl font-bold text-blue-600">847,293</p>
+                        </div>
+                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                            Manage
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-semibold">Active Sessions</p>
+                            <p class="text-2xl font-bold text-green-600">24,847</p>
+                        </div>
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                            Monitor
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-semibold">Blocked IPs</p>
+                            <p class="text-2xl font-bold text-red-600">1,247</p>
+                        </div>
+                        <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                            Review
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-Time System Monitoring -->
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h3 class="text-xl font-bold text-gray-900 mb-6">Real-Time System Status</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- CPU Usage -->
+                <div class="text-center">
+                    <div class="relative w-24 h-24 mx-auto mb-4">
+                        <div class="w-24 h-24 bg-red-200 rounded-full flex items-center justify-center">
+                            <div class="text-2xl font-bold text-red-600">87%</div>
+                        </div>
+                    </div>
+                    <h4 class="font-semibold text-gray-900">CPU Usage</h4>
+                    <p class="text-sm text-red-500">High load detected</p>
+                </div>
+                
+                <!-- Memory Usage -->
+                <div class="text-center">
+                    <div class="relative w-24 h-24 mx-auto mb-4">
+                        <div class="w-24 h-24 bg-yellow-200 rounded-full flex items-center justify-center">
+                            <div class="text-2xl font-bold text-yellow-600">72%</div>
+                        </div>
+                    </div>
+                    <h4 class="font-semibold text-gray-900">Memory Usage</h4>
+                    <p class="text-sm text-yellow-500">Moderate usage</p>
+                </div>
+                
+                <!-- Disk Usage -->
+                <div class="text-center">
+                    <div class="relative w-24 h-24 mx-auto mb-4">
+                        <div class="w-24 h-24 bg-green-200 rounded-full flex items-center justify-center">
+                            <div class="text-2xl font-bold text-green-600">45%</div>
+                        </div>
+                    </div>
+                    <h4 class="font-semibold text-gray-900">Disk Usage</h4>
+                    <p class="text-sm text-green-500">Optimal levels</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Critical Alerts -->
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
+            <h3 class="text-lg font-bold text-red-800 mb-4">⚠️ Critical System Alerts</h3>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-semibold text-red-800">High CPU Load Detected</p>
+                        <p class="text-sm text-red-600">Server cluster experiencing 87% average load - consider scaling</p>
+                    </div>
+                    <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                        Investigate
+                    </button>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-semibold text-yellow-800">Database Connection Pool Warning</p>
+                        <p class="text-sm text-yellow-600">Connection pool at 78% capacity - monitor closely</p>
+                    </div>
+                    <button class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                        Monitor
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

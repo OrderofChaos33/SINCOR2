@@ -1,0 +1,304 @@
+Folder PATH listing for volume OS
+Volume serial number is C240-9133
+C:.
+|   .env.example
+|   app.py
+|   aptfile
+|   clinton_ad_budget.db
+|   clinton_leads.db
+|   index.py
+|   main.py
+|   manifest.txt
+|   premium-business-products.md
+|   Procfile
+|   requirements.txt
+|   simple.py
+|   sincor_media_packs.db
+|   test.py
+|   test.txt
+|   
++---.claude
+|       settings.local.json
+|       
++---.github
+|   \---workflows
++---ads
++---ad_examp
++---agents
+|   |   agent_biographies.py
+|   |   complete_agent_roster.py
+|   |   README.md
+|   |   
+|   +---marketing
+|   |   \---__pycache__
+|   \---__pycache__
+|           complete_agent_roster.cpython-313.pyc
+|           
++---assets
+|   +---images
+|   +---music
+|   \---video
++---audits
+|   \---reports
++---broker
++---CAD_EVERYTHING
++---clinton_videos
++---competitive_intelligence_demo
++---compliance
+|   \---ledger
++---config
+|   +---buyers
+|   \---routing
++---cortecs_core
++---dashboard
++---infra
++---libs
+|   +---pkg_bus
+|   +---pkg_guard
+|   +---pkg_lead_model
+|   \---pkg_rules
++---mediapacks
+|   \---samples
++---memberships
+|   \---plan_v1
++---metadata
++---New folder
++---policy
++---project_root
+|   +---audio
+|   |   +---master
+|   |   \---raw
+|   +---branding
+|   +---delivery
+|   +---drafts
+|   +---final
+|   +---qc_reports
+|   +---storyboards
+|   \---video_assets
+|       +---photos
+|       \---stock
++---promos
++---services
+|   +---ab_testing_lab
+|   +---analytics_api
+|   +---booking_core
+|   +---chargeback_shield
+|   +---consent_vault
+|   +---content_pipeline
+|   +---kiosk_generator
+|   +---lead_cleaner
+|   +---lead_ingest
+|   +---lead_router
+|   |   +---adapters
+|   |   \---__pycache__
+|   +---lead_scoring
+|   +---ltv_forecaster
+|   +---marketing_workflow
+|   |   \---generated_packs
+|   +---marketplace
+|   |   \---__pycache__
+|   +---nurture_packs
+|   +---outreach_mediapax
+|   +---partner_api
+|   +---recycling_exchange
+|   +---referrals
+|   +---scheduler
+|   |   \---__pycache__
+|   +---social_proof
+|   +---status_page
+|   +---subscriptions
+|   +---suppression_graph
+|   +---tenant_gateway
+|   \---voice_hub
+|       \---__pycache__
++---shots
++---sincor
+|   |   agency_kernel.py
+|   |   cortecs_core.py
+|   |   dynamic_pricing_engine.py
+|   |   generate_agents.py
+|   |   identity_system.py
+|   |   infinite_scaling_engine.py
+|   |   instant_business_intelligence.py
+|   |   lifecycle_system.py
+|   |   memory_system.py
+|   |   monetization_engine.py
+|   |   partnership_framework.py
+|   |   paypal_integration.py
+|   |   persona_engine.py
+|   |   predictive_analytics_engine.py
+|   |   quality_scoring_engine.py
+|   |   railway_monetization_app.py
+|   |   real_time_intelligence.py
+|   |   recursive_memory.py
+|   |   recursive_value_products.py
+|   |   swarm_coordination.py
+|   |   
+|   +---New folder
+|   \---sincor
+|       |   .env.example
+|       |   agent_health_metrics.db
+|       |   agent_health_monitor.log
+|       |   cad_flask_skeleton.zip
+|       |   sincor_kernel_min.zip
+|       |   swarm_intelligence.db
+|       |   
+|       +---.claude
+|       +---.do
+|       +---.local
+|       |   \---state
+|       |       \---replit
+|       |           \---agent
+|       |               \---filesystem
+|       +---agentmode
+|       +---agents
+|       |   +---archetypes
+|       |   +---daetime
+|       |   |   \---__pycache__
+|       |   |           scheduler_harness.cpython-313.pyc
+|       |   |           
+|       |   +---daetox
+|       |   +---gazette
+|       |   +---marketing
+|       |   +---oversight
+|       |   +---paydae
+|       |   +---taskpool
+|       |   \---taskpool_agents
+|       |       +---daetime
+|       |       \---taskpool
+|       +---attached_assets
+|       +---config
+|       +---constitution
+|       +---docs
+|       +---kernels
+|       +---lifecycles
+|       +---market
+|       +---marketing
+|       +---memory
+|       |   +---autobiographical
+|       |   +---episodic
+|       |   +---procedural
+|       |   \---semantic
+|       |           E-auriga-01.db
+|       |           
+|       +---personas
+|       +---public
+|       +---scripts
+|       +---sincor_kernel_min
+|       |   |   .env.example
+|       |   |   
+|       |   +---agents
+|       |   |   \---leadgen
+|       |   |       +---service
+|       |   |       \---worker
+|       |   +---commons
+|       |   \---gateway
+|       +---static
+|       +---templates
+|       +---test_payloads
+|       \---__pycache__
+|               app.cpython-313.pyc
+|               cortecs_core.cpython-311.pyc
+|               cortecs_core.cpython-313.pyc
+|               dynamic_pricing_engine.cpython-311.pyc
+|               dynamic_pricing_engine.cpython-313.pyc
+|               infinite_scaling_engine.cpython-311.pyc
+|               infinite_scaling_engine.cpython-313.pyc
+|               instant_business_intelligence.cpython-311.pyc
+|               instant_business_intelligence.cpython-313.pyc
+|               monetization_engine.cpython-311.pyc
+|               monetization_engine.cpython-313.pyc
+|               partnership_framework.cpython-311.pyc
+|               partnership_framework.cpython-313.pyc
+|               paypal_integration.cpython-311.pyc
+|               paypal_integration.cpython-313.pyc
+|               predictive_analytics_engine.cpython-311.pyc
+|               predictive_analytics_engine.cpython-313.pyc
+|               quality_scoring_engine.cpython-311.pyc
+|               quality_scoring_engine.cpython-313.pyc
+|               real_time_intelligence.cpython-311.pyc
+|               real_time_intelligence.cpython-313.pyc
+|               recursive_value_products.cpython-311.pyc
+|               recursive_value_products.cpython-313.pyc
+|               simple.cpython-311.pyc
+|               swarm_coordination.cpython-311.pyc
+|               swarm_coordination.cpython-313.pyc
+|               
++---sincor_market
+|   +---config
+|   +---scripts
+|   \---src
+|       \---sincor
+|           \---__pycache__
++---site
++---square_integration.py
++---static
+|   |   favicon.ico
+|   |   sw.js
+|   |   
+|   +---css
+|   |       style.css
+|   |       
+|   +---images
+|   |       og-image.png
+|   |       
+|   +---js
+|   |       main.js
+|   |       
+|   \---widgets
++---storyboards
++---templates
+|   |   about.html
+|   |   admin_dashboard.html
+|   |   agent_services.html
+|   |   analytics.html
+|   |   analytics_dashboard.html
+|   |   automation.html
+|   |   base.html
+|   |   business_intelligence.html
+|   |   contact.html
+|   |   craft_content_generator.html
+|   |   craft_data_pipeline.html
+|   |   craft_deployment_manager.html
+|   |   craft_media_processor.html
+|   |   craft_model_trainer.html
+|   |   craft_service_automation.html
+|   |   craft_workflow_engine.html
+|   |   dashboard.html
+|   |   debug.html
+|   |   demo.html
+|   |   enterprise.html
+|   |   enterprise_solutions.html
+|   |   features.html
+|   |   home.html
+|   |   home_enhanced.html
+|   |   integration.html
+|   |   intelligence.html
+|   |   media_packs.html
+|   |   predictive_analytics.html
+|   |   pricing.html
+|   |   security.html
+|   |   signup.html
+|   |   solutions.html
+|   |   system_monitor.html
+|   |   test.html
+|   |   
+|   \---dashboards
+|           admin_dashboard.html
+|           agent_constellation.html
+|           agent_constellation_working.html
+|           bi_reporting.html
+|           member_analytics.html
+|           member_dashboard.html
+|           member_reports.html
+|           public_dashboard.html
+|           revenue_metrics.html
+|           system_health.html
+|           
++---tools
++---training
++---_local_overrides
+\---__pycache__
+        app.cpython-313.pyc
+        clinton_detailing_leads.cpython-313.pyc
+        

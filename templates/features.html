@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Features - SINCOR AI Business Intelligence{% endblock %}
+
+{% block content %}
+<style>
+    .features-hero {
+        background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 25%, #2d1b69 50%, #11998e 75%, #38ef7d 100%);
+        background-size: 400% 400%;
+        animation: etherealGradient 20s ease infinite;
+    }
+
+    .feature-glass {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(30px);
+        -webkit-backdrop-filter: blur(30px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+    }
+
+    .feature-glow:hover {
+        box-shadow: 0 0 50px rgba(102, 126, 234, 0.3);
+        transform: translateY(-8px) scale(1.02);
+        transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+    }
+
+    .icon-shimmer {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .icon-shimmer::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+
+    .capability-metric {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+</style>
+
+<!-- Ultra-Premium Features Hero -->
+<section class="min-h-screen features-hero relative overflow-hidden flex items-center justify-center">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-6xl mx-auto">
+            <!-- Status Badge -->
+            <div class="inline-flex items-center feature-glass rounded-full px-8 py-4 mb-12">
+                <div class="w-3 h-3 bg-emerald-400 rounded-full mr-4 animate-pulse"></div>
+                <span class="text-white font-mono text-sm tracking-wider">SINCOR CORE CAPABILITIES • ENTERPRISE GRADE</span>
+            </div>
+
+            <h1 class="text-7xl lg:text-8xl font-black mb-8 leading-tight text-white">
+                Enterprise <span class="morphing-text">Intelligence</span>
+            </h1>
+
+            <p class="text-2xl lg:text-3xl mb-16 text-gray-100 max-w-4xl mx-auto leading-relaxed">
+                Advanced AI capabilities that transform how enterprises understand, predict, and optimize their operations.
+            </p>
+
+            <div class="flex flex-col lg:flex-row gap-8 justify-center">
+                <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-12 py-6 rounded-2xl text-xl font-bold transition-all premium-glow shadow-2xl">
+                    Explore Capabilities
+                </a>
+                <a href="{{ url_for('demo') }}" class="feature-glass hover:bg-white/20 text-white px-12 py-6 rounded-2xl text-xl font-semibold transition-all border-2 border-white/20">
+                    Live Demo
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Core Capabilities Section -->
+<section class="py-32 bg-gradient-to-br from-gray-900 via-black to-gray-900 relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 relative z-10">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-24">
+                <div class="inline-block feature-glass rounded-full px-8 py-4 mb-8">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider">ENTERPRISE CAPABILITIES</span>
+                </div>
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    AI-Powered Business Intelligence
+                </h2>
+                <p class="text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                    Advanced capabilities designed for enterprise-scale operations and real-time decision making.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-16 mb-20">
+                <!-- Real-Time Analytics -->
+                <div class="feature-glass rounded-3xl p-12 feature-glow">
+                    <div class="w-24 h-24 bg-gradient-to-br from-purple-500 via-pink-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-8 icon-shimmer">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Real-Time Analytics Engine</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Process millions of data points instantly with sub-second latency. Monitor KPIs, track performance, and identify trends as they happen.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4"></div>
+                            <span>Sub-second query response times</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-pink-400 rounded-full mr-4"></div>
+                            <span>Live dashboard auto-refresh</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-cyan-400 rounded-full mr-4"></div>
+                            <span>Streaming data ingestion</span>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <div class="feature-glass rounded-full px-6 py-2 inline-block">
+                            <span class="capability-metric font-mono text-sm">&lt;100ms response</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Predictive Intelligence -->
+                <div class="feature-glass rounded-3xl p-12 feature-glow">
+                    <div class="w-24 h-24 bg-gradient-to-br from-emerald-500 via-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8 icon-shimmer">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Predictive Intelligence</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Advanced machine learning models that forecast trends, predict outcomes, and recommend optimal strategies before opportunities are missed.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-emerald-400 rounded-full mr-4"></div>
+                            <span>Revenue forecasting models</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-cyan-400 rounded-full mr-4"></div>
+                            <span>Customer behavior prediction</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full mr-4"></div>
+                            <span>Market trend analysis</span>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <div class="feature-glass rounded-full px-6 py-2 inline-block">
+                            <span class="capability-metric font-mono text-sm">97.3% accuracy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Autonomous Processing -->
+                <div class="feature-glass rounded-3xl p-12 feature-glow">
+                    <div class="w-24 h-24 bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-8 icon-shimmer">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Autonomous Processing</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        AI agents that continuously monitor, analyze, and optimize your business operations without human intervention, 24/7.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-orange-400 rounded-full mr-4"></div>
+                            <span>Automated anomaly detection</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-red-400 rounded-full mr-4"></div>
+                            <span>Self-healing data pipelines</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-pink-400 rounded-full mr-4"></div>
+                            <span>Intelligent alert prioritization</span>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <div class="feature-glass rounded-full px-6 py-2 inline-block">
+                            <span class="capability-metric font-mono text-sm">24/7 monitoring</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Enterprise Security -->
+                <div class="feature-glass rounded-3xl p-12 feature-glow">
+                    <div class="w-24 h-24 bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-8 icon-shimmer">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-6 text-center">Enterprise Security</h3>
+                    <p class="text-gray-300 leading-relaxed text-center text-lg mb-8">
+                        Bank-grade security infrastructure with comprehensive compliance, audit trails, and enterprise-level access controls.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-indigo-400 rounded-full mr-4"></div>
+                            <span>SOC 2 Type II compliance</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-purple-400 rounded-full mr-4"></div>
+                            <span>Zero-trust architecture</span>
+                        </div>
+                        <div class="flex items-center text-gray-300">
+                            <div class="w-2 h-2 bg-blue-400 rounded-full mr-4"></div>
+                            <span>End-to-end encryption</span>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <div class="feature-glass rounded-full px-6 py-2 inline-block">
+                            <span class="capability-metric font-mono text-sm">99.99% uptime</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Enterprise Integrations -->
+<section class="py-32 bg-white relative overflow-hidden">
+    <div class="container mx-auto px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-20">
+                <div class="inline-block bg-gray-100 rounded-full px-8 py-4 mb-8">
+                    <span class="text-gray-600 font-mono text-sm tracking-wider">ENTERPRISE INTEGRATIONS</span>
+                </div>
+                <h2 class="text-5xl font-black text-gray-900 mb-8">
+                    Connect Your <span class="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Tech Stack</span>
+                </h2>
+                <p class="text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    Native integrations with enterprise platforms, databases, and business applications.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 mb-16">
+                <div class="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-gray-800 mb-2">Salesforce</div>
+                        <div class="text-sm text-gray-500">CRM Integration</div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-gray-800 mb-2">Microsoft</div>
+                        <div class="text-sm text-gray-500">Office 365</div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-gray-800 mb-2">Google</div>
+                        <div class="text-sm text-gray-500">Workspace</div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-gray-800 mb-2">AWS</div>
+                        <div class="text-sm text-gray-500">Cloud Services</div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-gray-800 mb-2">PostgreSQL</div>
+                        <div class="text-sm text-gray-500">Database</div>
+                    </div>
+                </div>
+                <div class="bg-white border border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                    <div class="text-center">
+                        <div class="text-lg font-bold text-gray-800 mb-2">Slack</div>
+                        <div class="text-sm text-gray-500">Communication</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Documentation -->
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-12 text-center">
+                <h3 class="text-3xl font-bold text-gray-900 mb-6">Developer-First API</h3>
+                <p class="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                    RESTful APIs, webhooks, and SDKs for seamless integration with any enterprise system.
+                </p>
+                <div class="flex flex-col lg:flex-row gap-6 justify-center">
+                    <a href="#" class="bg-gray-900 text-white px-8 py-4 rounded-xl font-semibold hover:bg-gray-800 transition-all">
+                        API Documentation
+                    </a>
+                    <a href="#" class="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-semibold hover:border-gray-400 transition-all">
+                        Integration Support
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Premium CTA Section -->
+<section class="py-32 features-hero relative overflow-hidden">
+    <div class="neural-network absolute inset-0 opacity-10"></div>
+
+    <div class="container mx-auto px-6 text-center relative z-10">
+        <div class="max-w-5xl mx-auto">
+            <div class="feature-glass rounded-3xl p-16">
+                <h2 class="text-6xl font-black text-white mb-8 morphing-text">
+                    Ready to Deploy Enterprise AI?
+                </h2>
+                <p class="text-2xl text-gray-100 mb-12 leading-relaxed max-w-3xl mx-auto">
+                    Join leading enterprises using SINCOR to transform their data into competitive intelligence.
+                </p>
+
+                <div class="flex flex-col lg:flex-row gap-8 justify-center mb-12">
+                    <a href="{{ url_for('contact') }}" class="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white px-16 py-8 rounded-2xl text-2xl font-bold transition-all premium-glow shadow-2xl group">
+                        <span class="flex items-center justify-center">
+                            Schedule Consultation
+                            <svg class="w-8 h-8 ml-4 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </span>
+                    </a>
+                    <a href="{{ url_for('demo') }}" class="feature-glass hover:bg-white/20 text-white px-16 py-8 rounded-2xl text-2xl font-semibold transition-all border-2 border-white/20">
+                        Live Demo
+                    </a>
+                </div>
+
+                <!-- Enterprise Trust Indicators -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-white/20">
+                    <div class="text-center">
+                        <div class="text-emerald-400 font-mono text-sm mb-2">DEPLOYMENT</div>
+                        <div class="text-white font-bold">Cloud, On-Premise, or Hybrid</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-cyan-400 font-mono text-sm mb-2">SUPPORT</div>
+                        <div class="text-white font-bold">24/7 Enterprise Success Team</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-pink-400 font-mono text-sm mb-2">SLA</div>
+                        <div class="text-white font-bold">99.99% Uptime Guarantee</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
