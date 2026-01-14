@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | SINCOR</title>
+    <meta name="description" content="SINCOR token analytics dashboard. Track price, volume, holders, and more.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 2rem;
+            background: rgba(7, 7, 20, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+        }
+
+        .logo-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text);
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 6rem 2rem 2rem;
+        }
+
+        .dashboard-header {
+            margin-bottom: 2rem;
+        }
+
+        .dashboard-header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .dashboard-header p {
+            color: var(--text-muted);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            background: var(--card-hover);
+            transform: translateY(-2px);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-change {
+            padding: 0.25rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .stat-change.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .stat-change.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .chart-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chart-tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .chart-tab:hover, .chart-tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .chart-area {
+            height: 300px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 4px;
+            padding: 1rem 0;
+        }
+
+        .chart-bar {
+            flex: 1;
+            background: var(--gradient-1);
+            border-radius: 4px 4px 0 0;
+            min-height: 10px;
+            transition: all 0.3s ease;
+            opacity: 0.7;
+        }
+
+        .chart-bar:hover {
+            opacity: 1;
+        }
+
+        /* Token Distribution */
+        .distribution-list {
+            list-style: none;
+        }
+
+        .distribution-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .distribution-item:last-child {
+            border-bottom: none;
+        }
+
+        .distribution-rank {
+            width: 32px;
+            height: 32px;
+            background: var(--card-hover);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .distribution-info {
+            flex: 1;
+        }
+
+        .distribution-address {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.875rem;
+            color: var(--primary);
+        }
+
+        .distribution-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .distribution-amount {
+            text-align: right;
+        }
+
+        .distribution-tokens {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+        }
+
+        .distribution-percent {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Transactions Table */
+        .transactions-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .transactions-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .transactions-table th {
+            text-align: left;
+            padding: 1rem;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .transactions-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .transactions-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .tx-type {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tx-type.buy {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .tx-type.sell {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .tx-address {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.875rem;
+            color: var(--primary);
+        }
+
+        .tx-amount {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+        }
+
+        .tx-time {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Contract Info */
+        .contract-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .contract-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.5rem;
+        }
+
+        .contract-card h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .contract-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .contract-row:last-child {
+            border-bottom: none;
+        }
+
+        .contract-label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .contract-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+        }
+
+        .contract-value.mono {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.8rem;
+            color: var(--primary);
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .transactions-table {
+                font-size: 0.875rem;
+            }
+
+            .transactions-table th,
+            .transactions-table td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+
+    <nav>
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">S</div>
+                <span class="logo-text">SINCOR</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="trade.html">Trade</a>
+                <a href="dashboard.html" class="active">Dashboard</a>
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank">Explorer</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1>📊 SINC Analytics Dashboard</h1>
+            <p>Real-time token metrics and analytics</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">💰</div>
+                    <span class="stat-change positive">+0.00%</span>
+                </div>
+                <div class="stat-value" id="price">$1.05</div>
+                <div class="stat-label">Current Price</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">📈</div>
+                </div>
+                <div class="stat-value" id="marketCap">$105M</div>
+                <div class="stat-label">Market Cap</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">💎</div>
+                </div>
+                <div class="stat-value" id="totalSupply">100M</div>
+                <div class="stat-label">Total Supply</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">👥</div>
+                </div>
+                <div class="stat-value" id="holders">--</div>
+                <div class="stat-label">Token Holders</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">🔄</div>
+                </div>
+                <div class="stat-value" id="volume">$--</div>
+                <div class="stat-label">24h Volume</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">💧</div>
+                </div>
+                <div class="stat-value" id="liquidity">$--</div>
+                <div class="stat-label">Total Liquidity</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Price History</h3>
+                    <div class="chart-tabs">
+                        <button class="chart-tab">24H</button>
+                        <button class="chart-tab active">7D</button>
+                        <button class="chart-tab">30D</button>
+                        <button class="chart-tab">ALL</button>
+                    </div>
+                </div>
+                <div class="chart-area" id="priceChart">
+                    <!-- Bars will be generated by JS -->
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3 class="chart-title">Top Holders</h3>
+                </div>
+                <ul class="distribution-list">
+                    <li class="distribution-item">
+                        <div class="distribution-rank">1</div>
+                        <div class="distribution-info">
+                            <div class="distribution-address">0x25cA...90aa</div>
+                            <div class="distribution-label">Bonding Curve</div>
+                        </div>
+                        <div class="distribution-amount">
+                            <div class="distribution-tokens">50M SINC</div>
+                            <div class="distribution-percent">50%</div>
+                        </div>
+                    </li>
+                    <li class="distribution-item">
+                        <div class="distribution-rank">2</div>
+                        <div class="distribution-info">
+                            <div class="distribution-address">0xF915...09f1</div>
+                            <div class="distribution-label">Treasury</div>
+                        </div>
+                        <div class="distribution-amount">
+                            <div class="distribution-tokens">50M SINC</div>
+                            <div class="distribution-percent">50%</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Contract Info -->
+        <div class="contract-info">
+            <div class="contract-card">
+                <h3>Token Information</h3>
+                <div class="contract-row">
+                    <span class="contract-label">Name</span>
+                    <span class="contract-value">SINCOR</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Symbol</span>
+                    <span class="contract-value">SINC</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Decimals</span>
+                    <span class="contract-value">18</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Network</span>
+                    <span class="contract-value">Base Mainnet</span>
+                </div>
+            </div>
+            <div class="contract-card">
+                <h3>Smart Contracts</h3>
+                <div class="contract-row">
+                    <span class="contract-label">SINC Token</span>
+                    <span class="contract-value mono">0xd10D...A073</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Bonding Curve</span>
+                    <span class="contract-value mono">0x25cA...90aa</span>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">AMM Router</span>
+                    <span class="contract-value mono">0x7949...DaB7</span>
+                </div>
+            </div>
+            <div class="contract-card">
+                <h3>Quick Links</h3>
+                <div class="contract-row">
+                    <span class="contract-label">Block Explorer</span>
+                    <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" class="contract-value" style="color: var(--primary); text-decoration: none;">Basescan ↗</a>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">DEX Screener</span>
+                    <a href="https://dexscreener.com/base/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" class="contract-value" style="color: var(--primary); text-decoration: none;">DEXScreener ↗</a>
+                </div>
+                <div class="contract-row">
+                    <span class="contract-label">Trade</span>
+                    <a href="https://aerodrome.finance" target="_blank" class="contract-value" style="color: var(--primary); text-decoration: none;">Aerodrome ↗</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="transactions-card">
+            <div class="chart-header">
+                <h3 class="chart-title">Recent Transactions</h3>
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" style="color: var(--primary); text-decoration: none; font-size: 0.875rem;">View All →</a>
+            </div>
+            <table class="transactions-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Address</th>
+                        <th>Amount</th>
+                        <th>Value</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsBody">
+                    <tr>
+                        <td><span class="tx-type buy">↑ Buy</span></td>
+                        <td class="tx-address">0xF915...09f1</td>
+                        <td class="tx-amount">100,000,000 SINC</td>
+                        <td>$105M</td>
+                        <td class="tx-time">Just now</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Generate mock price chart bars
+        function generateChart() {
+            const chart = document.getElementById('priceChart');
+            chart.innerHTML = '';
+            
+            for (let i = 0; i < 30; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                // Generate varied heights for visual interest
+                const height = 30 + Math.random() * 70;
+                bar.style.height = height + '%';
+                chart.appendChild(bar);
+            }
+        }
+        generateChart();
+
+        // Fetch real data from APIs (placeholder)
+        async function fetchTokenData() {
+            try {
+                // Could integrate with:
+                // - DEXScreener API
+                // - CoinGecko API
+                // - The Graph
+                // - Direct RPC calls
+                
+                console.log('Fetching token data...');
+            } catch (e) {
+                console.log('Could not fetch data:', e);
+            }
+        }
+        
+        fetchTokenData();
+        setInterval(fetchTokenData, 30000);
+    </script>
+</body>
+</html>

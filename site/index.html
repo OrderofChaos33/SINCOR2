@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR | The Future of Digital Value on Base</title>
+    <meta name="description" content="SINCOR ($SINC) - Premium ERC-20 token powering the next generation of decentralized finance on Base. Trade, stake, and earn with institutional-grade infrastructure.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%236366f1'/><stop offset='100%25' stop-color='%238b5cf6'/></linearGradient></defs><circle cx='50' cy='50' r='45' fill='url(%23g)'/><text x='50' y='65' font-size='40' font-weight='bold' fill='white' text-anchor='middle'>S</text></svg>">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+            --gradient-2: linear-gradient(135deg, #06b6d4 0%, #10b981 100%);
+            --gradient-3: linear-gradient(180deg, rgba(99, 102, 241, 0.15) 0%, transparent 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
+            animation: bgPulse 20s ease-in-out infinite;
+        }
+
+        @keyframes bgPulse {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(-2%, -2%) rotate(1deg); }
+            66% { transform: translate(2%, 2%) rotate(-1deg); }
+        }
+
+        /* Floating particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float 15s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.3; }
+            90% { opacity: 0.3; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 2rem;
+            background: rgba(7, 7, 20, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        nav.scrolled {
+            padding: 0.75rem 2rem;
+            background: rgba(7, 7, 20, 0.95);
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.25rem;
+            color: white;
+        }
+
+        .logo-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a:hover {
+            color: var(--text);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient-1);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-secondary {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--card-hover);
+            border-color: var(--primary);
+        }
+
+        .btn-glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-glass:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8rem 2rem 4rem;
+            position: relative;
+        }
+
+        .hero-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-text {
+            z-index: 10;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 100px;
+            font-size: 0.875rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+        }
+
+        .hero-badge .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        .hero h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(3rem, 6vw, 5rem);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 .gradient {
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 500px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 3rem;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 3rem;
+        }
+
+        .stat {
+            text-align: left;
+        }
+
+        .stat-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* Hero Visual */
+        .hero-visual {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .token-display {
+            position: relative;
+            width: 400px;
+            height: 400px;
+        }
+
+        .token-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid;
+            animation: rotate 20s linear infinite;
+        }
+
+        .token-ring:nth-child(1) {
+            width: 100%;
+            height: 100%;
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .token-ring:nth-child(2) {
+            width: 80%;
+            height: 80%;
+            top: 10%;
+            left: 10%;
+            border-color: rgba(139, 92, 246, 0.3);
+            animation-direction: reverse;
+            animation-duration: 15s;
+        }
+
+        .token-ring:nth-child(3) {
+            width: 60%;
+            height: 60%;
+            top: 20%;
+            left: 20%;
+            border-color: rgba(6, 182, 212, 0.3);
+            animation-duration: 10s;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .token-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            background: var(--gradient-1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 4rem;
+            font-weight: 800;
+            color: white;
+            box-shadow: 
+                0 0 60px rgba(99, 102, 241, 0.5),
+                0 0 120px rgba(99, 102, 241, 0.3),
+                inset 0 -10px 30px rgba(0, 0, 0, 0.3);
+            animation: glow 3s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 60px rgba(99, 102, 241, 0.5), 0 0 120px rgba(99, 102, 241, 0.3); }
+            50% { box-shadow: 0 0 80px rgba(99, 102, 241, 0.7), 0 0 160px rgba(99, 102, 241, 0.4); }
+        }
+
+        .orbit-dot {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--accent);
+        }
+
+        /* Live Price Ticker */
+        .price-ticker {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            backdrop-filter: blur(20px);
+        }
+
+        .price-item {
+            text-align: center;
+        }
+
+        .price-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .price-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .price-change {
+            color: var(--success);
+        }
+
+        /* Sections */
+        section {
+            padding: 6rem 2rem;
+            position: relative;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto 4rem;
+        }
+
+        .section-header h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .section-header p {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+        }
+
+        /* Features Grid */
+        .features {
+            background: var(--dark);
+        }
+
+        .features-grid {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-1);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .feature-card:hover {
+            background: var(--card-hover);
+            border-color: var(--primary);
+            transform: translateY(-5px);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--gradient-1);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+        }
+
+        /* Tokenomics */
+        .tokenomics {
+            background: var(--darker);
+        }
+
+        .tokenomics-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .tokenomics-chart {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .chart-ring {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                var(--primary) 0deg 180deg,
+                var(--secondary) 180deg 270deg,
+                var(--accent) 270deg 324deg,
+                var(--success) 324deg 360deg
+            );
+            padding: 40px;
+        }
+
+        .chart-inner {
+            width: 100%;
+            height: 100%;
+            background: var(--darker);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-inner .amount {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .chart-inner .label {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .tokenomics-list {
+            list-style: none;
+        }
+
+        .tokenomics-list li {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tokenomics-list .dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .tokenomics-list .info {
+            flex: 1;
+        }
+
+        .tokenomics-list .title {
+            font-weight: 600;
+        }
+
+        .tokenomics-list .desc {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .tokenomics-list .percent {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        /* Contract Section */
+        .contract {
+            background: var(--dark);
+        }
+
+        .contract-box {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 3rem;
+            text-align: center;
+        }
+
+        .contract-address {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            background: var(--darker);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin: 2rem 0;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.95rem;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: white;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .contract-links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* How to Buy */
+        .how-to-buy {
+            background: var(--darker);
+        }
+
+        .steps-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+        }
+
+        .step-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0 auto 1.5rem;
+        }
+
+        .step-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .step-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Partners/Listings */
+        .partners {
+            background: var(--dark);
+            text-align: center;
+        }
+
+        .partners-logos {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4rem;
+            flex-wrap: wrap;
+            opacity: 0.6;
+        }
+
+        .partner-logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .partner-logo:hover {
+            color: var(--text);
+            opacity: 1;
+        }
+
+        /* CTA Section */
+        .cta {
+            background: var(--gradient-1);
+            text-align: center;
+            padding: 6rem 2rem;
+        }
+
+        .cta h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .cta p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--darker);
+            padding: 4rem 2rem 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 4rem;
+        }
+
+        .footer-brand {
+            max-width: 300px;
+        }
+
+        .footer-brand p {
+            color: var(--text-muted);
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .social-link {
+            width: 40px;
+            height: 40px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .social-link:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .footer-column h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-column ul {
+            list-style: none;
+        }
+
+        .footer-column li {
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-column a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-column a:hover {
+            color: var(--text);
+        }
+
+        .footer-bottom {
+            max-width: 1400px;
+            margin: 3rem auto 0;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer-bottom p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .hero-content {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .hero-text {
+                order: 1;
+            }
+
+            .hero-visual {
+                order: 0;
+                margin-bottom: 2rem;
+            }
+
+            .hero p {
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .hero-buttons {
+                justify-content: center;
+            }
+
+            .hero-stats {
+                justify-content: center;
+            }
+
+            .token-display {
+                width: 300px;
+                height: 300px;
+            }
+
+            .token-center {
+                width: 150px;
+                height: 150px;
+                font-size: 3rem;
+            }
+
+            .tokenomics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .hero {
+                padding: 6rem 1rem 4rem;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero-stats {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+
+            .stat {
+                text-align: center;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .price-ticker {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .contract-address {
+                flex-direction: column;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-bottom {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation"></div>
+    <div class="particles" id="particles"></div>
+
+    <!-- Navigation -->
+    <nav id="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">
+                <div class="logo-icon">S</div>
+                <span class="logo-text">SINCOR</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#tokenomics">Tokenomics</a>
+                <a href="#how-to-buy">How to Buy</a>
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank">Explorer</a>
+                <a href="#" class="btn btn-primary">Trade Now</a>
+            </div>
+            <button class="mobile-menu-btn">☰</button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-text">
+                <div class="hero-badge">
+                    <span class="dot"></span>
+                    Live on Base Mainnet
+                </div>
+                <h1>The Future of <span class="gradient">Digital Value</span></h1>
+                <p>SINCOR ($SINC) is a premium ERC-20 token built on Base, featuring advanced tokenomics, institutional-grade infrastructure, and seamless DeFi integration.</p>
+                <div class="hero-buttons">
+                    <a href="https://aerodrome.finance/swap?from=0xd10D86D09ee4316CdD3585fd6486537b7119A073&to=0x4200000000000000000000000000000000000006" class="btn btn-primary" target="_blank">
+                        Buy $SINC
+                    </a>
+                    <a href="#how-to-buy" class="btn btn-secondary">
+                        How to Buy
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <div class="stat-value" id="totalSupply">100M</div>
+                        <div class="stat-label">Total Supply</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="price">$1.05</div>
+                        <div class="stat-label">Current Price</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="holders">--</div>
+                        <div class="stat-label">Holders</div>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="token-display">
+                    <div class="token-ring"></div>
+                    <div class="token-ring"></div>
+                    <div class="token-ring"></div>
+                    <div class="token-center">S</div>
+                </div>
+                <div class="price-ticker">
+                    <div class="price-item">
+                        <div class="price-label">Price</div>
+                        <div class="price-value">$1.05</div>
+                    </div>
+                    <div class="price-item">
+                        <div class="price-label">24h Change</div>
+                        <div class="price-value price-change">+0.00%</div>
+                    </div>
+                    <div class="price-item">
+                        <div class="price-label">Market Cap</div>
+                        <div class="price-value">$105M</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-header">
+            <h2>Built for the Future</h2>
+            <p>SINCOR combines cutting-edge technology with proven tokenomics to deliver a premium digital asset experience.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Lightning Fast</h3>
+                <p>Built on Base L2, SINCOR offers near-instant transactions with minimal gas fees. Experience DeFi without the friction.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Secure & Audited</h3>
+                <p>Enterprise-grade smart contracts with ERC-2612 permit functionality for gasless approvals and maximum security.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3>Bonding Curve</h3>
+                <p>Innovative logarithmic bonding curve ensures fair price discovery and sustainable token economics.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>Multi-DEX Liquidity</h3>
+                <p>Trade on Aerodrome, BaseSwap, SwapBased, and all major aggregators with deep liquidity pools.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔥</div>
+                <h3>Deflationary</h3>
+                <p>Built-in burn mechanism reduces supply over time, creating natural scarcity and value appreciation.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🏛️</div>
+                <h3>Institutional Grade</h3>
+                <p>Designed for serious investors with transparent tokenomics, verified contracts, and professional documentation.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tokenomics Section -->
+    <section class="tokenomics" id="tokenomics">
+        <div class="section-header">
+            <h2>Tokenomics</h2>
+            <p>Transparent, fair, and designed for long-term value creation.</p>
+        </div>
+        <div class="tokenomics-grid">
+            <div class="tokenomics-chart">
+                <div class="chart-ring">
+                    <div class="chart-inner">
+                        <div class="amount">100M</div>
+                        <div class="label">Total Supply</div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <ul class="tokenomics-list">
+                    <li>
+                        <div class="dot" style="background: var(--primary)"></div>
+                        <div class="info">
+                            <div class="title">Bonding Curve</div>
+                            <div class="desc">Available for public purchase</div>
+                        </div>
+                        <div class="percent">50%</div>
+                    </li>
+                    <li>
+                        <div class="dot" style="background: var(--secondary)"></div>
+                        <div class="info">
+                            <div class="title">Liquidity Pools</div>
+                            <div class="desc">DEX trading liquidity</div>
+                        </div>
+                        <div class="percent">25%</div>
+                    </li>
+                    <li>
+                        <div class="dot" style="background: var(--accent)"></div>
+                        <div class="info">
+                            <div class="title">Treasury</div>
+                            <div class="desc">Development & marketing</div>
+                        </div>
+                        <div class="percent">15%</div>
+                    </li>
+                    <li>
+                        <div class="dot" style="background: var(--success)"></div>
+                        <div class="info">
+                            <div class="title">Team & Advisors</div>
+                            <div class="desc">12-month vesting</div>
+                        </div>
+                        <div class="percent">10%</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contract Section -->
+    <section class="contract" id="contract">
+        <div class="section-header">
+            <h2>Verified Contract</h2>
+            <p>Fully verified and transparent. Always verify the contract address before trading.</p>
+        </div>
+        <div class="contract-box">
+            <h3>SINC Token Contract</h3>
+            <div class="contract-address">
+                <span id="contractAddress">0xd10D86D09ee4316CdD3585fd6486537b7119A073</span>
+                <button class="copy-btn" onclick="copyAddress()">Copy</button>
+            </div>
+            <div class="contract-links">
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" class="btn btn-secondary" target="_blank">View on Basescan</a>
+                <a href="https://dexscreener.com/base/0xd10D86D09ee4316CdD3585fd6486537b7119A073" class="btn btn-secondary" target="_blank">DEXScreener</a>
+                <a href="https://www.geckoterminal.com/base/tokens/0xd10D86D09ee4316CdD3585fd6486537b7119A073" class="btn btn-secondary" target="_blank">GeckoTerminal</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- How to Buy Section -->
+    <section class="how-to-buy" id="how-to-buy">
+        <div class="section-header">
+            <h2>How to Buy $SINC</h2>
+            <p>Get started in minutes with these simple steps.</p>
+        </div>
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <h3>Get a Wallet</h3>
+                <p>Download MetaMask, Coinbase Wallet, or Rabby. Add Base network to your wallet.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <h3>Get ETH on Base</h3>
+                <p>Bridge ETH from Ethereum using bridge.base.org or buy directly on a CEX that supports Base.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <h3>Connect & Swap</h3>
+                <p>Visit Aerodrome or any Base DEX, connect your wallet, and swap ETH for $SINC.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">4</div>
+                <h3>Hold & Earn</h3>
+                <p>Add $SINC to your wallet and participate in the SINCOR ecosystem.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Partners Section -->
+    <section class="partners">
+        <div class="section-header">
+            <h2>Trade On</h2>
+        </div>
+        <div class="partners-logos">
+            <a href="https://aerodrome.finance" target="_blank" class="partner-logo">Aerodrome</a>
+            <a href="https://baseswap.fi" target="_blank" class="partner-logo">BaseSwap</a>
+            <a href="https://swapbased.finance" target="_blank" class="partner-logo">SwapBased</a>
+            <a href="https://app.1inch.io" target="_blank" class="partner-logo">1inch</a>
+            <a href="https://kyberswap.com" target="_blank" class="partner-logo">KyberSwap</a>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <h2>Ready to Get Started?</h2>
+        <p>Join thousands of holders building the future of digital value on Base.</p>
+        <div class="cta-buttons">
+            <a href="https://aerodrome.finance/swap?from=0xd10D86D09ee4316CdD3585fd6486537b7119A073&to=0x4200000000000000000000000000000000000006" class="btn btn-glass" target="_blank">Buy $SINC Now</a>
+            <a href="https://t.me/sincortoken" class="btn btn-glass" target="_blank">Join Telegram</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <a href="#" class="logo">
+                    <div class="logo-icon">S</div>
+                    <span class="logo-text">SINCOR</span>
+                </a>
+                <p>The future of digital value on Base. Premium tokenomics, institutional-grade infrastructure.</p>
+                <div class="social-links">
+                    <a href="https://twitter.com/sincortoken" class="social-link" target="_blank">𝕏</a>
+                    <a href="https://t.me/sincortoken" class="social-link" target="_blank">✈</a>
+                    <a href="https://discord.gg/sincor" class="social-link" target="_blank">💬</a>
+                </div>
+            </div>
+            <div class="footer-column">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#tokenomics">Tokenomics</a></li>
+                    <li><a href="#how-to-buy">How to Buy</a></li>
+                    <li><a href="#contract">Contract</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h4>Resources</h4>
+                <ul>
+                    <li><a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank">Basescan</a></li>
+                    <li><a href="https://dexscreener.com/base/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank">DEXScreener</a></li>
+                    <li><a href="#">Whitepaper</a></li>
+                    <li><a href="#">Audit Report</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h4>Trade</h4>
+                <ul>
+                    <li><a href="https://aerodrome.finance" target="_blank">Aerodrome</a></li>
+                    <li><a href="https://baseswap.fi" target="_blank">BaseSwap</a></li>
+                    <li><a href="https://app.1inch.io" target="_blank">1inch</a></li>
+                    <li><a href="https://kyberswap.com" target="_blank">KyberSwap</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2026 SINCOR. All rights reserved.</p>
+            <p>Contract: 0xd10D86D09ee4316CdD3585fd6486537b7119A073</p>
+        </div>
+    </footer>
+
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', () => {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Copy address function
+        function copyAddress() {
+            const address = document.getElementById('contractAddress').textContent;
+            navigator.clipboard.writeText(address);
+            const btn = document.querySelector('.copy-btn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+            }, 2000);
+        }
+
+        // Create floating particles
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+        createParticles();
+
+        // Fetch live data (placeholder - implement with actual API)
+        async function fetchTokenData() {
+            try {
+                // This would fetch from DEXScreener, CoinGecko, or your own API
+                // For now, using placeholder values
+                const data = {
+                    price: 1.05,
+                    holders: '--',
+                    marketCap: 105000000
+                };
+                
+                document.getElementById('price').textContent = '$' + data.price.toFixed(2);
+                document.getElementById('holders').textContent = data.holders;
+            } catch (e) {
+                console.log('Could not fetch live data');
+            }
+        }
+        fetchTokenData();
+        
+        // Refresh data every 30 seconds
+        setInterval(fetchTokenData, 30000);
+    </script>
+</body>
+</html>
