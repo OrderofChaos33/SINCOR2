@@ -1,0 +1,1 @@
+{"step_id": "scout_1", "plan_id": "plan_15ad2dbc", "status": "success", "outputs": {"scout_1_output": "Simulated output for Search for relevant information sources"}, "evidence": ["Evidence from search"], "citations": ["Source: search_data"], "confidence": 0.9192, "execution_time": 1.5e-05, "resource_usage": {"tool_calls": 2, "tokens": 150}, "errors": []}

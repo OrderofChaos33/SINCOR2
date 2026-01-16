@@ -270,6 +270,41 @@ npx hardhat verify --network base <AMM_ROUTER_ADDRESS> \
 5. **Transfer ownership to multisig** for production
 6. **Keep at least 0.05 ETH** in deployer wallet for gas
 
+### Security Incident: Leaked deployer key
+If a deployer private key has been committed or otherwise exposed, take these actions immediately:
+
+- **Rotate keys**: generate a new deployer key and store it locally (do NOT commit). Example (local):
+  ```bash
+  node -e "const { Wallet } = require('ethers'); const w = Wallet.createRandom(); console.log('PRIVATE_KEY=', w.privateKey);"
+  # Then paste into your local .env (do NOT commit)
+  ```
+
+- **Transfer ownership to your multisig/safe wallet** (must be executed by the current contract owner):
+  ```bash
+  # Example using hardhat (replace OWNER_ADDRESS and CONTRACT_ADDRESS)
+  npx hardhat run scripts/transfer-ownership.js --network base --contract <CONTRACT_ADDRESS> --owner <MULTISIG_ADDRESS>
+  ```
+  Or, manually in a node REPL:
+  ```js
+  const { ethers } = require('ethers');
+  const provider = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL);
+  const wallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+  const abi = ['function transferOwnership(address)'];
+  const c = new ethers.Contract('<CONTRACT_ADDRESS>', abi, wallet);
+  await c.transferOwnership('<MULTISIG_ADDRESS>');
+  ```
+
+- **Remove secrets from git and purge history**: remove the file and rewrite history using BFG or git filter-repo. Example:
+  ```bash
+  git rm --cached external/sinc-token/.env
+  git commit -m "chore(secrets): remove leaked .env"
+  # Then use BFG or git filter-repo to purge the key from history (this rewrites history).
+  ```
+
+- **Audit usages**: check CI, deploy scripts, and other places for the leaked key and rotate those credentials as well.
+
+If you want, we can perform the repository cleanup (remove `.env` from repo and add to `.gitignore`), generate a new local key, and add these instructions to the docs.
+
 ## 📞 Support
 
 For issues or questions:

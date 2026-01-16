@@ -1,0 +1,1 @@
+{"timestamp": "2025-10-13T10:59:38.971455", "agent_id": "CUST-04A903BE03DFB227-AG-08", "event_type": "provision", "content": {"customer_id": "CUST-04A903BE03DFB227", "plan": "enterprise", "tier_agents": 42, "created_at": "2025-10-13T15:59:38.971429"}, "context": {}, "confidence": 1.0, "citations": [], "hash": "4b4fd00c61ac5461"}

@@ -1,0 +1,1 @@
+{"timestamp": "2025-10-14T15:27:14.288385", "agent_id": "AGENT-TEST", "event_type": "work_usage", "content": {"label": "work_chunk", "tokens": 1000, "tool_calls": 5, "timestamp": "2025-10-14T20:27:14.288381"}, "context": {}, "confidence": 1.0, "citations": [], "hash": "55f5f86f27343d57"}

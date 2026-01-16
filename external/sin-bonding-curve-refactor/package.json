@@ -1,0 +1,17 @@
+{
+  "name": "sin-bonding-curve-refactor",
+  "version": "0.1.0",
+  "private": true,
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.0",
+    "chai": "^4.3.0",
+    "ethers": "^5.7.0",
+    "hardhat": "^2.12.0",
+    "@openzeppelin/contracts": "^4.9.0",
+    "solhint": "^3.3.7"
+  },
+  "scripts": {
+    "test": "hardhat test",
+    "lint:sol": "solhint 'contracts/**/*.sol'"
+  }
+}

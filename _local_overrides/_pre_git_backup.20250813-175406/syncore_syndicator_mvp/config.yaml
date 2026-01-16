@@ -1,0 +1,22 @@
+project_name: synCORE
+timezone: America/Chicago
+default_platforms: [buffer_csv]
+
+platforms:
+  buffer_csv:
+    enabled: true
+    path: out/schedules/buffer.csv
+  bluesky:
+    enabled: false
+    handle: yourname.bsky.social
+    app_password: "env:BLUESKY_APP_PASSWORD"
+  mastodon:
+    enabled: false
+    base_url: https://mastodon.social
+    access_token: "env:MASTODON_TOKEN"
+
+posting_window:
+  start_local: "09:00"
+  end_local: "22:00"
+
+cadence_minutes: 90

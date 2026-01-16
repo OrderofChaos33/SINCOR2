@@ -1,0 +1,781 @@
+{
+  "version": "1.0",
+  "created": "2025-08-28T21:36:21.541296",
+  "total_agents": 43,
+  "identities": {
+    "E-achernar-16": {
+      "id": "E-achernar-16",
+      "sigil_key": "did:key:z6Mk8_zuEq9CQk3w62AFXGDi0w8e0LjOahgV",
+      "sbt_role": {
+        "family": "Builder",
+        "grade": 2,
+        "competencies": [
+          "automation_discovery",
+          "tool_development"
+        ],
+        "issued_date": "2025-08-28T21:36:20.861884",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "1b5092ba4f2df167a4118668a90b152cb264cf54afb1f1197b062bec5005f0d0",
+      "created_date": "2025-08-28T21:36:20.862363",
+      "last_checkpoint": null
+    },
+    "E-acrux-23": {
+      "id": "E-acrux-23",
+      "sigil_key": "did:key:z6Mkrg2TOM0OWdViyb-D8MfJOHD-kWCBQYJe",
+      "sbt_role": {
+        "family": "Negotiator",
+        "grade": 2,
+        "competencies": [
+          "lead_qualification",
+          "initial_outreach"
+        ],
+        "issued_date": "2025-08-28T21:36:20.881427",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "f59c9474fb49132d7f1bf06f69c9ec5c865238c1630cbf5aef50b9a5790a1fb9",
+      "created_date": "2025-08-28T21:36:20.881467",
+      "last_checkpoint": null
+    },
+    "E-aldebaran-12": {
+      "id": "E-aldebaran-12",
+      "sigil_key": "did:key:z6MkM_oHQp5EQLpXigW-ZVvsmgKOzp1Z6eG0",
+      "sbt_role": {
+        "family": "Synthesizer",
+        "grade": 2,
+        "competencies": [
+          "compliance_reporting",
+          "risk_summaries"
+        ],
+        "issued_date": "2025-08-28T21:36:20.898690",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "3e827c5ff6984bf0de82b3b3ee74aa4b5db20148e414992dd8d898c1b48121ff",
+      "created_date": "2025-08-28T21:36:20.898730",
+      "last_checkpoint": null
+    },
+    "E-alioth-33": {
+      "id": "E-alioth-33",
+      "sigil_key": "did:key:z6Mko4RoK9clXj-RwloA1VScOYO6z4R4ftR-",
+      "sbt_role": {
+        "family": "Auditor",
+        "grade": 2,
+        "competencies": [
+          "governance_oversight",
+          "strategic_compliance"
+        ],
+        "issued_date": "2025-08-28T21:36:20.913597",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "c87d02d3938216b365a8828488ec3f076623bc20ffb507a3d1e2ce487c6cb70f",
+      "created_date": "2025-08-28T21:36:20.913647",
+      "last_checkpoint": null
+    },
+    "E-alkaid-28": {
+      "id": "E-alkaid-28",
+      "sigil_key": "did:key:z6Mk_Hy_K1B0F_Ljm2B3HftqctuVkxITQbjU",
+      "sbt_role": {
+        "family": "Caretaker",
+        "grade": 2,
+        "competencies": [
+          "compliance_maintenance",
+          "audit_preparation"
+        ],
+        "issued_date": "2025-08-28T21:36:20.929380",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "d68e2cbd9161cdde6b51ca75db52d69ade8840bde1ae0a8cdcd742b62325ada9",
+      "created_date": "2025-08-28T21:36:20.929416",
+      "last_checkpoint": null
+    },
+    "E-almaak-40": {
+      "id": "E-almaak-40",
+      "sigil_key": "did:key:z6Mk0AxJwbbn0tyL_CWn5vkLKq_6VF40dpJb",
+      "sbt_role": {
+        "family": "Director",
+        "grade": 2,
+        "competencies": [
+          "technology_strategy",
+          "development_coordination"
+        ],
+        "issued_date": "2025-08-28T21:36:20.945480",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "946ae52c0b15e93a3ee41f9a83c56e26b4b9a7fb4aab072f9772f553378f366c",
+      "created_date": "2025-08-28T21:36:20.945530",
+      "last_checkpoint": null
+    },
+    "E-alphard-37": {
+      "id": "E-alphard-37",
+      "sigil_key": "did:key:z6MkuVbfNsmGcZ7Fo5ZcN5QJs10JMcYmZXFS",
+      "sbt_role": {
+        "family": "Director",
+        "grade": 2,
+        "competencies": [
+          "strategic_partnerships",
+          "market_coordination"
+        ],
+        "issued_date": "2025-08-28T21:36:20.961024",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "619b6ce42fe879938d78a5550072e43dda94a9b8c9ed8a66d741e5dc4a778eed",
+      "created_date": "2025-08-28T21:36:20.961060",
+      "last_checkpoint": null
+    },
+    "E-alpheratz-38": {
+      "id": "E-alpheratz-38",
+      "sigil_key": "did:key:z6MkKYcyMeKQlojsFnDq9XO-fy6_L3FhBbXG",
+      "sbt_role": {
+        "family": "Director",
+        "grade": 2,
+        "competencies": [
+          "intelligence_coordination",
+          "mission_planning"
+        ],
+        "issued_date": "2025-08-28T21:36:20.977201",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "62981abfc8c670f79481229b3af9b71889b0731bf46e06d61edbc5677b7d471f",
+      "created_date": "2025-08-28T21:36:20.977265",
+      "last_checkpoint": null
+    },
+    "E-altair-04": {
+      "id": "E-altair-04",
+      "sigil_key": "did:key:z6Mk1i1t30Q9dIyuVMlWnemlp0RolDrR1t4Z",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "data_source_validation",
+          "quality_monitoring"
+        ],
+        "issued_date": "2025-08-28T21:36:20.995091",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "359f1b03914edd4e9a3abe7d5a9bbd9c5b7e0182b9f9f89374b956428e836426",
+      "created_date": "2025-08-28T21:36:20.995154",
+      "last_checkpoint": null
+    },
+    "E-antares-13": {
+      "id": "E-antares-13",
+      "sigil_key": "did:key:z6MkfRV1qS9RggWH2IrhdivvzFdWYOkcUfrt",
+      "sbt_role": {
+        "family": "Synthesizer",
+        "grade": 2,
+        "competencies": [
+          "data_curation",
+          "knowledge_organization"
+        ],
+        "issued_date": "2025-08-28T21:36:21.012219",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "be0621a98571038fd973b6c2807049b83a53bcafdcbf21221f56fb0e92a306bc",
+      "created_date": "2025-08-28T21:36:21.012271",
+      "last_checkpoint": null
+    },
+    "E-arcturus-10": {
+      "id": "E-arcturus-10",
+      "sigil_key": "did:key:z6Mk3GKMw3qNYrBMINg8O2T201x1UHjzxWN2",
+      "sbt_role": {
+        "family": "Synthesizer",
+        "grade": 1,
+        "competencies": [
+          "intelligence_fusion",
+          "threat_analysis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.029351",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "58d69560ece8032fddc06171ba11eabfd60ec5949979a3670c97f8ebb56ad894",
+      "created_date": "2025-08-28T21:36:21.029406",
+      "last_checkpoint": null
+    },
+    "E-auriga-01": {
+      "id": "E-auriga-01",
+      "sigil_key": "did:key:z6MkFu-o7BEhZnB7ToxyTeEZMLr_1Q4X8Po9",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "market_intelligence",
+          "competitive_analysis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.047358",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "9476aa4de27373c10b8692f09f4d7cd15c574e434b53c7b1501068cdca2b461a",
+      "created_date": "2025-08-28T21:36:21.047412",
+      "last_checkpoint": null
+    },
+    "E-bellatrix-17": {
+      "id": "E-bellatrix-17",
+      "sigil_key": "did:key:z6MkidZpyjmm6o3D_L14zw1kAx0FLt9NiQlQ",
+      "sbt_role": {
+        "family": "Builder",
+        "grade": 2,
+        "competencies": [
+          "data_pipeline_development",
+          "analytics_tools"
+        ],
+        "issued_date": "2025-08-28T21:36:21.063840",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "f686ca9a93f508d3694b4e582723809275233817e9071a9ac3ebe096004cc636",
+      "created_date": "2025-08-28T21:36:21.063895",
+      "last_checkpoint": null
+    },
+    "E-benetnash-35": {
+      "id": "E-benetnash-35",
+      "sigil_key": "did:key:z6MkYZE8eJXnqEA1ReaNVaojDP5auFJo02-e",
+      "sbt_role": {
+        "family": "Auditor",
+        "grade": 2,
+        "competencies": [
+          "operational_audits",
+          "process_compliance"
+        ],
+        "issued_date": "2025-08-28T21:36:21.079622",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "936c55dd40532ca84cacadc7eed12d5b300ff0cd7332c186d78344815a2d4f7f",
+      "created_date": "2025-08-28T21:36:21.079682",
+      "last_checkpoint": null
+    },
+    "E-betelgeuse-11": {
+      "id": "E-betelgeuse-11",
+      "sigil_key": "did:key:z6MkH6pkXJUTIofbSjD1krFyIX1WrQGDk_PU",
+      "sbt_role": {
+        "family": "Synthesizer",
+        "grade": 2,
+        "competencies": [
+          "technical_documentation",
+          "system_analysis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.098305",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "8895f13de5bc45ea4968facdc11a101261f818ae9f9d742c519cdcff3d323cd1",
+      "created_date": "2025-08-28T21:36:21.098345",
+      "last_checkpoint": null
+    },
+    "E-canopus-15": {
+      "id": "E-canopus-15",
+      "sigil_key": "did:key:z6MkTs1jfTfDelgpYPXs2vIFNlUkwCixSGy1",
+      "sbt_role": {
+        "family": "Builder",
+        "grade": 2,
+        "competencies": [
+          "architecture_design",
+          "system_integration"
+        ],
+        "issued_date": "2025-08-28T21:36:21.113942",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "fb74aa94ad1a1ac0630fa8ac8a02b94ebb3813ab0c34d22c9e5cbeb07e1642e1",
+      "created_date": "2025-08-28T21:36:21.113992",
+      "last_checkpoint": null
+    },
+    "E-capella-07": {
+      "id": "E-capella-07",
+      "sigil_key": "did:key:z6Mkh6Tr3oNfGqnEXXMGVbDvtoZ81pHyQ_vc",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "news_monitoring",
+          "trend_tracking"
+        ],
+        "issued_date": "2025-08-28T21:36:21.129385",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "c4e1158b532a14e53482e5a42a7263161efda73b74ecd6c25de3cfb6d56c94b8",
+      "created_date": "2025-08-28T21:36:21.129440",
+      "last_checkpoint": null
+    },
+    "E-castor-18": {
+      "id": "E-castor-18",
+      "sigil_key": "did:key:z6MkgrGlFc5Rch33SNu1paIKuT5PrKwJUaIU",
+      "sbt_role": {
+        "family": "Builder",
+        "grade": 2,
+        "competencies": [
+          "client_tools",
+          "integration_apis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.145461",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "4152a0b6a3ca8409cae1e8bdcf041d5e03cacc102ec7fda729213f09dddff8d5",
+      "created_date": "2025-08-28T21:36:21.145512",
+      "last_checkpoint": null
+    },
+    "E-cor-caroli-36": {
+      "id": "E-cor-caroli-36",
+      "sigil_key": "did:key:z6MkpoRGgfR55uMttJfLM-RhR45_Q1CNEZmy",
+      "sbt_role": {
+        "family": "Auditor",
+        "grade": 2,
+        "competencies": [
+          "technical_audits",
+          "security_reviews"
+        ],
+        "issued_date": "2025-08-28T21:36:21.160057",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "74aaabd37cd903a71cea879ba6250b4d0801b5414997de08e2f6b8b51d42f71e",
+      "created_date": "2025-08-28T21:36:21.160098",
+      "last_checkpoint": null
+    },
+    "E-deneb-06": {
+      "id": "E-deneb-06",
+      "sigil_key": "did:key:z6MkKqj0_HimGYHPAK50sNDRSfk9HnWjLLg2",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "strategic_intelligence",
+          "market_analysis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.178931",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "35fafe1982d6233c729ef6f66a436e97f2179e6406224c6583bcade149fcfe3c",
+      "created_date": "2025-08-28T21:36:21.178997",
+      "last_checkpoint": null
+    },
+    "E-dubhe-29": {
+      "id": "E-dubhe-29",
+      "sigil_key": "did:key:z6MkhBvfJICRw7k0x9Qa92eWUgB2Aj70YmGD",
+      "sbt_role": {
+        "family": "Caretaker",
+        "grade": 2,
+        "competencies": [
+          "system_maintenance",
+          "automation_oversight"
+        ],
+        "issued_date": "2025-08-28T21:36:21.194533",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "2853f46bf1c5159a6d6b4e388303da0227fc34913f1da5ced257dce122ab25d0",
+      "created_date": "2025-08-28T21:36:21.194577",
+      "last_checkpoint": null
+    },
+    "E-fomalhaut-22": {
+      "id": "E-fomalhaut-22",
+      "sigil_key": "did:key:z6MkwJlH3rZvDZ6KtDJi8DcZmp3FTiY6LUWK",
+      "sbt_role": {
+        "family": "Negotiator",
+        "grade": 2,
+        "competencies": [
+          "partnership_negotiations",
+          "strategic_deals"
+        ],
+        "issued_date": "2025-08-28T21:36:21.209243",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "308d882f2d6e1846714a35947cd723c933df2640a1a376dd1eed04e1c0ca15a9",
+      "created_date": "2025-08-28T21:36:21.209289",
+      "last_checkpoint": null
+    },
+    "E-gacrux-25": {
+      "id": "E-gacrux-25",
+      "sigil_key": "did:key:z6MkefEMnn-yyy8SihwT9yYoqe2k9nPhJETL",
+      "sbt_role": {
+        "family": "Negotiator",
+        "grade": 2,
+        "competencies": [
+          "technical_sales",
+          "solution_architecture"
+        ],
+        "issued_date": "2025-08-28T21:36:21.224098",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "f15cc724fb2c1e7e897ffc431a64e079cad8fc5db555fb7bde9f08ae3b8a55fe",
+      "created_date": "2025-08-28T21:36:21.224149",
+      "last_checkpoint": null
+    },
+    "E-hamal-41": {
+      "id": "E-hamal-41",
+      "sigil_key": "did:key:z6Mk2KPdbUcTpLILxD9Umh-qd79QxRA0poHA",
+      "sbt_role": {
+        "family": "Director",
+        "grade": 2,
+        "competencies": [
+          "operations_management",
+          "quality_governance"
+        ],
+        "issued_date": "2025-08-28T21:36:21.243325",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "3a40adf5039c9becf084f482fb6cb2551bf871528242c5f81a90a5c84322edbb",
+      "created_date": "2025-08-28T21:36:21.243384",
+      "last_checkpoint": null
+    },
+    "E-kaus-27": {
+      "id": "E-kaus-27",
+      "sigil_key": "did:key:z6Mk0XM9L8byxHuByqcUlYFoXxquMaLY82aC",
+      "sbt_role": {
+        "family": "Negotiator",
+        "grade": 2,
+        "competencies": [
+          "contract_negotiation",
+          "compliance_discussions"
+        ],
+        "issued_date": "2025-08-28T21:36:21.263079",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "f9c5a6d69e76fab0ad86066d7d17ee62ef0741d3f9be05e926e93e0b56adfe76",
+      "created_date": "2025-08-28T21:36:21.263140",
+      "last_checkpoint": null
+    },
+    "E-meback-34": {
+      "id": "E-meback-34",
+      "sigil_key": "did:key:z6MkCj3iGBUdi-_uFoH2xOntTLgx6zHYhUhD",
+      "sbt_role": {
+        "family": "Auditor",
+        "grade": 2,
+        "competencies": [
+          "audit_reporting",
+          "findings_analysis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.279928",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "8e62181724ee730bdcd58c585cb6ce6caf3f551baf525f9401037f403605ffb9",
+      "created_date": "2025-08-28T21:36:21.279996",
+      "last_checkpoint": null
+    },
+    "E-megrez-32": {
+      "id": "E-megrez-32",
+      "sigil_key": "did:key:z6MkNIBcgxazteC_coAwc7oBi3AmVlDqTj5i",
+      "sbt_role": {
+        "family": "Caretaker",
+        "grade": 2,
+        "competencies": [
+          "operational_excellence",
+          "process_optimization"
+        ],
+        "issued_date": "2025-08-28T21:36:21.296067",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "e50dc0f400020375d8e4e9b2879647849998a85dbfff70c65e4c3fcb5eae4585",
+      "created_date": "2025-08-28T21:36:21.296121",
+      "last_checkpoint": null
+    },
+    "E-merak-30": {
+      "id": "E-merak-30",
+      "sigil_key": "did:key:z6Mk9-Gt9yeMgHEoaRru6bmjCbYQA5xlFAgp",
+      "sbt_role": {
+        "family": "Caretaker",
+        "grade": 2,
+        "competencies": [
+          "knowledge_management",
+          "documentation_curation"
+        ],
+        "issued_date": "2025-08-28T21:36:21.311818",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "ad5c813a377ef3d8565bb30f0524b88985dc58d596cab2ee95a1d63c0c697180",
+      "created_date": "2025-08-28T21:36:21.311865",
+      "last_checkpoint": null
+    },
+    "E-mesarthim-43": {
+      "id": "E-mesarthim-43",
+      "sigil_key": "did:key:z6MkB_HXDOAES4eO9E8mpmBmISaq0YU5--U2",
+      "sbt_role": {
+        "family": "Director",
+        "grade": 2,
+        "competencies": [
+          "executive_coordination",
+          "strategic_oversight"
+        ],
+        "issued_date": "2025-08-28T21:36:21.327332",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "500e0c916620b57f328674bdaff7f69587222f1ab8b1401248e065aa05d1ccc9",
+      "created_date": "2025-08-28T21:36:21.327385",
+      "last_checkpoint": null
+    },
+    "E-mimosa-24": {
+      "id": "E-mimosa-24",
+      "sigil_key": "did:key:z6Mkn4zM2U3no7lKLqzgbe1iPDObROzWIluL",
+      "sbt_role": {
+        "family": "Negotiator",
+        "grade": 2,
+        "competencies": [
+          "proposal_development",
+          "value_articulation"
+        ],
+        "issued_date": "2025-08-28T21:36:21.342461",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "5ae858fc247c0b656dd744efa23b7752ab5510ab97d94047cdcbcf67fbed8b8b",
+      "created_date": "2025-08-28T21:36:21.342498",
+      "last_checkpoint": null
+    },
+    "E-mirach-39": {
+      "id": "E-mirach-39",
+      "sigil_key": "did:key:z6Mkjo8C5AyzDOK91YYOr2K1bMPoJePBRWlC",
+      "sbt_role": {
+        "family": "Director",
+        "grade": 2,
+        "competencies": [
+          "information_architecture",
+          "knowledge_strategy"
+        ],
+        "issued_date": "2025-08-28T21:36:21.356530",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "19d5026394831a4ee2b297bfd9116ad72e5cf2b0b6b024cfd6ae0015f940c3ca",
+      "created_date": "2025-08-28T21:36:21.356561",
+      "last_checkpoint": null
+    },
+    "E-mizar-21": {
+      "id": "E-mizar-21",
+      "sigil_key": "did:key:z6MkliPiYA5d3UcqchiEyev0urEkqN1UA0HP",
+      "sbt_role": {
+        "family": "Builder",
+        "grade": 2,
+        "competencies": [
+          "core_development",
+          "infrastructure"
+        ],
+        "issued_date": "2025-08-28T21:36:21.369361",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "a24dd4c81574618053d0ac33c45e50818d81ddcfec678a61d0fce68d30a913b6",
+      "created_date": "2025-08-28T21:36:21.369396",
+      "last_checkpoint": null
+    },
+    "E-phecda-31": {
+      "id": "E-phecda-31",
+      "sigil_key": "did:key:z6MkVFJh9C6uh36e6vvSWvYjk4p965cZScut",
+      "sbt_role": {
+        "family": "Caretaker",
+        "grade": 2,
+        "competencies": [
+          "data_source_monitoring",
+          "quality_assurance"
+        ],
+        "issued_date": "2025-08-28T21:36:21.385721",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "af32ebe617b91b2519157ac82e29da0b0c72a7e951bdfd41431729c1d89c4fed",
+      "created_date": "2025-08-28T21:36:21.385771",
+      "last_checkpoint": null
+    },
+    "E-polaris-09": {
+      "id": "E-polaris-09",
+      "sigil_key": "did:key:z6MkbUSA7vtRxqKrCc8rgfWazZms9kXVGKju",
+      "sbt_role": {
+        "family": "Synthesizer",
+        "grade": 1,
+        "competencies": [
+          "executive_briefings",
+          "strategic_synthesis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.402154",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "e5c884e9bddb170050246221a21c291588278ad327073c79575a42e30cb69aed",
+      "created_date": "2025-08-28T21:36:21.402201",
+      "last_checkpoint": null
+    },
+    "E-pollux-19": {
+      "id": "E-pollux-19",
+      "sigil_key": "did:key:z6Mkjy9sb86qV9LD1vIuekxILnibMc5cxn7U",
+      "sbt_role": {
+        "family": "Builder",
+        "grade": 2,
+        "competencies": [
+          "maintenance_automation",
+          "monitoring_systems"
+        ],
+        "issued_date": "2025-08-28T21:36:21.419340",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "b7931aa4f0cb5a6f2316e183250b2d053495969a9616c029895415ede049cd70",
+      "created_date": "2025-08-28T21:36:21.419392",
+      "last_checkpoint": null
+    },
+    "E-procyon-14": {
+      "id": "E-procyon-14",
+      "sigil_key": "did:key:z6Mk59B3OO9QtpacHB_hQhyYXkuIrbzxltg3",
+      "sbt_role": {
+        "family": "Synthesizer",
+        "grade": 2,
+        "competencies": [
+          "stakeholder_communications",
+          "proposal_writing"
+        ],
+        "issued_date": "2025-08-28T21:36:21.435633",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "e6f9633f20708836c054ae7c99f7bf2fe4fb4d9ff880c7bd127486ae8a3326fe",
+      "created_date": "2025-08-28T21:36:21.435684",
+      "last_checkpoint": null
+    },
+    "E-regulus-20": {
+      "id": "E-regulus-20",
+      "sigil_key": "did:key:z6Mk1TKAp23mR3WvxdSF9USMUsU6nXHwwPZo",
+      "sbt_role": {
+        "family": "Builder",
+        "grade": 2,
+        "competencies": [
+          "testing_frameworks",
+          "quality_tools"
+        ],
+        "issued_date": "2025-08-28T21:36:21.450450",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "c56edca673219b87d63743d3db86fd49c1c4a490c986c77b9a71b9521c964c3e",
+      "created_date": "2025-08-28T21:36:21.450494",
+      "last_checkpoint": null
+    },
+    "E-rigel-03": {
+      "id": "E-rigel-03",
+      "sigil_key": "did:key:z6MkDFZDBfCrNzo5JUEDxNhb3jWijx2AWGkH",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "technical_research",
+          "api_discovery"
+        ],
+        "issued_date": "2025-08-28T21:36:21.466383",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "4010b98eae6ca0a4a5d66a7346ce10518ff3db88ac0cb67fe5797ad5f41fb6f3",
+      "created_date": "2025-08-28T21:36:21.466428",
+      "last_checkpoint": null
+    },
+    "E-shaula-26": {
+      "id": "E-shaula-26",
+      "sigil_key": "did:key:z6MkqhlBexXL39prVcB-tptL95rPRbgejJkK",
+      "sbt_role": {
+        "family": "Negotiator",
+        "grade": 2,
+        "competencies": [
+          "client_success",
+          "relationship_maintenance"
+        ],
+        "issued_date": "2025-08-28T21:36:21.481398",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "21828e9d8670a618b4dbafa5f34b404e45444e608b229094197b767f84c808ac",
+      "created_date": "2025-08-28T21:36:21.481441",
+      "last_checkpoint": null
+    },
+    "E-sheratan-42": {
+      "id": "E-sheratan-42",
+      "sigil_key": "did:key:z6Mkx3RwfcHFbR_i7QRUnyjHjZcZuitfJN5W",
+      "sbt_role": {
+        "family": "Director",
+        "grade": 2,
+        "competencies": [
+          "risk_management",
+          "compliance_strategy"
+        ],
+        "issued_date": "2025-08-28T21:36:21.495553",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "0c4605bbb17929e2f55868f9ee638a9cc7c00ea29a0b6c08503e3647ee0b99e7",
+      "created_date": "2025-08-28T21:36:21.495594",
+      "last_checkpoint": null
+    },
+    "E-sirius-08": {
+      "id": "E-sirius-08",
+      "sigil_key": "did:key:z6Mk3H2yu3xXjIKVuJs-D0nbb19KuqBg8k-B",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "relationship_mapping",
+          "influence_analysis"
+        ],
+        "issued_date": "2025-08-28T21:36:21.511249",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "4c1272e9ec73d215ff839695acf5220979c77154e0ad26ae380c953048887d79",
+      "created_date": "2025-08-28T21:36:21.511293",
+      "last_checkpoint": null
+    },
+    "E-spica-05": {
+      "id": "E-spica-05",
+      "sigil_key": "did:key:z6Mkbf7FUDjzNrAvoJlvhygmDv250FmnpvLE",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "compliance_scanning",
+          "risk_identification"
+        ],
+        "issued_date": "2025-08-28T21:36:21.526789",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "9114f1c90102b7d9f565d58c61f452f5f5aa32ffb1a30e3578865464fb1ed25e",
+      "created_date": "2025-08-28T21:36:21.526834",
+      "last_checkpoint": null
+    },
+    "E-vega-02": {
+      "id": "E-vega-02",
+      "sigil_key": "did:key:z6Mk1Phn1fsF7ihHB85iMEbHbJQZR3CG7YIg",
+      "sbt_role": {
+        "family": "Scout",
+        "grade": 1,
+        "competencies": [
+          "lead_prospecting",
+          "contact_discovery"
+        ],
+        "issued_date": "2025-08-28T21:36:21.541230",
+        "expires_date": null,
+        "version": 1
+      },
+      "constitution_sha256": "e9d7045e143373bb6522f019f607d23d46a4cf5c1a9370e35f13e9ff9f3429e8",
+      "created_date": "2025-08-28T21:36:21.541273",
+      "last_checkpoint": null
+    }
+  }
+}

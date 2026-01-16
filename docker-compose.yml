@@ -1,0 +1,14 @@
+services:
+  detailers:
+    build: .
+    environment:
+      GOOGLE_PLACES_KEY: ${GOOGLE_PLACES_KEY}
+      YELP_API_KEY: ${YELP_API_KEY}
+      GOOGLE_SHEETS_CREDENTIALS_JSON: /secrets/credentials.json
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID}
+      GOOGLE_SHEETS_WORKSHEET: ${GOOGLE_SHEETS_WORKSHEET}
+    volumes:
+      - ./secrets:/secrets:ro
+      - ./output:/app/output
+    command: >
+      python main.py --region us_conus --cells ${CELLS:-3500} --radius_m ${RADIUS_M:-20000} --max_per_cell ${MAX_PER_CELL:-100}

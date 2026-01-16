@@ -1,0 +1,44 @@
+{
+  "E-auriga-01": {
+    "tasks_completed": 6,
+    "success_rate": 0.8333333333333334,
+    "average_quality": 0.83,
+    "competencies": [
+      "prospect",
+      "research",
+      "summarize"
+    ],
+    "total_merit_earned": 450,
+    "specializations": {
+      "prospect": {
+        "count": 4,
+        "avg_quality": 0.8574999999999999
+      },
+      "research": {
+        "count": 1,
+        "avg_quality": 0.88
+      },
+      "summarize": {
+        "count": 1,
+        "avg_quality": 0.88
+      }
+    }
+  },
+  "E-vega-02": {
+    "tasks_completed": 3,
+    "success_rate": 0.9,
+    "average_quality": 0.88,
+    "competencies": [
+      "prospect",
+      "research",
+      "summarize"
+    ],
+    "total_merit_earned": 340,
+    "specializations": {
+      "prospect": {
+        "count": 2,
+        "avg_quality": 0.9
+      }
+    }
+  }
+}

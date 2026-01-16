@@ -1,0 +1,238 @@
+[1mdiff --git a/compliance_core.py b/compliance_core.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..f58898c[m
+[1m--- /dev/null[m
+[1m+++ b/compliance_core.py[m
+[36m@@ -0,0 +1,93 @@[m
+[32m+[m[32m# compliance_core.py[m
+[32m+[m[32mfrom datetime import datetime[m
+[32m+[m[32mfrom typing import Optional, Dict, Any[m
+[32m+[m
+[32m+[m[32mfrom lifecycle_system import LifecycleManager   # already exists[m
+[32m+[m[32mfrom memory_system import MemorySystem          # already exists[m
+[32m+[m[32mfrom security_compliance import SecurityComplianceEngine  # already exists[m
+[32m+[m
+[32m+[m[32mclass ComplianceCore:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Thin façade to enforce: Lifecycle + Memory + Compliance for every agent op.[m
+[32m+[m[32m    This prevents 'freelancing logic' and guarantees auditability.[m
+[32m+[m[32m    """[m
+[32m+[m
+[32m+[m[32m    def __init__(self, customer_id: str, agent_id: str, archetype: Optional[str] = None):[m
+[32m+[m[32m        self.customer_id = customer_id[m
+[32m+[m[32m        self.agent_id = agent_id[m
+[32m+[m[32m        self.archetype = archetype or "generic"[m
+[32m+[m
+[32m+[m[32m        # Initialize per-agent core systems[m
+[32m+[m[32m        self.lifecycle = LifecycleManager(agent_id=self.agent_id, archetype=self.archetype)[m
+[32m+[m[32m        self.memory = MemorySystem(agent_id=self.agent_id)[m
+[32m+[m[32m        self.compliance = SecurityComplianceEngine(context={"customer_id": customer_id, "agent_id": agent_id})[m
+[32m+[m
+[32m+[m[32m        # Initial compliance record[m
+[32m+[m[32m        self.compliance.log_compliance_event([m
+[32m+[m[32m            event_type="agent_core_init",[m
+[32m+[m[32m            action_taken="init_lifecycle_memory_compliance",[m
+[32m+[m[32m            metadata={"archetype": self.archetype, "timestamp": datetime.utcnow().isoformat()}[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m    # ---- Provisioning + Mission/Version hooks --------------------------------[m
+[32m+[m
+[32m+[m[32m    def record_provision(self, plan: str, tier_agents: int, metadata: Optional[Dict[str, Any]] = None) -> None:[m
+[32m+[m[32m        payload = {"customer_id": self.customer_id, "plan": plan, "tier_agents": tier_agents}[m
+[32m+[m[32m        if metadata:[m
+[32m+[m[32m            payload.update(metadata)[m
+[32m+[m
+[32m+[m[32m        # Memory: episodic record of the creation event[m
+[32m+[m[32m        self.memory.record_episode(event_type="provision", content=payload)[m
+[32m+[m
+[32m+[m[32m        # Compliance: immutable audit[m
+[32m+[m[32m        self.compliance.log_compliance_event([m
+[32m+[m[32m            event_type="agent_provision",[m
+[32m+[m[32m            action_taken="customer_agent_created",[m
+[32m+[m[32m            metadata=payload[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m    def start_mission(self, mission_name: str, version: str, budget_tokens: int, tool_budget: int = 0) -> None:[m
+[32m+[m[32m        # Versioned procedural routine (ensures later reproducibility)[m
+[32m+[m[32m        self.memory.store_routine(name=mission_name, version=version, content={[m
+[32m+[m[32m            "customer_id": self.customer_id,[m
+[32m+[m[32m            "agent_id": self.agent_id,[m
+[32m+[m[32m            "budget_tokens": budget_tokens,[m
+[32m+[m[32m            "tool_budget": tool_budget,[m
+[32m+[m[32m            "started_at": datetime.utcnow().isoformat()[m
+[32m+[m[32m        })[m
+[32m+[m
+[32m+[m[32m        # Lifecycle token budget[m
+[32m+[m[32m        self.lifecycle.consume_budget(tokens=0, tool_calls=0)  # touch to ensure counters exist[m
+[32m+[m[32m        self.compliance.log_compliance_event([m
+[32m+[m[32m            event_type="mission_start",[m
+[32m+[m[32m            action_taken="routine_version_registered",[m
+[32m+[m[32m            metadata={"mission_name": mission_name, "version": version,[m
+[32m+[m[32m                      "budget_tokens": budget_tokens, "tool_budget": tool_budget}[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m    def record_token_usage(self, tokens: int, tool_calls: int = 0, label: str = "work_chunk") -> None:[m
+[32m+[m[32m        # Charge the lifecycle budget[m
+[32m+[m[32m        self.lifecycle.consume_budget(tokens=tokens, tool_calls=tool_calls)[m
+[32m+[m[32m        # Memory episodic[m
+[32m+[m[32m        self.memory.record_episode(event_type="work_usage", content={[m
+[32m+[m[32m            "label": label, "tokens": tokens, "tool_calls": tool_calls,[m
+[32m+[m[32m            "timestamp": datetime.utcnow().isoformat()[m
+[32m+[m[32m        })[m
+[32m+[m[32m        # Compliance audit[m
+[32m+[m[32m        self.compliance.log_compliance_event([m
+[32m+[m[32m            event_type="usage",[m
+[32m+[m[32m            action_taken="token_tool_usage",[m
+[32m+[m[32m            metadata={"label": label, "tokens": tokens, "tool_calls": tool_calls}[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m    def complete_mission(self, mission_name: str, version: str, output_ref: str, success: bool, notes: str = "") -> None:[m
+[32m+[m[32m        self.memory.record_episode(event_type="mission_complete", content={[m
+[32m+[m[32m            "mission_name": mission_name, "version": version, "output_ref": output_ref,[m
+[32m+[m[32m            "success": success, "notes": notes, "timestamp": datetime.utcnow().isoformat()[m
+[32m+[m[32m        })[m
+[32m+[m[32m        self.compliance.log_compliance_event([m
+[32m+[m[32m            event_type="mission_complete",[m
+[32m+[m[32m            action_taken="routine_version_output_recorded",[m
+[32m+[m[32m            metadata={"mission_name": mission_name, "version": version,[m
+[32m+[m[32m                      "output_ref": output_ref, "success": success}[m
+[32m+[m[32m        )[m
+[1mdiff --git a/customer_provisioning.py b/customer_provisioning.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..0a5edf2[m
+[1m--- /dev/null[m
+[1m+++ b/customer_provisioning.py[m
+[36m@@ -0,0 +1,133 @@[m
+[32m+[m
+[32m+[m[32m"""[m
+[32m+[m[32mcustomer_provisioning.py[m
+[32m+[m[32m------------------------[m
+[32m+[m
+[32m+[m[32mHandles the provisioning of customer agents across all plan tiers.[m
+[32m+[m[32mIntegrates directly with the ComplianceCore, Lifecycle, and Memory systems[m
+[32m+[m[32mto ensure full auditability, version control, and resource tracking.[m
+[32m+[m
+[32m+[m[32mUpdated: integrated ComplianceCore for lifecycle, memory, and compliance logging.[m
+[32m+[m[32m"""[m
+[32m+[m
+[32m+[m[32mfrom typing import List, Dict, Optional[m
+[32m+[m[32mfrom datetime import datetime[m
+[32m+[m
+[32m+[m[32mfrom customer_database import ([m
+[32m+[m[32m    get_customer_by_id,[m
+[32m+[m[32m    attach_agents_to_customer,[m
+[32m+[m[32m    agent_exists_for_customer,[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m[32m# Ensure compliance_core.py exists in the same directory or accessible path[m
+[32m+[m[32mfrom compliance_core import ComplianceCore[m
+[32m+[m
+[32m+[m
+[32m+[m[32masync def provision_customer_agents([m
+[32m+[m[32m    customer_id: str,[m
+[32m+[m[32m    plan: str,[m
+[32m+[m[32m    num_agents: int,[m
+[32m+[m[32m    archetype: Optional[str] = None[m
+[32m+[m[32m) -> Dict:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    Provision agents for a given customer ID and plan tier.[m
+[32m+[m
+[32m+[m[32m    This function:[m
+[32m+[m[32m      • Creates N new agents for the specified customer.[m
+[32m+[m[32m      • Skips agents that already exist (idempotent).[m
+[32m+[m[32m      • Initializes LifecycleManager, MemorySystem, and ComplianceEngine[m
+[32m+[m[32m        for every agent using the ComplianceCore wrapper.[m
+[32m+[m[32m      • Records all provisioning, missions, and audits.[m
+[32m+[m
+[32m+[m[32m    Args:[m
+[32m+[m[32m        customer_id (str): The unique ID of the customer.[m
+[32m+[m[32m        plan (str): The subscription tier (starter, professional, enterprise).[m
+[32m+[m[32m        num_agents (int): Number of agents to provision.[m
+[32m+[m[32m        archetype (Optional[str]): Optional agent archetype label.[m
+[32m+[m
+[32m+[m[32m    Returns:[m
+[32m+[m[32m        dict: Summary of created and skipped agents, plus audit info.[m
+[32m+[m[32m    """[m
+[32m+[m[32m    customer = get_customer_by_id(customer_id)[m
+[32m+[m[32m    if not customer:[m
+[32m+[m[32m        raise ValueError(f"Customer not found: {customer_id}")[m
+[32m+[m
+[32m+[m[32m    agents_to_create: List[Dict] = [][m
+[32m+[m[32m    skipped = 0[m
+[32m+[m[32m    audit_events: List[Dict] = [][m
+[32m+[m
+[32m+[m[32m    # --- Create or skip agents based on existence ---[m
+[32m+[m[32m    for i in range(num_agents):[m
+[32m+[m[32m        agent_id = f"{customer_id}-AG-{i+1:02d}"[m
+[32m+[m
+[32m+[m[32m        # Prevent duplicates[m
+[32m+[m[32m        if agent_exists_for_customer(customer_id, agent_id):[m
+[32m+[m[32m            skipped += 1[m
+[32m+[m[32m            continue[m
+[32m+[m
+[32m+[m[32m        agents_to_create.append({[m
+[32m+[m[32m            "agent_id": agent_id,[m
+[32m+[m[32m            "plan": plan,[m
+[32m+[m[32m            "archetype": archetype or "generic"[m
+[32m+[m[32m        })[m
+[32m+[m
+[32m+[m[32m    # --- Attach new agents to database ---[m
+[32m+[m[32m    if agents_to_create:[m
+[32m+[m[32m        attach_agents_to_customer(customer_id, agents_to_create)[m
+[32m+[m
+[32m+[m[32m    # --- Initialize core systems for each new agent ---[m
+[32m+[m[32m    for spec in agents_to_create:[m
+[32m+[m[32m        agent_id = spec["agent_id"][m
+[32m+[m
+[32m+[m[32m        # Initialize ComplianceCore (wraps lifecycle, memory, compliance)[m
+[32m+[m[32m        core = ComplianceCore([m
+[32m+[m[32m            customer_id=customer_id,[m
+[32m+[m[32m            agent_id=agent_id,[m
+[32m+[m[32m            archetype=spec["archetype"][m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        # Record provisioning and baseline mission[m
+[32m+[m[32m        core.record_provision([m
+[32m+[m[32m            plan=plan,[m
+[32m+[m[32m            tier_agents=num_agents,[m
+[32m+[m[32m            metadata={"created_at": datetime.utcnow().isoformat()}[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        # Initialize baseline mission (“boot”) to prime version tracking[m
+[32m+[m[32m        core.start_mission([m
+[32m+[m[32m            mission_name="boot",[m
+[32m+[m[32m            version="v1",[m
+[32m+[m[32m            budget_tokens=0,[m
+[32m+[m[32m            tool_budget=0[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        # Audit record[m
+[32m+[m[32m        audit_events.append({[m
+[32m+[m[32m            "agent_id": agent_id,[m
+[32m+[m[32m            "event": "provisioned_via_core",[m
+[32m+[m[32m            "timestamp": datetime.utcnow().isoformat()[m
+[32m+[m[32m        })[m
+[32m+[m
+[32m+[m[32m    # --- Return final provisioning summary ---[m
+[32m+[m[32m    return {[m
+[32m+[m[32m        "created": len(agents_to_create),[m
+[32m+[m[32m        "skipped": skipped,[m
+[32m+[m[32m        "plan": plan,[m
+[32m+[m[32m        "audited": len(audit_events),[m
+[32m+[m[32m        "timestamp": datetime.utcnow().isoformat(),[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m
+[32m+[m[32mif __name__ == "__main__":[m
+[32m+[m[32m    import asyncio[m
+[32m+[m
+[32m+[m[32m    async def _demo():[m
+[32m+[m[32m        result = await provision_customer_agents([m
+[32m+[m[32m            customer_id="CUST-DEMO",[m
+[32m+[m[32m            plan="professional",[m
+[32m+[m[32m            num_agents=3,[m
+[32m+[m[32m            archetype="default"[m
+[32m+[m[32m        )[m
+[32m+[m[32m        print("Provisioning Result:", result)[m
+[32m+[m
+[32m+[m[32m    asyncio.run(_demo())[m

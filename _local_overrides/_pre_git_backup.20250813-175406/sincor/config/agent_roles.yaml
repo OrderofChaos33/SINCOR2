@@ -1,0 +1,7 @@
+gazette:
+  - kyc
+  - aml
+  - sec
+paydae:
+  - logger
+  - reward_trigger

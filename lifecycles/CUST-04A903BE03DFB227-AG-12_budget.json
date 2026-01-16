@@ -1,0 +1,9 @@
+{
+  "daily_tokens": 12000,
+  "daily_tool_calls": 200,
+  "daily_play_time_mins": 30,
+  "tokens_used": 0,
+  "tool_calls_used": 0,
+  "play_time_used": 0,
+  "budget_date": "2025-10-13"
+}

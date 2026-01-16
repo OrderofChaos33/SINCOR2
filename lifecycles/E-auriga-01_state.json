@@ -1,0 +1,25 @@
+{
+  "current_state": "off_duty",
+  "state_entered": "2025-08-28T21:47:52.779498",
+  "transitions": [
+    {
+      "from_state": "hatch",
+      "to_state": "onboard",
+      "timestamp": "2025-08-28T21:47:52.725640",
+      "reason": "initial_onboarding"
+    },
+    {
+      "from_state": "onboard",
+      "to_state": "shift",
+      "timestamp": "2025-08-28T21:47:52.741475",
+      "reason": "starting_work_shift"
+    },
+    {
+      "from_state": "shift",
+      "to_state": "off_duty",
+      "timestamp": "2025-08-28T21:47:52.779473",
+      "reason": "entering_dream_mode"
+    }
+  ],
+  "created": "2025-08-28T21:46:26.833364"
+}
