@@ -74,6 +74,16 @@ def dashboard():
     """Token analytics dashboard"""
     return render_template('dashboard.html')
 
+@app.route('/faucet')
+def faucet():
+    """SINC Token Faucet page"""
+    return render_template('faucet.html')
+
+@app.route('/whitepaper')
+def whitepaper():
+    """SINC Token Whitepaper"""
+    return render_template('whitepaper.html')
+
 # Legal compliance routes
 @app.route('/privacy')
 def privacy_policy():
@@ -132,9 +142,10 @@ def gdpr_data_request():
         return jsonify({
             'success': True,
             'message': f'Your {request_type} request has been received. We will respond within 30 days as required by GDPR Article 12(3).',
-            'reference_id'email_sent
-            'email_sent': False  # Change to True when email is configured
+            'reference_id': ref_id,
+            'email_sent': email_sent
         })
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

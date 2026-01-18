@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINC Token Whitepaper - AI-Agent Payment Layer on Base</title>
+    <meta name="description" content="SINC: The native payment token for autonomous AI agents on Base. Complete whitepaper covering tokenomics, architecture, and roadmap.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .section { scroll-margin-top: 100px; }
+        body { background: #0a0a0f; color: #e5e7eb; }
+        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .toc-link:hover { color: #818cf8; }
+        .highlight { background: linear-gradient(135deg, rgba(102,126,234,0.2), rgba(118,75,162,0.2)); border-left: 3px solid #667eea; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Header -->
+    <header class="fixed top-0 w-full z-50 glass">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="text-2xl font-bold gradient-text">SINC</a>
+            <nav class="hidden md:flex gap-6 text-sm">
+                <a href="#abstract" class="toc-link text-gray-400 hover:text-white transition">Abstract</a>
+                <a href="#problem" class="toc-link text-gray-400 hover:text-white transition">Problem</a>
+                <a href="#solution" class="toc-link text-gray-400 hover:text-white transition">Solution</a>
+                <a href="#tokenomics" class="toc-link text-gray-400 hover:text-white transition">Tokenomics</a>
+                <a href="#roadmap" class="toc-link text-gray-400 hover:text-white transition">Roadmap</a>
+            </nav>
+            <a href="/faucet" class="gradient-bg px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition">Get SINC</a>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="pt-32 pb-20 px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="inline-block mb-6 px-4 py-1 rounded-full glass text-sm text-purple-400">
+                Version 1.0 • January 2026
+            </div>
+            <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                <span class="gradient-text">SINC</span> Whitepaper
+            </h1>
+            <p class="text-xl md:text-2xl text-gray-400 mb-8">
+                The AI-Agent Payment Layer on Base
+            </p>
+            <div class="flex justify-center gap-4 flex-wrap">
+                <div class="glass px-6 py-3 rounded-xl">
+                    <div class="text-2xl font-bold gradient-text">100M</div>
+                    <div class="text-xs text-gray-500">Total Supply</div>
+                </div>
+                <div class="glass px-6 py-3 rounded-xl">
+                    <div class="text-2xl font-bold gradient-text">Base</div>
+                    <div class="text-xs text-gray-500">Network</div>
+                </div>
+                <div class="glass px-6 py-3 rounded-xl">
+                    <div class="text-2xl font-bold gradient-text">$0.001</div>
+                    <div class="text-xs text-gray-500">Gas Cost</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-6 pb-20">
+        
+        <!-- Abstract -->
+        <section id="abstract" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">1</span>
+                Abstract
+            </h2>
+            <div class="glass p-8 rounded-2xl">
+                <p class="text-lg text-gray-300 leading-relaxed mb-4">
+                    SINC is a utility token designed to power the emerging <strong class="text-white">AI-agent economy</strong> on Base, Coinbase's Layer 2 network. As autonomous AI agents become increasingly capable of executing tasks, managing funds, and interacting with on-chain protocols, they require a native payment medium optimized for their unique operational patterns.
+                </p>
+                <p class="text-lg text-gray-300 leading-relaxed">
+                    SINC provides the infrastructure for agents to pay for services, receive compensation for tasks completed, and participate in governance—all with sub-cent transaction costs and sub-second finality.
+                </p>
+            </div>
+        </section>
+
+        <!-- Problem -->
+        <section id="problem" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">2</span>
+                The Problem
+            </h2>
+            <div class="space-y-6">
+                <div class="glass p-6 rounded-xl">
+                    <h3 class="text-xl font-semibold mb-3 text-red-400">❌ No Native Agent Payment Infrastructure</h3>
+                    <p class="text-gray-400">AI agents need to execute thousands of micro-transactions. ETH mainnet costs $5+ per transaction. Even stablecoins on L2s lack the agent-specific features needed for autonomous operation.</p>
+                </div>
+                <div class="glass p-6 rounded-xl">
+                    <h3 class="text-xl font-semibold mb-3 text-red-400">❌ Human-Centric Token Design</h3>
+                    <p class="text-gray-400">Existing tokens are designed for human traders—not autonomous agents that operate 24/7, make rapid decisions, and need programmable payment logic.</p>
+                </div>
+                <div class="glass p-6 rounded-xl">
+                    <h3 class="text-xl font-semibold mb-3 text-red-400">❌ Fragmented Agent Ecosystem</h3>
+                    <p class="text-gray-400">Bot operators, AI developers, and automation builders lack a unified token to coordinate value exchange across different agent types and protocols.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Solution -->
+        <section id="solution" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">3</span>
+                The SINC Solution
+            </h2>
+            
+            <div class="highlight p-6 rounded-r-xl mb-8">
+                <p class="text-lg text-white font-medium">
+                    SINC is purpose-built for the AI-agent economy: optimized for high-frequency micro-payments, programmable payment logic, and autonomous operation.
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="glass p-6 rounded-xl">
+                    <div class="text-3xl mb-3">⚡</div>
+                    <h3 class="text-lg font-semibold mb-2">Sub-Cent Transactions</h3>
+                    <p class="text-gray-400 text-sm">Base L2 enables ~$0.001 per transaction, making agent micropayments economically viable.</p>
+                </div>
+                <div class="glass p-6 rounded-xl">
+                    <div class="text-3xl mb-3">🤖</div>
+                    <h3 class="text-lg font-semibold mb-2">Agent-Native Design</h3>
+                    <p class="text-gray-400 text-sm">Built for bots: batch payments, scheduled transfers, conditional execution.</p>
+                </div>
+                <div class="glass p-6 rounded-xl">
+                    <div class="text-3xl mb-3">🔗</div>
+                    <h3 class="text-lg font-semibold mb-2">Protocol Integrations</h3>
+                    <p class="text-gray-400 text-sm">Native integrations with Aave, Uniswap, and lending protocols on Base.</p>
+                </div>
+                <div class="glass p-6 rounded-xl">
+                    <div class="text-3xl mb-3">💰</div>
+                    <h3 class="text-lg font-semibold mb-2">Earn System</h3>
+                    <p class="text-gray-400 text-sm">Earn SINC by running bots, completing tasks, and participating in the network.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Use Cases -->
+        <section id="usecases" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">4</span>
+                Use Cases
+            </h2>
+            
+            <div class="space-y-4">
+                <div class="glass p-6 rounded-xl flex gap-4">
+                    <div class="text-2xl">🎯</div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Bot Rental Marketplace</h3>
+                        <p class="text-gray-400 text-sm">Rent profitable bots (MEV, arbitrage, liquidation) using SINC. Bot owners earn passive income.</p>
+                    </div>
+                </div>
+                <div class="glass p-6 rounded-xl flex gap-4">
+                    <div class="text-2xl">🔄</div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Agent-to-Agent Payments</h3>
+                        <p class="text-gray-400 text-sm">AI agents pay each other for services: data, compute, API calls, task completion.</p>
+                    </div>
+                </div>
+                <div class="glass p-6 rounded-xl flex gap-4">
+                    <div class="text-2xl">📊</div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Performance Staking</h3>
+                        <p class="text-gray-400 text-sm">Stake SINC to access premium bot strategies. Returns tied to actual bot performance.</p>
+                    </div>
+                </div>
+                <div class="glass p-6 rounded-xl flex gap-4">
+                    <div class="text-2xl">🏆</div>
+                    <div>
+                        <h3 class="font-semibold mb-1">Task Bounties</h3>
+                        <p class="text-gray-400 text-sm">Post bounties for specific agent tasks. First agent to complete earns the SINC reward.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tokenomics -->
+        <section id="tokenomics" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">5</span>
+                Tokenomics
+            </h2>
+
+            <div class="glass p-8 rounded-2xl mb-8">
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4 text-purple-400">Token Details</h3>
+                        <table class="w-full text-sm">
+                            <tr class="border-b border-gray-800">
+                                <td class="py-2 text-gray-400">Name</td>
+                                <td class="py-2 text-right font-mono">SINC</td>
+                            </tr>
+                            <tr class="border-b border-gray-800">
+                                <td class="py-2 text-gray-400">Network</td>
+                                <td class="py-2 text-right font-mono">Base (Chain 8453)</td>
+                            </tr>
+                            <tr class="border-b border-gray-800">
+                                <td class="py-2 text-gray-400">Total Supply</td>
+                                <td class="py-2 text-right font-mono">100,000,000</td>
+                            </tr>
+                            <tr class="border-b border-gray-800">
+                                <td class="py-2 text-gray-400">Decimals</td>
+                                <td class="py-2 text-right font-mono">18</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 text-gray-400">Contract</td>
+                                <td class="py-2 text-right font-mono text-xs break-all">0xd10D86...9A073</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4 text-purple-400">Distribution</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Ecosystem & Airdrops</span>
+                                    <span>40%</span>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full gradient-bg" style="width: 40%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Liquidity Pool</span>
+                                    <span>25%</span>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full gradient-bg" style="width: 25%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Team (2yr vest)</span>
+                                    <span>15%</span>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full gradient-bg" style="width: 15%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Treasury</span>
+                                    <span>10%</span>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full gradient-bg" style="width: 10%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Staking Rewards</span>
+                                    <span>10%</span>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div class="h-full gradient-bg" style="width: 10%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight p-6 rounded-r-xl">
+                <h3 class="font-semibold mb-2">🔥 Deflationary Mechanism</h3>
+                <p class="text-gray-400 text-sm">1% of all bot rental fees and marketplace transactions are burned, creating long-term deflationary pressure as ecosystem activity grows.</p>
+            </div>
+        </section>
+
+        <!-- Architecture -->
+        <section id="architecture" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">6</span>
+                Technical Architecture
+            </h2>
+
+            <div class="glass p-8 rounded-2xl">
+                <pre class="mono text-sm text-gray-400 overflow-x-auto">
+┌─────────────────────────────────────────────────────────┐
+│                    SINC ECOSYSTEM                       │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│   ┌─────────────┐    ┌─────────────┐    ┌───────────┐  │
+│   │   Faucet    │    │  Earn Hub   │    │ Bot Rent  │  │
+│   │  100 SINC   │    │  25-100/day │    │ Marketplace│  │
+│   └──────┬──────┘    └──────┬──────┘    └─────┬─────┘  │
+│          │                  │                  │        │
+│          └──────────────────┼──────────────────┘        │
+│                             │                           │
+│                    ┌────────▼────────┐                  │
+│                    │   SINC Token    │                  │
+│                    │ 0xd10D86...9A073│                  │
+│                    └────────┬────────┘                  │
+│                             │                           │
+│          ┌──────────────────┼──────────────────┐        │
+│          │                  │                  │        │
+│   ┌──────▼──────┐    ┌──────▼──────┐    ┌─────▼─────┐  │
+│   │   Staking   │    │  Governance │    │ AI Oracle │  │
+│   │  12-18% APY │    │  DAO Votes  │    │  Pricing  │  │
+│   └─────────────┘    └─────────────┘    └───────────┘  │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│              BASE L2 (Chain 8453)                       │
+│         ~$0.001 tx cost • 2s finality                   │
+└─────────────────────────────────────────────────────────┘
+                </pre>
+            </div>
+        </section>
+
+        <!-- Roadmap -->
+        <section id="roadmap" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">7</span>
+                Roadmap
+            </h2>
+
+            <div class="space-y-6">
+                <div class="glass p-6 rounded-xl border-l-4 border-green-500">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-green-400 text-sm font-medium">✓ COMPLETED</span>
+                        <span class="text-gray-500">Q4 2025</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Phase 1: Foundation</h3>
+                    <ul class="text-gray-400 text-sm space-y-1">
+                        <li>• Token deployment on Base</li>
+                        <li>• Bonding curve launch</li>
+                        <li>• Initial distribution to 10+ wallets</li>
+                        <li>• Faucet & Earn system deployment</li>
+                    </ul>
+                </div>
+
+                <div class="glass p-6 rounded-xl border-l-4 border-purple-500">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-purple-400 text-sm font-medium">🔄 IN PROGRESS</span>
+                        <span class="text-gray-500">Q1 2026</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Phase 2: Growth</h3>
+                    <ul class="text-gray-400 text-sm space-y-1">
+                        <li>• 1,000+ holder target</li>
+                        <li>• Bot rental marketplace MVP</li>
+                        <li>• DEX liquidity (Uniswap V3 on Base)</li>
+                        <li>• Staking contract deployment</li>
+                    </ul>
+                </div>
+
+                <div class="glass p-6 rounded-xl border-l-4 border-gray-600">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-gray-400 text-sm font-medium">📅 PLANNED</span>
+                        <span class="text-gray-500">Q2-Q3 2026</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Phase 3: Expansion</h3>
+                    <ul class="text-gray-400 text-sm space-y-1">
+                        <li>• 10,000+ holders</li>
+                        <li>• AI oracle integration</li>
+                        <li>• Cross-chain bridges</li>
+                        <li>• Major CEX listings</li>
+                    </ul>
+                </div>
+
+                <div class="glass p-6 rounded-xl border-l-4 border-gray-600">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-gray-400 text-sm font-medium">📅 PLANNED</span>
+                        <span class="text-gray-500">Q4 2026+</span>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">Phase 4: Dominance</h3>
+                    <ul class="text-gray-400 text-sm space-y-1">
+                        <li>• Industry standard for AI-agent payments</li>
+                        <li>• Enterprise partnerships</li>
+                        <li>• Protocol DAO governance</li>
+                        <li>• $10M+ TVL target</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Contracts -->
+        <section id="contracts" class="section mb-16">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <span class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-lg">8</span>
+                Contract Addresses
+            </h2>
+
+            <div class="glass p-8 rounded-2xl">
+                <div class="space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-900/50 rounded-lg">
+                        <span class="text-gray-400 mb-2 md:mb-0">SINC Token</span>
+                        <code class="mono text-sm text-purple-400 break-all">0xd10D86D09ee4316CdD3585fd6486537b7119A073</code>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-900/50 rounded-lg">
+                        <span class="text-gray-400 mb-2 md:mb-0">Bonding Curve</span>
+                        <code class="mono text-sm text-purple-400 break-all">0x25cA41Dac29f892c72A53500853eC45a5FfF90aa</code>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-900/50 rounded-lg">
+                        <span class="text-gray-400 mb-2 md:mb-0">Network</span>
+                        <code class="mono text-sm text-purple-400">Base (Chain ID: 8453)</code>
+                    </div>
+                </div>
+                <div class="mt-6 text-center">
+                    <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" class="text-purple-400 hover:text-purple-300 text-sm">
+                        View on BaseScan →
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="text-center py-16">
+            <h2 class="text-3xl font-bold mb-4">Ready to Join the AI-Agent Economy?</h2>
+            <p class="text-gray-400 mb-8">Get your first SINC tokens and start participating in the ecosystem.</p>
+            <div class="flex justify-center gap-4 flex-wrap">
+                <a href="/faucet" class="gradient-bg px-8 py-3 rounded-xl text-white font-semibold hover:opacity-90 transition">
+                    🚰 Claim from Faucet
+                </a>
+                <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" class="glass px-8 py-3 rounded-xl text-white font-semibold hover:bg-white/10 transition">
+                    📊 View on BaseScan
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-800 py-12 px-6">
+        <div class="max-w-4xl mx-auto text-center text-gray-500 text-sm">
+            <p class="mb-4">© 2026 SINC Protocol. Built on Base.</p>
+            <div class="flex justify-center gap-6">
+                <a href="/terms" class="hover:text-white transition">Terms</a>
+                <a href="/privacy" class="hover:text-white transition">Privacy</a>
+                <a href="mailto:team@getsincor.com" class="hover:text-white transition">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

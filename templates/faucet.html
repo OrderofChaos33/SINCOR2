@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINC Faucet | Get Free $SINC</title>
+    <meta name="description" content="Get free SINCOR ($SINC) tokens from the official faucet on Base.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+        }
+
+        /* Nav */
+        nav {
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            background: rgba(7, 7, 20, 0.8);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--text);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo span {
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--text);
+        }
+
+        .btn {
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: var(--card-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+        }
+
+        .faucet-card {
+            background: rgba(15, 15, 35, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 3rem;
+            width: 100%;
+            max-width: 600px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .faucet-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .faucet-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .faucet-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-label {
+            display: block;
+            margin-bottom: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .status-box {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .status-label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+        
+        .status-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--accent);
+        }
+
+        .claims-info {
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 1.5rem;
+        }
+
+        #connect-wallet {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        
+        #request-btn {
+            width: 100%;
+            display: none;
+            justify-content: center;
+        }
+
+        /* Success/Error Messages */
+        #message {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .msg-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .msg-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+
+        footer {
+            padding: 2rem;
+            text-align: center;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            background: rgba(7, 7, 20, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+
+    <nav>
+        <a href="/" class="logo">SINCOR <span>FAUCET</span></a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Home</a>
+            <a href="/trade" class="nav-link">Trade SINC</a>
+            <a href="/dashboard" class="nav-link">Dashboard</a>
+            <a href="#" class="btn btn-primary" id="nav-connect">Connect Wallet</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="faucet-card">
+            <div class="faucet-header">
+                <h1 class="faucet-title">SINC Faucet</h1>
+                <p class="faucet-subtitle">Get free SINC tokens on Base testnet/mainnet to try the ecosystem.</p>
+            </div>
+
+            <div class="status-box">
+                <div class="status-item">
+                    <span class="status-label">Faucet Balance</span>
+                    <span class="status-value" id="faucet-balance">1,000,000 SINC</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Claim Amount</span>
+                    <span class="status-value">100 SINC</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Cooldown</span>
+                    <span class="status-value">24h</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label" for="wallet-address">Wallet Address</label>
+                <input type="text" id="wallet-address" class="input-field" placeholder="0x..." readonly>
+            </div>
+
+            <button id="connect-wallet" class="btn btn-primary">Connect Wallet to Claim</button>
+            <button id="request-btn" class="btn btn-primary">Request 100 SINC</button>
+
+            <div id="message"></div>
+
+            <p class="claims-info">
+                By claiming, you agree to use tokens for testing and ecosystem participation only.<br>
+                Limit: 1 claim per wallet every 24 hours.
+            </p>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 SINCOR. All rights reserved.</p>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <script>
+        // DOM Elements
+        const connectBtn = document.getElementById('connect-wallet');
+        const navConnectBtn = document.getElementById('nav-connect');
+        const requestBtn = document.getElementById('request-btn');
+        const addressInput = document.getElementById('wallet-address');
+        const messageDiv = document.getElementById('message');
+
+        let userAddress = null;
+
+        // Connect Wallet Function
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    userAddress = accounts[0];
+                    handleConnect(userAddress);
+                } catch (error) {
+                    console.error(error);
+                    showMessage('Failed to connect wallet', 'error');
+                }
+            } else {
+                showMessage('Please install MetaMask or another Web3 wallet', 'error');
+            }
+        }
+
+        // Handle successful connection
+        function handleConnect(address) {
+            const shortAddr = `${address.substring(0, 6)}...${address.substring(38)}`;
+            
+            addressInput.value = address;
+            
+            connectBtn.style.display = 'none';
+            navConnectBtn.innerText = shortAddr;
+            requestBtn.style.display = 'flex';
+            
+            showMessage('Wallet connected! You can now request tokens.', 'success');
+            
+            // Auto hide message after 3s
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // Mock Request (Since we don't have the backend wired up live ideally)
+        async function requestTokens() {
+            if (!userAddress) return;
+
+            requestBtn.innerText = 'Processing...';
+            requestBtn.disabled = true;
+
+            try {
+                // In a real implementation we would call a backend API here
+                // For now, simulate network delay
+                await new Promise(r => setTimeout(r, 2000));
+                
+                // For demo/MVP purposes, since we haven't deployed the backend server:
+                showMessage('Request submitted! SINC will arrive shortly (Mock).', 'success');
+                
+            } catch (error) {
+                showMessage('Error processing request. Try again later.', 'error');
+            } finally {
+                requestBtn.innerText = 'Request 100 SINC';
+                requestBtn.disabled = false;
+            }
+        }
+
+        // Utility to show messages
+        function showMessage(msg, type) {
+            messageDiv.textContent = msg;
+            messageDiv.className = type === 'error' ? 'msg-error' : 'msg-success';
+            messageDiv.style.display = 'block';
+        }
+
+        // Event Listeners
+        connectBtn.addEventListener('click', connectWallet);
+        navConnectBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!userAddress) connectWallet();
+        });
+        requestBtn.addEventListener('click', requestTokens);
+
+        // Check if already connected
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.request({ method: 'eth_accounts' })
+                .then(accounts => {
+                    if (accounts.length > 0) {
+                        userAddress = accounts[0];
+                        handleConnect(userAddress);
+                    }
+                })
+                .catch(console.error);
+        }
+    </script>
+</body>
+</html>
