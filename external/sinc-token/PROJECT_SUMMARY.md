@@ -2,7 +2,7 @@
 
 ## ✅ Project Status: READY FOR DEPLOYMENT
 
-**SINCOR (SINC)** - Premium ERC-20 token with bonding curve and AMM integration  
+**SINC (SINC)** - Premium ERC-20 token with bonding curve and AMM integration  
 **Created**: January 11, 2026  
 **Network**: Base Mainnet (Chain ID: 8453)  
 **Status**: ✅ Compiled, Tested, Ready to Deploy
@@ -13,7 +13,7 @@
 
 | Property | Value |
 |----------|-------|
-| **Name** | SINCOR |
+| **Name** | SINC |
 | **Symbol** | SINC |
 | **Total Supply** | 100,000,000 SINC |
 | **Decimals** | 18 |
@@ -376,5 +376,5 @@ Everything is prepared for your SINC token deployment:
 
 ---
 
-**Built with ❤️ and precision for SINCOR**  
+**Built with ❤️ and precision for SINC**  
 *Clean. Perfect. Production-Ready.*

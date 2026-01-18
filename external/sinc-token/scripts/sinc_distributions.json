@@ -1,0 +1,87 @@
+{
+  "total": 1000,
+  "recipients": [
+    "0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001",
+    "0x4200000000000000000000000000000000000015",
+    "0x6d5f5cac5078dbc78e125d995462214b8c346c75",
+    "0x875777351ded8f3d0cd2c9c04ddd70fa9f1ac154",
+    "0x3a53cc8a26691fd434f28dea2ce9a33d85730997",
+    "0x9cabe00d0325ff1e8bae816ae18632c1c987582b",
+    "0x827922686190790b37229fd06084350e74485b72",
+    "0x65b9abf051ea72895d01fc1bde7c5d63f47c2642",
+    "0x545e7f4813c9bd922eb5911bcadd48cf815e60fb",
+    "0xea337c3a7d3734b0cb8d469e7f5f5c1ec1d4502c"
+  ],
+  "history": [
+    {
+      "to": "0xDeaDDEaDDeAdDeAdDEAdDEaddeAddEAdDEAd0001",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x55cd3d72582500d8f6b519ab2533f7264ffab7a5f0ec01152fc20d9405c6c3a4",
+      "timestamp": "2026-01-17T03:02:37.728Z"
+    },
+    {
+      "to": "0x4200000000000000000000000000000000000015",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x3635789e8ebe00a3ae3f05062428245479003e1d7964bb94e53b4939c34f6048",
+      "timestamp": "2026-01-17T03:02:45.926Z"
+    },
+    {
+      "to": "0x6D5f5Cac5078dbc78E125D995462214b8C346C75",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x4c07c1056c9925c60bc97a416aebcbfca3b97b0a2af2df0bde92ffbae29a5bb1",
+      "timestamp": "2026-01-17T03:02:53.641Z"
+    },
+    {
+      "to": "0x875777351DEd8F3D0cD2c9c04DDD70fa9F1aC154",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x3097edcfe309561c3ae2e9126a6dbce69823d54ca7753722c04e16db97c94141",
+      "timestamp": "2026-01-17T03:03:01.689Z"
+    },
+    {
+      "to": "0x3A53Cc8A26691fd434F28DEa2ce9a33d85730997",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x0065da312dd64c3aef978eabc40d8a23cfb1a0f24f4c43b0aaa972e47a1e6c58",
+      "timestamp": "2026-01-17T03:03:09.889Z"
+    },
+    {
+      "to": "0x9caBe00D0325FF1E8baE816Ae18632C1c987582b",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0xd0460508629838d7c10c11873dd6a421234ea9e6e46c935fce6e4caa2e7385fc",
+      "timestamp": "2026-01-17T05:16:42.421Z"
+    },
+    {
+      "to": "0x827922686190790b37229fd06084350E74485b72",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0xc854953598fe613ee1983a214a48d175f39d289c9ce47bab5642554ba3a39749",
+      "timestamp": "2026-01-17T05:16:50.195Z"
+    },
+    {
+      "to": "0x65b9aBF051eA72895d01FC1BdE7c5D63F47C2642",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x48bf0dee04a4a21de2bdbfcc3a8f5a4809606e0f12a6dfa5f4f653cad360dac7",
+      "timestamp": "2026-01-17T05:16:58.142Z"
+    },
+    {
+      "to": "0x545e7f4813C9bd922eb5911BCadd48cF815e60fb",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x2feaf01a0947772fe8589b05acf51102f400f82bd43a5e318923af8c144c60e1",
+      "timestamp": "2026-01-17T05:17:06.040Z"
+    },
+    {
+      "to": "0xea337C3a7d3734B0Cb8d469E7f5f5c1ec1d4502C",
+      "amount": "100.0",
+      "reason": "airdrop",
+      "txHash": "0x6d3c1e3bdb80b113e0e14aea75821cce5c853406e26ecdc977890867b3b16b5e",
+      "timestamp": "2026-01-17T05:17:13.725Z"
+    }
+  ]
+}

@@ -2,33 +2,34 @@ const { ethers } = require("ethers");
 require("dotenv").config();
 
 // --- CONFIGURATION ---
-const RPC_URL = process.env.BASE_RPC_URL || "https://mainnet.base.org";
-const PRIVATE_KEY = process.env.PRIVATE_KEY; // Ensure this is set in .env
+const RPC_URL = process.env.BASE_RPC_URL || "https://base.publicnode.com";
+const PRIVATE_KEY = process.env.PRIVATE_KEY; 
 const SINC_ADDRESS = process.env.SINC_TOKEN_ADDRESS || "0xd10D86D09ee4316CdD3585fd6486537b7119A073";
 const BONDING_CURVE_ADDRESS = process.env.BONDING_CURVE_ADDRESS || "0x25cA41Dac29f892c72A53500853eC45a5FfF90aa";
+// WETH is the Quote Token
 const WETH_ADDRESS = process.env.QUOTE_TOKEN_ADDRESS || "0x4200000000000000000000000000000000000006";
+
 const AERO_ROUTER_ADDRESS = "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43";
 const AERO_FACTORY_ADDRESS = "0x420DD381b31aEf6683db6B902084cB0FFECe40Da";
 
 // EXECUTION SETTINGS
-const TARGET_PROFIT_ETH = 0.005; // Minimum profit to execute
-const TRADE_SIZE_SINC = 1000; // Amount of SINC to test swaps with
-const AUTO_TRADE = true; // MVP: We want to show it works, so auto-trade if profitable
+const TARGET_PROFIT_ETH = 0.0005; // Lower threshold; usually expect >0.005 for gas
+const TRADE_SIZE_WETH = 0.001; // Amount of WETH to test Buy with
+const AUTO_TRADE = true; 
 
 // ABIS
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
   "function approve(address, uint256) returns (bool)",
-  "function decimals() view returns (uint8)",
-  "function symbol() view returns (string)",
-  "function allowance(address, address) view returns (uint256)"
+  "function allowance(address, address) view returns (uint256)",
+  "function decimals() view returns (uint8)"
 ];
 
 const BONDING_ABI = [
-  "function costToAdd(uint256 _newAllocation, uint256 _currentSupply) external view returns (uint256)",
-  "function costToRemove(uint256 _amountToRemove, uint256 _currentSupply) external view returns (uint256)",
-  "function buyWithQuote(uint256 maxQuoteIn) external returns (uint256 sincOut)",
-  "function sell(uint256 sincIn, uint256 minQuoteOut) external returns (uint256 quoteOut)",
+  "function buy(uint256 quoteAmount, uint256 minSincAmount) returns (uint256)",
+  "function sell(uint256 sincAmount, uint256 minQuoteAmount) returns (uint256)",
+  "function calculateBuy(uint256 quoteAmount) view returns (uint256 sincAmount, uint256 fee)",
+  "function calculateSell(uint256 sincAmount) view returns (uint256 quoteAmount, uint256 fee)",
   "function circulatingSupply() view returns (uint256)"
 ];
 
@@ -41,8 +42,9 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 let wallet;
 
 async function main() {
-    console.log(`\n=== SINC ARBITRAGE & LIQUIDATION MVP ===`);
+    console.log(`\n=== SINC ARBITRAGE BOT v2 (Corrected ABI) ===`);
     console.log(`Target Token: SINC (${SINC_ADDRESS})`);
+    console.log(`Bonding Curve: ${BONDING_CURVE_ADDRESS}`);
     
     if (!PRIVATE_KEY) {
         console.error("❌ PRIVATE_KEY not found in .env");
@@ -52,127 +54,108 @@ async function main() {
     console.log(`Wallet: ${wallet.address}`);
 
     const sinc = new ethers.Contract(SINC_ADDRESS, ERC20_ABI, wallet);
+    const weth = new ethers.Contract(WETH_ADDRESS, ERC20_ABI, wallet);
     const bonding = new ethers.Contract(BONDING_CURVE_ADDRESS, BONDING_ABI, wallet);
     const router = new ethers.Contract(AERO_ROUTER_ADDRESS, AERO_ROUTER_ABI, wallet);
 
-    // Initial Checks
-    try {
-        const bal = await sinc.balanceOf(wallet.address);
-        console.log(`💰 SINC Balance: ${ethers.formatUnits(bal, 18)} SINC`);
-        if (bal === 0n) console.warn("⚠️ Warning: 0 SINC Balance. Can only test Buy Arb.");
-    } catch (e) {
-        console.error("Error reading SINC balance:", e.message);
-    }
-
-    console.log("\n🚀 Starting Aggressive Monitoring...");
+    console.log("\n🚀 Starting Monitoring Loop...");
     
     while (true) {
         try {
-            await checkOpportunities(sinc, bonding, router);
+            await checkOpportunities(sinc, weth, bonding, router);
         } catch (e) {
-            console.error("Loop Error:", e.message);
+            // Log only relevant errors
+            if (e.code === "CALL_EXCEPTION") console.log(".");
+            else console.error("Loop Error:", e.message);
         }
-        await new Promise(r => setTimeout(r, 5000)); // 5s loop
+        await new Promise(r => setTimeout(r, 6000)); // 6s loop
     }
 }
 
-async function checkOpportunities(sinc, bonding, router) {
-    const tradeAmt = ethers.parseUnits(TRADE_SIZE_SINC.toString(), 18);
+async function checkOpportunities(sinc, weth, bonding, router) {
     const ts = new Date().toLocaleTimeString();
+    
+    // Test Amount: Buy with 0.001 ETH
+    const wethIn = ethers.parseEther(TRADE_SIZE_WETH.toString());
 
-    // 1. Get Curve Prices
-    let curveSupply;
+    // 1. Get Curve Buy Price (Buy SINC with WETH)
+    let curveSincOut = 0n;
     try {
-        curveSupply = await bonding.circulatingSupply();
-    } catch(e) {
-        curveSupply = ethers.parseUnits("10000000", 18); // fallback estimate
-    }
-
-    // Sell Price on Curve (How much ETH do I get for 1000 SINC?)
-    let curveSellEth = 0n;
-    try {
-        curveSellEth = await bonding.costToRemove(tradeAmt, curveSupply);
+        // calculateBuy returns (sincAmount, fee)
+        const res = await bonding.calculateBuy(wethIn);
+        curveSincOut = res[0];
     } catch (e) {
-        // console.log("  Curve Sell Calc Error (Supply low?)"); 
+        console.log(`[${ts}] Curve Buy Calc Failed (Paused?): ${e.message}`);
+        return;
     }
 
-    // Buy Price on Curve (How much ETH do I pay for 1000 SINC?)
-    let curveBuyEth = await bonding.costToAdd(tradeAmt, curveSupply);
-
-    // 2. Get DEX Prices (Aerodrome)
+    // 2. Get DEX Sell Price (Sell the SINC we just bought back to WETH)
+    // Route: SINC -> WETH
     const routeSell = [{ from: SINC_ADDRESS, to: WETH_ADDRESS, stable: false, factory: AERO_FACTORY_ADDRESS }];
-    const routeBuy = [{ from: WETH_ADDRESS, to: SINC_ADDRESS, stable: false, factory: AERO_FACTORY_ADDRESS }];
-
-    // DEX Sell (SINC -> ETH)
-    let dexSellEth = 0n;
+    let dexWethOut = 0n;
     try {
-        const amts = await router.getAmountsOut(tradeAmt, routeSell);
-        dexSellEth = amts[amts.length - 1];
+        const amts = await router.getAmountsOut(curveSincOut, routeSell);
+        dexWethOut = amts[amts.length - 1];
     } catch(e) {
-        // console.log("  DEX Sell Query Failed");
+        console.log(`[${ts}] DEX Sell Calc Failed (No liquidity?): ${e.message}`);
+        // If DEX has no liq, we can't arb
+        return;
     }
 
-    // DEX Buy (ETH -> SINC)
-    // Approximate: check cost to buy using inverse price or small amount check
-    // Here we check how much SINC we get for 1 ETH to calc price
-    let dexBuyEth = 0n;
-    // MVP Estimation: Use getAmountsOut for reverse to estimate cost
-    // For exact check we need getAmountsIn or binary search. 
-    // Let's assume price is roughly symmetric for MVP check.
+    // ARB CALCULATION
+    // Start: 0.001 ETH -> Curve -> SINC -> DEX -> ETH
+    const profitEth = BigInt(dexWethOut) - BigInt(wethIn);
     
-    // --- OPPORTUNITY 1: SELL HIGH (Holdings Liquidation) ---
-    // If we have SINC, where is it better to sell?
-    // We want to generate NON-ZERO ETH balance.
-    if (curveSellEth > 0n || dexSellEth > 0n) {
-        const cEth = parseFloat(ethers.formatEther(curveSellEth));
-        const dEth = parseFloat(ethers.formatEther(dexSellEth));
-        
-        // Log Prices
-        // console.log(`[${ts}] Sell 1k SINC -> Curve: ${cEth.toFixed(6)} ETH | DEX: ${dEth.toFixed(6)} ETH`);
-        
-        const diff = cEth - dEth;
-        if (Math.abs(diff) > 0.0001) {
-            console.log(`[${ts}] 📊 Price Gap: Sell on ${cEth > dEth ? "CURVE" : "DEX"} is better by ${Math.abs(diff).toFixed(6)} ETH`);
-            
-            // If user has balance, we could auto-sell to optimize?
-            // User requested "generate non 0 balance". 
-        }
-    }
-
-    // --- OPPORTUNITY 2: ARBITRAGE (Buy Low, Sell High) ---
-    // A. Buy on DEX, Sell on Curve
-    // We pay dexBuyEth (estimated) -> Receive curveSellEth
-    // Need approx dex buy cost.
+    const wethInFloat = parseFloat(ethers.formatEther(wethIn));
+    const dexOutFloat = parseFloat(ethers.formatEther(dexWethOut));
+    const curveSincFloat = parseFloat(ethers.formatEther(curveSincOut));
     
-    // B. Buy on Curve, Sell on DEX
-    // Pay curveBuyEth -> Receive dexSellEth
-    if (dexSellEth > curveBuyEth) {
-        const profit = dexSellEth - curveBuyEth;
-        const profitEth = parseFloat(ethers.formatEther(profit));
+    // console.log(`[${ts}] 1 ETH buys ${curveSincFloat/wethInFloat} SINC on Curve`);
+    
+    if (profitEth > 0n) {
+        const pFloat = parseFloat(ethers.formatEther(profitEth));
+        console.log(`[${ts}] 💰 ARB FOUND: ${pFloat.toFixed(6)} ETH Profit! (Buy Curve -> Sell DEX)`);
         
-        console.log(`[${ts}] 🚨 ARB FOUND: Buy CURVE -> Sell DEX! Profit: ${profitEth.toFixed(6)} ETH`);
-        
-        if (profitEth > TARGET_PROFIT_ETH && AUTO_TRADE) {
-             console.log("⚡ EXECUTING ARBITRAGE...");
-             // 1. Buy on Curve
-             // 2. Approve Router
-             // 3. Sell on Router
+        if (pFloat > TARGET_PROFIT_ETH && AUTO_TRADE) {
+             console.log("⚡ EXECUTING ARB...");
+             await executeArb(wethIn, curveSincOut, bonding, sinc, router);
         }
+    } else {
+        // Log status occasionally
+        console.log(`[${ts}] No Arb. Loss/Diff: ${(dexOutFloat - wethInFloat).toFixed(6)} ETH (Curve buys ${curveSincFloat.toFixed(2)} SINC)`);
     }
+}
 
-    // C. Buy on DEX, Sell on Curve
-    // Harder to estimate exact buy cost on DEX without getAmountsIn. 
-    // But if (Curve Sell Price) > (DEX Sell Price * 1.05), likely arb exists.
-    if (curveSellEth > (dexSellEth + (dexSellEth / 20n))) { // > 5% diff
-         console.log(`[${ts}] ⚠️ POTENTIAL ARB: Curve Price significantly higher than DEX. Investigate Buy DEX -> Sell Curve.`);
-         console.log(`   Curve Sell: ${ethers.formatEther(curveSellEth)} | Dex Sell: ${ethers.formatEther(dexSellEth)}`);
-    }
+async function executeArb(wethIn, minSincFromCurve, bonding, sinc, router) {
+    try {
+        // 1. Buy on Curve
+       
+        console.log("   1. Buying on Curve...");
+         
+        // Slippage 1%
+        const minSinc = minSincFromCurve * 99n / 100n;
+        const txBuy = await bonding.buy(wethIn, minSinc);
+        console.log(`      TX: ${txBuy.hash}`);
+        await txBuy.wait();
 
-    // --- FLASH LOAN LIQUIDATION SIMULATION ---
-    // User requested "FL Liq". Since no lending pool specified, we run a "simulation" log 
-    // to show we are checking for liquidatable positions if SINC was on Aave.
-    if (Math.random() > 0.95) { // Occasional log
-        console.log(`[${ts}] 🔍 Scanning Flash Loan Pools for SINC liquidations... (No unhealthy positions found)`);
+        // 2. Sell on DEX
+        console.log("   2. Selling on DEX...");
+        const routeSell = [{ from: SINC_ADDRESS, to: WETH_ADDRESS, stable: false, factory: AERO_FACTORY_ADDRESS }];
+        // approve router
+        // await (await sinc.approve(AERO_ROUTER_ADDRESS, minSincFromCurve)).wait();
+        
+        const txSell = await router.swapExactTokensForTokens(
+            minSincFromCurve, // Try to sell what we got (or balance)
+            0, // Accept any ETH (risky but MVP) or set limit
+            routeSell,
+            wallet.address,
+            Math.floor(Date.now()/1000) + 60
+        );
+        await txSell.wait();
+        console.log("   ✅ Arbitrage Success!");
+        
+    } catch (e) {
+        console.error("   ❌ Execution Error:", e.message);
     }
 }
 

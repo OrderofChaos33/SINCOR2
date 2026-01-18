@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title SINC Token
- * @notice SINCOR (SINC) - Premium ERC-20 token with full interoperability
+ * @notice SINC (SINC) - Premium ERC-20 token with full interoperability
  * @dev Implements ERC-20, ERC-2612 (Permit), burnable, and ownership features
  * 
  * Features:
@@ -40,8 +40,8 @@ contract SINC is ERC20, ERC20Burnable, ERC20Permit, Ownable {
      * @param initialOwner Address to receive initial supply and ownership
      */
     constructor(address initialOwner) 
-        ERC20("SINCOR", "SINC") 
-        ERC20Permit("SINCOR")
+        ERC20("SINC", "SINC") 
+        ERC20Permit("SINC")
         Ownable(initialOwner)
     {
         // Mint entire supply to initial owner (will be distributed via bonding curve)

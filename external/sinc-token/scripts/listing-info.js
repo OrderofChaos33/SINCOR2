@@ -11,7 +11,7 @@ console.log(`
 
 TOKEN DETAILS
 ─────────────────────────────────────────────────────────────────────────────
-  Name:           SINCOR
+  Name:           SINC
   Symbol:         SINC
   Network:        Base (Chain ID: 8453)
   Contract:       0xd10D86D09ee4316CdD3585fd6486537b7119A073

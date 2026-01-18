@@ -1,7 +1,7 @@
 {
   "name": "sinc-token",
   "version": "1.0.0",
-  "description": "SINCOR (SINC) Token - Premium ERC-20 with Bonding Curve and AMM",
+  "description": "SINC (SINC) Token - Premium ERC-20 with Bonding Curve and AMM",
   "main": "index.js",
   "scripts": {
     "compile": "hardhat compile",
@@ -14,13 +14,13 @@
   },
   "keywords": [
     "SINC",
-    "SINCOR",
+    "DEFI",
     "ERC20",
     "bonding-curve",
     "AMM",
     "DeFi"
   ],
-  "author": "SINCOR Team",
+  "author": "SINC Team",
   "license": "MIT",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

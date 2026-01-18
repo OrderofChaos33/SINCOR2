@@ -11,7 +11,7 @@ require("dotenv").config();
 
 // Token Info
 const TOKEN = {
-  name: "SINCOR",
+  name: "SINC",
   symbol: "SINC",
   address: "0xd10D86D09ee4316CdD3585fd6486537b7119A073",
   decimals: 18,

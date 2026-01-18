@@ -1,10 +1,10 @@
 # SINC Token - Complete ERC-20 with Bonding Curve & AMM
 
-**SINCOR (SINC)** - Premium ERC-20 token with full interoperability, logarithmic bonding curve, and AMM integration on Base.
+**SINC (SINC)** - Premium ERC-20 token with full interoperability, logarithmic bonding curve, and AMM integration on Base.
 
 ## 📋 Token Specifications
 
-- **Name**: SINCOR
+- **Name**: SINC
 - **Symbol**: SINC
 - **Total Supply**: 100,000,000 SINC
 - **Decimals**: 18
@@ -319,5 +319,5 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Built with ❤️ for SINCOR**  
+**Built with ❤️ for SINC**  
 *Clean, Perfect, Production-Ready*
