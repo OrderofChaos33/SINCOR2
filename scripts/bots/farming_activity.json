@@ -1,0 +1,100 @@
+{
+  "wallets": {
+    "0xF915f3F4954c3da6A7D76B424b980A897c3909f1": {
+      "chains": {
+        "monad": {
+          "txs": [
+            {
+              "chain": "monad",
+              "chainName": "Monad Testnet",
+              "timestamp": "2026-01-17T01:30:59.114Z",
+              "txCount": 0,
+              "txHashes": [],
+              "balance": "0.0"
+            }
+          ],
+          "totalTxs": 0
+        },
+        "abstract": {
+          "txs": [
+            {
+              "chain": "abstract",
+              "chainName": "Abstract Testnet",
+              "timestamp": "2026-01-17T01:31:01.329Z",
+              "txCount": 0,
+              "txHashes": [],
+              "balance": "0.0"
+            }
+          ],
+          "totalTxs": 0
+        },
+        "rise": {
+          "txs": [
+            {
+              "chain": "rise",
+              "chainName": "Rise Chain Testnet",
+              "timestamp": "2026-01-17T01:31:04.157Z",
+              "txCount": 0,
+              "txHashes": [],
+              "balance": "0"
+            }
+          ],
+          "totalTxs": 0
+        },
+        "somnia": {
+          "txs": [
+            {
+              "chain": "somnia",
+              "chainName": "Somnia Testnet",
+              "timestamp": "2026-01-17T01:31:06.763Z",
+              "txCount": 0,
+              "txHashes": [],
+              "balance": "0"
+            }
+          ],
+          "totalTxs": 0
+        }
+      },
+      "totalTxs": 0
+    }
+  },
+  "sessions": [
+    {
+      "chain": "monad",
+      "chainName": "Monad Testnet",
+      "timestamp": "2026-01-17T01:30:59.114Z",
+      "txCount": 0,
+      "txHashes": [],
+      "balance": "0.0"
+    },
+    {
+      "chain": "abstract",
+      "chainName": "Abstract Testnet",
+      "timestamp": "2026-01-17T01:31:01.329Z",
+      "txCount": 0,
+      "txHashes": [],
+      "balance": "0.0"
+    },
+    {
+      "chain": "rise",
+      "chainName": "Rise Chain Testnet",
+      "timestamp": "2026-01-17T01:31:04.157Z",
+      "txCount": 0,
+      "txHashes": [],
+      "balance": "0"
+    },
+    {
+      "chain": "somnia",
+      "chainName": "Somnia Testnet",
+      "timestamp": "2026-01-17T01:31:06.763Z",
+      "txCount": 0,
+      "txHashes": [],
+      "balance": "0"
+    }
+  ],
+  "stats": {
+    "totalTxs": 0,
+    "chainsActive": 0,
+    "daysActive": 0
+  }
+}

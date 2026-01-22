@@ -1,0 +1,146 @@
+{
+  "updated": "2026-01-17T01:25:21.185Z",
+  "count": 7,
+  "tokens": [
+    {
+      "chain": "Base",
+      "dex": "UniswapV2",
+      "pair": "0x18668B7f3b2737D8c0eBA40456142F1Bf36cBD89",
+      "pairId": 2825169,
+      "newToken": {
+        "address": "0x58Cf48276a1966f7BeD83b079e53e93d8E2000a1",
+        "name": "Unknown",
+        "symbol": "???",
+        "decimals": 18,
+        "totalSupply": "0.0"
+      },
+      "baseToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "symbol": "???"
+      },
+      "liquidity": null,
+      "timestamp": "2026-01-17T01:21:08.286Z",
+      "block": 40911760
+    },
+    {
+      "chain": "Base",
+      "dex": "UniswapV2",
+      "pair": "0x1bF725245639bfEF67e548b44617747884294b36",
+      "pairId": 2825170,
+      "newToken": {
+        "address": "0xb6e03e6eD99D0fa9c7A1AfEB1E644639a1F0CaA8",
+        "name": "Unknown",
+        "symbol": "???",
+        "decimals": 18,
+        "totalSupply": "0.0"
+      },
+      "baseToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "symbol": "???"
+      },
+      "liquidity": null,
+      "timestamp": "2026-01-17T01:22:45.840Z",
+      "block": 40911809
+    },
+    {
+      "chain": "Base",
+      "dex": "UniswapV2",
+      "pair": "0x1f13509C1505b231a2DB3a0A4F4eB6C5a0CD9008",
+      "pairId": 2825171,
+      "newToken": {
+        "address": "0xdd472096Ca56a3270b823b667aDb71d05680EF44",
+        "name": "Unknown",
+        "symbol": "???",
+        "decimals": 18,
+        "totalSupply": "0.0"
+      },
+      "baseToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "symbol": "???"
+      },
+      "liquidity": null,
+      "timestamp": "2026-01-17T01:22:45.840Z",
+      "block": 40911809
+    },
+    {
+      "chain": "Base",
+      "dex": "UniswapV2",
+      "pair": "0x5f12e723CF0Bb51745ff5808bC4880D3D1F6D779",
+      "pairId": 2825172,
+      "newToken": {
+        "address": "0x4a29daB59171C30513f3F3ccFAb320Df37DDF685",
+        "name": "Unknown",
+        "symbol": "???",
+        "decimals": 18,
+        "totalSupply": "0.0"
+      },
+      "baseToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "symbol": "???"
+      },
+      "liquidity": null,
+      "timestamp": "2026-01-17T01:22:45.840Z",
+      "block": 40911809
+    },
+    {
+      "chain": "Base",
+      "dex": "UniswapV2",
+      "pair": "0x8D9d81eE52802CAF24ff07d59E3f66d94d447D50",
+      "pairId": 2825173,
+      "newToken": {
+        "address": "0xb1af7fB41688bC611d74d1C78105dc1d27e7B949",
+        "name": "Unknown",
+        "symbol": "???",
+        "decimals": 18,
+        "totalSupply": "0.0"
+      },
+      "baseToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "symbol": "???"
+      },
+      "liquidity": null,
+      "timestamp": "2026-01-17T01:22:45.840Z",
+      "block": 40911809
+    },
+    {
+      "chain": "Base",
+      "dex": "UniswapV2",
+      "pair": "0xD8165860E636F7D8e84D0C4Df90c168e8aaad2e6",
+      "pairId": 2825174,
+      "newToken": {
+        "address": "0x6536276985bFE609976d1215dE672ac1D3aD8BEf",
+        "name": "Unknown",
+        "symbol": "???",
+        "decimals": 18,
+        "totalSupply": "0.0"
+      },
+      "baseToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "symbol": "???"
+      },
+      "liquidity": null,
+      "timestamp": "2026-01-17T01:22:45.840Z",
+      "block": 40911809
+    },
+    {
+      "chain": "Base",
+      "dex": "UniswapV2",
+      "pair": "0x909fE1187c72E7795886a188b2Bf32Ef31719086",
+      "pairId": 2825175,
+      "newToken": {
+        "address": "0xe66f53178B0f4A03a7DBD07e1dba5a4361EF9265",
+        "name": "Unknown",
+        "symbol": "???",
+        "decimals": 18,
+        "totalSupply": "0.0"
+      },
+      "baseToken": {
+        "address": "0x4200000000000000000000000000000000000006",
+        "symbol": "WETH"
+      },
+      "liquidity": null,
+      "timestamp": "2026-01-17T01:25:21.075Z",
+      "block": 40911887
+    }
+  ]
+}
