@@ -36,6 +36,19 @@
             </p>
         </div>
 
+        <!-- Buy SINC (DEX) -->
+        <div class="bg-white rounded-2xl p-8 shadow-xl text-center mb-12 max-w-3xl mx-auto">
+            <h2 class="text-2xl font-bold mb-3">Buy SINC Token</h2>
+            <p class="text-gray-600 mb-6">Swap on a DEX or connect your wallet to purchase SINC on Base.</p>
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+                <button id="connectWalletBtn" class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold">Connect Wallet</button>
+                <a id="uniswapLink" href="https://app.uniswap.org/#/swap?outputCurrency=0xd10D86D09ee4316CdD3585fd6486537b7119A073&chain=base" target="_blank" class="px-6 py-3 border border-gray-200 rounded-lg text-gray-800 font-semibold">Buy on Uniswap</a>
+                <a href="/whitepaper" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold">Read Whitepaper</a>
+            </div>
+            <p id="walletAddr" class="text-sm text-gray-500 mt-4" style="min-height:18px;"></p>
+            <p class="text-xs text-gray-400 mt-4">Contract: <code class="mono">0xd10D86D09ee4316CdD3585fd6486537b7119A073</code> — Base (chain: 8453)</p>
+        </div>
+
         <!-- Pricing Cards with PayPal -->
         <div class="grid md:grid-cols-3 gap-8 mb-16">
             <!-- Starter Plan -->
@@ -238,6 +251,33 @@
                     return actions.order.capture().then(function(details) {
                         // Redirect to success page
                         window.location.href = '/success?plan=' + planType + '&order=' + data.orderID;
+        }
+
+        // --- Lightweight DEX / wallet helpers for SINC ---
+        const SINC_CONTRACT = '0xd10D86D09ee4316CdD3585fd6486537b7119A073';
+        const UNISWAP_URL = `https://app.uniswap.org/#/swap?outputCurrency=${SINC_CONTRACT}&chain=base`;
+
+        async function connectWallet() {
+            if (!window.ethereum) {
+                alert('No Web3 wallet detected — use MetaMask or Coinbase Wallet. You can still buy via Uniswap link.');
+                return;
+            }
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const addr = accounts && accounts[0];
+                document.getElementById('walletAddr').textContent = 'Connected: ' + addr;
+                // Open Uniswap with the user's wallet connected — Uniswap will prompt if needed
+                document.getElementById('uniswapLink').href = UNISWAP_URL;
+            } catch (err) {
+                console.error(err);
+                alert('Wallet connection failed.');
+            }
+        }
+
+        document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
+        // Prefill uniswap link (safe fallback)
+        document.getElementById('uniswapLink').href = UNISWAP_URL;
+    </script>
                     });
                 },
                 onError: function(err) {
