@@ -61,8 +61,8 @@ app.template_folder = 'templates'
 
 @app.route('/')
 def index():
-    """Main landing page - SINC Token"""
-    return render_template('index.html')
+    """Main landing page - SINC Token Portal"""
+    return render_template('index_sinc.html')
 
 @app.route('/trade')
 def trade():
