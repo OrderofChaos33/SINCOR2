@@ -255,7 +255,7 @@
                     <a href="#usecases">Use Cases</a>
                     <a href="#earn">Earn</a>
                     <a href="/whitepaper">Whitepaper</a>
-                    <a href="/faucet" class="btn btn-primary">Get SINC</a>
+                    <a href="#" class="btn btn-primary" onclick="openModal()">Get SINC</a>
                 </nav>
             </div>
         </div>
@@ -272,7 +272,7 @@
                 <h1>The <span class="gradient-text">AI-Agent</span> Payment Layer</h1>
                 <p>SINC powers the autonomous agent economy on Base. Sub-cent transactions, bot rental marketplace, and real yield for participants.</p>
                 <div class="hero-buttons">
-                    <a href="/faucet" class="btn btn-primary">🚰 Claim Free SINC</a>
+                    <a href="#" class="btn btn-primary" onclick="openModal()">🚰 Claim Free SINC</a>
                     <a href="/whitepaper" class="btn btn-secondary">📄 Read Whitepaper</a>
                     <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank" class="btn btn-secondary">🔍 View on BaseScan</a>
                 </div>
@@ -433,7 +433,7 @@
                 </div>
             </div>
             <div style="text-align: center; margin-top: 40px;">
-                <a href="/faucet" class="btn btn-primary">Start Earning Now</a>
+                <a href="#" class="btn btn-primary" onclick="openModal()">Start Earning Now</a>
             </div>
         </div>
     </section>
@@ -459,7 +459,7 @@
             <h2>Ready to Join the <span class="gradient-text">Agent Economy</span>?</h2>
             <p>Get your first SINC tokens and start participating in the future of autonomous AI.</p>
             <div class="cta-buttons">
-                <a href="/faucet" class="btn btn-primary">🚰 Claim from Faucet</a>
+                <a href="#" class="btn btn-primary" onclick="openModal()">🚰 Claim from Faucet</a>
                 <a href="/whitepaper" class="btn btn-secondary">📄 Read Whitepaper</a>
             </div>
         </div>
@@ -494,6 +494,40 @@
             navigator.clipboard.writeText('0xd10D86D09ee4316CdD3585fd6486537b7119A073');
             alert('Contract address copied!');
         }
+
+        // Modal functions
+        function openModal() {
+            document.getElementById('sincModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('sincModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('sincModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
     </script>
+
+    <!-- Modal Popup -->
+    <div id="sincModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px; max-width: 500px; width: 90%; text-align: center;">
+            <h2 style="font-size: 32px; margin-bottom: 20px; color: #fff;">🚰 Claim Free SINC</h2>
+            <p style="color: rgba(255,255,255,0.7); margin-bottom: 30px; line-height: 1.6;">
+                Get 100 free SINC tokens to start your journey in the AI-agent economy. Connect your wallet and claim instantly.
+            </p>
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <a href="/faucet" class="btn btn-primary" onclick="closeModal()">Claim Now</a>
+                <button class="btn btn-secondary" onclick="closeModal()">Maybe Later</button>
+            </div>
+            <button onclick="closeModal()" style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: rgba(255,255,255,0.5); font-size: 24px; cursor: pointer;">×</button>
+        </div>
+    </div>
 </body>
 </html>
