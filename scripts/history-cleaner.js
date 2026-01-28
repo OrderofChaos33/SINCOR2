@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const SECRET = '0x1d580c7fc747f69ca4f51a51c06e540a263daa69125ba22e992a0fd2e03bca54';
+// Secret value should be provided via environment and not committed
+const SECRET = process.env.REPO_SECRET || '<REDACTED>';
 const REPLACEMENT = '<REDACTED>'; // replacement string
 
 function walk(dir) {

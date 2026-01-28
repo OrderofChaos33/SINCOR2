@@ -15,7 +15,8 @@ async function main() {
   const oldWallet = new ethers.Wallet(OLD_PRIVATE_KEY, provider);
   
   // Derived wallet that now has the SINC (from mnemonic)
-  const DERIVED_PRIVATE_KEY = "your_new_secure_private_key_here";
+  // Use environment variable for the derived wallet private key
+  const DERIVED_PRIVATE_KEY = process.env.DERIVED_PRIVATE_KEY || "<REDACTED>";
   const derivedWallet = new ethers.Wallet(DERIVED_PRIVATE_KEY, provider);
   
   // Correct Uniswap wallet

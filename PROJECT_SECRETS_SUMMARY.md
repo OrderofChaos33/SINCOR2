@@ -3,11 +3,11 @@
 ## 🔑 Critical Keys & Secrets
 
 ### Private Keys (DO NOT SHARE)
-- **Deployer / Main Bot Key:** `0x590a22b9c4d798dcc66c39c3cad6aff574738b9792934cb80a03d7b337c916f4`
-  - *Used for:* Deploying contracts, running SINC bots, executing liquidations.
+- **Deployer / Main Bot Key:** `<REDACTED_PRIVATE_KEY>`
+  - *Used for:* Deploying contracts, running SINC bots, executing liquidations. **ROTATE IMMEDIATELY** if this was ever published.
   - *Associated Address:* `0xF915f3F4954c3da6A7D76B424b980A897c3909f1` (Safe Wallet)
-- **Compromised Key (Old):** `0x1d580c7fc747f69ca4f51a51c06e540a263daa69125ba22e992a0fd2e03bca54`
-  - *Status:* DO NOT USE.
+- **Compromised Key (Old):** `<REDACTED_PRIVATE_KEY_OLD>`
+  - *Status:* DO NOT USE. Rotate any systems that relied on this key and remove references.
 
 ### API Keys
 - **Basescan API Key:** `S6XK9N5PH8UM9W7QVCI1V2REP4IHRBEEN6`

@@ -40,6 +40,18 @@ secrets.txt
 *.pem
 *.key
 *.cert
+# Node keyfiles and keystores
+*.keystore
+*.p12
+# Private key artifacts
+**/private_key*
+**/*_private_key*
+# Project local override files
+config/production.env
+config/.env
+
+# Safety: Do not commit any file containing 'PRIVATE_KEY' or 'PRIVATE' in the filename
+
 
 # Databases
 *.db

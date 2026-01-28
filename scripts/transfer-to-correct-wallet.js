@@ -10,12 +10,13 @@ async function main() {
   const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
   
   // Old wallet that has ETH for gas
-  // OLD_PRIVATE_KEY redacted
-  // const OLD_PRIVATE_KEY = "<REDACTED>";
+  // OLD_PRIVATE_KEY should be provided via environment variable to avoid committing secrets
+  const OLD_PRIVATE_KEY = process.env.OLD_PRIVATE_KEY || "<REDACTED>";
   const oldWallet = new ethers.Wallet(OLD_PRIVATE_KEY, provider);
   
   // Derived wallet that now has the SINC (from mnemonic)
-  const DERIVED_PRIVATE_KEY = "0x8094a1304d942acada3cb22dbda68fd501d643443802e516ba37c2a609674536";
+  // Use environment variable for private key to avoid committing secrets
+  const DERIVED_PRIVATE_KEY = process.env.DERIVED_PRIVATE_KEY || "<REDACTED>";
   const derivedWallet = new ethers.Wallet(DERIVED_PRIVATE_KEY, provider);
   
   // Correct Uniswap wallet
