@@ -373,7 +373,7 @@ AUTO_DETAILING_CHECKOUT_TEMPLATE = """
 <head>
     <title>{{ plan.name }} - Auto Detailing Authority</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://js.stripe.com/v3/"></script>
+    <!-- Stripe JS removed: use PayPal JS SDK or on-chain checkout instead -->
 </head>
 <body class="bg-gray-50">
     <div class="max-w-2xl mx-auto py-12 px-4">
@@ -419,7 +419,7 @@ AUTO_DETAILING_CHECKOUT_TEMPLATE = """
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Card Information</label>
                     <div id="card-element" class="p-3 border border-gray-300 rounded-md">
-                        <!-- Stripe Elements will create form elements here -->
+                        <!-- Card / PayPal UI elements should be integrated here (Stripe removed) -->
                     </div>
                     <div id="card-errors" role="alert" class="text-red-600 text-sm mt-2"></div>
                 </div>
@@ -439,8 +439,9 @@ AUTO_DETAILING_CHECKOUT_TEMPLATE = """
     </div>
     
     <script>
-        const stripe = Stripe('{{ stripe_key }}' || 'pk_test_demo');
-        const elements = stripe.elements();
+        // Stripe removed: integrate PayPal JS SDK or on-chain checkout here.
+        const stripe = null; // compatibility disabled
+        const elements = null; // placeholder for card elements or PayPal components
         
         const cardElement = elements.create('card');
         cardElement.mount('#card-element');

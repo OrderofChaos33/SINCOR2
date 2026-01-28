@@ -1,0 +1,10 @@
+﻿{
+  "id": "CT-19",
+  "title": "Terms/Privacy Pack (Jurisdiction-Aware)",
+  "services": ["legal_packager","host_sync","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/legal/terms.html","output/legal/privacy.html","output/legal/change_log.json"],
+  "transaction": {"mode":"one-time+maintenance","provider":"stripe","product":"legal_pack"},
+  "kpis": ["terms_ready","privacy_ready","email_sent","payment_success"]
+}

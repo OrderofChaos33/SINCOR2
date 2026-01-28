@@ -1,0 +1,15 @@
+{
+  "defaults": {
+    "music": "stock_elevator.mp3",
+    "transition": "fade",
+    "overlay_text": true,
+    "text_style": "clean_white_shadow",
+    "cta": "Book Now at clintondetailing.com/booking",
+    "cta_position": "bottom_center"
+  },
+  "slot_bias": {
+    "HOOK": { "duration_sec": 5, "zoom_motion": true },
+    "BODY": { "duration_sec": 12, "pan_motion": true },
+    "CTA": { "duration_sec": 4, "highlight_cta": true }
+  }
+}

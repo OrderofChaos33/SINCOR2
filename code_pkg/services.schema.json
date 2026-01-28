@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Services CSV Schema (informal)",
+  "type": "object",
+  "properties": {
+    "service": {
+      "type": "string"
+    },
+    "base_price": {
+      "type": "string"
+    },
+    "duration_hours": {
+      "type": "string"
+    },
+    "upsell_recommendations": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "service",
+    "base_price",
+    "duration_hours"
+  ]
+}

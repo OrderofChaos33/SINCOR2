@@ -1,0 +1,10 @@
+﻿{
+  "id": "AE-26",
+  "title": "Outbound Concierge (Hand-Curated Outreach)",
+  "services": ["outbound_concierge","notifier","reporting","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/outbound/prospects.csv","output/outbound/pitches_sent.json","output/reports/batch.json"],
+  "transaction": {"mode":"batch_fee","provider":"stripe","product":"outbound_concierge"},
+  "kpis": ["prospects_ready","pitches_sent","report_generated","payment_success"]
+}

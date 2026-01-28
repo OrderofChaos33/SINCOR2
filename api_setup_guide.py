@@ -35,17 +35,17 @@ def get_api_setup_guide():
             "cost": "$17 per 1000 searches (first $200/month free)"
         },
         
-        "stripe_payments": {
-            "name": "Stripe Payment Processing", 
-            "required_keys": ["STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY"],
+        "paypal_payments": {
+            "name": "PayPal Payments (Recommended)",
+            "required_keys": ["PAYPAL_REST_API_ID", "PAYPAL_REST_API_SECRET"],
             "setup_steps": [
-                "1. Sign up at stripe.com",
-                "2. Complete business verification",
-                "3. Get API keys from Dashboard > API keys",
-                "4. Use test keys for development",
+                "1. Sign up at developer.paypal.com",
+                "2. Create REST API app in dashboard",
+                "3. Copy Client ID and Secret to environment variables",
+                "4. Use sandbox keys for development",
                 "5. Switch to live keys for production"
             ],
-            "cost": "2.9% + 30¢ per transaction"
+            "cost": "PayPal fees apply (varies by country)"
         },
         
         "email_automation": {
@@ -113,7 +113,7 @@ def get_priority_setup_order():
         ("google_places", "Highest Priority - Enables real lead generation"),
         ("email_automation", "High Priority - Needed for lead outreach"),
         ("google_calendar", "Medium Priority - For appointment booking"),
-        ("stripe_payments", "Medium Priority - For payment processing"),
+        ("paypal_payments", "Medium Priority - For payment processing"),
         ("sms_automation", "Low Priority - Additional communication channel"),
         ("yelp_business_data", "Optional - Additional lead sources")
     ]

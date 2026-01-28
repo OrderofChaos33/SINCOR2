@@ -1,0 +1,10 @@
+﻿{
+  "id": "BF-08",
+  "title": "Pay-Per-Lead Mode",
+  "services": ["lead_meter","qualification_engine","billing_meter","reporting"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price"],
+  "deliverables": ["output/leads/qualified.csv","output/billing/invoice.json","output/reports/weekly.json"],
+  "transaction": {"mode":"metered","provider":"paypal","plan":"ppl_basic"},
+  "kpis": ["leads_qualified","invoice_issued","report_generated"]
+}

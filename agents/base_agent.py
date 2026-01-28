@@ -46,12 +46,25 @@ class BaseAgent(ABC):
         try:
             self.heartbeat_count += 1
             self.status = "active"
-            self._log(f"Heartbeat #{self.heartbeat_count}")
+            try:
+                self._log(f"Heartbeat #{self.heartbeat_count}")
+            except Exception as e:
+                # Logging failed — record error and return False per tests' expectations
+                self.last_error = str(e)
+                self.status = "error"
+                print(f"[{self.name}] ERROR in heartbeat: {e}")
+                return False
+            # Also print heartbeat for test visibility
+            print(f"[{self.name}] Heartbeat #{self.heartbeat_count}")
             return True
         except Exception as e:
             self.last_error = str(e)
             self.status = "error"
-            self._log(f"ERROR in heartbeat: {e}")
+            try:
+                self._log(f"ERROR in heartbeat: {e}")
+            except Exception:
+                # Ensure logging failures don't propagate during error handling
+                print(f"[{self.name}] ERROR in heartbeat: {e}")
             return False
     
     def run_diagnostics(self) -> Dict[str, Any]:
@@ -84,7 +97,12 @@ class BaseAgent(ABC):
             error_msg = f"Diagnostics failed: {e}"
             self.last_error = str(e)
             self.status = "error"
-            self._log(f"ERROR: {error_msg}")
+            # Print a clear message (tests assert for printed error messages)
+            print(f"[{self.name}] ERROR: {error_msg}")
+            try:
+                self._log(f"ERROR: {error_msg}")
+            except Exception:
+                print(f"[{self.name}] LOG ERROR while logging diagnostics: {e}")
             return {"error": str(e), "agent_name": self.name}
     
     def _log(self, message: str) -> None:

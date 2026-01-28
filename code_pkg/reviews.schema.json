@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Reviews CSV Schema (informal)",
+  "type": "object",
+  "description": "Used by ReviewAgent to select testimonial text.",
+  "properties": {
+    "review_text": {
+      "type": "string"
+    },
+    "review_author": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "review_text",
+    "review_author"
+  ]
+}

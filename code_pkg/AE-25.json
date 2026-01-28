@@ -1,0 +1,10 @@
+﻿{
+  "id": "AE-25",
+  "title": "Local Rank Pulse (Light SEO)",
+  "services": ["local_rank_pulse","seo_worker","reporting","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/seo/audit.json","output/seo/rank_snapshot.json","output/reports/weekly.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"local_rank_pulse"},
+  "kpis": ["audit_ready","snapshot_ready","report_generated","payment_success"]
+}

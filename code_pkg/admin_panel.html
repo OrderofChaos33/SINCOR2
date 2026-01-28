@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORTEX Admin Panel - 42-Agent Business Orchestrator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+        }
+        .neon-text {
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        .neon-border {
+            border: 1px solid #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <!-- Header -->
+    <header class="bg-black bg-opacity-50 backdrop-blur-sm border-b border-green-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center">
+                    <img src="/static/SINCOR_logo_transparent.png" alt="CORTEX" class="h-12 w-auto mr-3">
+                    <div>
+                        <h1 class="text-2xl font-bold neon-text">CORTEX</h1>
+                        <span class="text-xs text-green-300">42-Agent Business Orchestrator</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse mr-2"></div>
+                        <span class="text-green-400 text-sm">All Systems Online</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-black bg-opacity-30 p-6 rounded-lg neon-border">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">Agent Coordination</p>
+                        <p class="text-3xl font-bold neon-text">100/100</p>
+                    </div>
+                    <div class="text-green-400 text-2xl">🤖</div>
+                </div>
+            </div>
+            
+            <div class="bg-black bg-opacity-30 p-6 rounded-lg neon-border">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">Active Agents</p>
+                        <p class="text-3xl font-bold neon-text">42</p>
+                    </div>
+                    <div class="text-green-400 text-2xl">⚡</div>
+                </div>
+            </div>
+            
+            <div class="bg-black bg-opacity-30 p-6 rounded-lg neon-border">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">Tasks Completed</p>
+                        <p class="text-3xl font-bold neon-text">1,247</p>
+                    </div>
+                    <div class="text-green-400 text-2xl">✅</div>
+                </div>
+            </div>
+            
+            <div class="bg-black bg-opacity-30 p-6 rounded-lg neon-border">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-sm">Success Rate</p>
+                        <p class="text-3xl font-bold neon-text">98.7%</p>
+                    </div>
+                    <div class="text-green-400 text-2xl">🎯</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-black bg-opacity-30 rounded-lg neon-border p-6 mb-8">
+            <h2 class="text-xl font-bold neon-text mb-6">Quick Actions</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <button class="bg-green-900 bg-opacity-50 hover:bg-opacity-70 border border-green-500 text-green-300 px-4 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
+                    <div class="text-2xl mb-2">📈</div>
+                    <div class="text-sm">Generate Leads</div>
+                </button>
+                
+                <button class="bg-green-900 bg-opacity-50 hover:bg-opacity-70 border border-green-500 text-green-300 px-4 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
+                    <div class="text-2xl mb-2">📊</div>
+                    <div class="text-sm">Business Report</div>
+                </button>
+                
+                <button class="bg-green-900 bg-opacity-50 hover:bg-opacity-70 border border-green-500 text-green-300 px-4 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
+                    <div class="text-2xl mb-2">🚀</div>
+                    <div class="text-sm">Launch Campaign</div>
+                </button>
+                
+                <button class="bg-green-900 bg-opacity-50 hover:bg-opacity-70 border border-green-500 text-green-300 px-4 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
+                    <div class="text-2xl mb-2">⚙️</div>
+                    <div class="text-sm">Optimize Ops</div>
+                </button>
+                
+                <button class="bg-green-900 bg-opacity-50 hover:bg-opacity-70 border border-green-500 text-green-300 px-4 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
+                    <div class="text-2xl mb-2">⚖️</div>
+                    <div class="text-sm">Compliance</div>
+                </button>
+                
+                <button class="bg-green-900 bg-opacity-50 hover:bg-opacity-70 border border-green-500 text-green-300 px-4 py-3 rounded-lg transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
+                    <div class="text-2xl mb-2">💰</div>
+                    <div class="text-sm">Revenue Analysis</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Agent Categories -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Business Operations -->
+            <div class="bg-black bg-opacity-30 rounded-lg neon-border p-6">
+                <h3 class="text-lg font-bold neon-text mb-4">Business Operations (12 Agents)</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Board Agent</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>CFO Agent</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Sales Agent</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Marketing Agent</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="text-green-600 text-sm mt-2">+ 8 more agents ready</div>
+                </div>
+            </div>
+
+            <!-- Intelligence & Analytics -->
+            <div class="bg-black bg-opacity-30 rounded-lg neon-border p-6">
+                <h3 class="text-lg font-bold neon-text mb-4">Intelligence & Analytics (4 Agents)</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Business Intelligence</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Industry Expansion</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Master Orchestrator</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Template Engine</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Marketing & Content -->
+            <div class="bg-black bg-opacity-30 rounded-lg neon-border p-6">
+                <h3 class="text-lg font-bold neon-text mb-4">Marketing & Content (6 Agents)</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Content Generation</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Campaign Automation</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>Profile Sync</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="text-green-600 text-sm mt-2">+ 3 more agents ready</div>
+                </div>
+            </div>
+
+            <!-- Compliance & Operations -->
+            <div class="bg-black bg-opacity-30 rounded-lg neon-border p-6">
+                <h3 class="text-lg font-bold neon-text mb-4">Compliance & Operations (20 Agents)</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>AML Agent</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>KYC Agent</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-green-300">
+                        <span>SEC Watchdog</span>
+                        <span class="text-green-400">READY</span>
+                    </div>
+                    <div class="text-green-600 text-sm mt-2">+ 17 more agents ready</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CORTEX Chat Access -->
+        <div class="mt-8 bg-green-900 bg-opacity-20 border border-green-500 rounded-lg p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="text-green-400 text-3xl mr-4">🧠</div>
+                    <div>
+                        <h3 class="text-lg font-bold neon-text">CORTEX Natural Language Interface</h3>
+                        <p class="text-green-300 mt-1">Admin-only access to communicate directly with your 42-agent ecosystem. Talk naturally to coordinate business tasks!</p>
+                        <p class="text-green-400 text-sm mt-2">Try: "Get me 100 leads for my business" or "How's my performance this month?"</p>
+                    </div>
+                </div>
+                <div>
+                    <a href="#" onclick="openCortexChat()" class="bg-gradient-to-r from-green-600 to-green-500 text-black px-6 py-3 rounded-lg font-bold hover:from-green-500 hover:to-green-400 transition-all duration-300">
+                        💬 Open CORTEX Chat
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- CORTEX AI Chat Widget -->
+    <script src="/static/cortex_chat_widget.js"></script>
+    
+    <script>
+        function openCortexChat() {
+            // Use current domain but with CORTEX port - will work on Railway too
+            const currentDomain = window.location.hostname;
+            let cortexUrl;
+            
+            if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
+                cortexUrl = 'http://localhost:5001/admin/chat';
+            } else {
+                // For Railway deployment, CORTEX should be on same domain with different service
+                cortexUrl = `https://${currentDomain}/cortex/chat`;
+            }
+            
+            window.open(cortexUrl, '_blank', 'width=1200,height=800');
+        }
+    </script>
+</body>
+</html>

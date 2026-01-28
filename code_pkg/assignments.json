@@ -1,0 +1,131 @@
+{
+  "A-ec50d2c7": {
+    "assignment_id": "A-ec50d2c7",
+    "task_id": "T-1cde3484",
+    "agent_id": "E-auriga-01",
+    "assigned_at": "2025-08-28T22:34:05.105042",
+    "bid_accepted": {
+      "bid_id": "B-e7cbde02",
+      "task_id": "T-1cde3484",
+      "agent_id": "E-auriga-01",
+      "archetype": "Scout",
+      "confidence": 0.85,
+      "estimated_cost_tokens": 6000,
+      "estimated_cost_calls": 20,
+      "estimated_duration": 180,
+      "plan": [
+        "search_ai_companies",
+        "extract_data",
+        "analyze_positioning",
+        "create_report"
+      ],
+      "unique_value": "Specialized in tech industry research with proven track record",
+      "agent_track_record": {
+        "prospect": 0.85,
+        "research": 0.8,
+        "summarize": 0.82
+      },
+      "submitted_at": "2025-08-28T22:34:05.088933",
+      "status": "accepted"
+    },
+    "progress_milestones": [],
+    "status_updates": [],
+    "completion_timestamp": null,
+    "final_results": null
+  },
+  "A-082e1ce3": {
+    "assignment_id": "A-082e1ce3",
+    "task_id": "T-fc526265",
+    "agent_id": "E-auriga-01",
+    "assigned_at": "2025-08-28T22:37:33.380388",
+    "bid_accepted": {
+      "bid_id": "B-dc623ac7",
+      "task_id": "T-fc526265",
+      "agent_id": "E-auriga-01",
+      "archetype": "Scout",
+      "confidence": 0.85,
+      "estimated_cost_tokens": 6000,
+      "estimated_cost_calls": 20,
+      "estimated_duration": 180,
+      "plan": [
+        "search_ai_companies",
+        "extract_data",
+        "analyze_positioning",
+        "create_report"
+      ],
+      "unique_value": "Specialized in tech industry research with proven track record",
+      "agent_track_record": {
+        "prospect": 0.85,
+        "research": 0.8,
+        "summarize": 0.82
+      },
+      "submitted_at": "2025-08-28T22:37:33.365316",
+      "status": "accepted"
+    },
+    "progress_milestones": [
+      {
+        "timestamp": "2025-08-28T22:37:33.382325",
+        "milestone": "execution_started",
+        "details": "Agent E-auriga-01 started execution"
+      }
+    ],
+    "status_updates": [],
+    "completion_timestamp": null,
+    "final_results": null
+  },
+  "A-7ac23548": {
+    "assignment_id": "A-7ac23548",
+    "task_id": "T-e2097720",
+    "agent_id": "E-auriga-01",
+    "assigned_at": "2025-08-28T22:37:56.651523",
+    "bid_accepted": {
+      "bid_id": "B-fc24d380",
+      "task_id": "T-e2097720",
+      "agent_id": "E-auriga-01",
+      "archetype": "Scout",
+      "confidence": 0.85,
+      "estimated_cost_tokens": 6000,
+      "estimated_cost_calls": 20,
+      "estimated_duration": 180,
+      "plan": [
+        "search_ai_companies",
+        "extract_data",
+        "analyze_positioning",
+        "create_report"
+      ],
+      "unique_value": "Specialized in tech industry research with proven track record",
+      "agent_track_record": {
+        "prospect": 0.85,
+        "research": 0.8,
+        "summarize": 0.82
+      },
+      "submitted_at": "2025-08-28T22:37:56.636421",
+      "status": "accepted"
+    },
+    "progress_milestones": [
+      {
+        "timestamp": "2025-08-28T22:37:56.654105",
+        "milestone": "execution_started",
+        "details": "Agent E-auriga-01 started execution"
+      }
+    ],
+    "status_updates": [
+      {
+        "timestamp": "2025-08-28T22:37:56.656364",
+        "status": "data_collection_complete",
+        "progress": 0.6,
+        "companies_found": 12
+      }
+    ],
+    "completion_timestamp": "2025-08-28T22:37:56.657434",
+    "final_results": {
+      "quality_score": 0.88,
+      "deliverables": [
+        "market_report.pdf",
+        "competitor_matrix.xlsx"
+      ],
+      "insights_count": 15,
+      "stakeholder_satisfaction": 0.9
+    }
+  }
+}

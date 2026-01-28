@@ -1,0 +1,10 @@
+﻿{
+  "id": "BF-07",
+  "title": "Calendar Booking + Deposit",
+  "services": ["landing_builder","calendar_adapter","payment_deposit","notifier","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/booking/landing.html","output/booking/calendar.json","output/booking/deposit_link.json"],
+  "transaction": {"mode":"deposit","provider":"paypal","product":"booking_deposit"},
+  "kpis": ["landing_live","calendar_linked","deposit_enabled","payment_success"]
+}

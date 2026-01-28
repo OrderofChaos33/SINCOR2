@@ -1,0 +1,38 @@
+﻿{
+    "id":  "MP-01",
+    "title":  "One-Off MediaPack Sale",
+    "services":  [
+                     "media_pack_gen",
+                     "template_renderer",
+                     "email_sender",
+                     "payments",
+                     "flyer_renderer"
+                 ],
+    "trigger":  {
+                    "type":  "manual"
+                },
+    "inputs":  [
+                   "biz",
+                   "city",
+                   "email",
+                   "phone",
+                   "price",
+                   "payURL"
+               ],
+    "deliverables":  [
+                         "output/pack.zip",
+                         "output/flyer.pdf",
+                         "output/asset_links.json",
+                         "output/flyer.html"
+                     ],
+    "transaction":  {
+                        "mode":  "one-time",
+                        "provider":  "stripe",
+                        "product":  "mediapack_basic"
+                    },
+    "kpis":  [
+                 "pack_generated",
+                 "email_sent",
+                 "payment_success"
+             ]
+}

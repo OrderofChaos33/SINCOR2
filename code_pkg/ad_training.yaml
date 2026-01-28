@@ -1,0 +1,115 @@
+version: 1
+name: "SINCOR Ad Frameworks (Local, no cloud)"
+personas:
+  business_owner:
+    tone: ["direct", "time-saving", "ROI-focused", "no fluff"]
+    pains: ["downtime", "dirty fleet hurts brand", "drivers wasting time", "compliance/cleanliness"]
+    promises: ["same-day interior resets", "pickup/return", "predictable pricing", "invoice-ready"]
+    ctas: ["Book your slot now", "Call to schedule today", "Get a same-day reset"]
+  senior:
+    tone: ["calm", "respectful", "safety/ease", "no pressure"]
+    pains: ["mobility limits", "heavy lifting", "allergies/odors", "waiting rooms"]
+    promises: ["we pick up & return", "gentle products", "clear pricing", "trusted 5-star care"]
+    ctas: ["Call for friendly scheduling", "Book a no-rush appointment", "We can pick up your car"]
+
+platforms:
+  fb_ig:
+    duration_sec: [15, 30]
+    aspect: "1080x1920 (9:16) or 1080x1080 (1:1)"
+    headline_max_chars: 40
+    primary_text_max_chars: 125
+    overlay_rules: ["phone visible final 3s", "URL visible final 3s", "large legible fonts"]
+  youtube_shorts:
+    duration_sec: [15, 30]
+    aspect: "9:16"
+    overlay_rules: ["hook text in 0-3s", "CTA end-card 3s with phone+URL"]
+  tiktok:
+    duration_sec: [9, 20]
+    aspect: "9:16"
+    overlay_rules: ["fast hook", "on-screen captions", "CTA end-card"]
+
+frameworks:
+  - id: "HBPC"  # Hook → Benefit → Proof → CTA
+    steps:
+      - name: "hook"
+        goal: "Stop scroll in 0–3s"
+        patterns:
+          - "Tired of {problem}? "
+          - "Fleet falling behind because cabs are a mess?"
+          - "Allergies or pet hair making drives miserable?"
+      - name: "benefit"
+        goal: "Promise outcome in plain language"
+        patterns:
+          - "Same-day interior reset that keeps your day moving."
+          - "We pick up, clean, and return—no lifting, no waiting."
+      - name: "proof"
+        goal: "1 quick receipt of reality"
+        patterns:
+          - "Before→After wipe/wand shot"
+          - "5-star badge + short testimonial line"
+          - "Pet hair/odor demo: 3-second clip"
+      - name: "cta"
+        goal: "One action only"
+        patterns:
+          - "Book now: {url} · {phone}"
+          - "Call to schedule today: {phone}"
+    guardrails:
+      required: ["hook","benefit","proof","cta"]
+      banned: ["long intro logos","tiny text","no contact info","multiple CTAs"]
+
+  - id: "PAS"   # Problem → Agitate → Solve → CTA
+    steps:
+      - { name: "problem", patterns: ["Dirty cab? Allergens? Odors?"] }
+      - { name: "agitate", patterns: ["Lost time, unhappy riders, bad first impressions."] }
+      - { name: "solve", patterns: ["Same-day detail. Pickup & return available. Gentle, pro products."] }
+      - { name: "cta", patterns: ["Book: {url} · {phone}"] }
+    guardrails:
+      required: ["problem","solve","cta"]
+
+  - id: "BAB"   # Before → After → Bridge → CTA
+    steps:
+      - { name: "before",  patterns: ["Quick ‘messy interior’ pan, label: BEFORE"] }
+      - { name: "after",   patterns: ["Clean interior pan, label: AFTER"] }
+      - { name: "bridge",  patterns: ["What we did in 3 bullets (vacuum, steam, odor neutralize)"] }
+      - { name: "cta",     patterns: ["Call {phone} or book {url}"] }
+    guardrails:
+      required: ["before","after","cta"]
+
+assets:
+  end_card:
+    min_duration_sec: 3
+    required_elements: ["phone","url","logo","service line"]
+    sample_caption: "{persona_cta}. {url} · {phone}"
+  overlays:
+    caption_style: ["large", "high contrast", "no cursive", "max 10 words per card"]
+    safety: ["avoid small legal text", "no claims you can’t verify"]
+  music_voice:
+    guidance: ["light instrumental or quiet beat", "voiceover if needed—slow, clear, friendly"]
+  broll_checklist:
+    - "wipe down console 1s macro"
+    - "vacuum nozzle pass 1s"
+    - "steam burst on vent 1s"
+    - "odor neutralizer spritz 1s"
+    - "before/after seat split 2s"
+
+validation_checklist:
+  - "Hook present in first 3s"
+  - "One benefit in plain language"
+  - "One proof element (demo/testimonial)"
+  - "Single CTA with phone and/or URL"
+  - "Phone+URL visible in final 3s"
+  - "Text legible (big, high contrast)"
+  - "No more than one idea per overlay"
+  - "Persona tone respected"
+
+defaults:
+  phone: "+1 (563) 555-1234"
+  url: "https://clintondetailing.com/book"
+  city: "Clinton, IA"
+
+negative_examples:
+  reasons_to_reject:
+    - "Intro longer than 2s before value"
+    - "No CTA or missing contact info"
+    - "Trendy slang irrelevant to seniors/business owners"
+    - "Overpromising results (e.g., 'new car smell forever')"

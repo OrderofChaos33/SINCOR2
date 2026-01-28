@@ -10,16 +10,46 @@
     "restartPolicyMaxRetries": 10
   },
   "environments": {
+    "testnet": {
+      "variables": {
+        "FLASK_ENV": "production",
+        "RAILWAY_ENVIRONMENT": "testnet",
+        "PORT": "$PORT",
+        "BASE_RPC_URL": "https://sepolia.base.org",
+        "GOOGLE_API_KEY": "$GOOGLE_API_KEY",
+        "GOOGLE_PLACES_API_KEY": "$GOOGLE_API_KEY",
+        "GOOGLE_CALENDAR_API_KEY": "$GOOGLE_API_KEY",
+        "GOOGLE_OAUTH_CLIENT_ID": "$GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "$GOOGLE_OAUTH_CLIENT_SECRET",
+        "PAYPAL_REST_API_ID": "$PAYPAL_REST_API_ID",
+        "PAYPAL_REST_API_SECRET": "$PAYPAL_REST_API_SECRET",
+        "ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
+        "SMTP_HOST": "$SMTP_HOST",
+        "SMTP_PORT": "$SMTP_PORT",
+        "SMTP_USER": "$SMTP_USER",
+        "SMTP_PASS": "$SMTP_PASS",
+        "ENCRYPTION_KEY": "$ENCRYPTION_KEY"
+      }
+    },
     "production": {
       "variables": {
         "FLASK_ENV": "production",
         "RAILWAY_ENVIRONMENT": "production",
         "PORT": "$PORT",
+        "BASE_RPC_URL": "https://mainnet.base.org",
         "GOOGLE_API_KEY": "$GOOGLE_API_KEY",
         "GOOGLE_PLACES_API_KEY": "$GOOGLE_API_KEY",
         "GOOGLE_CALENDAR_API_KEY": "$GOOGLE_API_KEY",
         "GOOGLE_OAUTH_CLIENT_ID": "$GOOGLE_OAUTH_CLIENT_ID",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "$GOOGLE_OAUTH_CLIENT_SECRET"
+        "GOOGLE_OAUTH_CLIENT_SECRET": "$GOOGLE_OAUTH_CLIENT_SECRET",
+        "PAYPAL_REST_API_ID": "$PAYPAL_REST_API_ID",
+        "PAYPAL_REST_API_SECRET": "$PAYPAL_REST_API_SECRET",
+        "ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
+        "SMTP_HOST": "$SMTP_HOST",
+        "SMTP_PORT": "$SMTP_PORT",
+        "SMTP_USER": "$SMTP_USER",
+        "SMTP_PASS": "$SMTP_PASS",
+        "ENCRYPTION_KEY": "$ENCRYPTION_KEY"
       }
     }
   }

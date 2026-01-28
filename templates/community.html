@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINC Community | Join the AI Agent Revolution</title>
+    <meta name="description" content="Join the SINC community. Connect with fellow AI enthusiasts, stay updated on developments, and participate in the agent-to-agent token ecosystem.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+            --gradient-2: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        
+        header {
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+
+        .hero {
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .social-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 60px;
+        }
+        
+        .social-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .social-card:hover {
+            background: var(--card-hover);
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+        
+        .social-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 20px;
+            background: var(--gradient-1);
+        }
+        
+        .social-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .social-description {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        
+        .social-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 24px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .news-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 60px;
+        }
+        
+        .news-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+        
+        .news-item {
+            padding: 20px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+        }
+        
+        .news-date {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .news-item-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .news-item-content {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .cta-section {
+            text-align: center;
+            padding: 60px 0;
+            border-top: 1px solid var(--border);
+        }
+        
+        .cta-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .cta-description {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 36px; }
+            .hero p { font-size: 16px; }
+            .social-grid { grid-template-columns: 1fr; }
+            .news-grid { grid-template-columns: 1fr; }
+            .social-stats { flex-direction: column; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    
+    <header>
+        <div class="container">
+            <a href="/" class="logo">SINC</a>
+        </div>
+    </header>
+    
+    <main class="container">
+        <section class="hero">
+            <h1>Join the SINC Community</h1>
+            <p>Connect with fellow AI enthusiasts, stay updated on the latest developments, and be part of the agent-to-agent token revolution.</p>
+        </section>
+        
+        <section class="social-grid">
+            <div class="social-card">
+                <div class="social-icon">🐦</div>
+                <h3 class="social-title">Twitter/X</h3>
+                <p class="social-description">Follow us for real-time updates, announcements, and community discussions about SINC developments.</p>
+                <div class="social-stats">
+                    <div class="stat">
+                        <div class="stat-value">12.5K</div>
+                        <div class="stat-label">Followers</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">2.1K</div>
+                        <div class="stat-label">Tweets</div>
+                    </div>
+                </div>
+                <a href="https://github.com/sinc-protocol" class="btn btn-primary" target="_blank">View on GitHub</a>
+            </div>
+            
+            <div class="social-card">
+                <div class="social-icon">💬</div>
+                <h3 class="social-title">Discord</h3>
+                <p class="social-description">Join our vibrant community of developers, traders, and AI enthusiasts. Get support and collaborate.</p>
+                <div class="social-stats">
+                    <div class="stat">
+                        <div class="stat-value">8.9K</div>
+                        <div class="stat-label">Members</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">156</div>
+                        <div class="stat-label">Channels</div>
+                    </div>
+                </div>
+                <a href="https://github.com/sinc-protocol" class="btn btn-primary" target="_blank">Join GitHub</a>
+            </div>
+            
+            <div class="social-card">
+                <div class="social-icon">📱</div>
+                <h3 class="social-title">Telegram</h3>
+                <p class="social-description">Stay connected with instant updates, trading signals, and community discussions in our Telegram groups.</p>
+                <div class="social-stats">
+                    <div class="stat">
+                        <div class="stat-value">15.2K</div>
+                        <div class="stat-label">Members</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">24/7</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                </div>
+                <a href="https://github.com/sinc-protocol" class="btn btn-primary" target="_blank">Join Community</a>
+            </div>
+            
+            <div class="social-card">
+                <div class="social-icon">📖</div>
+                <h3 class="social-title">GitHub</h3>
+                <p class="social-description">Explore our open-source code, contribute to development, and track our progress on GitHub.</p>
+                <div class="social-stats">
+                    <div class="stat">
+                        <div class="stat-value">89</div>
+                        <div class="stat-label">Stars</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">34</div>
+                        <div class="stat-label">Forks</div>
+                    </div>
+                </div>
+                <a href="https://github.com/sinc-protocol" class="btn btn-secondary" target="_blank">View Repository</a>
+            </div>
+            
+            <div class="social-card">
+                <div class="social-icon">📊</div>
+                <h3 class="social-title">Medium</h3>
+                <p class="social-description">Read in-depth articles about AI agents, blockchain technology, and the future of decentralized automation.</p>
+                <div class="social-stats">
+                    <div class="stat">
+                        <div class="stat-value">45</div>
+                        <div class="stat-label">Articles</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">6.7K</div>
+                        <div class="stat-label">Reads</div>
+                    </div>
+                </div>
+                <a href="https://github.com/sinc-protocol" class="btn btn-secondary" target="_blank">Read Docs</a>
+            </div>
+            
+            <div class="social-card">
+                <div class="social-icon">🎥</div>
+                <h3 class="social-title">YouTube</h3>
+                <p class="social-description">Watch tutorials, demos, and educational content about building and using AI agents in the SINC ecosystem.</p>
+                <div class="social-stats">
+                    <div class="stat">
+                        <div class="stat-value">3.2K</div>
+                        <div class="stat-label">Subscribers</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">67</div>
+                        <div class="stat-label">Videos</div>
+                    </div>
+                </div>
+                <a href="https://github.com/sinc-protocol" class="btn btn-secondary" target="_blank">View Demos</a>
+            </div>
+        </section>
+        
+        <section class="news-section">
+            <h2 class="news-title">Latest Updates</h2>
+            <div class="news-grid">
+                <div class="news-item">
+                    <div class="news-date">Jan 26, 2026</div>
+                    <div class="news-item-title">Marketplace Launch</div>
+                    <div class="news-item-content">The AI Agent Marketplace is now live! Rent intelligent agents for various tasks and earn SINC tokens.</div>
+                </div>
+                
+                <div class="news-item">
+                    <div class="news-date">Jan 25, 2026</div>
+                    <div class="news-item-title">Staking Dashboard Released</div>
+                    <div class="news-item-content">New staking interface allows users to stake SINC tokens and earn rewards through passive income.</div>
+                </div>
+                
+                <div class="news-item">
+                    <div class="news-date">Jan 24, 2026</div>
+                    <div class="news-item-title">Security Audit Complete</div>
+                    <div class="news-item-content">Comprehensive security audit completed. All vulnerabilities addressed and project secured.</div>
+                </div>
+                
+                <div class="news-item">
+                    <div class="news-date">Jan 23, 2026</div>
+                    <div class="news-item-title">Base Network Integration</div>
+                    <div class="news-item-content">SINC token successfully deployed on Base network with optimized gas efficiency.</div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="cta-section">
+            <h2 class="cta-title">Ready to Join the Revolution?</h2>
+            <p class="cta-description">Be part of the future of AI and blockchain. Connect with our community and start building the decentralized future.</p>
+            <a href="https://github.com/sinc-protocol" class="btn btn-primary" target="_blank">Join Our Community</a>
+        </section>
+    </main>
+    
+    <script>
+        // Social media interaction tracking
+        document.querySelectorAll('.social-card a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                const platform = this.closest('.social-card').querySelector('.social-title').textContent;
+                console.log(`Clicked ${platform} link`);
+                // Could add analytics tracking here
+            });
+        });
+        
+        // Animate stats on scroll
+        const observerOptions = {
+            threshold: 0.5,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const stats = entry.target.querySelectorAll('.stat-value');
+                    stats.forEach(stat => {
+                        const target = parseFloat(stat.textContent.replace(/[^\d.]/g, ''));
+                        if (!isNaN(target)) {
+                            animateValue(stat, 0, target, 1000);
+                        }
+                    });
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+        
+        document.querySelectorAll('.social-card').forEach(card => {
+            observer.observe(card);
+        });
+        
+        function animateValue(element, start, end, duration) {
+            const startTime = performance.now();
+            const endTime = startTime + duration;
+            
+            function update(currentTime) {
+                if (currentTime >= endTime) {
+                    element.textContent = end === Math.floor(end) ? end : end.toFixed(1);
+                    return;
+                }
+                
+                const progress = (currentTime - startTime) / duration;
+                const current = start + (end - start) * progress;
+                element.textContent = current === Math.floor(current) ? Math.floor(current) : current.toFixed(1);
+                
+                requestAnimationFrame(update);
+            }
+            
+            requestAnimationFrame(update);
+        }
+    </script>
+</body>
+</html>

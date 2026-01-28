@@ -1,0 +1,10 @@
+﻿{
+  "id": "AE-22",
+  "title": "Profile Sync (GMB/FB/IG/TikTok)",
+  "services": ["profile_sync","template_renderer","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/profile_sync/audit.json","output/profile_sync/schedule.csv"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"profilesync_basic"},
+  "kpis": ["profiles_connected","schedule_ready","email_sent","payment_success"]
+}

@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+  qdrant:
+    image: qdrant/qdrant:v1.7.3
+    ports: ["6333:6333"]
+    volumes: ["./.qdrant:/qdrant/storage"]
+  nats:
+    image: nats:2.10
+    ports: ["4222:4222", "8222:8222"]
+    command: ["-js"]

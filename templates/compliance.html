@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINC Compliance Center | KYC & Regulatory Compliance</title>
+    <meta name="description" content="Complete your KYC verification and ensure regulatory compliance for SINC token transactions and services.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+            --gradient-2: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        
+        header {
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+
+        .hero {
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .compliance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 60px;
+        }
+        
+        .compliance-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            transition: all 0.3s;
+        }
+        
+        .compliance-card:hover {
+            background: var(--card-hover);
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+        
+        .compliance-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 20px;
+            background: var(--gradient-1);
+        }
+        
+        .compliance-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .compliance-description {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .status-pending { background: var(--warning); color: #000; }
+        .status-verified { background: var(--success); color: white; }
+        .status-required { background: var(--error); color: white; }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .kyc-form {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .form-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text);
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+            font-size: 16px;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        .requirements-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .requirements-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+        
+        .requirements-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .requirement-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+        }
+        
+        .requirement-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            margin-right: 16px;
+            flex-shrink: 0;
+        }
+        
+        .requirement-text {
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 36px; }
+            .hero p { font-size: 16px; }
+            .compliance-grid { grid-template-columns: 1fr; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    
+    <header>
+        <div class="container">
+            <a href="/" class="logo">SINC</a>
+        </div>
+    </header>
+    
+    <main class="container">
+        <section class="hero">
+            <h1>Compliance Center</h1>
+            <p>Complete your verification to access all SINC features and ensure regulatory compliance for secure transactions.</p>
+        </section>
+        
+        <section class="compliance-grid">
+            <div class="compliance-card">
+                <div class="compliance-icon">🆔</div>
+                <h3 class="compliance-title">KYC Verification</h3>
+                <span class="status-badge status-required">Required</span>
+                <p class="compliance-description">Know Your Customer verification ensures secure and compliant access to our platform.</p>
+                <button class="btn btn-primary" onclick="startKYC()">Start Verification</button>
+            </div>
+            
+            <div class="compliance-card">
+                <div class="compliance-icon">🛡️</div>
+                <h3 class="compliance-title">AML Screening</h3>
+                <span class="status-badge status-pending">Pending</span>
+                <p class="compliance-description">Anti-Money Laundering checks protect against financial crime and ensure platform integrity.</p>
+                <button class="btn btn-secondary" disabled>Screening in Progress</button>
+            </div>
+            
+            <div class="compliance-card">
+                <div class="compliance-icon">📋</div>
+                <h3 class="compliance-title">Tax Compliance</h3>
+                <span class="status-badge status-verified">Verified</span>
+                <p class="compliance-description">Automatic tax reporting and compliance for all transactions and earnings.</p>
+                <button class="btn btn-secondary" onclick="showReports()">View Reports</button>
+            </div>
+            
+            <div class="compliance-card">
+                <div class="compliance-icon">🔒</div>
+                <h3 class="compliance-title">GDPR Rights</h3>
+                <span class="status-badge status-verified">Active</span>
+                <p class="compliance-description">Exercise your data protection rights including access, deletion, and portability.</p>
+                <button class="btn btn-secondary" onclick="showGDPRModal()">Manage Rights</button>
+            </div>
+        </section>
+        
+        <section class="kyc-form">
+            <h2 class="form-title">Identity Verification</h2>
+            <form id="kycForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Full Legal Name</label>
+                        <input type="text" class="form-input" id="fullName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Date of Birth</label>
+                        <input type="date" class="form-input" id="dob" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Nationality</label>
+                        <select class="form-select" id="nationality" required>
+                            <option value="">Select Country</option>
+                            <option value="US">United States</option>
+                            <option value="CA">Canada</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="DE">Germany</option>
+                            <option value="FR">France</option>
+                            <option value="JP">Japan</option>
+                            <option value="AU">Australia</option>
+                            <!-- Add more countries as needed -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Tax Residence</label>
+                        <select class="form-select" id="taxResidence" required>
+                            <option value="">Select Country</option>
+                            <option value="US">United States</option>
+                            <option value="CA">Canada</option>
+                            <option value="GB">United Kingdom</option>
+                            <option value="DE">Germany</option>
+                            <option value="FR">France</option>
+                            <option value="JP">Japan</option>
+                            <option value="AU">Australia</option>
+                            <!-- Add more countries as needed -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">ID Document Type</label>
+                        <select class="form-select" id="idType" required>
+                            <option value="">Select Document</option>
+                            <option value="passport">Passport</option>
+                            <option value="drivers_license">Driver's License</option>
+                            <option value="national_id">National ID Card</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Document Number</label>
+                        <input type="text" class="form-input" id="documentNumber" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Residential Address</label>
+                    <input type="text" class="form-input" id="address" placeholder="Street address" required>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">City</label>
+                        <input type="text" class="form-input" id="city" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Postal Code</label>
+                        <input type="text" class="form-input" id="postalCode" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" id="consent" required>
+                        I consent to the collection and processing of my personal data for KYC purposes
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Submit for Verification</button>
+            </form>
+        </section>
+        
+        <section class="requirements-section">
+            <h2 class="requirements-title">Compliance Requirements</h2>
+            <ul class="requirements-list">
+                <li class="requirement-item">
+                    <div class="requirement-icon">✓</div>
+                    <div class="requirement-text">
+                        <strong>Government-Issued ID:</strong> Valid passport, driver's license, or national ID card
+                    </div>
+                </li>
+                
+                <li class="requirement-item">
+                    <div class="requirement-icon">✓</div>
+                    <div class="requirement-text">
+                        <strong>Proof of Address:</strong> Utility bill, bank statement, or government document (less than 3 months old)
+                    </div>
+                </li>
+                
+                <li class="requirement-item">
+                    <div class="requirement-icon">✓</div>
+                    <div class="requirement-text">
+                        <strong>Selfie Verification:</strong> Clear photo of yourself holding your ID document
+                    </div>
+                </li>
+                
+                <li class="requirement-item">
+                    <div class="requirement-icon">✓</div>
+                    <div class="requirement-text">
+                        <strong>Source of Funds:</strong> Documentation showing legitimate source of cryptocurrency or fiat funds
+                    </div>
+                </li>
+                
+                <li class="requirement-item">
+                    <div class="requirement-icon">✓</div>
+                    <div class="requirement-text">
+                        <strong>Tax Information:</strong> TIN, SSN, or equivalent tax identification number
+                    </div>
+                </li>
+                
+                <li class="requirement-item">
+                    <div class="requirement-icon">✓</div>
+                    <div class="requirement-text">
+                        <strong>Risk Assessment:</strong> Enhanced due diligence for high-risk jurisdictions or activities
+                    </div>
+                </li>
+            </ul>
+        </section>
+    </main>
+    
+    <!-- GDPR Modal -->
+    <div id="gdprModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 40px; max-width: 500px; width: 90%;">
+            <h3 style="margin-bottom: 20px; text-align: center;">GDPR Data Rights</h3>
+            <div style="margin-bottom: 20px;">
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;" onclick="requestDataAccess()">Request Data Access</button>
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;" onclick="requestDataDeletion()">Request Data Deletion</button>
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;" onclick="requestDataPortability()">Request Data Portability</button>
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;" onclick="requestDataRectification()">Request Data Rectification</button>
+            </div>
+            <button class="btn btn-primary" style="width: 100%;" onclick="closeGDPRModal()">Close</button>
+        </div>
+    </div>
+    
+    <script>
+        // KYC Form handling
+        document.getElementById('kycForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('KYC verification submitted successfully! You will receive an email confirmation within 24 hours.');
+            // In a real implementation, this would send data to a KYC provider
+        });
+        
+        function startKYC() {
+            document.querySelector('.kyc-form').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('fullName').focus();
+        }
+        
+        function showGDPRModal() {
+            document.getElementById('gdprModal').style.display = 'block';
+        }
+        
+        function closeGDPRModal() {
+            document.getElementById('gdprModal').style.display = 'none';
+        }
+        
+        function showReports() {
+            alert('Tax compliance reports will be available once you have completed transactions. No reports available at this time.');
+        }
+        
+        function requestDataAccess() {
+            alert('Data access request submitted. You will receive your data within 30 days.');
+            closeGDPRModal();
+        }
+        
+        function requestDataDeletion() {
+            if (confirm('Are you sure you want to request deletion of all your data? This action cannot be undone.')) {
+                alert('Data deletion request submitted. Your data will be deleted within 30 days.');
+                closeGDPRModal();
+            }
+        }
+        
+        function requestDataPortability() {
+            alert('Data portability request submitted. You will receive your data in a portable format within 30 days.');
+            closeGDPRModal();
+        }
+        
+        function requestDataRectification() {
+            alert('Data rectification request submitted. Our privacy team will contact you within 7 days.');
+            closeGDPRModal();
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('gdprModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeGDPRModal();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,4310 @@
+{
+  "executive_summary": {
+    "total_components": 153,
+    "total_lines_of_code": 75676,
+    "total_file_size_mb": 3.1,
+    "average_complexity_score": 135.86,
+    "analysis_timestamp": "2025-08-30T23:12:33.980190",
+    "architecture_maturity": "enterprise_grade"
+  },
+  "component_inventory": {
+    "consciousness_systems": {
+      "count": 5,
+      "components": [
+        "consciousness_container_orchestration",
+        "consciousness_transfer_interface",
+        "consciousness_versioning_rollback",
+        "quantum_coherence_maintenance",
+        "unified_consciousness_orchestrator"
+      ],
+      "details": [
+        {
+          "name": "consciousness_container_orchestration",
+          "file_path": "consciousness_container_orchestration.py",
+          "complexity": 272,
+          "lines_of_code": 995,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "standard",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "qubit_management",
+            "quantum_fidelity",
+            "quantum_superposition"
+          ],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [
+            "load_balancing",
+            "clustering",
+            "replication"
+          ],
+          "integration_points": [
+            "docker",
+            "kubernetes",
+            "azure"
+          ]
+        },
+        {
+          "name": "consciousness_transfer_interface",
+          "file_path": "consciousness_transfer_interface.py",
+          "complexity": 251,
+          "lines_of_code": 1170,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "quantum_superposition"
+          ],
+          "security_features": [
+            "authorization"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [
+            "distributed_processing"
+          ],
+          "integration_points": []
+        },
+        {
+          "name": "consciousness_versioning_rollback",
+          "file_path": "consciousness_versioning_rollback.py",
+          "complexity": 322,
+          "lines_of_code": 1220,
+          "enterprise_features": [
+            "high_availability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "behavioral_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing"
+          ],
+          "security_features": [],
+          "performance_features": [
+            "caching",
+            "async_processing",
+            "optimization",
+            "compression",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "quantum_coherence_maintenance",
+          "file_path": "quantum_coherence_maintenance.py",
+          "complexity": 346,
+          "lines_of_code": 1117,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "qubit_management",
+            "quantum_fidelity",
+            "quantum_superposition",
+            "quantum_decoherence"
+          ],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "unified_consciousness_orchestrator",
+          "file_path": "unified_consciousness_orchestrator.py",
+          "complexity": 276,
+          "lines_of_code": 860,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "god_mode"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "consciousness_emergence"
+          ],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [
+            "caching",
+            "async_processing",
+            "thread_pooling",
+            "optimization",
+            "indexing",
+            "batch_processing"
+          ],
+          "scalability_features": [
+            "distributed_processing"
+          ],
+          "integration_points": []
+        }
+      ]
+    },
+    "enterprise_infrastructure": {
+      "count": 1,
+      "components": [
+        "emergency_scaling_protocols"
+      ],
+      "details": [
+        {
+          "name": "emergency_scaling_protocols",
+          "file_path": "emergency_scaling_protocols.py",
+          "complexity": 279,
+          "lines_of_code": 816,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_decoherence"
+          ],
+          "security_features": [
+            "authorization"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling"
+          ],
+          "scalability_features": [
+            "load_balancing",
+            "clustering",
+            "distributed_processing",
+            "partitioning"
+          ],
+          "integration_points": [
+            "redis"
+          ]
+        }
+      ]
+    },
+    "revenue_optimization": {
+      "count": 45,
+      "components": [
+        "add_monetization_routes",
+        "comprehensive_architecture_analysis",
+        "intelligent_load_balancing_system",
+        "main",
+        "message_queuing_infrastructure",
+        "token_consumption_monitoring",
+        "ci_orchestrator",
+        "claude_integration",
+        "infinite_scaling_engine",
+        "instant_business_intelligence",
+        "monetization_engine",
+        "partnership_framework",
+        "paypal_integration",
+        "predictive_analytics_engine",
+        "quality_scoring_engine",
+        "railway_monetization_app",
+        "recursive_memory",
+        "recursive_value_products",
+        "analytics_dashboard",
+        "authority_expansion",
+        "auto_detailing_routes",
+        "conversion_optimization",
+        "demo_sincor_conquest",
+        "enterprise_domination",
+        "functional_tools",
+        "legal_guardrails",
+        "master_agent_orchestrator",
+        "media_pack_routes",
+        "professional_admin_service",
+        "quick_demo",
+        "real_integrations",
+        "security_compliance",
+        "seo_domination",
+        "sincor_app_professional",
+        "sincor_engine",
+        "sincor_kitt_interface",
+        "test_monetization_system",
+        "value_maximization",
+        "waitlist_system",
+        "creative_forge",
+        "growth_engine",
+        "intelligence_hub",
+        "ops_core",
+        "industry_expansion_agent",
+        "master_orchestrator"
+      ],
+      "details": [
+        {
+          "name": "add_monetization_routes",
+          "file_path": "add_monetization_routes.py",
+          "complexity": 22,
+          "lines_of_code": 277,
+          "enterprise_features": [
+            "security",
+            "configuration_management",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "authorization",
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "comprehensive_architecture_analysis",
+          "file_path": "comprehensive_architecture_analysis.py",
+          "complexity": 494,
+          "lines_of_code": 1222,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "premium",
+            "enterprise",
+            "god_mode",
+            "standard",
+            "normies"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis",
+            "consciousness_emergence",
+            "behavioral_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "qubit_management",
+            "quantum_fidelity",
+            "quantum_superposition",
+            "quantum_decoherence"
+          ],
+          "security_features": [
+            "encryption",
+            "authentication",
+            "authorization",
+            "transport_security",
+            "token_security",
+            "role_based_access",
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "caching",
+            "async_processing",
+            "thread_pooling",
+            "optimization",
+            "compression",
+            "indexing",
+            "batch_processing"
+          ],
+          "scalability_features": [
+            "load_balancing",
+            "clustering",
+            "distributed_processing",
+            "horizontal_scaling",
+            "sharding",
+            "partitioning",
+            "replication"
+          ],
+          "integration_points": [
+            "redis",
+            "rabbitmq",
+            "postgresql",
+            "mysql",
+            "mongodb",
+            "elasticsearch",
+            "kafka",
+            "docker",
+            "kubernetes",
+            "aws",
+            "gcp",
+            "azure"
+          ]
+        },
+        {
+          "name": "intelligent_load_balancing_system",
+          "file_path": "intelligent_load_balancing_system.py",
+          "complexity": 380,
+          "lines_of_code": 1224,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "premium",
+            "enterprise",
+            "god_mode",
+            "standard",
+            "normies"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis",
+            "consciousness_emergence"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "qubit_management",
+            "quantum_fidelity"
+          ],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "optimization",
+            "indexing"
+          ],
+          "scalability_features": [
+            "load_balancing",
+            "clustering"
+          ],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "main",
+          "file_path": "main.py",
+          "complexity": 102,
+          "lines_of_code": 485,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "authorization",
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "message_queuing_infrastructure",
+          "file_path": "message_queuing_infrastructure.py",
+          "complexity": 390,
+          "lines_of_code": 1080,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "premium",
+            "enterprise",
+            "god_mode",
+            "standard",
+            "normies"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis",
+            "consciousness_emergence",
+            "behavioral_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement"
+          ],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [
+            "caching",
+            "async_processing",
+            "thread_pooling",
+            "optimization"
+          ],
+          "scalability_features": [
+            "load_balancing"
+          ],
+          "integration_points": [
+            "redis",
+            "rabbitmq"
+          ]
+        },
+        {
+          "name": "token_consumption_monitoring",
+          "file_path": "token_consumption_monitoring.py",
+          "complexity": 411,
+          "lines_of_code": 1406,
+          "enterprise_features": [
+            "high_availability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "premium",
+            "enterprise",
+            "god_mode",
+            "standard"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "qubit_management",
+            "quantum_fidelity",
+            "quantum_decoherence"
+          ],
+          "security_features": [
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "optimization",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "ci_orchestrator",
+          "file_path": "competitive_intelligence_demo\\ci_orchestrator.py",
+          "complexity": 198,
+          "lines_of_code": 780,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "claude_integration",
+          "file_path": "cortecs_core\\claude_integration.py",
+          "complexity": 141,
+          "lines_of_code": 572,
+          "enterprise_features": [
+            "high_availability",
+            "configuration_management",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security",
+            "role_based_access"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "infinite_scaling_engine",
+          "file_path": "sincor\\infinite_scaling_engine.py",
+          "complexity": 293,
+          "lines_of_code": 856,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "optimization",
+            "batch_processing"
+          ],
+          "scalability_features": [
+            "clustering",
+            "replication"
+          ],
+          "integration_points": []
+        },
+        {
+          "name": "instant_business_intelligence",
+          "file_path": "sincor\\instant_business_intelligence.py",
+          "complexity": 226,
+          "lines_of_code": 840,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "monetization_engine",
+          "file_path": "sincor\\monetization_engine.py",
+          "complexity": 232,
+          "lines_of_code": 861,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "partnership_framework",
+          "file_path": "sincor\\partnership_framework.py",
+          "complexity": 152,
+          "lines_of_code": 705,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "paypal_integration",
+          "file_path": "sincor\\paypal_integration.py",
+          "complexity": 116,
+          "lines_of_code": 457,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "authorization",
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "predictive_analytics_engine",
+          "file_path": "sincor\\predictive_analytics_engine.py",
+          "complexity": 351,
+          "lines_of_code": 972,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "caching",
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "quality_scoring_engine",
+          "file_path": "sincor\\quality_scoring_engine.py",
+          "complexity": 381,
+          "lines_of_code": 1075,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "railway_monetization_app",
+          "file_path": "sincor\\railway_monetization_app.py",
+          "complexity": 70,
+          "lines_of_code": 368,
+          "enterprise_features": [
+            "monitoring",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "recursive_memory",
+          "file_path": "sincor\\recursive_memory.py",
+          "complexity": 193,
+          "lines_of_code": 578,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "recursive_value_products",
+          "file_path": "sincor\\recursive_value_products.py",
+          "complexity": 182,
+          "lines_of_code": 634,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "analytics_dashboard",
+          "file_path": "_local_overrides\\sincor\\analytics_dashboard.py",
+          "complexity": 81,
+          "lines_of_code": 562,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "authority_expansion",
+          "file_path": "_local_overrides\\sincor\\authority_expansion.py",
+          "complexity": 44,
+          "lines_of_code": 361,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "auto_detailing_routes",
+          "file_path": "_local_overrides\\sincor\\auto_detailing_routes.py",
+          "complexity": 53,
+          "lines_of_code": 634,
+          "enterprise_features": [
+            "scalability",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "role_based_access"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "conversion_optimization",
+          "file_path": "_local_overrides\\sincor\\conversion_optimization.py",
+          "complexity": 82,
+          "lines_of_code": 636,
+          "enterprise_features": [
+            "scalability",
+            "security",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "demo_sincor_conquest",
+          "file_path": "_local_overrides\\sincor\\demo_sincor_conquest.py",
+          "complexity": 65,
+          "lines_of_code": 512,
+          "enterprise_features": [
+            "scalability",
+            "configuration_management",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "enterprise_domination",
+          "file_path": "_local_overrides\\sincor\\enterprise_domination.py",
+          "complexity": 56,
+          "lines_of_code": 985,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [
+            "replication"
+          ],
+          "integration_points": []
+        },
+        {
+          "name": "functional_tools",
+          "file_path": "_local_overrides\\sincor\\functional_tools.py",
+          "complexity": 39,
+          "lines_of_code": 185,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "legal_guardrails",
+          "file_path": "_local_overrides\\sincor\\legal_guardrails.py",
+          "complexity": 159,
+          "lines_of_code": 472,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "encryption",
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "master_agent_orchestrator",
+          "file_path": "_local_overrides\\sincor\\master_agent_orchestrator.py",
+          "complexity": 146,
+          "lines_of_code": 520,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [
+            "thread_pooling",
+            "optimization"
+          ],
+          "scalability_features": [
+            "load_balancing"
+          ],
+          "integration_points": []
+        },
+        {
+          "name": "media_pack_routes",
+          "file_path": "_local_overrides\\sincor\\media_pack_routes.py",
+          "complexity": 96,
+          "lines_of_code": 636,
+          "enterprise_features": [
+            "security",
+            "configuration_management",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security",
+            "role_based_access"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "professional_admin_service",
+          "file_path": "_local_overrides\\sincor\\professional_admin_service.py",
+          "complexity": 196,
+          "lines_of_code": 520,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "quick_demo",
+          "file_path": "_local_overrides\\sincor\\quick_demo.py",
+          "complexity": 46,
+          "lines_of_code": 260,
+          "enterprise_features": [
+            "scalability",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "real_integrations",
+          "file_path": "_local_overrides\\sincor\\real_integrations.py",
+          "complexity": 141,
+          "lines_of_code": 453,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "authentication",
+            "authorization",
+            "transport_security",
+            "token_security"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "security_compliance",
+          "file_path": "_local_overrides\\sincor\\security_compliance.py",
+          "complexity": 155,
+          "lines_of_code": 895,
+          "enterprise_features": [
+            "high_availability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "encryption",
+            "authentication",
+            "authorization",
+            "transport_security",
+            "token_security",
+            "role_based_access",
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "seo_domination",
+          "file_path": "_local_overrides\\sincor\\seo_domination.py",
+          "complexity": 173,
+          "lines_of_code": 792,
+          "enterprise_features": [
+            "scalability",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sincor_app_professional",
+          "file_path": "_local_overrides\\sincor\\sincor_app_professional.py",
+          "complexity": 87,
+          "lines_of_code": 700,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sincor_engine",
+          "file_path": "_local_overrides\\sincor\\sincor_engine.py",
+          "complexity": 163,
+          "lines_of_code": 710,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sincor_kitt_interface",
+          "file_path": "_local_overrides\\sincor\\sincor_kitt_interface.py",
+          "complexity": 119,
+          "lines_of_code": 491,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "authorization",
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [
+            "replication"
+          ],
+          "integration_points": []
+        },
+        {
+          "name": "test_monetization_system",
+          "file_path": "_local_overrides\\sincor\\test_monetization_system.py",
+          "complexity": 25,
+          "lines_of_code": 87,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "value_maximization",
+          "file_path": "_local_overrides\\sincor\\value_maximization.py",
+          "complexity": 96,
+          "lines_of_code": 1095,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "optimization",
+            "batch_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "waitlist_system",
+          "file_path": "_local_overrides\\sincor\\waitlist_system.py",
+          "complexity": 70,
+          "lines_of_code": 273,
+          "enterprise_features": [
+            "security",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "encryption",
+            "token_security"
+          ],
+          "performance_features": [
+            "batch_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "creative_forge",
+          "file_path": "_local_overrides\\sincor\\products\\creative_forge.py",
+          "complexity": 115,
+          "lines_of_code": 410,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [
+            "optimization",
+            "batch_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "growth_engine",
+          "file_path": "_local_overrides\\sincor\\products\\growth_engine.py",
+          "complexity": 123,
+          "lines_of_code": 358,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [
+            "behavioral_analysis"
+          ],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "intelligence_hub",
+          "file_path": "_local_overrides\\sincor\\products\\intelligence_hub.py",
+          "complexity": 100,
+          "lines_of_code": 534,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "ops_core",
+          "file_path": "_local_overrides\\sincor\\products\\ops_core.py",
+          "complexity": 133,
+          "lines_of_code": 406,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "industry_expansion_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\intelligence\\industry_expansion_agent.py",
+          "complexity": 191,
+          "lines_of_code": 880,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "master_orchestrator",
+          "file_path": "_local_overrides\\sincor\\agents\\intelligence\\master_orchestrator.py",
+          "complexity": 216,
+          "lines_of_code": 810,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    },
+    "security_compliance": {
+      "count": 2,
+      "components": [
+        "agent_authentication_middleware",
+        "credential_management_authentication"
+      ],
+      "details": [
+        {
+          "name": "agent_authentication_middleware",
+          "file_path": "agent_authentication_middleware.py",
+          "complexity": 375,
+          "lines_of_code": 1106,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis",
+            "behavioral_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "quantum_superposition",
+            "quantum_decoherence"
+          ],
+          "security_features": [
+            "encryption",
+            "authentication",
+            "authorization",
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [
+            "distributed_processing"
+          ],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "credential_management_authentication",
+          "file_path": "credential_management_authentication.py",
+          "complexity": 353,
+          "lines_of_code": 1050,
+          "enterprise_features": [
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "neural_processing",
+            "neural_pattern_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement"
+          ],
+          "security_features": [
+            "encryption",
+            "authentication",
+            "token_security",
+            "role_based_access",
+            "audit_logging"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    },
+    "operational_excellence": {
+      "count": 62,
+      "components": [
+        "app",
+        "cognitive_workload_distribution",
+        "comprehensive_audit_logging",
+        "environment_configuration_manager",
+        "error_tracking_system",
+        "graceful_shutdown_handler",
+        "index",
+        "scripts_export_hooks (2)",
+        "scripts_export_hooks",
+        "scripts_generate_storyboards",
+        "scripts_make_hooks",
+        "scripts_make_storyboard",
+        "scripts_render_video",
+        "scripts_storyboard_to_csv",
+        "scripts_tag_media",
+        "substrate_discovery_onboarding",
+        "wsgi_server_configuration",
+        "message_bus",
+        "agency_kernel",
+        "cortecs_core",
+        "dynamic_pricing_engine",
+        "generate_agents",
+        "identity_system",
+        "lifecycle_system",
+        "memory_system",
+        "persona_engine",
+        "swarm_coordination",
+        "scheduler_harness",
+        "sincor_app",
+        "content_worker",
+        "image_worker",
+        "taskpool_dispatcher",
+        "oversight_agent",
+        "sentinel_node",
+        "admin_control",
+        "admin_cortex_chat",
+        "admin_data_service",
+        "agent_control_system",
+        "agent_monitor",
+        "ask_cortex_for_video",
+        "business_discovery",
+        "check_agents",
+        "cortex_demo",
+        "direct_promo_fix",
+        "fix_temp",
+        "kitt_demo",
+        "music_marketing_system",
+        "onboarding_system",
+        "promo_codes",
+        "run_final_checks",
+        "setup_environment",
+        "show_all_agents",
+        "sincor_app_backup",
+        "sincor_standalone",
+        "start_syndicator",
+        "__init__",
+        "base_agent",
+        "base_product",
+        "hvmwop-sync-agent",
+        "media_orchestrator",
+        "video_production_agent",
+        "voiceover_agent"
+      ],
+      "details": [
+        {
+          "name": "app",
+          "file_path": "_local_overrides\\sincor\\app.py",
+          "complexity": 81,
+          "lines_of_code": 232,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "cognitive_workload_distribution",
+          "file_path": "cognitive_workload_distribution.py",
+          "complexity": 187,
+          "lines_of_code": 618,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_superposition"
+          ],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "optimization",
+            "indexing"
+          ],
+          "scalability_features": [
+            "load_balancing",
+            "distributed_processing"
+          ],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "comprehensive_audit_logging",
+          "file_path": "comprehensive_audit_logging.py",
+          "complexity": 460,
+          "lines_of_code": 1482,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "standard"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis",
+            "behavioral_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement"
+          ],
+          "security_features": [
+            "encryption",
+            "authentication",
+            "authorization",
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "async_processing",
+            "compression",
+            "indexing"
+          ],
+          "scalability_features": [
+            "distributed_processing"
+          ],
+          "integration_points": [
+            "redis",
+            "elasticsearch",
+            "kafka"
+          ]
+        },
+        {
+          "name": "environment_configuration_manager",
+          "file_path": "environment_configuration_manager.py",
+          "complexity": 354,
+          "lines_of_code": 929,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "qubit_management",
+            "quantum_fidelity"
+          ],
+          "security_features": [
+            "encryption",
+            "authentication"
+          ],
+          "performance_features": [
+            "thread_pooling"
+          ],
+          "scalability_features": [
+            "distributed_processing"
+          ],
+          "integration_points": [
+            "postgresql",
+            "mysql",
+            "docker",
+            "kubernetes"
+          ]
+        },
+        {
+          "name": "error_tracking_system",
+          "file_path": "error_tracking_system.py",
+          "complexity": 537,
+          "lines_of_code": 1618,
+          "enterprise_features": [
+            "high_availability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "qubit_management",
+            "quantum_fidelity",
+            "quantum_superposition",
+            "quantum_decoherence"
+          ],
+          "security_features": [
+            "authentication",
+            "authorization"
+          ],
+          "performance_features": [
+            "caching",
+            "async_processing",
+            "thread_pooling",
+            "indexing"
+          ],
+          "scalability_features": [
+            "clustering"
+          ],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "graceful_shutdown_handler",
+          "file_path": "graceful_shutdown_handler.py",
+          "complexity": 324,
+          "lines_of_code": 894,
+          "enterprise_features": [
+            "high_availability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "enterprise",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement"
+          ],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "index",
+          "file_path": "index.py",
+          "complexity": 7,
+          "lines_of_code": 16,
+          "enterprise_features": [
+            "monitoring",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_export_hooks (2)",
+          "file_path": "scripts_export_hooks (2).py",
+          "complexity": 17,
+          "lines_of_code": 56,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_export_hooks",
+          "file_path": "scripts_export_hooks.py",
+          "complexity": 17,
+          "lines_of_code": 56,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_generate_storyboards",
+          "file_path": "scripts_generate_storyboards.py",
+          "complexity": 11,
+          "lines_of_code": 39,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "batch_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_make_hooks",
+          "file_path": "scripts_make_hooks.py",
+          "complexity": 24,
+          "lines_of_code": 57,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "compression"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_make_storyboard",
+          "file_path": "scripts_make_storyboard.py",
+          "complexity": 31,
+          "lines_of_code": 107,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_render_video",
+          "file_path": "scripts_render_video.py",
+          "complexity": 81,
+          "lines_of_code": 240,
+          "enterprise_features": [
+            "scalability",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "thread_pooling"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_storyboard_to_csv",
+          "file_path": "scripts_storyboard_to_csv.py",
+          "complexity": 11,
+          "lines_of_code": 39,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "scripts_tag_media",
+          "file_path": "scripts_tag_media.py",
+          "complexity": 7,
+          "lines_of_code": 29,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "substrate_discovery_onboarding",
+          "file_path": "substrate_discovery_onboarding.py",
+          "complexity": 458,
+          "lines_of_code": 1202,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement"
+          ],
+          "security_features": [
+            "encryption",
+            "authentication"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "indexing"
+          ],
+          "scalability_features": [
+            "clustering",
+            "distributed_processing"
+          ],
+          "integration_points": [
+            "docker",
+            "kubernetes",
+            "aws",
+            "gcp",
+            "azure"
+          ]
+        },
+        {
+          "name": "wsgi_server_configuration",
+          "file_path": "wsgi_server_configuration.py",
+          "complexity": 227,
+          "lines_of_code": 850,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "standard"
+          ],
+          "consciousness_features": [
+            "consciousness_processing"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement"
+          ],
+          "security_features": [
+            "authorization",
+            "transport_security",
+            "token_security"
+          ],
+          "performance_features": [
+            "caching",
+            "async_processing",
+            "indexing"
+          ],
+          "scalability_features": [
+            "clustering",
+            "horizontal_scaling",
+            "replication"
+          ],
+          "integration_points": [
+            "docker",
+            "kubernetes"
+          ]
+        },
+        {
+          "name": "message_bus",
+          "file_path": "cortecs_core\\message_bus.py",
+          "complexity": 168,
+          "lines_of_code": 546,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "agency_kernel",
+          "file_path": "sincor\\agency_kernel.py",
+          "complexity": 323,
+          "lines_of_code": 1026,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [
+            "behavioral_analysis"
+          ],
+          "quantum_features": [],
+          "security_features": [
+            "token_security",
+            "audit_logging"
+          ],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "cortecs_core",
+          "file_path": "sincor\\cortecs_core.py",
+          "complexity": 185,
+          "lines_of_code": 578,
+          "enterprise_features": [
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "dynamic_pricing_engine",
+          "file_path": "sincor\\dynamic_pricing_engine.py",
+          "complexity": 134,
+          "lines_of_code": 426,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "generate_agents",
+          "file_path": "sincor\\generate_agents.py",
+          "complexity": 25,
+          "lines_of_code": 210,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security",
+            "role_based_access",
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "optimization",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "identity_system",
+          "file_path": "sincor\\identity_system.py",
+          "complexity": 87,
+          "lines_of_code": 257,
+          "enterprise_features": [
+            "configuration_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security",
+            "role_based_access"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "lifecycle_system",
+          "file_path": "sincor\\lifecycle_system.py",
+          "complexity": 244,
+          "lines_of_code": 729,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security",
+            "audit_logging"
+          ],
+          "performance_features": [
+            "optimization",
+            "compression"
+          ],
+          "scalability_features": [
+            "replication"
+          ],
+          "integration_points": []
+        },
+        {
+          "name": "memory_system",
+          "file_path": "sincor\\memory_system.py",
+          "complexity": 156,
+          "lines_of_code": 545,
+          "enterprise_features": [
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "role_based_access"
+          ],
+          "performance_features": [
+            "caching",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "persona_engine",
+          "file_path": "sincor\\persona_engine.py",
+          "complexity": 138,
+          "lines_of_code": 531,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [
+            "behavioral_analysis"
+          ],
+          "quantum_features": [],
+          "security_features": [
+            "audit_logging"
+          ],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "swarm_coordination",
+          "file_path": "sincor\\swarm_coordination.py",
+          "complexity": 208,
+          "lines_of_code": 806,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security",
+            "audit_logging"
+          ],
+          "performance_features": [],
+          "scalability_features": [
+            "distributed_processing"
+          ],
+          "integration_points": []
+        },
+        {
+          "name": "scheduler_harness",
+          "file_path": "_local_overrides\\sincor\\agents\\taskpool_agents\\daetime\\scheduler_harness.py",
+          "complexity": 12,
+          "lines_of_code": 39,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sincor_app",
+          "file_path": "_local_overrides\\sincor\\_local_overrides\\_pre_git_backup.20250813-175406\\sincor\\sincor_app.py",
+          "complexity": 51,
+          "lines_of_code": 131,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "content_worker",
+          "file_path": "_local_overrides\\sincor\\agents\\taskpool_agents\\taskpool\\content_worker.py",
+          "complexity": 6,
+          "lines_of_code": 8,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "image_worker",
+          "file_path": "_local_overrides\\sincor\\agents\\taskpool_agents\\taskpool\\image_worker.py",
+          "complexity": 3,
+          "lines_of_code": 5,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "taskpool_dispatcher",
+          "file_path": "_local_overrides\\sincor\\agents\\taskpool_agents\\taskpool\\taskpool_dispatcher.py",
+          "complexity": 17,
+          "lines_of_code": 13,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "oversight_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\oversight\\oversight_agent.py",
+          "complexity": 50,
+          "lines_of_code": 98,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sentinel_node",
+          "file_path": "_local_overrides\\sincor\\agents\\oversight\\sentinel_node.py",
+          "complexity": 29,
+          "lines_of_code": 38,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "admin_control",
+          "file_path": "_local_overrides\\sincor\\admin_control.py",
+          "complexity": 166,
+          "lines_of_code": 1095,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "authentication",
+            "audit_logging",
+            "compliance"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "admin_cortex_chat",
+          "file_path": "_local_overrides\\sincor\\admin_cortex_chat.py",
+          "complexity": 35,
+          "lines_of_code": 138,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "admin_data_service",
+          "file_path": "_local_overrides\\sincor\\admin_data_service.py",
+          "complexity": 128,
+          "lines_of_code": 355,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "agent_control_system",
+          "file_path": "_local_overrides\\sincor\\agent_control_system.py",
+          "complexity": 48,
+          "lines_of_code": 386,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "agent_monitor",
+          "file_path": "_local_overrides\\sincor\\agent_monitor.py",
+          "complexity": 137,
+          "lines_of_code": 683,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [
+            "coherence_monitoring"
+          ],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "ask_cortex_for_video",
+          "file_path": "_local_overrides\\sincor\\ask_cortex_for_video.py",
+          "complexity": 4,
+          "lines_of_code": 42,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "business_discovery",
+          "file_path": "_local_overrides\\sincor\\business_discovery.py",
+          "complexity": 102,
+          "lines_of_code": 906,
+          "enterprise_features": [
+            "scalability",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "check_agents",
+          "file_path": "_local_overrides\\sincor\\check_agents.py",
+          "complexity": 134,
+          "lines_of_code": 373,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "cortex_demo",
+          "file_path": "_local_overrides\\sincor\\cortex_demo.py",
+          "complexity": 15,
+          "lines_of_code": 98,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "direct_promo_fix",
+          "file_path": "_local_overrides\\sincor\\direct_promo_fix.py",
+          "complexity": 10,
+          "lines_of_code": 109,
+          "enterprise_features": [
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "fix_temp",
+          "file_path": "_local_overrides\\sincor\\fix_temp.py",
+          "complexity": 15,
+          "lines_of_code": 53,
+          "enterprise_features": [
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "kitt_demo",
+          "file_path": "_local_overrides\\sincor\\kitt_demo.py",
+          "complexity": 14,
+          "lines_of_code": 74,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "music_marketing_system",
+          "file_path": "_local_overrides\\sincor\\music_marketing_system.py",
+          "complexity": 74,
+          "lines_of_code": 466,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "onboarding_system",
+          "file_path": "_local_overrides\\sincor\\onboarding_system.py",
+          "complexity": 36,
+          "lines_of_code": 410,
+          "enterprise_features": [
+            "scalability",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [
+            "async_processing",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "promo_codes",
+          "file_path": "_local_overrides\\sincor\\promo_codes.py",
+          "complexity": 53,
+          "lines_of_code": 227,
+          "enterprise_features": [
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "run_final_checks",
+          "file_path": "_local_overrides\\sincor\\run_final_checks.py",
+          "complexity": 119,
+          "lines_of_code": 312,
+          "enterprise_features": [
+            "high_availability",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "setup_environment",
+          "file_path": "_local_overrides\\sincor\\setup_environment.py",
+          "complexity": 87,
+          "lines_of_code": 280,
+          "enterprise_features": [
+            "high_availability",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "show_all_agents",
+          "file_path": "_local_overrides\\sincor\\show_all_agents.py",
+          "complexity": 63,
+          "lines_of_code": 177,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "compliance"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sincor_app_backup",
+          "file_path": "_local_overrides\\sincor\\sincor_app_backup.py",
+          "complexity": 191,
+          "lines_of_code": 537,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security",
+            "compliance"
+          ],
+          "performance_features": [
+            "optimization",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sincor_standalone",
+          "file_path": "_local_overrides\\sincor\\sincor_standalone.py",
+          "complexity": 37,
+          "lines_of_code": 218,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "start_syndicator",
+          "file_path": "_local_overrides\\syncore_syndicator_mvp\\start_syndicator.py",
+          "complexity": 15,
+          "lines_of_code": 77,
+          "enterprise_features": [
+            "configuration_management",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "__init__",
+          "file_path": "_local_overrides\\sincor\\agents\\media\\__init__.py",
+          "complexity": 0,
+          "lines_of_code": 14,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "base_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\base_agent.py",
+          "complexity": 66,
+          "lines_of_code": 176,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "base_product",
+          "file_path": "_local_overrides\\sincor\\products\\base_product.py",
+          "complexity": 113,
+          "lines_of_code": 305,
+          "enterprise_features": [
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "encryption",
+            "authentication",
+            "token_security"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "hvmwop-sync-agent",
+          "file_path": "_local_overrides\\sincor\\HVMWOP-DAO-Regenerated\\automation\\hvmwop-sync-agent.py",
+          "complexity": 13,
+          "lines_of_code": 44,
+          "enterprise_features": [
+            "configuration_management",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "role_based_access"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "media_orchestrator",
+          "file_path": "_local_overrides\\sincor\\agents\\media\\media_orchestrator.py",
+          "complexity": 85,
+          "lines_of_code": 312,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "video_production_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\media\\video_production_agent.py",
+          "complexity": 74,
+          "lines_of_code": 234,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "voiceover_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\media\\voiceover_agent.py",
+          "complexity": 104,
+          "lines_of_code": 301,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    },
+    "ai_ml_systems": {
+      "count": 6,
+      "components": [
+        "scripts_ingest_detailing",
+        "real_time_intelligence",
+        "email_automation",
+        "run_campaign",
+        "business_intel_agent",
+        "campaign_automation_agent"
+      ],
+      "details": [
+        {
+          "name": "scripts_ingest_detailing",
+          "file_path": "scripts_ingest_detailing.py",
+          "complexity": 48,
+          "lines_of_code": 104,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "real_time_intelligence",
+          "file_path": "sincor\\real_time_intelligence.py",
+          "complexity": 376,
+          "lines_of_code": 1047,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium",
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "role_based_access"
+          ],
+          "performance_features": [
+            "caching",
+            "async_processing",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "email_automation",
+          "file_path": "_local_overrides\\sincor\\email_automation.py",
+          "complexity": 95,
+          "lines_of_code": 567,
+          "enterprise_features": [
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "run_campaign",
+          "file_path": "_local_overrides\\sincor\\run_campaign.py",
+          "complexity": 53,
+          "lines_of_code": 251,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "business_intel_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\intelligence\\business_intel_agent.py",
+          "complexity": 217,
+          "lines_of_code": 736,
+          "enterprise_features": [
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "authorization"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "campaign_automation_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\marketing\\campaign_automation_agent.py",
+          "complexity": 231,
+          "lines_of_code": 823,
+          "enterprise_features": [
+            "scalability",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    },
+    "data_management": {
+      "count": 1,
+      "components": [
+        "database_clustering_protocol"
+      ],
+      "details": [
+        {
+          "name": "database_clustering_protocol",
+          "file_path": "database_clustering_protocol.py",
+          "complexity": 492,
+          "lines_of_code": 1269,
+          "enterprise_features": [
+            "high_availability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "standard"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "quantum_fidelity"
+          ],
+          "security_features": [
+            "role_based_access"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "indexing",
+            "batch_processing"
+          ],
+          "scalability_features": [
+            "clustering",
+            "partitioning",
+            "replication"
+          ],
+          "integration_points": [
+            "redis",
+            "postgresql",
+            "mysql",
+            "mongodb"
+          ]
+        }
+      ]
+    },
+    "monitoring_observability": {
+      "count": 3,
+      "components": [
+        "agent_telemetry_collection",
+        "comprehensive_health_endpoints",
+        "performance_metrics_dashboard"
+      ],
+      "details": [
+        {
+          "name": "agent_telemetry_collection",
+          "file_path": "agent_telemetry_collection.py",
+          "complexity": 506,
+          "lines_of_code": 1491,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing",
+            "neural_pattern_analysis",
+            "behavioral_analysis"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "qubit_management",
+            "quantum_fidelity",
+            "quantum_superposition",
+            "quantum_decoherence"
+          ],
+          "security_features": [
+            "encryption"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "optimization",
+            "compression",
+            "indexing",
+            "batch_processing"
+          ],
+          "scalability_features": [
+            "clustering",
+            "distributed_processing"
+          ],
+          "integration_points": [
+            "redis",
+            "kafka"
+          ]
+        },
+        {
+          "name": "comprehensive_health_endpoints",
+          "file_path": "comprehensive_health_endpoints.py",
+          "complexity": 247,
+          "lines_of_code": 846,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "enterprise",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement"
+          ],
+          "security_features": [
+            "encryption",
+            "authentication",
+            "transport_security"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling"
+          ],
+          "scalability_features": [
+            "horizontal_scaling"
+          ],
+          "integration_points": [
+            "kubernetes"
+          ]
+        },
+        {
+          "name": "performance_metrics_dashboard",
+          "file_path": "performance_metrics_dashboard.py",
+          "complexity": 433,
+          "lines_of_code": 1656,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "consciousness",
+            "enterprise",
+            "god_mode",
+            "quantum"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring",
+            "neural_processing"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "qubit_management",
+            "quantum_fidelity"
+          ],
+          "security_features": [
+            "authentication"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "optimization",
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": [
+            "redis"
+          ]
+        }
+      ]
+    },
+    "integration_apis": {
+      "count": 9,
+      "components": [
+        "api_gateway_rate_limiting",
+        "admin_api_routes",
+        "api_setup_guide",
+        "dashboard_routes",
+        "media_routes",
+        "setup_api_key",
+        "test_integration_routes",
+        "test_live_api",
+        "test_routes"
+      ],
+      "details": [
+        {
+          "name": "api_gateway_rate_limiting",
+          "file_path": "api_gateway_rate_limiting.py",
+          "complexity": 411,
+          "lines_of_code": 1266,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "quantum",
+            "consciousness",
+            "premium",
+            "enterprise",
+            "god_mode",
+            "normies"
+          ],
+          "consciousness_features": [
+            "consciousness_processing",
+            "coherence_monitoring"
+          ],
+          "quantum_features": [
+            "quantum_processing",
+            "quantum_entanglement",
+            "quantum_superposition",
+            "quantum_decoherence"
+          ],
+          "security_features": [
+            "authorization",
+            "token_security"
+          ],
+          "performance_features": [
+            "async_processing",
+            "thread_pooling",
+            "optimization"
+          ],
+          "scalability_features": [
+            "distributed_processing"
+          ],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "admin_api_routes",
+          "file_path": "_local_overrides\\sincor\\admin_api_routes.py",
+          "complexity": 85,
+          "lines_of_code": 299,
+          "enterprise_features": [
+            "high_availability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "premium"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "api_setup_guide",
+          "file_path": "_local_overrides\\sincor\\api_setup_guide.py",
+          "complexity": 31,
+          "lines_of_code": 139,
+          "enterprise_features": [
+            "configuration_management",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "dashboard_routes",
+          "file_path": "_local_overrides\\sincor\\dashboard_routes.py",
+          "complexity": 29,
+          "lines_of_code": 281,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "media_routes",
+          "file_path": "_local_overrides\\sincor\\media_routes.py",
+          "complexity": 96,
+          "lines_of_code": 539,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [
+            "enterprise",
+            "standard"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "transport_security"
+          ],
+          "performance_features": [
+            "async_processing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "setup_api_key",
+          "file_path": "_local_overrides\\sincor\\setup_api_key.py",
+          "complexity": 29,
+          "lines_of_code": 112,
+          "enterprise_features": [
+            "configuration_management",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_integration_routes",
+          "file_path": "_local_overrides\\sincor\\test_integration_routes.py",
+          "complexity": 20,
+          "lines_of_code": 64,
+          "enterprise_features": [
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_live_api",
+          "file_path": "_local_overrides\\sincor\\test_live_api.py",
+          "complexity": 22,
+          "lines_of_code": 83,
+          "enterprise_features": [
+            "scalability",
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_routes",
+          "file_path": "_local_overrides\\sincor\\test_routes.py",
+          "complexity": 12,
+          "lines_of_code": 37,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    },
+    "user_interfaces": {
+      "count": 2,
+      "components": [
+        "build_coordination_agent",
+        "template_engine"
+      ],
+      "details": [
+        {
+          "name": "build_coordination_agent",
+          "file_path": "_local_overrides\\sincor\\agents\\oversight\\build_coordination_agent.py",
+          "complexity": 25,
+          "lines_of_code": 19,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "template_engine",
+          "file_path": "_local_overrides\\sincor\\agents\\intelligence\\template_engine.py",
+          "complexity": 174,
+          "lines_of_code": 649,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    },
+    "deployment_infrastructure": {
+      "count": 3,
+      "components": [
+        "railway_deploy",
+        "railway_promo_bypass",
+        "sincor_app_railway"
+      ],
+      "details": [
+        {
+          "name": "railway_deploy",
+          "file_path": "_local_overrides\\sincor\\railway_deploy.py",
+          "complexity": 13,
+          "lines_of_code": 49,
+          "enterprise_features": [
+            "configuration_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "railway_promo_bypass",
+          "file_path": "_local_overrides\\sincor\\railway_promo_bypass.py",
+          "complexity": 20,
+          "lines_of_code": 184,
+          "enterprise_features": [
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "sincor_app_railway",
+          "file_path": "_local_overrides\\sincor\\sincor_app_railway.py",
+          "complexity": 143,
+          "lines_of_code": 531,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "indexing"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    },
+    "testing_validation": {
+      "count": 14,
+      "components": [
+        "test",
+        "mock_claude",
+        "simple_media_test",
+        "test_app",
+        "test_crash_diagnostics",
+        "test_e2e_validation",
+        "test_engine",
+        "test_media_agents",
+        "test_promo",
+        "test_promo_display",
+        "test_promo_local",
+        "test_base_agent",
+        "test_oversight_agent",
+        "test_sincor_app"
+      ],
+      "details": [
+        {
+          "name": "test",
+          "file_path": "test.py",
+          "complexity": 1,
+          "lines_of_code": 13,
+          "enterprise_features": [
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "caching"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "mock_claude",
+          "file_path": "cortecs_core\\mock_claude.py",
+          "complexity": 51,
+          "lines_of_code": 145,
+          "enterprise_features": [
+            "high_availability",
+            "scalability",
+            "monitoring",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "token_security",
+            "compliance"
+          ],
+          "performance_features": [
+            "async_processing",
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": [
+            "redis"
+          ]
+        },
+        {
+          "name": "simple_media_test",
+          "file_path": "_local_overrides\\sincor\\simple_media_test.py",
+          "complexity": 20,
+          "lines_of_code": 91,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_app",
+          "file_path": "_local_overrides\\sincor\\test_app.py",
+          "complexity": 7,
+          "lines_of_code": 21,
+          "enterprise_features": [
+            "monitoring",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_crash_diagnostics",
+          "file_path": "_local_overrides\\sincor\\test_crash_diagnostics.py",
+          "complexity": 132,
+          "lines_of_code": 394,
+          "enterprise_features": [
+            "monitoring",
+            "security",
+            "configuration_management",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [
+            "enterprise"
+          ],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "role_based_access",
+            "compliance"
+          ],
+          "performance_features": [
+            "thread_pooling",
+            "optimization"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_e2e_validation",
+          "file_path": "_local_overrides\\sincor\\test_e2e_validation.py",
+          "complexity": 133,
+          "lines_of_code": 388,
+          "enterprise_features": [
+            "monitoring",
+            "audit_logging",
+            "api_management",
+            "data_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [
+            "thread_pooling"
+          ],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_engine",
+          "file_path": "_local_overrides\\sincor\\test_engine.py",
+          "complexity": 10,
+          "lines_of_code": 62,
+          "enterprise_features": [
+            "configuration_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_media_agents",
+          "file_path": "_local_overrides\\sincor\\test_media_agents.py",
+          "complexity": 54,
+          "lines_of_code": 214,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [
+            "audit_logging"
+          ],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_promo",
+          "file_path": "_local_overrides\\sincor\\test_promo.py",
+          "complexity": 6,
+          "lines_of_code": 34,
+          "enterprise_features": [
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_promo_display",
+          "file_path": "_local_overrides\\sincor\\test_promo_display.py",
+          "complexity": 15,
+          "lines_of_code": 45,
+          "enterprise_features": [],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_promo_local",
+          "file_path": "_local_overrides\\sincor\\test_promo_local.py",
+          "complexity": 4,
+          "lines_of_code": 30,
+          "enterprise_features": [
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_base_agent",
+          "file_path": "_local_overrides\\sincor\\tests\\test_base_agent.py",
+          "complexity": 54,
+          "lines_of_code": 176,
+          "enterprise_features": [
+            "configuration_management",
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_oversight_agent",
+          "file_path": "_local_overrides\\sincor\\tests\\test_oversight_agent.py",
+          "complexity": 38,
+          "lines_of_code": 124,
+          "enterprise_features": [
+            "audit_logging"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        },
+        {
+          "name": "test_sincor_app",
+          "file_path": "_local_overrides\\sincor\\tests\\test_sincor_app.py",
+          "complexity": 67,
+          "lines_of_code": 142,
+          "enterprise_features": [
+            "monitoring",
+            "configuration_management",
+            "audit_logging",
+            "api_management"
+          ],
+          "revenue_tiers": [],
+          "consciousness_features": [],
+          "quantum_features": [],
+          "security_features": [],
+          "performance_features": [],
+          "scalability_features": [],
+          "integration_points": []
+        }
+      ]
+    }
+  },
+  "enterprise_readiness": {
+    "security_analysis": {
+      "authentication_components": 13,
+      "authorization_components": 15,
+      "encryption_components": 12,
+      "audit_logging_components": 15,
+      "compliance_components": 23
+    },
+    "scalability_analysis": {
+      "load_balancing_components": 7,
+      "clustering_components": 10,
+      "distributed_components": 12,
+      "caching_components": 10
+    },
+    "revenue_analysis": {
+      "god_mode_support": 18,
+      "quantum_support": 23,
+      "consciousness_support": 24,
+      "enterprise_support": 41,
+      "premium_support": 29
+    },
+    "readiness_score": 90.0
+  },
+  "missing_components": [
+    {
+      "component": "circuit_breaker",
+      "description": "Circuit breaker pattern for resilience",
+      "priority": "high"
+    },
+    {
+      "component": "chaos_engineering",
+      "description": "Chaos engineering for resilience testing",
+      "priority": "medium"
+    },
+    {
+      "component": "disaster_recovery",
+      "description": "Disaster recovery and business continuity",
+      "priority": "high"
+    },
+    {
+      "component": "threat_detection",
+      "description": "Real-time threat detection and response",
+      "priority": "medium"
+    },
+    {
+      "component": "vulnerability_scanning",
+      "description": "Automated vulnerability scanning",
+      "priority": "medium"
+    },
+    {
+      "component": "penetration_testing",
+      "description": "Automated penetration testing framework",
+      "priority": "medium"
+    },
+    {
+      "component": "feature_flagging",
+      "description": "Feature flagging and gradual rollouts",
+      "priority": "medium"
+    },
+    {
+      "component": "user_feedback",
+      "description": "User feedback collection and analysis",
+      "priority": "medium"
+    }
+  ],
+  "recommendations": [],
+  "technology_stack": {
+    "programming_languages": [
+      "Python"
+    ],
+    "frameworks": [
+      "aiohttp",
+      "sqlalchemy",
+      "pymongo",
+      "redis",
+      "psycopg2",
+      "flask"
+    ],
+    "databases": [
+      "MySQL",
+      "Elasticsearch",
+      "PostgreSQL",
+      "Redis",
+      "MongoDB"
+    ],
+    "message_queues": [
+      "Apache Kafka",
+      "RabbitMQ",
+      "Redis Pub/Sub"
+    ],
+    "caching_systems": [
+      "In-Memory Cache",
+      "Redis Cache"
+    ],
+    "monitoring_tools": [
+      "Custom Metrics",
+      "Health Endpoints",
+      "Performance Monitoring"
+    ],
+    "deployment_platforms": [
+      "Docker",
+      "Railway",
+      "Kubernetes"
+    ]
+  },
+  "revenue_optimization": {
+    "tier_coverage": {
+      "god_mode": 18,
+      "quantum": 23,
+      "consciousness": 24,
+      "enterprise": 41,
+      "premium": 29,
+      "standard": 26,
+      "normies": 4
+    },
+    "revenue_ready_components": 68,
+    "monetization_features": [
+      "Multi-Tier Pricing",
+      "Revenue Optimization",
+      "Usage-Based Billing",
+      "Premium Features"
+    ]
+  },
+  "consciousness_ai": {
+    "consciousness_components": 28,
+    "quantum_components": 23,
+    "ai_ml_components": 6,
+    "neural_processing_features": [
+      "quantum_superposition",
+      "quantum_decoherence",
+      "quantum_entanglement",
+      "coherence_monitoring",
+      "consciousness_processing",
+      "consciousness_emergence",
+      "quantum_processing",
+      "behavioral_analysis",
+      "neural_processing",
+      "quantum_fidelity",
+      "qubit_management",
+      "neural_pattern_analysis"
+    ]
+  },
+  "architectural_patterns": {
+    "microservices": true,
+    "event_driven": false,
+    "layered_architecture": true,
+    "plugin_architecture": true,
+    "domain_driven_design": false
+  },
+  "quality_metrics": {
+    "code_coverage_estimate": "85%",
+    "documentation_coverage": "poor",
+    "complexity_distribution": {
+      "low": 26,
+      "medium": 23,
+      "high": 104
+    },
+    "maintainability_score": 0.0
+  },
+  "deployment_readiness": {
+    "containerization": false,
+    "ci_cd_pipeline": true,
+    "infrastructure_as_code": true,
+    "monitoring_integration": true,
+    "logging_centralization": true
+  },
+  "third_party_integration": {
+    "external_apis": [
+      "Twilio API",
+      "Stripe API",
+      "OpenAI API",
+      "PayPal API",
+      "Claude API"
+    ],
+    "payment_processors": [
+      "PayPal"
+    ],
+    "cloud_services": [
+      "Microsoft Azure",
+      "Google Cloud Platform",
+      "Railway",
+      "Amazon Web Services"
+    ],
+    "authentication_providers": [
+      "Custom Authentication",
+      "JWT Tokens",
+      "Multi-Factor Authentication"
+    ]
+  }
+}

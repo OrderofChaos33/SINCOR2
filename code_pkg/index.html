@@ -1,0 +1,2917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>SINCOR - AI Agents for Business Automation | White-Label Enterprise Platform</title>
+    <meta name="description" content="Deploy 42 specialized AI agents for complete business automation. Enterprise-grade lead generation, content creation, and operations management. White-label solutions for agencies and enterprises.">
+    <meta name="keywords" content="AI agents, business automation, white-label AI, enterprise AI, lead generation automation, content creation AI, operations automation, AI workforce">
+    <meta name="author" content="SINCOR">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="SINCOR - AI Agents for Business Automation">
+    <meta property="og:description" content="Deploy 42 specialized AI agents for complete business automation. Enterprise-grade solutions for lead generation, content creation, and operations.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://getsincor.com">
+    <meta property="og:image" content="https://getsincor.com/images/og-image.jpg">
+    <meta property="og:site_name" content="SINCOR">
+    <meta property="og:locale" content="en_US">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SINCOR - AI Agents for Business Automation">
+    <meta name="twitter:description" content="Deploy 42 specialized AI agents for complete business automation. Enterprise-grade solutions for lead generation, content creation, and operations.">
+    <meta name="twitter:image" content="https://getsincor.com/images/twitter-card.jpg">
+    <meta name="twitter:site" content="@getsincor">
+    <meta name="twitter:creator" content="@getsincor">
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "SINCOR",
+        "description": "Enterprise AI automation platform with 42 specialized agents for business operations",
+        "url": "https://getsincor.com",
+        "logo": "https://getsincor.com/images/logo.png",
+        "sameAs": [
+            "https://twitter.com/getsincor",
+            "https://linkedin.com/company/sincor"
+        ],
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "telephone": "+1-555-0123",
+            "contactType": "sales",
+            "email": "enterprise@getsincor.com"
+        },
+        "address": {
+            "@type": "PostalAddress",
+            "addressCountry": "US"
+        }
+    }
+    </script>
+    
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "SINCOR AI Business Automation Platform",
+        "description": "Complete business automation with 42 specialized AI agents for lead generation, content creation, operations, and intelligence",
+        "category": "Business Software",
+        "brand": {
+            "@type": "Brand",
+            "name": "SINCOR"
+        },
+        "offers": {
+            "@type": "Offer",
+            "availability": "https://schema.org/PreOrder",
+            "priceCurrency": "USD",
+            "seller": {
+                "@type": "Organization",
+                "name": "SINCOR"
+            }
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": "127"
+        }
+    }
+    </script>
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://getsincor.com">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        * {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        
+        .premium-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-size: 300% 300%;
+            animation: gradient-shift 8s ease-in-out infinite;
+        }
+        
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .luxury-text {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-size: 300% 300%;
+            animation: gradient-shift 6s ease-in-out infinite;
+        }
+        
+        .hero-premium {
+            background: radial-gradient(circle at 20% 80%, #120078 0%, transparent 50%),
+                       radial-gradient(circle at 80% 20%, #ff0080 0%, transparent 50%),
+                       radial-gradient(circle at 40% 40%, #00d4ff 0%, transparent 50%),
+                       linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-premium::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="0.5" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="0.3" fill="white" opacity="0.08"/><circle cx="50" cy="10" r="0.4" fill="white" opacity="0.06"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+            opacity: 0.4;
+        }
+        
+        .glass-premium {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .agent-card-luxury {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .agent-card-luxury::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .agent-card-luxury:hover::before {
+            left: 100%;
+        }
+        
+        .agent-card-luxury:hover {
+            transform: translateY(-12px) rotateX(5deg);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1);
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+        
+        .luxury-icon {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+            position: relative;
+        }
+        
+        .luxury-icon::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
+            border-radius: inherit;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .agent-card-luxury:hover .luxury-icon::before {
+            opacity: 1;
+        }
+        
+        .floating-elements {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        
+        .float-particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float-drift 20s linear infinite;
+        }
+        
+        @keyframes float-drift {
+            0% { transform: translateY(100vh) translateX(0) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100px) translateX(200px) rotate(360deg); opacity: 0; }
+        }
+        
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.1), transparent);
+            margin: 4rem 0;
+        }
+        
+        .premium-badge {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #fff2a6 100%);
+            color: #1a1a1a;
+            font-weight: 700;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+        }
+        
+        .agent-showcase {
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            border-left: 4px solid;
+            position: relative;
+        }
+        
+        .agent-showcase::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.02));
+            pointer-events: none;
+        }
+        
+        .capability-pill {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            color: #4338ca;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .capability-pill:hover {
+            background: linear-gradient(135deg, #c7d2fe 0%, #a5b4fc 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+        }
+        
+        .stats-counter {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stats-counter::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+        }
+        
+        .explainer-step {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.8s ease-in-out;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+        }
+        
+        .explainer-step.active {
+            opacity: 1;
+            transform: translateY(0);
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                            <span class="text-white font-bold text-lg">S</span>
+                        </div>
+                        <div>
+                            <span class="text-2xl font-bold gradient-text">SINCOR</span>
+                            <div class="text-xs text-gray-500">AI Business Automation</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#agent-clusters" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">AI Agents</a>
+                        <a href="#how-it-works" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">How It Works</a>
+                        <a href="#products" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">Products</a>
+                        <button onclick="showWaitlistModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">Join Waitlist</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-premium text-white pt-24 pb-32 relative overflow-hidden min-h-screen flex items-center">
+        <!-- Floating Background Elements -->
+        <div class="floating-elements">
+            <div class="float-particle w-4 h-4" style="top: 20%; left: 10%; animation-delay: 0s;"></div>
+            <div class="float-particle w-6 h-6" style="top: 60%; left: 80%; animation-delay: -5s;"></div>
+            <div class="float-particle w-3 h-3" style="top: 40%; left: 60%; animation-delay: -10s;"></div>
+            <div class="float-particle w-5 h-5" style="top: 80%; left: 20%; animation-delay: -15s;"></div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center">
+                <div class="premium-badge inline-flex items-center px-6 py-3 rounded-full text-sm font-bold mb-8">
+                    <span class="mr-2">✨</span> Enterprise AI Platform
+                </div>
+                
+                <h1 class="text-6xl md:text-8xl font-black mb-8 leading-none tracking-tight">
+                    Your AI Business
+                    <br>
+                    <span class="luxury-text">Automation Empire</span>
+                </h1>
+                
+                <p class="text-xl md:text-2xl mb-12 max-w-4xl mx-auto leading-relaxed font-light text-gray-300">
+                    SINCOR's <strong class="font-semibold text-white">42 specialized AI archetypes</strong> scale infinitely through intelligent orchestration. 
+                    One director agent per bundle recruits and manages swarms of specialists - from 5 agents to 500 - based on your project needs.
+                </p>
+                
+                <!-- Above-the-fold Proof Section -->
+                <div class="mb-12 flex flex-col lg:flex-row items-center justify-center gap-8">
+                    <!-- Client Proof Stack -->
+                    <div class="text-center lg:text-right">
+                        <div class="text-sm text-blue-200 mb-3">Trusted by leading teams</div>
+                        <div class="flex flex-wrap justify-center lg:justify-end items-center gap-4 opacity-80">
+                            <div class="bg-white bg-opacity-20 rounded-lg px-4 py-2 text-sm font-semibold text-white">
+                                ████████ AI
+                            </div>
+                            <div class="bg-white bg-opacity-20 rounded-lg px-4 py-2 text-sm font-semibold text-white">
+                                ████████ Labs
+                            </div>
+                            <div class="bg-white bg-opacity-20 rounded-lg px-4 py-2 text-sm font-semibold text-white">
+                                ████████ Ventures
+                            </div>
+                            <div class="text-blue-200 text-sm">+47 beta partners</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Silent Explainer Loop -->
+                    <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-2xl p-1 max-w-md">
+                        <div class="bg-gray-900 rounded-xl p-6 text-center relative overflow-hidden">
+                            <div id="explainerLoop" class="space-y-4">
+                                <!-- Step 1 -->
+                                <div class="explainer-step active">
+                                    <div class="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <span class="text-white text-2xl">🔍</span>
+                                    </div>
+                                    <div class="text-white font-semibold">Prospector finds 50+ leads</div>
+                                    <div class="text-gray-400 text-sm">LinkedIn, web scraping, ICP matching</div>
+                                </div>
+                                
+                                <!-- Step 2 -->
+                                <div class="explainer-step">
+                                    <div class="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <span class="text-white text-2xl">📧</span>
+                                    </div>
+                                    <div class="text-white font-semibold">Outreach writes 3-touch sequence</div>
+                                    <div class="text-gray-400 text-sm">Personalized emails, follow-ups, booking</div>
+                                </div>
+                                
+                                <!-- Step 3 -->
+                                <div class="explainer-step">
+                                    <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <span class="text-white text-2xl">📊</span>
+                                    </div>
+                                    <div class="text-white font-semibold">Analytics tracks & optimizes</div>
+                                    <div class="text-gray-400 text-sm">Response rates, A/B testing, improvements</div>
+                                </div>
+                                
+                                <!-- Step 4 -->
+                                <div class="explainer-step">
+                                    <div class="w-16 h-16 bg-orange-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <span class="text-white text-2xl">🎯</span>
+                                    </div>
+                                    <div class="text-white font-semibold">5+ meetings booked</div>
+                                    <div class="text-gray-400 text-sm">Qualified prospects, calendar sync</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Progress Bar -->
+                            <div class="mt-4 w-full bg-gray-700 rounded-full h-1">
+                                <div id="progressBar" class="bg-blue-500 h-1 rounded-full transition-all duration-1000"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Product Showcase Section -->
+                <div class="mb-16">
+                    <h3 class="text-2xl font-bold mb-8 text-blue-100">Choose Your AI Product Suite</h3>
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                        <!-- Growth Engine -->
+                        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-6 text-center hover:bg-opacity-20 transition-all duration-300 cursor-pointer" onclick="showProductDetails('growth-engine')">
+                            <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <span class="text-white font-bold text-xl">🚀</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-purple-300 mb-2">Growth Engine</h4>
+                            <p class="text-sm text-gray-300 mb-3">Lead Discovery → Outreach → Booking Pipeline</p>
+                            <div class="text-xs text-purple-200">"Your AI sales org in a box"</div>
+                        </div>
+
+                        <!-- Ops Core -->
+                        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-6 text-center hover:bg-opacity-20 transition-all duration-300 cursor-pointer" onclick="showProductDetails('ops-core')">
+                            <div class="w-12 h-12 bg-teal-500 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <span class="text-white font-bold text-xl">⚙️</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-teal-300 mb-2">Ops Core</h4>
+                            <p class="text-sm text-gray-300 mb-3">Cuts 70-80% Admin Overhead</p>
+                            <div class="text-xs text-teal-200">"Run leaner, faster, cleaner"</div>
+                        </div>
+
+                        <!-- Creative Forge -->
+                        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-6 text-center hover:bg-opacity-20 transition-all duration-300 cursor-pointer" onclick="showProductDetails('creative-forge')">
+                            <div class="w-12 h-12 bg-lime-500 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <span class="text-white font-bold text-xl">🎨</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-lime-300 mb-2">Creative Forge</h4>
+                            <p class="text-sm text-gray-300 mb-3">24/7 Creative Department</p>
+                            <div class="text-xs text-lime-200">"Creative horsepower at scale"</div>
+                        </div>
+
+                        <!-- Intelligence Hub -->
+                        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-xl p-6 text-center hover:bg-opacity-20 transition-all duration-300 cursor-pointer" onclick="showProductDetails('intelligence-hub')">
+                            <div class="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <span class="text-white font-bold text-xl">🧠</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-red-300 mb-2">Intelligence Hub</h4>
+                            <p class="text-sm text-gray-300 mb-3">Research & Strategy Suite</p>
+                            <div class="text-xs text-red-200">"Turn noise into signal"</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-6 justify-center items-center mb-8">
+                    <button onclick="showWaitlistModal()" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl text-lg font-bold hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-2xl">
+                        Join Waitlist
+                    </button>
+                    <a href="#agent-clusters" class="border-2 border-white text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white hover:text-blue-900 transition-all duration-300">
+                        Explore AI Agents
+                    </a>
+                </div>
+                
+            </div>
+        </div>
+    </section>
+
+    <!-- Premium Agent Showcase Section -->
+    <section id="agent-clusters" class="py-32 bg-gradient-to-b from-gray-50 to-white relative">
+        <div class="section-divider"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-20">
+                <div class="premium-badge inline-flex items-center px-6 py-3 rounded-full text-sm font-bold mb-8">
+                    <span class="mr-2">🤖</span> Elite AI Agent Portfolio
+                </div>
+                <h2 class="text-5xl md:text-6xl font-black text-gray-900 mb-8 tracking-tight">
+                    Meet Your <span class="luxury-text">AI Workforce</span>
+                </h2>
+                <p class="text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed font-light">
+                    42 specialized AI agents, each with unique personalities, capabilities, and dedicated functions.
+                    <br><span class="font-semibold text-gray-900">Enterprise-grade intelligence meets personalized automation.</span>
+                </p>
+            </div>
+
+            <!-- Customer Acquisition Division -->
+            <div class="mb-24">
+                <div class="text-center mb-16">
+                    <div class="inline-flex items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl text-xl font-bold mb-4 shadow-lg">
+                        <span class="mr-3 text-2xl">🎯</span> Customer Acquisition Division
+                    </div>
+                    <p class="text-lg text-gray-600 max-w-2xl mx-auto">Elite specialists in prospect discovery, qualification, and conversion orchestration</p>
+                </div>
+                
+                <!-- Premium Agent Grid -->
+                <div class="grid xl:grid-cols-3 lg:grid-cols-2 gap-8">
+                    <!-- Prospector Alpha - Premium Agent Card -->
+                    <div class="agent-card-luxury rounded-3xl p-8 group">
+                        <div class="flex items-start justify-between mb-6">
+                            <div class="luxury-icon w-16 h-16 rounded-2xl flex items-center justify-center">
+                                <span class="text-white text-2xl">🔍</span>
+                            </div>
+                            <div class="stats-counter px-4 py-2 text-sm font-bold">
+                                #001
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h4 class="text-2xl font-black text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                                Prospector Alpha
+                            </h4>
+                            <p class="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-4">
+                                Lead Discovery Specialist
+                            </p>
+                            <p class="text-gray-700 leading-relaxed font-medium">
+                                Elite Prospector Agent from our Growth Engine suite. Finds leads across LinkedIn, Crunchbase, and web sources 
+                                using advanced pattern recognition and 42-archetype orchestration protocols to surface high-value opportunities.
+                            </p>
+                            <div class="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                <p class="text-xs text-gray-600 font-medium">
+                                    <strong>Responsible Limits:</strong> 2,000 contacts/day maximum<sup><a href="#methods" class="text-blue-600">¹</a></sup>; excludes protected lists; 
+                                    48-hour cool-down per domain; human verification required for executive-level targeting.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-blue-600">500</div>
+                                <div class="text-xs text-gray-500 font-semibold">Daily Prospects</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-green-600">95%</div>
+                                <div class="text-xs text-gray-500 font-semibold">Accuracy Rate</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <div class="flex flex-wrap gap-2">
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs">Social Media Monitoring</span>
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs">Intent Detection</span>
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs">Real-time Analysis</span>
+                            </div>
+                        </div>
+                        
+                        <div class="agent-showcase border-l-blue-500 pl-6 py-4 rounded-r-xl">
+                            <div class="text-sm font-bold text-gray-900 mb-2">Operational Parameters:</div>
+                            <div class="space-y-2 text-sm text-gray-600">
+                                <div class="flex justify-between">
+                                    <span>Processing Speed:</span>
+                                    <span class="font-semibold text-blue-600">10K+ posts/hour</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Platform Coverage:</span>
+                                    <span class="font-semibold text-blue-600">50+ networks</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Learning Period:</span>
+                                    <span class="font-semibold text-orange-600">24 hours</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button onclick="showAgentDemo('prospector')" class="w-full bg-blue-50 text-blue-700 py-3 px-4 rounded-xl font-semibold text-sm hover:bg-blue-100 transition-colors border border-blue-200">
+                                👁️ Preview Lead Discovery
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Qualifier Beta - Premium Agent Card -->
+                    <div class="agent-card-luxury rounded-3xl p-8 group">
+                        <div class="flex items-start justify-between mb-6">
+                            <div class="luxury-icon w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-600">
+                                <span class="text-white text-2xl">🎯</span>
+                            </div>
+                            <div class="stats-counter px-4 py-2 text-sm font-bold">
+                                #002
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h4 class="text-2xl font-black text-gray-900 mb-2 group-hover:text-green-600 transition-colors">
+                                Qualifier Beta
+                            </h4>
+                            <p class="text-sm font-semibold text-green-600 uppercase tracking-wide mb-4">
+                                Lead Scoring Engine
+                            </p>
+                            <p class="text-gray-700 leading-relaxed font-medium">
+                                Advanced Qualifier Agent from Growth Engine suite. Enriches and filters leads based on ICP rules using 
+                                47 behavioral indicators and predictive analytics to ensure only high-value prospects enter your pipeline.
+                            </p>
+                            <div class="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                <p class="text-xs text-gray-600 font-medium">
+                                    <strong>Responsible Limits:</strong> 1,000 leads/day processing cap<sup><a href="#methods" class="text-blue-600">²</a></sup>; minimum 72-hour review cycle; 
+                                    requires human approval for scores >90%; GDPR-compliant data enrichment only.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-green-600">1000</div>
+                                <div class="text-xs text-gray-500 font-semibold">Scored Daily</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-blue-600">92%</div>
+                                <div class="text-xs text-gray-500 font-semibold">Prediction Accuracy</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <div class="flex flex-wrap gap-2">
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs bg-green-100 text-green-700 border-green-200">Behavioral Analysis</span>
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs bg-green-100 text-green-700 border-green-200">Predictive Scoring</span>
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs bg-green-100 text-green-700 border-green-200">Real-time Updates</span>
+                            </div>
+                        </div>
+                        
+                        <div class="agent-showcase border-l-green-500 pl-6 py-4 rounded-r-xl">
+                            <div class="text-sm font-bold text-gray-900 mb-2">Intelligence Metrics:</div>
+                            <div class="space-y-2 text-sm text-gray-600">
+                                <div class="flex justify-between">
+                                    <span>Behavioral Indicators:</span>
+                                    <span class="font-semibold text-green-600">47 data points</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Processing Capacity:</span>
+                                    <span class="font-semibold text-green-600">1K+ profiles/day</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Analysis Depth:</span>
+                                    <span class="font-semibold text-orange-600">72-hour window</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button onclick="showAgentDemo('qualifier')" class="w-full bg-green-50 text-green-700 py-3 px-4 rounded-xl font-semibold text-sm hover:bg-green-100 transition-colors border border-green-200">
+                                📊 See Scoring Demo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Outreach Gamma - Premium Agent Card -->
+                    <div class="agent-card-luxury rounded-3xl p-8 group">
+                        <div class="flex items-start justify-between mb-6">
+                            <div class="luxury-icon w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-violet-600">
+                                <span class="text-white text-2xl">📧</span>
+                            </div>
+                            <div class="stats-counter px-4 py-2 text-sm font-bold">
+                                #003
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h4 class="text-2xl font-black text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">
+                                Outreach Gamma
+                            </h4>
+                            <p class="text-sm font-semibold text-purple-600 uppercase tracking-wide mb-4">
+                                Engagement Architect
+                            </p>
+                            <p class="text-gray-700 leading-relaxed font-medium">
+                                Master Outreach Agent from Growth Engine suite. Crafts hyper-personalized email sequences, DMs, and scripts 
+                                that resonate with individual prospect psychology. Achieves 2000+ daily messages with industry-leading response rates.
+                            </p>
+                            <div class="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                <p class="text-xs text-gray-600 font-medium">
+                                    <strong>Responsible Limits:</strong> 12-touch maximum sequence<sup><a href="#methods" class="text-blue-600">³</a></sup>; 48-hour minimum intervals; 
+                                    CAN-SPAM compliant; auto-stop on unsubscribe; human review for C-suite outreach.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-purple-600">2000</div>
+                                <div class="text-xs text-gray-500 font-semibold">Messages Daily</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-black text-green-600">18%</div>
+                                <div class="text-xs text-gray-500 font-semibold">Response Rate</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <div class="flex flex-wrap gap-2">
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-700 border-purple-200">Personalization</span>
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-700 border-purple-200">Multi-Channel</span>
+                                <span class="capability-pill px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-700 border-purple-200">A/B Testing</span>
+                            </div>
+                        </div>
+                        
+                        <div class="agent-showcase border-l-purple-500 pl-6 py-4 rounded-r-xl">
+                            <div class="text-sm font-bold text-gray-900 mb-2">Communication Arsenal:</div>
+                            <div class="space-y-2 text-sm text-gray-600">
+                                <div class="flex justify-between">
+                                    <span>Channel Coverage:</span>
+                                    <span class="font-semibold text-purple-600">Email, LinkedIn, SMS</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Template Library:</span>
+                                    <span class="font-semibold text-purple-600">500+ variants</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Personalization Level:</span>
+                                    <span class="font-semibold text-green-600">85% unique</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button onclick="showAgentDemo('outreach')" class="w-full bg-purple-50 text-purple-700 py-3 px-4 rounded-xl font-semibold text-sm hover:bg-purple-100 transition-colors border border-purple-200">
+                                📧 Preview Email Sequence
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Premium Showcase Footer -->
+                <div class="text-center mt-16 glass-premium rounded-3xl p-12">
+                    <h3 class="text-3xl font-black text-gray-900 mb-4">
+                        <span class="luxury-text">39 More Elite Agents</span> Await Deployment
+                    </h3>
+                    <p class="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+                        Each agent in your workforce brings specialized expertise, advanced capabilities, and measurable ROI. 
+                        From content creation to financial analysis, your complete business automation ecosystem is ready.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Products -->
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-yellow-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">🔄</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold">Follow-Up Delta</h4>
+                                <div class="text-sm text-gray-500">Persistence Manager</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Manages follow-up sequences and nurtures prospects until they respond or opt out</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• 12-touch automated sequences</li>
+                                <li>• Optimal timing algorithms</li>
+                                <li>• Behavioral trigger responses</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Stops after 12 touches (compliance)</li>
+                                <li>• Cannot override opt-out requests</li>
+                                <li>• 48hr minimum between touches</li>
+                            </ul>
+                        </div>
+                        <div class="bg-yellow-50 rounded-lg p-3">
+                            <div class="text-xs text-yellow-700 font-semibold">Daily Output: 500+ follow-up sequences</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales Optimization Cluster -->
+            <div class="mb-16">
+                <div class="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl p-8 mb-8">
+                    <h3 class="text-3xl font-bold mb-4">💰 Sales Optimization Cluster (6 Agents)</h3>
+                    <p class="text-xl text-green-100">Converts leads into paying customers through intelligent automation</p>
+                </div>
+                
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <div class="card-hover bg-white border-2 border-green-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">🗣️</span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold">Closer Echo</h4>
+                                <div class="text-sm text-gray-500">Conversation Specialist</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Handles inbound responses and guides conversations toward sales</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Natural language processing</li>
+                                <li>• Objection handling database</li>
+                                <li>• Price negotiation logic</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Escalates complex objections</li>
+                                <li>• Cannot negotiate beyond set parameters</li>
+                                <li>• Requires human approval for custom pricing</li>
+                            </ul>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <div class="text-xs text-green-700 font-semibold">Conversion Rate: 34%</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-blue-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">📊</span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold">Optimizer Foxtrot</h4>
+                                <div class="text-sm text-gray-500">Performance Analyst</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Analyzes sales data and optimizes messaging and timing for better conversions</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Real-time A/B testing</li>
+                                <li>• Predictive analytics</li>
+                                <li>• Pattern recognition</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Needs 30+ conversions for accurate optimization</li>
+                                <li>• Cannot predict market shifts</li>
+                                <li>• Updates recommendations weekly</li>
+                            </ul>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-xs text-blue-700 font-semibold">Improvement Rate: 15-25%</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-purple-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">📝</span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold">Proposal Golf</h4>
+                                <div class="text-sm text-gray-500">Quote Generator</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Creates custom quotes, proposals, and contracts based on prospect needs</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• 50+ proposal templates</li>
+                                <li>• Dynamic pricing algorithms</li>
+                                <li>• Legal compliance checks</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Cannot create custom service packages</li>
+                                <li>• Requires approval for unusual terms</li>
+                                <li>• Limited to predefined service categories</li>
+                            </ul>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-3">
+                            <div class="text-xs text-purple-700 font-semibold">Daily Output: 50+ proposals</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Operations Management Cluster -->
+            <div class="mb-16">
+                <div class="bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-2xl p-8 mb-8">
+                    <h3 class="text-3xl font-bold mb-4">⚙️ Operations Management Cluster (10 Agents)</h3>
+                    <p class="text-xl text-orange-100">Handles day-to-day business operations and customer service</p>
+                </div>
+                
+                <div class="grid lg:grid-cols-2 gap-6">
+                    <div class="card-hover bg-white border-2 border-orange-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">📅</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold">Scheduler Hotel</h4>
+                                <div class="text-sm text-gray-500">Appointment Coordinator</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Manages calendars, books appointments, and handles scheduling conflicts automatically</p>
+                        <div class="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <p class="text-xs text-gray-600 font-medium">
+                                <strong>Responsible Limits:</strong> 100 bookings/day maximum<sup><a href="#methods" class="text-blue-600">⁴</a></sup>; respects business hours only; 
+                                requires confirmation for executive meetings; double-booking protection enabled.
+                            </p>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Syncs with 15+ calendar platforms</li>
+                                <li>• Handles time zone conversions</li>
+                                <li>• Automatic conflict resolution</li>
+                                <li>• SMS/Email confirmations and reminders</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Cannot override manual blocks</li>
+                                <li>• Requires 2hr minimum notice for changes</li>
+                                <li>• Limited to business hours unless configured</li>
+                            </ul>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-3">
+                            <div class="text-xs text-orange-700 font-semibold">Daily Bookings: 100-200 appointments</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-red-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">💬</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold">Support India</h4>
+                                <div class="text-sm text-gray-500">Customer Service Specialist</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Handles customer inquiries, complaints, and support requests 24/7</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• 24/7 availability</li>
+                                <li>• Multi-channel support (chat, email, SMS)</li>
+                                <li>• Knowledge base with 500+ answers</li>
+                                <li>• Sentiment analysis and escalation</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Escalates complex technical issues</li>
+                                <li>• Cannot process refunds over $500</li>
+                                <li>• Limited to predefined service policies</li>
+                            </ul>
+                        </div>
+                        <div class="bg-red-50 rounded-lg p-3">
+                            <div class="text-xs text-red-700 font-semibold">Resolution Rate: 78% first contact</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-green-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">💳</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold">Billing Juliet</h4>
+                                <div class="text-sm text-gray-500">Financial Processor</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Generates invoices, processes payments, and manages billing cycles</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Automated invoicing</li>
+                                <li>• Payment processing integration</li>
+                                <li>• Dunning management</li>
+                                <li>• Financial reporting</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Cannot modify locked invoices</li>
+                                <li>• Requires approval for payment plans</li>
+                                <li>• Limited to configured payment methods</li>
+                            </ul>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <div class="text-xs text-green-700 font-semibold">Processing: $50K+ monthly</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-blue-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">📈</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold">Analytics Kilo</h4>
+                                <div class="text-sm text-gray-500">Business Intelligence</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Tracks performance metrics and generates business intelligence reports</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• 50+ KPI tracking</li>
+                                <li>• Custom dashboard creation</li>
+                                <li>• Predictive forecasting</li>
+                                <li>• Automated report generation</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Requires 30 days of data for trends</li>
+                                <li>• Cannot access external data sources</li>
+                                <li>• Updates reports daily, not real-time</li>
+                            </ul>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-xs text-blue-700 font-semibold">Daily Reports: 15+ automated insights</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content & Media Cluster -->
+            <div class="mb-16">
+                <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl p-8 mb-8">
+                    <h3 class="text-3xl font-bold mb-4">🎨 Content & Media Cluster (8 Agents)</h3>
+                    <p class="text-xl text-purple-100">Creates, manages, and optimizes all marketing content and media</p>
+                </div>
+                
+                <div class="grid lg:grid-cols-2 gap-6">
+                    <div class="card-hover bg-white border-2 border-purple-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">✍️</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold">Writer Lima</h4>
+                                <div class="text-sm text-gray-500">Content Generation Specialist</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Creates blog posts, social media content, and marketing copy</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• 20+ content formats</li>
+                                <li>• SEO optimization</li>
+                                <li>• Brand voice consistency</li>
+                                <li>• Multi-platform adaptation</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Requires brand guidelines setup</li>
+                                <li>• Cannot create technical documentation</li>
+                                <li>• Max 2000 words per piece</li>
+                            </ul>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-3">
+                            <div class="text-xs text-purple-700 font-semibold">Daily Output: 10-15 pieces of content</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-pink-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-pink-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">📱</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold">Social Mike</h4>
+                                <div class="text-sm text-gray-500">Social Media Manager</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Schedules and publishes content across all social media platforms</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• 15+ platform integrations</li>
+                                <li>• Optimal timing algorithms</li>
+                                <li>• Hashtag optimization</li>
+                                <li>• Engagement tracking</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Cannot respond to negative comments automatically</li>
+                                <li>• Max 10 posts per platform per day</li>
+                                <li>• Requires manual approval for sensitive topics</li>
+                            </ul>
+                        </div>
+                        <div class="bg-pink-50 rounded-lg p-3">
+                            <div class="text-xs text-pink-700 font-semibold">Daily Posts: 50-75 across all platforms</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Intelligence & Analysis Cluster -->
+            <div class="mb-16">
+                <div class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl p-8 mb-8">
+                    <h3 class="text-3xl font-bold mb-4">🧠 Intelligence & Analysis Cluster (10 Agents)</h3>
+                    <p class="text-xl text-indigo-100">Provides strategic insights and competitive intelligence</p>
+                </div>
+                
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <div class="card-hover bg-white border-2 border-indigo-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">🕵️</span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold">Intel November</h4>
+                                <div class="text-sm text-gray-500">Market Research</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Monitors competitors and market trends</p>
+                        <div class="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <p class="text-xs text-gray-600 font-medium">
+                                <strong>Responsible Limits:</strong> Public data sources only; respects robots.txt; 
+                                monthly report cadence; cannot access proprietary/confidential information.
+                            </p>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Competitor price tracking</li>
+                                <li>• Market trend analysis</li>
+                                <li>• SWOT assessments</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Cannot access private company data</li>
+                                <li>• Updates weekly, not real-time</li>
+                                <li>• Limited to public information</li>
+                            </ul>
+                        </div>
+                        <div class="bg-indigo-50 rounded-lg p-3">
+                            <div class="text-xs text-indigo-700 font-semibold">Weekly Reports: Market analysis</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-blue-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">🔮</span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold">Forecast Oscar</h4>
+                                <div class="text-sm text-gray-500">Predictive Analytics</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Predicts business outcomes and market opportunities</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Revenue forecasting</li>
+                                <li>• Demand prediction</li>
+                                <li>• Risk assessment</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Needs 6+ months historical data</li>
+                                <li>• Cannot predict external shocks</li>
+                                <li>• 80% accuracy for 90-day forecasts</li>
+                            </ul>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-xs text-blue-700 font-semibold">Accuracy: 80-95% depending on timeframe</div>
+                        </div>
+                    </div>
+
+                    <div class="card-hover bg-white border-2 border-teal-200 rounded-xl p-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-12 h-12 bg-teal-600 rounded-lg flex items-center justify-center mr-4">
+                                <span class="text-white text-xl">🎯</span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-bold">Strategy Papa</h4>
+                                <div class="text-sm text-gray-500">Strategic Planner</div>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 mb-4">Develops business strategies and optimization recommendations</p>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Capabilities:</div>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Strategic planning frameworks</li>
+                                <li>• Goal setting and KPI selection</li>
+                                <li>• Resource allocation optimization</li>
+                            </ul>
+                        </div>
+                        <div class="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <p class="text-xs text-gray-600 font-medium">
+                                <strong>Responsible Limits:</strong> Strategic recommendations only; requires human approval for implementation; 
+                                quarterly review cycles; cannot access financial/confidential data without permission.
+                            </p>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">Limitations:</div>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• Requires business goals input</li>
+                                <li>• Cannot make final decisions</li>
+                                <li>• Updates strategies quarterly</li>
+                            </ul>
+                        </div>
+                        <div class="bg-teal-50 rounded-lg p-3">
+                            <div class="text-xs text-teal-700 font-semibold">Output: Strategic recommendations monthly</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-16">
+                <div class="bg-gradient-to-r from-gray-900 to-black rounded-2xl p-8 text-white">
+                    <h3 class="text-2xl font-bold mb-4">Ready to Deploy Your AI Workforce?</h3>
+                    <p class="text-xl text-gray-300 mb-6">
+                        All 42 agents work together seamlessly, handling your business operations 24/7
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button onclick="showWaitlistModal()" class="bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:bg-blue-700 transition-colors">
+                            Join Waitlist
+                        </button>
+                        <a href="#products" class="border-2 border-white text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white hover:text-gray-900 transition-all duration-300">
+                            View Products
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="py-20 bg-gray-900 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">How SINCOR Works</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Simple setup, powerful results. Your AI workforce starts working in minutes.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">1</div>
+                    <h3 class="text-lg font-bold mb-3">Connect Your Business</h3>
+                    <p class="text-gray-300">Tell SINCOR about your services, target market, and goals. Takes 5 minutes.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">2</div>
+                    <h3 class="text-lg font-bold mb-3">AI Agents Deploy</h3>
+                    <p class="text-gray-300">42 specialized agents start working across all business functions immediately.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">3</div>
+                    <h3 class="text-lg font-bold mb-3">Watch Results Flow</h3>
+                    <p class="text-gray-300">Leads, sales, and operations run automatically. Monitor everything in real-time.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">4</div>
+                    <h3 class="text-lg font-bold mb-3">Scale Infinitely</h3>
+                    <p class="text-gray-300">Your AI workforce never sleeps, never quits, and handles unlimited growth.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Industry Use Cases -->
+    <div class="py-16 bg-gradient-to-br from-gray-50 to-blue-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Built for Your Industry</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">Tailored AI orchestration designed for the specific needs and KPIs of your business vertical.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Agencies -->
+                <div class="bg-white rounded-2xl p-8 shadow-xl border border-gray-100 hover:shadow-2xl transition-all duration-300">
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-2xl">🎨</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Marketing Agencies</h3>
+                        <p class="text-gray-600">Scale client acquisition and delivery without scaling headcount</p>
+                    </div>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Client Capacity</span>
+                            <span class="text-lg font-bold text-purple-600">3.2x increase<sup><a href="#methods" class="text-blue-600">⁵</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Campaign Launch Speed</span>
+                            <span class="text-lg font-bold text-purple-600">72% faster<sup><a href="#methods" class="text-blue-600">⁶</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Creative Output</span>
+                            <span class="text-lg font-bold text-purple-600">5-8 variants/hour<sup><a href="#methods" class="text-blue-600">⁷</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Client Reporting</span>
+                            <span class="text-lg font-bold text-purple-600">Automated</span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold text-gray-800 mb-2">Key Agents for Agencies:</h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li>• Creative Forge → Content at scale</li>
+                            <li>• Prospector Alpha → Lead generation</li>
+                            <li>• Campaign Manager → Multi-client orchestration</li>
+                            <li>• Report Generator → Client dashboards</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Professional Services -->
+                <div class="bg-white rounded-2xl p-8 shadow-xl border border-gray-100 hover:shadow-2xl transition-all duration-300">
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-2xl">⚖️</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Professional Services</h3>
+                        <p class="text-gray-600">Elevate expertise delivery while reducing administrative overhead</p>
+                    </div>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Billable Hours</span>
+                            <span class="text-lg font-bold text-blue-600">+40% recovery<sup><a href="#methods" class="text-blue-600">⁸</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Admin Reduction</span>
+                            <span class="text-lg font-bold text-blue-600">70-80%<sup><a href="#methods" class="text-blue-600">⁹</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Research Speed</span>
+                            <span class="text-lg font-bold text-blue-600">10x faster<sup><a href="#methods" class="text-blue-600">¹⁰</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Document Quality</span>
+                            <span class="text-lg font-bold text-blue-600">Enterprise-grade</span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold text-gray-800 mb-2">Key Agents for Professional Services:</h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li>• Document Architect → Proposals & contracts</li>
+                            <li>• Research Prime → Market intelligence</li>
+                            <li>• Time Tracker → Billing optimization</li>
+                            <li>• Client Communicator → Relationship management</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- SaaS -->
+                <div class="bg-white rounded-2xl p-8 shadow-xl border border-gray-100 hover:shadow-2xl transition-all duration-300">
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-2xl">🚀</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">SaaS Companies</h3>
+                        <p class="text-gray-600">Accelerate growth loops from acquisition to expansion</p>
+                    </div>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Lead Velocity</span>
+                            <span class="text-lg font-bold text-green-600">2,000+ /day<sup><a href="#methods" class="text-blue-600">¹¹</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Conversion Rate</span>
+                            <span class="text-lg font-bold text-green-600">+180% lift<sup><a href="#methods" class="text-blue-600">¹²</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Onboarding Speed</span>
+                            <span class="text-lg font-bold text-green-600">48hrs → 4hrs<sup><a href="#methods" class="text-blue-600">¹³</a></sup></span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">Support Automation</span>
+                            <span class="text-lg font-bold text-green-600">85% deflection<sup><a href="#methods" class="text-blue-600">¹⁴</a></sup></span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-4">
+                        <h4 class="font-semibold text-gray-800 mb-2">Key Agents for SaaS:</h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li>• Growth Engine → Full funnel automation</li>
+                            <li>• Product Evangelist → Feature education</li>
+                            <li>• Churn Predictor → Retention signals</li>
+                            <li>• Usage Analyst → Expansion opportunities</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-12">
+                <p class="text-sm text-gray-500 mb-4">Don't see your industry? <a href="mailto:enterprise@getsincor.com" class="text-blue-600 hover:underline">Contact us</a> for custom configuration.</p>
+                <button onclick="showWaitlistModal()" class="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors">
+                    Get Industry-Specific Demo →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrations Section -->
+    <section class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Enterprise Integrations</h2>
+                <p class="text-xl text-gray-600">Seamlessly connect with your existing business tools and workflows</p>
+            </div>
+
+            <div class="grid md:grid-cols-4 gap-6 mb-12">
+                <!-- CRM Integrations -->
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <h3 class="font-bold text-gray-900 mb-4">CRM & Sales</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-orange-500 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">HS</span>
+                                </div>
+                                <span class="text-sm">HubSpot</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">SF</span>
+                                </div>
+                                <span class="text-sm">Salesforce</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-red-500 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">PD</span>
+                                </div>
+                                <span class="text-sm">Pipedrive</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Communication -->
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <h3 class="font-bold text-gray-900 mb-4">Communication</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-red-600 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">G</span>
+                                </div>
+                                <span class="text-sm">Gmail</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-purple-600 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">S</span>
+                                </div>
+                                <span class="text-sm">Slack</span>
+                            </div>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">R</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-500 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">LI</span>
+                                </div>
+                                <span class="text-sm">LinkedIn</span>
+                            </div>
+                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">API</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Productivity -->
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <h3 class="font-bold text-gray-900 mb-4">Productivity</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-green-600 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">GW</span>
+                                </div>
+                                <span class="text-sm">Google Workspace</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-700 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">MS</span>
+                                </div>
+                                <span class="text-sm">Microsoft 365</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-gray-800 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">N</span>
+                                </div>
+                                <span class="text-sm">Notion</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics & Marketing -->
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <h3 class="font-bold text-gray-900 mb-4">Analytics & Marketing</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-orange-600 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">GA</span>
+                                </div>
+                                <span class="text-sm">Google Analytics</span>
+                            </div>
+                            <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">R</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-800 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">FB</span>
+                                </div>
+                                <span class="text-sm">Meta Ads</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center mr-3">
+                                    <span class="text-white text-xs font-bold">ZD</span>
+                                </div>
+                                <span class="text-sm">Zendesk</span>
+                            </div>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">R/W</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Integration Capabilities Legend -->
+            <div class="bg-white rounded-xl p-6 shadow-sm">
+                <div class="flex flex-wrap justify-center items-center gap-6 text-sm">
+                    <div class="flex items-center">
+                        <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded mr-2">R/W</span>
+                        <span class="text-gray-600">Full Read/Write Access</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2">R</span>
+                        <span class="text-gray-600">Read-Only Access</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded mr-2">API</span>
+                        <span class="text-gray-600">API Integration</span>
+                    </div>
+                    <div class="text-gray-500">
+                        <strong>50+</strong> additional integrations available in Enterprise plans
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quality Assurance Section -->
+    <section class="py-20 bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-6">How Quality is Guaranteed</h2>
+                <p class="text-xl text-gray-600 max-w-4xl mx-auto">
+                    Enterprise-grade quality control architecture with multiple verification layers ensures reliable, accurate, and secure output every time.
+                </p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Quality Points -->
+                <div class="space-y-8">
+                    <div class="flex items-start">
+                        <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                            <span class="text-white text-xl">🛡️</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">QC Evaluators & LLM Judges</h3>
+                            <p class="text-gray-600">Every agent output passes through specialized Quality Control agents that score accuracy, brand consistency, and safety using both deterministic rules and advanced AI evaluation models.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start">
+                        <div class="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                            <span class="text-white text-xl">📋</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">RAG Cite-Checking & Fact Verification</h3>
+                            <p class="text-gray-600">All generated content undergoes real-time verification against approved knowledge bases with mandatory citation requirements to eliminate hallucinations and ensure factual accuracy.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start">
+                        <div class="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                            <span class="text-white text-xl">👥</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Human Quality Gates</h3>
+                            <p class="text-gray-600">High-risk tasks automatically trigger human review checkpoints with side-by-side comparisons, giving you final approval control over critical business communications and decisions.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start">
+                        <div class="w-12 h-12 bg-orange-600 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
+                            <span class="text-white text-xl">📊</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">Immutable Audit Trails</h3>
+                            <p class="text-gray-600">Every agent action, decision, and output modification is logged with cryptographic hashes, creating tamper-proof lineage tracking for compliance and accountability.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quality Flow Diagram -->
+                <div class="relative">
+                    <div class="bg-white rounded-2xl p-8 shadow-xl">
+                        <h3 class="text-xl font-bold text-gray-900 mb-6 text-center">Quality Control Flow</h3>
+                        
+                        <!-- Flow Steps -->
+                        <div class="space-y-4">
+                            <!-- Input -->
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-gray-400 rounded-full"></div>
+                                <div class="flex-1 ml-4 p-3 bg-gray-100 rounded-lg">
+                                    <span class="text-sm font-semibold">1. Agent Output</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Arrow -->
+                            <div class="flex justify-center">
+                                <div class="w-px h-6 bg-gray-300"></div>
+                            </div>
+                            
+                            <!-- QC Stage -->
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-blue-500 rounded-full"></div>
+                                <div class="flex-1 ml-4 p-3 bg-blue-50 rounded-lg border-2 border-blue-200">
+                                    <span class="text-sm font-semibold text-blue-800">2. QC Evaluation</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Arrow -->
+                            <div class="flex justify-center">
+                                <div class="w-px h-6 bg-gray-300"></div>
+                            </div>
+                            
+                            <!-- RAG Check -->
+                            <div class="flex items-center">
+                                <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                                <div class="flex-1 ml-4 p-3 bg-green-50 rounded-lg border-2 border-green-200">
+                                    <span class="text-sm font-semibold text-green-800">3. Fact Check & Citations</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Decision Diamond -->
+                            <div class="flex justify-center my-4">
+                                <div class="w-16 h-16 bg-purple-100 border-2 border-purple-400 transform rotate-45 flex items-center justify-center">
+                                    <span class="text-xs font-bold text-purple-700 transform -rotate-45">Risk?</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Two paths -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="flex items-center">
+                                    <div class="w-4 h-4 bg-orange-500 rounded-full"></div>
+                                    <div class="flex-1 ml-4 p-3 bg-orange-50 rounded-lg border-2 border-orange-200">
+                                        <span class="text-sm font-semibold text-orange-800">4a. Human Gate</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-4 h-4 bg-emerald-500 rounded-full"></div>
+                                    <div class="flex-1 ml-4 p-3 bg-emerald-50 rounded-lg border-2 border-emerald-200">
+                                        <span class="text-sm font-semibold text-emerald-800">4b. Auto-Approve</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Final Output -->
+                            <div class="flex justify-center mt-4">
+                                <div class="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold">
+                                    ✓ Verified Output + Audit Log
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Details -->
+            <div class="mt-16 bg-white rounded-2xl p-8 shadow-xl">
+                <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">Enterprise Anti-Theft Security</h3>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-white text-2xl">🔐</span>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-900 mb-2">Containerized Deployment</h4>
+                        <p class="text-gray-600">Each product runs in isolated, encrypted containers with role-based access controls and time-limited API tokens.</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-white text-2xl">🛡️</span>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-900 mb-2">IP Protection & Obfuscation</h4>
+                        <p class="text-gray-600">Advanced code obfuscation, licensing verification, and hardware fingerprinting prevent unauthorized copying or reverse engineering.</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span class="text-white text-2xl">📡</span>
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-900 mb-2">Real-time Monitoring</h4>
+                        <p class="text-gray-600">Continuous behavioral analysis detects anomalous usage patterns and automatically revokes access for suspicious activities.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cross-Suite Choreography -->
+    <div class="py-16 bg-gray-900 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-4">Cross-Suite AI Orchestration</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">Watch your business intelligence flow seamlessly through interconnected AI agents, creating a complete automation ecosystem.</p>
+            </div>
+            
+            <div class="relative">
+                <!-- Flow Diagram Container -->
+                <div class="bg-gray-800 rounded-2xl p-8 mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+                        <!-- Step 1: Lead Discovery -->
+                        <div class="relative">
+                            <div class="bg-blue-600 rounded-xl p-6 text-center shadow-lg">
+                                <div class="text-3xl mb-2">🔍</div>
+                                <h3 class="font-bold text-lg mb-2">Lead Discovery</h3>
+                                <p class="text-sm text-blue-200 mb-4">Growth Engine finds and qualifies prospects</p>
+                                <div class="bg-blue-700 rounded-lg p-3">
+                                    <div class="text-xs font-mono text-blue-100">LeadList.json</div>
+                                    <div class="text-xs text-gray-300 mt-1">127 qualified leads</div>
+                                </div>
+                            </div>
+                            <!-- Arrow -->
+                            <div class="hidden md:block absolute -right-3 top-1/2 transform -translate-y-1/2">
+                                <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-sm">→</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Content Creation -->
+                        <div class="relative">
+                            <div class="bg-green-600 rounded-xl p-6 text-center shadow-lg">
+                                <div class="text-3xl mb-2">✨</div>
+                                <h3 class="font-bold text-lg mb-2">Content Creation</h3>
+                                <p class="text-sm text-green-200 mb-4">Creative Forge generates personalized campaigns</p>
+                                <div class="bg-green-700 rounded-lg p-3">
+                                    <div class="text-xs font-mono text-green-100">ContentPack.zip</div>
+                                    <div class="text-xs text-gray-300 mt-1">45 email sequences</div>
+                                </div>
+                            </div>
+                            <!-- Arrow -->
+                            <div class="hidden md:block absolute -right-3 top-1/2 transform -translate-y-1/2">
+                                <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-sm">→</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Operations -->
+                        <div class="relative">
+                            <div class="bg-teal-600 rounded-xl p-6 text-center shadow-lg">
+                                <div class="text-3xl mb-2">⚙️</div>
+                                <h3 class="font-bold text-lg mb-2">Operations</h3>
+                                <p class="text-sm text-teal-200 mb-4">Ops Core manages outreach & scheduling</p>
+                                <div class="bg-teal-700 rounded-lg p-3">
+                                    <div class="text-xs font-mono text-teal-100">CRMEvents.csv</div>
+                                    <div class="text-xs text-gray-300 mt-1">89 meetings booked</div>
+                                </div>
+                            </div>
+                            <!-- Arrow -->
+                            <div class="hidden md:block absolute -right-3 top-1/2 transform -translate-y-1/2">
+                                <div class="w-6 h-6 bg-teal-500 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-sm">→</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Intelligence Reports -->
+                        <div class="relative">
+                            <div class="bg-red-600 rounded-xl p-6 text-center shadow-lg">
+                                <div class="text-3xl mb-2">📊</div>
+                                <h3 class="font-bold text-lg mb-2">Intelligence</h3>
+                                <p class="text-sm text-red-200 mb-4">Intelligence Hub creates executive reports</p>
+                                <div class="bg-red-700 rounded-lg p-3">
+                                    <div class="text-xs font-mono text-red-100">ExecReport.pdf</div>
+                                    <div class="text-xs text-gray-300 mt-1">Weekly dashboard</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Performance Metrics -->
+                    <div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-blue-400">2,000+<sup><a href="#methods" class="text-blue-600">¹¹</a></sup></div>
+                            <div class="text-xs text-gray-400">Leads/Day</div>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-green-400">180%<sup><a href="#methods" class="text-blue-600">¹²</a></sup></div>
+                            <div class="text-xs text-gray-400">Conversion Lift</div>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-teal-400">70%<sup><a href="#methods" class="text-blue-600">⁹</a></sup></div>
+                            <div class="text-xs text-gray-400">Admin Reduction</div>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-4 text-center">
+                            <div class="text-2xl font-bold text-red-400">24/7</div>
+                            <div class="text-xs text-gray-400">Operations</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Integration Points -->
+                <div class="text-center">
+                    <h3 class="text-xl font-bold mb-4">Seamless Integration with Your Stack</h3>
+                    <div class="flex justify-center space-x-6 text-sm text-gray-400">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                            CRM (HubSpot, Salesforce)
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                            Marketing (Mailchimp, Klaviyo)
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-teal-500 rounded-full mr-2"></div>
+                            Calendar (Google, Outlook)
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                            Analytics (Google, Mixpanel)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Products -->
+    <section id="products" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-6">SINCOR Product Suite</h2>
+                <p class="text-xl text-gray-600">
+                    Four powerful, containerized AI products. Each secured with enterprise-grade anti-theft measures.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8 mb-16">
+                <!-- Growth Engine -->
+                <div class="bg-gradient-to-br from-purple-600 to-purple-700 text-white rounded-2xl p-8 relative">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-4">
+                            <span class="text-3xl">🚀</span>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold">Growth Engine</h3>
+                            <p class="text-purple-200">Lead Generation & Sales Automation Suite</p>
+                        </div>
+                    </div>
+                    <p class="text-lg mb-6 text-purple-100">"Your AI sales org in a box"</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">5</div>
+                            <div class="text-sm text-purple-200">AI Agents</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">2000</div>
+                            <div class="text-sm text-purple-200">Contacts/Day</div>
+                        </div>
+                    </div>
+                    
+                    <ul class="space-y-2 mb-6 text-sm">
+                        <li>• Prospector: Finds leads across LinkedIn, Crunchbase, web</li>
+                        <li>• Qualifier: Enriches + filters leads based on ICP rules</li>
+                        <li>• Outreach: Crafts personalized emails, DMs, scripts</li>
+                        <li>• Follow-up: Handles sequencing and persistence</li>
+                        <li>• Scheduler: Books meetings, syncs calendars</li>
+                    </ul>
+                    
+                    <button onclick="showSampleOutput('growth')" class="w-full bg-white bg-opacity-20 text-white py-2 rounded-lg text-sm font-semibold mb-3 hover:bg-opacity-30 transition-colors border border-white border-opacity-30">
+                        👁️ View Sample Output
+                    </button>
+                    
+                    <button onclick="showWaitlistModal('Growth Engine')" class="w-full bg-white text-purple-600 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">
+                        Join Growth Engine Waitlist
+                    </button>
+                </div>
+
+                <!-- Ops Core -->
+                <div class="bg-gradient-to-br from-teal-600 to-teal-700 text-white rounded-2xl p-8 relative">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-4">
+                            <span class="text-3xl">⚙️</span>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold">Ops Core</h3>
+                            <p class="text-teal-200">Workflow & Business Automation Suite</p>
+                        </div>
+                    </div>
+                    <p class="text-lg mb-6 text-teal-100">"Run leaner, faster, cleaner"</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">6</div>
+                            <div class="text-sm text-teal-200">AI Agents</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">70-80%</div>
+                            <div class="text-sm text-teal-200">Admin Reduction</div>
+                        </div>
+                    </div>
+                    
+                    <ul class="space-y-2 mb-6 text-sm">
+                        <li>• Scheduler: Calendar management and appointment booking</li>
+                        <li>• Document: Automated document generation and contracts</li>
+                        <li>• Data Entry: System integration and data transfer</li>
+                        <li>• Support: Customer support ticket automation</li>
+                        <li>• Compliance: Compliance monitoring and audit trails</li>
+                        <li>• Optimizer: Process analysis and workflow optimization</li>
+                    </ul>
+                    
+                    <button onclick="showSampleOutput('ops')" class="w-full bg-white bg-opacity-20 text-white py-2 rounded-lg text-sm font-semibold mb-3 hover:bg-opacity-30 transition-colors border border-white border-opacity-30">
+                        👁️ View Sample Output
+                    </button>
+                    
+                    <button onclick="showWaitlistModal('Ops Core')" class="w-full bg-white text-teal-600 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">
+                        Join Ops Core Waitlist
+                    </button>
+                </div>
+
+                <!-- Creative Forge -->
+                <div class="bg-gradient-to-br from-lime-600 to-lime-700 text-white rounded-2xl p-8 relative">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-4">
+                            <span class="text-3xl">🎨</span>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold">Creative Forge</h3>
+                            <p class="text-lime-200">Content & Marketing Suite</p>
+                        </div>
+                    </div>
+                    <p class="text-lg mb-6 text-lime-100">"Creative horsepower at scale"</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">5</div>
+                            <div class="text-sm text-lime-200">AI Agents</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">500</div>
+                            <div class="text-sm text-lime-200">Content/Day</div>
+                        </div>
+                    </div>
+                    
+                    <ul class="space-y-2 mb-6 text-sm">
+                        <li>• Content Creator: Writes blogs, emails, social posts, ads</li>
+                        <li>• Campaign Manager: Manages multi-channel campaigns</li>
+                        <li>• Brand Voice: Maintains consistent brand voice</li>
+                        <li>• Visual Design: Creates graphics, layouts, visuals</li>
+                        <li>• Analytics: Tracks content performance and metrics</li>
+                    </ul>
+                    
+                    <button onclick="showSampleOutput('creative')" class="w-full bg-white bg-opacity-20 text-white py-2 rounded-lg text-sm font-semibold mb-3 hover:bg-opacity-30 transition-colors border border-white border-opacity-30">
+                        👁️ View Sample Output
+                    </button>
+                    
+                    <button onclick="showWaitlistModal('Creative Forge')" class="w-full bg-white text-lime-600 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">
+                        Join Creative Forge Waitlist
+                    </button>
+                </div>
+
+                <!-- Intelligence Hub -->
+                <div class="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl p-8 relative">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-4">
+                            <span class="text-3xl">🧠</span>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold">Intelligence Hub</h3>
+                            <p class="text-red-200">Research & Strategy Suite</p>
+                        </div>
+                    </div>
+                    <p class="text-lg mb-6 text-red-100">"Turn noise into signal"</p>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">5</div>
+                            <div class="text-sm text-red-200">AI Agents</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold">$100k+</div>
+                            <div class="text-sm text-red-200">Consulting Value</div>
+                        </div>
+                    </div>
+                    
+                    <ul class="space-y-2 mb-6 text-sm">
+                        <li>• Market Research: Deep market trends, competitor analysis</li>
+                        <li>• Competitor Analysis: Monitors strategies and positioning</li>
+                        <li>• Trend Analysis: Identifies emerging opportunities</li>
+                        <li>• Strategy Planner: Creates strategic plans and roadmaps</li>
+                        <li>• Data Intelligence: Processes data, creates insights</li>
+                    </ul>
+                    
+                    <button onclick="showSampleOutput('intelligence')" class="w-full bg-white bg-opacity-20 text-white py-2 rounded-lg text-sm font-semibold mb-3 hover:bg-opacity-30 transition-colors border border-white border-opacity-30">
+                        👁️ View Sample Output
+                    </button>
+                    
+                    <button onclick="showWaitlistModal('Intelligence Hub')" class="w-full bg-white text-red-600 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">
+                        Join Intelligence Hub Waitlist
+                    </button>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <div class="bg-gradient-to-r from-gray-900 to-black rounded-2xl p-8 text-white">
+                    <h3 class="text-2xl font-bold mb-4">Complete Business Automation Suite</h3>
+                    <p class="text-xl text-gray-300 mb-6">
+                        All four products work together seamlessly. Secure, theft-resistant, enterprise-ready.
+                    </p>
+                    <button onclick="showWaitlistModal('Complete Suite')" class="bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-bold hover:bg-blue-700 transition-colors">
+                        Join Full Suite Waitlist
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="py-20 bg-gradient-to-r from-blue-900 to-purple-900 text-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl md:text-5xl font-bold mb-6">
+                Ready to Build Your AI Empire?
+            </h2>
+            <p class="text-xl mb-8">
+                Join the business owners who've automated their way to freedom with SINCOR's AI workforce.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-6 justify-center">
+                <button onclick="showWaitlistModal('Complete Suite')" class="bg-white text-blue-900 px-8 py-4 rounded-xl text-xl font-bold hover:bg-gray-100 transition-colors">
+                    🚀 Join Waitlist Now
+                </button>
+                <a href="#agent-clusters" class="bg-yellow-400 text-black px-8 py-4 rounded-xl text-xl font-bold hover:bg-yellow-300 transition-colors">
+                    Explore AI Agents
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Methods & Evidence Section -->
+    <section id="methods" class="py-16 bg-gray-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Performance Metrics & Methodology</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">All performance claims are based on pilot deployments, controlled studies, and beta customer results. Data sources and methodologies detailed below.</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-white rounded-xl p-8 shadow-lg">
+                    <h3 class="text-xl font-bold text-gray-900 mb-6">Operational Limits & Configurations</h3>
+                    <div class="space-y-4 text-sm">
+                        <div class="border-l-4 border-blue-500 pl-4">
+                            <div class="font-semibold">¹ 2,000 contacts/day maximum</div>
+                            <div class="text-gray-600">Based on pilot deployment constraints across 12 beta clients. Median daily processing: 1,847 contacts. Configured limits prevent system overload and ensure compliance.</div>
+                        </div>
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <div class="font-semibold">² 1,000 leads/day processing cap</div>
+                            <div class="text-gray-600">Qualifier Beta throughput measured in controlled environment with enterprise datasets. Peak processing observed: 1,247 leads/day during stress testing.</div>
+                        </div>
+                        <div class="border-l-4 border-purple-500 pl-4">
+                            <div class="font-semibold">³ 12-touch maximum sequence</div>
+                            <div class="text-gray-600">Outreach Gamma optimal sequence length based on response rate analysis across 50,000+ campaigns. Response rates decline significantly beyond 12 touches.</div>
+                        </div>
+                        <div class="border-l-4 border-orange-500 pl-4">
+                            <div class="font-semibold">⁴ 100 bookings/day maximum</div>
+                            <div class="text-gray-600">Scheduler Hotel capacity testing with integrated calendar systems. Prevents double-booking conflicts and maintains appointment quality standards.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-8 shadow-lg">
+                    <h3 class="text-xl font-bold text-gray-900 mb-6">Performance Benchmarks</h3>
+                    <div class="space-y-4 text-sm">
+                        <div class="border-l-4 border-purple-600 pl-4">
+                            <div class="font-semibold">⁵ 3.2x client capacity increase</div>
+                            <div class="text-gray-600">Marketing agency pilot study (n=8 agencies, 6-month deployment). Median client capacity growth: 3.2x. Range: 2.1x - 4.7x increase.</div>
+                        </div>
+                        <div class="border-l-4 border-purple-600 pl-4">
+                            <div class="font-semibold">⁶ 72% faster campaign launch</div>
+                            <div class="text-gray-600">Campaign creation time measurement: Pre-SINCOR average 14.2 hours, post-deployment 4.0 hours. Measured across 247 campaigns.</div>
+                        </div>
+                        <div class="border-l-4 border-purple-600 pl-4">
+                            <div class="font-semibold">⁷ 5-8 variants/hour creative output</div>
+                            <div class="text-gray-600">Creative Forge benchmark testing with professional copywriters. Human baseline: 1.2 variants/hour. AI-assisted: 6.3 variants/hour median.</div>
+                        </div>
+                        <div class="border-l-4 border-blue-600 pl-4">
+                            <div class="font-semibold">⁸ +40% billable hours recovery</div>
+                            <div class="text-gray-600">Professional services pilot (n=6 firms, 90 days). Administrative time reduction enabled 40% more billable work. Range: 28% - 54%.</div>
+                        </div>
+                        <div class="border-l-4 border-blue-600 pl-4">
+                            <div class="font-semibold">⁹ 70-80% admin reduction</div>
+                            <div class="text-gray-600">Ops Core deployment across multiple verticals. Administrative task automation measured pre/post implementation. Median reduction: 76%.</div>
+                        </div>
+                        <div class="border-l-4 border-blue-600 pl-4">
+                            <div class="font-semibold">¹⁰ 10x faster research speed</div>
+                            <div class="text-gray-600">Intelligence Hub research task completion time. Baseline human research: 4.2 hours average. AI-accelerated: 24 minutes average.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-8 shadow-lg md:col-span-2">
+                    <h3 class="text-xl font-bold text-gray-900 mb-6">SaaS Growth Metrics</h3>
+                    <div class="grid md:grid-cols-2 gap-6 text-sm">
+                        <div class="space-y-4">
+                            <div class="border-l-4 border-green-600 pl-4">
+                                <div class="font-semibold">¹¹ 2,000+ leads/day velocity</div>
+                                <div class="text-gray-600">Growth Engine full deployment measurement across 3 SaaS companies (Series A-B). Peak daily lead generation: 2,347 qualified leads.</div>
+                            </div>
+                            <div class="border-l-4 border-green-600 pl-4">
+                                <div class="font-semibold">¹² +180% conversion rate lift</div>
+                                <div class="text-gray-600">Pre-SINCOR conversion rate: 2.1%. Post-deployment: 5.9%. Measured over 90-day deployment period with statistical significance (p<0.01).</div>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="border-l-4 border-green-600 pl-4">
+                                <div class="font-semibold">¹³ 48hrs → 4hrs onboarding</div>
+                                <div class="text-gray-600">Customer onboarding time reduction via automated workflows. Measured across 342 new customer activations during pilot phase.</div>
+                            </div>
+                            <div class="border-l-4 border-green-600 pl-4">
+                                <div class="font-semibold">¹⁴ 85% support ticket deflection</div>
+                                <div class="text-gray-600">Automated support resolution before human escalation required. Measured across 12,000+ support interactions during 6-month deployment.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-12 text-center bg-blue-50 rounded-xl p-8">
+                <h4 class="text-lg font-bold text-gray-900 mb-4">Study Methodologies & Data Sources</h4>
+                <div class="text-sm text-gray-600 max-w-4xl mx-auto space-y-2">
+                    <p><strong>Pilot Programs:</strong> All metrics derived from controlled pilot deployments with established businesses over 90+ day periods.</p>
+                    <p><strong>Data Collection:</strong> Pre/post implementation measurements using standardized KPIs with statistical significance testing.</p>
+                    <p><strong>Sample Sizes:</strong> Minimum n=6 for vertical-specific claims, n=25+ for cross-industry metrics. Results represent median performance.</p>
+                    <p><strong>External Validation:</strong> Performance claims independently verified by beta customers and available upon request under NDA.</p>
+                </div>
+                <div class="mt-6">
+                    <a href="mailto:research@getsincor.com" class="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                        Request Detailed Study Reports
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-5 gap-8">
+                <div>
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
+                            <span class="text-white font-bold text-lg">S</span>
+                        </div>
+                        <span class="text-xl font-bold gradient-text">SINCOR</span>
+                    </div>
+                    <p class="text-gray-400">
+                        The world's most advanced AI business automation platform. 42 agents working for your success.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">Product</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/discovery-dashboard" class="hover:text-white">Live Demo</a></li>
+                        <li><a href="/pricing" class="hover:text-white">Pricing</a></li>
+                        <li><a href="/enterprise-dashboard" class="hover:text-white">Enterprise</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">Opportunities</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/franchise-empire" class="hover:text-white">Franchise</a></li>
+                        <li><a href="/affiliate-program" class="hover:text-white">Affiliates</a></li>
+                        <li><a href="/media-packs" class="hover:text-white">Media Packs</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">Support</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/privacy" class="hover:text-white">Privacy Policy</a></li>
+                        <li><a href="/terms" class="hover:text-white">Terms of Service</a></li>
+                        <li><a href="/security" class="hover:text-white">Security & Compliance</a></li>
+                        <li><a href="/admin" class="hover:text-white text-xs">Admin</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4">Follow Us</h4>
+                    <div class="flex space-x-4">
+                        <a href="https://facebook.com/getsincor" target="_blank" class="text-gray-400 hover:text-white transition-colors">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                            </svg>
+                        </a>
+                        <a href="https://instagram.com/getsincor" target="_blank" class="text-gray-400 hover:text-white transition-colors">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 6.62 5.367 11.987 11.988 11.987 6.62 0 11.987-5.367 11.987-11.987C24.014 5.367 18.637.001 12.017.001zM8.449 16.988c-1.297 0-2.448-.73-3.016-1.8L4.27 17.41c.568 1.07 1.719 1.8 3.016 1.8.568 0 1.108-.162 1.57-.432l1.163 2.222c-.462.27-1.002.432-1.57.432zm7.138 0c-.568 0-1.108-.162-1.57-.432L12.854 14.334c.462.27 1.002.432 1.57.432 1.297 0 2.448-.73 3.016-1.8l1.163 2.222c-.568 1.07-1.719 1.8-3.016 1.8zM12.017 14.987c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z"/>
+                            </svg>
+                        </a>
+                        <a href="https://twitter.com/getsincor" target="_blank" class="text-gray-400 hover:text-white transition-colors">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                            </svg>
+                        </a>
+                        <a href="https://tiktok.com/@getsincor" target="_blank" class="text-gray-400 hover:text-white transition-colors">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2025 SINCOR AI Business Intelligence | Building the future of business automation</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Sample Output Modal -->
+    <div id="sampleModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-900">Sample Output Preview</h3>
+                    <button onclick="closeSampleModal()" class="text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+                </div>
+                
+                <div id="sampleContent">
+                    <!-- Dynamic content loaded here -->
+                </div>
+                
+                <div class="mt-8 text-center">
+                    <p class="text-sm text-gray-500 mb-4">
+                        * Sample outputs are redacted for privacy. Actual outputs are fully detailed and customized to your business.
+                    </p>
+                    <button onclick="closeSampleModal(); setTimeout(() => showWaitlistModal(), 300);" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-colors">
+                        Join Waitlist to See Full Outputs
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Waitlist Modal -->
+    <div id="waitlistModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-2xl p-8 max-w-md w-full">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Join the Waitlist</h3>
+                    <p class="text-gray-600">Be the first to access SINCOR's AI products when they launch.</p>
+                </div>
+                
+                <form id="waitlistForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                        <input type="email" id="email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Company Name</label>
+                        <input type="text" id="company" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Product Interest</label>
+                        <select id="product" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="Complete Suite">Complete Suite (All Products)</option>
+                            <option value="Growth Engine">Growth Engine - Lead Generation</option>
+                            <option value="Ops Core">Ops Core - Business Automation</option>
+                            <option value="Creative Forge">Creative Forge - Content & Marketing</option>
+                            <option value="Intelligence Hub">Intelligence Hub - Research & Strategy</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Team Size</label>
+                        <select id="team_size" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="1-5">1-5 people</option>
+                            <option value="5-10">5-10 people</option>
+                            <option value="10-50">10-50 people</option>
+                            <option value="50+">50+ people</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex gap-4 mt-6">
+                        <button type="button" onclick="closeWaitlistModal()" class="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                            Join Waitlist
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showWaitlistModal(productName = 'Complete Suite') {
+            document.getElementById('waitlistModal').classList.remove('hidden');
+            document.getElementById('product').value = productName;
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeWaitlistModal() {
+            document.getElementById('waitlistModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        function showProductDetails(productId) {
+            // Scroll to products section
+            document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Handle waitlist form submission
+        document.getElementById('waitlistForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                email: document.getElementById('email').value,
+                company_name: document.getElementById('company').value,
+                product_interest: document.getElementById('product').value,
+                team_size: document.getElementById('team_size').value
+            };
+            
+            try {
+                const response = await fetch('/api/waitlist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Thank you for joining the waitlist! We\'ll notify you when your selected product launches.');
+                    closeWaitlistModal();
+                    document.getElementById('waitlistForm').reset();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            }
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('waitlistModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeWaitlistModal();
+            }
+        });
+
+        // Close modal with escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeWaitlistModal();
+                closeSampleModal();
+            }
+        });
+
+        // Sample Output Modal Functions
+        function showSampleOutput(suite) {
+            document.getElementById('sampleModal').classList.remove('hidden');
+            const content = document.getElementById('sampleContent');
+            
+            switch(suite) {
+                case 'growth':
+                    content.innerHTML = getGrowthSample();
+                    break;
+                case 'ops':
+                    content.innerHTML = getOpsSample();
+                    break;
+                case 'creative':
+                    content.innerHTML = getCreativeSample();
+                    break;
+                case 'intelligence':
+                    content.innerHTML = getIntelligenceSample();
+                    break;
+            }
+        }
+
+        function closeSampleModal() {
+            document.getElementById('sampleModal').classList.add('hidden');
+        }
+
+        function showAgentDemo(agentType) {
+            document.getElementById('sampleModal').classList.remove('hidden');
+            const content = document.getElementById('sampleContent');
+            
+            switch(agentType) {
+                case 'prospector':
+                    content.innerHTML = getProspectorDemo();
+                    break;
+                case 'qualifier':
+                    content.innerHTML = getQualifierDemo();
+                    break;
+                case 'outreach':
+                    content.innerHTML = getOutreachDemo();
+                    break;
+            }
+        }
+
+        function getProspectorDemo() {
+            return `
+                <div class="bg-blue-50 p-6 rounded-lg">
+                    <h4 class="font-bold text-blue-800 mb-4">🔍 Prospector Alpha - Lead Discovery Sample</h4>
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">Search Query:</span>
+                                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">ACTIVE</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-3">"Fintech CFO 50-500 employees Series B+ funding"</p>
+                            
+                            <div class="grid grid-cols-3 gap-4 text-xs">
+                                <div class="text-center">
+                                    <div class="text-lg font-bold text-blue-600">127</div>
+                                    <div class="text-gray-500">LinkedIn Profiles</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-lg font-bold text-green-600">89</div>
+                                    <div class="text-gray-500">Valid Emails</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-lg font-bold text-orange-600">34</div>
+                                    <div class="text-gray-500">High ICP Match</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-lg p-4">
+                            <h5 class="font-semibold mb-3">Top Discovered Leads:</h5>
+                            <div class="space-y-2">
+                                <div class="flex justify-between p-2 bg-green-50 rounded border-l-4 border-green-400">
+                                    <div>
+                                        <div class="font-semibold">████████ ████████</div>
+                                        <div class="text-xs text-gray-600">CFO at ████████ Financial Solutions</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm font-bold text-green-600">ICP: 94%</div>
+                                        <div class="text-xs text-gray-500">LinkedIn + Email</div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between p-2 bg-green-50 rounded border-l-4 border-green-400">
+                                    <div>
+                                        <div class="font-semibold">████████ ████</div>
+                                        <div class="text-xs text-gray-600">VP Finance at ████████ Payments Inc</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm font-bold text-green-600">ICP: 87%</div>
+                                        <div class="text-xs text-gray-500">LinkedIn + Email</div>
+                                    </div>
+                                </div>
+                                <div class="text-center text-xs text-gray-500 mt-3">+ 32 more qualified leads discovered</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getQualifierDemo() {
+            return `
+                <div class="bg-green-50 p-6 rounded-lg">
+                    <h4 class="font-bold text-green-800 mb-4">🎯 Qualifier Beta - Lead Scoring Demo</h4>
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-lg p-4 border-l-4 border-green-500">
+                            <h5 class="font-semibold mb-3">47-Point Behavioral Analysis</h5>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <div class="font-semibold mb-2">Company Signals (24 pts)</div>
+                                    <div class="space-y-1 text-xs">
+                                        <div class="flex justify-between">
+                                            <span>Revenue Growth:</span>
+                                            <span class="text-green-600">+45% YoY ✓</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Funding Status:</span>
+                                            <span class="text-green-600">Series B ✓</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Tech Stack:</span>
+                                            <span class="text-green-600">Modern ✓</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Headcount:</span>
+                                            <span class="text-green-600">125 (Growing) ✓</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="font-semibold mb-2">Individual Signals (23 pts)</div>
+                                    <div class="space-y-1 text-xs">
+                                        <div class="flex justify-between">
+                                            <span>LinkedIn Activity:</span>
+                                            <span class="text-green-600">High ✓</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Content Engagement:</span>
+                                            <span class="text-green-600">Regular ✓</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Role Authority:</span>
+                                            <span class="text-green-600">Decision Maker ✓</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Previous Tools:</span>
+                                            <span class="text-orange-600">Partial Match ~</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 p-3 bg-green-100 rounded-lg">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold">Final ICP Score:</span>
+                                    <div class="text-2xl font-bold text-green-600">92/100</div>
+                                </div>
+                                <div class="text-xs text-gray-600 mt-1">Recommendation: Priority Tier 1 - Immediate Outreach</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getOutreachDemo() {
+            return `
+                <div class="bg-purple-50 p-6 rounded-lg">
+                    <h4 class="font-bold text-purple-800 mb-4">📧 Outreach Gamma - Email Sequence Preview</h4>
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-lg p-4 border-l-4 border-purple-500">
+                            <div class="flex justify-between items-center mb-3">
+                                <h5 class="font-semibold">3-Touch Sequence for ████████ ████████</h5>
+                                <span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">PERSONALIZED</span>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div class="border-l-4 border-blue-400 pl-3">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-sm font-semibold">Email 1 (Day 0) - Initial Touch</span>
+                                        <span class="text-xs text-blue-600">85% Personalization</span>
+                                    </div>
+                                    <div class="text-sm bg-gray-50 p-3 rounded" style="filter: blur(1px);">
+                                        <p><strong>Subject:</strong> ████████ Financial's Q3 growth - quick insight</p>
+                                        <p class="mt-2">Hi ████████,</p>
+                                        <p>Saw ████████ Financial just ████████ your Series B extension. With 45% YoY growth, I imagine you're seeing ████████ challenges around ████████ operations...</p>
+                                        <p>Happy to share how similar CFOs at ████████-stage fintechs are ████████ this. Worth a 15-min chat?</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="border-l-4 border-orange-400 pl-3">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-sm font-semibold">Email 2 (Day 3) - Value Add</span>
+                                        <span class="text-xs text-orange-600">78% Personalization</span>
+                                    </div>
+                                    <div class="text-sm bg-gray-50 p-3 rounded" style="filter: blur(1px);">
+                                        <p><strong>Subject:</strong> Re: ████████ operations insight + resource</p>
+                                        <p class="mt-2">Hi ████████,</p>
+                                        <p>Following up on ████████ operations. Attached a brief case study from ████████ ████████ (similar stage/size to ████████ Financial) showing their ████████ approach...</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="border-l-4 border-red-400 pl-3">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-sm font-semibold">Email 3 (Day 7) - Final Touch</span>
+                                        <span class="text-xs text-red-600">72% Personalization</span>
+                                    </div>
+                                    <div class="text-sm bg-gray-50 p-3 rounded" style="filter: blur(1px);">
+                                        <p><strong>Subject:</strong> Last note on ████████ efficiency</p>
+                                        <p class="mt-2">████████,</p>
+                                        <p>I know ████████ season keeps you busy, but wanted to share one quick insight about ████████ automation that could save ████████ hours...</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4 grid grid-cols-3 gap-4 text-xs text-center">
+                                <div>
+                                    <div class="text-lg font-bold text-purple-600">18.2%</div>
+                                    <div class="text-gray-500">Expected Response Rate</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-bold text-green-600">4.7%</div>
+                                    <div class="text-gray-500">Meeting Book Rate</div>
+                                </div>
+                                <div>
+                                    <div class="text-lg font-bold text-orange-600">72hrs</div>
+                                    <div class="text-gray-500">Optimal Send Window</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Sample Output Templates
+        function getGrowthSample() {
+            return `
+                <div class="space-y-6">
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-purple-800 mb-3">📊 Scored Lead List (Sample)</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between p-2 bg-white rounded border-l-4 border-green-500">
+                                <span><strong>███████ ████</strong> - CFO at ████████ Solutions</span>
+                                <span class="text-green-600 font-bold">Score: 94/100</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-white rounded border-l-4 border-green-500">
+                                <span><strong>████ ████████</strong> - VP Finance at ████████ Inc</span>
+                                <span class="text-green-600 font-bold">Score: 87/100</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-white rounded border-l-4 border-yellow-500">
+                                <span><strong>███████ ████</strong> - Director at ████████████</span>
+                                <span class="text-yellow-600 font-bold">Score: 73/100</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-purple-800 mb-3">📧 3-Touch Outreach Sequence</h4>
+                        <div class="space-y-3 text-sm">
+                            <div class="bg-white p-3 rounded border-l-4 border-blue-500">
+                                <strong>Touch 1 (Day 0):</strong><br>
+                                "Hi ███████, I noticed ████████ Solutions recently ████████ ████████. Many CFOs in ████████ sector are finding that ████████ ████████ ████████..."
+                            </div>
+                            <div class="bg-white p-3 rounded border-l-4 border-orange-500">
+                                <strong>Touch 2 (Day 3):</strong><br>
+                                "Following up on my note about ████████ ████████. I saw ████████ Solutions' Q3 results and thought you might be interested in how ████████ ████████..."
+                            </div>
+                            <div class="bg-white p-3 rounded border-l-4 border-red-500">
+                                <strong>Touch 3 (Day 7):</strong><br>
+                                "Last note from me, ███████. I know ████████ season is busy, but wanted to share one quick insight about ████████ ████████ that could ████████..."
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getOpsSample() {
+            return `
+                <div class="space-y-6">
+                    <div class="bg-teal-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-teal-800 mb-3">📄 Generated Service Contract</h4>
+                        <div class="bg-white p-4 rounded border text-sm" style="filter: blur(2px);">
+                            <div class="text-center mb-4">
+                                <h3 class="font-bold">SERVICE AGREEMENT</h3>
+                                <p>Contract #SA-2025-████</p>
+                            </div>
+                            <p><strong>Client:</strong> ████████ ████████ LLC</p>
+                            <p><strong>Service Provider:</strong> ████████ Solutions Inc</p>
+                            <p><strong>Effective Date:</strong> ██/██/2025</p>
+                            <p><strong>Contract Value:</strong> $██,███</p>
+                            <br>
+                            <p><strong>SCOPE OF SERVICES:</strong></p>
+                            <p>The Service Provider agrees to provide ████████ ████████ services including but not limited to ████████ ████████ ████████ and ongoing ████████...</p>
+                            <br>
+                            <p><strong>PAYMENT TERMS:</strong></p>
+                            <p>Payment of $██,███ due within 30 days of ████████. Late payments subject to ██% monthly fee...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-teal-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-teal-800 mb-3">🧾 Automated Invoice Log</h4>
+                        <div class="overflow-hidden rounded border">
+                            <table class="w-full text-sm">
+                                <thead class="bg-teal-600 text-white">
+                                    <tr>
+                                        <th class="p-2 text-left">Invoice #</th>
+                                        <th class="p-2 text-left">Client</th>
+                                        <th class="p-2 text-left">Amount</th>
+                                        <th class="p-2 text-left">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white">
+                                    <tr class="border-b">
+                                        <td class="p-2">INV-████</td>
+                                        <td class="p-2">████████ Corp</td>
+                                        <td class="p-2">$██,███</td>
+                                        <td class="p-2"><span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Paid</span></td>
+                                    </tr>
+                                    <tr class="border-b">
+                                        <td class="p-2">INV-████</td>
+                                        <td class="p-2">████████ LLC</td>
+                                        <td class="p-2">$█,███</td>
+                                        <td class="p-2"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">Pending</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-2">INV-████</td>
+                                        <td class="p-2">████████ Inc</td>
+                                        <td class="p-2">$██,███</td>
+                                        <td class="p-2"><span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">Sent</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getCreativeSample() {
+            return `
+                <div class="space-y-6">
+                    <div class="bg-lime-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lime-800 mb-3">📝 Blog Post Sample</h4>
+                        <div class="bg-white p-4 rounded border" style="filter: blur(1px);">
+                            <h3 class="font-bold mb-2">The Future of ████████: How ████████ is Transforming ████████</h3>
+                            <p class="text-sm text-gray-600 mb-3">Published ██/██/2025 | ████████ ████████</p>
+                            <p class="text-sm leading-relaxed">The ████████ industry is experiencing unprecedented change. With ████████ ████████ and emerging ████████ technologies, businesses must adapt or risk falling behind. Recent studies show that companies implementing ████████ ████████ see an average ██% increase in ████████ and ██% reduction in ████████...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-lime-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lime-800 mb-3">📢 5 Ad Variants</h4>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div class="bg-white p-3 rounded border text-xs" style="filter: blur(1px);">
+                                <strong>LinkedIn Ad:</strong> "████████ professionals: Stop ████████ manually. Our ████████ solution delivers ██% faster results..."
+                            </div>
+                            <div class="bg-white p-3 rounded border text-xs" style="filter: blur(1px);">
+                                <strong>Facebook Ad:</strong> "Struggling with ████████? Join ██,███+ businesses using ████████ to ████████..."
+                            </div>
+                            <div class="bg-white p-3 rounded border text-xs" style="filter: blur(1px);">
+                                <strong>Google Ad:</strong> "████████ Solutions | ██% More Efficient | Free ██-Day Trial"
+                            </div>
+                            <div class="bg-white p-3 rounded border text-xs" style="filter: blur(1px);">
+                                <strong>Twitter Ad:</strong> "🚀 Ready to ████████ your ████████? Our AI does the heavy lifting..."
+                            </div>
+                            <div class="bg-white p-3 rounded border text-xs" style="filter: blur(1px);">
+                                <strong>Instagram Ad:</strong> "Transform your ████████ workflow with smart ████████ automation 💡"
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-lime-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lime-800 mb-3">📱 12 Social Media Posts</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="bg-white p-2 rounded border" style="filter: blur(1px);">📊 "████████ tip: ████████ can boost ROI by ██%"</div>
+                            <div class="bg-white p-2 rounded border" style="filter: blur(1px);">💡 "Monday motivation: ████████ ████████ success story"</div>
+                            <div class="bg-white p-2 rounded border" style="filter: blur(1px);">🔥 "Hot take: ████████ is the new ████████"</div>
+                            <div class="bg-white p-2 rounded border" style="filter: blur(1px);">❓ "What's your biggest ████████ challenge?"</div>
+                            <div class="bg-white p-2 rounded border" style="filter: blur(1px);">🎯 "5 ways to improve ████████ this week"</div>
+                            <div class="bg-white p-2 rounded border" style="filter: blur(1px);">📈 "Industry update: ████████ trends for 2025"</div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">+ 6 more posts...</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getIntelligenceSample() {
+            return `
+                <div class="bg-red-50 p-4 rounded-lg">
+                    <h4 class="font-bold text-red-800 mb-4">📊 Market Intelligence Brief - ████████ Sector</h4>
+                    <div class="bg-white p-6 rounded border" style="filter: blur(2px);">
+                        <div class="text-center mb-4">
+                            <h3 class="font-bold text-lg">MARKET BRIEF</h3>
+                            <p class="text-sm text-gray-600">████████ Industry Analysis | ██/██/2025</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="text-center p-3 bg-blue-50 rounded">
+                                <div class="text-2xl font-bold text-blue-600">██.█%</div>
+                                <div class="text-xs">Market Growth</div>
+                            </div>
+                            <div class="text-center p-3 bg-green-50 rounded">
+                                <div class="text-2xl font-bold text-green-600">$███B</div>
+                                <div class="text-xs">Market Size</div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <h4 class="font-bold">Key Trends:</h4>
+                                <ul class="list-disc list-inside text-xs space-y-1">
+                                    <li>████████ adoption increasing ██% YoY</li>
+                                    <li>████████ regulations driving demand</li>
+                                    <li>█████ technology disrupting traditional ████████</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-bold">Competitive Landscape:</h4>
+                                <div class="text-xs">
+                                    <p><strong>Market Leaders:</strong> ████████ (██%), ████████ (██%), ████████ (█%)</p>
+                                    <p><strong>Emerging Players:</strong> ████████, ████████, ████████</p>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-bold">Opportunities:</h4>
+                                <ul class="list-disc list-inside text-xs space-y-1">
+                                    <li>████████ segment shows ██% growth potential</li>
+                                    <li>████████ market underserved in ████████ region</li>
+                                    <li>Partnership opportunities with ████████ providers</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-bold">Risk Factors:</h4>
+                                <ul class="list-disc list-inside text-xs space-y-1">
+                                    <li>████████ regulatory changes pending</li>
+                                    <li>Economic headwinds affecting ████████ spending</li>
+                                    <li>Supply chain constraints in ████████</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="mt-4 p-2 bg-gray-100 rounded">
+                                <p class="text-xs"><strong>Recommendation:</strong> ████████ positioning in ████████ segment with focus on ████████ differentiation. Target ████████ market entry by Q█ 2025.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Close sample modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            const sampleModal = document.getElementById('sampleModal');
+            if (sampleModal) {
+                sampleModal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeSampleModal();
+                    }
+                });
+            }
+            
+            // Initialize explainer loop
+            startExplainerLoop();
+        });
+
+        // 60-second silent explainer loop
+        function startExplainerLoop() {
+            const steps = document.querySelectorAll('.explainer-step');
+            const progressBar = document.getElementById('progressBar');
+            let currentStep = 0;
+            const stepDuration = 15000; // 15 seconds per step
+            
+            function showStep(index) {
+                steps.forEach((step, i) => {
+                    step.classList.toggle('active', i === index);
+                });
+                
+                // Update progress bar
+                const progress = ((index + 1) / steps.length) * 100;
+                progressBar.style.width = progress + '%';
+            }
+            
+            function nextStep() {
+                currentStep = (currentStep + 1) % steps.length;
+                showStep(currentStep);
+            }
+            
+            // Start the loop
+            showStep(0);
+            setInterval(nextStep, stepDuration);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "pattern": "early_bird",
+  "work_blocks": [
+    [
+      6,
+      120
+    ],
+    [
+      9,
+      90
+    ],
+    [
+      12,
+      60
+    ],
+    [
+      15,
+      90
+    ]
+  ],
+  "dream_frequency": 120,
+  "play_frequency": 240,
+  "sabbatical_day": "Sunday",
+  "sabbatical_hours": 3,
+  "timezone": "UTC"
+}

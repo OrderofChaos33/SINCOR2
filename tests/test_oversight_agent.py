@@ -14,11 +14,20 @@ class TestOversightAgent:
     @pytest.fixture
     def temp_log_path(self):
         """Create a temporary log file path."""
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            yield Path(tmp.name)
-            # Clean up
-            if Path(tmp.name).exists():
-                Path(tmp.name).unlink()
+        import os, time as _time
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        try:
+            yield Path(path)
+        finally:
+            # Try to remove file with retries (Windows can hold handles briefly)
+            for _ in range(5):
+                try:
+                    if Path(path).exists():
+                        Path(path).unlink()
+                    break
+                except PermissionError:
+                    _time.sleep(0.05)
     
     def test_agent_initialization(self, temp_log_path):
         """Test agent initializes correctly."""
@@ -116,8 +125,9 @@ class TestOversightAgent:
     
     def test_check_log_writable_failure(self):
         """Test log writable check when it fails."""
-        # Use a path that should fail (directory that doesn't exist and can't be created)
-        invalid_path = "/nonexistent/path/that/should/fail.log"
+        # Use a directory path which will fail to be opened as a file
+        import tempfile
+        invalid_path = tempfile.gettempdir()
         agent = OversightAgent(log_path=invalid_path)
         
         result = agent._check_log_writable()

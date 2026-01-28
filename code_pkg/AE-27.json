@@ -1,0 +1,10 @@
+﻿{
+  "id": "AE-27",
+  "title": "Node Licensing (City/Vertical)",
+  "services": ["node_kit_builder","license_manager","onboarding_flow","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/node/kit.zip","output/node/license.json","output/node/onboarding.json"],
+  "transaction": {"mode":"license_plus_revshare","provider":"stripe","product":"node_license"},
+  "kpis": ["kit_ready","license_issued","onboarding_ready","payment_success"]
+}

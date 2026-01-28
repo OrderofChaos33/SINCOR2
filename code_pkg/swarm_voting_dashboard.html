@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Swarm Intelligence Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #00d4ff;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #00d4ff, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .god-mode-indicator {
+            background: linear-gradient(45deg, #ff6b6b, #ffd700);
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: bold;
+            animation: pulse-glow 2s infinite;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 107, 107, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .panel h2 {
+            margin-bottom: 15px;
+            color: #00d4ff;
+            font-size: 1.4rem;
+        }
+        
+        .swarm-status {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .status-card {
+            background: rgba(0, 212, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .status-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .status-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .decision-item {
+            background: rgba(255, 255, 255, 0.03);
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #00d4ff;
+        }
+        
+        .decision-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .decision-type {
+            background: #00d4ff;
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .vote-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .vote-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .vote-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .vote-btn.agree {
+            background: linear-gradient(45deg, #4CAF50, #81C784);
+        }
+        
+        .vote-btn.disagree {
+            background: linear-gradient(45deg, #f44336, #e57373);
+        }
+        
+        .goal-item {
+            background: rgba(255, 255, 255, 0.03);
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #ff6b6b;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #ff6b6b);
+            transition: width 0.5s ease;
+        }
+        
+        .god-controls {
+            background: linear-gradient(135deg, #ff6b6b, #ffd700);
+            color: #000;
+        }
+        
+        .god-controls h2 {
+            color: #000;
+        }
+        
+        .control-group {
+            margin: 15px 0;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+        }
+        
+        .god-btn {
+            background: linear-gradient(45deg, #000, #333);
+            color: #ffd700;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        
+        .god-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .votes-list {
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .vote-item {
+            background: rgba(255, 255, 255, 0.05);
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .consensus-indicator {
+            float: right;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        .consensus-reached {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .consensus-pending {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .auto-scroll {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .time-remaining {
+            color: #ff6b6b;
+            font-size: 0.9rem;
+        }
+        
+        .priority-badge {
+            background: #ffd700;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SINCOR Swarm Intelligence</h1>
+        <div class="god-mode-indicator">GOD MODE ACTIVE</div>
+        <p>Democratic Agent Lifecycle Management</p>
+    </div>
+    
+    <div class="dashboard">
+        <!-- Swarm Status Overview -->
+        <div class="panel swarm-status">
+            <div class="status-card">
+                <div class="status-value" id="active-decisions">0</div>
+                <div class="status-label">Active Decisions</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="active-goals">0</div>
+                <div class="status-label">Active Goals</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="consensus-rate">0%</div>
+                <div class="status-label">Consensus Rate</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="swarm-health">OPTIMAL</div>
+                <div class="status-label">Swarm Health</div>
+            </div>
+            <div class="status-card">
+                <div class="status-value" id="total-agents">0</div>
+                <div class="status-label">Agents in Swarm</div>
+            </div>
+        </div>
+        
+        <!-- Active Decisions -->
+        <div class="panel">
+            <h2>Swarm Decisions</h2>
+            <div class="auto-scroll" id="decisions-list">
+                <div style="opacity: 0.5; text-align: center; padding: 20px;">
+                    No active decisions
+                </div>
+            </div>
+        </div>
+        
+        <!-- Active Goals -->
+        <div class="panel">
+            <h2>Goal Tracking</h2>
+            <div class="auto-scroll" id="goals-list">
+                <div style="opacity: 0.5; text-align: center; padding: 20px;">
+                    No active goals
+                </div>
+            </div>
+        </div>
+        
+        <!-- God Mode Controls -->
+        <div class="panel god-controls">
+            <h2>God Mode Controls</h2>
+            
+            <div class="control-group">
+                <label>Instant Agent Scaling</label>
+                <input type="number" id="scale-count" placeholder="Number of agents" min="1" max="1000" value="5">
+                <select id="scale-task-type">
+                    <option value="general">General Tasks</option>
+                    <option value="lead_generation">Lead Generation</option>
+                    <option value="data_processing">Data Processing</option>
+                    <option value="analysis">Analysis</option>
+                    <option value="emergency">Emergency Response</option>
+                </select>
+                <button class="god-btn" onclick="godModeScale()">SPAWN AGENTS</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Create Goal</label>
+                <input type="number" id="goal-target" placeholder="Target (e.g., 50 leads)" min="1" value="50">
+                <input type="number" id="goal-days" placeholder="Days to deadline" min="1" max="30" value="3">
+                <button class="god-btn" onclick="createGoal()">CREATE GOAL</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Emergency Actions</label>
+                <button class="god-btn" onclick="emergencyScale()">EMERGENCY SCALE</button>
+                <button class="god-btn" onclick="swarmReset()">SWARM RESET</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Socket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to swarm intelligence dashboard');
+        });
+        
+        socket.on('swarm_update', function(data) {
+            updateSwarmStatus(data.swarm_status);
+            updateDecisionsList(data.active_decisions);
+            updateGoalsList(data.active_goals);
+        });
+        
+        function updateSwarmStatus(status) {
+            document.getElementById('active-decisions').textContent = status.active_decisions || 0;
+            document.getElementById('active-goals').textContent = status.active_goals || 0;
+            document.getElementById('consensus-rate').textContent = 
+                Math.round((status.consensus_rate || 0) * 100) + '%';
+            document.getElementById('swarm-health').textContent = status.swarm_intelligence_health || 'UNKNOWN';
+            document.getElementById('total-agents').textContent = status.total_agents_in_swarm || 0;
+        }
+        
+        function updateDecisionsList(decisions) {
+            const container = document.getElementById('decisions-list');
+            
+            if (Object.keys(decisions).length === 0) {
+                container.innerHTML = '<div style="opacity: 0.5; text-align: center; padding: 20px;">No active decisions</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const [decisionId, decision] of Object.entries(decisions)) {
+                const consensusClass = decision.consensus_reached ? 'consensus-reached' : 'consensus-pending';
+                const consensusText = decision.consensus_reached ? 'CONSENSUS' : `${decision.vote_count} VOTES`;
+                
+                html += `
+                    <div class="decision-item">
+                        <div class="decision-header">
+                            <div class="decision-type">${decision.decision_type}</div>
+                            <div class="consensus-indicator ${consensusClass}">${consensusText}</div>
+                        </div>
+                        <div><strong>Proposal:</strong> ${JSON.stringify(decision.proposal)}</div>
+                        <div><strong>Status:</strong> ${decision.execution_status}</div>
+                        
+                        ${!decision.consensus_reached ? `
+                            <div class="vote-buttons">
+                                <button class="vote-btn agree" onclick="simulateVote('${decisionId}', 1, 0.8)">
+                                    AGREE
+                                </button>
+                                <button class="vote-btn disagree" onclick="simulateVote('${decisionId}', -1, 0.8)">
+                                    DISAGREE
+                                </button>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="votes-list">
+                            ${decision.votes.map(vote => `
+                                <div class="vote-item">
+                                    <span>Agent ${vote.agent_id}</span>
+                                    <span>Vote: ${vote.vote_type} (${Math.round(vote.confidence * 100)}%)</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        function updateGoalsList(goals) {
+            const container = document.getElementById('goals-list');
+            
+            if (Object.keys(goals).length === 0) {
+                container.innerHTML = '<div style="opacity: 0.5; text-align: center; padding: 20px;">No active goals</div>';
+                return;
+            }
+            
+            let html = '';
+            for (const [goalId, goal] of Object.entries(goals)) {
+                const timeRemaining = Math.max(0, Math.round(goal.time_remaining_hours));
+                const progressWidth = Math.min(100, goal.progress_percentage);
+                
+                html += `
+                    <div class="goal-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>${goal.description}</strong>
+                            <div class="priority-badge">P${goal.priority}</div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progressWidth}%"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                            <span>${goal.current_progress} / ${goal.target_value}</span>
+                            <span class="time-remaining">${timeRemaining}h remaining</span>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <button class="vote-btn" onclick="updateProgress('${goalId}', ${goal.current_progress + 5})">
+                                +5 Progress
+                            </button>
+                            <button class="vote-btn" onclick="updateProgress('${goalId}', ${goal.current_progress + 10})">
+                                +10 Progress
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        function simulateVote(decisionId, voteType, confidence) {
+            const agentId = `agent_${Math.floor(Math.random() * 42) + 1}`;
+            const reasoning = voteType > 0 ? "Supporting this decision for swarm efficiency" : "Concerns about resource allocation";
+            
+            socket.emit('simulate_agent_vote', {
+                agent_id: agentId,
+                decision_id: decisionId,
+                vote_type: voteType,
+                confidence: confidence,
+                reasoning: reasoning
+            });
+        }
+        
+        function godModeScale() {
+            const agentCount = parseInt(document.getElementById('scale-count').value) || 5;
+            const taskType = document.getElementById('scale-task-type').value;
+            
+            fetch('/api/god/scale', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    agent_count: agentCount,
+                    task_type: taskType,
+                    reasoning: `God mode scaling: ${agentCount} agents for ${taskType}`
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('God mode scaling initiated:', data);
+            });
+        }
+        
+        function createGoal() {
+            const targetLeads = parseInt(document.getElementById('goal-target').value) || 50;
+            const deadlineDays = parseInt(document.getElementById('goal-days').value) || 3;
+            
+            fetch('/api/goal/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    target_leads: targetLeads,
+                    deadline_days: deadlineDays
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Goal created:', data);
+            });
+        }
+        
+        function updateProgress(goalId, newProgress) {
+            fetch(`/api/goal/${goalId}/progress`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    current_progress: newProgress
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Progress updated:', data);
+            });
+        }
+        
+        function emergencyScale() {
+            if (confirm('Emergency scale will spawn 100 agents immediately. Continue?')) {
+                godModeScale();
+                document.getElementById('scale-count').value = 100;
+                document.getElementById('scale-task-type').value = 'emergency';
+                godModeScale();
+            }
+        }
+        
+        function swarmReset() {
+            if (confirm('This will reset all swarm decisions. Continue?')) {
+                console.log('Swarm reset initiated');
+                // Implementation would go here
+            }
+        }
+    </script>
+</body>
+</html>

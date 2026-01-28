@@ -1,0 +1,10 @@
+﻿{
+  "id": "MP-02",
+  "title": "MediaPack + 7-Day Ad Sprint",
+  "services": ["media_pack_gen","ads_config_builder","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/pack.zip","output/adset_config.json","output/asset_links.json"],
+  "transaction": {"mode":"one-time","provider":"stripe","product":"mediapack_sprint"},
+  "kpis": ["pack_generated","adset_config_ready","email_sent","payment_success"]
+}

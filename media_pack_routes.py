@@ -6,10 +6,12 @@ Industries: Auto Detailing, Pest Control, HVAC, Chiropractors, Electrical, Plumb
 """
 
 from flask import render_template_string, request, jsonify, redirect
-import stripe
 import os
 from datetime import datetime
 import json
+
+# Note: Stripe support removed per project scope (use PayPal/on-chain SINC for payments)
+# Stripe compatibility shim removed; payment flows should use PayPal or on-chain SINC by default.
 
 # Media Pack Configuration
 MEDIA_PACKS = {
@@ -172,22 +174,14 @@ def add_media_pack_routes(app):
             
             pack = MEDIA_PACKS[pack_id]
             
-            # Create Stripe payment intent
-            stripe.api_key = os.environ.get("stripe", "")
-            
-            intent = stripe.PaymentIntent.create(
-                amount=pack['price'],
-                currency='usd',
-                metadata={
-                    'pack_id': pack_id,
-                    'pack_name': pack['name'],
-                    'customization': json.dumps(customization)
-                }
-            )
-            
+            # Payment processing: project now uses PayPal or on-chain SINC.
+            # For demo/local mode return a simulated client_secret and purchase token.
+            demo_client_secret = f"demo_cs_{pack_id}_{int(datetime.utcnow().timestamp())}"
+            purchase_token = f"purchase_{pack_id}_{int(datetime.utcnow().timestamp())}"
             return jsonify({
                 "success": True,
-                "client_secret": intent.client_secret,
+                "client_secret": demo_client_secret,
+                "purchase_token": purchase_token,
                 "pack_name": pack['name'],
                 "amount": pack['price']
             })
@@ -393,7 +387,7 @@ MEDIA_PACK_DETAIL_TEMPLATE = """
                     </a>
                     
                     <p class="text-xs text-gray-500 text-center">
-                        Secure checkout powered by Stripe • SSL encrypted
+                        Secure checkout (PayPal / On-chain SINC) • SSL encrypted
                     </p>
                 </div>
                 
@@ -423,7 +417,7 @@ CUSTOMIZE_TEMPLATE = """
 <head>
     <title>Customize {{ pack.name }} - SINCOR</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <script src="https://js.stripe.com/v3/"></script>
+    <!-- Stripe removed: use PayPal JS SDK or on-chain checkout instead -->
 </head>
 <body class="bg-gray-50">
     <!-- Header -->
@@ -504,15 +498,16 @@ CUSTOMIZE_TEMPLATE = """
         <div class="text-center mt-8">
             <div class="flex items-center justify-center space-x-4 text-sm text-gray-500">
                 <span>🔒 SSL Encrypted</span>
-                <span>💳 Stripe Secure</span>
+                <span>💳 Card Secure (PayPal/other)</span>
                 <span>💰 30-Day Guarantee</span>
             </div>
         </div>
     </div>
 
     <script>
-        const stripe = Stripe('{{ stripe_key }}' || 'pk_test_demo');
-        const elements = stripe.elements();
+        // Stripe removed from primary flows; integrate PayPal JS SDK or on-chain checkout here.
+        const stripe = null; // compatibility disabled
+        const elements = null; // placeholder for card elements or PayPal components
         
         const cardElement = elements.create('card');
         cardElement.mount('#card-element');

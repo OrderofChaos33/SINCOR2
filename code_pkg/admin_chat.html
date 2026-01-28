@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORTEX Admin Chat - 42-Agent Orchestrator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #00ff41;
+            height: 100vh;
+        }
+        
+        .admin-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            height: 100vh;
+            gap: 1px;
+            background: #000;
+        }
+        
+        .chat-panel {
+            background: #0a0a0a;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #00ff41;
+        }
+        
+        .chat-header {
+            background: linear-gradient(90deg, #001a00 0%, #003300 100%);
+            padding: 20px;
+            border-bottom: 2px solid #00ff41;
+            text-align: center;
+        }
+        
+        .chat-header h1 {
+            font-size: 24px;
+            text-shadow: 0 0 10px #00ff41;
+            margin-bottom: 10px;
+        }
+        
+        .system-status {
+            font-size: 14px;
+            color: #00aa00;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: #00ff41 #0a0a0a;
+            max-height: calc(100vh - 200px);
+            scroll-behavior: smooth;
+        }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #00ff41;
+            border-radius: 4px;
+        }
+        
+        .message {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #00ff41;
+            background: rgba(0, 255, 65, 0.05);
+        }
+        
+        .message.user {
+            border-left-color: #0088ff;
+            background: rgba(0, 136, 255, 0.05);
+        }
+        
+        .message.processing {
+            border-left-color: #ff8800;
+            background: rgba(255, 136, 0, 0.05);
+            color: #ff8800;
+        }
+        
+        .message.agent-activation {
+            border-left-color: #ff0088;
+            background: rgba(255, 0, 136, 0.05);
+            color: #ff0088;
+        }
+        
+        .message-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .message-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .agent-list {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .chat-input-area {
+            padding: 20px;
+            background: #001100;
+            border-top: 1px solid #00ff41;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #messageInput {
+            flex: 1;
+            background: #0a0a0a;
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 16px;
+        }
+        
+        #messageInput:focus {
+            outline: none;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.3);
+        }
+        
+        #sendButton {
+            background: linear-gradient(45deg, #00ff41, #00aa00);
+            border: none;
+            color: #000;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        #sendButton:hover {
+            background: linear-gradient(45deg, #00aa00, #008800);
+            transform: scale(1.05);
+        }
+        
+        .agent-panel {
+            background: #0a0a0a;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .agent-panel h2 {
+            color: #00ff41;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 8px #00ff41;
+        }
+        
+        .coordination-score {
+            text-align: center;
+            font-size: 18px;
+            color: #00ff41;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #00ff41;
+            border-radius: 8px;
+            background: rgba(0, 255, 65, 0.05);
+        }
+        
+        .agent-category {
+            margin-bottom: 15px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #111;
+        }
+        
+        .category-header {
+            background: #1a1a1a;
+            padding: 10px;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+        }
+        
+        .category-agents {
+            padding: 10px;
+        }
+        
+        .agent-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 12px;
+        }
+        
+        .agent-status {
+            color: #00ff41;
+            font-weight: bold;
+        }
+        
+        .sample-commands {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 255, 65, 0.05);
+            border: 1px solid #00ff41;
+            border-radius: 8px;
+        }
+        
+        .sample-commands h3 {
+            margin-bottom: 10px;
+            color: #00ff41;
+        }
+        
+        .sample-commands button {
+            background: transparent;
+            border: 1px solid #555;
+            color: #aaa;
+            padding: 8px 12px;
+            margin: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s;
+        }
+        
+        .sample-commands button:hover {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="chat-panel">
+            <div class="chat-header">
+                <h1>🧠 CORTEX Admin Chat</h1>
+                <div class="system-status">42-Agent Business Orchestrator | Status: <span id="connectionStatus">Connecting...</span></div>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message">
+                    <div class="message-header">[SYSTEM]</div>
+                    <div class="message-content">CORTEX Admin Chat Interface Initialized
+42 specialized agents standing by for coordination.
+
+Type your business requests naturally - CORTEX will coordinate the appropriate agent teams to fulfill them.
+
+Examples:
+- "Get me 100 leads for my auto detailing business"
+- "How's my business performing this month?"
+- "Launch a marketing campaign for my new service"</div>
+                </div>
+            </div>
+            
+            <div class="chat-input-area">
+                <div class="input-container">
+                    <input type="text" id="messageInput" placeholder="Talk to CORTEX... (e.g., 'Get me 50 leads for my landscaping business')" maxlength="500">
+                    <button id="sendButton">SEND</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="agent-panel">
+            <h2>Agent Coordination</h2>
+            <div class="coordination-score" id="coordinationScore">
+                Coordination Score: 100/100
+            </div>
+            
+            <div id="agentCategories">
+                <!-- Agent categories will be populated by JavaScript -->
+            </div>
+            
+            <div class="sample-commands">
+                <h3>Quick Commands</h3>
+                <button onclick="sendMessage('Get me 100 leads for my business')">Generate Leads</button>
+                <button onclick="sendMessage('How is my business performing?')">Business Report</button>
+                <button onclick="sendMessage('Launch a marketing campaign')">Marketing Campaign</button>
+                <button onclick="sendMessage('Optimize my operations')">Optimize Operations</button>
+                <button onclick="sendMessage('Check compliance requirements')">Compliance Check</button>
+                <button onclick="sendMessage('Show me revenue opportunities')">Revenue Analysis</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let isConnected = false;
+        
+        // DOM elements
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatMessages = document.getElementById('chatMessages');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const coordinationScore = document.getElementById('coordinationScore');
+        const agentCategories = document.getElementById('agentCategories');
+        
+        // Socket event handlers
+        socket.on('connect', function() {
+            isConnected = true;
+            connectionStatus.textContent = 'ONLINE';
+            connectionStatus.style.color = '#00ff41';
+            
+            // Request agent status on connect
+            socket.emit('get_agent_status');
+        });
+        
+        socket.on('disconnect', function() {
+            isConnected = false;
+            connectionStatus.textContent = 'OFFLINE';
+            connectionStatus.style.color = '#ff4444';
+        });
+        
+        socket.on('status', function(data) {
+            addMessage('SYSTEM', data.message, 'system');
+        });
+        
+        socket.on('processing', function(data) {
+            addMessage('CORTEX', data.message, 'processing');
+        });
+        
+        socket.on('agent_activation', function(data) {
+            const message = `Intent: ${data.intent.toUpperCase()} (${Math.round(data.confidence * 100)}% confidence)
+${data.message}
+Agents: ${data.agents.join(', ')}`;
+            addMessage('AGENT COORDINATION', message, 'agent-activation');
+        });
+        
+        socket.on('cortex_response', function(data) {
+            const message = `${data.message}
+
+[Coordination Score: ${data.coordination_score} | Agents: ${data.agents_coordinated}]`;
+            addMessage('CORTEX', message, 'cortex');
+        });
+        
+        socket.on('coordination_status', function(data) {
+            const message = `${data.message}
+Success Probability: ${data.success_probability}%
+Completion: ${data.estimated_completion}`;
+            addMessage('COORDINATION', message, 'agent-activation');
+        });
+        
+        socket.on('agent_status_update', function(data) {
+            updateAgentPanel(data);
+            coordinationScore.textContent = `Coordination Score: ${data.coordination_score}/100`;
+        });
+        
+        socket.on('error', function(data) {
+            addMessage('ERROR', data.message, 'error');
+        });
+        
+        // Add message to chat
+        function addMessage(sender, content, type = '') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <div class="message-header">[${sender}] ${timestamp}</div>
+                <div class="message-content">${content}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            
+            // Enhanced scroll to bottom with fallback
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                // Double-check scroll position
+                if (chatMessages.scrollTop < chatMessages.scrollHeight - chatMessages.clientHeight - 50) {
+                    chatMessages.scrollIntoView(false);
+                    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }
+            }, 100);
+        }
+        
+        // Update agent panel
+        function updateAgentPanel(data) {
+            agentCategories.innerHTML = '';
+            
+            for (const [category, agents] of Object.entries(data.categories)) {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'agent-category';
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'category-header';
+                headerDiv.textContent = `${category} (${agents.length})`;
+                
+                const agentsDiv = document.createElement('div');
+                agentsDiv.className = 'category-agents';
+                
+                agents.forEach(agent => {
+                    const agentDiv = document.createElement('div');
+                    agentDiv.className = 'agent-item';
+                    agentDiv.innerHTML = `
+                        <span>${agent.name}</span>
+                        <span class="agent-status">${agent.status}</span>
+                    `;
+                    agentsDiv.appendChild(agentDiv);
+                });
+                
+                categoryDiv.appendChild(headerDiv);
+                categoryDiv.appendChild(agentsDiv);
+                agentCategories.appendChild(categoryDiv);
+            }
+        }
+        
+        // Send message function
+        function sendMessage(message = null) {
+            const messageText = message || messageInput.value.trim();
+            if (!messageText || !isConnected) return;
+            
+            addMessage('ADMIN', messageText, 'user');
+            socket.emit('cortex_message', { message: messageText });
+            
+            if (!message) {
+                messageInput.value = '';
+            }
+        }
+        
+        // Event listeners
+        sendButton.addEventListener('click', () => sendMessage());
+        
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Auto-focus input
+        messageInput.focus();
+        
+        // Initialize
+        console.log('CORTEX Admin Chat Interface Loaded');
+    </script>
+</body>
+</html>

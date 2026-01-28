@@ -1,0 +1,10 @@
+﻿{
+  "id": "CT-16",
+  "title": "Compliance Reserve Setup",
+  "services": ["compliance_broker","ledger","email_sender"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price"],
+  "deliverables": ["output/compliance/policy.json","output/compliance/ledger.json"],
+  "transaction": {"mode":"setup","provider":"stripe","product":"compliance_reserve"},
+  "kpis": ["policy_ready","ledger_ready","email_sent"]
+}

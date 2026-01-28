@@ -249,7 +249,7 @@ class CrashDiagnostics:
         
         test_urls = [
             ("Google API", "https://maps.googleapis.com/"),
-            ("Stripe API", "https://api.stripe.com/"),
+            ("PayPal API", "https://developer.paypal.com/"),
             ("General Internet", "https://httpbin.org/get")
         ]
         

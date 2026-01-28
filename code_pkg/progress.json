@@ -1,0 +1,52 @@
+{
+  "day": 19,
+  "date": "2025-10-04T11:56:27.986700",
+  "total_content": 190,
+  "total_value": 83030,
+  "daily_results": {
+    "content_created": [
+      [
+        "blog_post",
+        "blog_20251004_1.json"
+      ],
+      [
+        "blog_post",
+        "blog_20251004_2.json"
+      ],
+      [
+        "blog_post",
+        "blog_20251004_3.json"
+      ],
+      [
+        "landing_page",
+        "landing_20251004_1.json"
+      ],
+      [
+        "landing_page",
+        "landing_20251004_2.json"
+      ],
+      [
+        "email",
+        "email_20251004_1.json"
+      ],
+      [
+        "email",
+        "email_20251004_2.json"
+      ],
+      [
+        "email",
+        "email_20251004_3.json"
+      ],
+      [
+        "email",
+        "email_20251004_4.json"
+      ],
+      [
+        "email",
+        "email_20251004_5.json"
+      ]
+    ],
+    "total_value": 4370,
+    "count": 10
+  }
+}

@@ -1,0 +1,10 @@
+﻿{
+  "id": "CT-20",
+  "title": "Action Broker Guardrails as a Service",
+  "services": ["action_broker","audit_logger","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/guardrails/policy.json","output/guardrails/logs.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"guardrails_basic"},
+  "kpis": ["policy_live","events_logged","payment_success"]
+}

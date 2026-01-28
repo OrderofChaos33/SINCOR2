@@ -1,0 +1,10 @@
+﻿{
+  "id": "AE-23",
+  "title": "Review Accelerator",
+  "services": ["review_accel","notifier","reporting","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/reviews/flow.json","output/reports/weekly.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"reviews_basic"},
+  "kpis": ["flows_live","report_generated","payment_success"]
+}

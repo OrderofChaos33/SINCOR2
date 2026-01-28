@@ -21,11 +21,20 @@ class TestBaseAgent:
     @pytest.fixture
     def temp_log_path(self):
         """Create a temporary log file path."""
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            yield Path(tmp.name)
-            # Clean up
-            if Path(tmp.name).exists():
-                Path(tmp.name).unlink()
+        import os, time as _time
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        try:
+            yield Path(path)
+        finally:
+            # Try to remove file with retries (Windows can hold handles briefly)
+            for _ in range(5):
+                try:
+                    if Path(path).exists():
+                        Path(path).unlink()
+                    break
+                except PermissionError:
+                    _time.sleep(0.05)
     
     def test_agent_initialization(self, temp_log_path):
         """Test agent initializes correctly."""
@@ -145,8 +154,9 @@ class TestBaseAgent:
     
     def test_log_error_handling(self):
         """Test log error handling when file can't be written."""
-        # Use invalid path
-        invalid_path = "/nonexistent/path/test.log"
+        # Use directory path to provoke a write error
+        import tempfile
+        invalid_path = tempfile.gettempdir()
         agent = TestAgent(name="LogErrorTest", log_path=invalid_path)
         
         with patch('builtins.print') as mock_print:
@@ -168,8 +178,9 @@ class TestBaseAgent:
     
     def test_check_log_writable_failure(self):
         """Test log writable check when it fails."""
-        # Use a path that should fail
-        invalid_path = "/nonexistent/path/test.log"
+        # Use a directory path which will fail to be opened as a file
+        import tempfile
+        invalid_path = tempfile.gettempdir()
         agent = TestAgent(name="WriteFailTest", log_path=invalid_path)
         
         result = agent._check_log_writable()

@@ -1,0 +1,14 @@
+name: HVMWOP Sync Agent
+on:
+  schedule:
+    - cron: '11 11 * * *'
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Sync Script
+        run: python automation/hvmwop-sync-agent.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

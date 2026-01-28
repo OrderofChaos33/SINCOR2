@@ -1,0 +1,32 @@
+agents:
+  - name: ScarcityAgent
+    schedule: 'Mon 09:00'
+    actions:
+      - read_calendar: true
+      - compute_slots: true
+      - publish:
+          channels: [GBP, FacebookPage]
+          template: content/templates/gbp_post_scarcity.md
+
+  - name: ReviewAgent
+    schedule: 'Wed 10:00'
+    actions:
+      - pick_review: data/reviews.csv
+      - publish:
+          channels: [GBP, FacebookPage]
+          template: content/templates/gbp_post_review.md
+
+  - name: BeforeAfterAgent
+    schedule: 'Fri 11:00'
+    actions:
+      - load_before_after: 'images/before_after/*'
+      - publish:
+          channels: [GBP, FacebookPage, FB_Groups]
+          template: content/templates/fb_group_post_before_after.md
+
+  - name: ComplianceAgent
+    schedule: 'Every run'
+    actions:
+      - ensure_link: 'https://www.clintondetailing.com/booking/'
+      - ensure_qr: 'assets/qr.png'
+      - reject_if_missing: [link, qr]

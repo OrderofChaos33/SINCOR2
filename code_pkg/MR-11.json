@@ -1,0 +1,10 @@
+﻿{
+  "id": "MR-11",
+  "title": "Loyalty Membership (Monthly)",
+  "services": ["subscription_manager","member_portal","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/membership/portal.json","output/membership/welcome_email.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"loyalty_basic"},
+  "kpis": ["subscription_active","portal_ready","welcome_sent"]
+}

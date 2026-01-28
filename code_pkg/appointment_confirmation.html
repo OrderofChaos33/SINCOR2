@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment Confirmed - {{business_name}}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #00ff00 0%, #00cc00 100%); color: white; text-align: center; padding: 30px; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; }
+        .appointment-details { background: #fff; border-left: 4px solid #00ff00; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .cta-button { display: inline-block; background: #00ff00; color: #000; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+        .footer { background: #333; color: #ccc; text-align: center; padding: 20px; border-radius: 0 0 10px 10px; }
+        .checkmark { font-size: 3em; color: #00ff00; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="checkmark">✅</div>
+            <h2>Appointment Confirmed!</h2>
+        </div>
+        
+        <div class="content">
+            <h3>Your detailing service is scheduled</h3>
+            
+            <p>Hi {{name}},</p>
+            
+            <p>Great news! Your appointment has been confirmed. We're looking forward to making your vehicle shine!</p>
+            
+            <div class="appointment-details">
+                <h4>📅 Appointment Details:</h4>
+                <p><strong>Service:</strong> {{service_type}}</p>
+                <p><strong>Date & Time:</strong> {{service_time}}</p>
+                <p><strong>Location:</strong> {{business_name}} Detail Shop</p>
+                <p><strong>Duration:</strong> Approximately 2-3 hours</p>
+            </div>
+            
+            <h4>🚗 What to expect:</h4>
+            <ul>
+                <li>Professional exterior wash and wax</li>
+                <li>Complete interior cleaning and protection</li>
+                <li>Tire shine and wheel detailing</li>
+                <li>Final quality inspection</li>
+            </ul>
+            
+            <h4>📋 Please bring:</h4>
+            <ul>
+                <li>Vehicle keys</li>
+                <li>Remove personal items from car</li>
+                <li>Any specific concerns or requests</li>
+            </ul>
+            
+            <a href="https://your-calendar-link.com" class="cta-button">Add to Calendar</a>
+            
+            <p><strong>Need to reschedule?</strong> No problem! Just reply to this email or call us at (555) 123-4567.</p>
+            
+            <p>We can't wait to exceed your expectations!</p>
+            
+            <p><strong>The {{business_name}} Team</strong></p>
+        </div>
+        
+        <div class="footer">
+            <p>{{business_name}} | Premium Automotive Detailing</p>
+            <p>{{business_email}} | (555) 123-4567</p>
+        </div>
+    </div>
+</body>
+</html>

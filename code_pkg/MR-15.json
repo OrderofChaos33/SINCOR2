@@ -1,0 +1,10 @@
+﻿{
+  "id": "MR-15",
+  "title": "Gift Subscriptions",
+  "services": ["subscription_manager","gift_code_gen","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/gifts/codes.csv","output/gifts/instructions.pdf"],
+  "transaction": {"mode":"prepaid","provider":"stripe","product":"gift_subs"},
+  "kpis": ["codes_generated","email_sent","payment_success"]
+}

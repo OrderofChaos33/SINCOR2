@@ -1,0 +1,72 @@
+personas:
+  business_owner:
+    hooks:
+      - "Driving clients tomorrow? Make the first impression count."
+      - "Fleet vehicles looking rough? Keep your brand sharp."
+      - "Work trucks don’t need to smell like last week’s lunch."
+    benefits:
+      - "Predictable pricing and invoice-ready service."
+      - "Fast turnaround—vehicles back in use the same day."
+      - "Keeps your team comfortable, focused, and professional."
+    proofs:
+      - "Trusted by local businesses for over a decade."
+      - "Zero downtime for our fleet partners."
+      - "Google-verified 5-star service from over 30 reviews."
+    ctas:
+      - "Invoice-ready detailing—book now."
+      - "Schedule online and keep your fleet running clean."
+      - "Tap to reserve a same-day service slot."
+
+  senior:
+    hooks:
+      - "Does your car feel hard to keep clean?"
+      - "Dust, smells, and pet hair making rides uncomfortable?"
+      - "Wish your car felt fresh without the hassle?"
+    benefits:
+      - "We handle pickup and return—no heavy lifting."
+      - "Gentle cleaning safe for sensitive lungs & allergies."
+      - "Simple, trustworthy service from a local team."
+    proofs:
+      - "Neighbors recommend us again and again."
+      - "Family-owned, Clinton-based for over 10 years."
+      - "Senior customers love our pickup & return option."
+    ctas:
+      - "Call us today—we’ll handle the rest."
+      - "Book now, ride fresh tomorrow."
+      - "One call for a worry-free clean."
+
+  busy_parent:
+    hooks:
+      - "Spilled snacks, sticky fingers, dog hair—sound familiar?"
+      - "Family car starting to smell like a locker room?"
+      - "Kids + pets = chaos. We’ve got the fix."
+    benefits:
+      - "Same-day interior reset so you don’t lose time."
+      - "Safer, allergen-free ride for the whole family."
+      - "Flexible scheduling around school runs & sports."
+    proofs:
+      - "Parents say: ‘It’s like we got a new car again.’"
+      - "Child-safe, pet-safe cleaning solutions."
+      - "Over 30 local families booked with us last month."
+    ctas:
+      - "Tap now—book before practice tonight."
+      - "Reserve today, enjoy a fresh ride tomorrow."
+      - "Book online in seconds—no hassle."
+
+  fleet_manager:
+    hooks:
+      - "Fleet downtime costing you money?"
+      - "Company cars looking worn out?"
+      - "Keep your drivers and clients impressed."
+    benefits:
+      - "Invoice-ready, business-friendly packages."
+      - "We handle multiple vehicles—fast turnaround."
+      - "Same-day service to minimize downtime."
+    proofs:
+      - "Trusted by local businesses for professional fleet care."
+      - "Clinton companies rely on us week after week."
+      - "Fastest turnaround for multiple vehicles in the area."
+    ctas:
+      - "Call now for fleet pricing."
+      - "Reserve your fleet detail slot online."
+      - "Keep your fleet clean—schedule today."

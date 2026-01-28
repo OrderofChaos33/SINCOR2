@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Leads</h2>
+  {% if leads %}
+    <table>
+      <thead><tr><th>When</th><th>Name</th><th>Contact</th><th>Vehicle</th><th>Service</th><th>Message</th></tr></thead>
+      <tbody>
+      {% for l in leads %}
+        <tr>
+          <td>{{ l.created_at }}</td>
+          <td>{{ l.name }}</td>
+          <td>{{ l.email }} {{ l.phone }}</td>
+          <td>{{ l.vehicle }}</td>
+          <td>{{ l.service }}</td>
+          <td>{{ l.message }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No leads yet.</p>
+  {% endif %}
+{% endblock %}

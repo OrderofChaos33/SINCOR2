@@ -1,0 +1,10 @@
+﻿{
+  "id": "AE-21",
+  "title": "Ad Autopilot (Budget-Bound)",
+  "services": ["ads_autopilot","reporting","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/autopilot/config.json","output/reports/weekly.json"],
+  "transaction": {"mode":"mgmt_fee_plus_pct","provider":"stripe","plan":"ads_autopilot"},
+  "kpis": ["autopilot_enabled","report_generated","payment_success"]
+}

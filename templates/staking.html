@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINC Staking | Earn Rewards</title>
+    <meta name="description" content="Stake SINC tokens to earn rewards and participate in the ecosystem.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        
+        header {
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+
+        .hero {
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+            margin-bottom: 60px;
+        }
+        
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .staking-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        
+        .staking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .staking-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .apy-badge {
+            background: var(--success);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .staking-form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .input-group {
+            position: relative;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 16px;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .max-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .rewards-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+        }
+        
+        .rewards-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+        
+        .rewards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        
+        .reward-item {
+            text-align: center;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+        }
+        
+        .reward-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--success);
+        }
+        
+        .reward-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .stakes-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            margin-top: 32px;
+        }
+
+        .stakes-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .stakes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .stake-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .stake-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stake-amount {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .stake-details {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .stake-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-unstake {
+            background: var(--error);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn-unstake:hover {
+            background: #dc2626;
+        }
+
+        .no-stakes {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .no-stakes p {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 36px; }
+            .hero p { font-size: 16px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .staking-form { grid-template-columns: 1fr; }
+            .stake-item { flex-direction: column; align-items: flex-start; gap: 16px; }
+            .stake-actions { align-self: stretch; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    
+    <header>
+        <div class="container">
+            <a href="/" class="logo">SINC</a>
+        </div>
+    </header>
+    
+    <main class="container">
+        <section class="hero">
+            <h1>Stake SINC, Earn Rewards</h1>
+            <p>Lock your SINC tokens to earn passive income and help secure the network. Higher stakes = higher rewards.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">12.5%</div>
+                    <div class="stat-label">Current APY</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">1.2M</div>
+                    <div class="stat-label">Total Staked</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">45</div>
+                    <div class="stat-label">Days Locked</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">$2.4K</div>
+                    <div class="stat-label">Daily Rewards</div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="staking-card">
+            <div class="staking-header">
+                <h2 class="staking-title">Stake Your SINC</h2>
+                <div class="apy-badge">12.5% APY</div>
+            </div>
+            
+            <form class="staking-form">
+                <div class="input-group">
+                    <input type="number" placeholder="Enter amount to stake" min="1">
+                    <button type="button" class="max-btn">MAX</button>
+                </div>
+                <button type="submit" class="btn btn-primary">Stake Tokens</button>
+            </form>
+            
+            <p style="color: var(--text-secondary); font-size: 14px;">
+                Minimum stake: 100 SINC | Lock period: 30 days | Early unstake penalty: 10%
+            </p>
+        </section>
+        
+        <section class="rewards-section">
+            <h2 class="rewards-title">Your Staking Rewards</h2>
+            
+            <div class="rewards-grid">
+                <div class="reward-item">
+                    <div class="reward-value">0.00</div>
+                    <div class="reward-label">Daily Earnings</div>
+                </div>
+                <div class="reward-item">
+                    <div class="reward-value">0.00</div>
+                    <div class="reward-label">Monthly Earnings</div>
+                </div>
+                <div class="reward-item">
+                    <div class="reward-value">0.00</div>
+                    <div class="reward-label">Total Earned</div>
+                </div>
+                <div class="reward-item">
+                    <div class="reward-value">0</div>
+                    <div class="reward-label">Days Staked</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="stakes-section">
+            <h2 class="stakes-title">Your Current Stakes</h2>
+            <div class="stakes-list" id="stakes-list">
+                <div class="no-stakes">
+                    <p>No active stakes found. Connect your wallet and stake some SINC tokens to start earning rewards!</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <script>
+        // DOM Elements
+        const stakeForm = document.querySelector('.staking-form');
+        const stakeInput = document.querySelector('input[type="number"]');
+        const maxBtn = document.querySelector('.max-btn');
+        const stakeBtn = document.querySelector('.btn-primary');
+        const rewardsGrid = document.querySelector('.rewards-grid');
+        const statsGrid = document.querySelector('.stats-grid');
+
+        let userAddress = null;
+
+        // Connect Wallet Function
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    userAddress = accounts[0];
+                    handleConnect(userAddress);
+                } catch (error) {
+                    console.error(error);
+                    alert('Failed to connect wallet');
+                }
+            } else {
+                alert('Please install MetaMask or another Web3 wallet');
+            }
+        }
+
+        // Handle successful connection
+        function handleConnect(address) {
+            // Update UI to show connected state
+            updateStakingInfo();
+            updateGlobalStats();
+        }
+
+        // Update global staking statistics
+        async function updateGlobalStats() {
+            try {
+                const response = await fetch('/api/staking/stats');
+                const stats = await response.json();
+                
+                // Update stats display
+                const statCards = statsGrid.querySelectorAll('.stat-value');
+                statCards[0].textContent = stats.apy.toFixed(1) + '%'; // APY
+                statCards[1].textContent = (stats.total_staked / 1000).toFixed(1) + 'K'; // Total Staked
+                statCards[2].textContent = '30'; // Lock period (static)
+                statCards[3].textContent = '$' + (stats.daily_rewards * 0.01).toFixed(1) + 'K'; // Daily Rewards
+            } catch (error) {
+                console.error('Error updating global stats:', error);
+            }
+        }
+
+        // Update user's staking information
+        async function updateStakingInfo() {
+            if (!userAddress) return;
+
+            try {
+                const response = await fetch('/api/staking/user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ address: userAddress })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateRewardsDisplay(result.stakes);
+                }
+            } catch (error) {
+                console.error('Error updating user staking info:', error);
+            }
+        }
+
+        // Update rewards display
+        function updateRewardsDisplay(stakes) {
+            const rewardItems = rewardsGrid.querySelectorAll('.reward-value');
+            const stakesList = document.getElementById('stakes-list');
+
+            if (stakes.length === 0) {
+                rewardItems[0].textContent = '0.00'; // Daily Earnings
+                rewardItems[1].textContent = '0.00'; // Monthly Earnings
+                rewardItems[2].textContent = '0.00'; // Total Earned
+                rewardItems[3].textContent = '0'; // Days Staked
+
+                // Show no stakes message
+                stakesList.innerHTML = '<div class="no-stakes"><p>No active stakes found. Connect your wallet and stake some SINC tokens to start earning rewards!</p></div>';
+                return;
+            }
+
+            let totalStaked = 0;
+            let totalRewards = 0;
+            let totalDays = 0;
+
+            stakes.forEach(stake => {
+                totalStaked += stake.amount;
+                totalRewards += stake.rewards_earned;
+                totalDays = Math.max(totalDays, stake.days_staked);
+            });
+
+            const dailyEarnings = totalRewards / Math.max(totalDays, 1);
+            const monthlyEarnings = dailyEarnings * 30;
+
+            rewardItems[0].textContent = dailyEarnings.toFixed(2);
+            rewardItems[1].textContent = monthlyEarnings.toFixed(2);
+            rewardItems[2].textContent = totalRewards.toFixed(2);
+            rewardItems[3].textContent = totalDays;
+
+            // Update stakes list
+            stakesList.innerHTML = '';
+            stakes.forEach((stake) => {
+                const stakeItem = document.createElement('div');
+                stakeItem.className = 'stake-item';
+
+                const stakeDate = new Date(stake.start_date).toLocaleDateString();
+                const unlockDate = new Date(stake.unlock_date).toLocaleDateString();
+                const canUnstake = new Date() >= new Date(stake.unlock_date);
+
+                stakeItem.innerHTML = `
+                    <div class="stake-info">
+                        <div class="stake-amount">${stake.amount.toLocaleString()} SINC</div>
+                        <div class="stake-details">
+                            Staked on ${stakeDate} • Unlocks ${unlockDate} • ${stake.days_staked} days staked
+                        </div>
+                    </div>
+                    <div class="stake-actions">
+                        <button class="btn-unstake" ${canUnstake ? '' : 'disabled'} data-amount="${stake.amount}">
+                            ${canUnstake ? 'Unstake' : 'Locked'}
+                        </button>
+                    </div>
+                `;
+
+                stakesList.appendChild(stakeItem);
+            });
+
+            // Add event listeners to unstake buttons
+            document.querySelectorAll('.btn-unstake').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const amount = parseFloat(this.getAttribute('data-amount'));
+                    unstakeTokens({ amount: amount });
+                });
+            });
+        }
+
+        // Stake tokens
+        async function stakeTokens(amount) {
+            if (!userAddress) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            stakeBtn.textContent = 'Staking...';
+            stakeBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/staking/stake', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        address: userAddress,
+                        amount: parseFloat(amount)
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    stakeInput.value = '';
+                    updateStakingInfo();
+                    updateGlobalStats();
+                } else {
+                    alert(result.error);
+                }
+
+            } catch (error) {
+                console.error('Staking error:', error);
+                alert('Network error. Please try again.');
+            } finally {
+                stakeBtn.textContent = 'Stake Tokens';
+                stakeBtn.disabled = false;
+            }
+        }
+
+        // Unstake tokens
+        async function unstakeTokens(stake) {
+            if (!userAddress) {
+                alert('Please connect your wallet first');
+                return;
+            }
+
+            const confirmMsg = `Unstake ${stake.amount} SINC tokens?\n\nThis will return your tokens to your wallet.`;
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const response = await fetch('/api/staking/unstake', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        address: userAddress,
+                        amount: stake.amount
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    updateStakingInfo();
+                    updateGlobalStats();
+                } else {
+                    alert(result.error);
+                }
+
+            } catch (error) {
+                console.error('Unstaking error:', error);
+                alert('Network error. Please try again.');
+            }
+        }
+
+        // Event Listeners
+        stakeForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const amount = stakeInput.value;
+            if (amount && parseFloat(amount) > 0) {
+                stakeTokens(amount);
+            } else {
+                alert('Please enter a valid amount');
+            }
+        });
+
+        maxBtn.addEventListener('click', function() {
+            // For now, set a default amount since we can't check user's balance
+            stakeInput.value = '1000';
+        });
+
+        // Initialize
+        updateGlobalStats();
+
+        // Check if already connected
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.request({ method: 'eth_accounts' })
+                .then(accounts => {
+                    if (accounts.length > 0) {
+                        userAddress = accounts[0];
+                        handleConnect(userAddress);
+                    }
+                })
+                .catch(console.error);
+        }
+
+        // Add connect wallet button to nav (assuming there's a nav)
+        const nav = document.querySelector('nav') || document.querySelector('header');
+        if (nav && !document.querySelector('.connect-btn')) {
+            const connectBtn = document.createElement('button');
+            connectBtn.className = 'btn btn-primary connect-btn';
+            connectBtn.textContent = 'Connect Wallet';
+            connectBtn.onclick = connectWallet;
+            nav.appendChild(connectBtn);
+        }
+    </script>
+</body>
+</html>

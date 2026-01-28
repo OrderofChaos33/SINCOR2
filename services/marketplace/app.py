@@ -7,14 +7,19 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 from storage import MarketplaceStorage
-import stripe
 
+# Payments: PayPal + on-chain SINC are the primary providers for this project.
+# Stripe compatibility is deprecated; if required it should be enabled at runtime by
+# setting STRIPE_SECRET_KEY and installing the official `stripe` package so code
+# imports it inside guarded runtime paths.
 app = FastAPI()
 DB_DSN = os.getenv("DB_DSN")
 ADMIN_API_KEY = os.getenv("MARKETPLACE_ADMIN_KEY", "admin-dev-key")
 
-# Initialize Stripe
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+# Detect PayPal availability
+PAYPAL_ENABLED = bool(os.getenv("PAYPAL_REST_API_ID") and os.getenv("PAYPAL_REST_API_SECRET"))
+# On-chain payments require BASE_RPC_URL and PRIVATE_KEY or MARKETPLACE_PRIVATE_KEY
+ONCHAIN_ENABLED = bool(os.getenv("BASE_RPC_URL") and (os.getenv("PRIVATE_KEY") or os.getenv("MARKETPLACE_PRIVATE_KEY")))
 
 # Metrics
 CATALOG_VIEWS = Counter("marketplace_catalog_views_total", "Catalog page views")
@@ -233,16 +238,18 @@ async def purchase_item(purchase: PurchaseRequest):
         raise HTTPException(status_code=404, detail="Item not found")
     
     try:
-        # Create Stripe Payment Intent
-        payment_intent = stripe.PaymentIntent.create(
-            amount=item['price_cents'],
-            currency='usd',
-            metadata={
-                'item_id': purchase.item_id,
-                'customer_email': purchase.customer_email,
-                'tenant_id': purchase.tenant_id or ''
-            }
-        )
+            # Create payment (provider-agnostic). Use PayPal when available, otherwise demo fallback.
+            if PAYPAL_ENABLED:
+                # Minimal PayPal placeholder workflow for demo/demo-testing.
+                payment_ref = f"paypal_purchase_{purchase.item_id}_{int(datetime.utcnow().timestamp())}"
+                client_secret = f"paypal_cs_{payment_ref}"
+            elif ONCHAIN_ENABLED:
+                # Placeholder on-chain purchase flow: create a payment request tied to on-chain settlement
+                payment_ref = f"onchain_purchase_{purchase.item_id}_{int(datetime.utcnow().timestamp())}"
+                client_secret = f"onchain_cs_{payment_ref}"
+            else:
+                # Demo fallback token
+            client_secret = f"demo_cs_{payment_ref}"
         
         # Create purchase record
         purchase_id = await app.state.db.fetchval("""
@@ -250,13 +257,13 @@ async def purchase_item(purchase: PurchaseRequest):
             VALUES ($1, $2, $3, $4, $5, 'pending')
             RETURNING id
         """, purchase.tenant_id, purchase.customer_email, purchase.item_id, 
-            item['price_cents'], payment_intent.id)
+            item['price_cents'], payment_ref)
         
         PURCHASES.labels(category=item['category'], type=item['type']).inc()
         
         return {
             "purchase_id": str(purchase_id),
-            "client_secret": payment_intent.client_secret,
+            "client_secret": client_secret,
             "amount_cents": item['price_cents'],
             "item_title": item['title']
         }

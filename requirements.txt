@@ -46,8 +46,9 @@ numpy>=1.24.0                # Numerical computing for analytics
 pytest>=7.0.0
 pytest-flask>=1.2.0
 
-# Optional: For better development experience
-python-dotenv>=1.0.0
+# Blockchain Integration
+web3==6.0.0                 # Ethereum blockchain interaction
+eth-account==0.8.0          # Ethereum account management
 
 # Optional: Enhanced functionality
 beautifulsoup4>=4.12.0       # Web scraping for email extraction

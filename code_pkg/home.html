@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+  <section>
+    <h2>Showroom Shine. Honest Pricing.</h2>
+    <p>Call 1-815-718-8936 or book online at <strong>clintondetailing.com/booking</strong>.</p>
+  </section>
+  <section>
+    <h3>Request a Quote</h3>
+    <form method="POST" action="/quote">
+      {{ form.hidden_tag() }}
+      <label>Name {{ form.name() }}</label>
+      <label>Email {{ form.email() }}</label>
+      <label>Phone {{ form.phone() }}</label>
+      <label>Vehicle {{ form.vehicle() }}</label>
+      <label>Service {{ form.service() }}</label>
+      <label>Message {{ form.message() }}</label>
+      {{ form.submit() }}
+    </form>
+  </section>
+{% endblock %}

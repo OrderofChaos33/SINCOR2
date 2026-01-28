@@ -5,9 +5,13 @@
 ### 1. Environment Variables Setup
 Add these environment variables in Railway dashboard (Variables tab):
 
-**Required for Payments:**
+**Required for Payments (PayPal / on-chain):**
 ```
-stripe = sk_live_YOUR_STRIPE_SECRET_KEY
+PAYPAL_REST_API_ID = your_paypal_rest_api_id
+PAYPAL_REST_API_SECRET = your_paypal_rest_api_secret
+# For on-chain SINC marketplace settlement and checks:
+BASE_RPC_URL = https://your-rpc-endpoint
+MARKETPLACE_PRIVATE_KEY = <hex private key for marketplace wallet>
 ```
 
 **Required for Business Discovery:**
@@ -43,7 +47,7 @@ Railway will check: `https://your-app.railway.app/health`
 ## 🎯 Live Features After Deployment
 
 ✅ **Professional AI Demo** - `/discovery-dashboard`
-✅ **Real Stripe Payments** - All `/checkout/*` routes  
+✅ **Real PayPal Payments** - All `/checkout/*` routes (PayPal JS/REST checkout)  
 ✅ **Business Discovery** - Google Places API integration
 ✅ **Email Campaigns** - SMTP integration
 ✅ **Analytics Dashboard** - `/analytics-dashboard`
@@ -52,22 +56,22 @@ Railway will check: `https://your-app.railway.app/health`
 ## 🔧 Testing Checklist
 
 1. **Demo Works**: Visit `/discovery-dashboard` - should show live AI processing
-2. **Checkout Works**: Visit `/checkout/professional` - should load Stripe form
+2. **Checkout Works**: Visit `/checkout/professional` - should load PayPal checkout flow
 3. **API Connected**: Demo should use real Google Places API data
-4. **Payments Process**: Test cards should work with Stripe
+4. **Payments Process**: Test sandbox PayPal transactions should work
 
 ## 🚨 If Issues Occur
 
 1. Check Railway logs for startup errors
 2. Verify all environment variables are set correctly
-3. Ensure Stripe keys match your Stripe dashboard
-4. Test Google Places API key in Stripe dashboard
+3. Ensure PayPal REST credentials match your PayPal dashboard
+4. Test Google Places API key in your app dashboard
 
 ## 💡 Success Indicators
 
 - Homepage shows "🔴 LIVE AI DEMO" prominently
 - Demo page shows professional dark interface
-- Checkout shows real Stripe payment form
+- Checkout shows PayPal payment flow
 - Business discovery finds real businesses
 - No "demo mode" messages anywhere
 

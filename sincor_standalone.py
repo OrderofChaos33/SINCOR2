@@ -44,9 +44,18 @@ EMAIL_TO=[e.strip() for e in os.getenv("EMAIL_TO","admin@sincor.local").split(",
 NOTIFY_PHONE=os.getenv("NOTIFY_PHONE","+15551234567")
 
 # API Keys
-GOOGLE_API_KEY=os.getenv("GOOGLE_API_KEY","") or os.getenv("GOOGLE_PLACES_API_KEY","")
-STRIPE_SECRET_KEY=os.getenv("STRIPE_SECRET_KEY","")
-STRIPE_PUBLISHABLE_KEY=os.getenv("STRIPE_PUBLISHABLE_KEY","")
+GOOGLE_API_KEY=os.getenv("GOOGLE_API_KEY","") or os.getenv("GOOGLE_PLACES_API_KEY",
+"")
+# PayPal REST API credentials (preferred)
+PAYPAL_REST_API_ID=os.getenv("PAYPAL_REST_API_ID","")
+PAYPAL_REST_API_SECRET=os.getenv("PAYPAL_REST_API_SECRET","")
+PAYPAL_MODE=os.getenv("PAYPAL_MODE","sandbox")
+# On-chain marketplace config
+BASE_RPC_URL=os.getenv("BASE_RPC_URL","")
+MARKETPLACE_PRIVATE_KEY=os.getenv("MARKETPLACE_PRIVATE_KEY","")
+# Legacy Stripe compatibility removed from primary codebase. To enable legacy Stripe support,
+# set STRIPE_SECRET_KEY and install the official 'stripe' package and re-introduce guarded imports.
+# NOTE: Primary providers are PayPal and on-chain SINC.
 
 def log(msg):
     ts=datetime.datetime.now().isoformat(timespec="seconds")

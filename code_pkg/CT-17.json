@@ -1,0 +1,10 @@
+﻿{
+  "id": "CT-17",
+  "title": "KYC/AML Light for Agencies",
+  "services": ["kyc_service","audit_logger","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/kyc/report.pdf","output/audit/receipts.json"],
+  "transaction": {"mode":"per-seat","provider":"stripe","plan":"kyc_light"},
+  "kpis": ["kyc_passed","audit_logged","payment_success"]
+}

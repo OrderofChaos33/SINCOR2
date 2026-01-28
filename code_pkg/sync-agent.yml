@@ -1,0 +1,28 @@
+name: HVMWOP Sync Agent
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '11 11 * * *'  # Runs daily at 11:11 UTC
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install openai
+          pip install pyyaml
+
+      - name: Run sync agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python automation/hvmwop-sync-agent.py
+

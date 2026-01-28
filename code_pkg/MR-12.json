@@ -1,0 +1,10 @@
+﻿{
+  "id": "MR-12",
+  "title": "Seasonal Pass (Quarterly)",
+  "services": ["subscription_manager","scheduler","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/membership/schedule.json","output/membership/seasonal_benefits.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"seasonal_pass"},
+  "kpis": ["subscription_active","schedule_ready","benefits_issued"]
+}

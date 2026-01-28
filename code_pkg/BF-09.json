@@ -1,0 +1,10 @@
+﻿{
+  "id": "BF-09",
+  "title": "Fill-the-Week Fast Pack",
+  "services": ["quick_campaign_builder","ads_autopilot","notifier","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/campaign/creative.zip","output/campaign/config.json","output/alerts.json"],
+  "transaction": {"mode":"surge","provider":"paypal","product":"fastpack_72h"},
+  "kpis": ["campaign_ready","autopilot_enabled","alerts_live","payment_success"]
+}

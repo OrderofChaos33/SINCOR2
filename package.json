@@ -8,6 +8,9 @@
     "test": "hardhat test",
     "deploy": "hardhat run scripts/deploy.js",
     "deploy:base": "hardhat run scripts/deploy.js --network base",
+    "deploy:sinc": "hardhat run scripts/deploy_sinc.js --network baseSepolia",
+    "mint:sinc": "hardhat run scripts/mint_sinc.js --network baseSepolia --no-compile --",
+    "add-liquidity:sinc": "hardhat run scripts/add_liquidity.js --network baseSepolia --no-compile",
     "verify": "hardhat verify",
     "setup-liquidity": "hardhat run scripts/setup-liquidity.js",
     "check-deployment": "node scripts/check-deployment.js"

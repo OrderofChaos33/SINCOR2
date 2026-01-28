@@ -64,7 +64,7 @@ Go through ALL folders one by one:
 - Never show "business to business" partnerships
 
 ### USER PREFERENCES
-- Prefers PayPal over Stripe
+- Prefers PayPal
 - Wants 24/7 automation
 - Needs safe scraping protocols
 - Wants Canva integration

@@ -78,7 +78,7 @@ def test_sincor_monetization():
     print(f"Target: Service businesses nationwide")
     
     print(f"\nNEXT STEPS:")
-    print(f"1. Add Stripe API keys to Railway environment")
+    print(f"1. Add PayPal API keys to Railway environment")
     print(f"2. Force redeploy if checkout routes not working")
     print(f"3. Test end-to-end payment flow")
     print(f"4. Launch marketing campaigns")

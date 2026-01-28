@@ -1,0 +1,14 @@
+﻿{
+  "id": "TR-01",
+  "title": "TriFold Brochure (Outside+Inside)",
+  "services": ["trifold_renderer","email_sender"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": [
+    "output/trifold/trifold_outside.html",
+    "output/trifold/trifold_inside.html",
+    "output/email_receipt.json"
+  ],
+  "transaction": {"mode":"one-time","provider":"stripe","product":"trifold_pack"},
+  "kpis": ["outside_ready","inside_ready","email_sent"]
+}

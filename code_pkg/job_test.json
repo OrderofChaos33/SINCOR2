@@ -1,0 +1,11 @@
+{
+  "id": "job_test_001",
+  "path": "MP-01",
+  "biz": "Clinton Auto Detailing",
+  "city": "Clinton, IA",
+  "email": "you@example.com",
+  "phone": "563-000-0000",
+  "price": 275,
+  "payURL": "https://square.link/u/YOURPAYLINK",
+  "ts": "20250921-000000"
+}

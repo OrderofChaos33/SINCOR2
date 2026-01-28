@@ -111,34 +111,35 @@ class GoogleCalendarIntegration:
                 "setup_required": True
             }
 
-class StripeIntegration:
-    """Real Stripe payment processing integration."""
+class LegacyStripeIntegration:
+    """(Deprecated) Stripe payment integration kept for compatibility. Prefer PayPal or on-chain integrations for production."""
     
     def __init__(self, secret_key: Optional[str] = None):
         self.secret_key = secret_key or os.getenv('STRIPE_SECRET_KEY')
         self.base_url = 'https://api.stripe.com/v1'
     
     def setup_stripe_connection(self) -> Dict[str, Any]:
-        """Set up Stripe integration."""
+        """Set up Stripe integration (deprecated)."""
         return {
             "success": True,
+            "note": "Stripe support is deprecated in SINCOR. Prefer PayPal or on-chain SINC for payments; Stripe may be enabled for compatibility by setting STRIPE_SECRETKey.",
             "setup_steps": [
-                "1. Sign up for Stripe account at stripe.com",
-                "2. Get your API keys from Stripe Dashboard",
-                "3. Enter your Secret Key in SINCOR settings",
-                "4. Configure payment methods and products"
+                "1. Prefer PayPal: create a PayPal Business account at business.paypal.com",
+                "2. Get REST API credentials (client id & secret) from PayPal Dashboard",
+                "3. Configure your PayPal credentials in environment variables (PAYPAL_REST_API_ID, PAYPAL_REST_API_SECRET)",
+                "4. For on-chain payments, provide RPC endpoint and PRIVATE_KEY for marketplace operations"
             ],
-            "stripe_signup_url": "https://dashboard.stripe.com/register",
+            "paypal_signup_url": "https://business.paypal.com/",
             "integration_benefits": [
-                "Automated invoicing after each service",
-                "Accept credit cards, Apple Pay, Google Pay",
-                "Automatic payment reminders",
+                "Use PayPal for card and wallet payments",
+                "Use on-chain SINC token for marketplace payments and settlements",
+                "Automated payment notifications via webhooks",
                 "Real-time revenue tracking"
             ]
         }
     
     def test_stripe_connection(self) -> Dict[str, Any]:
-        """Test Stripe API connection."""
+        """Test Stripe API connection (deprecated)."""
         if not self.secret_key:
             return self.setup_stripe_connection()
         
@@ -164,7 +165,7 @@ class StripeIntegration:
             }
     
     def create_invoice(self, customer_info: Dict[str, Any], services: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Create and send invoice through Stripe."""
+        """Create and send invoice through Stripe (legacy)."""
         # Would create real Stripe invoice here
         
         total_amount = sum([service.get('price', 0) for service in services])
@@ -180,6 +181,36 @@ class StripeIntegration:
             "due_date": (datetime.datetime.now() + datetime.timedelta(days=15)).strftime('%Y-%m-%d'),
             "status": "sent"
         }
+
+
+class PayPalIntegration:
+    """PayPal integration helpers (basic demo/testing stubs)."""
+    def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None):
+        self.client_id = client_id or os.getenv('PAYPAL_REST_API_ID')
+        self.client_secret = client_secret or os.getenv('PAYPAL_REST_API_SECRET')
+        self.mode = os.getenv('PAYPAL_MODE', 'sandbox')
+
+    def setup_paypal_connection(self) -> Dict[str, Any]:
+        if not (self.client_id and self.client_secret):
+            return {
+                "success": False,
+                "setup_required": True,
+                "message": "PayPal REST API credentials not configured",
+                "instructions": [
+                    "1. Create a PayPal Business account",
+                    "2. Obtain REST API client id & secret from developer.paypal.com",
+                    "3. Set PAYPAL_REST_API_ID and PAYPAL_REST_API_SECRET environment variables"
+                ]
+            }
+        return {
+            "success": True,
+            "connected": True,
+            "mode": self.mode,
+            "integration_status": "✅ PayPal configured"
+        }
+
+    def test_paypal_connection(self) -> Dict[str, Any]:
+        return self.setup_paypal_connection()
 
 class EmailAutomation:
     """Real email automation using SMTP."""
@@ -421,9 +452,13 @@ def test_all_integrations() -> Dict[str, Any]:
     calendar = GoogleCalendarIntegration()
     results['calendar'] = calendar.test_connection()
     
-    # Test Stripe
-    stripe = StripeIntegration()
-    results['payments'] = stripe.test_stripe_connection()
+    # Test PayPal primary integration
+    paypal = PayPalIntegration()
+    results['payments'] = paypal.test_paypal_connection()
+
+    # Legacy Stripe compatibility report
+    legacy_stripe = LegacyStripeIntegration()
+    results['legacy_stripe'] = legacy_stripe.test_stripe_connection()
     
     # Test Email
     email = EmailAutomation()

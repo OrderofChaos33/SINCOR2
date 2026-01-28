@@ -107,14 +107,15 @@ class EnvironmentSetup:
         if setup_apis:
             self.env_vars['GOOGLE_API_KEY'] = self.prompt_user("Google Places API Key")
             self.env_vars['YELP_API_KEY'] = self.prompt_user("Yelp API Key")
-            self.env_vars['STRIPE_SECRET_KEY'] = self.prompt_user("Stripe Secret Key (test)")
-            self.env_vars['STRIPE_PUBLISHABLE_KEY'] = self.prompt_user("Stripe Publishable Key (test)")
+            # PayPal keys instead of Stripe
+            self.env_vars['PAYPAL_REST_API_ID'] = self.prompt_user("PayPal REST API Client ID")
+            self.env_vars['PAYPAL_REST_API_SECRET'] = self.prompt_user("PayPal REST API Secret")
         else:
             self.env_vars.update({
                 'GOOGLE_API_KEY': '',
                 'YELP_API_KEY': '',
-                'STRIPE_SECRET_KEY': 'sk_test_placeholder',
-                'STRIPE_PUBLISHABLE_KEY': 'pk_test_placeholder'
+                'PAYPAL_REST_API_ID': '',
+                'PAYPAL_REST_API_SECRET': ''
             })
         
         # Development settings
@@ -166,12 +167,11 @@ class EnvironmentSetup:
             self.env_vars['GOOGLE_API_KEY'] = self.prompt_user("Google Places API Key")
             self.env_vars['YELP_API_KEY'] = self.prompt_user("Yelp API Key")
             
-            # Stripe (optional)
-            setup_stripe = self.prompt_user("Configure Stripe for payments? (y/n)", "y").lower() == 'y'
-            if setup_stripe:
-                print("⚠️  Use LIVE keys for production!")
-                self.env_vars['STRIPE_SECRET_KEY'] = self.prompt_user("Stripe SECRET Key (sk_live_...)", password=True)
-                self.env_vars['STRIPE_PUBLISHABLE_KEY'] = self.prompt_user("Stripe PUBLISHABLE Key (pk_live_...)")
+            # PayPal (recommended)
+            print("⚠️  PayPal credentials are required for live PayPal payments in production")
+            self.env_vars['PAYPAL_REST_API_ID'] = self.prompt_user("PayPal REST API Client ID", required=True)
+            self.env_vars['PAYPAL_REST_API_SECRET'] = self.prompt_user("PayPal REST API Secret", password=True, required=True)
+            self.env_vars['PAYPAL_SANDBOX'] = self.prompt_user("Use PayPal sandbox? (y/n)", "y").lower() in ('y','yes','1')
         
         # Production settings
         self.env_vars.update({
@@ -206,7 +206,7 @@ class EnvironmentSetup:
             groups = {
                 "Flask Configuration": ["FLASK_SECRET_KEY", "FLASK_ENV"],
                 "Email Configuration": ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "EMAIL_FROM", "EMAIL_TO", "NOTIFY_PHONE"],
-                "API Keys": ["GOOGLE_API_KEY", "YELP_API_KEY", "STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY"],
+                "API Keys": ["GOOGLE_API_KEY", "YELP_API_KEY", "PAYPAL_REST_API_ID", "PAYPAL_REST_API_SECRET"],
                 "Application Settings": ["PORT", "LOG_LEVEL", "DATABASE_URL", "BUSINESS_SEARCH_RADIUS", "RATE_LIMIT_DELAY", "MAX_DAILY_API_CALLS"]
             }
             

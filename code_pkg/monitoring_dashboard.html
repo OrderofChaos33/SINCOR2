@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Agent Health Monitoring - Real-Time Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.4/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .dashboard-header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00d4ff, #7b68ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ff88;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .metrics-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #00d4ff, #7b68ee);
+        }
+
+        .metric-title {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .metric-change {
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .metric-change.positive { color: #00ff88; }
+        .metric-change.negative { color: #ff4757; }
+        .metric-change.neutral { color: rgba(255, 255, 255, 0.7); }
+
+        .agents-grid-container {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .agent-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(0, 212, 255, 0.5);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .agent-card.healthy { border-left: 4px solid #00ff88; }
+        .agent-card.warning { border-left: 4px solid #ffa502; }
+        .agent-card.critical { border-left: 4px solid #ff4757; }
+        .agent-card.offline { border-left: 4px solid #747d8c; }
+
+        .agent-id {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .agent-metrics {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .agent-status {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-healthy { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+        .status-warning { background: rgba(255, 165, 2, 0.2); color: #ffa502; }
+        .status-critical { background: rgba(255, 71, 87, 0.2); color: #ff4757; }
+        .status-offline { background: rgba(116, 125, 140, 0.2); color: #747d8c; }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .alerts-panel {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .alert-item {
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .performance-charts {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+            height: 300px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 200px;
+        }
+
+        .real-time-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .update-timestamp {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Responsive design */
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .agents-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="header-content">
+            <div class="logo">🚀 SINCOR Agent Health Monitor</div>
+            <div class="connection-status">
+                <div class="status-dot" id="connectionDot"></div>
+                <span id="connectionStatus">Connected</span>
+                <div class="real-time-indicator">
+                    <span>●</span>
+                    <span>LIVE</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="main-content">
+            <!-- System Metrics Overview -->
+            <div class="metrics-overview">
+                <div class="metric-card">
+                    <div class="metric-title">Total Agents</div>
+                    <div class="metric-value" id="totalAgents">42</div>
+                    <div class="metric-change neutral">
+                        <span>Active in swarm</span>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">Healthy Agents</div>
+                    <div class="metric-value" id="healthyAgents">38</div>
+                    <div class="metric-change positive" id="healthyChange">
+                        <span>↗</span> <span>90.5%</span>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">Avg Response Time</div>
+                    <div class="metric-value" id="avgResponseTime">324ms</div>
+                    <div class="metric-change positive" id="responseTimeChange">
+                        <span>↗</span> <span>Under 500ms target</span>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">Swarm Efficiency</div>
+                    <div class="metric-value" id="swarmEfficiency">94.2%</div>
+                    <div class="metric-change positive" id="efficiencyChange">
+                        <span>↗</span> <span>Optimal range</span>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">Total Revenue</div>
+                    <div class="metric-value" id="totalRevenue">$47.2K</div>
+                    <div class="metric-change positive" id="revenueChange">
+                        <span>↗</span> <span>+12.4% today</span>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-title">Tasks Completed</div>
+                    <div class="metric-value" id="tasksCompleted">4,847</div>
+                    <div class="metric-change positive" id="tasksChange">
+                        <span>↗</span> <span>+247 last hour</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agents Grid -->
+            <div class="agents-grid-container">
+                <div class="section-title">
+                    <span>🤖</span>
+                    <span>Agent Status Grid (42 Agents)</span>
+                </div>
+                <div class="agents-grid" id="agentsGrid">
+                    <!-- Agent cards will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Performance Charts -->
+            <div class="performance-charts">
+                <div class="section-title">
+                    <span>📊</span>
+                    <span>Real-Time Performance Metrics</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <!-- System Alerts -->
+            <div class="alerts-panel">
+                <div class="section-title">
+                    <span>🚨</span>
+                    <span>Active Alerts</span>
+                </div>
+                <div id="alertsList">
+                    <div class="alert-item">
+                        System monitoring active - all systems operational
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Health -->
+            <div class="alerts-panel">
+                <div class="section-title">
+                    <span>💻</span>
+                    <span>System Health</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>System Load</span>
+                        <span id="systemLoad" style="color: #00ff88;">Normal</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Coordination Rate</span>
+                        <span id="coordinationRate" style="color: #00ff88;">94.2%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Last Update</span>
+                        <span id="lastUpdate" class="update-timestamp">Just now</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Chart variables
+        let performanceChart;
+        
+        // Data storage
+        let systemData = {
+            summary: null,
+            agents: {},
+            performanceHistory: []
+        };
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeChart();
+            updateConnectionStatus(true);
+        });
+
+        // Socket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to monitoring dashboard');
+            updateConnectionStatus(true);
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Disconnected from monitoring dashboard');
+            updateConnectionStatus(false);
+        });
+
+        socket.on('system_update', function(data) {
+            console.log('Received system update', data);
+            updateDashboard(data);
+        });
+
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('connectionDot');
+            const status = document.getElementById('connectionStatus');
+            
+            if (connected) {
+                dot.style.background = '#00ff88';
+                status.textContent = 'Connected';
+            } else {
+                dot.style.background = '#ff4757';
+                status.textContent = 'Disconnected';
+            }
+        }
+
+        function updateDashboard(data) {
+            const { summary, agent_metrics, timestamp } = data;
+            
+            // Update system metrics
+            updateSystemMetrics(summary);
+            
+            // Update agents grid
+            updateAgentsGrid(agent_metrics);
+            
+            // Update alerts
+            updateAlerts(summary.alerts || []);
+            
+            // Update performance chart
+            updatePerformanceChart(summary);
+            
+            // Update timestamp
+            updateLastUpdateTime();
+            
+            // Store data for future use
+            systemData.summary = summary;
+            systemData.agents = agent_metrics;
+        }
+
+        function updateSystemMetrics(summary) {
+            // Update metric cards
+            document.getElementById('totalAgents').textContent = summary.total_agents || 42;
+            document.getElementById('healthyAgents').textContent = summary.healthy_agents || 0;
+            document.getElementById('avgResponseTime').textContent = `${Math.round(summary.avg_response_time)}ms`;
+            document.getElementById('swarmEfficiency').textContent = `${summary.swarm_efficiency.toFixed(1)}%`;
+            document.getElementById('totalRevenue').textContent = `$${(summary.total_revenue / 1000).toFixed(1)}K`;
+            document.getElementById('tasksCompleted').textContent = summary.total_tasks_completed.toLocaleString();
+            
+            // Update system health indicators
+            document.getElementById('systemLoad').textContent = `${summary.system_load.toFixed(1)}%`;
+            document.getElementById('coordinationRate').textContent = `${summary.coordination_success_rate.toFixed(1)}%`;
+            
+            // Update health percentage
+            const healthPercentage = ((summary.healthy_agents / summary.total_agents) * 100).toFixed(1);
+            document.getElementById('healthyChange').innerHTML = `<span>↗</span> <span>${healthPercentage}%</span>`;
+            
+            // Update response time indicator
+            const responseStatus = summary.avg_response_time < 500 ? 'Under 500ms target' : 'Above target';
+            const responseClass = summary.avg_response_time < 500 ? 'positive' : 'negative';
+            const responseIcon = summary.avg_response_time < 500 ? '↗' : '↑';
+            document.getElementById('responseTimeChange').className = `metric-change ${responseClass}`;
+            document.getElementById('responseTimeChange').innerHTML = `<span>${responseIcon}</span> <span>${responseStatus}</span>`;
+        }
+
+        function updateAgentsGrid(agents) {
+            const grid = document.getElementById('agentsGrid');
+            grid.innerHTML = '';
+            
+            Object.values(agents).forEach(agent => {
+                const agentCard = document.createElement('div');
+                agentCard.className = `agent-card ${agent.status}`;
+                agentCard.onclick = () => showAgentDetails(agent.agent_id);
+                
+                agentCard.innerHTML = `
+                    <div class="agent-id">${agent.agent_id}</div>
+                    <div class="agent-metrics">
+                        <div>
+                            <div style="font-size: 10px; color: rgba(255,255,255,0.6);">Response</div>
+                            <div>${Math.round(agent.response_time_ms)}ms</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: rgba(255,255,255,0.6);">CPU</div>
+                            <div>${Math.round(agent.cpu_usage)}%</div>
+                        </div>
+                        <div class="agent-status status-${agent.status}">
+                            ${agent.status}
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(agentCard);
+            });
+        }
+
+        function updateAlerts(alerts) {
+            const alertsList = document.getElementById('alertsList');
+            
+            if (alerts.length === 0) {
+                alertsList.innerHTML = '<div class="alert-item" style="background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.3); color: #00ff88;">System monitoring active - all systems operational</div>';
+                return;
+            }
+            
+            alertsList.innerHTML = alerts.map(alert => 
+                `<div class="alert-item">${alert}</div>`
+            ).join('');
+        }
+
+        function initializeChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Avg Response Time (ms)',
+                        data: [],
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Swarm Efficiency (%)',
+                        data: [],
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                        tension: 0.4,
+                        fill: false,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: 'white' }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            beginAtZero: true
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { drawOnChartArea: false },
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        function updatePerformanceChart(summary) {
+            const now = new Date().toLocaleTimeString();
+            
+            // Keep last 20 data points
+            if (performanceChart.data.labels.length >= 20) {
+                performanceChart.data.labels.shift();
+                performanceChart.data.datasets[0].data.shift();
+                performanceChart.data.datasets[1].data.shift();
+            }
+            
+            performanceChart.data.labels.push(now);
+            performanceChart.data.datasets[0].data.push(Math.round(summary.avg_response_time));
+            performanceChart.data.datasets[1].data.push(Math.round(summary.swarm_efficiency));
+            
+            performanceChart.update('none');
+        }
+
+        function updateLastUpdateTime() {
+            document.getElementById('lastUpdate').textContent = 'Just now';
+        }
+
+        function showAgentDetails(agentId) {
+            const agent = systemData.agents[agentId];
+            if (!agent) return;
+            
+            alert(`Agent Details: ${agentId}
+            
+Status: ${agent.status}
+Response Time: ${Math.round(agent.response_time_ms)}ms
+CPU Usage: ${Math.round(agent.cpu_usage)}%
+Memory Usage: ${Math.round(agent.memory_usage)}%
+Error Rate: ${agent.error_rate.toFixed(1)}%
+Task Completion: ${Math.round(agent.task_completion_rate)}%
+Revenue Generated: $${Math.round(agent.revenue_generated)}
+Tasks Processed: ${agent.tasks_processed}
+
+${agent.alerts.length > 0 ? 'Alerts:\n' + agent.alerts.join('\n') : 'No active alerts'}`);
+        }
+
+        // Auto-refresh fallback if socket connection fails
+        setInterval(function() {
+            if (!socket.connected) {
+                fetch('/api/system/status')
+                    .then(response => response.json())
+                    .then(summary => {
+                        fetch('/api/agents/all')
+                            .then(response => response.json())
+                            .then(agents => {
+                                updateDashboard({
+                                    summary: summary,
+                                    agent_metrics: agents,
+                                    timestamp: Date.now() / 1000
+                                });
+                            });
+                    })
+                    .catch(console.error);
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

@@ -16,14 +16,14 @@ require("dotenv").config();
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Amount of SINC per airdrop recipient
-const SINC_PER_ADDRESS = "100"; // 100 SINC each
+const SINC_PER_ADDRESS = "1000"; // 1000 SINC each
 
 // List of addresses to receive airdrop
 // Add wallet addresses here (one per line)
 const AIRDROP_LIST = [
-  // Example addresses - replace with real ones:
-  // "0x1234567890123456789012345678901234567890",
-  // "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  // Test airdrop addresses
+  "0x742d35Cc6634C0532925a3b844Bc454e4438f44e", // Example address
+  "0x1234567890123456789012345678901234567890", // Dummy
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -51,10 +51,14 @@ async function main() {
     return;
   }
 
-  const provider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+  const provider = new ethers.JsonRpcProvider(process.env.BASE_RPC_URL || "https://mainnet.base.org");
   
-  const MNEMONIC = "equal case hope mirror sketch kitten vivid arctic type earn hidden shed";
-  const wallet = ethers.HDNodeWallet.fromPhrase(MNEMONIC, undefined, "m/44'/60'/0'/0/1").connect(provider);
+  if (!process.env.PRIVATE_KEY) {
+    console.error("❌ ERROR: PRIVATE_KEY not found in .env");
+    process.exit(1);
+  }
+  
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
   
   const sincABI = [
     "function balanceOf(address) view returns (uint256)",

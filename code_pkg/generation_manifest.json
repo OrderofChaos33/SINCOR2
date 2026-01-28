@@ -1,0 +1,10 @@
+{
+  "path": "MP-01",
+  "job_id": "MP-01-20250922-113900",
+  "ts": "2025-09-22 11:39:00",
+  "deliverables": [
+    "output/flyer.pdf",
+    "output/pack.zip",
+    "output/asset_links.json"
+  ]
+}

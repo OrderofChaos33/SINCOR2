@@ -1,0 +1,20 @@
+{
+  "name": "sinc-deploy",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:sinc": "hardhat run scripts/deploy_sinc.js --network baseSepolia",
+    "mint:sinc": "hardhat run scripts/mint_sinc.js --network baseSepolia --",
+    "add-liquidity": "node scripts/add_liquidity.js"
+  },
+  "devDependencies": {
+    "hardhat": "^2.22.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.2"
+  }
+}

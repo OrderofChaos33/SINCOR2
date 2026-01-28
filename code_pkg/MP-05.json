@@ -1,0 +1,10 @@
+﻿{
+  "id": "MP-05",
+  "title": "First Sale Free, Unlock Full",
+  "services": ["media_pack_gen","paywall","template_renderer","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/sample/flyer.pdf","output/full/pack.zip","output/full/asset_links.json"],
+  "transaction": {"mode":"unlock","provider":"stripe","product":"mediapack_unlock"},
+  "kpis": ["sample_delivered","unlock_converted","payment_success"]
+}

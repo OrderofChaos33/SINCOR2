@@ -1,0 +1,10 @@
+﻿{
+  "id": "MR-13",
+  "title": "Founders Lifetime Tier",
+  "services": ["subscription_manager","sbt_issuer","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/membership/founders_badge.json","output/membership/perks.json"],
+  "transaction": {"mode":"lifetime","provider":"stripe","product":"founders_lifetime"},
+  "kpis": ["badge_issued","perks_issued","payment_success"]
+}

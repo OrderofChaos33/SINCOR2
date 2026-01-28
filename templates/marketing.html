@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINC Marketing Hub | Campaigns & Promotions</title>
+    <meta name="description" content="Explore SINC marketing campaigns, promotional materials, and partnership opportunities. Join our affiliate program and earn rewards.">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --dark: #0f0f23;
+            --darker: #070714;
+            --card: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%);
+            --gradient-2: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .bg-gradient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 40% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        
+        header {
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+
+        .hero {
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .campaigns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 60px;
+        }
+        
+        .campaign-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            transition: all 0.3s;
+        }
+        
+        .campaign-card:hover {
+            background: var(--card-hover);
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+        
+        .campaign-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .badge-active { background: var(--success); color: white; }
+        .badge-upcoming { background: var(--warning); color: #000; }
+        .badge-ended { background: var(--text-muted); color: white; }
+        
+        .campaign-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .campaign-description {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .campaign-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .affiliate-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        
+        .affiliate-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .affiliate-description {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .affiliate-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .affiliate-stat {
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+        }
+        
+        .affiliate-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 4px;
+        }
+        
+        .affiliate-stat-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .materials-section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .materials-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        
+        .materials-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+        }
+        
+        .material-card {
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        
+        .material-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 16px;
+        }
+        
+        .material-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .material-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .social-proof {
+            text-align: center;
+            padding: 60px 0;
+            border-top: 1px solid var(--border);
+        }
+        
+        .social-proof-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .social-proof-text {
+            color: var(--text-secondary);
+            font-size: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .testimonials {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+        
+        .testimonial {
+            padding: 24px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        
+        .testimonial-text {
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-bottom: 16px;
+        }
+        
+        .testimonial-author {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 36px; }
+            .hero p { font-size: 16px; }
+            .campaigns-grid { grid-template-columns: 1fr; }
+            .affiliate-stats { grid-template-columns: repeat(2, 1fr); }
+            .materials-grid { grid-template-columns: 1fr; }
+            .testimonials { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-gradient"></div>
+    
+    <header>
+        <div class="container">
+            <a href="/" class="logo">SINC</a>
+        </div>
+    </header>
+    
+    <main class="container">
+        <section class="hero">
+            <h1>Marketing Hub</h1>
+            <p>Join our marketing campaigns, access promotional materials, and earn rewards through our affiliate program.</p>
+        </section>
+        
+        <section class="campaigns-grid">
+            <div class="campaign-card">
+                <span class="campaign-badge badge-active">Active</span>
+                <h3 class="campaign-title">Early Adopter Rewards</h3>
+                <p class="campaign-description">Join our community in the first 30 days and earn bonus SINC tokens for every referral and stake.</p>
+                <div class="campaign-stats">
+                    <div class="stat">
+                        <div class="stat-value">500</div>
+                        <div class="stat-label">Participants</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">25K</div>
+                        <div class="stat-label">SINC Rewarded</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">15</div>
+                        <div class="stat-label">Days Left</div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="joinCampaign('early-adopter')">Join Campaign</button>
+            </div>
+            
+            <div class="campaign-card">
+                <span class="campaign-badge badge-active">Active</span>
+                <h3 class="campaign-title">Staking Multiplier</h3>
+                <p class="campaign-description">Stake SINC tokens during this period and receive 2x rewards on all staking earnings.</p>
+                <div class="campaign-stats">
+                    <div class="stat">
+                        <div class="stat-value">1,200</div>
+                        <div class="stat-label">Stakers</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">2x</div>
+                        <div class="stat-label">Multiplier</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">45</div>
+                        <div class="stat-label">Days Left</div>
+                    </div>
+                </div>
+                <a href="/staking" class="btn btn-primary">Start Staking</a>
+            </div>
+            
+            <div class="campaign-card">
+                <span class="campaign-badge badge-upcoming">Upcoming</span>
+                <h3 class="campaign-title">Agent Marketplace Launch</h3>
+                <p class="campaign-description">Celebrate the launch of our AI agent marketplace with exclusive rewards and early access.</p>
+                <div class="campaign-stats">
+                    <div class="stat">
+                        <div class="stat-value">TBA</div>
+                        <div class="stat-label">Launch Date</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">50K</div>
+                        <div class="stat-label">Prize Pool</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">∞</div>
+                        <div class="stat-label">Winners</div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" disabled>Get Notified</button>
+            </div>
+            
+            <div class="campaign-card">
+                <span class="campaign-badge badge-active">Active</span>
+                <h3 class="campaign-title">Social Media Challenge</h3>
+                <p class="campaign-description">Share your SINC journey on social media and earn tokens for the best content and engagement.</p>
+                <div class="campaign-stats">
+                    <div class="stat">
+                        <div class="stat-value">850</div>
+                        <div class="stat-label">Submissions</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">15K</div>
+                        <div class="stat-label">Total Rewards</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">Ongoing</div>
+                        <div class="stat-label">Status</div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="joinCampaign('social-challenge')">Submit Content</button>
+            </div>
+        </section>
+        
+        <section class="affiliate-section">
+            <h2 class="affiliate-title">Affiliate Program</h2>
+            <p class="affiliate-description">Earn passive income by referring friends and businesses to the SINC ecosystem. Higher tiers unlock better rewards.</p>
+            
+            <div class="affiliate-stats">
+                <div class="affiliate-stat">
+                    <div class="affiliate-stat-value">$12,450</div>
+                    <div class="affiliate-stat-label">Total Paid Out</div>
+                </div>
+                <div class="affiliate-stat">
+                    <div class="affiliate-stat-value">1,250</div>
+                    <div class="affiliate-stat-label">Active Affiliates</div>
+                </div>
+                <div class="affiliate-stat">
+                    <div class="affiliate-stat-value">15%</div>
+                    <div class="affiliate-stat-label">Commission Rate</div>
+                </div>
+                <div class="affiliate-stat">
+                    <div class="affiliate-stat-value">30</div>
+                    <div class="affiliate-stat-label">Days Avg. Payout</div>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="joinAffiliate()">Join Affiliate Program</button>
+        </section>
+        
+        <section class="materials-section">
+            <h2 class="materials-title">Marketing Materials</h2>
+            <div class="materials-grid">
+                <div class="material-card">
+                    <div class="material-icon">📊</div>
+                    <h3 class="material-title">Infographics</h3>
+                    <p class="material-description">Eye-catching graphics explaining SINC's value proposition and tokenomics.</p>
+                    <button class="btn btn-secondary" onclick="showComingSoon()">Coming Soon</button>
+                </div>
+                
+                <div class="material-card">
+                    <div class="material-icon">🎥</div>
+                    <h3 class="material-title">Video Content</h3>
+                    <p class="material-description">Short promotional videos and explainer content for social media sharing.</p>
+                    <button class="btn btn-secondary" onclick="showComingSoon()">Coming Soon</button>
+                </div>
+                
+                <div class="material-card">
+                    <div class="material-icon">📝</div>
+                    <h3 class="material-title">Press Kit</h3>
+                    <p class="material-description">Complete press kit with logos, brand guidelines, and company information.</p>
+                    <button class="btn btn-secondary" onclick="showComingSoon()">Coming Soon</button>
+                </div>
+                
+                <div class="material-card">
+                    <div class="material-icon">🔗</div>
+                    <h3 class="material-title">Referral Links</h3>
+                    <p class="material-description">Custom tracking links for affiliate marketing and referral campaigns.</p>
+                    <button class="btn btn-secondary" onclick="generateReferralLink()">Generate Link</button>
+                </div>
+                
+                <div class="material-card">
+                    <div class="material-icon">📱</div>
+                    <h3 class="material-title">Social Media Kit</h3>
+                    <p class="material-description">Ready-to-use posts, stories, and content for all major social platforms.</p>
+                    <button class="btn btn-secondary" onclick="showComingSoon()">Coming Soon</button>
+                </div>
+                
+                <div class="material-card">
+                    <div class="material-icon">🎯</div>
+                    <h3 class="material-title">Email Templates</h3>
+                    <p class="material-description">Professional email templates for newsletters and promotional campaigns.</p>
+                    <button class="btn btn-secondary" onclick="showComingSoon()">Coming Soon</button>
+                </div>
+            </div>
+        </section>
+        
+        <section class="social-proof">
+            <h2 class="social-proof-title">Success Stories</h2>
+            <p class="social-proof-text">See how our community members are earning through SINC marketing campaigns</p>
+            
+            <div class="testimonials">
+                <div class="testimonial">
+                    <p class="testimonial-text">"Joined the affiliate program 3 months ago and I've already earned over $2,500 in commissions. The referral system is incredible!"</p>
+                    <p class="testimonial-author">- Sarah Chen, Content Creator</p>
+                </div>
+                
+                <div class="testimonial">
+                    <p class="testimonial-text">"The social media challenge helped me grow my following by 300% while earning SINC tokens. Best marketing campaign I've participated in."</p>
+                    <p class="testimonial-author">- Mike Rodriguez, Crypto Influencer</p>
+                </div>
+                
+                <div class="testimonial">
+                    <p class="testimonial-text">"Started with staking rewards and now I'm earning passive income through multiple campaigns. SINC changed my financial future."</p>
+                    <p class="testimonial-author">- Emma Thompson, Early Adopter</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <script>
+        function joinCampaign(campaignType) {
+            const messages = {
+                'early-adopter': 'Early Adopter campaign joined! Check your email for bonus token details.',
+                'social-challenge': 'Social Media Challenge joined! Share your content and start earning rewards.'
+            };
+            alert(messages[campaignType] || 'Campaign joined successfully!');
+        }
+        
+        function joinAffiliate() {
+            alert('Affiliate program application submitted! You will receive your unique referral link within 24 hours.');
+        }
+        
+        // Animate stats on scroll
+        const observerOptions = {
+            threshold: 0.5,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const stats = entry.target.querySelectorAll('.affiliate-stat-value');
+                    stats.forEach(stat => {
+                        const target = parseFloat(stat.textContent.replace(/[^\d.]/g, ''));
+                        if (!isNaN(target)) {
+                            animateValue(stat, 0, target, 2000);
+                        }
+                    });
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+        
+        document.querySelectorAll('.affiliate-section').forEach(section => {
+            observer.observe(section);
+        });
+        
+        function animateValue(element, start, end, duration) {
+            const startTime = performance.now();
+            const endTime = startTime + duration;
+            
+            function update(currentTime) {
+                if (currentTime >= endTime) {
+                    element.textContent = end === Math.floor(end) ? end : end.toFixed(0);
+                    return;
+                }
+                
+                const progress = (currentTime - startTime) / duration;
+                const current = start + (end - start) * progress;
+                element.textContent = current === Math.floor(current) ? Math.floor(current) : current.toFixed(0);
+                
+                requestAnimationFrame(update);
+            }
+            
+            requestAnimationFrame(update);
+        }
+        
+        function showComingSoon() {
+            alert('Marketing materials coming soon! Join our affiliate program to get early access.');
+        }
+        
+        function generateReferralLink() {
+            const referralCode = 'SINC-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+            const referralLink = window.location.origin + '?ref=' + referralCode;
+            navigator.clipboard.writeText(referralLink);
+            alert('Referral link copied to clipboard: ' + referralLink);
+        }
+    </script>
+</body>
+</html>

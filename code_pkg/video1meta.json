@@ -1,0 +1,39 @@
+{
+  "id": "biz_1",
+  "title": "Clinton Auto Detailing - Full Interior & Exterior Service",
+  "description": "Professional auto detailing in Clinton, IA. Book now for interior shampoo, ceramic protection, and showroom-level shine.",
+  "format": "mp4",
+  "duration": 20,
+  "created_at": "2025-08-20T23:40:00Z",
+  "keywords": [
+    "auto detailing",
+    "ceramic coating",
+    "car wash Clinton IA",
+    "Clinton Auto Detailing",
+    "interior cleaning",
+    "paint protection"
+  ],
+  "cta": {
+    "text": "Book Your Appointment Now",
+    "url": "https://clintondetailing.com/booking",
+    "phone": "1-815-718-8936"
+  },
+  "visual_overlays": [
+    {
+      "text": "Showroom Shine Guaranteed",
+      "time_start": 2,
+      "time_end": 6,
+      "position": "center"
+    },
+    {
+      "text": "Interior • Exterior • Ceramic",
+      "time_start": 10,
+      "time_end": 14,
+      "position": "bottom"
+    }
+  ],
+  "music": {
+    "track": "stock/elevator_bg.mp3",
+    "volume": 0.3
+  }
+}

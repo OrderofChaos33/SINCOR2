@@ -1,0 +1,10 @@
+﻿{
+  "id": "MR-14",
+  "title": "Post-Booking Membership Upsell",
+  "services": ["booking_funnel","subscription_manager","email_sender","payments"],
+  "trigger": {"type":"booking_success"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/membership/upsell_offer.json","output/membership/activation.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"membership_addon"},
+  "kpis": ["upsell_shown","subscription_active","payment_success"]
+}

@@ -1,0 +1,17 @@
+{
+  "goal_001": {
+    "goal_id": "goal_001",
+    "description": "Research competitive landscape in AI market",
+    "context": {
+      "industry": "AI",
+      "timeframe": "Q4_2025"
+    },
+    "priority": 0.8,
+    "deadline": "2025-12-31",
+    "success_criteria": [
+      "comprehensive_report",
+      "actionable_insights"
+    ],
+    "assigned_agent": "E-auriga-01"
+  }
+}

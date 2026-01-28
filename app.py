@@ -14,6 +14,42 @@ except ImportError:
     print("Compliance email system not available")
     EMAIL_AVAILABLE = False
 
+# Import faucet system
+try:
+    from faucet import init_faucet, get_faucet_status, process_claim_request
+    FAUCET_AVAILABLE = init_faucet()
+    if FAUCET_AVAILABLE:
+        print("Faucet system initialized successfully")
+    else:
+        print("Faucet system failed to initialize")
+except ImportError as e:
+    print(f"Faucet system not available: {e}")
+    FAUCET_AVAILABLE = False
+
+# Import staking system
+try:
+    from staking import init_staking, get_staking_stats, get_user_staking_info, process_stake_request, process_unstake_request
+    STAKING_AVAILABLE = init_staking()
+    if STAKING_AVAILABLE:
+        print("Staking system initialized successfully")
+    else:
+        print("Staking system failed to initialize")
+except ImportError as e:
+    print(f"Staking system not available: {e}")
+    STAKING_AVAILABLE = False
+
+# Import marketplace system
+try:
+    from marketplace import init_marketplace, get_agents, get_categories, get_marketplace_stats, process_rental_request, get_user_rentals
+    MARKETPLACE_AVAILABLE = init_marketplace()
+    if MARKETPLACE_AVAILABLE:
+        print("Marketplace system initialized successfully")
+    else:
+        print("Marketplace system failed to initialize")
+except ImportError as e:
+    print(f"Marketplace system not available: {e}")
+    MARKETPLACE_AVAILABLE = False
+
 # Import waitlist system with error handling
 try:
     from waitlist_system import waitlist_manager
@@ -64,6 +100,10 @@ def index():
     """Main landing page - SINC Token Portal"""
     return render_template('index_sinc.html')
 
+@app.route('/test')
+def test_route():
+    return 'Test route works'
+
 @app.route('/trade')
 def trade():
     """Trade SINC token page"""
@@ -78,6 +118,216 @@ def dashboard():
 def faucet():
     """SINC Token Faucet page"""
     return render_template('faucet.html')
+
+@app.route('/api/faucet/status')
+def faucet_status():
+    """Get faucet status"""
+    if not FAUCET_AVAILABLE:
+        return jsonify({
+            'balance': 0,
+            'claim_amount': 100,
+            'cooldown_hours': 24,
+            'daily_claims': 0,
+            'max_daily_claims': 100
+        }), 503
+
+    return jsonify(get_faucet_status())
+
+@app.route('/api/faucet/claim', methods=['POST'])
+def faucet_claim():
+    """Process token claim request"""
+    if not FAUCET_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Faucet service unavailable'
+        }), 503
+
+    return process_claim_request()
+
+@app.route('/api/staking/stats')
+def staking_stats():
+    """Get staking statistics"""
+    if not STAKING_AVAILABLE:
+        return jsonify({
+            'total_staked': 0,
+            'total_stakers': 0,
+            'daily_rewards': 0,
+            'apy': 12.5
+        }), 503
+
+    return jsonify(get_staking_stats())
+
+@app.route('/api/staking/user', methods=['POST'])
+def staking_user_info():
+    """Get user's staking information"""
+    return get_user_staking_info()
+
+@app.route('/api/staking/stake', methods=['POST'])
+def staking_stake():
+    """Process token staking request"""
+    if not STAKING_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Staking service unavailable'
+        }), 503
+
+    return process_stake_request()
+
+@app.route('/api/staking/unstake', methods=['POST'])
+def staking_unstake():
+    """Process token unstaking request"""
+    if not STAKING_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Staking service unavailable'
+        }), 503
+
+    return process_unstake_request()
+
+@app.route('/api/marketplace/agents')
+def marketplace_agents():
+    """Get available agents"""
+    return get_agents()
+
+@app.route('/api/marketplace/categories')
+def marketplace_categories():
+    """Get agent categories"""
+    return get_categories()
+
+@app.route('/api/marketplace/stats')
+def marketplace_stats():
+    """Get marketplace statistics"""
+    return get_marketplace_stats()
+
+@app.route('/api/marketplace/rent', methods=['POST'])
+def marketplace_rent():
+    """Process agent rental request"""
+    if not MARKETPLACE_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Marketplace service unavailable'
+        }), 503
+
+    return process_rental_request()
+
+@app.route('/api/marketplace/user-rentals', methods=['POST'])
+def marketplace_user_rentals():
+    """Get user's rental history"""
+    return get_user_rentals()
+
+@app.route('/api/marketplace/subscription-plans')
+def marketplace_subscription_plans():
+    """Get available subscription plans"""
+    if not MARKETPLACE_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Marketplace service unavailable'
+        }), 503
+
+    plans = marketplace.get_subscription_plans()
+    return jsonify({
+        'success': True,
+        'plans': plans
+    })
+
+@app.route('/api/marketplace/subscribe', methods=['POST'])
+def marketplace_subscribe():
+    """Subscribe user to a plan"""
+    if not MARKETPLACE_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Marketplace service unavailable'
+        }), 503
+
+    data = request.get_json()
+    if not data or 'address' not in data or 'plan_type' not in data:
+        return jsonify({
+            'success': False,
+            'error': 'Missing address or plan_type'
+        }), 400
+
+    user_address = data['address']
+    plan_type = data['plan_type']
+
+    result = marketplace.subscribe_user(user_address, plan_type)
+
+    if result['success']:
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 400
+
+@app.route('/api/marketplace/user-subscription', methods=['POST'])
+def marketplace_user_subscription():
+    """Get user's active subscription"""
+    if not MARKETPLACE_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Marketplace service unavailable'
+        }), 503
+
+    data = request.get_json()
+    if not data or 'address' not in data:
+        return jsonify({
+            'success': False,
+            'error': 'Missing address'
+        }), 400
+
+    user_address = data['address']
+    subscription = marketplace.get_user_subscription(user_address)
+
+    return jsonify({
+        'success': True,
+        'subscription': subscription
+    })
+
+@app.route('/api/marketplace/cancel-subscription', methods=['POST'])
+def marketplace_cancel_subscription():
+    """Cancel user's subscription"""
+    if not MARKETPLACE_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Marketplace service unavailable'
+        }), 503
+
+    data = request.get_json()
+    if not data or 'address' not in data:
+        return jsonify({
+            'success': False,
+            'error': 'Missing address'
+        }), 400
+
+    user_address = data['address']
+    result = marketplace.cancel_subscription(user_address)
+
+    if result['success']:
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 400
+
+@app.route('/staking')
+def staking():
+    """SINC Token Staking Dashboard"""
+    return render_template('staking.html')
+
+@app.route('/marketplace')
+def marketplace():
+    """AI Agent Marketplace"""
+    return render_template('marketplace.html')
+
+@app.route('/community')
+def community():
+    """SINC Community and Social Media"""
+    return render_template('community.html')
+
+@app.route('/compliance')
+def compliance():
+    """Compliance Center - KYC and Regulatory"""
+    return render_template('compliance.html')
+
+@app.route('/marketing')
+def marketing():
+    """Marketing Hub - Campaigns and Promotions"""
+    return render_template('marketing.html')
 
 @app.route('/whitepaper')
 def whitepaper():

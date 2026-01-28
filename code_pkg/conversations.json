@@ -1,0 +1,54 @@
+[
+  {
+    "lead": {
+      "platform": "reddit",
+      "subreddit": "smallbusiness",
+      "title": "How do I forecast revenue for Q1?",
+      "author": "small_biz_owner",
+      "url": "https://reddit.com/r/smallbusiness/...",
+      "text": "Need to project revenue for next 90 days...",
+      "timestamp": "2025-10-04T20:28:56.856277",
+      "matched_keyword": "revenue forecasting",
+      "recommended_service": "growth_forecast",
+      "lead_score": 0.92
+    },
+    "message": "Saw your post about revenue forecasting. Built an AI that forecasts business growth (90-day revenue predictions + growth opportunities). $247, takes 20 minutes. Here's what it looks like: [link]\n\nInterested? I can run the analysis for you.",
+    "payment_link": "https://paypal.me/SINCOR/247",
+    "sent_at": "2025-10-04T20:28:56.873330",
+    "status": "pending"
+  },
+  {
+    "lead": {
+      "platform": "twitter",
+      "author": "@tech_startup",
+      "text": "Anyone know a good service for competitive analysis? Need it ASAP",
+      "url": "https://twitter.com/tech_startup/status/...",
+      "timestamp": "2025-10-04T20:28:56.858443",
+      "matched_keyword": "competitive analysis",
+      "recommended_service": "competitive_analysis",
+      "lead_score": 0.88
+    },
+    "message": "Saw your post about competitive analysis. I've got an AI that does deep competitive analysis (analyzes your top 3 competitors + gives you strategic moves). $147, delivered in 15 min. Want a sample?\n\nInterested? I can run the analysis for you.",
+    "payment_link": "https://paypal.me/SINCOR/147",
+    "sent_at": "2025-10-04T20:28:56.873351",
+    "status": "pending"
+  },
+  {
+    "lead": {
+      "platform": "reddit",
+      "subreddit": "Entrepreneur",
+      "title": "Need help analyzing competitor pricing strategies",
+      "author": "startup_founder_42",
+      "url": "https://reddit.com/r/Entrepreneur/...",
+      "text": "Looking for someone to help analyze my top 3 competitors...",
+      "timestamp": "2025-10-04T20:28:56.856235",
+      "matched_keyword": "competitor research",
+      "recommended_service": "competitive_analysis",
+      "lead_score": 0.85
+    },
+    "message": "Saw your post about competitor research. I've got an AI that does deep competitive analysis (analyzes your top 3 competitors + gives you strategic moves). $147, delivered in 15 min. Want a sample?\n\nInterested? I can run the analysis for you.",
+    "payment_link": "https://paypal.me/SINCOR/147",
+    "sent_at": "2025-10-04T20:28:56.873363",
+    "status": "pending"
+  }
+]

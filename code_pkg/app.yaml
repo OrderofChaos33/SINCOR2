@@ -1,0 +1,26 @@
+name: sincor-production
+services:
+- name: web
+  source_dir: /
+  github:
+    repo: YOUR_GITHUB_USERNAME/sincor-clean
+    branch: main
+  run_command: gunicorn app:app --bind 0.0.0.0:$PORT
+  environment_slug: python
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /
+  envs:
+  - key: FLASK_ENV
+    value: production
+  - key: PAYPAL_ENV
+    value: live
+  - key: APP_BASE_URL
+    value: ${APP_DOMAIN}
+  - key: LOG_LEVEL
+    value: INFO
+databases:
+- name: sincor-db
+  engine: PG
+  size: db-s-dev-database

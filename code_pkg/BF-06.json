@@ -1,0 +1,10 @@
+﻿{
+  "id": "BF-06",
+  "title": "Lead-Form + Call Routing",
+  "services": ["landing_builder","form_handler","notifier","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/landing/index.html","output/form/schema.json","output/notifications.json"],
+  "transaction": {"mode":"setup","provider":"paypal","product":"leadform_setup"},
+  "kpis": ["landing_live","form_live","alerts_live","payment_success"]
+}

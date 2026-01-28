@@ -1,0 +1,36 @@
+[
+  {
+    "platform": "reddit",
+    "subreddit": "Entrepreneur",
+    "title": "Need help analyzing competitor pricing strategies",
+    "author": "startup_founder_42",
+    "url": "https://reddit.com/r/Entrepreneur/...",
+    "text": "Looking for someone to help analyze my top 3 competitors...",
+    "timestamp": "2025-10-04T20:28:56.856235",
+    "matched_keyword": "competitor research",
+    "recommended_service": "competitive_analysis",
+    "lead_score": 0.85
+  },
+  {
+    "platform": "reddit",
+    "subreddit": "smallbusiness",
+    "title": "How do I forecast revenue for Q1?",
+    "author": "small_biz_owner",
+    "url": "https://reddit.com/r/smallbusiness/...",
+    "text": "Need to project revenue for next 90 days...",
+    "timestamp": "2025-10-04T20:28:56.856277",
+    "matched_keyword": "revenue forecasting",
+    "recommended_service": "growth_forecast",
+    "lead_score": 0.92
+  },
+  {
+    "platform": "twitter",
+    "author": "@tech_startup",
+    "text": "Anyone know a good service for competitive analysis? Need it ASAP",
+    "url": "https://twitter.com/tech_startup/status/...",
+    "timestamp": "2025-10-04T20:28:56.858443",
+    "matched_keyword": "competitive analysis",
+    "recommended_service": "competitive_analysis",
+    "lead_score": 0.88
+  }
+]

@@ -1,0 +1,19 @@
+id: track01
+title: "Country Heathen — Blacktop Hymn"
+series: "Drop Series A"
+media:
+  - path: content/media/track01-clip-00.mp4
+  - path: content/media/track01-cover.png
+tags: [music, synthwave, country]
+hook: "grit & neon stitched into one bassline"
+call_to_action: "Stream now and tag a friend who needs new fuel."
+hashtags: ["#CountryHeathen", "#Synthwave", "#NewMusic"]
+platforms: [buffer_csv]
+releases:
+  date: 2025-08-13
+  embargo_until: null
+variants:
+  - tag: "30s clip"
+    media: content/media/track01-clip-00.mp4
+  - tag: "cover art"
+    media: content/media/track01-cover.png

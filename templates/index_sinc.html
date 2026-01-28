@@ -99,6 +99,54 @@
         nav { display: flex; gap: 32px; align-items: center; }
         nav a { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
         nav a:hover { color: #fff; }
+        
+        /* Mobile navigation */
+        .mobile-menu-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            padding: 8px;
+            margin-left: 16px;
+        }
+        .mobile-menu-toggle span {
+            width: 24px; height: 2px;
+            background: #fff;
+            margin: 3px 0;
+            transition: 0.3s;
+        }
+        .mobile-menu-toggle.active span:nth-child(1) { transform: rotate(-45deg) translate(-5px, 6px); }
+        .mobile-menu-toggle.active span:nth-child(2) { opacity: 0; }
+        .mobile-menu-toggle.active span:nth-child(3) { transform: rotate(45deg) translate(-5px, -6px); }
+        
+        @media (max-width: 768px) {
+            nav {
+                position: fixed;
+                top: 70px; left: 0; right: 0;
+                background: rgba(7,7,20,0.95);
+                backdrop-filter: blur(20px);
+                flex-direction: column;
+                gap: 0;
+                padding: 20px;
+                transform: translateY(-100%);
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.3s;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+            }
+            nav.active {
+                transform: translateY(0);
+                opacity: 1;
+                visibility: visible;
+            }
+            nav a {
+                padding: 12px 0;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+                width: 100%;
+                text-align: center;
+            }
+            nav a:last-child { border-bottom: none; }
+            .mobile-menu-toggle { display: flex; }
+        }
         .btn {
             display: inline-flex; align-items: center; gap: 8px;
             padding: 12px 24px; border-radius: 12px;
@@ -254,9 +302,19 @@
                     <a href="#features">Features</a>
                     <a href="#usecases">Use Cases</a>
                     <a href="#earn">Earn</a>
+                    <a href="/staking">Staking</a>
+                    <a href="/marketplace">Marketplace</a>
+                    <a href="/community">Community</a>
+                    <a href="/compliance">Compliance</a>
+                    <a href="/marketing">Marketing</a>
                     <a href="/whitepaper">Whitepaper</a>
                     <a href="#" class="btn btn-primary" onclick="openModal()">Get SINC</a>
                 </nav>
+                <div class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
             </div>
         </div>
     </header>
@@ -472,6 +530,11 @@
                 <div class="footer-links">
                     <a href="/whitepaper">Whitepaper</a>
                     <a href="/faucet">Faucet</a>
+                    <a href="/staking">Staking</a>
+                    <a href="/marketplace">Marketplace</a>
+                    <a href="/community">Community</a>
+                    <a href="/compliance">Compliance</a>
+                    <a href="/marketing">Marketing</a>
                     <a href="https://basescan.org/token/0xd10D86D09ee4316CdD3585fd6486537b7119A073" target="_blank">BaseScan</a>
                     <a href="/terms">Terms</a>
                     <a href="/privacy">Privacy</a>
@@ -487,6 +550,24 @@
         // Header scroll effect
         window.addEventListener('scroll', () => {
             document.getElementById('header').classList.toggle('scrolled', window.scrollY > 50);
+        });
+        
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            const nav = document.querySelector('nav');
+            const toggle = document.querySelector('.mobile-menu-toggle');
+            nav.classList.toggle('active');
+            toggle.classList.toggle('active');
+        }
+        
+        // Close mobile menu when clicking a link
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', () => {
+                const nav = document.querySelector('nav');
+                const toggle = document.querySelector('.mobile-menu-toggle');
+                nav.classList.remove('active');
+                toggle.classList.remove('active');
+            });
         });
         
         // Copy contract

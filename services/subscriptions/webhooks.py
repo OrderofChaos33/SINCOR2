@@ -15,7 +15,7 @@ async def handle_subscription_updated(event_data: dict, db_conn):
             current_period_start = $2,
             current_period_end = $3,
             updated_at = now()
-        WHERE stripe_subscription_id = $4
+        WHERE provider_subscription_id = $4
     """, 
         subscription['status'],
         datetime.fromtimestamp(subscription['current_period_start']),
@@ -85,7 +85,7 @@ async def handle_customer_subscription_deleted(event_data: dict, db_conn):
             status = 'cancelled',
             cancelled_at = now(),
             updated_at = now()
-        WHERE stripe_subscription_id = $1
+        WHERE providerer_subscription_id = $1
     """, subscription_id)
     
     # Emit event

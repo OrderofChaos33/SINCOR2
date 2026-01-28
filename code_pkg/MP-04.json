@@ -1,0 +1,10 @@
+﻿{
+  "id": "MP-04",
+  "title": "White-Label Pack for Agencies",
+  "services": ["media_pack_gen","white_label_packager","license_manager","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/whitelabel/pack.zip","output/whitelabel/license.json"],
+  "transaction": {"mode":"tiered-license","provider":"stripe","product":"wl_mediapack"},
+  "kpis": ["pack_generated","license_issued","email_sent","payment_success"]
+}

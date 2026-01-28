@@ -1,0 +1,11 @@
+{
+  "biz": "Clinton Auto Detailing",
+  "city": "Clinton, IA",
+  "contact": {
+    "email": "you@example.com",
+    "phone": "563-000-0000"
+  },
+  "payURL": "https://square.link/u/YOURPAYLINK",
+  "notes": "Placeholder links for harness validation.",
+  "generated_at": "2025-09-22 11:39:00"
+}

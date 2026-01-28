@@ -1,0 +1,57 @@
+frameworks:
+  - id: HBPC
+    name: Hook-Benefit-Proof-CTA
+    hooks:
+      - "Tired of pet hair & odors?"
+      - "Driving clients tomorrow? Make the first impression count."
+      - "Embarrassed by coffee stains on the seats?"
+      - "Your car’s interior doesn’t have to smell like yesterday."
+      - "Fleet looking rough? We’ll reset it today."
+      - "Want your ride to feel new again?"
+      - "Dog hair everywhere? Let us fix it."
+      - "Smells that won’t go away? We can."
+      - "Don’t waste weekends scrubbing—book today."
+      - "Fast, pro detailing that keeps your car in the game."
+    benefits:
+      - "Same-day interior reset that keeps your day moving."
+      - "Predictable pricing and invoice-ready service."
+      - "Gentle on fabrics, tough on stains."
+      - "Fast turnaround so you’re never waiting."
+      - "Fresh smell, spotless look, every time."
+      - "Safer drive with allergen-free interiors."
+      - "We come to you—pickup & return available."
+      - "Flexible scheduling for busy people."
+      - "Perfect for family cars, work trucks, or weekend cruisers."
+      - "One clean that lasts for months."
+    proofs:
+      - "Perfect for our work trucks—zero downtime."
+      - "Allergens, pet hair, and odor—gone in one session."
+      - "Customer said: ‘My SUV hasn’t looked this new since I bought it.’"
+      - "Senior-friendly pickup and return—no heavy lifting."
+      - "Before/after shots prove the difference."
+      - "Local businesses trust us to keep fleets clean."
+      - "Over 30 verified 5-star reviews on Google."
+      - "Detailing Clinton cars for over 10 years."
+      - "Family-owned, professional service."
+      - "Neighbors book with us again and again."
+    ctas:
+      - "Book now: https://clintondetailing.com/book · +1 (563) 555-1234"
+      - "Tap to reserve your slot: https://clintondetailing.com/book"
+      - "Call today for fast booking: +1 (563) 555-1234"
+      - "Schedule now—spots fill fast: https://clintondetailing.com/book"
+      - "Get your ride reset today—book online."
+      - "Easy booking, one click away: clintondetailing.com/book"
+      - "DM us now or call +1 (563) 555-1234"
+      - "Your clean car is waiting—reserve now."
+      - "Tap the link, drive fresh tomorrow."
+      - "One call, one clean: +1 (563) 555-1234"
+
+personas:
+  business_owner:
+    tone: "professional, efficient, cost-aware"
+  senior:
+    tone: "gentle, convenient, trustworthy"
+  busy_parent:
+    tone: "empathetic, practical, family-safe"
+  fleet_manager:
+    tone: "reliable, uptime-focused, invoice-ready"

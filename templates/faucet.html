@@ -377,7 +377,7 @@
             }, 3000);
         }
 
-        // Mock Request (Since we don't have the backend wired up live ideally)
+        // Request Tokens Function
         async function requestTokens() {
             if (!userAddress) return;
 
@@ -385,26 +385,49 @@
             requestBtn.disabled = true;
 
             try {
-                // In a real implementation we would call a backend API here
-                // For now, simulate network delay
-                await new Promise(r => setTimeout(r, 2000));
-                
-                // For demo/MVP purposes, since we haven't deployed the backend server:
-                showMessage('Request submitted! SINC will arrive shortly (Mock).', 'success');
-                
+                const response = await fetch('/api/faucet/claim', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        address: userAddress
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage(`Success! ${result.amount} SINC sent to your wallet. TX: ${result.tx_hash.substring(0, 10)}...`, 'success');
+                    // Update balance display
+                    updateFaucetStatus();
+                } else {
+                    showMessage(result.error, 'error');
+                }
+
             } catch (error) {
-                showMessage('Error processing request. Try again later.', 'error');
+                console.error('Claim error:', error);
+                showMessage('Network error. Please try again.', 'error');
             } finally {
                 requestBtn.innerText = 'Request 100 SINC';
                 requestBtn.disabled = false;
             }
         }
 
-        // Utility to show messages
-        function showMessage(msg, type) {
-            messageDiv.textContent = msg;
-            messageDiv.className = type === 'error' ? 'msg-error' : 'msg-success';
-            messageDiv.style.display = 'block';
+        // Update Faucet Status
+        async function updateFaucetStatus() {
+            try {
+                const response = await fetch('/api/faucet/status');
+                const status = await response.json();
+                
+                document.getElementById('faucet-balance').textContent = 
+                    `${status.balance.toLocaleString()} SINC`;
+                
+                // Update claim amount and cooldown if needed
+                // These are static for now but could be dynamic
+            } catch (error) {
+                console.error('Error updating faucet status:', error);
+            }
         }
 
         // Event Listeners
@@ -426,6 +449,9 @@
                 })
                 .catch(console.error);
         }
+
+        // Update faucet status on page load
+        updateFaucetStatus();
     </script>
 </body>
 </html>

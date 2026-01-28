@@ -1,0 +1,10 @@
+﻿{
+  "id": "AE-24",
+  "title": "Industry Templates Library Access",
+  "services": ["template_library","license_manager","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/library/access.json","output/library/quotas.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"templates_library"},
+  "kpis": ["access_granted","quota_set","payment_success"]
+}

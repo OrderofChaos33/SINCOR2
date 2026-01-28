@@ -1,0 +1,10 @@
+﻿{
+  "id": "BF-10",
+  "title": "Landing + Phone Tree + SMS Nurture",
+  "services": ["landing_builder","phone_tree","sms_nurture","notifier","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/landing/index.html","output/ivr/flows.json","output/sms/flows.json"],
+  "transaction": {"mode":"bundle","provider":"paypal","product":"landing_ivr_sms"},
+  "kpis": ["landing_live","ivr_live","sms_live","payment_success"]
+}

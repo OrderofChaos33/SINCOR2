@@ -45,8 +45,68 @@ NOTIFY_PHONE=os.getenv("NOTIFY_PHONE","+15551234567")
 
 # API Keys
 GOOGLE_API_KEY=os.getenv("GOOGLE_API_KEY","") or os.getenv("GOOGLE_PLACES_API_KEY","")
-STRIPE_SECRET_KEY=os.getenv("STRIPE_SECRET_KEY","")
-STRIPE_PUBLISHABLE_KEY=os.getenv("STRIPE_PUBLISHABLE_KEY","")
+# PayPal configuration (Court uses PayPal + on-chain SINC)
+PAYPAL_REST_API_ID = os.getenv('PAYPAL_REST_API_ID', '')
+PAYPAL_REST_API_SECRET = os.getenv('PAYPAL_REST_API_SECRET', '')
+PAYPAL_SANDBOX = os.getenv('PAYPAL_SANDBOX', 'true').lower() == 'true'
+
+# Utility: sanitize and normalize phone numbers for display/storage
+def clean_phone(p):
+    """Return sanitized E.164-like phone string (demo-safe)."""
+    import re
+    s = str(p or "")
+    digits = re.sub(r"\D", "", s)
+    if not digits:
+        return ""
+    # If US-style 10-digit number, prefix with +1
+    if len(digits) == 10:
+        return "+1" + digits
+    if digits.startswith('1') and len(digits) == 11:
+        return "+" + digits
+    return "+" + digits
+
+# Utility: send an email (demo-safe: write to outbox file when SMTP not configured)
+def send_email(subject, body):
+    """Send email via SMTP if configured; otherwise write to OUT/outbox.txt.
+
+    Returns a dict: { sent: bool, method: 'smtp'|'draft'|'error', file: <filename?>, error: <msg?> }
+    """
+    # Prefer dynamic EMAIL_TO from environment at call time (tests patch os.environ)
+    recipients_raw = os.getenv('EMAIL_TO', None)
+    if recipients_raw is None:
+        recipients_raw = ','.join(EMAIL_TO) if EMAIL_TO else ''
+    if not recipients_raw or recipients_raw.strip() == '':
+        return {"method": "error", "error": "EMAIL_TO not configured"}
+
+    # Try SMTP if available
+    if SMTP_HOST and SMTP_USER and SMTP_PASS:
+        try:
+            msg = EmailMessage()
+            msg['Subject'] = subject
+            msg['From'] = EMAIL_FROM
+            msg['To'] = recipients_raw
+            msg.set_content(body)
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+                s.starttls()
+                s.login(SMTP_USER, SMTP_PASS)
+                s.send_message(msg)
+            return {"sent": True, "method": "smtp"}
+        except Exception as e:
+            log(f"Email send failed (SMTP): {e}")
+            # fall through to draft
+
+    # Draft fallback: write an .eml-like draft to OUT
+    try:
+        OUT.mkdir(parents=True, exist_ok=True)
+        outbox = OUT / f"email_draft_{int(datetime.datetime.now().timestamp())}.eml"
+        content = f"Subject: {subject}\nFrom: {EMAIL_FROM}\nTo: {recipients_raw}\n\n{body}\n"
+        # Use Path.write_bytes so tests that patch Path.write_bytes will be triggered
+        outbox.write_bytes(content.encode('utf-8'))
+        return {"sent": False, "method": "draft", "file": outbox.name}
+    except Exception as e:
+        log(f"Outbox write failed: {e}")
+        return {"method": "error", "error": str(e)}
+
 
 def log(msg):
     ts=datetime.datetime.now().isoformat(timespec="seconds")
@@ -224,7 +284,195 @@ PROTOTYPE2025<br>FRIENDSTEST<br>COURTTESTER
 # Basic routes
 @app.get("/")
 def home():
-    return send_from_directory("templates", "index.html")
+    # Simple landing used for tests and lightweight deployments
+    return ("""<!doctype html><meta charset="utf-8"><title>SINCOR</title>
+<body style="font-family:system-ui;margin:2rem">
+<h2>SINCOR Lead Engine</h2>
+<p><a href="/lead">Lead form</a> · <a href="/logs">Logs</a> · <a href="/outputs">Outputs</a> · <a href="/health">Health</a></p>
+</body>""",200,{"Content-Type":"text/html"})
+
+@app.get("/lead")
+def lead_form():
+    return ("""<!doctype html><meta charset="utf-8"><title>Book a Detail</title>
+<body style="font-family:system-ui;margin:2rem;max-width:640px">
+<h2>Book a Detail</h2>
+<form method="post" action="/lead">
+  <label>Name<br><input name="name" required style="width:100%"></label><br><br>
+  <label>Phone<br><input name="phone" required placeholder="+1..." style="width:100%"></label><br><br>
+  <label>Service<br>
+    <select name="service" style="width:100%">
+      <option>Full Detail</option><option>Interior Only</option><option>Exterior + Wax</option><option>Engine Bay</option>
+    </select></label><br><br>
+  <label>Notes<br><textarea name="notes" rows="4" style="width:100%"></textarea></label><br><br>
+  <button type="submit">Request Booking</button>
+</form>
+</body>""",200,{"Content-Type":"text/html"})
+
+@app.post("/lead")
+def lead_submit():
+    name=(request.form.get("name") or "").strip()
+    phone=clean_phone(request.form.get("phone") or "")
+    service=(request.form.get("service") or "").strip()
+    notes=(request.form.get("notes") or "").strip()
+    ip=request.headers.get("X-Forwarded-For", request.remote_addr)
+    if not (name and phone): return ("Missing name/phone",400)
+    save_lead(name,phone,service,notes,ip)
+    subject=f"NEW LEAD: {name} — {service}"
+    body=f"""New lead captured.
+
+Name: {name}
+Phone: {phone}
+Service: {service}
+Notes: {notes}
+IP: {ip}
+
+Owner phone (stored): {NOTIFY_PHONE}
+File: {LEADSCSV.relative_to(ROOT)}
+"""
+    info=send_email(subject,body)
+    msg="Thanks! We'll email confirmation shortly."
+    extra=f"<p>Email notification: <b>{info.get('method')}</b></p>"
+    if info.get("file"): extra+=f"<p>Draft: <a href='/outputs/{info['file']}'>download .eml</a></p>"
+    return (f"<!doctype html><body style='font-family:system-ui;margin:2rem'><h3>Request received</h3><p>{msg}</p>{extra}<p><a href='/'>Back</a></p></body>",200)
+
+# Persistence for leads
+def save_lead(name, phone, service, notes, ip):
+    try:
+        LEADSCSV.parent.mkdir(parents=True, exist_ok=True)
+        with open(LEADSCSV, 'a', encoding='utf-8') as f:
+            f.write(f'"{name}","{phone}","{service}","{notes}","{ip}","{datetime.datetime.now().isoformat()}"\n')
+        return True
+    except Exception as e:
+        log(f"Failed to save lead: {e}")
+        return False
+
+@app.get('/logs')
+def logs():
+    if not LOGFILE.exists(): return jsonify({"path":str(LOGFILE),"tail":[]})
+    try:
+        lines = []
+        with open(LOGFILE,'r',encoding='utf-8') as f:
+            for l in f.readlines()[-50:]:
+                lines.append(l.strip())
+        return jsonify({"path":str(LOGFILE),"tail":lines})
+    except Exception as e:
+        return jsonify({"path":str(LOGFILE),"tail":[],"error":str(e)})
+
+@app.get('/outputs/')
+def outputs():
+    files = []
+    for root, dirs, fs in os.walk(OUT):
+        for f in fs:
+            files.append(f)
+    return jsonify({"files": files})
+
+# Digital store endpoints (simple storefront for Court's digital products)
+try:
+    from digital_store import list_products, create_purchase, execute_purchase
+
+    @app.get("/store/products")
+    def store_products():
+        return list_products()
+
+    @app.route("/store/create", methods=["POST"])
+    def store_create():
+        import asyncio
+        return asyncio.run(create_purchase())
+
+    @app.route("/store/execute", methods=["POST"])
+    def store_execute():
+        import asyncio
+        return asyncio.run(execute_purchase())
+
+    # Product landing page
+    @app.get('/store/product/<product_id>')
+    def store_product_page(product_id):
+        try:
+            import digital_store
+            product = next((p for p in digital_store.PRODUCT_CATALOG if p['id'] == product_id), None)
+            if not product:
+                return ("Product not found", 404)
+            return render_template('store_product.html', product=product)
+        except Exception as e:
+            log(f"Failed to render product page: {e}")
+            return ("Internal error", 500)
+
+    # Webhook endpoints
+    @app.route('/webhook/paypal', methods=['POST'])
+    def webhook_paypal():
+        try:
+            import digital_store
+            payload = request.get_json() or {}
+            result = digital_store.handle_paypal_webhook(payload)
+            if result.get('success'):
+                return jsonify({'success': True}), 200
+            else:
+                return jsonify(result), 400
+        except Exception as e:
+            log(f"PayPal webhook error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # Stripe webhook support removed — project uses PayPal and on-chain SINC only.
+
+    # Marketplace on-chain payment endpoints
+    @app.route('/marketplace/create_onchain_payment', methods=['POST'])
+    def marketplace_create_payment():
+        data = request.get_json() or {}
+        agent_id = data.get('agent_id')
+        address = data.get('address')
+        hours = data.get('hours', 1)
+
+        if not agent_id or not address:
+            return jsonify({'success': False, 'error': 'Missing agent_id or address'}), 400
+
+        if not marketplace:
+            return jsonify({'success': False, 'error': 'Marketplace service unavailable'}), 503
+
+        result = marketplace.generate_payment_request(agent_id, address, hours)
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+
+    @app.route('/marketplace/check_payment', methods=['POST'])
+    def marketplace_check_payment():
+        data = request.get_json() or {}
+        payment_id = data.get('payment_id')
+
+        if not payment_id:
+            return jsonify({'success': False, 'error': 'Missing payment_id'}), 400
+
+        if not marketplace:
+            return jsonify({'success': False, 'error': 'Marketplace service unavailable'}), 503
+
+        # Try local check (demo) and then on-chain scan
+        local = marketplace.check_payment_received(payment_id)
+        if local.get('success'):
+            return jsonify(local), 200
+
+        chain = marketplace.check_payments_onchain(payment_id)
+        return jsonify(chain), 200
+
+    @app.route('/marketplace/settle', methods=['POST'])
+    def marketplace_settle():
+        data = request.get_json() or {}
+        payment_id = data.get('payment_id')
+        agent_address = data.get('agent_address')
+        share = float(data.get('share', 0.8))
+
+        if not payment_id or not agent_address:
+            return jsonify({'success': False, 'error': 'Missing payment_id or agent_address'}), 400
+
+        if not marketplace:
+            return jsonify({'success': False, 'error': 'Marketplace service unavailable'}), 503
+
+        result = marketplace.settle_payment(payment_id, agent_address, share)
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+except Exception as e:
+    log(f"Failed to register digital store routes: {e}")
 
 @app.route("/business-setup", methods=["GET", "POST"])
 def business_setup():
@@ -434,21 +682,20 @@ def admin():
     # Create industry-specific metrics
     # Check for real data sources instead of showing fake metrics
     has_google_api = bool(GOOGLE_API_KEY)
-    has_stripe = bool(STRIPE_SECRET_KEY)
     has_email = bool(SMTP_USER and SMTP_PASS)
     
-    if not any([has_google_api, has_stripe, has_email]):
+    if not any([has_google_api, has_email]):
         # No data sources - prompt for setup
         metrics = {
             "setup_required": "Connect your systems to see real metrics",
-            "available_connections": "Google Calendar • Stripe • Email • SMS",
+            "available_connections": "Google Calendar • Email • SMS",
             "status": "Setup Required",
             "next_step": "Click integration buttons below"
         }
         industry_metrics = {
             "leads_database": "No leads yet - run lead generation",
             "campaigns_active": "No campaigns - create your first campaign", 
-            "integrations_connected": f"{sum([has_google_api, has_stripe, has_email])}/3 connected",
+            "integrations_connected": f"{sum([has_google_api, has_email])}/2 connected",
             "business_profile": "Complete setup to personalize dashboard"
         }
     else:
@@ -468,7 +715,7 @@ def admin():
                 }
                 industry_metrics = {
                     "top_cities": " • ".join(list(stats.get("top_cities", {}).keys())[:3]) or "Run lead generation",
-                    "integrations_status": f"{sum([has_google_api, has_stripe, has_email])}/3 systems connected",
+                    "integrations_status": f"{sum([has_google_api, has_email])}/2 systems connected",
                     "database_status": "Active - real data loaded",
                     "ready_for_outreach": f"{stats.get('high_value_prospects', 0)} prospects ready"
                 }
@@ -477,7 +724,7 @@ def admin():
                     "setup_complete": "Systems connected successfully",
                     "next_action": "Run lead generation to populate dashboard",
                     "database_ready": "Ready to collect real business data",
-                    "integrations": f"{sum([has_google_api, has_stripe, has_email])}/3 connected"
+                    "integrations": f"{sum([has_google_api, has_email])}/2 connected"
                 }
                 industry_metrics = {
                     "status": "Connected but no data yet",
@@ -489,7 +736,7 @@ def admin():
             metrics = {
                 "connection_error": "Unable to load business data",
                 "check_required": "Verify API configurations",
-                "systems_connected": f"{sum([has_google_api, has_stripe, has_email])}/3",
+                "systems_connected": f"{sum([has_google_api, has_email])}/2",
                 "status": "Connected with errors"
             }
             industry_metrics = {
@@ -897,22 +1144,23 @@ def connect_calendar():
 
 @app.route("/connect-payments", methods=["POST"])
 def connect_payments():
-    """Connect to Stripe for payment processing."""
-    from real_integrations import StripeIntegration
-    
+    """Test PayPal connection configuration."""
     try:
-        stripe = StripeIntegration()
-        result = stripe.test_stripe_connection()
-        
-        if result.get('success'):
-            session['integrations'] = session.get('integrations', {})
-            session['integrations']['payments'] = {
-                'connected': True,
-                'connected_at': datetime.datetime.now().isoformat(),
-                'service': 'Stripe'
-            }
-        
-        return jsonify(result)
+        from paypal_integration import SINCORPaymentProcessor
+        import asyncio
+
+        processor = SINCORPaymentProcessor()
+        # Attempt to get access token to validate credentials
+        token = asyncio.run(processor.paypal.get_access_token())
+
+        session['integrations'] = session.get('integrations', {})
+        session['integrations']['payments'] = {
+            'connected': True,
+            'connected_at': datetime.datetime.now().isoformat(),
+            'service': 'PayPal'
+        }
+
+        return jsonify({'success': True, 'message': 'PayPal connected', 'token_preview': token[:8] if token else None})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 

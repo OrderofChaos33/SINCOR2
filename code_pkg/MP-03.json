@@ -1,0 +1,10 @@
+﻿{
+  "id": "MP-03",
+  "title": "MediaPack Subscription (Monthly Refresh)",
+  "services": ["media_pack_gen","subscription_manager","template_renderer","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/month_1/pack.zip","output/month_1/flyer.pdf","output/month_1/asset_links.json"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"mediapack_monthly"},
+  "kpis": ["pack_generated","subscription_active","email_sent"]
+}

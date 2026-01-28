@@ -1,0 +1,10 @@
+﻿{
+  "id": "CT-18",
+  "title": "Trusted Vendor Badge + Public Page",
+  "services": ["trust_badge","public_page_generator","email_sender","payments"],
+  "trigger": {"type":"manual"},
+  "inputs": ["biz","city","email","phone","price","payURL"],
+  "deliverables": ["output/trust/badge.svg","output/trust/public_page.html"],
+  "transaction": {"mode":"recurring","provider":"stripe","plan":"trusted_vendor"},
+  "kpis": ["badge_issued","page_live","payment_success"]
+}
