@@ -15,9 +15,11 @@ from sincor2.mvp_app import app
 
 if __name__ == '__main__':
     # Get port from environment or default to 8080 for Railway
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8080))
     host = os.environ.get('HOST', '0.0.0.0')
     debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    print(f'[SINCOR2] Starting MVP app on {host}:{port} (debug={debug})')
     
     # Run Flask app
     app.run(host=host, port=port, debug=debug)
