@@ -17,7 +17,7 @@ load_dotenv()
 
 # Import authentication system
 try:
-    from auth_system import SINCORAuth, admin_required
+    from sincor2.auth_system import SINCORAuth, admin_required
     AUTH_AVAILABLE = True
 except ImportError as e:
     print(f"Auth system not available: {e}")
@@ -25,7 +25,7 @@ except ImportError as e:
 
 # Import rate limiter
 try:
-    from rate_limiter import (
+    from sincor2.rate_limiter import (
         SINCORRateLimiter,
         AUTH_LIMITS,
         PAYMENT_LIMITS,
@@ -41,7 +41,7 @@ except ImportError as e:
 
 # Import security headers
 try:
-    from security_headers import SecurityHeaders
+    from sincor2.security_headers import SecurityHeaders
     SECURITY_HEADERS_AVAILABLE = True
 except ImportError as e:
     print(f"Security headers not available: {e}")
@@ -49,7 +49,7 @@ except ImportError as e:
 
 # Import production logger
 try:
-    from production_logger import SINCORLogger
+    from sincor2.production_logger import SINCORLogger
     LOGGING_AVAILABLE = True
 except ImportError as e:
     print(f"Production logger not available: {e}")
@@ -57,7 +57,7 @@ except ImportError as e:
 
 # Import monitoring dashboard
 try:
-    from monitoring_dashboard import MonitoringDashboard
+    from sincor2.monitoring_dashboard import MonitoringDashboard
     MONITORING_AVAILABLE = True
 except ImportError as e:
     print(f"Monitoring dashboard not available: {e}")
@@ -65,7 +65,7 @@ except ImportError as e:
 
 # Import validation models
 try:
-    from validation_models import (
+    from sincor2.validation_models import (
         WaitlistSignup,
         PaymentCreateRequest,
         PaymentExecuteRequest,
@@ -79,7 +79,7 @@ except ImportError as e:
 
 # Import waitlist system with error handling
 try:
-    from waitlist_system import waitlist_manager
+    from sincor2.waitlist_system import waitlist_manager
     WAITLIST_AVAILABLE = True
 except ImportError as e:
     print(f"Waitlist system not available: {e}")
@@ -87,8 +87,8 @@ except ImportError as e:
 
 # Import PayPal integration with SYNC wrappers
 try:
-    from paypal_integration_sync import PayPalIntegrationSync, SINCORPaymentProcessorSync
-    from paypal_integration import PaymentRequest
+    from sincor2.paypal_integration_sync import PayPalIntegrationSync, SINCORPaymentProcessorSync
+    from sincor2.paypal_integration import PaymentRequest
     paypal_processor = PayPalIntegrationSync()
     PAYPAL_AVAILABLE = True
     print("PayPal Integration Loaded Successfully (Sync Mode)")
@@ -103,7 +103,7 @@ except Exception as e:
 
 # Import monetization engine with error handling
 try:
-    from monetization_engine import MonetizationEngine
+    from sincor2.monetization_engine import MonetizationEngine
     monetization_engine = MonetizationEngine()
     MONETIZATION_AVAILABLE = True
     print("Monetization Engine Loaded Successfully")
@@ -118,7 +118,7 @@ except Exception as e:
 
 # Import order fulfillment system
 try:
-    from order_fulfillment import fulfillment_system
+    from sincor2.order_fulfillment import fulfillment_system
     FULFILLMENT_AVAILABLE = True
     print("Order Fulfillment System Loaded Successfully")
 except ImportError as e:
