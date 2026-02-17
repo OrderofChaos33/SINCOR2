@@ -1,0 +1,358 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIN Token Airdrop - SINCOR</title>
+    <meta name="description" content="Claim your SIN token airdrop. Complete social tasks and register your wallet address.">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        
+        .premium-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-size: 300% 300%;
+            animation: gradient-shift 8s ease-in-out infinite;
+        }
+
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .luxury-text {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-size: 300% 300%;
+            animation: gradient-shift 6s ease-in-out infinite;
+        }
+
+        .hero-premium {
+            background: radial-gradient(circle at 20% 80%, #120078 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, #ff0080 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, #00d4ff 0%, transparent 50%),
+                        linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+        }
+
+        .glass-premium {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .sin-token-glow {
+            box-shadow: 0 0 60px rgba(102, 126, 234, 0.4), 0 0 100px rgba(240, 147, 251, 0.2);
+            animation: pulse-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 60px rgba(102, 126, 234, 0.4), 0 0 100px rgba(240, 147, 251, 0.2); }
+            50% { box-shadow: 0 0 80px rgba(102, 126, 234, 0.6), 0 0 120px rgba(240, 147, 251, 0.4); }
+        }
+
+        .task-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .task-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .task-card.completed {
+            border-color: rgba(34, 197, 94, 0.5);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .checkbox-custom {
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .checkbox-custom:checked {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            border-color: #22c55e;
+        }
+
+        .checkbox-custom:checked::after {
+            content: '';
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .wallet-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .wallet-input:focus {
+            outline: none;
+            border-color: rgba(102, 126, 234, 0.6);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .float-particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 15s infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.5; }
+            50% { transform: translateY(-100px) rotate(180deg); opacity: 0.2; }
+        }
+    </style>
+</head>
+<body class="hero-premium text-white">
+    <!-- Floating Particles Background -->
+    <div class="float-particles">
+        <div class="particle" style="width: 10px; height: 10px; left: 10%; top: 20%; animation-delay: 0s;"></div>
+        <div class="particle" style="width: 15px; height: 15px; left: 20%; top: 60%; animation-delay: 2s;"></div>
+        <div class="particle" style="width: 8px; height: 8px; left: 70%; top: 30%; animation-delay: 4s;"></div>
+        <div class="particle" style="width: 12px; height: 12px; left: 80%; top: 70%; animation-delay: 6s;"></div>
+        <div class="particle" style="width: 6px; height: 6px; left: 50%; top: 80%; animation-delay: 8s;"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass-premium">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center space-x-3">
+                <div class="w-10 h-10 premium-gradient rounded-xl flex items-center justify-center font-bold text-white">S</div>
+                <span class="text-xl font-bold">SINCOR</span>
+            </a>
+            <a href="/" class="text-sm text-gray-300 hover:text-white transition"> Back to Main Site</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="relative z-10 flex items-center justify-center min-h-screen pt-20 pb-12 px-6">
+        <div class="max-w-lg w-full" x-data="airdropForm()">
+            <!-- Token Card -->
+            <div class="glass-premium rounded-3xl p-8 mb-8 sin-token-glow">
+                <!-- SIN Token Header -->
+                <div class="text-center mb-8">
+                    <div class="w-24 h-24 mx-auto mb-6 premium-gradient rounded-full flex items-center justify-center">
+                        <span class="text-4xl font-black">SIN</span>
+                    </div>
+                    <h1 class="text-3xl font-bold mb-2">
+                        <span class="luxury-text">SIN Token Airdrop</span>
+                    </h1>
+                    <p class="text-gray-400">Complete the tasks below to register for the airdrop</p>
+                </div>
+
+                <!-- Airdrop Info -->
+                <div class="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-2xl p-4 mb-8 border border-purple-500/20">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wider">Token</p>
+                            <p class="font-semibold">SIN (Base Network)</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-400 uppercase tracking-wider">Allocation</p>
+                            <p class="font-semibold text-green-400">TBA</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tasks Section -->
+                <div class="space-y-4 mb-8">
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Complete All Tasks</h3>
+                    
+                    <!-- Task 1: Telegram -->
+                    <div class="task-card rounded-xl p-4" :class="{ 'completed': tasks.telegram }">
+                        <div class="flex items-center space-x-4">
+                            <input type="checkbox" class="checkbox-custom" x-model="tasks.telegram">
+                            <div class="flex-1">
+                                <p class="font-medium">Follow on Telegram</p>
+                                <p class="text-sm text-gray-400">Join @getsincor channel</p>
+                            </div>
+                            <a href="https://t.me/getsincor" target="_blank" 
+                               class="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-blue-400 text-sm font-medium transition">
+                                Follow 
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Task 2: Facebook -->
+                    <div class="task-card rounded-xl p-4" :class="{ 'completed': tasks.facebook }">
+                        <div class="flex items-center space-x-4">
+                            <input type="checkbox" class="checkbox-custom" x-model="tasks.facebook">
+                            <div class="flex-1">
+                                <p class="font-medium">Like Facebook Page</p>
+                                <p class="text-sm text-gray-400">Coming soon</p>
+                            </div>
+                            <span class="px-4 py-2 bg-gray-500/20 rounded-lg text-gray-500 text-sm font-medium cursor-not-allowed">
+                                Soon
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Task 3: Twitter/X (Bonus) -->
+                    <div class="task-card rounded-xl p-4" :class="{ 'completed': tasks.twitter }">
+                        <div class="flex items-center space-x-4">
+                            <input type="checkbox" class="checkbox-custom" x-model="tasks.twitter">
+                            <div class="flex-1">
+                                <p class="font-medium">Follow on X (Twitter)</p>
+                                <p class="text-sm text-gray-400">@getsincor</p>
+                            </div>
+                            <a href="https://twitter.com/getsincor" target="_blank" 
+                               class="px-4 py-2 bg-gray-700/50 hover:bg-gray-700 rounded-lg text-gray-300 text-sm font-medium transition">
+                                Follow 
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wallet Address Input -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Your Wallet Address (Base Network)</label>
+                    <input type="text" 
+                           x-model="walletAddress"
+                           placeholder="0x..."
+                           class="wallet-input w-full px-4 py-4 rounded-xl text-white placeholder-gray-500">
+                    <p class="text-xs text-gray-500 mt-2">Enter your EVM wallet address to receive the airdrop</p>
+                </div>
+
+                <!-- Submit Button -->
+                <button @click="submitAirdrop()"
+                        :disabled="!canSubmit"
+                        class="submit-btn w-full py-4 rounded-xl font-semibold text-white text-lg">
+                    <span x-show="!submitted">Register for Airdrop</span>
+                    <span x-show="submitted" class="flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Registered Successfully!</span>
+                    </span>
+                </button>
+
+                <!-- Success Message -->
+                <div x-show="submitted" x-transition class="mt-6 bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
+                    <p class="text-green-400 font-medium"> You're on the list!</p>
+                    <p class="text-sm text-gray-400 mt-1">We'll notify you when the airdrop is ready.</p>
+                </div>
+            </div>
+
+            <!-- Footer Links -->
+            <div class="text-center space-y-4">
+                <a href="/" class="inline-block text-gray-400 hover:text-white transition text-sm">
+                    Learn more about SINCOR 
+                </a>
+                <div class="flex items-center justify-center space-x-4 text-gray-500 text-xs">
+                    <span>SIN Token on Base</span>
+                    <span></span>
+                    <a href="https://basescan.org/token/0xa8a20f33C56B5B519f65CBf9529ab0d9FD785BA2" 
+                       target="_blank" class="hover:text-white transition">
+                        View Contract
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function airdropForm() {
+            return {
+                tasks: {
+                    telegram: false,
+                    facebook: false,
+                    twitter: false
+                },
+                walletAddress: '',
+                submitted: false,
+                
+                get canSubmit() {
+                    // Require at least Telegram and valid wallet address
+                    const isValidAddress = /^0x[a-fA-F0-9]{40}$/.test(this.walletAddress);
+                    return this.tasks.telegram && isValidAddress && !this.submitted;
+                },
+                
+                async submitAirdrop() {
+                    if (!this.canSubmit) return;
+                    
+                    // Store submission (you can connect this to a backend)
+                    const submission = {
+                        wallet: this.walletAddress,
+                        tasks: this.tasks,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Send to backend API
+                    try {
+                        const response = await fetch('/api/airdrop/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(submission)
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('Registration failed');
+                        }
+                        
+                        // Also store locally as backup
+                        let submissions = JSON.parse(localStorage.getItem('sin_airdrop_submissions') || '[]');
+                        submissions.push(submission);
+                        localStorage.setItem('sin_airdrop_submissions', JSON.stringify(submissions));
+                    } catch (error) {
+                        console.error('API error:', error);
+                        // Still save locally even if API fails
+                        let submissions = JSON.parse(localStorage.getItem('sin_airdrop_submissions') || '[]');
+                        submissions.push(submission);
+                        localStorage.setItem('sin_airdrop_submissions', JSON.stringify(submissions));
+                    }
+                    
+                    this.submitted = true;
+                    
+                    console.log('Airdrop registration:', submission);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+
