@@ -1,4 +1,4 @@
-﻿"""
+"""
 SINCOR2 MVP - Minimal Flask Application
 A lean, deployable MVP with health checks, home page, buy flow, and basic auth.
 Full PayPal checkout → order DB → asset delivery pipeline.
@@ -7,14 +7,24 @@ Full PayPal checkout → order DB → asset delivery pipeline.
 import os
 import re
 import json
+import time
+import logging
 import sqlite3
 import asyncio
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, render_template, request, jsonify, g
+from flask import Flask, render_template, request, jsonify, g, make_response
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger('sincor2')
 
 # Load environment variables
 load_dotenv()
@@ -29,11 +39,71 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 # Configure JWT
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-prod')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB max request size
 jwt = JWTManager(app)
 
 # PayPal configuration
 PAYPAL_CLIENT_ID = os.environ.get('PAYPAL_REST_API_ID', os.environ.get('PAYPAL_CLIENT_ID', 'sandbox-demo'))
 PAYPAL_SANDBOX = os.environ.get('PAYPAL_SANDBOX', 'true').lower() == 'true'
+
+
+# ============================================================================
+# SECURITY MIDDLEWARE
+# ============================================================================
+
+@app.before_request
+def log_request():
+    """Log incoming requests and record start time for latency tracking."""
+    g.start_time = time.time()
+    if request.path not in ('/health', '/favicon.ico'):
+        logger.info(f"{request.method} {request.path} from {request.remote_addr}")
+
+
+@app.after_request
+def apply_security_headers(response):
+    """Apply security headers and log response timing."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+
+    # Log response timing
+    elapsed = time.time() - getattr(g, 'start_time', time.time())
+    if request.path not in ('/health', '/favicon.ico'):
+        logger.info(f"{request.method} {request.path} → {response.status_code} ({elapsed:.3f}s)")
+
+    return response
+
+
+# ============================================================================
+# INPUT VALIDATION HELPERS
+# ============================================================================
+
+def validate_email(email):
+    """Validate email format. Returns sanitized email or None."""
+    if not email or not isinstance(email, str):
+        return None
+    email = email.strip().lower()[:254]  # RFC 5321 limit
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return email if re.match(pattern, email) else None
+
+
+def validate_wallet(wallet):
+    """Validate Ethereum wallet address."""
+    if not wallet or not isinstance(wallet, str):
+        return None
+    wallet = wallet.strip()
+    return wallet if re.match(r'^0x[a-fA-F0-9]{40}$', wallet) else None
+
+
+def sanitize_string(value, max_length=200):
+    """Sanitize user input string: strip, limit length, remove control chars."""
+    if not value or not isinstance(value, str):
+        return ''
+    value = value.strip()[:max_length]
+    value = re.sub(r'[\x00-\x1f\x7f]', '', value)  # Remove control characters
+    return value
 
 # ============================================================================
 # DATABASE SETUP (SQLite for orders)
@@ -79,7 +149,7 @@ def init_db():
     )''')
     db.commit()
     db.close()
-    print(f"[DB] Orders database ready at {DB_PATH}")
+    logger.info(f"[DB] Orders database ready at {DB_PATH}")
 
 
 # Initialize DB on import
@@ -135,7 +205,7 @@ def health():
 @app.route('/', methods=['GET'])
 def home():
     """Home page."""
-    return render_template('home_mvp.html', service_name='SINCOR2 MVP')
+    return render_template('home.html')
 
 
 # ============================================================================
@@ -200,17 +270,35 @@ def payment_webhook():
     Called by buy.html onApprove() after actions.order.capture() succeeds.
     Stores order in DB and triggers product fulfillment/delivery.
     """
-    data = request.get_json() or {}
-    paypal_order_id = data.get('id', '')
-    payer = data.get('payer', {})
-    customer_email = payer.get('email_address', '')
-    purchase_units = data.get('purchase_units', [{}])
-    product_name = purchase_units[0].get('description', 'Unknown') if purchase_units else 'Unknown'
-    amount_obj = purchase_units[0].get('amount', {}) if purchase_units else {}
-    amount = float(amount_obj.get('value', 0)) if isinstance(amount_obj, dict) else float(amount_obj or 0)
+    data = request.get_json(silent=True) or {}
 
-    if not paypal_order_id or not customer_email:
-        return jsonify({'error': 'Missing payment data'}), 400
+    # Validate required fields
+    paypal_order_id = sanitize_string(data.get('id', ''), max_length=50)
+    payer = data.get('payer', {})
+    if not isinstance(payer, dict):
+        payer = {}
+    raw_email = payer.get('email_address', '')
+    customer_email = validate_email(raw_email)
+
+    purchase_units = data.get('purchase_units', [{}])
+    if not isinstance(purchase_units, list) or len(purchase_units) == 0:
+        purchase_units = [{}]
+    product_name = sanitize_string(purchase_units[0].get('description', 'Unknown'))
+    amount_obj = purchase_units[0].get('amount', {}) if purchase_units else {}
+
+    try:
+        amount = float(amount_obj.get('value', 0)) if isinstance(amount_obj, dict) else float(amount_obj or 0)
+        if amount < 0 or amount > 100000:
+            return jsonify({'error': 'Invalid payment amount'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid amount format'}), 400
+
+    if not paypal_order_id:
+        return jsonify({'error': 'Missing PayPal order ID'}), 400
+    if not customer_email:
+        return jsonify({'error': 'Invalid or missing email address'}), 400
+
+    logger.info(f"[PAYMENT] Processing: {paypal_order_id} | {product_name} | ${amount} | {customer_email}")
 
     # Generate internal order ID
     order_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{paypal_order_id[:8]}"
@@ -248,9 +336,9 @@ def payment_webhook():
              json.dumps({'payer': payer, 'product_info': product_info}))
         )
         db.commit()
-        print(f"[ORDER] Saved: {order_id} | {product_name} | ${amount} | {customer_email}")
+        logger.info(f"[ORDER] Saved: {order_id} | {product_name} | ${amount} | {customer_email}")
     except sqlite3.IntegrityError:
-        print(f"[ORDER] Duplicate order: {paypal_order_id}")
+        logger.warning(f"[ORDER] Duplicate order: {paypal_order_id}")
         # Order already exists, return success anyway
         pass
 
@@ -285,7 +373,7 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
             f'Access your dashboard with {agent_count} active AI agents',
             'Your agents will begin generating leads and content within 24 hours'
         ]
-        print(f"[FULFILL] Subscription activated: {product_name} ({agent_count} agents) for {email}")
+        logger.info(f"[FULFILL] Subscription activated: {product_name} ({agent_count} agents) for {email}")
 
         # Update delivery status to delivered
         db = get_db()
@@ -305,7 +393,7 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
             f'You will receive a {pages}-page report within 48 hours',
             'Download link will be emailed and available at /my-orders'
         ]
-        print(f"[FULFILL] BI Report queued: {product_name} ({pages} pages) for {email}")
+        logger.info(f"[FULFILL] BI Report queued: {product_name} ({pages} pages) for {email}")
 
     elif order_type == 'content':
         # Content Package: Queue for creation
@@ -317,12 +405,12 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
             f'Expected delivery within {days} business days',
             'Download link will be emailed and available at /my-orders'
         ]
-        print(f"[FULFILL] Content Package queued: {product_name} ({pieces} pieces) for {email}")
+        logger.info(f"[FULFILL] Content Package queued: {product_name} ({pieces} pieces) for {email}")
 
     else:
         result['message'] = 'Order received and being processed.'
         result['next_steps'] = ['Check /my-orders for delivery status']
-        print(f"[FULFILL] Generic order: {order_id} for {email}")
+        logger.info(f"[FULFILL] Generic order: {order_id} for {email}")
 
     return result
 
@@ -372,6 +460,10 @@ def get_customer_orders(email):
     Get all orders for a customer by email.
     Returns order list with delivery status and download URLs.
     """
+    email = validate_email(email)
+    if not email:
+        return jsonify({'error': 'Invalid email format'}), 400
+
     db = get_db()
     rows = db.execute(
         "SELECT * FROM orders WHERE customer_email=? ORDER BY created_at DESC",
@@ -422,17 +514,15 @@ def sin_airdrop():
 @app.route('/api/airdrop/register', methods=['POST'])
 def register_airdrop():
     """Register wallet for SIN token airdrop."""
-    data = request.get_json() or {}
-    wallet = data.get('wallet', '')
+    data = request.get_json(silent=True) or {}
+    raw_wallet = data.get('wallet', '')
     tasks = data.get('tasks', {})
 
+    wallet = validate_wallet(raw_wallet)
     if not wallet:
-        return jsonify({'error': 'wallet address required'}), 400
+        return jsonify({'error': 'Invalid or missing wallet address (must be 0x + 40 hex chars)'}), 400
 
-    if not re.match(r'^0x[a-fA-F0-9]{40}$', wallet):
-        return jsonify({'error': 'invalid wallet address format'}), 400
-
-    print(f"[AIRDROP] New registration: {wallet}")
+    logger.info(f"[AIRDROP] New registration: {wallet}")
     return jsonify({
         'status': 'success',
         'message': 'Successfully registered for SIN airdrop',
@@ -468,6 +558,48 @@ def dashboard():
     return render_template('dashboard.html')
 
 
+@app.route('/privacy')
+def privacy():
+    """Privacy policy page."""
+    return render_template('privacy.html')
+
+
+@app.route('/terms')
+def terms():
+    """Terms of service page."""
+    return render_template('terms.html')
+
+
+@app.route('/security')
+def security():
+    """Security information page."""
+    return render_template('security.html')
+
+
+@app.route('/media-packs')
+def media_packs():
+    """Media packs showcase page."""
+    return render_template('media-packs.html')
+
+
+@app.route('/enterprise-dashboard')
+def enterprise_dashboard():
+    """Enterprise dashboard page."""
+    return render_template('enterprise-dashboard.html')
+
+
+@app.route('/affiliate-program')
+def affiliate_program():
+    """Affiliate program page."""
+    return render_template('affiliate-program.html')
+
+
+@app.route('/login')
+def login_page():
+    """Login page."""
+    return render_template('login.html')
+
+
 # ============================================================================
 # WHITEPAPER & DOCUMENTATION
 # ============================================================================
@@ -494,16 +626,19 @@ def whitepaper_pdf():
 @app.route('/api/crypto/checkout', methods=['POST'])
 def crypto_checkout():
     """Create crypto payment checkout (ETH/USDC on Base)."""
-    data = request.get_json() or {}
-    amount = data.get('amount', 0)
-    wallet = data.get('wallet', '')
-    currency = data.get('currency', 'ETH').upper()
+    data = request.get_json(silent=True) or {}
+    currency = sanitize_string(data.get('currency', 'ETH'), max_length=10).upper()
 
-    if not amount or not wallet:
-        return jsonify({'error': 'amount and wallet required'}), 400
+    try:
+        amount = float(data.get('amount', 0))
+        if amount <= 0 or amount > 100000:
+            return jsonify({'error': 'Amount must be between 0 and 100,000'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid amount'}), 400
 
-    if not re.match(r'^0x[a-fA-F0-9]{40}$', wallet):
-        return jsonify({'error': 'invalid wallet address'}), 400
+    wallet = validate_wallet(data.get('wallet', ''))
+    if not wallet:
+        return jsonify({'error': 'Invalid wallet address'}), 400
 
     eth_price = 2500
     if currency == 'ETH':
@@ -584,14 +719,27 @@ def crypto_verify_payment():
 
 @app.errorhandler(404)
 def not_found(error):
-    """Handle 404 errors."""
-    return jsonify({'error': 'Not found', 'status': 404}), 404
+    """Handle 404 errors with a styled page."""
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Not found', 'status': 404}), 404
+    return render_template('error.html', code=404, title='Page Not Found',
+                           message="The page you're looking for doesn't exist or has been moved."), 404
 
 
 @app.errorhandler(500)
 def server_error(error):
     """Handle 500 errors."""
-    return jsonify({'error': 'Internal server error', 'status': 500}), 500
+    logger.error(f"[500] Internal server error on {request.path}: {error}")
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Internal server error', 'status': 500}), 500
+    return render_template('error.html', code=500, title='Server Error',
+                           message="Something went wrong on our end. Please try again later."), 500
+
+
+@app.errorhandler(413)
+def request_too_large(error):
+    """Handle oversized request payloads."""
+    return jsonify({'error': 'Request too large (max 1MB)'}), 413
 
 
 # ============================================================================
@@ -602,4 +750,3 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
     app.run(host='0.0.0.0', port=port, debug=debug)
-
