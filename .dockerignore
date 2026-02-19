@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+*.egg
+dist
+build
+.eggs
+
+# Virtual environments
+.venv
+venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Tests
+tests/
+test/
+*.test.py
+pytest.ini
+.pytest_cache
+
+# Misc
+*.backup
+*.bak
+*.log
+*.db-journal
+money_assets/
+node_modules/
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+.gitlab-ci.yml
