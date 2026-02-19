@@ -31,3 +31,5 @@ psutil>=5.9.0                 # System and process monitoring
 
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
+dnspython>=2.6.1 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
