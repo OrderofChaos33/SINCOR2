@@ -17,9 +17,9 @@ ENV PYTHONPATH=/app/src
 # Create necessary directories
 RUN mkdir -p logs outputs data
 
-# Expose Railway port
+# Expose default port (Railway overrides via $PORT)
 EXPOSE 8080
 
 # Run with gunicorn for production stability
-# --preload ensures import errors are caught at startup
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "120", "--preload", "run:app"]
+# Use shell form so $PORT env var is expanded at runtime
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --preload run:app
