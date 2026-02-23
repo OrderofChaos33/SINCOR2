@@ -1,4 +1,6 @@
-# SINCOR Master Platform Requirements - Production Ready
+# SINCOR2 MVP Platform - Production Dependencies
+# Build: 2026-02-23-v4 (cache bust)
+
 # Core Flask framework
 Flask>=3.0.0,<4.0.0
 
@@ -10,17 +12,17 @@ PyYAML>=6.0                   # Configuration files
 python-dotenv>=1.0.0          # Environment variable management
 numpy>=1.24.0                 # Numerical computing for monetization engine
 
-# Security & Authentication (Fix #3)
+# Security & Authentication
 flask-jwt-extended>=4.7.0     # JWT authentication with refresh tokens
 
-# Input Validation (Fix #4)
+# Input Validation
 pydantic[email]>=2.0.0        # Data validation and settings management
 email-validator>=2.0.0        # Email validation for Pydantic
 
-# Rate Limiting (Fix #5)
+# Rate Limiting
 flask-limiter>=3.8.0          # Rate limiting for DDoS protection
 
-# AI Integration (Fix #2)
+# AI Integration
 anthropic>=0.69.0             # Claude 4.5 Sonnet API
 
 # Production Server
@@ -29,7 +31,6 @@ gunicorn>=21.0.0              # Production WSGI server
 # Monitoring
 psutil>=5.9.0                 # System and process monitoring
 
-# Optional: Redis for production rate limiting
-# redis>=5.0.0
-dnspython>=2.6.1 # not directly required, pinned by Snyk to avoid a vulnerability
-zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
+# Security patches
+dnspython>=2.6.1
+zipp>=3.19.1
