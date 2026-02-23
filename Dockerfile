@@ -8,7 +8,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Copy application code
+# Force cache invalidation for COPY step
+ENV BUILD_VERSION=2026-02-23-v3
+
+# Copy application code (cache busted by BUILD_VERSION above)
 COPY . .
 
 # Add src to Python path so sincor2 package is importable
@@ -20,6 +23,5 @@ RUN mkdir -p logs outputs data
 # Expose default port (Railway overrides via $PORT)
 EXPOSE 8080
 
-# Run with gunicorn via wsgi.py diagnostic wrapper
-# railway.json startCommand overrides this in Railway deployments
-CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --log-level info --access-logfile - wsgi:app
+# Default CMD - railway.json startCommand overrides this
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "120", "--log-level", "info", "--access-logfile", "-", "run:app"]
