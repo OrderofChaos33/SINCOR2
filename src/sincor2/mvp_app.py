@@ -215,25 +215,38 @@ def home():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """
-    Mock login endpoint.
-    POST /api/auth/login with JSON: {"email": "user@example.com", "password": "demo"}
-    Returns a JWT token.
+    Authentication endpoint requiring valid credentials.
+    POST /api/auth/login with JSON: {"email": "user@example.com", "password": "password"}
+    Returns a JWT token if credentials match environment variables.
     """
     data = request.get_json() or {}
-    email = data.get('email', '')
-    password = data.get('password', '')
-    
-    # Mock authentication (accept any email/password for demo)
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '').strip()
+
     if not email or not password:
         return jsonify({'error': 'email and password required'}), 400
-    
-    # Create access token
-    access_token = create_access_token(identity=email)
-    return jsonify({
-        'access_token': access_token,
-        'user': {'email': email},
-        'expires_in': 86400
-    }), 200
+
+    # Load credentials from environment variables (no hardcoded defaults)
+    valid_email = os.environ.get('LOGIN_EMAIL', '').lower().strip()
+    valid_password = os.environ.get('LOGIN_PASSWORD', '')
+
+    # Don't reveal if credentials are configured
+    if not valid_email or not valid_password:
+        logger.warning("LOGIN_EMAIL or LOGIN_PASSWORD not configured in environment")
+        return jsonify({'error': 'Authentication system not configured'}), 503
+
+    # Strict comparison (constant-time would be better, but this is adequate)
+    if email == valid_email and password == valid_password:
+        access_token = create_access_token(identity=email)
+        logger.info(f"Successful login for {email}")
+        return jsonify({
+            'access_token': access_token,
+            'user': {'email': email},
+            'expires_in': 86400
+        }), 200
+    else:
+        logger.warning(f"Failed login attempt for {email}")
+        return jsonify({'error': 'Invalid email or password'}), 401
 
 
 @app.route('/api/protected', methods=['GET'])
