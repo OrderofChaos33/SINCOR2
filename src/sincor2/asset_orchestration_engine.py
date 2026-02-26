@@ -357,31 +357,37 @@ class AssetOrchestrationEngine:
         else:
             return QualityStandard.STANDARD
 
-    def calculate_asset_value(self, asset_id: str, base_price: float,
+    def calculate_asset_value(self, asset_id: str, base_price: float = None,
                              complexity: str = "medium",
-                             market_demand: float = 1.0) -> AssetValueMetrics:
-        """Calculate asset value and revenue"""
+                             market_demand: float = 1.0,
+                             customer_segment: str = "standard",
+                             delivery_speed: str = "standard") -> AssetValueMetrics:
+        """Calculate asset value with strategic pricing multipliers"""
         if asset_id not in self.asset_registry:
             logger.error(f"Asset not found: {asset_id}")
             return AssetValueMetrics()
 
         asset = self.asset_registry[asset_id]
+        asset_type = asset.asset_type.value
 
-        # Complexity multiplier
-        complexity_mult = {'trivial': 0.5, 'simple': 0.7, 'medium': 1.0,
-                          'complex': 1.5, 'enterprise': 2.0}.get(complexity, 1.0)
+        # If no base price provided, use standard for asset type
+        if base_price is None:
+            standard = self.quality_standards.get(asset_type, {})
+            base_price = standard.get("base_price", 5000)
 
-        # Quality multiplier
-        quality_mult = 1.0 + (asset.quality_metrics.overall_score - 0.70) * 2
+        # Use value attribution engine for strategic pricing
+        from sincor2.value_standards_framework import value_attribution
+        pricing_result = value_attribution.calculate_with_multipliers(
+            asset_type=asset_type,
+            base_quality_score=asset.quality_metrics.overall_score,
+            market_demand=market_demand,
+            customer_segment=customer_segment
+        )
 
-        # Market demand multiplier
-        demand_mult = max(0.5, min(3.0, market_demand))
-
-        # Final price
-        final_price = base_price * complexity_mult * quality_mult * demand_mult
+        final_price = pricing_result.get("final_price", base_price)
 
         # Costs & margin
-        creation_cost = base_price * 0.20  # 20% cost ratio
+        creation_cost = final_price * 0.20  # 20% cost ratio
         margin = final_price - creation_cost
         gross_margin = (margin / final_price) * 100 if final_price > 0 else 0
 
@@ -390,18 +396,22 @@ class AssetOrchestrationEngine:
             total_revenue=final_price,
             base_price=base_price,
             dynamic_multipliers={
-                'complexity': complexity_mult,
-                'quality': quality_mult,
-                'demand': demand_mult
+                'quality': pricing_result.get("quality_multiplier", 1.0),
+                'demand': pricing_result.get("demand_multiplier", 1.0),
+                'segment_discount': pricing_result.get("segment_discount", 0),
+                'customer_segment': customer_segment,
+                'delivery_speed': delivery_speed
             },
             final_price=final_price,
             creation_cost=creation_cost,
-            gross_margin=gross_margin
+            gross_margin=gross_margin,
+            client_value_delivered=final_price * 3  # Estimated 3x value delivered to client
         )
 
         asset.value_metrics = value_metrics
 
-        logger.info(f"Value calculated for {asset_id}: ${final_price:.2f} (margin: {gross_margin:.1f}%)")
+        logger.info(f"Value calculated for {asset_id}: ${final_price:.2f} (margin: {gross_margin:.1f}%) | "
+                   f"Segment: {customer_segment}, Demand: {market_demand:.1f}x")
         return value_metrics
 
     def complete_asset(self, asset_id: str):
