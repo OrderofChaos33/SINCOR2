@@ -248,6 +248,44 @@ def create_asset_monitoring_routes(app):
             }
         }), 200
 
+    @app.route('/api/pricing/standards', methods=['GET'])
+    def pricing_standards():
+        """Get current pricing standards and tiers"""
+        from sincor2.value_standards_framework import VALUE_STANDARDS, STRATEGIC_PRICING_CONFIG
+
+        return jsonify({
+            'pricing_standards': {
+                asset_type: {
+                    'base_price': standard.get('base_price'),
+                    'tiers': standard.get('pricing_tiers', {}),
+                    'min_quality_for_delivery': standard.get('min_quality_for_delivery'),
+                    'quality_premiums': {
+                        'standard': 1.0,
+                        'premium': 1.2,
+                        'enterprise': 1.35
+                    },
+                    'typical_delivery': standard.get('delivery_multipliers', {})
+                }
+                for asset_type, standard in VALUE_STANDARDS.items()
+            },
+            'discounts': {
+                'bundle': STRATEGIC_PRICING_CONFIG.get('bundle_discounts', {}),
+                'volume': STRATEGIC_PRICING_CONFIG.get('volume_discounts', {}),
+                'startup': STRATEGIC_PRICING_CONFIG.get('startup_discount', 0),
+                'nonprofit': STRATEGIC_PRICING_CONFIG.get('nonprofit_discount', 0)
+            },
+            'message': 'SINCOR Premium Services - 5% Below Industry Average',
+            'value_multiplier': 3.0,
+            'competitive_advantage': [
+                '5% below industry benchmarks',
+                '40% faster delivery with AI parallelization',
+                '3x estimated value delivered to clients',
+                'Transparent tiered pricing',
+                'Flexible bundle and volume discounts',
+                'Quality-based premium positioning'
+            ]
+        }), 200
+
     logger.info("Asset monitoring routes registered")
 
 # Register when app initializes
