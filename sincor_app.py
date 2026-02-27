@@ -9,6 +9,11 @@ from flask import Flask, request, jsonify, send_from_directory, render_template,
 import os, csv, datetime, re, smtplib
 from email.message import EmailMessage
 
+# Autonomous revenue generation
+from src.sincor2.lead_discovery_engine import LeadDiscoveryEngine
+from src.sincor2.agent_outreach_handler import AgentOutreachHandler
+from src.sincor2.autonomous_scheduler import AutonomousTaskScheduler, start_scheduler_background
+
 # Load environment variables
 def load_environment():
     try:
@@ -130,6 +135,21 @@ if not flask_secret:
 app.secret_key = flask_secret
 
 log(f"Environment loaded from: {env_source}")
+
+# Initialize autonomous revenue generation systems
+try:
+    lead_engine = LeadDiscoveryEngine(db_path='data/sincor.db')
+    outreach_handler = AgentOutreachHandler(lead_engine)
+    scheduler = AutonomousTaskScheduler(lead_engine, outreach_handler)
+
+    # Start scheduler in background (non-blocking)
+    start_scheduler_background(lead_engine, outreach_handler)
+    log("✓ Autonomous revenue system initialized and running in background")
+except Exception as e:
+    log(f"ERROR: Failed to initialize autonomous system: {e}")
+    lead_engine = None
+    outreach_handler = None
+    scheduler = None
 
 # PROMO CODES - DIRECT IMPLEMENTATION
 PROMO_CODES = {
@@ -1442,6 +1462,88 @@ def user_dashboard():
     except Exception as e:
         log(f"Error loading dashboard: {e}")
         return jsonify({"error": "Dashboard unavailable"}), 500
+
+@app.route("/api/autonomous/status")
+def autonomous_status():
+    """Check autonomous revenue system status"""
+    if not lead_engine:
+        return jsonify({"status": "disabled", "message": "Autonomous system not initialized"}), 503
+
+    try:
+        stats = lead_engine.get_lead_stats()
+        return jsonify({
+            "status": "running",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "lead_stats": stats,
+            "next_tasks": [
+                {"task": "Lead discovery", "frequency": "Every 12 hours"},
+                {"task": "Lead scoring", "frequency": "Every 6 hours"},
+                {"task": "Autonomous outreach", "frequency": "Every 3 hours"},
+                {"task": "Follow-ups", "frequency": "Every 24 hours"}
+            ]
+        })
+    except Exception as e:
+        log(f"Error getting autonomous status: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/autonomous/test-run", methods=['POST'])
+def autonomous_test_run():
+    """Run one autonomous outreach cycle immediately (for testing)"""
+    if not outreach_handler:
+        return jsonify({"status": "error", "message": "Outreach handler not initialized"}), 503
+
+    try:
+        log("Running manual autonomous outreach test...")
+        result = outreach_handler.run_outreach_cycle()
+        return jsonify({
+            "status": "complete",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "result": result
+        })
+    except Exception as e:
+        log(f"Error in test outreach run: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/leads", methods=['GET', 'POST'])
+def manage_leads():
+    """Get leads or add new lead manually"""
+    if not lead_engine:
+        return jsonify({"error": "Lead engine not initialized"}), 503
+
+    if request.method == 'POST':
+        # Manual lead submission
+        try:
+            data = request.json
+            lead_id = lead_engine.add_lead(
+                company_name=data.get('company_name'),
+                website=data.get('website'),
+                industry=data.get('industry'),
+                company_size=data.get('company_size'),
+                decision_maker_name=data.get('decision_maker_name'),
+                decision_maker_email=data.get('decision_maker_email'),
+                decision_maker_title=data.get('decision_maker_title'),
+                evidence=data.get('evidence')
+            )
+            return jsonify({
+                "status": "created",
+                "lead_id": lead_id,
+                "message": "Lead added to pipeline"
+            }), 201
+        except Exception as e:
+            log(f"Error adding lead: {e}")
+            return jsonify({"error": str(e)}), 400
+
+    else:
+        # Get lead stats
+        try:
+            stats = lead_engine.get_lead_stats()
+            return jsonify(stats)
+        except Exception as e:
+            log(f"Error getting leads: {e}")
+            return jsonify({"error": str(e)}), 500
+
 
 if __name__=="__main__":
     port=int(os.environ.get("PORT","5001"))  # Use port 5001 to avoid conflicts
