@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIN Token Airdrop - SINCOR</title>
-    <meta name="description" content="Claim your SIN token airdrop. Complete social tasks and register your wallet address.">
+    <title>SINC Token Airdrop - SINCOR</title>
+    <meta name="description" content="Claim your SINC token airdrop. Complete social tasks and register your wallet address.">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
@@ -174,13 +174,13 @@
         <div class="max-w-lg w-full" x-data="airdropForm()">
             <!-- Token Card -->
             <div class="glass-premium rounded-3xl p-8 mb-8 sin-token-glow">
-                <!-- SIN Token Header -->
+                <!-- SINC Token Header -->
                 <div class="text-center mb-8">
                     <div class="w-24 h-24 mx-auto mb-6 premium-gradient rounded-full flex items-center justify-center">
-                        <span class="text-4xl font-black">SIN</span>
+                        <span class="text-4xl font-black">SINC</span>
                     </div>
                     <h1 class="text-3xl font-bold mb-2">
-                        <span class="luxury-text">SIN Token Airdrop</span>
+                        <span class="luxury-text">SINC Token Airdrop</span>
                     </h1>
                     <p class="text-gray-400">Complete the tasks below to register for the airdrop</p>
                 </div>
@@ -190,7 +190,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-xs text-gray-400 uppercase tracking-wider">Token</p>
-                            <p class="font-semibold">SIN (Base Network)</p>
+                            <p class="font-semibold">SINC (Base Network)</p>
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-400 uppercase tracking-wider">Allocation</p>
@@ -335,15 +335,15 @@
                         }
                         
                         // Also store locally as backup
-                        let submissions = JSON.parse(localStorage.getItem('sin_airdrop_submissions') || '[]');
+                        let submissions = JSON.parse(localStorage.getItem('sinc_airdrop_submissions') || '[]');
                         submissions.push(submission);
-                        localStorage.setItem('sin_airdrop_submissions', JSON.stringify(submissions));
+                        localStorage.setItem('sinc_airdrop_submissions', JSON.stringify(submissions));
                     } catch (error) {
                         console.error('API error:', error);
                         // Still save locally even if API fails
-                        let submissions = JSON.parse(localStorage.getItem('sin_airdrop_submissions') || '[]');
+                        let submissions = JSON.parse(localStorage.getItem('sinc_airdrop_submissions') || '[]');
                         submissions.push(submission);
-                        localStorage.setItem('sin_airdrop_submissions', JSON.stringify(submissions));
+                        localStorage.setItem('sinc_airdrop_submissions', JSON.stringify(submissions));
                     }
                     
                     this.submitted = true;

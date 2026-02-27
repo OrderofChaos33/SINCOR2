@@ -515,18 +515,24 @@ def list_all_orders():
 
 
 # ============================================================================
-# SIN TOKEN AIRDROP
+# SINC TOKEN AIRDROP
 # ============================================================================
 
+@app.route('/sinc-airdrop')
+def sinc_airdrop():
+    """SINC Token Airdrop funnel page."""
+    return render_template('sinc-airdrop.html')
+
+
 @app.route('/sin-airdrop')
-def sin_airdrop():
-    """SIN Token Airdrop funnel page."""
-    return render_template('sin-airdrop.html')
+def sin_airdrop_redirect():
+    """Backward compatibility redirect from old SIN airdrop URL to SINC airdrop."""
+    return redirect('/sinc-airdrop', code=301)
 
 
 @app.route('/api/airdrop/register', methods=['POST'])
 def register_airdrop():
-    """Register wallet for SIN token airdrop."""
+    """Register wallet for SINC token airdrop."""
     data = request.get_json(silent=True) or {}
     raw_wallet = data.get('wallet', '')
     tasks = data.get('tasks', {})
