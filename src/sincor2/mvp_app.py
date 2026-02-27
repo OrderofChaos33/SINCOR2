@@ -18,6 +18,9 @@ from flask import Flask, render_template, request, jsonify, g, make_response
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
 
+# Import checkout engine
+from src.sincor2.checkout_engine import CheckoutEngine
+
 # Configure structured logging
 logging.basicConfig(
     level=logging.INFO,
@@ -613,14 +616,102 @@ def affiliate_program():
     return render_template('affiliate-program.html')
 
 
-@app.route('/login')
-def login_page():
-    """Login page."""
-    return render_template('login.html')
 
 
 # ============================================================================
-# WHITEPAPER & DOCUMENTATION
+# CHECKOUT & PAYMENT PROCESSING
+# ============================================================================
+
+# Initialize checkout engine
+checkout_engine = CheckoutEngine()
+
+@app.route('/checkout', methods=['GET'])
+def checkout_page():
+    """Render checkout page"""
+    stripe_public_key = os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_')
+    return render_template('checkout.html', stripe_key=stripe_public_key)
+
+@app.route('/api/checkout', methods=['POST'])
+def process_checkout():
+    """Process payment and create order"""
+    try:
+        data = request.json
+
+        # Validate required fields
+        if not all(k in data for k in ['paymentMethodId', 'amount', 'orderData', 'billingData']):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+
+        # Process payment through Stripe
+        result = checkout_engine.process_payment(
+            payment_method_id=data['paymentMethodId'],
+            amount_cents=data['amount'],
+            order_data=data['orderData'],
+            billing_data=data['billingData']
+        )
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Checkout error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/orders', methods=['GET'])
+def list_orders():
+    """List all paid orders (admin only)"""
+    status = request.args.get('status', 'paid')
+    orders = checkout_engine.list_orders(status=status)
+
+    return jsonify({
+        'orders': [
+            {
+                'id': o[0],
+                'customer': o[2],
+                'company': o[3],
+                'service': o[5],
+                'amount': o[10] / 100,
+                'status': o[11],
+                'created_at': o[15]
+            }
+            for o in orders
+        ]
+    })
+
+@app.route('/api/orders/<order_id>', methods=['GET'])
+def get_order_details(order_id):
+    """Get order details"""
+    order = checkout_engine.get_order(order_id)
+    if not order:
+        return jsonify({'error': 'Order not found'}), 404
+
+    return jsonify({
+        'id': order[0],
+        'customer': order[2],
+        'company': order[3],
+        'service': order[5],
+        'tier': order[7],
+        'amount': order[10] / 100,
+        'status': order[11],
+        'paid_at': order[12],
+        'project_status': order[13]
+    })
+
+@app.route('/api/revenue', methods=['GET'])
+def revenue_summary():
+    """Get revenue metrics dashboard"""
+    summary = checkout_engine.get_revenue_summary()
+
+    return jsonify({
+        'total_revenue': summary['total_revenue'],
+        'order_count': summary['order_count'],
+        'average_order_value': summary['average_order_value'],
+        'monthly_run_rate': summary['monthly_rate']
+    })
+
+@app.route('/checkout/success', methods=['GET'])
+def checkout_success():
+    """Post-payment success page"""
+    return render_template('checkout_success.html')
+
 # ============================================================================
 
 @app.route('/whitepaper')
