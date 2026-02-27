@@ -21,6 +21,19 @@ from dotenv import load_dotenv
 # Import checkout engine
 from src.sincor2.checkout_engine import CheckoutEngine
 
+# Import sales closing engine and routes
+from src.sincor2.sales_closing_engine import SalesClosingEngine
+from src.sincor2.closing_routes import closing_bp
+
+# Import lead discovery and autonomous scheduler
+from src.sincor2.lead_discovery_engine import LeadDiscoveryEngine
+from src.sincor2.agent_outreach_handler import AgentOutreachHandler
+from src.sincor2.autonomous_scheduler import start_scheduler_background
+
+# Import commission engine and routes
+from src.sincor2.agent_commission_engine import AgentCommissionEngine
+from src.sincor2.commission_routes import commission_bp
+
 # Configure structured logging
 logging.basicConfig(
     level=logging.INFO,
@@ -624,6 +637,19 @@ def affiliate_program():
 
 # Initialize checkout engine
 checkout_engine = CheckoutEngine()
+
+# Initialize lead discovery and sales closing engines
+lead_engine = LeadDiscoveryEngine()
+outreach_handler = AgentOutreachHandler(lead_engine)
+closing_engine = SalesClosingEngine()
+commission_engine = AgentCommissionEngine()
+
+# Register sales closing and commission blueprints
+app.register_blueprint(closing_bp)
+app.register_blueprint(commission_bp)
+
+# Start autonomous scheduler in background
+scheduler = start_scheduler_background(lead_engine, outreach_handler, closing_engine)
 
 @app.route('/checkout', methods=['GET'])
 def checkout_page():
