@@ -3,15 +3,12 @@ SINCOR Checkout & Payment Processing
 File: src/sincor2/checkout_engine.py
 """
 
-import stripe
 import json
 import uuid
+import os
 from datetime import datetime
 from pathlib import Path
 import sqlite3
-
-# Initialize Stripe
-stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 class CheckoutEngine:
     def __init__(self, db_path='data/sincor.db'):
@@ -44,8 +41,8 @@ class CheckoutEngine:
                 final_price INTEGER NOT NULL,  -- cents (after multipliers)
                 currency TEXT DEFAULT 'USD',
 
-                -- Payment
-                stripe_payment_id TEXT,
+                -- Payment (PayPal)
+                paypal_order_id TEXT,
                 payment_status TEXT DEFAULT 'pending',  -- pending, paid, failed, refunded
                 paid_at TIMESTAMP,
 
@@ -110,23 +107,15 @@ class CheckoutEngine:
         conn.commit()
         conn.close()
 
-    def process_payment(self, payment_method_id, amount_cents, order_data, billing_data):
-        """Process Stripe payment and create order"""
+    def process_payment(self, paypal_order_id, amount_cents, order_data, billing_data):
+        """Process PayPal payment and create order"""
 
         try:
-            # Create Stripe charge
-            charge = stripe.PaymentIntent.create(
-                amount=amount_cents,
-                currency='usd',
-                payment_method=payment_method_id,
-                confirm=True,
-                return_url='https://app.getsincor.com/checkout/success'
-            )
-
-            if charge.status != 'succeeded':
+            # PayPal has already verified the payment, we just record it
+            if not paypal_order_id:
                 return {
                     'success': False,
-                    'error': f'Payment failed: {charge.status}'
+                    'error': 'PayPal order ID is required'
                 }
 
             # Payment successful - create order
@@ -139,7 +128,7 @@ class CheckoutEngine:
                 INSERT INTO orders (
                     id, customer_email, customer_name, company_name,
                     service_type, service_name, complexity_tier, delivery_speed, quality_tier,
-                    base_price, final_price, stripe_payment_id, payment_status, paid_at,
+                    base_price, final_price, paypal_order_id, payment_status, paid_at,
                     billing_address
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
@@ -154,7 +143,7 @@ class CheckoutEngine:
                 order_data['quality'],
                 0,  # base_price (would calculate from order history)
                 int(order_data['price']),
-                charge.id,
+                paypal_order_id,
                 'paid',
                 datetime.utcnow(),
                 json.dumps(billing_data)
@@ -201,11 +190,6 @@ class CheckoutEngine:
                 'projectId': project_id
             }
 
-        except stripe.error.CardError as e:
-            return {
-                'success': False,
-                'error': f'Card declined: {e.user_message}'
-            }
         except Exception as e:
             return {
                 'success': False,

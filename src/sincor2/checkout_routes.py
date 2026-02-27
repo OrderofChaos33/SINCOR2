@@ -13,22 +13,22 @@ checkout_engine = CheckoutEngine()
 @checkout_bp.route('/checkout', methods=['GET'])
 def checkout_page():
     """Render checkout page"""
-    return render_template('checkout.html', stripe_key=os.environ.get('STRIPE_PUBLIC_KEY'))
+    return render_template('checkout.html', paypal_client_id=os.environ.get('PAYPAL_CLIENT_ID'))
 
 @checkout_bp.route('/api/checkout', methods=['POST'])
 def process_checkout():
-    """Process payment and create order"""
+    """Process PayPal payment and create order"""
 
     try:
         data = request.json
 
         # Validate required fields
-        if not all(k in data for k in ['paymentMethodId', 'amount', 'orderData', 'billingData']):
+        if not all(k in data for k in ['paypalOrderId', 'amount', 'orderData', 'billingData']):
             return jsonify({'success': False, 'error': 'Missing required fields'}), 400
 
-        # Process payment through Stripe
+        # Process payment through PayPal
         result = checkout_engine.process_payment(
-            payment_method_id=data['paymentMethodId'],
+            paypal_order_id=data['paypalOrderId'],
             amount_cents=data['amount'],
             order_data=data['orderData'],
             billing_data=data['billingData']

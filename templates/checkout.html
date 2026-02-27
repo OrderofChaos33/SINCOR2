@@ -5,26 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout - SINCOR</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-
-        .stripe-element {
-            padding: 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 0.5rem;
-            background: white;
-        }
-
-        .stripe-element.StripeElement--focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .stripe-element.StripeElement--invalid {
-            border-color: #ef4444;
-        }
 
         .loading {
             opacity: 0.6;
@@ -101,7 +85,7 @@
 
         <!-- Billing Information -->
         <div class="bg-white rounded-xl shadow-md p-8 mb-8">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6">Billing Information</h2>
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Your Information</h2>
 
             <form id="billingForm" class="space-y-6">
                 <div class="grid md:grid-cols-2 gap-6">
@@ -124,56 +108,24 @@
                     <label class="block text-sm font-semibold text-gray-900 mb-2">Company Name *</label>
                     <input type="text" name="company" id="company" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="Your Company">
                 </div>
-
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-900 mb-2">Address *</label>
-                        <input type="text" name="address" id="address" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="123 Main St">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-900 mb-2">City *</label>
-                        <input type="text" name="city" id="city" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="San Francisco">
-                    </div>
-                </div>
-
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-900 mb-2">State/Province *</label>
-                        <input type="text" name="state" id="state" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="CA">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-900 mb-2">ZIP/Postal Code *</label>
-                        <input type="text" name="zip" id="zip" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="94102">
-                    </div>
-                </div>
             </form>
         </div>
 
-        <!-- Payment Information -->
+        <!-- PayPal Payment -->
         <div class="bg-white rounded-xl shadow-md p-8 mb-8">
             <h2 class="text-2xl font-bold text-gray-900 mb-6">Payment Method</h2>
 
-            <form id="paymentForm" class="space-y-6">
-                <div id="card-element" class="stripe-element"></div>
+            <div id="paypal-button-container" class="mb-6"></div>
 
-                <div id="card-errors" class="text-red-600 text-sm hidden"></div>
+            <div id="payment-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg hidden"></div>
 
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                    <div class="text-blue-600 text-2xl">🔒</div>
-                    <div>
-                        <div class="font-semibold text-blue-900">Bank-Level Security</div>
-                        <div class="text-sm text-blue-700">Your payment is encrypted and secured with Stripe. We never see your card details.</div>
-                    </div>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                <div class="text-blue-600 text-2xl">🔒</div>
+                <div>
+                    <div class="font-semibold text-blue-900">Bank-Level Security</div>
+                    <div class="text-sm text-blue-700">Your payment is processed securely through PayPal. We never see your card details.</div>
                 </div>
-
-                <button type="submit" id="submitButton" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-bold text-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    💳 Complete Purchase - <span id="submitButtonAmount">$0</span>
-                </button>
-
-                <div class="text-sm text-gray-600 text-center">
-                    By clicking the button above, you agree to our <a href="/terms" class="text-blue-600 hover:underline">Terms of Service</a> and <a href="/privacy" class="text-blue-600 hover:underline">Privacy Policy</a>.
-                </div>
-            </form>
+            </div>
         </div>
 
         <!-- Guarantees -->
@@ -217,12 +169,6 @@
     </div>
 
     <script>
-        // Initialize Stripe
-        const stripe = Stripe('pk_live_YOUR_PUBLISHABLE_KEY'); // Will be replaced in backend
-        const elements = stripe.elements();
-        const cardElement = elements.create('card');
-        cardElement.mount('#card-element');
-
         // Load order from sessionStorage
         function loadOrder() {
             const orderData = JSON.parse(sessionStorage.getItem('pendingOrder') || '{}');
@@ -232,7 +178,6 @@
                 return;
             }
 
-            // Display order summary
             const serviceNames = {
                 'intelligence': 'Intelligence Reports',
                 'predictive': 'Predictive Models',
@@ -246,107 +191,89 @@
             document.getElementById('speedName').textContent = orderData.speed.charAt(0).toUpperCase() + orderData.speed.slice(1);
             document.getElementById('qualityName').textContent = orderData.quality.charAt(0).toUpperCase() + orderData.quality.slice(1);
 
-            const amount = parseInt(orderData.price);
+            const amount = parseFloat(orderData.price);
             document.getElementById('totalAmount').textContent = `$${amount.toLocaleString()}`;
-            document.getElementById('submitButtonAmount').textContent = `$${amount.toLocaleString()}`;
 
-            // Store order data for submission
             window.orderData = orderData;
             window.totalAmount = amount;
         }
 
-        // Handle card errors
-        cardElement.addEventListener('change', function(event) {
-            const displayError = document.getElementById('card-errors');
-            if (event.error) {
-                displayError.textContent = event.error.message;
-                displayError.classList.remove('hidden');
-            } else {
-                displayError.classList.add('hidden');
-            }
-        });
+        // Initialize PayPal
+        function initPayPal() {
+            paypal.Buttons({
+                createOrder: (data, actions) => {
+                    // Validate form
+                    if (!document.getElementById('firstName').value ||
+                        !document.getElementById('lastName').value ||
+                        !document.getElementById('email').value ||
+                        !document.getElementById('company').value) {
+                        alert('Please fill in all fields');
+                        return;
+                    }
 
-        // Handle form submission
-        document.getElementById('paymentForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+                    return actions.order.create({
+                        purchase_units: [{
+                            amount: {
+                                value: window.totalAmount.toString(),
+                                currency_code: 'USD'
+                            },
+                            description: `${window.orderData.serviceName} - ${window.orderData.tier} Tier`
+                        }]
+                    });
+                },
+                onApprove: (data, actions) => {
+                    return actions.order.capture().then((orderDetails) => {
+                        // Order captured successfully
+                        processPayment(orderDetails);
+                    });
+                },
+                onError: (err) => {
+                    console.error('PayPal error:', err);
+                    document.getElementById('payment-error').textContent = 'Payment failed. Please try again.';
+                    document.getElementById('payment-error').classList.remove('hidden');
+                }
+            }).render('#paypal-button-container');
+        }
 
-            const submitButton = document.getElementById('submitButton');
-            submitButton.disabled = true;
-            submitButton.textContent = 'Processing...';
-
-            // Gather billing info
+        function processPayment(paypalOrderDetails) {
+            // Send to backend
             const billingData = {
                 firstName: document.getElementById('firstName').value,
                 lastName: document.getElementById('lastName').value,
                 email: document.getElementById('email').value,
-                company: document.getElementById('company').value,
-                address: document.getElementById('address').value,
-                city: document.getElementById('city').value,
-                state: document.getElementById('state').value,
-                zip: document.getElementById('zip').value
+                company: document.getElementById('company').value
             };
 
-            // Create payment method
-            const {error, paymentMethod} = await stripe.createPaymentMethod({
-                type: 'card',
-                card: cardElement,
-                billing_details: {
-                    name: `${billingData.firstName} ${billingData.lastName}`,
-                    email: billingData.email,
-                    address: {
-                        line1: billingData.address,
-                        city: billingData.city,
-                        state: billingData.state,
-                        postal_code: billingData.zip
-                    }
-                }
-            });
-
-            if (error) {
-                document.getElementById('card-errors').textContent = error.message;
-                document.getElementById('card-errors').classList.remove('hidden');
-                submitButton.disabled = false;
-                submitButton.textContent = '💳 Complete Purchase';
-                return;
-            }
-
-            // Send to backend to create charge
-            try {
-                const response = await fetch('/api/checkout', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        paymentMethodId: paymentMethod.id,
-                        amount: window.totalAmount * 100, // Stripe uses cents
-                        orderData: window.orderData,
-                        billingData: billingData
-                    })
-                });
-
-                const result = await response.json();
-
+            fetch('/api/checkout', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    paypalOrderId: paypalOrderDetails.id,
+                    paypalPayerId: paypalOrderDetails.payer.payer_info?.email || 'unknown',
+                    amount: window.totalAmount,
+                    orderData: window.orderData,
+                    billingData: billingData
+                })
+            })
+            .then(r => r.json())
+            .then(result => {
                 if (result.success) {
-                    // Show success modal
                     document.getElementById('orderId').textContent = result.orderId;
                     document.getElementById('successModal').classList.remove('hidden');
-
-                    // Clear session storage
                     sessionStorage.removeItem('pendingOrder');
-
-                    // Send confirmation email (backend handles this)
                 } else {
-                    throw new Error(result.error || 'Payment failed');
+                    alert('Error creating order: ' + result.error);
                 }
-            } catch (error) {
-                document.getElementById('card-errors').textContent = error.message;
-                document.getElementById('card-errors').classList.remove('hidden');
-                submitButton.disabled = false;
-                submitButton.textContent = '💳 Complete Purchase';
-            }
-        });
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                alert('Payment processing error');
+            });
+        }
 
-        // Load order on page load
+        // Load and initialize
         loadOrder();
+        initPayPal();
     </script>
 </body>
 </html>
