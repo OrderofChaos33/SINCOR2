@@ -201,3 +201,19 @@ jinja2.exceptions.TemplateNotFound: index.html
 [2026-03-01T23:29:12] Environment loaded from: system
 [2026-03-01T23:29:12] ✓ Autonomous revenue system initialized and running in background
 [2026-03-01T23:29:12] Failed to register digital store routes: No module named 'digital_store'
+[2026-03-01T23:30:44] WARNING: Using default Flask secret key
+[2026-03-01T23:30:44] Environment loaded from: system
+[2026-03-01T23:30:44] ✓ Autonomous revenue system initialized and running in background
+[2026-03-01T23:30:44] Failed to register digital store routes: No module named 'digital_store'
+[2026-03-01T23:30:51] WARNING: Using default Flask secret key
+[2026-03-01T23:30:51] Environment loaded from: system
+[2026-03-01T23:30:51] ✓ Autonomous revenue system initialized and running in background
+[2026-03-01T23:30:51] Failed to register digital store routes: No module named 'digital_store'
+[2026-03-01T23:31:32] WARNING: Using default Flask secret key
+[2026-03-01T23:31:32] Environment loaded from: system
+[2026-03-01T23:31:32] ✓ Autonomous revenue system initialized and running in background
+[2026-03-01T23:31:32] Failed to register digital store routes: No module named 'digital_store'
+[2026-03-01T23:32:18] WARNING: Using default Flask secret key
+[2026-03-01T23:32:18] Environment loaded from: system
+[2026-03-01T23:32:18] ✓ Autonomous revenue system initialized and running in background
+[2026-03-01T23:32:18] Failed to register digital store routes: No module named 'digital_store'
