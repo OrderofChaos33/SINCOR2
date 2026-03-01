@@ -1392,9 +1392,8 @@ def paypal_checkout_override(plan_id):
                     return;
                 }}
                 
-                // For demo purposes, create a simple subscription
                 return actions.subscription.create({{
-                    'plan_id': 'P-5ML4271244454362WXNWU5NQ', // PayPal plan ID
+                    'plan_id': '{plan['paypal_plan_id']}',
                     'subscriber': {{
                         'name': {{
                             'given_name': company,
