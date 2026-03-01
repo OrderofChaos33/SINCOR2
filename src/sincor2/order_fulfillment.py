@@ -13,7 +13,7 @@ from enum import Enum
 
 # Import content and BI engines
 try:
-    from unified_content_engine import (
+    from sincor2.unified_content_engine import (
         UnifiedContentEngine,
         ContentRequest,
         ContentPackage,
@@ -25,7 +25,7 @@ except ImportError:
     print("Warning: Content engine not available for fulfillment")
 
 try:
-    from instant_business_intelligence import InstantBusinessIntelligence
+    from sincor2.instant_business_intelligence import InstantBusinessIntelligence
     BI_ENGINE_AVAILABLE = True
 except ImportError:
     BI_ENGINE_AVAILABLE = False
