@@ -4,7 +4,7 @@ Add to: src/sincor2/mvp_app.py or sincor_app.py
 """
 
 from flask import Blueprint, request, jsonify, render_template
-from src.sincor2.checkout_engine import CheckoutEngine
+from sincor2.checkout_engine import CheckoutEngine
 import os
 
 checkout_bp = Blueprint('checkout', __name__)

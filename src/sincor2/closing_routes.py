@@ -4,7 +4,7 @@ API endpoints for sales conversion pipeline
 """
 
 from flask import Blueprint, request, jsonify
-from src.sincor2.sales_closing_engine import SalesClosingEngine
+from sincor2.sales_closing_engine import SalesClosingEngine
 import logging
 
 closing_bp = Blueprint('closing', __name__)

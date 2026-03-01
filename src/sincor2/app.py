@@ -130,6 +130,31 @@ except Exception as e:
     FULFILLMENT_AVAILABLE = False
     fulfillment_system = None
 
+# Import revenue-generating blueprints
+try:
+    from sincor2.checkout_routes import checkout_bp
+    CHECKOUT_ROUTES_AVAILABLE = True
+except ImportError as e:
+    print(f"Checkout routes not available: {e}")
+    CHECKOUT_ROUTES_AVAILABLE = False
+    checkout_bp = None
+
+try:
+    from sincor2.closing_routes import closing_bp
+    CLOSING_ROUTES_AVAILABLE = True
+except ImportError as e:
+    print(f"Sales closing routes not available: {e}")
+    CLOSING_ROUTES_AVAILABLE = False
+    closing_bp = None
+
+try:
+    from sincor2.commission_routes import commission_bp
+    COMMISSION_ROUTES_AVAILABLE = True
+except ImportError as e:
+    print(f"Commission routes not available: {e}")
+    COMMISSION_ROUTES_AVAILABLE = False
+    commission_bp = None
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-in-production')
@@ -186,6 +211,17 @@ if MONITORING_AVAILABLE:
     print("Monitoring Dashboard Enabled")
 else:
     print("WARNING: Monitoring Dashboard NOT available!")
+
+# Register revenue-generating blueprints
+if CHECKOUT_ROUTES_AVAILABLE and checkout_bp is not None:
+    app.register_blueprint(checkout_bp)
+    print("Checkout Routes Registered")
+if CLOSING_ROUTES_AVAILABLE and closing_bp is not None:
+    app.register_blueprint(closing_bp)
+    print("Sales Closing Routes Registered")
+if COMMISSION_ROUTES_AVAILABLE and commission_bp is not None:
+    app.register_blueprint(commission_bp)
+    print("Commission Routes Registered")
 
 # ==================== AUTHENTICATION ROUTES ====================
 

@@ -4,7 +4,7 @@ Endpoints for agents to view commissions and for admin to manage payouts
 """
 
 from flask import Blueprint, request, jsonify
-from src.sincor2.agent_commission_engine import AgentCommissionEngine
+from sincor2.agent_commission_engine import AgentCommissionEngine
 import logging
 
 commission_bp = Blueprint('commissions', __name__)
