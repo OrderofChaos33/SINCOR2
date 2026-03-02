@@ -16,6 +16,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Import intelligence engine for real lead discovery
+try:
+    from src.sincor2.lead_intelligence_engine import LeadIntelligenceEngine
+    intelligence_engine = LeadIntelligenceEngine()
+except ImportError:
+    intelligence_engine = None
+    logger.warning("LeadIntelligenceEngine not available")
+
 
 class AutonomousTaskScheduler:
     """Schedules and runs autonomous revenue generation tasks"""
@@ -26,24 +34,74 @@ class AutonomousTaskScheduler:
         self.closing_engine = closing_engine
 
     def task_discover_leads(self):
-        """Discover new leads (placeholder - would integrate with LinkedIn, Apollo, etc)"""
+        """Discover new leads using Apollo.io + NewsAPI"""
         logger.info("Running lead discovery task...")
 
-        # TODO: Integrate with actual lead sources:
-        # - LinkedIn Sales Navigator API
-        # - Apollo.io API
-        # - Hunter.io for email finding
-        # - Web scraping for company data
+        if not intelligence_engine:
+            logger.warning("Intelligence engine not available")
+            return {
+                'task': 'lead_discovery',
+                'timestamp': datetime.utcnow().isoformat(),
+                'leads_found': 0,
+                'status': 'engine_not_available'
+            }
 
-        # For now, just log the task
-        stats = self.lead_engine.get_lead_stats()
-        logger.info(f"Lead stats: {stats}")
+        # For MVP: Get hot industries and search them
+        # In production: would have custom lead source queries
+        search_queries = [
+            'SaaS companies 50-100 employees',
+            'FinTech startups Series A-B funding',
+            'E-commerce platforms scaling',
+            'Enterprise software Series B-C',
+            'Data analytics companies hiring'
+        ]
+
+        leads_found = 0
+        leads_qualified = 0
+
+        for query in search_queries:
+            try:
+                logger.info(f"Searching: {query}")
+                companies = intelligence_engine.search_companies(query, limit=3)
+
+                for company in companies:
+                    try:
+                        company_name = company.get('name')
+                        logger.info(f"Qualifying: {company_name}")
+
+                        # Auto-qualify the company
+                        qualification = intelligence_engine.auto_qualify_company(company_name)
+
+                        if qualification and qualification['should_contact']:
+                            # Create lead in database
+                            lead_id = intelligence_engine.create_lead_from_qualification(
+                                self.lead_engine,
+                                qualification
+                            )
+
+                            if lead_id:
+                                leads_qualified += 1
+                                logger.info(f"Created lead: {company_name} "
+                                           f"(Score: {qualification['composite_score']:.1f})")
+
+                        leads_found += 1
+
+                    except Exception as e:
+                        logger.error(f"Error qualifying company: {e}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"Error in search query '{query}': {e}")
+                continue
+
+        logger.info(f"Lead discovery complete: {leads_found} searched, {leads_qualified} qualified")
 
         return {
             'task': 'lead_discovery',
             'timestamp': datetime.utcnow().isoformat(),
-            'leads_found': 0,  # Would be > 0 with real integration
-            'status': 'pending_integration'
+            'companies_searched': leads_found,
+            'leads_qualified': leads_qualified,
+            'status': 'complete'
         }
 
     def task_score_leads(self):
