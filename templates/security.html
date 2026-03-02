@@ -1,8 +1,240 @@
 <!DOCTYPE html>
-<html><head><title>Security & Compliance - SINCOR</title><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-8">
-<div class="bg-white rounded-2xl p-12 shadow-xl text-center max-w-2xl">
-<h1 class="text-3xl font-bold mb-4">Security & Compliance</h1>
-<p class="text-xl text-gray-600 mb-8">Data flow diagrams, PII handling, SOC 2 compliance, and enterprise security details. Coming soon.</p>
-<a href="/" class="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors">← Back to Home</a>
-</div></body></html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security &amp; Compliance - SINCOR AI Platform</title>
+    <meta name="description" content="SINCOR Security & Compliance - Learn how we protect your data with enterprise-grade security controls, encryption, and compliance frameworks.">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .prose h2 { font-size: 1.5rem; font-weight: 700; margin: 2rem 0 1rem; color: #111827; }
+        .prose h3 { font-size: 1.125rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: #1f2937; }
+        .prose p { margin: 0.75rem 0; color: #4b5563; line-height: 1.75; }
+        .prose ul { margin: 0.75rem 0 0.75rem 1.5rem; list-style: disc; color: #4b5563; }
+        .prose ul li { margin: 0.4rem 0; line-height: 1.7; }
+        .prose a { color: #2563eb; text-decoration: underline; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <a href="/" class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold">S</span>
+                </div>
+                <span class="text-xl font-bold text-gray-900">SINCOR</span>
+            </a>
+            <a href="/" class="text-blue-600 hover:text-blue-700 font-medium text-sm">← Back to Home</a>
+        </div>
+    </nav>
+
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-sm p-8 mb-8 border border-gray-100">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                    <span class="text-2xl">🛡️</span>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Security &amp; Compliance</h1>
+                    <p class="text-gray-500 text-sm mt-1">How SINCOR protects your data and maintains enterprise-grade security</p>
+                </div>
+            </div>
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-800">
+                Enterprise-grade security is built into every layer of the SINCOR platform. Security questions? Email <a href="mailto:security@getsincor.com" class="underline">security@getsincor.com</a>
+            </div>
+        </div>
+
+        <!-- Security Highlights -->
+        <div class="grid sm:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
+                <div class="text-3xl mb-2">🔐</div>
+                <div class="font-bold text-gray-900 text-sm">AES-256</div>
+                <div class="text-gray-500 text-xs">Encryption at Rest</div>
+            </div>
+            <div class="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
+                <div class="text-3xl mb-2">🔒</div>
+                <div class="font-bold text-gray-900 text-sm">TLS 1.2+</div>
+                <div class="text-gray-500 text-xs">Encryption in Transit</div>
+            </div>
+            <div class="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
+                <div class="text-3xl mb-2">📡</div>
+                <div class="font-bold text-gray-900 text-sm">24/7 Monitoring</div>
+                <div class="text-gray-500 text-xs">Real-time Threat Detection</div>
+            </div>
+            <div class="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
+                <div class="text-3xl mb-2">📋</div>
+                <div class="font-bold text-gray-900 text-sm">Audit Logs</div>
+                <div class="text-gray-500 text-xs">Immutable Audit Trails</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-2xl shadow-sm p-8 border border-gray-100 prose">
+
+            <h2>1. Data Encryption</h2>
+            <h3>1.1 Encryption at Rest</h3>
+            <p>All customer data stored on SINCOR's infrastructure is encrypted using AES-256, the industry standard for enterprise data protection. This includes:</p>
+            <ul>
+                <li>Database records containing customer and business data</li>
+                <li>File storage for deliverables, reports, and uploaded assets</li>
+                <li>Backup copies and disaster recovery snapshots</li>
+                <li>Secrets management (API keys, credentials) using vault-based encryption</li>
+            </ul>
+            <h3>1.2 Encryption in Transit</h3>
+            <p>All data transmitted between your browser/application and SINCOR's servers is protected by TLS 1.2 or higher. We enforce HTTPS on all endpoints and reject older, insecure protocols.</p>
+
+            <h2>2. Access Controls</h2>
+            <h3>2.1 Role-Based Access Control (RBAC)</h3>
+            <p>Access to customer data within SINCOR is governed by strict role-based permissions. Employees and systems access only the minimum data required to perform their function (principle of least privilege). All access is logged and auditable.</p>
+            <h3>2.2 Customer Access Controls</h3>
+            <p>Customers can manage access through:</p>
+            <ul>
+                <li>Secure password authentication with bcrypt hashing</li>
+                <li>Session management with automatic timeout</li>
+                <li>Activity logs showing recent account access</li>
+                <li>Team-level access permissions (Enterprise plans)</li>
+            </ul>
+            <h3>2.3 Internal Access Governance</h3>
+            <p>SINCOR employees undergo background checks before receiving data access. Production data access requires multi-factor authentication, is limited to authorized personnel, and is logged in immutable audit trails reviewed quarterly.</p>
+
+            <h2>3. Infrastructure Security</h2>
+            <h3>3.1 Cloud Infrastructure</h3>
+            <p>SINCOR runs on enterprise cloud infrastructure with:</p>
+            <ul>
+                <li>Isolated, containerized deployment for each customer environment</li>
+                <li>Network segmentation and private VPCs</li>
+                <li>Web Application Firewall (WAF) protection against OWASP Top 10</li>
+                <li>DDoS mitigation and rate limiting</li>
+                <li>Automated vulnerability scanning and patch management</li>
+            </ul>
+            <h3>3.2 Physical Security</h3>
+            <p>Our infrastructure partners maintain SOC 2-certified data centers with 24/7 physical security, biometric access controls, and environmental monitoring.</p>
+
+            <h2>4. Application Security</h2>
+            <h3>4.1 Secure Development Lifecycle</h3>
+            <ul>
+                <li>All code changes undergo peer code review before deployment</li>
+                <li>Automated static analysis and dependency vulnerability scanning (SAST/SCA)</li>
+                <li>Regular third-party penetration testing</li>
+                <li>Secure coding training for all engineering staff</li>
+            </ul>
+            <h3>4.2 API Security</h3>
+            <ul>
+                <li>All API endpoints require authentication</li>
+                <li>Rate limiting to prevent abuse and brute-force attacks</li>
+                <li>Input validation and parameterized queries to prevent injection attacks</li>
+                <li>CORS policies restricting cross-origin access</li>
+            </ul>
+            <h3>4.3 Secrets Management</h3>
+            <p>API keys, credentials, and configuration secrets are stored in a dedicated secrets management system (never hardcoded in source code). Keys are rotated regularly and revoked immediately upon employee offboarding.</p>
+
+            <h2>5. Data Handling &amp; PII</h2>
+            <h3>5.1 Data Minimization</h3>
+            <p>We collect only the personal information necessary to provide the Services. Business data you provide (customer lists, content, etc.) is processed solely for the purpose of delivering your AI services and is not shared or used for any other purpose.</p>
+            <h3>5.2 Data Flow</h3>
+            <p>Customer data flow within the SINCOR platform:</p>
+            <ul>
+                <li><strong>Input:</strong> Your data enters via encrypted HTTPS connections</li>
+                <li><strong>Processing:</strong> AI agents process data in isolated, containerized environments with no cross-customer access</li>
+                <li><strong>Storage:</strong> Results stored in encrypted, customer-isolated storage</li>
+                <li><strong>Delivery:</strong> Deliverables accessible only through authenticated sessions</li>
+                <li><strong>Deletion:</strong> Data purged per retention schedules or upon your request</li>
+            </ul>
+            <h3>5.3 Third-Party Sub-Processors</h3>
+            <p>SINCOR uses a limited set of vetted sub-processors for specific functions (cloud hosting, payment processing, email delivery). All sub-processors are bound by data processing agreements consistent with our privacy obligations. A complete list of sub-processors is available upon request by emailing <a href="mailto:privacy@getsincor.com">privacy@getsincor.com</a>.</p>
+
+            <h2>6. Compliance Frameworks</h2>
+            <div class="grid sm:grid-cols-2 gap-4 my-4" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0;">
+                <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:0.75rem; padding:1rem;">
+                    <div style="font-weight:700; color:#166534; margin-bottom:0.5rem;">GDPR (EU/UK)</div>
+                    <div style="font-size:0.875rem; color:#4b5563;">Lawful basis for processing, data subject rights, 72-hour breach notification, DPA with sub-processors, Standard Contractual Clauses for international transfers</div>
+                </div>
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:0.75rem; padding:1rem;">
+                    <div style="font-weight:700; color:#1e40af; margin-bottom:0.5rem;">CCPA/CPRA (California)</div>
+                    <div style="font-size:0.875rem; color:#4b5563;">Right to know, delete, correct, and opt out. No sale of personal information. Annual data inventory maintained.</div>
+                </div>
+                <div style="background:#fdf4ff; border:1px solid #e9d5ff; border-radius:0.75rem; padding:1rem;">
+                    <div style="font-weight:700; color:#7e22ce; margin-bottom:0.5rem;">CAN-SPAM / CASL</div>
+                    <div style="font-size:0.875rem; color:#4b5563;">AI outreach agents enforce 12-touch maximum, mandatory unsubscribe handling, business hours only, and compliant sender identification.</div>
+                </div>
+                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:0.75rem; padding:1rem;">
+                    <div style="font-weight:700; color:#c2410c; margin-bottom:0.5rem;">SOC 2 Type II (In Progress)</div>
+                    <div style="font-size:0.875rem; color:#4b5563;">We are working toward SOC 2 Type II certification. Our infrastructure partners maintain SOC 2-certified facilities. Expected completion: Q4 2025.</div>
+                </div>
+            </div>
+
+            <h2>7. AI Agent Compliance &amp; Ethics</h2>
+            <p>SINCOR's AI agents operate under strict responsible-use policies:</p>
+            <ul>
+                <li><strong>Outreach limits:</strong> Maximum 12-touch sequences; 48-hour minimum intervals between touches; auto-stop on unsubscribe</li>
+                <li><strong>Lead discovery:</strong> 2,000 contacts/day maximum; excludes protected lists (do-not-contact registries); respects robots.txt</li>
+                <li><strong>Human oversight:</strong> High-risk actions (executive-level outreach, custom pricing, unusual transactions) require human approval</li>
+                <li><strong>Data sourcing:</strong> Only public data sources used for lead discovery; no proprietary or confidential data accessed without permission</li>
+                <li><strong>Transparency:</strong> AI-generated content is identifiable in your dashboard with full audit trails</li>
+            </ul>
+
+            <h2>8. Incident Response</h2>
+            <p>In the event of a security incident:</p>
+            <ul>
+                <li><strong>Detection:</strong> 24/7 automated monitoring with real-time alerting</li>
+                <li><strong>Containment:</strong> Automated isolation of affected systems within minutes</li>
+                <li><strong>Notification:</strong> Affected customers notified within 72 hours of confirmed breach (per GDPR requirements)</li>
+                <li><strong>Remediation:</strong> Root cause analysis and corrective actions documented</li>
+                <li><strong>Post-incident review:</strong> Process improvements implemented within 30 days</li>
+            </ul>
+            <p>To report a security vulnerability, email <a href="mailto:security@getsincor.com">security@getsincor.com</a>. We operate a responsible disclosure program and commit to responding within 48 hours.</p>
+
+            <h2>9. Business Continuity &amp; Uptime</h2>
+            <ul>
+                <li><strong>Target SLA:</strong> 99.5% monthly uptime for platform services</li>
+                <li><strong>Backups:</strong> Automated daily backups with 30-day retention; point-in-time recovery available</li>
+                <li><strong>Disaster recovery:</strong> RTO (Recovery Time Objective) of 4 hours; RPO (Recovery Point Objective) of 24 hours</li>
+                <li><strong>Maintenance:</strong> Scheduled maintenance during off-peak hours with advance notice</li>
+            </ul>
+
+            <h2>10. Security Certifications &amp; Assessments</h2>
+            <ul>
+                <li>Annual third-party penetration testing by independent security firms</li>
+                <li>Quarterly internal security reviews</li>
+                <li>Continuous automated vulnerability scanning</li>
+                <li>SOC 2 Type II certification in progress (target: Q4 2025)</li>
+                <li>GDPR Data Protection Impact Assessments (DPIAs) for high-risk processing activities</li>
+            </ul>
+            <p>Enterprise customers may request security documentation packages including questionnaire responses, penetration test summaries, and data flow diagrams under NDA by emailing <a href="mailto:enterprise@getsincor.com">enterprise@getsincor.com</a>.</p>
+
+            <h2>11. Contact Security Team</h2>
+            <ul>
+                <li><strong>Security vulnerabilities:</strong> <a href="mailto:security@getsincor.com">security@getsincor.com</a> (response within 48 hours)</li>
+                <li><strong>Data privacy:</strong> <a href="mailto:privacy@getsincor.com">privacy@getsincor.com</a></li>
+                <li><strong>Enterprise security reviews:</strong> <a href="mailto:enterprise@getsincor.com">enterprise@getsincor.com</a></li>
+            </ul>
+        </div>
+
+        <!-- Footer CTA -->
+        <div class="mt-8 bg-gradient-to-r from-gray-800 to-blue-900 rounded-2xl p-8 text-center text-white">
+            <h3 class="text-xl font-bold mb-2">Enterprise Security Review</h3>
+            <p class="text-gray-300 mb-4">Need a security questionnaire, data flow diagram, or pen test summary? Contact our enterprise team.</p>
+            <a href="mailto:enterprise@getsincor.com" class="inline-block bg-white text-gray-900 font-bold px-6 py-3 rounded-xl hover:bg-gray-100 transition-colors">
+                Request Security Package
+            </a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-8 mt-12">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="text-gray-400 text-sm">© 2025 SINCOR. All rights reserved.</div>
+            <div class="flex gap-6 text-sm">
+                <a href="/privacy" class="text-gray-400 hover:text-white">Privacy Policy</a>
+                <a href="/terms" class="text-gray-400 hover:text-white">Terms of Service</a>
+                <a href="/security" class="text-gray-400 hover:text-white">Security</a>
+                <a href="/" class="text-gray-400 hover:text-white">Home</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

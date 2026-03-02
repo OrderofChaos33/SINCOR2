@@ -324,6 +324,7 @@
                         <a href="/pricing" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium font-semibold text-blue-600">💰 Pricing</a>
                         <a href="#how-it-works" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">How It Works</a>
                         <a href="#products" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">Products</a>
+                        <a href="#faq" class="text-gray-700 hover:text-blue-600 px-3 py-2 font-medium">FAQ</a>
                         <a href="/buy" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">Get Started</a>
                     </div>
                 </div>
@@ -2345,6 +2346,291 @@
         </div>
     </section>
 
+    <!-- FAQ Section -->
+    <section id="faq" class="py-20 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <div class="inline-block bg-yellow-100 text-yellow-700 px-4 py-2 rounded-full mb-4 text-sm font-semibold">
+                    ❓ Frequently Asked Questions
+                </div>
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">Everything You Need to Know</h2>
+                <p class="text-xl text-gray-600">No question left unanswered. If you don't find your answer here, email <a href="mailto:hello@getsincor.com" class="text-blue-600 underline">hello@getsincor.com</a>.</p>
+            </div>
+
+            <div x-data="{ open: null }" class="space-y-4">
+
+                <!-- Category: Pricing & Payment -->
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 mt-8">💰 Pricing &amp; Payment</div>
+
+                <!-- FAQ Item -->
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 1 ? null : 1" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">What does SINCOR cost?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 1 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 1" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        SINCOR offers two pricing models:<br><br>
+                        <strong>Subscription Products</strong> (Growth Engine, Ops Core, Creative Forge, Intelligence Hub): Starting at $297/month per product. Bundle all four for significant discounts.<br><br>
+                        <strong>Enterprise Services</strong> (one-time project deliverables): Intelligence Reports from $4,500; Predictive Models from $8,500; Custom AI Agents from $7,100; Automation Solutions from $6,800; Market Analysis from $5,700.<br><br>
+                        All prices are 5% below the industry average for equivalent services from firms like Gartner, Deloitte, or Accenture. See our <a href="/pricing" class="text-blue-600 underline">full pricing page</a> for all tiers and discounts.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 2 ? null : 2" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Are there any hidden fees?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 2 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 2" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        No. Transparent pricing is a core SINCOR principle. What you see on our pricing page is what you pay. There are no setup fees, per-seat fees hidden in fine print, or usage overages unless you exceed a plan limit we've clearly communicated upfront. Applicable taxes may be added based on your location.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 3 ? null : 3" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Can I get a refund if I'm not satisfied?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 3 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 3" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Yes. New subscribers have a <strong>14-day Satisfaction Guarantee</strong>. If SINCOR doesn't deliver as described in the first 14 days, we'll issue a full refund—no questions asked.<br><br>
+                        For enterprise project-based services, refund terms depend on project stage (see our <a href="/terms" class="text-blue-600 underline">Terms of Service</a>). Email <a href="mailto:billing@getsincor.com" class="text-blue-600 underline">billing@getsincor.com</a> to initiate any refund request.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 4 ? null : 4" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">What payment methods do you accept?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 4 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 4" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        We accept major credit/debit cards (Visa, Mastercard, American Express, Discover) and PayPal. Enterprise customers can also pay by ACH bank transfer or wire transfer with net-30 terms. All payments are processed securely through PayPal's enterprise payment infrastructure.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 5 ? null : 5" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Are there discounts for bundles, volume, or nonprofits?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 5 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Yes! SINCOR offers:<br><br>
+                        • <strong>Bundle discounts</strong>: 10-20% off when purchasing multiple products or services together<br>
+                        • <strong>Volume discounts</strong>: 10-25% off for large enterprise service packages<br>
+                        • <strong>Annual subscription discount</strong>: ~17% savings vs. monthly billing<br>
+                        • <strong>Startup discount</strong>: Reduced pricing for early-stage companies (&lt;$1M ARR)<br>
+                        • <strong>Nonprofit discount</strong>: Special pricing for registered nonprofits<br><br>
+                        Email <a href="mailto:hello@getsincor.com" class="text-blue-600 underline">hello@getsincor.com</a> to discuss your specific situation.
+                    </div>
+                </div>
+
+                <!-- Category: Product & Delivery -->
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 mt-8">📦 Product &amp; Delivery</div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 6 ? null : 6" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">How quickly will I see results?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 6 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 6" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        For subscription products (Growth Engine, etc.): AI agents begin working immediately after setup (takes ~5 minutes). Most clients see initial pipeline activity within 24–48 hours. The system's learning period is 24 hours to calibrate to your business.<br><br>
+                        For enterprise project services: Timelines depend on complexity — Intelligence Reports in 2–6 weeks, Custom AI Agents in 4–24 weeks. Exact timelines are confirmed in your Service Order Form. SINCOR delivers 40% faster than traditional consulting on equivalent work.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 7 ? null : 7" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">What exactly do I get when I buy a subscription product?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 7 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 7" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Each product is a fully managed AI automation suite running in the cloud. You get:<br><br>
+                        • Access to specialized AI agents pre-configured for your business<br>
+                        • A real-time dashboard showing agent activity, outputs, and performance metrics<br>
+                        • Generated deliverables (leads, content, reports, etc.) downloadable from your dashboard<br>
+                        • Integration setup assistance for CRM, calendar, email, and other tools<br>
+                        • Email and chat support included<br>
+                        • Ongoing system updates and improvements at no extra cost<br><br>
+                        You don't need to install anything — it's fully managed and runs in the cloud.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 8 ? null : 8" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Do I own the outputs and deliverables?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 8 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 8" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Yes. All deliverables created specifically for you — reports, AI agents, models, content, leads — belong to you upon payment in full. SINCOR retains ownership of its underlying platform, algorithms, and technology, but everything generated for your business is yours to use, distribute, and build on without restriction.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 9 ? null : 9" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">How accurate are the AI outputs? What if something is wrong?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 9 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 9" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        SINCOR uses a multi-layer Quality Control (QC) system including AI evaluators, fact-checking, RAG citation verification, and human review gates for high-risk outputs. Our 9-dimension quality guarantee covers accuracy, completeness, brand consistency, and more.<br><br>
+                        That said, AI-generated content can contain errors. We recommend reviewing outputs before acting on them. If any deliverable doesn't meet the specification we promised, contact support and we'll make it right — revisions are included in all engagements.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 10 ? null : 10" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Can I cancel my subscription anytime?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 10 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 10" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Yes. Cancel anytime with no cancellation fee. Your subscription remains active until the end of the current billing period, then stops. You can export all your data within 30 days of cancellation. No contracts, no lock-in.
+                    </div>
+                </div>
+
+                <!-- Category: Technical & Integrations -->
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 mt-8">⚙️ Technical &amp; Integrations</div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 11 ? null : 11" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">What tools does SINCOR integrate with?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 11 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 11" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        SINCOR integrates with 50+ business tools including:<br><br>
+                        • <strong>CRM:</strong> HubSpot, Salesforce, Pipedrive<br>
+                        • <strong>Email:</strong> Gmail, Outlook, Mailchimp, Klaviyo<br>
+                        • <strong>Calendar:</strong> Google Calendar, Outlook Calendar<br>
+                        • <strong>Productivity:</strong> Google Workspace, Microsoft 365, Notion<br>
+                        • <strong>Social:</strong> LinkedIn, Twitter/X, Facebook, Instagram<br>
+                        • <strong>Analytics:</strong> Google Analytics, Mixpanel, Zendesk<br><br>
+                        Enterprise plans include custom API integrations for proprietary systems. If you don't see your tool listed, email <a href="mailto:hello@getsincor.com" class="text-blue-600 underline">hello@getsincor.com</a>.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 12 ? null : 12" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Do I need technical skills to use SINCOR?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 12 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 12" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        No. SINCOR is a fully managed service. You describe your business, target market, and goals — and our AI agents handle the rest. The onboarding process takes 5 minutes. For integrations, our team assists with setup. No coding or AI expertise required.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 13 ? null : 13" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text="gray-900">Is there an API I can use to build on SINCOR?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 13 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 13" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Yes. SINCOR provides a REST API for Enterprise subscribers, allowing you to programmatically trigger agents, retrieve outputs, and integrate SINCOR's capabilities into your own applications. API documentation is available in your Enterprise dashboard. Contact <a href="mailto:enterprise@getsincor.com" class="text-blue-600 underline">enterprise@getsincor.com</a> for API access.
+                    </div>
+                </div>
+
+                <!-- Category: Security & Compliance -->
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 mt-8">🔒 Security &amp; Compliance</div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 14 ? null : 14" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Is my data safe? Who can access it?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 14 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 14" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Your data is encrypted at rest (AES-256) and in transit (TLS 1.2+). Access is restricted by role-based permissions — only the minimum personnel needed to deliver your service can access your data, and all access is logged. We never share or sell your data. See our <a href="/security" class="text-blue-600 underline">Security page</a> for full details.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 15 ? null : 15" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Is SINCOR GDPR compliant?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 15 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 15" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Yes. SINCOR is GDPR-compliant for EEA and UK customers. This includes lawful basis for all data processing, full support for data subject rights (access, deletion, portability, etc.), Standard Contractual Clauses for international transfers, and 72-hour breach notification. Our AI agents also enforce CAN-SPAM and CASL compliance for outreach activities.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 16 ? null : 16" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Is the AI outreach compliant with anti-spam laws?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 16 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 16" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Absolutely. SINCOR's outreach agents are built with compliance as a core feature:<br><br>
+                        • Maximum 12-touch sequence per prospect (compliance cutoff)<br>
+                        • 48-hour minimum interval between messages<br>
+                        • Automatic immediate stop on any unsubscribe request<br>
+                        • CAN-SPAM compliant sender identification and opt-out mechanisms<br>
+                        • CASL consent requirements enforced for Canadian recipients<br>
+                        • Do-not-contact lists respected<br>
+                        • Human review required for executive-level targeting<br><br>
+                        You remain responsible for ensuring you have a lawful basis to contact the individuals in your target list.
+                    </div>
+                </div>
+
+                <!-- Category: Getting Started -->
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 mt-8">🚀 Getting Started</div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 17 ? null : 17" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">How do I get started?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 17 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 17" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Getting started takes three steps:<br><br>
+                        1. <strong>Choose your product</strong> on the <a href="/buy" class="text-blue-600 underline">Buy page</a> and complete checkout<br>
+                        2. <strong>Complete onboarding</strong> (5 minutes): tell us about your business, target market, and goals<br>
+                        3. <strong>AI agents deploy</strong> and start working immediately<br><br>
+                        For enterprise projects, the process starts with a scoping call. Email <a href="mailto:hello@getsincor.com" class="text-blue-600 underline">hello@getsincor.com</a> to schedule.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 18 ? null : 18" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Is there a free trial or demo?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 18 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 18" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        We offer interactive demos on this page showing sample AI agent outputs. You can also explore the <a href="/discovery-dashboard" class="text-blue-600 underline">Live Demo dashboard</a> to see the platform in action before purchasing.<br><br>
+                        Full free trials are available on a case-by-case basis for qualifying enterprise accounts. Email <a href="mailto:hello@getsincor.com" class="text-blue-600 underline">hello@getsincor.com</a> to inquire.<br><br>
+                        Note: All subscriptions include a 14-day Satisfaction Guarantee, so you can buy with confidence.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 19 ? null : 19" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">What support is included?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 19 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 19" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        All plans include email support with response times of 1–2 business days. Enterprise plans include priority support (4-hour response SLA), a dedicated account manager, and optional onboarding calls. Email us at <a href="mailto:support@getsincor.com" class="text-blue-600 underline">support@getsincor.com</a> for any issue.
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button @click="open = open === 20 ? null : 20" class="w-full flex justify-between items-center p-5 text-left bg-white hover:bg-gray-50 transition-colors">
+                        <span class="font-semibold text-gray-900">Can I white-label SINCOR for my agency or clients?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open === 20 }" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div x-show="open === 20" x-collapse class="px-5 pb-5 text-gray-600 text-sm leading-relaxed">
+                        Yes! SINCOR offers white-label licensing and franchise opportunities for agencies, consultants, and enterprises who want to offer SINCOR's capabilities under their own brand. See our <a href="/affiliate-program" class="text-blue-600 underline">Affiliate Program</a> and <a href="/franchise-empire" class="text-blue-600 underline">Franchise</a> pages for details, or email <a href="mailto:partners@getsincor.com" class="text-blue-600 underline">partners@getsincor.com</a>.
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-12 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 text-center border border-blue-100">
+                <h3 class="text-xl font-bold text-gray-900 mb-3">Still have questions?</h3>
+                <p class="text-gray-600 mb-6">Our team responds to all inquiries within 1–2 business days.</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="mailto:hello@getsincor.com" class="inline-block bg-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-700 transition-colors">
+                        📧 Email Us
+                    </a>
+                    <a href="/pricing" class="inline-block border-2 border-blue-600 text-blue-600 font-bold px-8 py-3 rounded-xl hover:bg-blue-50 transition-colors">
+                        💰 View Pricing
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Methods & Evidence Section -->
     <section id="methods" class="py-16 bg-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -2471,6 +2757,7 @@
                         <li><a href="/discovery-dashboard" class="hover:text-white">Live Demo</a></li>
                         <li><a href="/pricing" class="hover:text-white">Pricing</a></li>
                         <li><a href="/enterprise-dashboard" class="hover:text-white">Enterprise</a></li>
+                        <li><a href="#faq" class="hover:text-white">FAQ</a></li>
                     </ul>
                 </div>
                 <div>
@@ -2484,6 +2771,7 @@
                 <div>
                     <h4 class="font-semibold mb-4">Support</h4>
                     <ul class="space-y-2 text-gray-400">
+                        <li><a href="mailto:hello@getsincor.com" class="hover:text-white">Contact Us</a></li>
                         <li><a href="/privacy" class="hover:text-white">Privacy Policy</a></li>
                         <li><a href="/terms" class="hover:text-white">Terms of Service</a></li>
                         <li><a href="/security" class="hover:text-white">Security & Compliance</a></li>
