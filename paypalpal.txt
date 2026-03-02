@@ -1,2 +1,0 @@
-  Client ID    AZdYb8E394_g08iXBSH2pLFEtwG-AUj6pHWtEuDJF6tU-jIfGAAev381tIdJdxlfrD3ddHoWvlT3mZTO
-Secret key EPCCykMSzZ1xfAn5-_bTsmSm03dve5M1-L6EHcSJtD6J0XeKttw5HAqycJfWFRQTO2h8rNkkA4se2dxr
