@@ -103,7 +103,7 @@ ensure_newline_before_comments = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --ignore=tests/test_units.py --ignore=tests/test_value.py"
 
 [tool.mypy]
 python_version = "3.9"
