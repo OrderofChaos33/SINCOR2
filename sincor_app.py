@@ -307,12 +307,43 @@ PROTOTYPE2025<br>FRIENDSTEST<br>COURTTESTER
 # Basic routes
 @app.get("/")
 def home():
-    # Simple landing used for tests and lightweight deployments
-    return ("""<!doctype html><meta charset="utf-8"><title>SINCOR</title>
+    """Main landing page."""
+    try:
+        return render_template("index.html")
+    except Exception as e:
+        log(f"Error loading index page: {e}")
+        return ("""<!doctype html><meta charset="utf-8"><title>SINCOR</title>
 <body style="font-family:system-ui;margin:2rem">
 <h2>SINCOR Lead Engine</h2>
 <p><a href="/lead">Lead form</a> · <a href="/logs">Logs</a> · <a href="/outputs">Outputs</a> · <a href="/health">Health</a></p>
 </body>""",200,{"Content-Type":"text/html"})
+
+@app.route("/terms")
+def terms():
+    """Terms of Service page."""
+    try:
+        return render_template("terms.html")
+    except Exception as e:
+        log(f"Error loading terms page: {e}")
+        return jsonify({"error": "Terms page unavailable"}), 500
+
+@app.route("/privacy")
+def privacy():
+    """Privacy Policy page."""
+    try:
+        return render_template("privacy.html")
+    except Exception as e:
+        log(f"Error loading privacy page: {e}")
+        return jsonify({"error": "Privacy page unavailable"}), 500
+
+@app.route("/security")
+def security():
+    """Security & Compliance page."""
+    try:
+        return render_template("security.html")
+    except Exception as e:
+        log(f"Error loading security page: {e}")
+        return jsonify({"error": "Security page unavailable"}), 500
 
 @app.get("/lead")
 def lead_form():
