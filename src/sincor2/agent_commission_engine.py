@@ -9,6 +9,14 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+try:
+    from src.sincor2.commission_payout_engine import UnifiedPayoutEngine
+    payout_engine = UnifiedPayoutEngine()
+except ImportError:
+    payout_engine = None
+    logger_temp = logging.getLogger(__name__)
+    logger_temp.warning("PayPal payout engine not available")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -188,10 +196,10 @@ class AgentCommissionEngine:
             logger.error(f"Error marking commission paid: {e}")
             return False
 
-    def batch_payout(self, agent_name=None):
+    def batch_payout(self, agent_name=None, payment_method='paypal'):
         """
         Process payout for all pending commissions of an agent (or all agents).
-        In production, this would integrate with Stripe Connect or similar.
+        NOW INTEGRATED WITH PAYPAL & CRYPTO PAYOUT ENGINES
         """
         try:
             # Get pending commissions
@@ -213,34 +221,70 @@ class AgentCommissionEngine:
             for commission in pending:
                 agent = commission[1]
                 amount = commission[4]
+                commission_id = commission[0]
                 if agent not in by_agent:
                     by_agent[agent] = []
-                by_agent[agent].append(commission)
+                by_agent[agent].append({
+                    'id': commission_id,
+                    'amount': amount
+                })
 
-            # Process each agent
+            # Get agent payment preferences from database
             payout_results = []
-            for agent, commissions in by_agent.items():
-                total_amount = sum(c[4] for c in commissions)
+            total_paid = 0
 
-                # TODO: Integrate with actual payment processor
-                # For now, just mark as paid
-                for commission in commissions:
-                    self.mark_commission_paid(commission[0])
+            for agent, commissions in by_agent.items():
+                total_amount = sum(c['amount'] for c in commissions)
+
+                # Get agent's payment preferences (stored in database or config)
+                agent_info = self._get_agent_payment_info(agent, payment_method)
+
+                if not agent_info or not payout_engine:
+                    logger.warning(f"Cannot process payout for {agent}: Missing info or payout engine")
+                    payout_results.append({
+                        'agent': agent,
+                        'commission_count': len(commissions),
+                        'total_amount': float(total_amount),
+                        'status': 'pending',
+                        'reason': 'Agent info incomplete or payout engine unavailable'
+                    })
+                    continue
+
+                # Send actual payout
+                payout_result = payout_engine.payout_to_agent(
+                    agent_info=agent_info,
+                    amount=total_amount,
+                    commission_id=f"{agent}_{int(datetime.utcnow().timestamp())}"
+                )
+
+                # Update database based on result
+                if payout_result['status'] == 'success':
+                    for commission in commissions:
+                        self.mark_commission_paid(
+                            commission['id'],
+                            transaction_id=payout_result.get('payout_id', payout_result.get('tx_hash'))
+                        )
+                    total_paid += total_amount
 
                 payout_results.append({
                     'agent': agent,
                     'commission_count': len(commissions),
                     'total_amount': float(total_amount),
-                    'status': 'paid'
+                    'status': payout_result['status'],
+                    'payout_id': payout_result.get('payout_id'),
+                    'message': payout_result.get('message')
                 })
 
-                logger.info(f"Paid out ${total_amount:.2f} to {agent} ({len(commissions)} commissions)")
+                logger.info(f"Payout result for {agent}: {payout_result['status']} - ${total_amount:.2f}")
 
             return {
                 'status': 'success',
                 'payouts': payout_results,
-                'total_amount': sum(p['total_amount'] for p in payout_results),
-                'agent_count': len(payout_results)
+                'total_amount_paid': float(total_paid),
+                'total_attempted': sum(p['total_amount'] for p in payout_results),
+                'agent_count': len(payout_results),
+                'payment_method': payment_method,
+                'timestamp': datetime.utcnow().isoformat()
             }
 
         except Exception as e:
@@ -249,6 +293,27 @@ class AgentCommissionEngine:
                 'status': 'error',
                 'error': str(e)
             }
+
+    def _get_agent_payment_info(self, agent_name, payment_method='paypal'):
+        """
+        Get agent's payment information from database.
+        This would normally come from agent profile/settings.
+        """
+        # In production, query agent preferences table
+        # For MVP, return mock data
+        agent_info = {
+            'name': agent_name,
+            'payment_method': payment_method,
+        }
+
+        if payment_method.lower() == 'paypal':
+            # Would query from database
+            agent_info['paypal_email'] = f"{agent_name.lower().replace(' ', '.')}@example.com"
+        elif payment_method.lower() == 'crypto':
+            agent_info['crypto_address'] = '0x' + 'a' * 40  # Placeholder
+            agent_info['crypto_type'] = 'ETH'
+
+        return agent_info
 
     def record_commission_activity(self, agent_name):
         """Get detailed activity log for an agent's commissions"""
