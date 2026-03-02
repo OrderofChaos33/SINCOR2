@@ -140,6 +140,45 @@ docs/reality_bending_market_models.pdf
 *.backup
 *_backup.py
 *.py.bak
+*.py.backup
+*.py.backup-*
+*.py.pre-*
+*.py.original
+*.py.no-*
+*.py.mocked
+*.py.old
+
+# AI Agent Temp Directories (Claude, etc.)
+tmpclaude-*/
+tmp*/
+
+# Legacy / duplicate app files
+sincor_app.py
+sincor_app_professional.py
+sincor_app_railway.py
+wsgi.py
+
+# Part files and windows scripts
+app_part*.txt
+*.bat
+paypalpal.txt
+"New Text Document*.txt"
+New\ Text\ Document*.txt
+
+# Development Status Markdown Files (one-time reports)
+ALL_FIXES_COMPLETE.md
+COMPLETE_TEST_SUMMARY.md
+FINAL_DELIVERABLES.md
+FINAL_STATUS.md
+FIXES_COMPLETE.md
+FIX_*.md
+PRODUCTION_TEST_REPORT.md
+SALES_*_INTEGRATION.md
+SALES_*_SUMMARY.md
+SECURITY_INTEGRATION_REPORT.md
+SESSION_SUMMARY.md
+TEST_REPORT.md
+PAYPAL_SDK_DIAGNOSIS.md
 
 # Archives & Links (Windows)
 *.lnk
