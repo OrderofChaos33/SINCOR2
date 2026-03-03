@@ -40,6 +40,9 @@ from src.sincor2.stripe_payment_engine import StripePaymentEngine
 # Import crypto payout engine for agent commissions
 from src.sincor2.commission_payout_engine import CryptoPayoutEngine, UnifiedPayoutEngine
 
+# Import sincor platform routes (business setup, agents, integrations, etc)
+from src.sincor2.sincor_routes import sincor_bp
+
 # Configure structured logging
 logging.basicConfig(
     level=logging.INFO,
@@ -661,6 +664,7 @@ unified_payout = UnifiedPayoutEngine()
 # Register sales closing and commission blueprints
 app.register_blueprint(closing_bp)
 app.register_blueprint(commission_bp)
+app.register_blueprint(sincor_bp)  # All business setup, agents, integrations, demos
 
 # Start autonomous scheduler in background
 scheduler = start_scheduler_background(lead_engine, outreach_handler, closing_engine)
