@@ -25,7 +25,7 @@ class SalesClosingEngine:
 
     def init_database(self):
         """Create sales opportunities, proposals, and objections tables"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         # Sales opportunities table
@@ -156,7 +156,7 @@ class SalesClosingEngine:
         # Auto-qualify response
         sentiment, qualification = self.qualify_response(response_text)
 
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -244,7 +244,7 @@ class SalesClosingEngine:
         proposal_id = str(uuid.uuid4())
 
         # Get opportunity details
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('SELECT * FROM sales_opportunities WHERE id = ?', (opportunity_id,))
@@ -427,7 +427,7 @@ SINCOR Automation Team""",
         # Categorize objection
         category = self.categorize_objection(objection_text)
 
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         # Get opportunity
@@ -576,7 +576,7 @@ When works best for you?"""
         """Track agent contribution for commission payment"""
         commission_id = str(uuid.uuid4())
 
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -605,7 +605,7 @@ When works best for you?"""
 
     def close_deal(self, opportunity_id, order_id, deal_amount, closing_agent=None):
         """Mark deal as closed and process final commission"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         # Update opportunity to closed_won
@@ -627,6 +627,9 @@ When works best for you?"""
         cursor.execute('SELECT lead_id FROM sales_opportunities WHERE id = ?', (opportunity_id,))
         lead_id = cursor.fetchone()[0]
 
+        conn.commit()
+        conn.close()
+
         # Pay closing agent commission (10% of deal if closing_agent provided)
         if closing_agent:
             commission = deal_amount * 0.10
@@ -640,9 +643,6 @@ When works best for you?"""
                 commission_percent=10.0
             )
 
-        conn.commit()
-        conn.close()
-
         logger.info(f"Deal closed: {order_id} for ${deal_amount}")
 
         return {
@@ -654,7 +654,7 @@ When works best for you?"""
 
     def get_opportunity_status(self, opportunity_id):
         """Get current status of a sales opportunity"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('SELECT * FROM sales_opportunities WHERE id = ?', (opportunity_id,))
@@ -677,7 +677,7 @@ When works best for you?"""
 
     def get_agent_commissions(self, agent_name=None):
         """Get earned commissions for an agent"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         if agent_name:

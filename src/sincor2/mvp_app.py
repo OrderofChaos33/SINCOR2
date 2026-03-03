@@ -34,6 +34,12 @@ from src.sincor2.autonomous_scheduler import start_scheduler_background
 from src.sincor2.agent_commission_engine import AgentCommissionEngine
 from src.sincor2.commission_routes import commission_bp
 
+# Import Stripe payment engine (primary processor)
+from src.sincor2.stripe_payment_engine import StripePaymentEngine
+
+# Import crypto payout engine for agent commissions
+from src.sincor2.commission_payout_engine import CryptoPayoutEngine, UnifiedPayoutEngine
+
 # Configure structured logging
 logging.basicConfig(
     level=logging.INFO,
@@ -647,6 +653,11 @@ outreach_handler = AgentOutreachHandler(lead_engine)
 closing_engine = SalesClosingEngine()
 commission_engine = AgentCommissionEngine()
 
+# Initialize Stripe (primary) and Crypto (agent payouts) engines
+stripe_engine = StripePaymentEngine()
+crypto_engine = CryptoPayoutEngine()
+unified_payout = UnifiedPayoutEngine()
+
 # Register sales closing and commission blueprints
 app.register_blueprint(closing_bp)
 app.register_blueprint(commission_bp)
@@ -739,6 +750,145 @@ def process_payment():
 
     except Exception as e:
         logger.error(f"Process payment error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# STRIPE PAYMENT ROUTES (Primary Customer Payment Processor)
+# ============================================================================
+
+@app.route('/api/stripe/create-payment-intent', methods=['POST'])
+def stripe_create_payment_intent():
+    """Create a Stripe PaymentIntent for customer checkout.
+
+    POST body: {"amount": 12500, "description": "...", "email": "...", "service": "...", "order_id": "..."}
+    amount is in USD (e.g., 12500 = $12,500)
+    Returns client_secret for frontend confirmation.
+    """
+    try:
+        data = request.json or {}
+        amount = data.get('amount')
+        if not amount or float(amount) <= 0:
+            return jsonify({'error': 'Valid amount required'}), 400
+
+        amount_cents = int(float(amount) * 100)
+        description = sanitize_string(data.get('description', 'SINCOR Service Purchase'), max_length=200)
+        email = data.get('email', '')
+        order_id = data.get('order_id', '')
+        service = data.get('service', 'general')
+
+        result = stripe_engine.create_payment_intent(
+            amount_cents=amount_cents,
+            description=description,
+            customer_email=email if email else None,
+            metadata={
+                'order_id': order_id,
+                'service': service,
+                'platform': 'sincor2'
+            }
+        )
+
+        if result.get('payment_intent_id'):
+            # Create order record in DB
+            import uuid
+            if not order_id:
+                order_id = f"STRIPE-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
+
+            db = get_db()
+            db.execute(
+                'INSERT INTO orders (order_id, customer_email, product_name, amount, payment_status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+                (order_id, email, description, float(amount), 'pending', datetime.utcnow().isoformat())
+            )
+            db.commit()
+
+            return jsonify({
+                'client_secret': result['client_secret'],
+                'payment_intent_id': result['payment_intent_id'],
+                'order_id': order_id,
+                'amount': float(amount)
+            }), 200
+        else:
+            return jsonify({'error': result.get('message', 'Failed to create payment')}), 400
+
+    except Exception as e:
+        logger.error(f"Stripe payment intent error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/stripe/confirm-payment', methods=['POST'])
+def stripe_confirm_payment():
+    """Confirm a Stripe payment after client-side completion.
+
+    POST body: {"payment_intent_id": "pi_...", "order_id": "..."}
+    """
+    try:
+        data = request.json or {}
+        payment_intent_id = data.get('payment_intent_id', '')
+        order_id = data.get('order_id', '')
+
+        if not payment_intent_id:
+            return jsonify({'error': 'payment_intent_id required'}), 400
+
+        result = stripe_engine.confirm_payment(payment_intent_id)
+
+        if result.get('status') == 'success':
+            # Update order status in DB
+            if order_id:
+                db = get_db()
+                db.execute(
+                    'UPDATE orders SET payment_status = ?, updated_at = ? WHERE order_id = ?',
+                    ('paid', datetime.utcnow().isoformat(), order_id)
+                )
+                db.commit()
+
+            return jsonify({
+                'status': 'success',
+                'order_id': order_id,
+                'amount': result.get('amount'),
+                'charge_id': result.get('charge_id')
+            }), 200
+        else:
+            return jsonify({
+                'status': result.get('status', 'error'),
+                'message': result.get('message', 'Payment not confirmed')
+            }), 402
+
+    except Exception as e:
+        logger.error(f"Stripe confirm error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# CRYPTO PAYOUT ROUTES (Agent Commission Payouts via Blockchain)
+# ============================================================================
+
+@app.route('/api/crypto/payout', methods=['POST'])
+def crypto_payout():
+    """Send crypto payout to an agent.
+
+    POST body: {"agent_address": "0x...", "amount": 1250.00, "crypto_type": "USDC", "agent_name": "..."}
+    """
+    try:
+        data = request.json or {}
+        address = data.get('agent_address', '')
+        amount = float(data.get('amount', 0))
+        crypto_type = data.get('crypto_type', 'USDC')
+        agent_name = data.get('agent_name', 'Unknown')
+
+        if not address or amount <= 0:
+            return jsonify({'error': 'Valid address and amount required'}), 400
+
+        result = crypto_engine.send_crypto_payout(
+            agent_crypto_address=address,
+            amount=amount,
+            crypto_type=crypto_type,
+            description=f"SINCOR Commission for {agent_name}"
+        )
+
+        return jsonify(result), 200 if result['status'] == 'success' else 400
+
+    except Exception as e:
+        logger.error(f"Crypto payout error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 

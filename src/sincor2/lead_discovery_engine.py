@@ -22,7 +22,7 @@ class LeadDiscoveryEngine:
 
     def init_database(self):
         """Create leads and outreach tables"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         # Leads table
@@ -87,7 +87,7 @@ class LeadDiscoveryEngine:
         """Add a new lead to database"""
         lead_id = str(uuid.uuid4())
 
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -124,7 +124,7 @@ class LeadDiscoveryEngine:
         # Calculate composite score (weighted average)
         composite_score = (fit_score * 0.4) + (intent_score * 0.35) + (timing_score * 0.25)
 
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -156,7 +156,7 @@ class LeadDiscoveryEngine:
 
     def get_hot_leads(self, threshold=75):
         """Get leads ready for outreach (score >= threshold)"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -177,7 +177,7 @@ class LeadDiscoveryEngine:
         """Log an outreach attempt"""
         outreach_id = str(uuid.uuid4())
 
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -211,7 +211,7 @@ class LeadDiscoveryEngine:
 
     def update_lead_status(self, lead_id, status):
         """Update lead status (new → contacted → interested → proposal_sent → won)"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -228,7 +228,7 @@ class LeadDiscoveryEngine:
 
     def get_lead_stats(self):
         """Get summary stats on leads"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         cursor = conn.cursor()
 
         cursor.execute('SELECT COUNT(*) FROM leads')

@@ -16,3 +16,4 @@ psutil>=5.9.0
 dnspython>=2.6.1
 zipp>=3.19.1
 schedule>=1.2.0
+stripe>=7.4.0

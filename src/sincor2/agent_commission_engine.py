@@ -44,7 +44,7 @@ class AgentCommissionEngine:
     def get_agent_balance(self, agent_name):
         """Get current commission balance for an agent"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
             cursor = conn.cursor()
 
             # Get earned commissions
@@ -76,7 +76,7 @@ class AgentCommissionEngine:
     def get_agent_commissions_pending(self, agent_name=None, limit=50):
         """Get pending (unpaid) commissions for an agent"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
             cursor = conn.cursor()
 
             if agent_name:
@@ -112,7 +112,7 @@ class AgentCommissionEngine:
             from datetime import timedelta
             cutoff_date = (datetime.utcnow() - timedelta(days=30*months)).isoformat()
 
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
             cursor = conn.cursor()
 
             cursor.execute('''
@@ -148,7 +148,7 @@ class AgentCommissionEngine:
     def get_top_earning_agents(self, limit=10):
         """Get top earning agents by total commission"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
             cursor = conn.cursor()
 
             cursor.execute('''
@@ -178,7 +178,7 @@ class AgentCommissionEngine:
     def mark_commission_paid(self, commission_id, transaction_id=None):
         """Mark a commission as paid"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
             cursor = conn.cursor()
 
             cursor.execute('''
@@ -318,7 +318,7 @@ class AgentCommissionEngine:
     def record_commission_activity(self, agent_name):
         """Get detailed activity log for an agent's commissions"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
             cursor = conn.cursor()
 
             cursor.execute('''

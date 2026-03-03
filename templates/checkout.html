@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout - SINCOR</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
@@ -20,14 +20,41 @@
         }
 
         @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #card-element {
+            padding: 14px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+        }
+
+        #card-element.StripeElement--focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        #card-element.StripeElement--invalid {
+            border-color: #ef4444;
+        }
+
+        .payment-tab {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .payment-tab.active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .payment-tab:not(.active) {
+            border-color: #e5e7eb;
+            background: white;
+            color: #6b7280;
         }
     </style>
 </head>
@@ -41,7 +68,7 @@
                 </div>
                 <span class="text-xl font-bold text-gray-900">SINCOR</span>
             </div>
-            <a href="/buy" class="text-gray-600 hover:text-gray-900">← Back to Services</a>
+            <a href="/buy" class="text-gray-600 hover:text-gray-900">&larr; Back to Services</a>
         </div>
     </nav>
 
@@ -111,19 +138,74 @@
             </form>
         </div>
 
-        <!-- PayPal Payment -->
+        <!-- Payment Method Selection -->
         <div class="bg-white rounded-xl shadow-md p-8 mb-8">
             <h2 class="text-2xl font-bold text-gray-900 mb-6">Payment Method</h2>
 
-            <div id="paypal-button-container" class="mb-6"></div>
+            <!-- Payment Tabs -->
+            <div class="flex gap-4 mb-6">
+                <div id="tab-card" class="payment-tab active flex-1 border-2 rounded-lg p-4 text-center" onclick="switchPaymentMethod('card')">
+                    <div class="text-2xl mb-1">&#128179;</div>
+                    <div class="font-semibold">Credit / Debit Card</div>
+                    <div class="text-xs">Powered by Stripe</div>
+                </div>
+                <div id="tab-crypto" class="payment-tab flex-1 border-2 rounded-lg p-4 text-center" onclick="switchPaymentMethod('crypto')">
+                    <div class="text-2xl mb-1">&#9939;</div>
+                    <div class="font-semibold">Cryptocurrency</div>
+                    <div class="text-xs">BTC / ETH / USDC</div>
+                </div>
+            </div>
 
-            <div id="payment-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg hidden"></div>
+            <!-- Stripe Card Payment -->
+            <div id="stripe-payment" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-900 mb-2">Card Details</label>
+                    <div id="card-element"></div>
+                    <div id="card-errors" class="text-red-600 text-sm mt-2 hidden"></div>
+                </div>
 
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                <div class="text-blue-600 text-2xl">🔒</div>
+                <button id="stripe-pay-btn" onclick="handleStripePayment()" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-lg font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    Pay <span id="stripe-btn-amount">$0</span>
+                </button>
+            </div>
+
+            <!-- Crypto Payment -->
+            <div id="crypto-payment" class="space-y-4 hidden">
+                <div class="bg-gray-50 border-2 border-gray-200 rounded-lg p-6">
+                    <p class="text-gray-600 mb-4">Send payment to the following address:</p>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-900 mb-2">Select Currency</label>
+                        <select id="crypto-type" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                            <option value="USDC">USDC (Recommended)</option>
+                            <option value="ETH">Ethereum (ETH)</option>
+                            <option value="BTC">Bitcoin (BTC)</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-white border-2 border-gray-300 rounded-lg p-4 mb-4">
+                        <div class="text-sm text-gray-600 mb-1">Payment Address (Base Network)</div>
+                        <div id="crypto-address" class="font-mono text-sm break-all font-bold text-gray-900">0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18</div>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <span class="text-gray-600">Amount Due:</span>
+                        <span id="crypto-amount" class="font-bold text-lg text-blue-600">$0</span>
+                    </div>
+                </div>
+
+                <button id="crypto-pay-btn" onclick="handleCryptoPayment()" class="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white px-8 py-4 rounded-lg font-bold text-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-lg">
+                    I've Sent the Payment
+                </button>
+            </div>
+
+            <div id="payment-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg hidden mt-4"></div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 mt-4">
+                <div class="text-blue-600 text-2xl">&#128274;</div>
                 <div>
                     <div class="font-semibold text-blue-900">Bank-Level Security</div>
-                    <div class="text-sm text-blue-700">Your payment is processed securely through PayPal. We never see your card details.</div>
+                    <div class="text-sm text-blue-700">Payments processed securely via Stripe. Your card details never touch our servers.</div>
                 </div>
             </div>
         </div>
@@ -131,17 +213,17 @@
         <!-- Guarantees -->
         <div class="grid md:grid-cols-3 gap-6 mb-8">
             <div class="text-center">
-                <div class="text-3xl mb-2">🛡️</div>
+                <div class="text-3xl mb-2">&#128737;</div>
                 <div class="font-semibold text-gray-900 mb-1">30-Day Guarantee</div>
                 <div class="text-sm text-gray-600">Not satisfied? Full refund, no questions.</div>
             </div>
             <div class="text-center">
-                <div class="text-3xl mb-2">🚀</div>
+                <div class="text-3xl mb-2">&#128640;</div>
                 <div class="font-semibold text-gray-900 mb-1">Fast Start</div>
                 <div class="text-sm text-gray-600">Kickoff within 24 hours of payment.</div>
             </div>
             <div class="text-center">
-                <div class="text-3xl mb-2">📞</div>
+                <div class="text-3xl mb-2">&#128222;</div>
                 <div class="font-semibold text-gray-900 mb-1">Dedicated Support</div>
                 <div class="text-sm text-gray-600">Account manager included with all tiers.</div>
             </div>
@@ -152,7 +234,7 @@
     <div id="successModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md success-animation">
             <div class="text-center">
-                <div class="text-6xl mb-4">✅</div>
+                <div class="text-6xl mb-4">&#9989;</div>
                 <h3 class="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
                 <p class="text-gray-600 mb-6">Your order has been confirmed. Check your email for next steps.</p>
 
@@ -169,6 +251,33 @@
     </div>
 
     <script>
+        // Stripe initialization
+        const stripe = Stripe('{{ stripe_key }}');
+        const elements = stripe.elements();
+        const cardElement = elements.create('card', {
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#1f2937',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                    '::placeholder': { color: '#9ca3af' }
+                },
+                invalid: { color: '#ef4444' }
+            }
+        });
+        cardElement.mount('#card-element');
+
+        // Handle card errors in real-time
+        cardElement.on('change', function(event) {
+            const errorEl = document.getElementById('card-errors');
+            if (event.error) {
+                errorEl.textContent = event.error.message;
+                errorEl.classList.remove('hidden');
+            } else {
+                errorEl.classList.add('hidden');
+            }
+        });
+
         // Load order from sessionStorage
         function loadOrder() {
             const orderData = JSON.parse(sessionStorage.getItem('pendingOrder') || '{}');
@@ -193,87 +302,151 @@
 
             const amount = parseFloat(orderData.price);
             document.getElementById('totalAmount').textContent = `$${amount.toLocaleString()}`;
+            document.getElementById('stripe-btn-amount').textContent = `$${amount.toLocaleString()}`;
+            document.getElementById('crypto-amount').textContent = `$${amount.toLocaleString()}`;
 
             window.orderData = orderData;
             window.totalAmount = amount;
         }
 
-        // Initialize PayPal
-        function initPayPal() {
-            paypal.Buttons({
-                createOrder: (data, actions) => {
-                    // Validate form
-                    if (!document.getElementById('firstName').value ||
-                        !document.getElementById('lastName').value ||
-                        !document.getElementById('email').value ||
-                        !document.getElementById('company').value) {
-                        alert('Please fill in all fields');
-                        return;
-                    }
-
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: {
-                                value: window.totalAmount.toString(),
-                                currency_code: 'USD'
-                            },
-                            description: `${window.orderData.serviceName} - ${window.orderData.tier} Tier`
-                        }]
-                    });
-                },
-                onApprove: (data, actions) => {
-                    return actions.order.capture().then((orderDetails) => {
-                        // Order captured successfully
-                        processPayment(orderDetails);
-                    });
-                },
-                onError: (err) => {
-                    console.error('PayPal error:', err);
-                    document.getElementById('payment-error').textContent = 'Payment failed. Please try again.';
-                    document.getElementById('payment-error').classList.remove('hidden');
-                }
-            }).render('#paypal-button-container');
+        // Switch between card and crypto
+        function switchPaymentMethod(method) {
+            document.getElementById('tab-card').classList.toggle('active', method === 'card');
+            document.getElementById('tab-crypto').classList.toggle('active', method === 'crypto');
+            document.getElementById('stripe-payment').classList.toggle('hidden', method !== 'card');
+            document.getElementById('crypto-payment').classList.toggle('hidden', method !== 'crypto');
         }
 
-        function processPayment(paypalOrderDetails) {
-            // Send to backend
-            const billingData = {
-                firstName: document.getElementById('firstName').value,
-                lastName: document.getElementById('lastName').value,
-                email: document.getElementById('email').value,
-                company: document.getElementById('company').value
-            };
+        // Handle Stripe card payment
+        async function handleStripePayment() {
+            const btn = document.getElementById('stripe-pay-btn');
+            const errorEl = document.getElementById('payment-error');
+            errorEl.classList.add('hidden');
 
-            fetch('/api/checkout', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    paypalOrderId: paypalOrderDetails.id,
-                    paypalPayerId: paypalOrderDetails.payer.payer_info?.email || 'unknown',
-                    amount: window.totalAmount,
-                    orderData: window.orderData,
-                    billingData: billingData
-                })
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.success) {
-                    document.getElementById('orderId').textContent = result.orderId;
+            // Validate form
+            if (!document.getElementById('firstName').value ||
+                !document.getElementById('lastName').value ||
+                !document.getElementById('email').value ||
+                !document.getElementById('company').value) {
+                errorEl.textContent = 'Please fill in all required fields.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                // Step 1: Create PaymentIntent on server
+                const intentResponse = await fetch('/api/stripe/create-payment-intent', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        amount: window.totalAmount,
+                        description: `${window.orderData.serviceName || 'SINCOR Service'} - ${window.orderData.tier || 'Standard'} Tier`,
+                        email: document.getElementById('email').value,
+                        service: window.orderData.service
+                    })
+                });
+
+                const intentData = await intentResponse.json();
+                if (!intentData.client_secret) {
+                    throw new Error(intentData.error || 'Failed to create payment');
+                }
+
+                // Step 2: Confirm payment with Stripe.js
+                const { error, paymentIntent } = await stripe.confirmCardPayment(intentData.client_secret, {
+                    payment_method: {
+                        card: cardElement,
+                        billing_details: {
+                            name: `${document.getElementById('firstName').value} ${document.getElementById('lastName').value}`,
+                            email: document.getElementById('email').value
+                        }
+                    }
+                });
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+
+                if (paymentIntent.status === 'succeeded') {
+                    // Step 3: Confirm with backend
+                    await fetch('/api/stripe/confirm-payment', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            payment_intent_id: paymentIntent.id,
+                            order_id: intentData.order_id
+                        })
+                    });
+
+                    // Show success
+                    document.getElementById('orderId').textContent = intentData.order_id;
+                    document.getElementById('successModal').classList.remove('hidden');
+                    sessionStorage.removeItem('pendingOrder');
+                }
+
+            } catch (err) {
+                errorEl.textContent = err.message || 'Payment failed. Please try again.';
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `Pay <span id="stripe-btn-amount">$${window.totalAmount.toLocaleString()}</span>`;
+            }
+        }
+
+        // Handle crypto payment
+        async function handleCryptoPayment() {
+            const btn = document.getElementById('crypto-pay-btn');
+            const errorEl = document.getElementById('payment-error');
+            errorEl.classList.add('hidden');
+
+            // Validate form
+            if (!document.getElementById('email').value) {
+                errorEl.textContent = 'Please enter your email address.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+
+            try {
+                const cryptoType = document.getElementById('crypto-type').value;
+
+                const response = await fetch('/api/crypto/checkout', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        amount: window.totalAmount,
+                        crypto_type: cryptoType,
+                        email: document.getElementById('email').value,
+                        service: window.orderData.service,
+                        company: document.getElementById('company').value
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.order_id) {
+                    document.getElementById('orderId').textContent = result.order_id;
                     document.getElementById('successModal').classList.remove('hidden');
                     sessionStorage.removeItem('pendingOrder');
                 } else {
-                    alert('Error creating order: ' + result.error);
+                    throw new Error(result.error || 'Crypto payment verification failed');
                 }
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                alert('Payment processing error');
-            });
+
+            } catch (err) {
+                errorEl.textContent = err.message || 'Payment verification failed.';
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "I've Sent the Payment";
+            }
         }
 
         // Load and initialize
         loadOrder();
-        initPayPal();
     </script>
 </body>
 </html>
