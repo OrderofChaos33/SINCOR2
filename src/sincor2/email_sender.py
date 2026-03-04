@@ -1,0 +1,350 @@
+"""
+SINCOR Email Delivery Module
+
+Sends transactional emails (thank-you, confirmations) via SendGrid.
+Includes template rendering and personalization.
+"""
+
+import os
+import json
+import logging
+from typing import Dict, Optional, List
+from datetime import datetime
+
+logger = logging.getLogger('sincor2.email')
+
+# Try to import SendGrid
+try:
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail, Email, Content, Personalization, Attachment
+    SENDGRID_AVAILABLE = True
+except ImportError:
+    SENDGRID_AVAILABLE = False
+    logger.warning("[EMAIL] SendGrid not installed, email delivery will use stub mode")
+
+
+class EmailSender:
+    """Send transactional emails via SendGrid."""
+
+    def __init__(self, sendgrid_api_key: Optional[str] = None):
+        """Initialize email sender with optional API key."""
+        self.api_key = sendgrid_api_key or os.environ.get('SENDGRID_API_KEY')
+        self.from_email = os.environ.get('SENDGRID_FROM_EMAIL', 'support@sincor.com')
+        self.from_name = os.environ.get('SENDGRID_FROM_NAME', 'SINCOR Team')
+
+        if SENDGRID_AVAILABLE and self.api_key:
+            self.client = SendGridAPIClient(self.api_key)
+            self.mode = 'production'
+            logger.info("[EMAIL] Using SendGrid API for email delivery")
+        else:
+            self.client = None
+            self.mode = 'stub'
+            if not SENDGRID_AVAILABLE:
+                logger.warning("[EMAIL] SendGrid library not available, using stub mode")
+            if not self.api_key:
+                logger.warning("[EMAIL] SENDGRID_API_KEY not configured, using stub mode")
+
+    def send_thank_you_email(self, customer_email: str, customer_name: str, tier: str,
+                            order_id: str, download_urls: Dict[str, str]) -> Dict[str, str]:
+        """
+        Send thank-you email after purchase.
+
+        Args:
+            customer_email: Customer's email address
+            customer_name: Customer's name for personalization
+            tier: Plan tier (Starter, Professional, Enterprise)
+            order_id: Order ID for tracking
+            download_urls: Dict with URL keys: 'starter', 'professional', 'enterprise', 'quickstart'
+
+        Returns:
+            {'status': 'sent|failed|stub', 'message_id': '...', 'error': '...'}
+        """
+        subject = f"Welcome to SINCOR {tier}! Your Training Guides Are Ready"
+
+        html_content = self._render_thank_you_email(
+            customer_name=customer_name,
+            tier=tier,
+            order_id=order_id,
+            download_urls=download_urls
+        )
+
+        text_content = f"""
+Welcome to SINCOR {tier}!
+
+Thank you for your purchase. Your training guides are ready for download.
+
+{tier} Guide:
+{download_urls.get(tier.lower(), 'N/A')}
+
+Quick-Start Checklist:
+{download_urls.get('quickstart', 'N/A')}
+
+Dashboard:
+https://sincor.com/dashboard?email={customer_email}&order={order_id}
+
+Support:
+Email: support@sincor.com
+Chat: https://sincor.com/support
+
+Best regards,
+SINCOR Team
+"""
+
+        return self.send_email(
+            to_email=customer_email,
+            to_name=customer_name,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+            metadata={'order_id': order_id, 'tier': tier, 'type': 'thank_you'}
+        )
+
+    def send_email(self, to_email: str, to_name: str, subject: str,
+                  html_content: str, text_content: Optional[str] = None,
+                  metadata: Optional[Dict] = None) -> Dict[str, str]:
+        """
+        Send email via SendGrid.
+
+        Args:
+            to_email: Recipient email
+            to_name: Recipient name
+            subject: Email subject
+            html_content: HTML email body
+            text_content: Plain text email body (optional)
+            metadata: Custom metadata dict (for tracking)
+
+        Returns:
+            {'status': 'sent|failed|stub', 'message_id': '...', 'error': '...'}
+        """
+        metadata = metadata or {}
+
+        if self.mode == 'stub':
+            # Stub mode - log email but don't send
+            logger.info(f"[EMAIL-STUB] Would send to {to_email} subject='{subject}'")
+            return {
+                'status': 'stub',
+                'message_id': f"stub-{datetime.now().isoformat()}",
+                'message': 'Email service not configured - stub mode'
+            }
+
+        if not SENDGRID_AVAILABLE or not self.client:
+            return {
+                'status': 'failed',
+                'error': 'Email service not available'
+            }
+
+        try:
+            # Create email
+            from_email = Email(self.from_email, self.from_name)
+            to_email_obj = Email(to_email, to_name)
+
+            content = Content("text/html", html_content)
+            if text_content:
+                mail = Mail(
+                    from_email=from_email,
+                    to_emails=to_email_obj,
+                    subject=subject,
+                    plain_text_content=Content("text/plain", text_content),
+                    html_content=content
+                )
+            else:
+                mail = Mail(
+                    from_email=from_email,
+                    to_emails=to_email_obj,
+                    subject=subject,
+                    html_content=content
+                )
+
+            # Add custom headers for tracking
+            mail.custom_args = metadata
+
+            # Send
+            response = self.client.send(mail)
+
+            logger.info(f"[EMAIL] Sent to {to_email} | status={response.status_code}")
+
+            return {
+                'status': 'sent',
+                'message_id': response.headers.get('X-Message-ID', 'unknown'),
+                'status_code': response.status_code
+            }
+
+        except Exception as e:
+            logger.error(f"[EMAIL] Error sending to {to_email}: {e}")
+            return {
+                'status': 'failed',
+                'error': str(e)
+            }
+
+    def _render_thank_you_email(self, customer_name: str, tier: str,
+                               order_id: str, download_urls: Dict[str, str]) -> str:
+        """Render thank-you email HTML."""
+        agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 42}
+        agent_count = agent_counts.get(tier, 10)
+
+        guide_url = download_urls.get(tier.lower(), f"/files/guides/sincor-{tier.lower()}-guide-{order_id}.pdf")
+        quickstart_url = download_urls.get('quickstart', f"/files/guides/quickstart-checklist-{order_id}.pdf")
+
+        return f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to SINCOR</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }}
+        .email-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }}
+        .header h1 {{
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }}
+        .header p {{
+            margin: 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }}
+        .content {{
+            padding: 30px 20px;
+        }}
+        .greeting {{
+            font-size: 16px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }}
+        .button {{
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 10px 0;
+            font-size: 14px;
+        }}
+        .feature-box {{
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }}
+        .feature-box strong {{
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }}
+        .footer {{
+            background: #f8f9fa;
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }}
+        .footer a {{
+            color: #667eea;
+            text-decoration: none;
+        }}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Welcome to SINCOR!</h1>
+            <p>{tier} Plan - {agent_count} AI Agents Ready to Work</p>
+        </div>
+
+        <div class="content">
+            <div class="greeting">
+                <p>Hi {customer_name},</p>
+                <p>Your SINCOR {tier} subscription is now active! We're excited to have you on board.</p>
+                <p>Your training guides are ready to download and your new AI agents are standing by to start generating leads, automating workflows, and scaling your business.</p>
+            </div>
+
+            <h2 style="color: #667eea; margin-top: 30px;">Get Started in 3 Steps</h2>
+
+            <div class="feature-box">
+                <strong>1. Download Your Training Guide</strong>
+                Click below to download the {tier}-tier setup guide ({{'30 pages' if tier == 'Starter' else '60 pages' if tier == 'Professional' else '120+ pages'}}):
+                <p><a href="{guide_url}" class="button">Download {tier} Guide (PDF)</a></p>
+            </div>
+
+            <div class="feature-box">
+                <strong>2. Print the Quick-Start Checklist</strong>
+                A 1-page checklist for your first 30 days:
+                <p><a href="{quickstart_url}" class="button">Download Checklist (PDF)</a></p>
+            </div>
+
+            <div class="feature-box">
+                <strong>3. Access Your Dashboard</strong>
+                Log in to your training vault with all resources:
+                <p><a href="https://sincor.com/admin/training-vault?email={customer_name}@{customer_name.split('@')[1] if '@' in customer_name else 'example.com'}" class="button">Go to Dashboard</a></p>
+            </div>
+
+            <h2 style="color: #667eea; margin-top: 30px;">Your {tier} Plan Includes</h2>
+            <ul style="line-height: 2; color: #555;">
+                <li>{{'Scout, Synthesizer, Builder Agents' if tier == 'Starter' else 'All Scout/Synthesizer/Builder plus Negotiator, Caretaker Agents' if tier == 'Professional' else 'All 42 AI Agents with custom development'}} </li>
+                <li>{{'5 core integrations' if tier == 'Starter' else '15 enterprise integrations' if tier == 'Professional' else '25+ white-label integrations'}}</li>
+                <li>{{'Email support - 24 hour response' if tier == 'Starter' else 'Priority support - 4 hour response' if tier == 'Professional' else '24/7 dedicated success manager'}}</li>
+                <li>Full knowledge base access</li>
+                <li>{{'14-day free trial' if tier == 'Starter' else 'First month included training calls' if tier == 'Professional' else 'Unlimited onboarding & strategy'}}</li>
+            </ul>
+
+            <div style="background: #eef2ff; padding: 20px; border-radius: 6px; margin: 30px 0;">
+                <h3 style="margin-top: 0; color: #667eea;">Need Help?</h3>
+                <p style="margin-bottom: 10px;">Our support team is here for you:</p>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Email:</strong> support@sincor.com</li>
+                    <li><strong>Chat:</strong> https://sincor.com/support</li>
+                    <li><strong>Knowledge Base:</strong> https://help.sincor.com</li>
+                    <li><strong>Video Tutorials:</strong> https://youtube.com/sincor</li>
+                </ul>
+            </div>
+
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                <strong>Tip:</strong> The best first step is to download the guide above and follow the "Day 1" setup instructions. You'll have your first workflow running within 24 hours!
+            </p>
+        </div>
+
+        <div class="footer">
+            <p style="margin: 0 0 10px 0;">SINCOR - AI-Powered Automation Platform</p>
+            <p style="margin: 0;">
+                <a href="https://sincor.com">Website</a> |
+                <a href="https://sincor.com/privacy">Privacy</a> |
+                <a href="https://sincor.com/terms">Terms</a>
+            </p>
+            <p style="margin: 10px 0 0 0; color: #999;">
+                Order ID: {order_id}
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
+def get_email_sender(sendgrid_api_key: Optional[str] = None) -> EmailSender:
+    """Factory function to get email sender instance."""
+    return EmailSender(sendgrid_api_key)

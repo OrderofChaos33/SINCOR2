@@ -20,6 +20,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from dotenv import load_dotenv
 
 from sincor2.pdf_generator import get_pdf_generator
+from sincor2.email_sender import get_email_sender
 
 # Configure structured logging
 logging.basicConfig(
@@ -57,6 +58,14 @@ try:
 except Exception as e:
     logger.warning(f"[PDF] PDF generator initialization failed: {e}")
     pdf_generator = None
+
+# Email Sender initialization
+try:
+    email_sender = get_email_sender()
+    logger.info(f"[EMAIL] Email sender initialized ({email_sender.mode} mode)")
+except Exception as e:
+    logger.warning(f"[EMAIL] Email sender initialization failed: {e}")
+    email_sender = None
 
 
 # ============================================================================
@@ -371,17 +380,20 @@ def payment_webhook():
 def trigger_fulfillment(order_id, email, product_name, amount, order_type, product_info):
     """
     Trigger asset delivery based on product type.
+    Includes sending thank-you email for subscription orders.
     Returns delivery result dict.
     """
-    result = {'message': '', 'next_steps': []}
+    result = {'message': '', 'next_steps': [], 'email_sent': False}
+
+    # First, determine all the delivery details
+    agent_count = product_info.get('agents', 10)
+    features = product_info.get('features', [])
 
     if order_type == 'subscription':
         # Subscription: Activate account + agents immediately
-        agent_count = product_info.get('agents', 10)
-        features = product_info.get('features', [])
         result['message'] = f'Your {product_name} plan is ACTIVE! {agent_count} AI agents are now working for you.'
         result['next_steps'] = [
-            'Check your email for login credentials',
+            'Check your email for login credentials and training guides',
             f'Access your dashboard with {agent_count} active AI agents',
             'Your agents will begin generating leads and content within 24 hours'
         ]
@@ -394,6 +406,35 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
             (datetime.utcnow().isoformat(), order_id)
         )
         db.commit()
+
+        # Send thank-you email with training guides
+        if email_sender:
+            try:
+                customer_name = email.split('@')[0].title()
+                tier = product_name if product_name in ['Starter', 'Professional', 'Enterprise'] else 'Professional'
+
+                # Build download URLs
+                download_urls = {
+                    'starter': f'/files/guides/sincor-starter-guide-{order_id}.pdf',
+                    'professional': f'/files/guides/sincor-professional-guide-{order_id}.pdf',
+                    'enterprise': f'/files/guides/sincor-enterprise-guide-{order_id}.pdf',
+                    'quickstart': f'/files/guides/quickstart-checklist-{order_id}.pdf'
+                }
+
+                email_result = email_sender.send_thank_you_email(
+                    customer_email=email,
+                    customer_name=customer_name,
+                    tier=tier,
+                    order_id=order_id,
+                    download_urls=download_urls
+                )
+
+                result['email_sent'] = email_result.get('status') in ['sent', 'stub']
+                logger.info(f"[EMAIL] Thank-you email for {email}: {email_result.get('status')}")
+
+            except Exception as e:
+                logger.error(f"[EMAIL] Error sending thank-you email for {order_id}: {e}")
+                result['email_sent'] = False
 
     elif order_type == 'bi_report':
         # BI Report: Queue for generation (delivered within 48h)
