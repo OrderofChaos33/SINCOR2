@@ -421,11 +421,13 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
 
 @app.route('/payment/success')
 def payment_success():
-    """Render payment success page after PayPal capture."""
+    """
+    Render payment success page after PayPal capture.
+    If order found, redirect to thank-you email page; otherwise show generic success.
+    """
     order_id = request.args.get('order_id', '')
 
     # Try to find order in DB for extra details
-    order_data = None
     if order_id:
         db = get_db()
         row = db.execute(
@@ -433,9 +435,182 @@ def payment_success():
             (order_id, order_id)
         ).fetchone()
         if row:
-            order_data = dict(row)
+            # Redirect to thank-you email page with personalization
+            return f'<meta http-equiv="refresh" content="0; url=/thank-you/{order_id}" />'
 
-    return render_template('payment_success.html', order_data=order_data)
+    # Fallback to generic success page if order not found
+    return render_template('payment_success.html', order_data=None)
+
+
+@app.route('/thank-you/<order_id>')
+def thank_you_email(order_id):
+    """
+    Render the thank-you email template with order and customer personalization.
+    This can be used for both email rendering and live preview.
+    """
+    # Fetch order data from database
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM orders WHERE order_id=? OR paypal_order_id=? ORDER BY created_at DESC LIMIT 1",
+        (order_id, order_id)
+    ).fetchone()
+
+    if not row:
+        return render_template('error.html', code=404, title='Order Not Found',
+                             message=f"Order {order_id} not found."), 404
+
+    order_data = dict(row)
+    product_name = order_data.get('product_name', '').strip()
+
+    # Determine tier (Starter, Professional, Enterprise)
+    tier_name = product_name if product_name in ['Starter', 'Professional', 'Enterprise'] else 'Enterprise'
+    tier_slug = tier_name.lower()
+
+    # Extract customer details
+    customer_name = order_data.get('customer_email', 'Customer').split('@')[0].title()
+
+    # Get product info for page count and feature count
+    product_info = PRODUCT_CATALOG.get(product_name, {})
+    agent_count = product_info.get('agents', 10)
+    features = product_info.get('features', [])
+    feature_list = ', '.join(features) if features else 'All core features'
+
+    # Determine which tier sections are visible
+    tier_flags = {
+        'STARTER_SELECTED': tier_name == 'Starter',
+        'PROFESSIONAL_SELECTED': tier_name == 'Professional',
+        'ENTERPRISE_SELECTED': tier_name == 'Enterprise',
+    }
+
+    # Template variables for personalization
+    template_vars = {
+        'CUSTOMER_NAME': customer_name,
+        'CUSTOMER_EMAIL': order_data.get('customer_email', ''),
+        'TIER_NAME': tier_name,
+        'TIER_SLUG': tier_slug,
+        'AGENT_COUNT': agent_count,
+        'FEATURE_LIST': feature_list,
+        'ACTIVATION_DATE': order_data.get('created_at', '').split('T')[0],
+        'PAGE_COUNT': {'Starter': 30, 'Professional': 60, 'Enterprise': 120}.get(tier_name, 30),
+        'INTEGRATION_COUNT': {'Starter': 5, 'Professional': 15, 'Enterprise': 25}.get(tier_name, 5),
+        'DOWNLOAD_STARTER_GUIDE': f'/files/guides/sincor-starter-guide-{order_data.get("order_id")}.pdf',
+        'DOWNLOAD_PROFESSIONAL_GUIDE': f'/files/guides/sincor-professional-guide-{order_data.get("order_id")}.pdf',
+        'DOWNLOAD_ENTERPRISE_GUIDE': f'/files/guides/sincor-enterprise-guide-{order_data.get("order_id")}.pdf',
+        'DOWNLOAD_QUICKSTART': f'/files/guides/quickstart-checklist-{order_data.get("order_id")}.pdf',
+        'DASHBOARD_URL': f'/dashboard?email={order_data.get("customer_email", "")}&order={order_id}',
+        'HELP_URL': 'https://help.sincor.com',
+        'STATUS_URL': 'https://status.sincor.com',
+        'UNSUBSCRIBE': f'mailto:support@getsincor.com?subject=Unsubscribe',
+        'COMPANY_ADDRESS': '123 Innovation Drive, Tech City, TC 12345',
+        **tier_flags
+    }
+
+    logger.info(f"[EMAIL] Rendering thank-you email for {order_id} | {tier_name} | {order_data.get('customer_email')}")
+
+    return render_template('thank_you_purchase_email.html', **template_vars)
+
+
+@app.route('/admin/training-vault')
+def admin_training_vault():
+    """
+    Render the training vault dashboard for logged-in customers.
+    Shows tier-specific guides, videos, industry guides, and onboarding progress.
+    """
+    # Get customer email from query params or JWT
+    customer_email = request.args.get('email')
+    if not customer_email:
+        customer_email = request.args.get('customer_email')
+
+    if not customer_email or not validate_email(customer_email):
+        # Redirect to login if no valid email
+        return render_template('error.html', code=401, title='Authentication Required',
+                             message="Please log in to access your training vault."), 401
+
+    # Fetch customer's orders from database
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM orders WHERE customer_email=? AND product_name IN ('Starter', 'Professional', 'Enterprise') "
+        "ORDER BY created_at DESC LIMIT 1",
+        (customer_email,)
+    ).fetchone()
+
+    if not rows:
+        return render_template('error.html', code=404, title='No Active Subscription',
+                             message="You don't have an active SINCOR subscription. Please purchase one to access training materials."), 404
+
+    order_data = dict(rows)
+    product_name = order_data.get('product_name', 'Enterprise')
+    tier_name = product_name if product_name in ['Starter', 'Professional', 'Enterprise'] else 'Enterprise'
+    tier_slug = tier_name.lower()
+
+    # Get product info
+    product_info = PRODUCT_CATALOG.get(product_name, {})
+    agent_count = product_info.get('agents', 10)
+    features = product_info.get('features', [])
+
+    # Determine onboarding progress (default all pending; update based on customer activity)
+    onboarding_steps = {
+        'GUIDE_DOWNLOADED': False,
+        'CONFIG_COMPLETE': False,
+        'INTEGRATIONS_ACTIVE': False,
+        'WORKFLOW_ACTIVE': False,
+        'MULTI_AGENT_ENABLED': tier_name in ['Professional', 'Enterprise'],
+        'WHITE_LABEL_ENABLED': tier_name == 'Enterprise',
+        'CUSTOM_AGENTS_ENABLED': tier_name == 'Enterprise',
+    }
+
+    # Template variables for training vault
+    template_vars = {
+        'TIER': tier_name,
+        'TIER_SLUG': tier_slug,
+        'CUSTOMER_EMAIL': customer_email,
+        'CUSTOMER_NAME': customer_email.split('@')[0].title(),
+        'AGENT_COUNT': agent_count,
+        'PAGE_COUNT': {'Starter': 30, 'Professional': 60, 'Enterprise': 120}.get(tier_name, 30),
+        'INTEGRATION_COUNT': {'Starter': 5, 'Professional': 15, 'Enterprise': 25}.get(tier_name, 5),
+        # Tier conditional flags for template
+        'STARTER': tier_name == 'Starter',
+        'PROFESSIONAL': tier_name == 'Professional',
+        'ENTERPRISE': tier_name == 'Enterprise',
+        # Onboarding status flags
+        'GUIDE_DOWNLOADED': onboarding_steps['GUIDE_DOWNLOADED'],
+        'CONFIG_COMPLETE': onboarding_steps['CONFIG_COMPLETE'],
+        'INTEGRATIONS_ACTIVE': onboarding_steps['INTEGRATIONS_ACTIVE'],
+        'WORKFLOW_ACTIVE': onboarding_steps['WORKFLOW_ACTIVE'],
+        # Download URLs (these would point to actual PDF files in production)
+        'DOWNLOAD_GUIDE_URL': f'/files/guides/sincor-{tier_slug}-guide-{order_data.get("order_id")}.pdf',
+        'VIEW_GUIDE_URL': f'/guides/{tier_slug}-guide-online',
+        'DOWNLOAD_QUICKSTART': f'/files/guides/quickstart-{order_data.get("order_id")}.pdf',
+        'DOWNLOAD_CONFIG_TEMPLATE': f'/files/templates/config-template-{tier_slug}-{order_data.get("order_id")}.xlsx',
+    }
+
+    logger.info(f"[VAULT] Training vault accessed: {customer_email} | {tier_name}")
+
+    return render_template('admin_training_vault.html', **template_vars)
+
+
+@app.route('/files/guides/<filename>', methods=['GET'])
+def download_guide(filename):
+    """
+    Serve training guide PDF files.
+    Stub endpoint - in production, these would be generated or stored in cloud storage.
+    """
+    # Validate filename to prevent directory traversal
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return jsonify({'error': 'Invalid filename'}), 400
+
+    # In production, check if user has access to this guide based on order
+    # For now, we'll just return a placeholder response
+    logger.info(f"[DOWNLOAD] Requested guide: {filename}")
+
+    # Return a JSON response indicating what would be served
+    # In production, use: send_from_directory, send_file, etc.
+    return jsonify({
+        'message': f'Guide {filename} would be served here',
+        'note': 'PDF generation infrastructure needed',
+        'filename': filename,
+        'development': True
+    }), 200
 
 
 @app.route('/payment/cancel')

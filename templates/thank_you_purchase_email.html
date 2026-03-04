@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to SINCOR - Your Training Guides Await</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .tier-selector {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        .tier-selector h3 {
+            margin: 0 0 15px 0;
+            color: #1a202c;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .download-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 8px 8px 8px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-size: 14px;
+        }
+        .download-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        .feature-box {
+            background: #f8fafc;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .feature-box strong {
+            display: block;
+            color: #667eea;
+            margin-bottom: 5px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .feature-box p {
+            margin: 0;
+            font-size: 14px;
+            color: #4a5568;
+            line-height: 1.5;
+        }
+        .next-steps {
+            background: #eef2ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            border-left: 4px solid #667eea;
+        }
+        .next-steps h4 {
+            margin: 0 0 15px 0;
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .step-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .step-list li {
+            padding: 8px 0;
+            font-size: 14px;
+            color: #4a5568;
+            display: flex;
+            align-items: flex-start;
+        }
+        .step-list li:before {
+            content: "→";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        .dashboard-link {
+            background: #f0f4ff;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .dashboard-link a {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 14px 32px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .dashboard-link a:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        .support-footer {
+            background: #f8fafc;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+            font-size: 13px;
+            color: #718096;
+        }
+        .support-footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .highlight {
+            color: #667eea;
+            font-weight: 600;
+        }
+        .tier-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎉 Welcome to SINCOR</h1>
+            <p>Your AI Agent Swarm Awaits Activation</p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <!-- Personalized Greeting -->
+            <div class="greeting">
+                <p>Hi {{CUSTOMER_NAME}},</p>
+                <p>Thank you for purchasing SINCOR {{TIER_NAME}}! Your account is ready, and we've prepared comprehensive training materials to help you hit the ground running.</p>
+            </div>
+
+            <!-- Your Purchase Info -->
+            <div class="feature-box">
+                <strong>✓ Your SINCOR Activation</strong>
+                <p><strong>Tier:</strong> {{TIER_NAME}}<br>
+                <strong>Agents:</strong> {{AGENT_COUNT}}<br>
+                <strong>Features:</strong> {{FEATURE_LIST}}<br>
+                <strong>Go-Live Date:</strong> {{ACTIVATION_DATE}}</p>
+            </div>
+
+            <!-- Training Guides Section -->
+            <div class="tier-selector">
+                <h3>📚 Your Training Guides (Download Below)</h3>
+
+                {% if STARTER_SELECTED %}
+                <p><strong style="color: #667eea;">SINCOR Starter Guide</strong> – 30-page quick-start manual<br>
+                <small>Perfect for solopreneurs & small teams. Complete setup in your first week.</small></p>
+                <a href="{{DOWNLOAD_STARTER_GUIDE}}" class="download-button">📥 Download Starter Guide (PDF, 2.4 MB)</a>
+                <br><br>
+                {% endif %}
+
+                {% if PROFESSIONAL_SELECTED %}
+                <p><strong style="color: #667eea;">SINCOR Professional Guide</strong> – 60-page deployment manual<br>
+                <small>Everything you need for multi-agent coordination & advanced workflows.</small></p>
+                <a href="{{DOWNLOAD_PROFESSIONAL_GUIDE}}" class="download-button">📥 Download Professional Guide (PDF, 5.2 MB)</a>
+                <br><br>
+                {% endif %}
+
+                {% if ENTERPRISE_SELECTED %}
+                <p><strong style="color: #667eea;">SINCOR Enterprise Guide</strong> – 120+ page complete manual<br>
+                <small>Full deployment, white-label setup, custom agent development, and SLA management.</small></p>
+                <a href="{{DOWNLOAD_ENTERPRISE_GUIDE}}" class="download-button">📥 Download Enterprise Guide (PDF, 8.7 MB)</a>
+                <br><br>
+                {% endif %}
+
+                <p><strong style="color: #667eea;">Quick-Start Checklist</strong> – Your first 30 days<br>
+                <small>One-page action plan to get maximum value immediately.</small></p>
+                <a href="{{DOWNLOAD_QUICKSTART}}" class="download-button">📥 Download Checklist (PDF, 0.3 MB)</a>
+            </div>
+
+            <!-- What's Inside Your Guide -->
+            <div class="feature-box">
+                <strong>Inside Your Training Guides</strong>
+                <p>✅ Step-by-step deployment timeline<br>
+                ✅ Agent configuration for your use case<br>
+                ✅ Integration setup (CRM, email, calendar, etc.)<br>
+                ✅ Knowledge Base population strategy<br>
+                ✅ Workflow templates and best practices<br>
+                ✅ Performance metrics to track<br>
+                ✅ Troubleshooting and support contacts<br>
+                ✅ {% if ENTERPRISE_SELECTED %}Advanced customization, security, and compliance{% endif %}{% if not ENTERPRISE_SELECTED %}Next-level optimization strategies{% endif %}</p>
+            </div>
+
+            <!-- Next Steps -->
+            <div class="next-steps">
+                <h4>🚀 Your First 7 Days</h4>
+                <ul class="step-list">
+                    <li><strong>Today:</strong> Download your training guide (above)</li>
+                    <li><strong>Tomorrow:</strong> Log into your dashboard and verify agent activation</li>
+                    <li><strong>Day 2-3:</strong> Complete the configuration checklist from your guide</li>
+                    <li><strong>Day 4-5:</strong> Begin processing your first real tasks</li>
+                    <li><strong>Day 6-7:</strong> Review performance and fine-tune settings</li>
+                </ul>
+            </div>
+
+            <!-- Dashboard Access -->
+            <div class="dashboard-link">
+                <p style="margin: 0 0 15px 0; color: #4a5568; font-weight: 600;">Access Your Secure Dashboard</p>
+                <a href="{{DASHBOARD_URL}}">→ Go to Your Control Center ←</a>
+                <p style="margin: 15px 0 0 0; font-size: 13px; color: #718096;">
+                    Your login credentials:<br>
+                    <strong>Email:</strong> {{CUSTOMER_EMAIL}}<br>
+                    <strong>Password:</strong> Set in welcome email
+                </p>
+            </div>
+
+            <!-- Available Resources -->
+            <div class="feature-box">
+                <strong>📚 Additional Resources Available in Your Dashboard</strong>
+                <p>• Video tutorials (5-15 min each)<br>
+                • Live demo recordings<br>
+                • API documentation<br>
+                • Integration guides<br>
+                • Industry-specific templates<br>
+                • Case studies from similar companies</p>
+            </div>
+
+            <!-- Support Info -->
+            <div class="feature-box">
+                <strong>👥 Your Support Team</strong>
+                <p>{% if PROFESSIONAL_SELECTED %}<strong>Priority Email Support:</strong> 4-hour response guarantee<br>{% endif %}{% if ENTERPRISE_SELECTED %}<strong>Dedicated Account Manager</strong> – Assigned to your account<br><strong>24/7 Emergency Hotline</strong> – For critical issues<br>{% endif %}<strong>Email:</strong> support@getsincor.com<br>
+                <strong>In-App Help:</strong> Click Help → Chat in your dashboard<br>
+                <strong>Knowledge Base:</strong> help.sincor.com (1,000+ articles)</p>
+            </div>
+
+            <!-- Call to Action -->
+            <div style="background: #fff5e6; border-left: 4px solid #f5a623; padding: 20px; border-radius: 6px; margin: 30px 0;">
+                <p style="margin: 0; font-size: 14px; color: #744210;">
+                    <strong>💡 Pro Tip:</strong> We recommend reviewing your guide before logging in. It will give you confidence and context around what you're seeing in the dashboard.
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="support-footer">
+            <p style="margin: 0 0 15px 0;">
+                <strong>Questions?</strong> We're here to help!
+            </p>
+            <p style="margin: 0;">
+                <a href="mailto:support@getsincor.com">support@getsincor.com</a>
+                | <a href="{{HELP_URL}}">Help Center</a>
+                | <a href="{{STATUS_URL}}">System Status</a>
+            </p>
+            <p style="margin: 15px 0 0 0; font-size: 12px; color: #a0aec0;">
+                © 2025 SINCOR. All rights reserved.<br>
+                {{COMPANY_ADDRESS}}<br>
+                <a href="{{UNSUBSCRIBE}}">Unsubscribe</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
