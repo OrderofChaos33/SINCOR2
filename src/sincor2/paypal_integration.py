@@ -2,13 +2,14 @@
 SINCOR PayPal Payment Integration
 Connects monetization engine to your Railway PayPal configuration
 Uses PAYPAL_REST_API_ID and PAYPAL_REST_API_SECRET environment variables
+Optimized: Uses async httpx instead of blocking requests for concurrent payment processing
 """
 
 import os
 import json
-import requests
+import httpx
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
@@ -46,24 +47,31 @@ class PayPalIntegration:
         # Use your Railway environment variable names
         self.client_id = os.getenv('PAYPAL_REST_API_ID')
         self.client_secret = os.getenv('PAYPAL_REST_API_SECRET')
-        
+
         # PayPal API configuration
         self.sandbox_mode = os.getenv('PAYPAL_SANDBOX', 'true').lower() == 'true'
-        
+
         if self.sandbox_mode:
             self.base_url = "https://api.sandbox.paypal.com"
         else:
             self.base_url = "https://api.paypal.com"
-        
+
         self.access_token = None
         self.token_expires_at = None
-        
+        self._http_client = None
+
         # Validate configuration
         if not self.client_id or not self.client_secret:
             raise ValueError("PayPal credentials not found. Ensure PAYPAL_REST_API_ID and PAYPAL_REST_API_SECRET are set in Railway")
-    
+
+    async def _get_http_client(self) -> httpx.AsyncClient:
+        """Get or create async HTTP client (lazy initialization)"""
+        if self._http_client is None:
+            self._http_client = httpx.AsyncClient(timeout=30.0)
+        return self._http_client
+
     async def get_access_token(self) -> str:
-        """Get or refresh PayPal access token"""
+        """Get or refresh PayPal access token (async)"""
         
         # Check if current token is still valid
         if self.access_token and self.token_expires_at:
@@ -79,16 +87,16 @@ class PayPalIntegration:
         }
         
         data = 'grant_type=client_credentials'
-        
+
         try:
-            response = requests.post(
-                url, 
-                headers=headers, 
-                data=data,
-                auth=(self.client_id, self.client_secret),
-                timeout=30
+            client = await self._get_http_client()
+            response = await client.post(
+                url,
+                headers=headers,
+                content=data,
+                auth=(self.client_id, self.client_secret)
             )
-            
+
             if response.status_code == 200:
                 token_data = response.json()
                 self.access_token = token_data['access_token']
@@ -135,9 +143,10 @@ class PayPalIntegration:
                     "cancel_url": payment_request.cancel_url or "https://your-sincor-domain.railway.app/payment/cancel"
                 }
             }
-            
-            response = requests.post(url, headers=headers, json=payment_data, timeout=30)
-            
+
+            client = await self._get_http_client()
+            response = await client.post(url, headers=headers, json=payment_data)
+
             if response.status_code == 201:
                 payment_response = response.json()
                 payment_id = payment_response['id']
@@ -197,9 +206,10 @@ class PayPalIntegration:
             execute_data = {
                 "payer_id": payer_id
             }
-            
-            response = requests.post(url, headers=headers, json=execute_data, timeout=30)
-            
+
+            client = await self._get_http_client()
+            response = await client.post(url, headers=headers, json=execute_data)
+
             if response.status_code == 200:
                 execution_response = response.json()
                 
@@ -268,9 +278,10 @@ class PayPalIntegration:
                 'Content-Type': 'application/json',
                 'Authorization': f'Bearer {access_token}',
             }
-            
-            response = requests.get(url, headers=headers, timeout=30)
-            
+
+            client = await self._get_http_client()
+            response = await client.get(url, headers=headers)
+
             if response.status_code == 200:
                 return response.json()
             else:
@@ -315,9 +326,10 @@ class PayPalIntegration:
             
             if start_date:
                 subscription_data["start_time"] = start_date
-            
-            response = requests.post(url, headers=headers, json=subscription_data, timeout=30)
-            
+
+            client = await self._get_http_client()
+            response = await client.post(url, headers=headers, json=subscription_data)
+
             if response.status_code == 201:
                 return response.json()
             else:
