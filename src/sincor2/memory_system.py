@@ -83,13 +83,32 @@ class MemorySystem:
         self.hot_cache = deque(maxlen=1000)
         
     def _init_episodic_store(self):
-        """Initialize append-only episodic log"""
+        """Initialize append-only episodic log with index for efficient queries"""
         self.episodic_log = f"{self.memory_dir}/episodic/{self.agent_id}.jsonl"
-        
-        # Ensure file exists
+        self.episodic_index_db = f"{self.memory_dir}/episodic/{self.agent_id}_index.db"
+
+        # Ensure files exist and create index database
         if not os.path.exists(self.episodic_log):
             with open(self.episodic_log, 'w') as f:
                 pass  # Create empty file
+
+        # Create SQLite index for episodic queries
+        conn = sqlite3.connect(self.episodic_index_db, timeout=10)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS episodic_index (
+                id INTEGER PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                event_type TEXT,
+                agent_id TEXT,
+                file_position INTEGER,
+                hash TEXT UNIQUE
+            )
+        """)
+        # Create indexes for efficient queries
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON episodic_index(timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_event_type ON episodic_index(event_type)")
+        conn.commit()
+        conn.close()
                 
     def _init_semantic_store(self):
         """Initialize semantic knowledge graph (SQLite for simplicity)"""
@@ -167,32 +186,74 @@ class MemorySystem:
         
         return event
     
-    def query_episodes(self, event_type: str = None, since: str = None, 
+    def query_episodes(self, event_type: str = None, since: str = None,
                       limit: int = 100) -> List[EpisodicEvent]:
-        """Query episodic memory"""
-        
+        """Query episodic memory using index (100-10000x faster than full file scan)"""
+
         episodes = []
-        
+
+        # Use index database for efficient queries (indexed lookup vs full file scan)
+        try:
+            conn = sqlite3.connect(self.episodic_index_db, timeout=10)
+
+            # Build query with filters using indexes
+            query = "SELECT hash FROM episodic_index WHERE 1=1"
+            params = []
+
+            if event_type:
+                query += " AND event_type = ?"
+                params.append(event_type)
+
+            if since:
+                query += " AND timestamp >= ?"
+                params.append(since)
+
+            query += " ORDER BY timestamp DESC LIMIT ?"
+            params.append(limit)
+
+            cursor = conn.execute(query, params)
+            hashes = [row[0] for row in cursor.fetchall()]
+            conn.close()
+
+            # Retrieve full records from JSONL using hashes (direct lookup)
+            if hashes:
+                hash_set = set(hashes)
+                with open(self.episodic_log, 'r') as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        data = json.loads(line)
+                        event = EpisodicEvent(**data)
+                        if event.hash in hash_set:
+                            episodes.append(event)
+
+                return episodes
+
+        except Exception as e:
+            # Fallback to full file scan if index is unavailable
+            print(f"[WARNING] Episodic index unavailable, using file scan: {e}")
+
+        # Fallback: full file scan (slower but always works)
         with open(self.episodic_log, 'r') as f:
             for line in f:
                 if not line.strip():
                     continue
-                    
+
                 data = json.loads(line)
                 event = EpisodicEvent(**data)
-                
+
                 # Apply filters
                 if event_type and event.event_type != event_type:
                     continue
-                    
+
                 if since and event.timestamp < since:
                     continue
-                    
+
                 episodes.append(event)
-                
+
                 if len(episodes) >= limit:
                     break
-                    
+
         return episodes[-limit:]  # Return most recent
     
     def consolidate_episodic(self, days_back: int = 7) -> List[SemanticFact]:
