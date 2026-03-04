@@ -13,10 +13,13 @@ import sqlite3
 import asyncio
 from datetime import datetime, timedelta
 from functools import wraps
+from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, g, make_response
+from flask import Flask, render_template, request, jsonify, g, make_response, send_file
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
+
+from sincor2.pdf_generator import get_pdf_generator
 
 # Configure structured logging
 logging.basicConfig(
@@ -45,6 +48,15 @@ jwt = JWTManager(app)
 # PayPal configuration
 PAYPAL_CLIENT_ID = os.environ.get('PAYPAL_REST_API_ID', os.environ.get('PAYPAL_CLIENT_ID', 'sandbox-demo'))
 PAYPAL_SANDBOX = os.environ.get('PAYPAL_SANDBOX', 'true').lower() == 'true'
+
+# PDF Generator initialization
+pdf_guides_dir = os.path.join(project_root, 'files', 'guides')
+try:
+    pdf_generator = get_pdf_generator(pdf_guides_dir)
+    logger.info(f"[PDF] PDF generator initialized for: {pdf_guides_dir}")
+except Exception as e:
+    logger.warning(f"[PDF] PDF generator initialization failed: {e}")
+    pdf_generator = None
 
 
 # ============================================================================
@@ -593,24 +605,64 @@ def admin_training_vault():
 def download_guide(filename):
     """
     Serve training guide PDF files.
-    Stub endpoint - in production, these would be generated or stored in cloud storage.
+    Generates PDF on first request, caches for subsequent requests.
     """
     # Validate filename to prevent directory traversal
     if '..' in filename or '/' in filename or '\\' in filename:
         return jsonify({'error': 'Invalid filename'}), 400
 
-    # In production, check if user has access to this guide based on order
-    # For now, we'll just return a placeholder response
-    logger.info(f"[DOWNLOAD] Requested guide: {filename}")
+    # Extract order ID from filename (format: sincor-{tier}-guide-{order_id}.pdf)
+    if not filename.endswith('.pdf'):
+        return jsonify({'error': 'Only PDF files allowed'}), 400
 
-    # Return a JSON response indicating what would be served
-    # In production, use: send_from_directory, send_file, etc.
-    return jsonify({
-        'message': f'Guide {filename} would be served here',
-        'note': 'PDF generation infrastructure needed',
-        'filename': filename,
-        'development': True
-    }), 200
+    # Check if file already exists
+    filepath = Path(pdf_guides_dir) / filename
+    if filepath.exists():
+        logger.info(f"[DOWNLOAD] Serving cached guide: {filename}")
+        try:
+            return send_file(
+                filepath,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=filename
+            )
+        except Exception as e:
+            logger.error(f"[DOWNLOAD] Error serving file {filename}: {e}")
+            return jsonify({'error': 'Error serving file'}), 500
+
+    # PDF doesn't exist, try to generate it
+    if not pdf_generator:
+        return jsonify({'error': 'PDF generation not available'}), 503
+
+    try:
+        # Extract tier and order_id from filename
+        if 'starter' in filename:
+            order_id = filename.replace('sincor-starter-guide-', '').replace('.pdf', '')
+            filepath, pages = pdf_generator.generate_starter_guide(order_id)
+        elif 'professional' in filename:
+            order_id = filename.replace('sincor-professional-guide-', '').replace('.pdf', '')
+            filepath, pages = pdf_generator.generate_professional_guide(order_id)
+        elif 'enterprise' in filename:
+            order_id = filename.replace('sincor-enterprise-guide-', '').replace('.pdf', '')
+            filepath, pages = pdf_generator.generate_enterprise_guide(order_id)
+        elif 'quickstart' in filename:
+            order_id = filename.replace('quickstart-checklist-', '').replace('.pdf', '')
+            filepath, pages = pdf_generator.generate_quickstart_checklist(order_id)
+        else:
+            return jsonify({'error': 'Unknown guide type'}), 400
+
+        logger.info(f"[DOWNLOAD] Generated and serving guide: {filename} ({pages} pages)")
+
+        return send_file(
+            filepath,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        logger.error(f"[DOWNLOAD] Error generating guide {filename}: {e}")
+        return jsonify({'error': f'Error generating PDF: {str(e)}'}), 500
 
 
 @app.route('/payment/cancel')
