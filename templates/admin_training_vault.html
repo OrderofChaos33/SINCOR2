@@ -1,0 +1,842 @@
+<!-- SINCOR Admin Dashboard - Training Vault Section -->
+<!-- Location: /admin/training-vault -->
+
+<div class="admin-section training-vault">
+    <div class="section-header">
+        <h2>📚 Training & Documentation Center</h2>
+        <p class="subtitle">Complete guides, videos, and resources for your SINCOR deployment</p>
+    </div>
+
+    <!-- Tier-Specific Guide Section -->
+    <div class="guides-container">
+        <div class="guide-card primary">
+            <div class="guide-badge">YOUR TIER</div>
+            <h3 id="yourTierName">SINCOR {{TIER}} Training Manual</h3>
+            <p class="guide-description">Complete deployment guide tailored to your tier with setup instructions, agent configuration, workflow templates, and optimization strategies.</p>
+
+            <div class="guide-meta">
+                <span class="pages">📄 {{PAGE_COUNT}} pages</span>
+                <span class="updated">✓ Updated March 2025</span>
+            </div>
+
+            <div class="guide-actions">
+                <a href="/download/guide-{{TIER_SLUG}}-{{CUSTOMER_ID}}.pdf" class="btn btn-primary" download>
+                    📥 Download Complete Guide (PDF)
+                </a>
+                <a href="/view/guide-{{TIER_SLUG}}-online" class="btn btn-secondary" target="_blank">
+                    👁️ View Online (Interactive)
+                </a>
+            </div>
+
+            <div class="guide-includes">
+                <h4>This guide includes:</h4>
+                <ul>
+                    <li>{% if STARTER %}<strong>Quick 30-day deployment</strong> timeline{% endif %}{% if PROFESSIONAL %}<strong>12-week multi-agent</strong> deployment{% endif %}{% if ENTERPRISE %}<strong>Complete 16-week enterprise</strong> deployment with white-label{% endif %}</li>
+                    <li>Agent configuration and optimization</li>
+                    <li>{{INTEGRATION_COUNT}} integrations setup guide</li>
+                    <li>{% if PROFESSIONAL %}Advanced workflow builder{% endif %}{% if ENTERPRISE %}Custom agent development & white-label rebranding{% endif %}</li>
+                    <li>Performance tracking and KPIs</li>
+                    <li>Troubleshooting and support procedures</li>
+                    {% if ENTERPRISE %}<li>Security, compliance, and SLA management</li>{% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Quick-Start Checklist -->
+        <div class="guide-card">
+            <h3>⚡ Quick-Start Checklist</h3>
+            <p class="guide-description">One-page action plan for your first 30 days. Print it out and check off as you progress.</p>
+
+            <div class="guide-meta">
+                <span class="pages">📄 1 page</span>
+                <span class="printable">🖨️ Printable</span>
+            </div>
+
+            <div class="guide-actions">
+                <a href="/download/quickstart-checklist-{{CUSTOMER_ID}}.pdf" class="btn btn-secondary" download>
+                    📥 Download Checklist
+                </a>
+            </div>
+
+            <div class="checklist-preview">
+                <p><strong>Includes:</strong></p>
+                <ul style="font-size: 13px; line-height: 1.6;">
+                    <li>✓ Day 1: Account setup tasks</li>
+                    <li>✓ Days 2-5: Core configuration</li>
+                    <li>✓ Days 6-14: First workflows</li>
+                    <li>✓ Days 15-30: Optimization</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Configuration Template -->
+        <div class="guide-card">
+            <h3>🔧 Configuration Template</h3>
+            <p class="guide-description">Pre-built configuration spreadsheet for your specific agents, integrations, and workflows. Download and fill in your details.</p>
+
+            <div class="guide-meta">
+                <span class="format">Excel</span>
+                <span class="editable">Editable</span>
+            </div>
+
+            <div class="guide-actions">
+                <a href="/download/config-template-{{TIER_SLUG}}-{{CUSTOMER_ID}}.xlsx" class="btn btn-secondary" download>
+                    📥 Download Template
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Training Library -->
+    <div class="video-section">
+        <h3>🎥 Video Training Library</h3>
+        <p>Watch these short videos to see SINCOR in action</p>
+
+        <div class="video-grid">
+            <!-- Video 1 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-dashboard.jpg')">
+                    <span class="video-duration">8:23</span>
+                </div>
+                <h4>Dashboard Tour & Navigation</h4>
+                <p>Walk-through of your main control center</p>
+                <a href="/videos/dashboard-tour" class="video-link">▶️ Watch</a>
+            </div>
+
+            <!-- Video 2 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-setup.jpg')">
+                    <span class="video-duration">12:45</span>
+                </div>
+                <h4>Initial Setup & Activation</h4>
+                <p>First hour configuration steps</p>
+                <a href="/videos/initial-setup" class="video-link">▶️ Watch</a>
+            </div>
+
+            <!-- Video 3 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-integrations.jpg')">
+                    <span class="video-duration">15:30</span>
+                </div>
+                <h4>Connecting Your CRM & Email</h4>
+                <p>Step-by-step integration setup (Salesforce, HubSpot, Gmail, Outlook included)</p>
+                <a href="/videos/crm-integration" class="video-link">▶️ Watch</a>
+            </div>
+
+            <!-- Video 4 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-workflows.jpg')">
+                    <span class="video-duration">18:15</span>
+                </div>
+                <h4>Building Your First Workflow</h4>
+                <p>From template to customized automation</p>
+                <a href="/videos/workflow-builder" class="video-link">▶️ Watch</a>
+            </div>
+
+            <!-- Video 5 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-analytics.jpg')">
+                    <span class="video-duration">10:45</span>
+                </div>
+                <h4>Reading Your Analytics Dashboard</h4>
+                <p>Understanding KPIs and performance metrics</p>
+                <a href="/videos/analytics" class="video-link">▶️ Watch</a>
+            </div>
+
+            {% if PROFESSIONAL %}
+            <!-- Video 6 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-multiagent.jpg')">
+                    <span class="video-duration">14:20</span>
+                </div>
+                <h4>Multi-Agent Coordination</h4>
+                <p>How agents work together in a swarm</p>
+                <a href="/videos/agent-coordination" class="video-link">▶️ Watch</a>
+            </div>
+            {% endif %}
+
+            {% if ENTERPRISE %}
+            <!-- Video 6 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-whitelabel.jpg')">
+                    <span class="video-duration">20:15</span>
+                </div>
+                <h4>White-Label Branding Setup</h4>
+                <p>Customize SINCOR to match your brand</p>
+                <a href="/videos/white-label-setup" class="video-link">▶️ Watch</a>
+            </div>
+
+            <!-- Video 7 -->
+            <div class="video-card">
+                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-custom-agents.jpg')">
+                    <span class="video-duration">25:45</span>
+                </div>
+                <h4>Building Custom Agents</h4>
+                <p>Develop specialized agents for unique workflows</p>
+                <a href="/videos/custom-agent-dev" class="video-link">▶️ Watch</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Industry & Use-Case Guides -->
+    <div class="usecase-section">
+        <h3>🎯 Industry-Specific Guides</h3>
+        <p>Proven deployment patterns for your industry</p>
+
+        <div class="usecase-grid">
+            <div class="usecase-card" data-industry="saas">
+                <h4>SaaS & B2B</h4>
+                <p>Lead generation, sales cycle acceleration, customer success</p>
+                <a href="/guides/industry/saas" class="btn btn-small">View Guide</a>
+            </div>
+
+            <div class="usecase-card" data-industry="services">
+                <h4>Professional Services</h4>
+                <p>Project automation, client communication, resource management</p>
+                <a href="/guides/industry/services" class="btn btn-small">View Guide</a>
+            </div>
+
+            <div class="usecase-card" data-industry="ecommerce">
+                <h4>E-Commerce</h4>
+                <p>Customer support, order fulfillment, retention campaigns</p>
+                <a href="/guides/industry/ecommerce" class="btn btn-small">View Guide</a>
+            </div>
+
+            <div class="usecase-card" data-industry="marketing">
+                <h4>Marketing Agencies</h4>
+                <p>Content creation, campaign management, client reporting</p>
+                <a href="/guides/industry/marketing" class="btn btn-small">View Guide</a>
+            </div>
+
+            <div class="usecase-card" data-industry="realestate">
+                <h4>Real Estate</h4>
+                <p>Lead qualification, property research, buyer nurturing</p>
+                <a href="/guides/industry/realestate" class="btn btn-small">View Guide</a>
+            </div>
+
+            <div class="usecase-card" data-industry="healthcare">
+                <h4>Healthcare</h4>
+                <p>Patient communication, appointment scheduling, compliance</p>
+                <a href="/guides/industry/healthcare" class="btn btn-small">View Guide</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- API & Developer Documentation -->
+    <div class="dev-section">
+        <h3>👨‍💻 Developer Documentation</h3>
+
+        <div class="doc-cards">
+            <div class="doc-card">
+                <h4>REST API Reference</h4>
+                <p>Complete API documentation for integrating SINCOR with your tools</p>
+                <a href="https://developers.sincor.com/api" target="_blank" class="btn btn-secondary">
+                    View Docs →
+                </a>
+            </div>
+
+            <div class="doc-card">
+                <h4>Webhooks & Events</h4>
+                <p>Subscribe to real-time events from your agents</p>
+                <a href="https://developers.sincor.com/webhooks" target="_blank" class="btn btn-secondary">
+                    View Docs →
+                </a>
+            </div>
+
+            <div class="doc-card">
+                <h4>Custom Agent SDK</h4>
+                <p>Build custom agents for your unique workflows</p>
+                <a href="https://developers.sincor.com/sdk" target="_blank" class="btn btn-secondary">
+                    View Docs →
+                </a>
+            </div>
+
+            {% if ENTERPRISE %}
+            <div class="doc-card">
+                <h4>White-Label API</h4>
+                <p>Embed SINCOR in your own SaaS product</p>
+                <a href="https://developers.sincor.com/white-label" target="_blank" class="btn btn-secondary">
+                    View Docs →
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Support & Help -->
+    <div class="support-section" style="background: #f8fafc; padding: 30px; border-radius: 12px; margin-top: 40px;">
+        <h3>🤝 Support & Community</h3>
+
+        <div class="support-options">
+            <div class="support-option">
+                <h4>📧 Email Support</h4>
+                <p>support@getsincor.com</p>
+                <p style="font-size: 13px; color: #718096;">
+                    {% if STARTER %}4-24 hour response{% endif %}
+                    {% if PROFESSIONAL %}4-hour response (Priority){% endif %}
+                    {% if ENTERPRISE %}15-minute response (24/7 Emergency Hotline){% endif %}
+                </p>
+            </div>
+
+            <div class="support-option">
+                <h4>💬 In-App Chat</h4>
+                <p>Click Help → Chat in your dashboard</p>
+                <p style="font-size: 13px; color: #718096;">Instant access to AI support + human handoff</p>
+            </div>
+
+            <div class="support-option">
+                <h4>📚 Knowledge Base</h4>
+                <p><a href="https://help.sincor.com" target="_blank">help.sincor.com</a></p>
+                <p style="font-size: 13px; color: #718096;">1,000+ articles, searchable 24/7</p>
+            </div>
+
+            <div class="support-option">
+                <h4>👥 Community Forum</h4>
+                <p><a href="https://community.sincor.com" target="_blank">community.sincor.com</a></p>
+                <p style="font-size: 13px; color: #718096;">Connect with other SINCOR users</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Status -->
+    <div class="onboarding-status" style="background: #eef2ff; border-left: 4px solid #667eea; padding: 20px; border-radius: 8px; margin-top: 30px;">
+        <h3 style="margin-top: 0; color: #667eea;">🚀 Your Onboarding Progress</h3>
+
+        <div class="progress-item">
+            <span class="step-number">1</span>
+            <span class="step-title">Sign Up & Activation</span>
+            <span class="status completed">✓ Complete</span>
+        </div>
+
+        <div class="progress-item">
+            <span class="step-number">2</span>
+            <span class="step-title">Download Training Guide</span>
+            <span class="status {{ 'completed' if GUIDE_DOWNLOADED else 'pending' }}">{{ '✓ Complete' if GUIDE_DOWNLOADED else 'Pending' }}</span>
+        </div>
+
+        <div class="progress-item">
+            <span class="step-number">3</span>
+            <span class="step-title">Agent Configuration</span>
+            <span class="status {{ 'completed' if CONFIG_COMPLETE else 'in-progress' }}">{{ '✓ Complete' if CONFIG_COMPLETE else 'In Progress' }}</span>
+        </div>
+
+        <div class="progress-item">
+            <span class="step-number">4</span>
+            <span class="step-title">Integration Setup</span>
+            <span class="status {{ 'completed' if INTEGRATIONS_ACTIVE else 'pending' }}">{{ '✓ Complete' if INTEGRATIONS_ACTIVE else 'Pending' }}</span>
+        </div>
+
+        <div class="progress-item">
+            <span class="step-number">5</span>
+            <span class="step-title">First Workflow Running</span>
+            <span class="status {{ 'completed' if WORKFLOW_ACTIVE else 'pending' }}">{{ '✓ Complete' if WORKFLOW_ACTIVE else 'Pending' }}</span>
+        </div>
+
+        {% if PROFESSIONAL %}
+        <div class="progress-item">
+            <span class="step-number">6</span>
+            <span class="step-title">Multi-Agent Optimization</span>
+            <span class="status in-progress">In Progress</span>
+        </div>
+        {% endif %}
+
+        {% if ENTERPRISE %}
+        <div class="progress-item">
+            <span class="step-number">6</span>
+            <span class="step-title">White-Label Deployment</span>
+            <span class="status pending">Scheduled</span>
+        </div>
+
+        <div class="progress-item">
+            <span class="step-number">7</span>
+            <span class="step-title">Custom Agent Development</span>
+            <span class="status pending">On Demand</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recommended Next Steps -->
+    <div class="call-to-action" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin-top: 30px; text-align: center;">
+        <h3 style="margin-top: 0;">Next: Start Your Configuration</h3>
+        <p>Download your training guide and follow the quickstart checklist to get your first agent running within 24 hours.</p>
+
+        <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-top: 20px;">
+            <a href="#yourTierName" class="btn btn-light" onclick="document.querySelector('.guide-card.primary .btn-primary').click()">
+                📥 Download Guide Now
+            </a>
+            <a href="/onboarding/next-step" class="btn btn-light-outline">
+                → Continue Setup Wizard
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .training-vault {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .section-header {
+        text-align: center;
+        margin-bottom: 50px;
+    }
+
+    .section-header h2 {
+        font-size: 32px;
+        margin: 0 0 10px 0;
+        color: #1a202c;
+    }
+
+    .section-header .subtitle {
+        font-size: 16px;
+        color: #718096;
+        margin: 0;
+    }
+
+    .guides-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 30px;
+        margin-bottom: 50px;
+    }
+
+    .guide-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 30px;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+
+    .guide-card:hover {
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+        transform: translateY(-5px);
+    }
+
+    .guide-card.primary {
+        border: 2px solid #667eea;
+        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    }
+
+    .guide-badge {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 15px;
+    }
+
+    .guide-card h3 {
+        margin: 0 0 10px 0;
+        font-size: 20px;
+        color: #1a202c;
+    }
+
+    .guide-description {
+        color: #718096;
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 15px;
+    }
+
+    .guide-meta {
+        display: flex;
+        gap: 20px;
+        font-size: 13px;
+        color: #a0aec0;
+        margin-bottom: 20px;
+        padding: 15px 0;
+        border-top: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .guide-actions {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.2s;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+        background: #f0f4ff;
+        color: #667eea;
+        border: 1px solid #667eea;
+    }
+
+    .btn-secondary:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn-small {
+        padding: 8px 14px;
+        font-size: 13px;
+    }
+
+    .btn-light {
+        background: white;
+        color: #667eea;
+    }
+
+    .btn-light:hover {
+        background: #f8fafc;
+    }
+
+    .btn-light-outline {
+        background: transparent;
+        color: white;
+        border: 2px solid white;
+    }
+
+    .btn-light-outline:hover {
+        background: white;
+        color: #667eea;
+    }
+
+    .guide-includes {
+        background: #f8fafc;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+    }
+
+    .guide-includes h4 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        color: #1a202c;
+    }
+
+    .guide-includes ul {
+        margin: 0;
+        padding-left: 20px;
+        list-style: none;
+    }
+
+    .guide-includes li {
+        font-size: 13px;
+        color: #4a5568;
+        margin-bottom: 6px;
+        position: relative;
+        padding-left: 18px;
+    }
+
+    .guide-includes li:before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: #667eea;
+        font-weight: bold;
+    }
+
+    .checklist-preview {
+        background: #f8fafc;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+    }
+
+    .checklist-preview p {
+        margin: 0 0 10px 0;
+        font-weight: 600;
+        color: #1a202c;
+    }
+
+    .video-section {
+        margin-top: 50px;
+    }
+
+    .video-section h3 {
+        font-size: 24px;
+        margin: 0 0 10px 0;
+        color: #1a202c;
+    }
+
+    .video-section > p {
+        color: #718096;
+        margin-bottom: 25px;
+    }
+
+    .video-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 25px;
+    }
+
+    .video-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .video-card:hover {
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        transform: translateY(-5px);
+    }
+
+    .video-thumbnail {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background-size: cover;
+        background-position: center;
+        position: relative;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+        padding: 10px;
+    }
+
+    .video-duration {
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .video-card h4 {
+        margin: 15px;
+        margin-bottom: 8px;
+        font-size: 16px;
+        color: #1a202c;
+    }
+
+    .video-card p {
+        margin: 0 15px;
+        font-size: 13px;
+        color: #718096;
+    }
+
+    .video-link {
+        display: inline-block;
+        margin: 12px 15px 15px 15px;
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .video-link:hover {
+        text-decoration: underline;
+    }
+
+    .usecase-section {
+        margin-top: 50px;
+    }
+
+    .usecase-section h3 {
+        font-size: 24px;
+        margin: 0 0 10px 0;
+        color: #1a202c;
+    }
+
+    .usecase-section > p {
+        color: #718096;
+        margin-bottom: 25px;
+    }
+
+    .usecase-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .usecase-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+
+    .usecase-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+    }
+
+    .usecase-card h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        color: #1a202c;
+    }
+
+    .usecase-card p {
+        margin: 0 0 15px 0;
+        font-size: 13px;
+        color: #718096;
+        line-height: 1.5;
+    }
+
+    .dev-section {
+        margin-top: 50px;
+    }
+
+    .dev-section h3 {
+        font-size: 24px;
+        margin: 0 0 25px 0;
+        color: #1a202c;
+    }
+
+    .doc-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .doc-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 25px;
+        transition: all 0.3s ease;
+    }
+
+    .doc-card:hover {
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.1);
+        border-color: #667eea;
+    }
+
+    .doc-card h4 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+        color: #1a202c;
+    }
+
+    .doc-card p {
+        margin: 0 0 15px 0;
+        font-size: 14px;
+        color: #718096;
+        line-height: 1.6;
+    }
+
+    .support-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 25px;
+    }
+
+    .support-option {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+    }
+
+    .support-option h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        color: #1a202c;
+    }
+
+    .support-option p {
+        margin: 0 0 5px 0;
+        font-size: 14px;
+        color: #667eea;
+        font-weight: 500;
+    }
+
+    .progress-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+    }
+
+    .progress-item:last-child {
+        border-bottom: none;
+    }
+
+    .step-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: #667eea;
+        color: white;
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .step-title {
+        flex: 1;
+        font-size: 14px;
+        font-weight: 500;
+        color: #1a202c;
+    }
+
+    .status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .status.completed {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status.in-progress {
+        background: #feebc8;
+        color: #7c2d12;
+    }
+
+    .status.pending {
+        background: #e2e8f0;
+        color: #2d3748;
+    }
+
+    .call-to-action {
+        margin-top: 50px;
+    }
+
+    .call-to-action h3 {
+        color: white;
+        margin-bottom: 10px;
+    }
+
+    .call-to-action p {
+        color: rgba(255, 255, 255, 0.9);
+        margin: 0;
+    }
+</style>
