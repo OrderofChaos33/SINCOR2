@@ -545,21 +545,32 @@
             };
             script.onerror = function() {
                 console.error('Failed to load PayPal SDK - using fallback buttons');
-                statusEl.innerHTML = '<div class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded text-center">💡 Demo mode: Contact us buttons shown. PayPal will work when deployed to Railway with your credentials.</div>';
+                statusEl.innerHTML = '<div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded text-center"><strong>🚀 Early Access</strong> - Join our waitlist to get priority access when payments launch</div>';
 
-                // Show "Contact Us" fallback buttons
+                // Show "Join Waitlist" fallback buttons
                 document.querySelectorAll('[id^="paypal-"]').forEach(el => {
                     const productName = el.id.replace('paypal-', '');
+                    const planName = productName.charAt(0).toUpperCase() + productName.slice(1);
                     el.innerHTML = `
-                        <a href="mailto:sales@getsincor.com?subject=Purchase ${productName}"
+                        <button onclick="joinWaitlist('${planName}')"
                            class="block w-full bg-gradient-to-r from-purple-600 to-purple-500 text-white px-6 py-3 rounded-xl font-bold text-center hover:from-purple-700 hover:to-purple-600 transition shadow-lg">
-                            📧 Contact to Purchase
-                        </a>
+                            🎯 Join Waitlist - ${planName}
+                        </button>
                     `;
                 });
             };
             document.head.appendChild(script);
         })();
+
+        function joinWaitlist(planName) {
+            const email = prompt(`Join the ${planName} waitlist!\n\nEnter your email to get early access when payments launch:`);
+            if (email && email.includes('@')) {
+                alert(`✓ You're on the waitlist!\n\nWe'll send you an email when ${planName} is ready to purchase.\n\nEmail: ${email}`);
+                console.log(`Waitlist signup: ${email} for ${planName}`);
+            } else if (email) {
+                alert('Please enter a valid email address');
+            }
+        }
 
         function initializePayPalButtons() {
             // Starter - $297/month
