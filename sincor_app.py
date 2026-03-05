@@ -1349,6 +1349,19 @@ Current Status: CORTEX backend development mode
 </p>
 </div></body></html>'''
 
+@app.route("/checkout", methods=["GET"])
+def checkout():
+    """Checkout page for orders originating from the /buy page."""
+    paypal_client_id = os.getenv(
+        'PAYPAL_CLIENT_ID',
+        'Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh'
+    )
+    try:
+        return render_template("checkout.html", paypal_client_id=paypal_client_id)
+    except Exception as e:
+        log(f"Error loading checkout page: {e}")
+        return jsonify({"error": "Checkout unavailable"}), 500
+
 # FORCE PayPal checkout (disable any existing routes)
 @app.route("/checkout/<plan_id>", methods=["GET"])
 def paypal_checkout_override(plan_id):
