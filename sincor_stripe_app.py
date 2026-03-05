@@ -45,12 +45,12 @@ def home():
 
 @app.route('/buy')
 def buy():
-    """Buy page with Stripe checkout"""
+    """Buy page with high-converting Stripe checkout"""
     if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
-        return render_template('buy_stripe.html')
+        return render_template('buy_converting.html')
     else:
         # Fallback to old buy page
-        return render_template('buy.html')
+        return render_template('buy_stripe.html')
 
 @app.route('/pricing')
 def pricing():

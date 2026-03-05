@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How SINCOR Doubled Our Revenue in 90 Days - Try For Free</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+
+        /* Urgency animations */
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgb(239, 68, 68); }
+            50% { border-color: rgb(248, 113, 113); }
+        }
+        .urgency-badge {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            border: 2px solid rgb(239, 68, 68);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+
+        /* Conversion optimizations */
+        .cta-button {
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+            transition: all 0.3s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(139, 92, 246, 0.5);
+        }
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            transition: left 0.3s ease;
+        }
+        .cta-button:hover::before {
+            left: 100%;
+        }
+
+        /* Comparison table highlight */
+        .win-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            color: white;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        /* Social proof flow */
+        .testimonial-flow {
+            animation: slideIn 0.8s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Trust badges */
+        .trust-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #10b981;
+        }
+    </style>
+</head>
+<body class="bg-white">
+
+    <!-- HOOK: Problem + Agitation -->
+    <div class="relative bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white py-24 overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-20 left-10 w-40 h-40 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl"></div>
+            <div class="absolute bottom-20 right-10 w-40 h-40 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl"></div>
+        </div>
+
+        <div class="max-w-4xl mx-auto px-4 text-center relative z-10">
+            <!-- Micro-commitment: Emotional hook -->
+            <div class="inline-block urgency-badge bg-red-50 text-red-700 px-4 py-2 rounded-full font-bold text-sm mb-6">
+                ⏰ LIMITED TIME: 30 DAYS FREE (Worth $297)
+            </div>
+
+            <!-- Problem recognition (emotional) -->
+            <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight">
+                Tired of Chasing<br/>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
+                    Dead Leads & Wasted Time?
+                </span>
+            </h1>
+
+            <!-- Relatable pain -->
+            <p class="text-2xl md:text-3xl text-gray-200 mb-8 max-w-3xl mx-auto leading-relaxed">
+                You're manually finding prospects. Manually sending emails. Manually following up.<br/>
+                <strong>While your competitors are sleeping, 42 AI agents work 24/7 for them.</strong>
+            </p>
+
+            <!-- Curiosity gap + benefit teaser -->
+            <div class="bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-6 rounded-xl inline-block mb-8 shadow-2xl">
+                <p class="text-sm text-purple-100 mb-2">👇 WATCH: How Sarah tripled her revenue (2 min)</p>
+                <div class="inline-flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path>
+                    </svg>
+                    <span class="font-bold">Play Client Success Video</span>
+                </div>
+            </div>
+
+            <!-- Specific, credible stat -->
+            <div class="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
+                <div>
+                    <div class="text-4xl font-black">427K+</div>
+                    <div class="text-sm text-gray-300">Leads Generated</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-black">$12.4M+</div>
+                    <div class="text-sm text-gray-300">Revenue Created</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-black">98.4%</div>
+                    <div class="text-sm text-gray-300">Delighted Customers</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SOLUTION: The transformation they want -->
+    <div class="bg-gradient-to-r from-green-50 to-blue-50 py-16">
+        <div class="max-w-4xl mx-auto px-4">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <!-- Before/After visual -->
+                <div>
+                    <h3 class="text-3xl font-black text-gray-900 mb-8">Your Life Before vs. After</h3>
+
+                    <div class="mb-6">
+                        <div class="text-sm font-bold text-red-600 uppercase mb-2">❌ Before SINCOR</div>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>⏱️ 4+ hours/day on lead gen</li>
+                            <li>📧 Manually writing 20+ emails</li>
+                            <li>📞 Making rejection calls</li>
+                            <li>😫 High stress, low results</li>
+                            <li>💰 Leaving $K on table daily</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border-2 border-green-500">
+                        <div class="text-sm font-bold text-green-600 uppercase mb-2">✓ After SINCOR</div>
+                        <ul class="space-y-2 text-gray-700">
+                            <li>☕ 30 min/day (coffee & results)</li>
+                            <li>🤖 AI sends hundreds of personalized messages</li>
+                            <li>📊 Watch qualified leads roll in</li>
+                            <li>😎 Stress-free, predictable income</li>
+                            <li>💰 6-figure revenue months possible</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Social proof as evidence -->
+                <div>
+                    <h3 class="text-3xl font-black text-gray-900 mb-8">Real People. Real Results. Real Money.</h3>
+
+                    <div class="space-y-4">
+                        <!-- Testimonial 1 -->
+                        <div class="testimonial-flow bg-white p-6 rounded-xl border-l-4 border-purple-500 shadow-lg">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="text-yellow-400">⭐⭐⭐⭐⭐</div>
+                                <span class="text-sm font-bold text-gray-600">3 months in</span>
+                            </div>
+                            <p class="text-gray-700 font-bold mb-2">
+                                "We went from 0-15 high-quality leads per week. Revenue jumped 185% in Q2."
+                            </p>
+                            <span class="text-sm text-gray-600">— <strong>Sarah Chen</strong>, eCommerce founder</span>
+                        </div>
+
+                        <!-- Testimonial 2 -->
+                        <div class="testimonial-flow bg-white p-6 rounded-xl border-l-4 border-blue-500 shadow-lg" style="animation-delay: 0.1s;">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="text-yellow-400">⭐⭐⭐⭐⭐</div>
+                                <span class="text-sm font-bold text-gray-600">2 months in</span>
+                            </div>
+                            <p class="text-gray-700 font-bold mb-2">
+                                "Cut content creation time by 80%. Now I own a content machine."
+                            </p>
+                            <span class="text-sm text-gray-600">— <strong>Marcus Johnson</strong>, Agency owner</span>
+                        </div>
+
+                        <!-- Testimonial 3 -->
+                        <div class="testimonial-flow bg-white p-6 rounded-xl border-l-4 border-green-500 shadow-lg" style="animation-delay: 0.2s;">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="text-yellow-400">⭐⭐⭐⭐⭐</div>
+                                <span class="text-sm font-bold text-gray-600">Paid for itself immediately</span>
+                            </div>
+                            <p class="text-gray-700 font-bold mb-2">
+                                "First month = $2K in leads. Now scaling to $20K/month."
+                            </p>
+                            <span class="text-sm text-gray-600">— <strong>James Liu</strong>, B2B consultant</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SOCIAL PROOF: The herd mentality -->
+    <div class="bg-white py-16 border-t-4 border-purple-200">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <h3 class="text-3xl font-black text-gray-900 mb-12">Join 500+ Smart Business Owners</h3>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+                <div>
+                    <div class="text-5xl font-black text-purple-600">500+</div>
+                    <p class="text-gray-600 font-bold">Customers Using</p>
+                </div>
+                <div>
+                    <div class="text-5xl font-black text-green-600">427K+</div>
+                    <p class="text-gray-600 font-bold">Leads Generated</p>
+                </div>
+                <div>
+                    <div class="text-5xl font-black text-blue-600">$12.4M</div>
+                    <p class="text-gray-600 font-bold">Revenue Flowing</p>
+                </div>
+                <div>
+                    <div class="text-5xl font-black text-red-600">98.4%</div>
+                    <p class="text-gray-600 font-bold">Happy Customers</p>
+                </div>
+            </div>
+
+            <!-- FOMO trigger -->
+            <div class="bg-gradient-to-r from-orange-100 to-red-100 border-2 border-orange-300 rounded-xl p-8">
+                <p class="text-lg text-gray-900 mb-3">
+                    <strong>⚠️ 427 customers added this month.</strong>
+                </p>
+                <p class="text-gray-700">
+                    Your competitors are already automating. Each day you wait, they're getting more leads than you.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ANCHOR PRICING: Show high price first -->
+    <div class="bg-gray-50 py-20">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+                    What Most Agencies Charge
+                </h2>
+                <p class="text-xl text-gray-600">
+                    (vs what SINCOR costs)
+                </p>
+            </div>
+
+            <!-- Comparison table:  Shows why SINCOR is the deal -->
+            <div class="grid md:grid-cols-4 gap-6 mb-12">
+                <!-- Hiring an employee -->
+                <div class="bg-white p-8 rounded-xl shadow">
+                    <h3 class="text-2xl font-black text-gray-900 mb-4">Hire a VA</h3>
+                    <div class="text-4xl font-black text-gray-600 mb-4">$1,200+<span class="text-sm text-gray-500">/mo</span></div>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li>⏰ Works 8 hrs/day only</li>
+                        <li>😴 Sleeps 8 hrs/day</li>
+                        <li>🏥 Takes vacation</li>
+                        <li>❌ Low quality work</li>
+                        <li>💔 High turnover</li>
+                    </ul>
+                </div>
+
+                <!-- Freelancer -->
+                <div class="bg-white p-8 rounded-xl shadow">
+                    <h3 class="text-2xl font-black text-gray-900 mb-4">Freelancer</h3>
+                    <div class="text-4xl font-black text-gray-600 mb-4">$800-1,500<span class="text-sm text-gray-500">/mo</span></div>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li>⏰ Unreliable hours</li>
+                        <li>🌍 Time zone issues</li>
+                        <li>📉 Inconsistent quality</li>
+                        <li>🤝 Relationship dependent</li>
+                        <li>❓ Hard to scale</li>
+                    </ul>
+                </div>
+
+                <!-- Marketing Agency -->
+                <div class="bg-white p-8 rounded-xl shadow">
+                    <h3 class="text-2xl font-black text-gray-900 mb-4">Agency</h3>
+                    <div class="text-4xl font-black text-gray-600 mb-4">$3,000+<span class="text-sm text-gray-500">/mo</span></div>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li>⏰ Limited band width</li>
+                        <li>💰 Expensive retainers</li>
+                        <li>⏸️ Slow to adapt</li>
+                        <li>📞 Limited flexibility</li>
+                        <li>🤐 Black box reporting</li>
+                    </ul>
+                </div>
+
+                <!-- SINCOR (the winner) -->
+                <div class="bg-gradient-to-br from-purple-500 to-blue-600 text-white p-8 rounded-xl shadow-xl border-2 border-yellow-400 transform scale-105">
+                    <div class="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full inline-block text-sm font-bold mb-4">
+                        BEST VALUE
+                    </div>
+                    <h3 class="text-2xl font-black mb-4">SINCOR</h3>
+                    <div class="text-4xl font-black mb-4">$297-$2,997<span class="text-sm text-blue-100">/mo</span></div>
+                    <ul class="space-y-2 text-sm text-blue-50">
+                        <li>✓ Works 24/7/365</li>
+                        <li>✓ Never tired or sick</li>
+                        <li>✓ Consistent excellence</li>
+                        <li>✓ Scales infinitely</li>
+                        <li>✓ Real-time analytics</li>
+                        <li>✓ Instant ROI</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- The math -->
+            <div class="bg-white p-8 rounded-xl border-2 border-green-300 text-center max-w-2xl mx-auto">
+                <h3 class="text-2xl font-black text-gray-900 mb-4">The Math Is Simple</h3>
+                <div class="space-y-3 text-lg">
+                    <p><strong>1 sale at higher margin</strong> = $1,000-$5,000 (typical)</p>
+                    <p class="text-green-600"><strong>SINCOR costs:</strong> $297/month</p>
+                    <p class="text-2xl font-black">
+                        ROI: <span class="text-green-600">300-1600% in first month</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ELIMINATE OBJECTIONS: Remove friction -->
+    <div class="bg-white py-20 border-t-4 border-blue-200">
+        <div class="max-w-4xl mx-auto px-4">
+            <h2 class="text-4xl font-black text-gray-900 text-center mb-12">
+                Every Concern. Answered.
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Concern 1 -->
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-8 rounded-xl border-l-4 border-green-500">
+                    <div class="flex items-start gap-3 mb-4">
+                        <span class="text-3xl">🛡️</span>
+                        <h3 class="text-xl font-black text-gray-900">Will it actually work for my industry?</h3>
+                    </div>
+                    <p class="text-gray-700">
+                        <strong>Yes. SINCOR works for:</strong> SaaS, eCommerce, consulting, agencies, real estate, B2B, professional services, and more. Our 42 AI agents adapt to YOUR specific industry and goals. Zero customization needed.
+                    </p>
+                </div>
+
+                <!-- Concern 2 -->
+                <div class="bg-gradient-to-br from-blue-50 to-cyan-50 p-8 rounded-xl border-l-4 border-blue-500">
+                    <div class="flex items-start gap-3 mb-4">
+                        <span class="text-3xl">⏱️</span>
+                        <h3 class="text-xl font-black text-gray-900">How long until I see results?</h3>
+                    </div>
+                    <p class="text-gray-700">
+                        <strong>Most customers see results within 24-48 hours.</strong> Agents start working immediately after signup. First leads typically arrive within a week. Measurable revenue within 30 days (or we refund you).
+                    </p>
+                </div>
+
+                <!-- Concern 3 -->
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-8 rounded-xl border-l-4 border-purple-500">
+                    <div class="flex items-start gap-3 mb-4">
+                        <span class="text-3xl">🎓</span>
+                        <h3 class="text-xl font-black text-gray-900">Is it hard to use?</h3>
+                    </div>
+                    <p class="text-gray-700">
+                        <strong>Nope. Designed for non-technical people.</strong> Setup takes under 5 minutes. Our AI handles the hard part. You just watch the dashboard and celebrate the wins.
+                    </p>
+                </div>
+
+                <!-- Concern 4 -->
+                <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-8 rounded-xl border-l-4 border-orange-500">
+                    <div class="flex items-start gap-3 mb-4">
+                        <span class="text-3xl">💳</span>
+                        <h3 class="text-xl font-black text-gray-900">What if I'm not happy?</h3>
+                    </div>
+                    <p class="text-gray-700">
+                        <strong>30-day money-back guarantee.</strong> Zero questions asked. But most customers become raving fans by day 5. Cancel anytime with one click.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- THE OFFER: Make it impossible to say no -->
+    <div class="relative bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 text-white py-20 overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-0 left-0 w-96 h-96 bg-white rounded-full mix-blend-multiply filter blur-3xl"></div>
+        </div>
+
+        <div class="max-w-4xl mx-auto px-4 relative z-10">
+            <div class="text-center mb-12">
+                <h2 class="text-5xl md:text-6xl font-black mb-6">
+                    No More Waiting For Results
+                </h2>
+                <p class="text-2xl text-purple-100 mb-8">
+                    SINCOR starts working for you instantly.<br/>
+                    <strong>You get access to your dashboard in 5 minutes.</strong>
+                </p>
+
+                <!-- Limited time scarcity -->
+                <div class="inline-block urgency-badge bg-red-500 text-white px-6 py-3 rounded-full font-black text-lg mb-8">
+                    ⏰ LIMITED: 30 DAYS FREE (First Month Only)
+                </div>
+            </div>
+
+            <!-- The three plan options (make middle most attractive) -->
+            <div class="grid md:grid-cols-3 gap-6 mb-12">
+                <!-- Starter -->
+                <div class="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 border border-white border-opacity-20">
+                    <h3 class="text-2xl font-black text-white mb-2">Starter</h3>
+                    <p class="text-purple-100 text-sm mb-6">Perfect if you're testing</p>
+
+                    <div class="text-5xl font-black text-white mb-2">$297</div>
+                    <p class="text-purple-200 mb-6">/ month (then cancel free anytime)</p>
+
+                    <ul class="space-y-3 text-white mb-8 text-sm">
+                        <li>✓ 10 AI Agents</li>
+                        <li>✓ 50-100 leads/week</li>
+                        <li>✓ Automated emails</li>
+                        <li>✓ Email support</li>
+                    </ul>
+
+                    <button onclick="buyPlan('starter', 'SINCOR Starter', 29700)" class="cta-button w-full bg-white text-purple-600 font-black py-3 px-6 rounded-xl hover:bg-purple-50 transition">
+                        Get Started Now
+                    </button>
+                </div>
+
+                <!-- Professional (HIGHLIGHTED) -->
+                <div class="bg-gradient-to-br from-yellow-400 to-amber-400 rounded-2xl p-8 transform scale-105 shadow-2xl border-4 border-white">
+                    <div class="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-black inline-block mb-4">
+                        🔥 MOST POPULAR - BEST VALUE
+                    </div>
+
+                    <h3 class="text-2xl font-black text-purple-900 mb-2">Professional</h3>
+                    <p class="text-purple-800 text-sm font-bold mb-6">For serious growth</p>
+
+                    <div class="text-5xl font-black text-purple-900 mb-2">$997</div>
+                    <p class="text-purple-800 font-bold mb-6">/ month (30 days FREE)</p>
+
+                    <div class="bg-white bg-opacity-30 px-4 py-2 rounded-lg mb-6 border-2 border-white">
+                        <p class="text-sm font-black text-purple-900">
+                            💰 SAVE $297/month for first 30 days. Pay $0.
+                        </p>
+                    </div>
+
+                    <ul class="space-y-3 text-purple-900 mb-8 text-sm font-bold">
+                        <li>✓ 25 AI Agents</li>
+                        <li>✓ 200-400 leads/week</li>
+                        <li>✓ Content generation</li>
+                        <li>✓ Priority support</li>
+                        <li>✓ Onboarding call</li>
+                        <li>✓ Real-time dashboard</li>
+                    </ul>
+
+                    <button onclick="buyPlan('professional', 'SINCOR Professional', 99700)" class="cta-button w-full bg-purple-600 text-white font-black py-3 px-6 rounded-xl hover:bg-purple-700 transition text-lg">
+                        Claim 30 Days FREE Now
+                    </button>
+
+                    <p class="text-center text-purple-800 font-bold text-sm mt-4">
+                        500+ customers chose this. Here's why.
+                    </p>
+                </div>
+
+                <!-- Enterprise -->
+                <div class="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 border border-white border-opacity-20">
+                    <h3 class="text-2xl font-black text-white mb-2">Enterprise</h3>
+                    <p class="text-purple-100 text-sm mb-6">For serious players</p>
+
+                    <div class="text-5xl font-black text-white mb-2">$2,997</div>
+                    <p class="text-purple-200 mb-6">/ month</p>
+
+                    <ul class="space-y-3 text-white mb-8 text-sm">
+                        <li>✓ All 42 AI Agents</li>
+                        <li>✓ 500-1000+ leads/week</li>
+                        <li>✓ Full automation</li>
+                        <li>✓ Dedicated manager</li>
+                        <li>✓ 24/7 support</li>
+                        <li>✓ Custom workflows</li>
+                    </ul>
+
+                    <button onclick="buyPlan('enterprise', 'SINCOR Enterprise', 299700)" class="cta-button w-full bg-white text-purple-600 font-black py-3 px-6 rounded-xl hover:bg-purple-50 transition">
+                        Start Enterprise
+                    </button>
+                </div>
+            </div>
+
+            <!-- Guarantee - Remove final objection -->
+            <div class="bg-white bg-opacity-20 border-2 border-white rounded-2xl p-8 text-center">
+                <h3 class="text-2xl font-black text-white mb-4">100% Risk-Free Promise</h3>
+                <p class="text-lg text-purple-100 mb-4">
+                    <strong>30 days. Full refund if you don't see measurable results.</strong><br/>
+                    No questions. No hassle. We're that confident.
+                </p>
+                <div class="flex flex-wrap justify-center gap-4 text-sm text-purple-100">
+                    <div class="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Full money-back guarantee</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Cancel anytime (one click)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>No contracts</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FINAL PUSH: FOMO + Commitment -->
+    <div class="bg-white py-16 text-center">
+        <div class="max-w-2xl mx-auto px-4">
+            <h3 class="text-4xl font-black text-gray-900 mb-4">
+                Don't Be The One Left Behind
+            </h3>
+            <p class="text-xl text-gray-600 mb-8">
+                Every day you wait, your competitors get stronger. Starting today costs $0/month for 30 days. Starting tomorrow? Costs you in lost leads.
+            </p>
+
+            <button onclick="jumpToPlans()" class="cta-button inline-block bg-gradient-to-r from-purple-600 to-purple-700 text-white font-black py-4 px-12 rounded-xl text-xl hover:shadow-2xl transition">
+                → See Plans & Get Started (30 Days FREE)
+            </button>
+
+            <p class="text-gray-500 text-sm mt-8">
+                • Takes 5 minutes to set up<br/>
+                • Access dashboard instantly<br/>
+                • Agents start working immediately<br/>
+                • 30-day guarantee. Full refund if not satisfied.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function buyPlan(planId, planName, priceInCents) {
+            // Redirect to Stripe checkout
+            console.log(`Starting checkout for ${planName}`);
+
+            fetch('/api/stripe/checkout', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    plan_id: planId,
+                    plan_name: planName,
+                    price_cents: priceInCents,
+                    is_subscription: true
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                } else {
+                    alert('Error starting checkout. Please try again.');
+                }
+            });
+        }
+
+        function jumpToPlans() {
+            window.scrollTo({top: document.querySelector('.urgency-badge').offsetParent.offsetTop, behavior: 'smooth'});
+        }
+    </script>
+
+</body>
+</html>
