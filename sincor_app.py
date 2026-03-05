@@ -50,10 +50,9 @@ NOTIFY_PHONE=os.getenv("NOTIFY_PHONE","+15551234567")
 
 # API Keys
 GOOGLE_API_KEY=os.getenv("GOOGLE_API_KEY","") or os.getenv("GOOGLE_PLACES_API_KEY","")
-# PayPal configuration (Court uses PayPal + on-chain SINC)
-PAYPAL_REST_API_ID = os.getenv('PAYPAL_REST_API_ID', '')
-PAYPAL_REST_API_SECRET = os.getenv('PAYPAL_REST_API_SECRET', '')
-PAYPAL_SANDBOX = os.getenv('PAYPAL_SANDBOX', 'true').lower() == 'true'
+# Stripe configuration
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', os.getenv('STRIPE_PUBLIC_KEY', ''))
 
 # Utility: sanitize and normalize phone numbers for display/storage
 def clean_phone(p):
@@ -1352,122 +1351,164 @@ Current Status: CORTEX backend development mode
 @app.route("/checkout", methods=["GET"])
 def checkout():
     """Checkout page for orders originating from the /buy page."""
-    paypal_client_id = os.getenv(
-        'PAYPAL_CLIENT_ID',
-        'Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh'
-    )
     try:
-        return render_template("checkout.html", paypal_client_id=paypal_client_id)
+        return render_template("checkout.html", stripe_publishable_key=STRIPE_PUBLISHABLE_KEY)
     except Exception as e:
         log(f"Error loading checkout page: {e}")
         return jsonify({"error": "Checkout unavailable"}), 500
 
-# FORCE PayPal checkout (disable any existing routes)
 @app.route("/checkout/<plan_id>", methods=["GET"])
-def paypal_checkout_override(plan_id):
-    """PayPal checkout page - OVERRIDES any other checkout routes."""
-    from paypal_checkout import PLANS
-    if plan_id not in PLANS:
+def stripe_checkout_plan(plan_id):
+    """Stripe checkout page for subscription plans."""
+    try:
+        from paypal_checkout import PLANS
+    except ImportError:
+        PLANS = {}
+    plan = PLANS.get(plan_id)
+    if not plan:
         return "Plan not found", 404
-    
-    plan = PLANS[plan_id]
-    
+
+    features_html = ''.join(
+        f'<li class="flex items-center gap-2"><span class="text-green-500">✓</span>{f}</li>'
+        for f in plan.get('features', [])
+    )
     return f"""<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>SINCOR Checkout - {plan['name']}</title>
-    <script src="https://www.paypal.com/sdk/js?client-id=Ac0_uwVreyKj-vz0l8n5f2PDNs0-LCIuqahsBdeIMsJ-kMEzxXcEiWYI1kse8Ai0qoGH-bpCtZQgaoPh&vault=true&intent=subscription"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINCOR Checkout – {plan['name']}</title>
+    <script src="https://js.stripe.com/v3/"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-50">
     <div class="max-w-2xl mx-auto py-12 px-4">
         <div class="bg-white rounded-lg shadow-lg p-8">
             <h1 class="text-2xl font-bold mb-6">Complete Your SINCOR Subscription</h1>
-            
             <div class="border-b pb-6 mb-6">
                 <h2 class="text-xl font-semibold">{plan['name']}</h2>
                 <p class="text-3xl font-bold text-blue-600">${plan['price']:.0f}<span class="text-base text-gray-500">/month</span></p>
-                <div class="mt-4">
-                    <h3 class="font-semibold mb-2">What's included:</h3>
-                    <ul class="space-y-1">
-                        {''.join(f'<li class="flex items-center"><span class="text-green-500 mr-2">✓</span>{feature}</li>' for feature in plan['features'])}
-                    </ul>
-                </div>
+                <ul class="mt-4 space-y-1">{features_html}</ul>
             </div>
-            
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
                 <input type="email" id="email" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
             </div>
-            
-            <div class="mb-6">
+            <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
                 <input type="text" id="company" required class="w-full px-3 py-2 border border-gray-300 rounded-md">
             </div>
-            
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-                <div id="paypal-button-container" class="mt-4">
-                    <!-- PayPal button will be rendered here -->
-                </div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Card Details</label>
+                <div id="card-element" class="p-3 border border-gray-300 rounded-md bg-white"></div>
+                <div id="card-errors" class="text-red-600 text-sm mt-2 hidden"></div>
             </div>
-            
-            <p class="text-sm text-gray-500 mt-4 text-center">
-                Powered by PayPal. Full access to SINCOR. Cancel anytime through PayPal.
-            </p>
+            <button id="pay-btn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors">
+                Subscribe – ${plan['price']:.0f}/mo
+            </button>
+            <p class="text-sm text-gray-500 mt-4 text-center">Powered by Stripe. Cancel anytime.</p>
         </div>
     </div>
-    
     <script>
-        paypal.Buttons({{
-            style: {{
-                shape: 'rect',
-                color: 'blue',
-                layout: 'vertical',
-                label: 'subscribe'
-            }},
-            
-            createSubscription: function(data, actions) {{
-                const email = document.getElementById('email').value;
-                const company = document.getElementById('company').value;
-                
-                if (!email || !company) {{
-                    alert('Please fill in email and company name');
-                    return;
-                }}
-                
-                // For demo purposes, create a simple subscription
-                return actions.subscription.create({{
-                    'plan_id': 'P-5ML4271244454362WXNWU5NQ', // PayPal plan ID
-                    'subscriber': {{
-                        'name': {{
-                            'given_name': company,
-                            'surname': 'Customer'
-                        }},
-                        'email_address': email
-                    }},
-                    'application_context': {{
-                        'brand_name': 'SINCOR',
-                        'shipping_preference': 'NO_SHIPPING',
-                        'user_action': 'SUBSCRIBE_NOW'
-                    }}
-                }});
-            }},
-            
-            onApprove: function(data, actions) {{
-                // Handle successful subscription approval
-                alert('Subscription approved! ID: ' + data.subscriptionID);
-                window.location.href = '/success?subscription_id=' + data.subscriptionID;
-            }},
-            
-            onError: function(err) {{
-                console.error('PayPal error:', err);
-                alert('An error occurred with PayPal. Please try again.');
-            }}
-        }}).render('#paypal-button-container');
+        const stripe = Stripe('{STRIPE_PUBLISHABLE_KEY}');
+        const elements = stripe.elements();
+        const card = elements.create('card');
+        card.mount('#card-element');
+        card.on('change', e => {{
+            const el = document.getElementById('card-errors');
+            if (e.error) {{ el.textContent = e.error.message; el.classList.remove('hidden'); }}
+            else {{ el.classList.add('hidden'); }}
+        }});
+        document.getElementById('pay-btn').addEventListener('click', async () => {{
+            const email = document.getElementById('email').value.trim();
+            const company = document.getElementById('company').value.trim();
+            if (!email || !company) {{ alert('Please fill in all fields'); return; }}
+            const btn = document.getElementById('pay-btn');
+            btn.disabled = true; btn.textContent = 'Processing…';
+            const pi = await fetch('/api/create-payment-intent', {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{ amount: {int(plan['price'] * 100)}, currency: 'usd',
+                    description: '{plan['name']} subscription', email }})
+            }}).then(r => r.json());
+            if (!pi.client_secret) {{ alert(pi.error || 'Error'); btn.disabled = false; btn.textContent = 'Retry'; return; }}
+            const {{ error }} = await stripe.confirmCardPayment(pi.client_secret, {{
+                payment_method: {{ card, billing_details: {{ name: company, email }} }}
+            }});
+            if (error) {{ document.getElementById('card-errors').textContent = error.message;
+                document.getElementById('card-errors').classList.remove('hidden');
+                btn.disabled = false; btn.textContent = 'Retry'; }}
+            else {{ window.location.href = '/success'; }}
+        }});
     </script>
 </body>
-</html>"""
+</html>""".replace('{STRIPE_PUBLISHABLE_KEY}', STRIPE_PUBLISHABLE_KEY)
+
+@app.route("/api/create-payment-intent", methods=["POST"])
+def create_payment_intent():
+    """Create a Stripe PaymentIntent for one-time checkout."""
+    try:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+        data = request.get_json() or {}
+        amount = int(data.get('amount', 0))
+        if amount <= 0:
+            return jsonify({'error': 'Invalid amount'}), 400
+        intent = stripe_lib.PaymentIntent.create(
+            amount=amount,
+            currency=data.get('currency', 'usd'),
+            description=data.get('description', 'SINCOR service'),
+            receipt_email=data.get('email') or None,
+            metadata={'source': 'sincor_checkout'}
+        )
+        return jsonify({'client_secret': intent.client_secret})
+    except Exception as e:
+        log(f"Stripe PaymentIntent error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/checkout", methods=["POST"])
+def api_checkout():
+    """Confirm an order after successful Stripe payment capture."""
+    try:
+        data = request.get_json() or {}
+        payment_intent_id = data.get('stripePaymentIntentId', '')
+        order_data = data.get('orderData', {})
+        billing_data = data.get('billingData', {})
+        amount = data.get('amount', 0)
+
+        # Log order for fulfilment
+        order_id = f"ORD-{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{payment_intent_id[-6:] if payment_intent_id else 'MANUAL'}"
+        log(f"New order {order_id}: service={order_data.get('service')}, tier={order_data.get('tier')}, "
+            f"amount=${amount}, customer={billing_data.get('email')}, stripe_pi={payment_intent_id}")
+
+        # Send confirmation email if SMTP is configured
+        if SMTP_HOST and SMTP_USER and billing_data.get('email'):
+            try:
+                msg = EmailMessage()
+                msg['Subject'] = f"SINCOR Order Confirmed – {order_id}"
+                msg['From'] = EMAIL_FROM
+                msg['To'] = billing_data['email']
+                msg.set_content(
+                    f"Hi {billing_data.get('firstName', '')},\n\n"
+                    f"Thank you for your SINCOR order!\n\n"
+                    f"Order ID: {order_id}\n"
+                    f"Service: {order_data.get('serviceName', order_data.get('service'))}\n"
+                    f"Tier: {order_data.get('tier')}\n"
+                    f"Amount: ${amount:,.2f}\n\n"
+                    f"Your dedicated account manager will reach out within 24 hours to kick things off.\n\n"
+                    f"Questions? Email hello@getsincor.com\n\nThe SINCOR Team"
+                )
+                with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+                    s.starttls()
+                    s.login(SMTP_USER, SMTP_PASS)
+                    s.send_message(msg)
+            except Exception as mail_err:
+                log(f"Order confirmation email failed: {mail_err}")
+
+        return jsonify({'success': True, 'orderId': order_id})
+    except Exception as e:
+        log(f"API checkout error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route("/pricing")
 def pricing():

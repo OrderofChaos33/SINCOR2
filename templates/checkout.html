@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout - SINCOR</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
@@ -111,19 +111,24 @@
             </form>
         </div>
 
-        <!-- PayPal Payment -->
+        <!-- Stripe Payment -->
         <div class="bg-white rounded-xl shadow-md p-8 mb-8">
             <h2 class="text-2xl font-bold text-gray-900 mb-6">Payment Method</h2>
 
-            <div id="paypal-button-container" class="mb-6"></div>
+            <div id="card-element" class="mb-4 p-4 border-2 border-gray-300 rounded-lg bg-white"></div>
+            <div id="card-errors" class="text-red-600 text-sm mb-4 hidden"></div>
 
-            <div id="payment-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg hidden"></div>
+            <button id="submit-payment" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg">
+                Pay Now
+            </button>
 
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <div id="payment-error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg hidden mt-4"></div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 mt-6">
                 <div class="text-blue-600 text-2xl">🔒</div>
                 <div>
                     <div class="font-semibold text-blue-900">Bank-Level Security</div>
-                    <div class="text-sm text-blue-700">Your payment is processed securely through PayPal. We never see your card details.</div>
+                    <div class="text-sm text-blue-700">Your payment is processed securely by Stripe. We never see your card details.</div>
                 </div>
             </div>
         </div>
@@ -169,15 +174,38 @@
     </div>
 
     <script>
+        const stripe = Stripe('{{ stripe_publishable_key }}');
+        const elements = stripe.elements();
+        const cardElement = elements.create('card', {
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#1f2937',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                    '::placeholder': { color: '#9ca3af' }
+                },
+                invalid: { color: '#ef4444' }
+            }
+        });
+        cardElement.mount('#card-element');
+
+        cardElement.on('change', (e) => {
+            const errEl = document.getElementById('card-errors');
+            if (e.error) {
+                errEl.textContent = e.error.message;
+                errEl.classList.remove('hidden');
+            } else {
+                errEl.classList.add('hidden');
+            }
+        });
+
         // Load order from sessionStorage
         function loadOrder() {
             const orderData = JSON.parse(sessionStorage.getItem('pendingOrder') || '{}');
-
             if (!orderData.service) {
                 window.location.href = '/buy';
                 return;
             }
-
             const serviceNames = {
                 'intelligence': 'Intelligence Reports',
                 'predictive': 'Predictive Models',
@@ -185,95 +213,86 @@
                 'automation': 'Automation Solutions',
                 'market': 'Market Analysis'
             };
-
             document.getElementById('serviceName').textContent = serviceNames[orderData.service] || orderData.serviceName;
             document.getElementById('tierName').textContent = orderData.tier;
             document.getElementById('speedName').textContent = orderData.speed.charAt(0).toUpperCase() + orderData.speed.slice(1);
             document.getElementById('qualityName').textContent = orderData.quality.charAt(0).toUpperCase() + orderData.quality.slice(1);
-
             const amount = parseFloat(orderData.price);
             document.getElementById('totalAmount').textContent = `$${amount.toLocaleString()}`;
-
             window.orderData = orderData;
             window.totalAmount = amount;
         }
 
-        // Initialize PayPal
-        function initPayPal() {
-            paypal.Buttons({
-                createOrder: (data, actions) => {
-                    // Validate form
-                    if (!document.getElementById('firstName').value ||
-                        !document.getElementById('lastName').value ||
-                        !document.getElementById('email').value ||
-                        !document.getElementById('company').value) {
-                        alert('Please fill in all fields');
-                        return;
+        document.getElementById('submit-payment').addEventListener('click', async () => {
+            const btn = document.getElementById('submit-payment');
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName  = document.getElementById('lastName').value.trim();
+            const email     = document.getElementById('email').value.trim();
+            const company   = document.getElementById('company').value.trim();
+
+            if (!firstName || !lastName || !email || !company) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Processing…';
+
+            try {
+                // 1. Create PaymentIntent on the server
+                const piRes = await fetch('/api/create-payment-intent', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        amount: Math.round(window.totalAmount * 100), // cents
+                        currency: 'usd',
+                        description: `${window.orderData.serviceName} - ${window.orderData.tier} Tier`,
+                        email: email
+                    })
+                });
+                const piData = await piRes.json();
+                if (!piData.client_secret) throw new Error(piData.error || 'Failed to create payment intent');
+
+                // 2. Confirm card payment with Stripe.js
+                const { error, paymentIntent } = await stripe.confirmCardPayment(piData.client_secret, {
+                    payment_method: {
+                        card: cardElement,
+                        billing_details: { name: `${firstName} ${lastName}`, email: email }
                     }
+                });
 
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: {
-                                value: window.totalAmount.toString(),
-                                currency_code: 'USD'
-                            },
-                            description: `${window.orderData.serviceName} - ${window.orderData.tier} Tier`
-                        }]
-                    });
-                },
-                onApprove: (data, actions) => {
-                    return actions.order.capture().then((orderDetails) => {
-                        // Order captured successfully
-                        processPayment(orderDetails);
-                    });
-                },
-                onError: (err) => {
-                    console.error('PayPal error:', err);
-                    document.getElementById('payment-error').textContent = 'Payment failed. Please try again.';
-                    document.getElementById('payment-error').classList.remove('hidden');
-                }
-            }).render('#paypal-button-container');
-        }
+                if (error) throw new Error(error.message);
 
-        function processPayment(paypalOrderDetails) {
-            // Send to backend
-            const billingData = {
-                firstName: document.getElementById('firstName').value,
-                lastName: document.getElementById('lastName').value,
-                email: document.getElementById('email').value,
-                company: document.getElementById('company').value
-            };
+                // 3. Confirm with backend
+                const confirmRes = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        stripePaymentIntentId: paymentIntent.id,
+                        amount: window.totalAmount,
+                        orderData: window.orderData,
+                        billingData: { firstName, lastName, email, company }
+                    })
+                });
+                const result = await confirmRes.json();
 
-            fetch('/api/checkout', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    paypalOrderId: paypalOrderDetails.id,
-                    paypalPayerId: paypalOrderDetails.payer.payer_info?.email || 'unknown',
-                    amount: window.totalAmount,
-                    orderData: window.orderData,
-                    billingData: billingData
-                })
-            })
-            .then(r => r.json())
-            .then(result => {
                 if (result.success) {
                     document.getElementById('orderId').textContent = result.orderId;
                     document.getElementById('successModal').classList.remove('hidden');
                     sessionStorage.removeItem('pendingOrder');
                 } else {
-                    alert('Error creating order: ' + result.error);
+                    throw new Error(result.error || 'Order confirmation failed');
                 }
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                alert('Payment processing error');
-            });
-        }
+            } catch (err) {
+                const errEl = document.getElementById('payment-error');
+                errEl.textContent = err.message;
+                errEl.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Pay Now';
+            }
+        });
 
-        // Load and initialize
         loadOrder();
-        initPayPal();
     </script>
 </body>
 </html>
