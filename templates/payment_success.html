@@ -44,6 +44,25 @@
             </ol>
         </div>
 
+        <!-- Post-payment upsell — shown only when plan is starter or not set -->
+        <div id="upsell-block" class="bg-gradient-to-br from-purple-50 to-indigo-100 rounded-2xl p-6 mb-8 border-2 border-purple-300">
+            <div class="flex items-center gap-2 mb-3">
+                <span class="bg-red-500 text-white text-xs font-black px-3 py-1 rounded-full">⚡ ONE-TIME OFFER</span>
+                <span class="text-red-600 text-sm font-bold">Expires in: <span id="upsell-timer" class="font-black">10:00</span></span>
+            </div>
+            <h2 class="text-2xl font-black text-gray-900 mb-2">Upgrade to Professional — Save $200/mo</h2>
+            <p class="text-gray-700 mb-1">You just activated SINCOR. Unlock <strong>25 agents</strong>, <strong>400 leads/week</strong>, dedicated onboarding and priority support for only <strong class="text-purple-700">$797/mo</strong> (normally $997).</p>
+            <p class="text-gray-500 text-sm mb-4">This discount is applied automatically — available only on this page, only once.</p>
+            <div class="flex flex-col sm:flex-row gap-3 items-center">
+                <a href="/buy?plan=professional&discount=upsell200" class="inline-block bg-gradient-to-r from-purple-600 to-purple-800 text-white font-black py-3 px-8 rounded-xl hover:from-purple-700 hover:to-purple-900 transition text-lg shadow-lg">
+                    Upgrade Now → Save $200/mo
+                </a>
+                <button onclick="document.getElementById('upsell-block').style.display='none'" class="text-gray-400 text-sm underline hover:text-gray-600">
+                    No thanks, I'll stay on my current plan
+                </button>
+            </div>
+        </div>
+
         <div class="flex flex-col sm:flex-row gap-4">
             <a href="/" class="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-6 rounded-xl font-bold text-center hover:from-purple-700 hover:to-purple-800 transition">
                 ← Back to Home
@@ -57,5 +76,36 @@
             <p class="mb-3"><strong>Need help?</strong> Email: <a href="mailto:support@getsincor.com" class="text-blue-600 hover:underline">support@getsincor.com</a></p>
         </div>
     </div>
+
+    <script>
+        // Hide upsell if URL says plan=professional or plan=enterprise
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const plan = params.get('plan') || '';
+            if (plan === 'professional' || plan === 'enterprise') {
+                var block = document.getElementById('upsell-block');
+                if (block) block.style.display = 'none';
+            }
+        })();
+
+        // 10-minute countdown timer
+        (function() {
+            var totalSeconds = 600;
+            var timerEl = document.getElementById('upsell-timer');
+            if (!timerEl) return;
+            var interval = setInterval(function() {
+                totalSeconds--;
+                if (totalSeconds <= 0) {
+                    clearInterval(interval);
+                    var block = document.getElementById('upsell-block');
+                    if (block) block.style.display = 'none';
+                    return;
+                }
+                var m = Math.floor(totalSeconds / 60);
+                var s = totalSeconds % 60;
+                timerEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+            }, 1000);
+        })();
+    </script>
 </body>
 </html>

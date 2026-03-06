@@ -78,6 +78,23 @@ def payment_cancel():
     """Payment cancelled page"""
     return render_template('payment_cancel.html')
 
+@app.route('/billing')
+def billing_portal():
+    """Redirect customer to Stripe Customer Portal for self-service billing management"""
+    customer_id = request.args.get('customer_id')
+    if not customer_id:
+        # No customer_id — send them to buy page
+        return redirect('/buy')
+    if not stripe_processor or not stripe_processor.enabled:
+        return "<h2>Billing portal unavailable. Please contact support@getsincor.com</h2>", 503
+    result = stripe_processor.create_portal_session(
+        customer_id=customer_id,
+        return_url=request.host_url,
+    )
+    if result.get('success'):
+        return redirect(result['portal_url'])
+    return "<h2>Could not open billing portal. Please contact support@getsincor.com</h2>", 500
+
 @app.route('/health')
 def health():
     """Health check"""

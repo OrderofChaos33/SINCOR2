@@ -36,17 +36,18 @@ class StripeCheckout:
 
     def create_checkout_session(self, product_name: str, price_cents: int,
                                 quantity: int = 1, customer_email: str = None,
-                                is_subscription: bool = False,
+                                is_subscription: bool = True,
                                 interval: str = 'month') -> Dict:
         """
-        Create a Stripe checkout session for a product
+        Create a Stripe checkout session using inline price_data.
+        Uses recurring billing for subscriptions — no phantom Product/Price objects.
 
         Args:
             product_name: Name of the product (e.g., "SINCOR Starter")
             price_cents: Price in cents (e.g., 29700 for $297.00)
             quantity: Number of items
-            customer_email: Customer email for receipt
-            is_subscription: Whether this is a monthly subscription
+            customer_email: Customer email for receipt and abandoned-checkout recovery
+            is_subscription: Whether this is a recurring subscription (default True)
             interval: Billing interval ('month' or 'year')
 
         Returns:
@@ -57,48 +58,46 @@ class StripeCheckout:
             return {'success': False, 'error': 'Payment processor not available'}
 
         try:
-            # Create a product
-            product = stripe.Product.create(
-                name=product_name,
-                type='service'
-            )
-
-            # Create a price
-            price_data = {
+            price_data_obj: Dict = {
                 'currency': 'usd',
                 'unit_amount': price_cents,
-                'product': product.id,
+                'product_data': {'name': product_name},
+            }
+            if is_subscription:
+                price_data_obj['recurring'] = {'interval': interval}
+
+            session_params: Dict = {
+                'payment_method_types': ['card'],
+                'line_items': [{'price_data': price_data_obj, 'quantity': quantity}],
+                'mode': 'subscription' if is_subscription else 'payment',
+                'success_url': os.getenv(
+                    'STRIPE_SUCCESS_URL',
+                    'https://getsincor.com/payment/success?session_id={CHECKOUT_SESSION_ID}'
+                ),
+                'cancel_url': os.getenv(
+                    'STRIPE_CANCEL_URL',
+                    'https://getsincor.com/payment/cancel'
+                ),
+                # Allow coupon/promo codes at checkout
+                'allow_promotion_codes': True,
             }
 
-            if is_subscription:
-                price_data['recurring'] = {
-                    'interval': interval,
-                    'interval_count': 1
-                }
+            if customer_email:
+                session_params['customer_email'] = customer_email
 
-            price = stripe.Price.create(**price_data)
+            # 30-day free trial for subscriptions
+            trial_days = int(os.getenv('STRIPE_TRIAL_DAYS', '30'))
+            if is_subscription and trial_days > 0:
+                session_params['subscription_data'] = {'trial_period_days': trial_days}
 
-            # Create checkout session
-            session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
-                    'price': price.id,
-                    'quantity': quantity,
-                }],
-                mode='subscription' if is_subscription else 'payment',
-                success_url=os.getenv('STRIPE_SUCCESS_URL', 'https://getsincor.com/payment/success?session_id={CHECKOUT_SESSION_ID}'),
-                cancel_url=os.getenv('STRIPE_CANCEL_URL', 'https://getsincor.com/payment/cancel'),
-                customer_email=customer_email,
-            )
+            session = stripe.checkout.Session.create(**session_params)
 
-            logger.info(f"[STRIPE] Created checkout session: {session.id} for {product_name}")
+            logger.info(f"[STRIPE] Created checkout session: {session.id} for {product_name} ({interval})")
 
             return {
                 'success': True,
                 'session_id': session.id,
                 'checkout_url': session.url,
-                'product_id': product.id,
-                'price_id': price.id,
             }
 
         except Exception as e:
@@ -142,13 +141,18 @@ class StripeCheckout:
             )
 
             data = event['data']['object']
-
-            if event['type'] == 'checkout.session.completed':
-                return self._handle_session_completed(data)
-            elif event['type'] == 'payment_intent.succeeded':
-                return self._handle_payment_succeeded(data)
-            elif event['type'] == 'customer.subscription.updated':
-                return self._handle_subscription_updated(data)
+            handlers = {
+                'checkout.session.completed':       self._handle_session_completed,
+                'checkout.session.expired':         self._handle_session_expired,
+                'invoice.paid':                     self._handle_invoice_paid,
+                'invoice.payment_failed':           self._handle_invoice_payment_failed,
+                'customer.subscription.updated':    self._handle_subscription_updated,
+                'customer.subscription.deleted':    self._handle_subscription_deleted,
+                'payment_intent.succeeded':         self._handle_payment_succeeded,
+            }
+            handler = handlers.get(event['type'])
+            if handler:
+                return handler(data)
             else:
                 logger.info(f"[STRIPE] Unhandled event type: {event['type']}")
                 return True, {'event_type': event['type']}
@@ -160,37 +164,81 @@ class StripeCheckout:
     def _handle_session_completed(self, session: Dict) -> Tuple[bool, Dict]:
         """Handle completed checkout session"""
         logger.info(f"[STRIPE] Session completed: {session['id']}")
-
         return True, {
+            'event': 'payment_completed',
             'session_id': session['id'],
-            'customer_email': session.get('customer_email'),
+            'customer_email': session.get('customer_email') or session.get('customer_details', {}).get('email'),
+            'customer_id': session.get('customer'),
             'amount_total': session.get('amount_total'),
             'currency': session.get('currency'),
             'subscription_id': session.get('subscription'),
-            'event': 'payment_completed'
         }
 
-    def _handle_payment_succeeded(self, payment: Dict) -> Tuple[bool, Dict]:
-        """Handle successful payment intent"""
-        logger.info(f"[STRIPE] Payment succeeded: {payment['id']}")
-
+    def _handle_session_expired(self, session: Dict) -> Tuple[bool, Dict]:
+        """Checkout session expired — trigger abandoned checkout recovery email"""
+        logger.info(f"[STRIPE] Session expired (abandoned checkout): {session['id']}")
         return True, {
-            'payment_id': payment['id'],
-            'amount': payment.get('amount'),
-            'currency': payment.get('currency'),
-            'status': payment.get('status'),
-            'event': 'payment_succeeded'
+            'event': 'checkout_abandoned',
+            'session_id': session['id'],
+            'customer_email': session.get('customer_email') or session.get('customer_details', {}).get('email'),
+            'amount_total': session.get('amount_total'),
+        }
+
+    def _handle_invoice_paid(self, invoice: Dict) -> Tuple[bool, Dict]:
+        """Recurring invoice paid — subscription renewed"""
+        logger.info(f"[STRIPE] Invoice paid: {invoice['id']}")
+        return True, {
+            'event': 'invoice_paid',
+            'invoice_id': invoice['id'],
+            'subscription_id': invoice.get('subscription'),
+            'customer_id': invoice.get('customer'),
+            'customer_email': invoice.get('customer_email'),
+            'amount_paid': invoice.get('amount_paid'),
+        }
+
+    def _handle_invoice_payment_failed(self, invoice: Dict) -> Tuple[bool, Dict]:
+        """Recurring invoice payment failed — alert customer"""
+        logger.warning(f"[STRIPE] Invoice payment failed: {invoice['id']}")
+        return True, {
+            'event': 'invoice_payment_failed',
+            'invoice_id': invoice['id'],
+            'subscription_id': invoice.get('subscription'),
+            'customer_id': invoice.get('customer'),
+            'customer_email': invoice.get('customer_email'),
+            'amount_due': invoice.get('amount_due'),
+            'next_payment_attempt': invoice.get('next_payment_attempt'),
         }
 
     def _handle_subscription_updated(self, subscription: Dict) -> Tuple[bool, Dict]:
         """Handle subscription updates"""
         logger.info(f"[STRIPE] Subscription updated: {subscription['id']}")
-
         return True, {
+            'event': 'subscription_updated',
             'subscription_id': subscription['id'],
             'status': subscription.get('status'),
+            'customer_id': subscription.get('customer'),
             'current_period_end': subscription.get('current_period_end'),
-            'event': 'subscription_updated'
+            'cancel_at_period_end': subscription.get('cancel_at_period_end'),
+        }
+
+    def _handle_subscription_deleted(self, subscription: Dict) -> Tuple[bool, Dict]:
+        """Subscription fully cancelled"""
+        logger.info(f"[STRIPE] Subscription cancelled: {subscription['id']}")
+        return True, {
+            'event': 'subscription_cancelled',
+            'subscription_id': subscription['id'],
+            'customer_id': subscription.get('customer'),
+            'ended_at': subscription.get('ended_at'),
+        }
+
+    def _handle_payment_succeeded(self, payment: Dict) -> Tuple[bool, Dict]:
+        """Handle successful payment intent"""
+        logger.info(f"[STRIPE] Payment succeeded: {payment['id']}")
+        return True, {
+            'event': 'payment_succeeded',
+            'payment_id': payment['id'],
+            'amount': payment.get('amount'),
+            'currency': payment.get('currency'),
         }
 
     def cancel_subscription(self, subscription_id: str) -> Tuple[bool, str]:
@@ -225,6 +273,21 @@ class StripeCheckout:
         except Exception as e:
             logger.error(f"[STRIPE] Subscription retrieval failed: {str(e)}")
             return None
+
+    def create_portal_session(self, customer_id: str, return_url: str = None) -> Dict:
+        """Create a Stripe Customer Portal session for self-service billing management"""
+        if not self.enabled:
+            return {'success': False, 'error': 'Payment processor not available'}
+        try:
+            portal = stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=return_url or os.getenv('STRIPE_PORTAL_RETURN_URL', 'https://getsincor.com/'),
+            )
+            logger.info(f"[STRIPE] Portal session created for customer: {customer_id}")
+            return {'success': True, 'portal_url': portal.url}
+        except Exception as e:
+            logger.error(f"[STRIPE] Portal session creation failed: {str(e)}")
+            return {'success': False, 'error': str(e)}
 
 
 def get_stripe_checkout(api_key: Optional[str] = None) -> StripeCheckout:
