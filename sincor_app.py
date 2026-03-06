@@ -50,9 +50,9 @@ NOTIFY_PHONE=os.getenv("NOTIFY_PHONE","+15551234567")
 
 # API Keys
 GOOGLE_API_KEY=os.getenv("GOOGLE_API_KEY","") or os.getenv("GOOGLE_PLACES_API_KEY","")
-# Stripe configuration
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
-STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', os.getenv('STRIPE_PUBLIC_KEY', ''))
+# Stripe configuration — accepts both canonical names and the Railway var names (STRIPE_SECRET / STRIPE_ID)
+STRIPE_SECRET_KEY = (os.getenv('STRIPE_SECRET_KEY') or os.getenv('STRIPE_SECRET') or '')
+STRIPE_PUBLISHABLE_KEY = (os.getenv('STRIPE_PUBLISHABLE_KEY') or os.getenv('STRIPE_PUBLIC_KEY') or os.getenv('STRIPE_ID') or '')
 
 # Utility: sanitize and normalize phone numbers for display/storage
 def clean_phone(p):
