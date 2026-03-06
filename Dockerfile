@@ -5,9 +5,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
 
 # Install only essential dependencies
-# Cache bust: v2 (removed python-sendgrid)
+# Strip any erroneous python-sendgrid line (not a real PyPI package) before installing
+# Cache bust: v3
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN sed '/^python-sendgrid/d' requirements.txt > /tmp/req_clean.txt \
+    && pip install --upgrade pip \
+    && pip install -r /tmp/req_clean.txt
 
 # Copy application code
 COPY . .
