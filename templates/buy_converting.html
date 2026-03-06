@@ -416,6 +416,21 @@
                 <div class="inline-block urgency-badge bg-red-500 text-white px-6 py-3 rounded-full font-black text-lg mb-8">
                     ⏰ LIMITED: 30 DAYS FREE (First Month Only)
                 </div>
+
+                <!-- Billing toggle -->
+                <div class="flex items-center justify-center mb-8">
+                    <div class="inline-flex rounded-full bg-purple-800 p-1 items-center gap-1">
+                        <button id="btn-monthly" onclick="setBilling('month')"
+                            class="px-5 py-2 rounded-full font-bold text-sm transition bg-white text-purple-700">
+                            Monthly
+                        </button>
+                        <button id="btn-annual" onclick="setBilling('year')"
+                            class="px-5 py-2 rounded-full font-bold text-sm transition text-purple-200">
+                            Annual
+                        </button>
+                    </div>
+                    <span class="ml-3 bg-green-500 text-white text-xs font-black px-3 py-1 rounded-full">SAVE 2 MONTHS</span>
+                </div>
             </div>
 
             <!-- The three plan options (make middle most attractive) -->
@@ -425,8 +440,9 @@
                     <h3 class="text-2xl font-black text-white mb-2">Starter</h3>
                     <p class="text-purple-100 text-sm mb-6">Perfect if you're testing</p>
 
-                    <div class="text-5xl font-black text-white mb-2">$297</div>
-                    <p class="text-purple-200 mb-6">/ month (then cancel free anytime)</p>
+                    <div class="text-5xl font-black text-white mb-2" id="price-starter">$297</div>
+                    <p class="text-purple-200 mb-2" id="period-starter">/ month (then cancel free anytime)</p>
+                    <p id="savings-starter" class="text-green-300 text-sm font-bold mb-4" style="display:none;">💰 Save $594/yr vs monthly</p>
 
                     <ul class="space-y-3 text-white mb-8 text-sm">
                         <li>✓ 10 AI Agents</li>
@@ -449,8 +465,9 @@
                     <h3 class="text-2xl font-black text-purple-900 mb-2">Professional</h3>
                     <p class="text-purple-800 text-sm font-bold mb-6">For serious growth</p>
 
-                    <div class="text-5xl font-black text-purple-900 mb-2">$997</div>
-                    <p class="text-purple-800 font-bold mb-6">/ month (30 days FREE)</p>
+                    <div class="text-5xl font-black text-purple-900 mb-2" id="price-professional">$997</div>
+                    <p class="text-purple-800 font-bold mb-4" id="period-professional">/ month (30 days FREE)</p>
+                    <p id="savings-professional" class="text-green-700 text-sm font-bold mb-4" style="display:none;">💰 Save $1,994/yr vs monthly</p>
 
                     <div class="bg-white bg-opacity-30 px-4 py-2 rounded-lg mb-6 border-2 border-white">
                         <p class="text-sm font-black text-purple-900">
@@ -481,8 +498,9 @@
                     <h3 class="text-2xl font-black text-white mb-2">Enterprise</h3>
                     <p class="text-purple-100 text-sm mb-6">For serious players</p>
 
-                    <div class="text-5xl font-black text-white mb-2">$2,997</div>
-                    <p class="text-purple-200 mb-6">/ month</p>
+                    <div class="text-5xl font-black text-white mb-2" id="price-enterprise">$2,997</div>
+                    <p class="text-purple-200 mb-2" id="period-enterprise">/ month</p>
+                    <p id="savings-enterprise" class="text-green-300 text-sm font-bold mb-4" style="display:none;">💰 Save $5,994/yr vs monthly</p>
 
                     <ul class="space-y-3 text-white mb-8 text-sm">
                         <li>✓ All 42 AI Agents</li>
@@ -548,18 +566,102 @@
     </div>
 
     <script>
+        // ===== BILLING STATE =====
+        let currentBilling = 'month';
+
+        const PLANS = {
+            starter:      { name: 'SINCOR Starter',      monthly: 29700,  annual: 267300  },  // $297/mo | $2,673/yr (~save 2mo)
+            professional: { name: 'SINCOR Professional', monthly: 99700,  annual: 897300  },  // $997/mo | $8,973/yr
+            enterprise:   { name: 'SINCOR Enterprise',   monthly: 299700, annual: 2697300 },  // $2997/mo | $26,973/yr
+        };
+
+        function formatPrice(cents) {
+            const dollars = cents / 100;
+            return dollars >= 1000
+                ? '$' + (dollars / 1000).toFixed(1).replace('.0','') + 'k'
+                : '$' + Math.round(dollars).toLocaleString();
+        }
+
+        function setBilling(billing) {
+            currentBilling = billing;
+
+            // Toggle button styles
+            document.getElementById('btn-monthly').classList.toggle('bg-white', billing === 'month');
+            document.getElementById('btn-monthly').classList.toggle('text-purple-700', billing === 'month');
+            document.getElementById('btn-monthly').classList.toggle('text-purple-200', billing !== 'month');
+            document.getElementById('btn-annual').classList.toggle('bg-white', billing === 'year');
+            document.getElementById('btn-annual').classList.toggle('text-purple-700', billing === 'year');
+            document.getElementById('btn-annual').classList.toggle('text-purple-200', billing !== 'year');
+
+            // Update prices
+            Object.entries(PLANS).forEach(([planId, plan]) => {
+                const priceEl    = document.getElementById('price-' + planId);
+                const periodEl   = document.getElementById('period-' + planId);
+                const savingsEl  = document.getElementById('savings-' + planId);
+                if (!priceEl) return;
+
+                const trialSuffix = planId === 'professional' ? ' (30 days FREE)' : '';
+                if (billing === 'year') {
+                    const annualMonthly = Math.round(plan.annual / 12);
+                    priceEl.textContent  = '$' + annualMonthly.toLocaleString();
+                    periodEl.textContent = '/ mo (billed annually)';
+                    if (savingsEl) savingsEl.style.display = 'block';
+                } else {
+                    priceEl.textContent  = formatPrice(plan.monthly);
+                    periodEl.textContent = '/ month' + trialSuffix;
+                    if (savingsEl) savingsEl.style.display = 'none';
+                }
+            });
+        }
+
+        // ===== EMAIL CAPTURE MODAL =====
         function buyPlan(planId, planName, priceInCents) {
-            // Redirect to Stripe checkout
-            console.log(`Starting checkout for ${planName}`);
+            showEmailModal(planId, planName, priceInCents);
+        }
+
+        function showEmailModal(planId, planName, priceInCents) {
+            const modal = document.getElementById('email-modal');
+            modal.style.display = 'flex';
+            modal.dataset.planId      = planId;
+            modal.dataset.planName    = planName;
+            modal.dataset.priceCents  = priceInCents;
+        }
+
+        function closeModal() {
+            document.getElementById('email-modal').style.display = 'none';
+        }
+
+        function proceedToCheckout() {
+            const modal       = document.getElementById('email-modal');
+            const email       = document.getElementById('modal-email').value.trim();
+            const planId      = modal.dataset.planId;
+            const planName    = modal.dataset.planName;
+            const billing     = currentBilling;
+
+            // Calculate actual price for current billing period
+            const plan       = PLANS[planId];
+            const priceCents = billing === 'year' ? plan.annual : plan.monthly;
+
+            if (!email || !email.includes('@')) {
+                document.getElementById('modal-error').textContent = 'Please enter a valid email address.';
+                return;
+            }
+            document.getElementById('modal-error').textContent = '';
+
+            const btn = document.getElementById('modal-btn');
+            btn.textContent = 'Redirecting to secure checkout…';
+            btn.disabled = true;
 
             fetch('/api/stripe/checkout', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    plan_id: planId,
-                    plan_name: planName,
-                    price_cents: priceInCents,
-                    is_subscription: true
+                    plan_id:        planId,
+                    plan_name:      planName,
+                    price_cents:    priceCents,
+                    customer_email: email,
+                    billing:        billing,
+                    is_subscription: true,
                 })
             })
             .then(res => res.json())
@@ -567,15 +669,51 @@
                 if (data.success && data.checkout_url) {
                     window.location.href = data.checkout_url;
                 } else {
-                    alert('Error starting checkout. Please try again.');
+                    document.getElementById('modal-error').textContent = data.error || 'Checkout error. Please try again.';
+                    btn.textContent = 'Start Free Trial →';
+                    btn.disabled = false;
                 }
+            })
+            .catch(() => {
+                document.getElementById('modal-error').textContent = 'Network error. Please try again.';
+                btn.textContent = 'Start Free Trial →';
+                btn.disabled = false;
             });
         }
 
         function jumpToPlans() {
-            window.scrollTo({top: document.querySelector('.urgency-badge').offsetParent.offsetTop, behavior: 'smooth'});
+            document.querySelector('.urgency-badge').scrollIntoView({behavior: 'smooth', block: 'center'});
         }
+
+        // Close modal on backdrop click
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('email-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+            // Enter key in email field
+            document.getElementById('modal-email').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') proceedToCheckout();
+            });
+        });
     </script>
+
+    <!-- ===== EMAIL CAPTURE MODAL ===== -->
+    <div id="email-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+        <div style="background:white;border-radius:16px;padding:2rem;max-width:420px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.3);">
+            <h3 style="font-size:1.5rem;font-weight:900;color:#1f1f2e;margin-bottom:0.5rem;">Start your 30-day free trial</h3>
+            <p style="color:#6b7280;margin-bottom:1.5rem;font-size:0.95rem;">Enter your email to continue to secure checkout. No charge until your trial ends.</p>
+            <input id="modal-email" type="email" placeholder="your@email.com"
+                style="width:100%;padding:0.75rem 1rem;border:2px solid #e5e7eb;border-radius:8px;font-size:1rem;margin-bottom:0.75rem;box-sizing:border-box;outline:none;"
+                onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e5e7eb'">
+            <p id="modal-error" style="color:#ef4444;font-size:0.85rem;margin-bottom:0.75rem;min-height:1.2em;"></p>
+            <button id="modal-btn" onclick="proceedToCheckout()"
+                style="width:100%;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:white;font-weight:900;font-size:1.1rem;padding:0.875rem;border:none;border-radius:10px;cursor:pointer;margin-bottom:0.75rem;">
+                Start Free Trial →
+            </button>
+            <button onclick="closeModal()" style="width:100%;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:0.9rem;">Cancel</button>
+            <p style="text-align:center;color:#9ca3af;font-size:0.75rem;margin-top:0.75rem;">🔒 Secured by Stripe. Cancel anytime.</p>
+        </div>
+    </div>
 
 </body>
 </html>
