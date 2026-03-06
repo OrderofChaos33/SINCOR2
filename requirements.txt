@@ -31,7 +31,7 @@ gunicorn>=21.0.0              # Production WSGI server
 psutil>=5.9.0                 # System and process monitoring
 
 # PDF Generation (for training guide delivery)
-weasyprint>=60.0              # HTML/CSS to PDF conversion
+weasyprint>=68.0              # HTML/CSS to PDF conversion
 reportlab>=4.0.0              # PDF generation library
 
 # Email Delivery
@@ -43,3 +43,8 @@ stripe>=7.0.0                 # Stripe payment processor API
 
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
+cryptography>=46.0.5 # not directly required, pinned by Snyk to avoid a vulnerability
+dnspython>=2.6.1 # not directly required, pinned by Snyk to avoid a vulnerability
+fonttools>=4.61.0 # not directly required, pinned by Snyk to avoid a vulnerability
+pillow>=10.3.0 # not directly required, pinned by Snyk to avoid a vulnerability
+werkzeug>=3.1.6 # not directly required, pinned by Snyk to avoid a vulnerability
