@@ -36,7 +36,6 @@ reportlab>=4.0.0              # PDF generation library
 
 # Email Delivery
 sendgrid>=6.10.0              # SendGrid email API
-python-sendgrid>=6.10.0       # SendGrid Python library
 
 # Payment Processing
 stripe>=7.0.0                 # Stripe payment processor API
