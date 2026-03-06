@@ -37,10 +37,12 @@ class StripeCheckout:
     def create_checkout_session(self, product_name: str, price_cents: int,
                                 quantity: int = 1, customer_email: str = None,
                                 is_subscription: bool = True,
-                                interval: str = 'month') -> Dict:
+                                interval: str = 'month',
+                                price_id: str = None) -> Dict:
         """
-        Create a Stripe checkout session using inline price_data.
-        Uses recurring billing for subscriptions — no phantom Product/Price objects.
+        Create a Stripe checkout session.
+        If price_id is provided, uses the real Stripe Price object (preferred).
+        Falls back to inline price_data if no price_id given.
 
         Args:
             product_name: Name of the product (e.g., "SINCOR Starter")
@@ -49,6 +51,7 @@ class StripeCheckout:
             customer_email: Customer email for receipt and abandoned-checkout recovery
             is_subscription: Whether this is a recurring subscription (default True)
             interval: Billing interval ('month' or 'year')
+            price_id: Real Stripe Price ID (e.g., price_1T84ngDuhR2MxqDMrEdObjnD)
 
         Returns:
             Dict with session_id and checkout_url
@@ -58,17 +61,21 @@ class StripeCheckout:
             return {'success': False, 'error': 'Payment processor not available'}
 
         try:
-            price_data_obj: Dict = {
-                'currency': 'usd',
-                'unit_amount': price_cents,
-                'product_data': {'name': product_name},
-            }
-            if is_subscription:
-                price_data_obj['recurring'] = {'interval': interval}
+            if price_id:
+                line_item = {'price': price_id, 'quantity': quantity}
+            else:
+                price_data_obj: Dict = {
+                    'currency': 'usd',
+                    'unit_amount': price_cents,
+                    'product_data': {'name': product_name},
+                }
+                if is_subscription:
+                    price_data_obj['recurring'] = {'interval': interval}
+                line_item = {'price_data': price_data_obj, 'quantity': quantity}
 
             session_params: Dict = {
                 'payment_method_types': ['card'],
-                'line_items': [{'price_data': price_data_obj, 'quantity': quantity}],
+                'line_items': [line_item],
                 'mode': 'subscription' if is_subscription else 'payment',
                 'success_url': os.getenv(
                     'STRIPE_SUCCESS_URL',
