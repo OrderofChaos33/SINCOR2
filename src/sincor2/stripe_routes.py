@@ -15,6 +15,13 @@ logger = logging.getLogger('sincor.stripe_routes')
 
 stripe_bp = Blueprint('stripe', __name__, url_prefix='/api/stripe')
 
+# Real Stripe Price IDs (live mode)
+PRICE_IDS = {
+    'starter':      'price_1T84ngDuhR2MxqDMrEdObjnD',
+    'professional': 'price_1T84oyDuhR2MxqDMPmMKJkfQ',
+    'enterprise':   'price_1T84qHDuhR2MxqDMG1LNnMbm',
+}
+
 # ----- Abandoned checkout SQLite helpers -----
 
 def _get_abandoned_db():
@@ -86,12 +93,15 @@ def init_stripe_routes(app, stripe_processor):
             if not all([plan_id, plan_name, price_cents]):
                 return jsonify({'success': False, 'error': 'Missing required fields'}), 400
 
+            price_id = PRICE_IDS.get(plan_id)
+
             result = stripe_processor.create_checkout_session(
                 product_name=plan_name,
                 price_cents=price_cents,
                 is_subscription=is_subscription,
                 interval=billing,
                 customer_email=customer_email or None,
+                price_id=price_id,
             )
 
             if result.get('success'):
