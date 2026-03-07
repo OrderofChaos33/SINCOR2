@@ -1,549 +1,1760 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SINCOR - AI-Powered Business Intelligence</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon.svg">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        * { font-family: 'Inter', sans-serif; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR — AI Business Intelligence & SINC Token</title>
+  <meta name="description" content="42 AI agents. Autonomous revenue generation. SINC token powering the next era of decentralized business intelligence.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508;
+      --surface: #0d0d15;
+      --surface2: #12121f;
+      --border: rgba(255,255,255,0.08);
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --blue: #2563eb;
+      --cyan: #06b6d4;
+      --gold: #f59e0b;
+      --green: #10b981;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --mono: 'JetBrains Mono', monospace;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
 
-        .hero-bg {
-            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 25%, #2d1b69 50%, #11998e 75%, #0c0c0c 100%);
-            background-size: 400% 400%;
-            animation: gradientShift 20s ease infinite;
-        }
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 100%; }
-            100% { background-position: 0% 50%; }
-        }
+    /* ── SCROLLING TICKER ── */
+    .ticker-wrap {
+      background: #0a0a12;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+      padding: 8px 0;
+      position: relative;
+      z-index: 100;
+    }
+    .ticker-track {
+      display: flex;
+      gap: 60px;
+      animation: tickerScroll 40s linear infinite;
+      width: max-content;
+    }
+    .ticker-wrap:hover .ticker-track { animation-play-state: paused; }
+    @keyframes tickerScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .tick-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .tick-item .label { color: var(--purple-light); font-weight: 700; }
+    .tick-item .val { color: var(--text); }
+    .tick-up { color: var(--green); }
+    .tick-down { color: var(--red); }
+    .tick-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--purple);
+      opacity: 0.6;
+    }
 
-        .particle {
-            position: absolute;
-            width: 4px; height: 4px;
-            background: rgba(255,255,255,0.6);
-            border-radius: 50%;
-            animation: float linear infinite;
-        }
-        .particle:nth-child(1) { left:10%; animation-duration:8s; }
-        .particle:nth-child(2) { left:25%; animation-duration:12s; animation-delay:2s; }
-        .particle:nth-child(3) { left:40%; animation-duration:10s; animation-delay:4s; }
-        .particle:nth-child(4) { left:55%; animation-duration:14s; animation-delay:1s; }
-        .particle:nth-child(5) { left:70%; animation-duration:9s; animation-delay:3s; }
-        .particle:nth-child(6) { left:85%; animation-duration:11s; animation-delay:5s; }
-        @keyframes float {
-            0% { transform: translateY(100vh) scale(0); opacity:0; }
-            10% { opacity:1; }
-            90% { opacity:1; }
-            100% { transform: translateY(-10vh) scale(1); opacity:0; }
-        }
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      background: rgba(5,5,8,0.85);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+    }
+    .nav-logo span { color: var(--purple-light); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-links .sinc-badge {
+      background: linear-gradient(135deg, var(--gold), #fbbf24);
+      color: #000;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .nav-cta {
+      background: var(--purple);
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-cta:hover { background: #6d28d9; transform: translateY(-1px); }
 
-        .glass {
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+    /* ── HERO ── */
+    .hero {
+      min-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,58,237,0.25) 0%, transparent 70%),
+                  radial-gradient(ellipse 60% 40% at 80% 80%, rgba(6,182,212,0.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(124,58,237,0.15);
+      border: 1px solid rgba(124,58,237,0.35);
+      color: var(--purple-light);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+      position: relative;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    .hero h1 {
+      font-size: clamp(40px, 7vw, 86px);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      margin-bottom: 28px;
+      color: #fff;
+      position: relative;
+    }
+    .hero h1 .grad {
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--muted);
+      max-width: 640px;
+      margin: 0 auto 44px;
+      position: relative;
+    }
+    .hero-btns {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: relative;
+      margin-bottom: 64px;
+    }
+    .btn-primary {
+      background: var(--purple);
+      color: #fff;
+      padding: 16px 36px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+    .btn-primary:hover { background: #6d28d9; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(124,58,237,0.4); }
+    .btn-gold {
+      background: linear-gradient(135deg, var(--gold), #fbbf24);
+      color: #000;
+      padding: 16px 36px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+    .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(245,158,11,0.4); }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      padding: 16px 36px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+    .btn-outline:hover { border-color: var(--purple); color: var(--purple-light); }
 
-        .gradient-text {
-            background: linear-gradient(135deg, #667eea, #764ba2, #f093fb, #4facfe);
-            background-size: 300% 300%;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: gradientShift 6s ease infinite;
-        }
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      max-width: 900px;
+      width: 100%;
+      position: relative;
+    }
+    .hero-stat-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .hero-stat-val {
+      font-family: var(--mono);
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      display: block;
+    }
+    .hero-stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
 
-        .glow-hover:hover {
-            box-shadow: 0 0 40px rgba(102,126,234,0.4), 0 0 80px rgba(118,75,162,0.2);
-            transform: translateY(-4px);
-            transition: all 0.4s ease;
-        }
+    /* ── NETWORK STATUS BAR ── */
+    .network-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-evenly;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .net-metric {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .net-metric .nm-label { color: var(--muted); }
+    .net-metric .nm-val { color: var(--text); font-weight: 700; }
+    .nm-status {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
 
-        .card-3d {
-            transition: all 0.4s ease;
-        }
-        .card-3d:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
+    /* ── SECTIONS ── */
+    section { padding: 100px 24px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .section-eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--purple-light);
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: clamp(28px, 4vw, 52px);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .section-sub {
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 600px;
+      margin-bottom: 56px;
+    }
 
-        .pulse-ring {
-            animation: pulseRing 2s ease-out infinite;
-        }
-        @keyframes pulseRing {
-            0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
-            100% { box-shadow: 0 0 0 15px rgba(16,185,129,0); }
-        }
+    /* ── PLATFORM / OVERVIEW ── */
+    .platform-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: start;
+    }
+    .step-list { list-style: none; }
+    .step-item {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 36px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .step-body h3 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .step-body p { font-size: 14px; color: var(--muted); line-height: 1.6; }
 
-        .counter { font-variant-numeric: tabular-nums; }
-    </style>
+    .perf-bars { margin-top: 16px; }
+    .perf-bar { margin-bottom: 20px; }
+    .perf-bar-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .perf-bar-header span:first-child { font-size: 13px; font-weight: 600; color: var(--text); }
+    .perf-bar-header span:last-child { font-family: var(--mono); font-size: 13px; color: var(--purple-light); }
+    .bar-track {
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--purple), var(--cyan));
+      width: 0;
+      transition: width 1.4s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .console-box {
+      background: #060609;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .console-header {
+      background: #0d0d15;
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .dot-red { width:12px;height:12px;border-radius:50%;background:#ef4444; }
+    .dot-yellow { width:12px;height:12px;border-radius:50%;background:#f59e0b; }
+    .dot-green { width:12px;height:12px;border-radius:50%;background:#10b981; }
+    .console-title { font-family: var(--mono); font-size:12px; color: var(--muted); margin-left:8px; }
+    .console-body { padding: 20px; font-family: var(--mono); font-size: 12px; line-height: 1.9; }
+    .cl { display:block; }
+    .cl-time { color: var(--muted); }
+    .cl-green { color: var(--green); }
+    .cl-cyan { color: var(--cyan); }
+    .cl-yellow { color: var(--gold); }
+    .cl-purple { color: var(--purple-light); }
+    .cursor { display:inline-block; width:8px;height:14px;background:var(--cyan);animation:blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ── AGENTS GRID ── */
+    .agents-section { background: var(--surface); }
+    .agent-cats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .agent-cat-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .agent-cat-card:hover { border-color: var(--purple); transform: translateY(-4px); }
+    .cat-icon { font-size: 28px; margin-bottom: 14px; }
+    .cat-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .cat-count {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--purple-light);
+      margin-bottom: 16px;
+    }
+    .agent-list { list-style: none; }
+    .agent-list li {
+      font-size: 13px;
+      color: var(--muted);
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .agent-list li::before {
+      content: '›';
+      color: var(--purple-light);
+      font-weight: 700;
+    }
+    .agent-list li:last-child { border-bottom: none; }
+
+    /* ── SINC TOKEN ── */
+    .sinc-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 56px;
+      align-items: start;
+    }
+    .sinc-chart-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+    }
+    .sinc-chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .sinc-price {
+      font-family: var(--mono);
+      font-size: 36px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .sinc-change {
+      font-family: var(--mono);
+      font-size: 14px;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    .sinc-change.up { background: rgba(16,185,129,0.15); color: var(--green); }
+    .sparkline { width: 100%; overflow: visible; }
+    .sinc-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .sinc-stat {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .sinc-stat .ss-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .sinc-stat .ss-val { font-family: var(--mono); font-size: 18px; font-weight: 700; color: #fff; margin-top: 4px; }
+
+    .token-info h3 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 16px; }
+    .token-info p { font-size: 15px; color: var(--muted); margin-bottom: 28px; line-height: 1.7; }
+
+    .tokenomics { margin-bottom: 32px; }
+    .tokenomics h4 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+    .tnom-item { margin-bottom: 12px; }
+    .tnom-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .tnom-header span { font-size: 13px; color: var(--muted); }
+    .tnom-header strong { font-family: var(--mono); font-size: 13px; color: var(--text); }
+    .tnom-bar { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+    .tnom-fill { height: 100%; border-radius: 3px; }
+
+    .utility-list { list-style: none; }
+    .utility-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .utility-list li:last-child { border-bottom: none; }
+    .utility-list li .uicon { font-size: 18px; }
+
+    /* ── DEX ── */
+    .dex-section { background: var(--surface); }
+    .dex-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .dex-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .dex-card:hover { border-color: var(--gold); transform: translateY(-4px); }
+    .dex-logo { font-size: 40px; margin-bottom: 16px; }
+    .dex-name { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .dex-pair { font-family: var(--mono); font-size: 12px; color: var(--purple-light); margin-bottom: 16px; }
+    .dex-stats { display: flex; justify-content: space-around; margin-bottom: 24px; }
+    .dex-stat span { display: block; }
+    .dex-stat .ds-val { font-family: var(--mono); font-size: 16px; font-weight: 700; color: #fff; }
+    .dex-stat .ds-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .btn-dex {
+      display: block;
+      background: linear-gradient(135deg, var(--gold), #fbbf24);
+      color: #000;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-dex:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(245,158,11,0.35); }
+
+    .contract-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .contract-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .contract-addr {
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--cyan);
+      word-break: break-all;
+    }
+    .copy-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.1); }
+
+    /* ── PRICING ── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+    .plan-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 32px;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .plan-card.featured {
+      border-color: var(--purple);
+      background: linear-gradient(145deg, rgba(124,58,237,0.1), var(--surface2));
+    }
+    .plan-card:hover { transform: translateY(-4px); }
+    .plan-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--purple);
+      color: #fff;
+      padding: 5px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .plan-name { font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+    .plan-price { font-family: var(--mono); font-size: 52px; font-weight: 700; color: #fff; line-height: 1; margin-bottom: 6px; }
+    .plan-price sup { font-size: 24px; vertical-align: super; }
+    .plan-cadence { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+    .plan-desc { font-size: 14px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+    .plan-features { list-style: none; margin-bottom: 36px; }
+    .plan-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 14px;
+      color: var(--text);
+    }
+    .plan-features li:last-child { border-bottom: none; }
+    .plan-features li .chk { color: var(--green); font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .btn-plan {
+      display: block;
+      text-align: center;
+      padding: 15px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-plan-primary {
+      background: var(--purple);
+      color: #fff;
+    }
+    .btn-plan-primary:hover { background: #6d28d9; transform: translateY(-1px); }
+    .btn-plan-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-plan-outline:hover { border-color: var(--purple); color: var(--purple-light); }
+
+    /* ── ROADMAP ── */
+    .roadmap-section { background: var(--surface); }
+    .roadmap-timeline {
+      position: relative;
+      padding-left: 40px;
+    }
+    .roadmap-timeline::before {
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(180deg, var(--purple) 0%, var(--cyan) 100%);
+    }
+    .rm-item {
+      position: relative;
+      margin-bottom: 48px;
+    }
+    .rm-dot {
+      position: absolute;
+      left: -34px;
+      top: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--purple);
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .rm-dot.done { background: var(--purple); }
+    .rm-dot.active { background: var(--surface2); border-color: var(--cyan); animation: pulse 2s infinite; }
+    .rm-dot::after {
+      content: '';
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #fff;
+      opacity: 0;
+    }
+    .rm-dot.done::after { opacity: 1; }
+    .rm-q { font-family: var(--mono); font-size: 12px; color: var(--cyan); font-weight: 700; margin-bottom: 8px; }
+    .rm-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .rm-items-list { list-style: none; }
+    .rm-items-list li { font-size: 14px; color: var(--muted); padding: 4px 0; display: flex; gap: 8px; align-items: center; }
+    .rm-items-list li::before { content: '→'; color: var(--purple-light); }
+    .rm-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+    .rm-tag.done { background: rgba(16,185,129,0.15); color: var(--green); }
+    .rm-tag.active { background: rgba(6,182,212,0.15); color: var(--cyan); }
+    .rm-tag.upcoming { background: rgba(124,58,237,0.15); color: var(--purple-light); }
+
+    /* ── TESTIMONIALS ── */
+    .testi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .testi-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: border-color 0.2s;
+    }
+    .testi-card:hover { border-color: var(--purple); }
+    .testi-stars { color: var(--gold); font-size: 16px; margin-bottom: 16px; letter-spacing: 2px; }
+    .testi-text { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 20px; font-style: italic; }
+    .testi-author { display: flex; align-items: center; gap: 12px; }
+    .testi-avatar {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+    }
+    .testi-name { font-size: 14px; font-weight: 700; color: #fff; }
+    .testi-role { font-size: 12px; color: var(--muted); }
+
+    /* ── FAQ ── */
+    .faq-section { background: var(--surface); }
+    .faq-list { max-width: 800px; margin: 0 auto; }
+    .faq-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      background: var(--surface2);
+    }
+    .faq-q {
+      padding: 20px 24px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .faq-q:hover { color: #fff; }
+    .faq-icon {
+      width: 24px; height: 24px;
+      background: rgba(124,58,237,0.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: var(--purple-light);
+      flex-shrink: 0;
+      transition: transform 0.3s;
+    }
+    .faq-item.open .faq-icon { transform: rotate(45deg); }
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease;
+      padding: 0 24px;
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .faq-item.open .faq-a {
+      max-height: 300px;
+      padding-bottom: 20px;
+    }
+
+    /* ── FINAL CTA ── */
+    .final-cta {
+      text-align: center;
+      padding: 120px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .final-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 100%, rgba(124,58,237,0.2) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .final-cta h2 {
+      font-size: clamp(32px, 5vw, 60px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .final-cta p { font-size: 18px; color: var(--muted); max-width: 520px; margin: 0 auto 44px; }
+    .final-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #040406;
+      border-top: 1px solid var(--border);
+      padding: 64px 32px 32px;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      gap: 48px;
+      max-width: 1200px;
+      margin: 0 auto 48px;
+    }
+    .footer-brand .fb-logo {
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+    .footer-brand .fb-logo span { color: var(--purple-light); }
+    .footer-brand p { font-size: 14px; color: var(--muted); line-height: 1.65; max-width: 280px; }
+    .footer-col h4 { font-size: 13px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+    .footer-col ul { list-style: none; }
+    .footer-col ul li { margin-bottom: 10px; }
+    .footer-col ul li a { font-size: 14px; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+    .footer-col ul li a:hover { color: var(--text); }
+    .footer-bottom {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .footer-bottom p { font-size: 13px; color: var(--muted); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1024px) {
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+      .platform-grid { grid-template-columns: 1fr; }
+      .sinc-grid { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 768px) {
+      nav { padding: 12px 16px; }
+      .nav-links { display: none; }
+      .agent-cats { grid-template-columns: 1fr 1fr; }
+      .dex-grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .testi-grid { grid-template-columns: 1fr; }
+      .network-bar { padding: 10px 16px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+    }
+    @media (max-width: 480px) {
+      .agent-cats { grid-template-columns: 1fr; }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
 </head>
-<body class="bg-gray-950 text-white">
+<body>
 
-    <!-- Navigation -->
-    <nav class="fixed top-0 left-0 right-0 z-50 glass">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-500 rounded-xl flex items-center justify-center font-black text-lg">S</div>
-                <span class="text-xl font-bold">SINCOR</span>
+<!-- ══════════════════════════════════════
+     SCROLLING TICKER
+════════════════════════════════════════ -->
+<div class="ticker-wrap" aria-label="Live market data">
+  <div class="ticker-track" id="tickerTrack">
+    <!-- Populated twice for seamless loop -->
+    <div class="tick-item"><span class="label">SINC/USD</span><span class="val" id="sincPrice">$0.0847</span><span class="tick-up" id="sincChange">▲ 12.4%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">SINC/BTC</span><span class="val">0.00000187 BTC</span><span class="tick-up">▲ 9.1%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Market Cap</span><span class="val">$84.7M</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">24H Vol</span><span class="val">$12.3M</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Circulating</span><span class="val">1B SINC</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Agents Active</span><span class="val" id="agentsCount">42</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Rev Generated</span><span class="val">$4.2M</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">BTC</span><span class="val">$84,320</span><span class="tick-up">▲ 2.1%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">ETH</span><span class="val">$3,847</span><span class="tick-down">▼ 0.8%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Uniswap Rank</span><span class="val">#1,247</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Staking APY</span><span class="val">28.4%</span></div>
+    <div class="tick-dot"></div>
+    <!-- Duplicate for seamless loop -->
+    <div class="tick-item"><span class="label">SINC/USD</span><span class="val">$0.0847</span><span class="tick-up">▲ 12.4%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">SINC/BTC</span><span class="val">0.00000187 BTC</span><span class="tick-up">▲ 9.1%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Market Cap</span><span class="val">$84.7M</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">24H Vol</span><span class="val">$12.3M</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Circulating</span><span class="val">1B SINC</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Agents Active</span><span class="val">42</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Rev Generated</span><span class="val">$4.2M</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">BTC</span><span class="val">$84,320</span><span class="tick-up">▲ 2.1%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">ETH</span><span class="val">$3,847</span><span class="tick-down">▼ 0.8%</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Uniswap Rank</span><span class="val">#1,247</span></div>
+    <div class="tick-dot"></div>
+    <div class="tick-item"><span class="label">Staking APY</span><span class="val">28.4%</span></div>
+    <div class="tick-dot"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     NAVIGATION
+════════════════════════════════════════ -->
+<nav>
+  <a href="/" class="nav-logo">SINC<span>OR</span></a>
+  <ul class="nav-links">
+    <li><a href="#platform">Platform</a></li>
+    <li><a href="#agents">AI Agents</a></li>
+    <li><a href="#token">SINC Token</a></li>
+    <li><a href="#dex">Buy SINC</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#sinc-badge" class="sinc-badge">🪙 SINC $0.0847</a></li>
+  </ul>
+  <a href="/buy" class="nav-cta">Get Started →</a>
+</nav>
+
+<!-- ══════════════════════════════════════
+     HERO
+════════════════════════════════════════ -->
+<section class="hero" id="home">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-eyebrow">
+    <span class="live-dot"></span>
+    42 AI Agents Live — Network Uptime 99.97%
+  </div>
+  <h1>
+    The AI Operating System<br>
+    for <span class="grad">Revenue-First</span> Businesses
+  </h1>
+  <p class="hero-sub">
+    Deploy 42 autonomous AI agents that research, write, outreach, and convert — 24/7, without a team. Powered by the SINC token on-chain economy.
+  </p>
+  <div class="hero-btns">
+    <a href="/buy" class="btn-primary">🚀 Start Automating</a>
+    <a href="#dex" class="btn-gold">🪙 Buy SINC Token</a>
+    <a href="#platform" class="btn-outline">Read Whitepaper ↗</a>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat-card">
+      <span class="hero-stat-val">$84.7M</span>
+      <div class="hero-stat-label">SINC Market Cap</div>
+    </div>
+    <div class="hero-stat-card">
+      <span class="hero-stat-val">42</span>
+      <div class="hero-stat-label">Autonomous AI Agents</div>
+    </div>
+    <div class="hero-stat-card">
+      <span class="hero-stat-val">500+</span>
+      <div class="hero-stat-label">Businesses Deployed</div>
+    </div>
+    <div class="hero-stat-card">
+      <span class="hero-stat-val">28.4%</span>
+      <div class="hero-stat-label">Staking APY</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     NETWORK STATUS
+════════════════════════════════════════ -->
+<div class="network-bar">
+  <div class="net-metric"><span class="nm-status"></span><span class="nm-label">Network</span><span class="nm-val">99.97% Uptime</span></div>
+  <div class="net-metric"><span class="nm-label">Packs Built Today</span><span class="nm-val" id="packsCount">1,247</span></div>
+  <div class="net-metric"><span class="nm-label">Emails Sent</span><span class="nm-val">84,312</span></div>
+  <div class="net-metric"><span class="nm-label">Leads Generated</span><span class="nm-val">12,847</span></div>
+  <div class="net-metric"><span class="nm-label">Avg Conversion</span><span class="nm-val">34.7%</span></div>
+  <div class="net-metric"><span class="nm-label">Active Stakers</span><span class="nm-val">8,423</span></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     PLATFORM OVERVIEW
+════════════════════════════════════════ -->
+<section id="platform">
+  <div class="container">
+    <div class="section-eyebrow">How It Works</div>
+    <div class="section-title">From Setup to Revenue<br>in 48 Hours</div>
+    <p class="section-sub">No dev team. No agency. Just deploy your agents and watch the pipeline fill.</p>
+    <div class="platform-grid">
+      <div>
+        <ol class="step-list">
+          <li class="step-item">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h3>Connect Your Business</h3>
+              <p>Import your CRM, product catalog, and target ICP. SINCOR maps your offer to the right agent stack in minutes.</p>
             </div>
-            <div class="hidden md:flex items-center gap-8">
-                <a href="#features" class="text-gray-300 hover:text-white transition text-sm font-medium">Features</a>
-                <a href="#products" class="text-gray-300 hover:text-white transition text-sm font-medium">Products</a>
-                <a href="/whitepaper" class="text-gray-300 hover:text-white transition text-sm font-medium">Whitepaper</a>
-                <a href="/sin-airdrop" class="text-gray-300 hover:text-white transition text-sm font-medium">SIN Airdrop</a>
-                <a href="/buy" class="bg-gradient-to-r from-purple-600 to-blue-500 px-6 py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition">Get Started</a>
+          </li>
+          <li class="step-item">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h3>Deploy Your Agent Squad</h3>
+              <p>42 specialized AI agents go live — researching prospects, crafting content, sending outreach, and booking meetings autonomously.</p>
             </div>
-            <button id="mobile-menu-btn" class="md:hidden text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-            </button>
+          </li>
+          <li class="step-item">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h3>Watch Revenue Flow</h3>
+              <p>Real-time dashboards show pipeline value, conversion rates, and ROI. Most clients see first results within 72 hours.</p>
+            </div>
+          </li>
+          <li class="step-item">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <h3>Stake SINC, Earn More</h3>
+              <p>Hold SINC tokens to unlock premium agents, reduced fees, and a share of platform revenue at 28.4% APY.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="perf-bars">
+          <div class="perf-bar">
+            <div class="perf-bar-header"><span>Lead Qualification Accuracy</span><span>94%</span></div>
+            <div class="bar-track"><div class="bar-fill" data-width="94"></div></div>
+          </div>
+          <div class="perf-bar">
+            <div class="perf-bar-header"><span>Email Open Rate (vs 21% avg)</span><span>67%</span></div>
+            <div class="bar-track"><div class="bar-fill" data-width="67"></div></div>
+          </div>
+          <div class="perf-bar">
+            <div class="perf-bar-header"><span>Pipeline Conversion Rate</span><span>34.7%</span></div>
+            <div class="bar-track"><div class="bar-fill" data-width="34.7"></div></div>
+          </div>
+          <div class="perf-bar">
+            <div class="perf-bar-header"><span>Avg Client Revenue Lift</span><span>312%</span></div>
+            <div class="bar-track"><div class="bar-fill" data-width="100"></div></div>
+          </div>
         </div>
-        <div id="mobile-menu" class="hidden md:hidden px-6 pb-4 space-y-3">
-            <a href="#features" class="block text-gray-300 hover:text-white text-sm">Features</a>
-            <a href="#products" class="block text-gray-300 hover:text-white text-sm">Products</a>
-            <a href="/whitepaper" class="block text-gray-300 hover:text-white text-sm">Whitepaper</a>
-            <a href="/sin-airdrop" class="block text-gray-300 hover:text-white text-sm">SIN Airdrop</a>
-            <a href="/buy" class="block bg-gradient-to-r from-purple-600 to-blue-500 px-6 py-2.5 rounded-xl font-bold text-sm text-center">Get Started</a>
+      </div>
+
+      <div>
+        <div class="console-box">
+          <div class="console-header">
+            <div class="dot-red"></div>
+            <div class="dot-yellow"></div>
+            <div class="dot-green"></div>
+            <span class="console-title">sincor-agent-network — live</span>
+          </div>
+          <div class="console-body">
+            <span class="cl"><span class="cl-time">[08:42:01]</span> <span class="cl-green">✓</span> ResearchAgent: Enriched 47 leads</span>
+            <span class="cl"><span class="cl-time">[08:42:04]</span> <span class="cl-cyan">→</span> OutreachAgent: Sent 12 personalized emails</span>
+            <span class="cl"><span class="cl-time">[08:42:09]</span> <span class="cl-yellow">★</span> ContentAgent: Published LinkedIn post (2.3K reach)</span>
+            <span class="cl"><span class="cl-time">[08:42:15]</span> <span class="cl-green">✓</span> SalesAgent: Booked meeting — Acme Corp</span>
+            <span class="cl"><span class="cl-time">[08:42:21]</span> <span class="cl-cyan">→</span> AnalyticsAgent: Pipeline updated +$47K</span>
+            <span class="cl"><span class="cl-time">[08:42:28]</span> <span class="cl-purple">◆</span> SINC reward: 142 tokens distributed</span>
+            <span class="cl"><span class="cl-time">[08:42:33]</span> <span class="cl-green">✓</span> RetentionAgent: NPS survey sent to 8 accounts</span>
+            <span class="cl"><span class="cl-time">[08:42:39]</span> <span class="cl-cyan">→</span> ResearchAgent: 23 new ICP matches found</span>
+            <span class="cl"><span class="cl-time">[08:42:44]</span> <span class="cl-yellow">★</span> ContentAgent: Blog post → 4.7K views</span>
+            <span class="cl"><span class="cl-time">[08:42:49]</span> <span class="cl-green">✓</span> All agents nominal — 42/42 active <span class="cursor"></span></span>
+          </div>
         </div>
-    </nav>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <!-- Hero Section -->
-    <section class="hero-bg min-h-screen relative overflow-hidden flex items-center pt-20">
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
+<!-- ══════════════════════════════════════
+     42 AI AGENTS
+════════════════════════════════════════ -->
+<section class="agents-section" id="agents">
+  <div class="container">
+    <div class="section-eyebrow">The Agent Network</div>
+    <div class="section-title">42 AI Agents.<br>One Mission: Your Revenue.</div>
+    <p class="section-sub">Every agent is purpose-built for a specific revenue function. They work together as one autonomous system.</p>
+    <div class="agent-cats">
+      <div class="agent-cat-card">
+        <div class="cat-icon">🔍</div>
+        <div class="cat-name">Research Agents</div>
+        <div class="cat-count">8 Agents</div>
+        <ul class="agent-list">
+          <li>ICP Profile Builder</li>
+          <li>Competitor Intelligence</li>
+          <li>Market Trend Scanner</li>
+          <li>Lead Enrichment Engine</li>
+          <li>Industry News Monitor</li>
+          <li>LinkedIn Signal Tracker</li>
+          <li>Pricing Benchmark Agent</li>
+          <li>Buyer Intent Detector</li>
+        </ul>
+      </div>
+      <div class="agent-cat-card">
+        <div class="cat-icon">✍️</div>
+        <div class="cat-name">Content Agents</div>
+        <div class="cat-count">7 Agents</div>
+        <ul class="agent-list">
+          <li>Blog & SEO Writer</li>
+          <li>LinkedIn Post Composer</li>
+          <li>Email Newsletter Builder</li>
+          <li>Case Study Generator</li>
+          <li>Ad Copy Optimizer</li>
+          <li>Video Script Writer</li>
+          <li>Proposal Generator</li>
+        </ul>
+      </div>
+      <div class="agent-cat-card">
+        <div class="cat-icon">📧</div>
+        <div class="cat-name">Outreach Agents</div>
+        <div class="cat-count">9 Agents</div>
+        <ul class="agent-list">
+          <li>Cold Email Sequencer</li>
+          <li>LinkedIn Auto-Connect</li>
+          <li>Follow-Up Orchestrator</li>
+          <li>Objection Handler</li>
+          <li>Meeting Booker</li>
+          <li>Re-engagement Drip</li>
+          <li>Partnership Outreacher</li>
+          <li>Referral Request Agent</li>
+          <li>Multi-Channel Coordinator</li>
+        </ul>
+      </div>
+      <div class="agent-cat-card">
+        <div class="cat-icon">💰</div>
+        <div class="cat-name">Sales Agents</div>
+        <div class="cat-count">6 Agents</div>
+        <ul class="agent-list">
+          <li>Deal Scoring Agent</li>
+          <li>CRM Auto-Updater</li>
+          <li>Upsell Identifier</li>
+          <li>Churn Risk Predictor</li>
+          <li>Contract Drafter</li>
+          <li>Win/Loss Analyzer</li>
+        </ul>
+      </div>
+      <div class="agent-cat-card">
+        <div class="cat-icon">📊</div>
+        <div class="cat-name">Analytics Agents</div>
+        <div class="cat-count">7 Agents</div>
+        <ul class="agent-list">
+          <li>Revenue Dashboard</li>
+          <li>Funnel Leak Detector</li>
+          <li>Campaign ROI Tracker</li>
+          <li>Cohort Analysis Agent</li>
+          <li>A/B Test Optimizer</li>
+          <li>Forecast Engine</li>
+          <li>Attribution Modeler</li>
+        </ul>
+      </div>
+      <div class="agent-cat-card">
+        <div class="cat-icon">🔄</div>
+        <div class="cat-name">Retention Agents</div>
+        <div class="cat-count">5 Agents</div>
+        <ul class="agent-list">
+          <li>NPS & Feedback Collector</li>
+          <li>Success Story Miner</li>
+          <li>Health Score Monitor</li>
+          <li>Renewal Nudge Agent</li>
+          <li>Loyalty Reward Trigger</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
 
-        <div class="max-w-7xl mx-auto px-6 py-20 relative z-10 w-full">
-            <div class="max-w-4xl mx-auto text-center">
-                <div class="inline-flex items-center glass rounded-full px-6 py-3 mb-10">
-                    <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full mr-3 pulse-ring"></div>
-                    <span class="text-sm font-mono text-gray-300 tracking-wider">SINCOR AI &bull; LIVE &bull; 42 AGENTS ACTIVE</span>
-                </div>
-
-                <h1 class="text-5xl md:text-7xl lg:text-8xl font-black mb-8 leading-tight">
-                    The Future of<br>
-                    <span class="gradient-text">Business Intelligence</span>
-                </h1>
-
-                <p class="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
-                    42 AI agents working 24/7 to generate leads, create content, analyze markets, and grow your revenue &mdash; all on autopilot.
-                </p>
-
-                <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-                    <a href="/buy" class="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white px-10 py-5 rounded-2xl text-lg font-bold glow-hover transition-all shadow-xl">
-                        Start Automating &rarr;
-                    </a>
-                    <a href="/whitepaper" class="glass hover:bg-white/10 text-white px-10 py-5 rounded-2xl text-lg font-semibold transition-all border border-white/20">
-                        Read Whitepaper
-                    </a>
-                </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="glass rounded-xl p-4 glow-hover">
-                        <div class="text-2xl md:text-3xl font-black text-emerald-400 counter">500+</div>
-                        <div class="text-xs text-gray-400 font-mono mt-1">Businesses Automated</div>
-                    </div>
-                    <div class="glass rounded-xl p-4 glow-hover">
-                        <div class="text-2xl md:text-3xl font-black text-purple-400 counter">42</div>
-                        <div class="text-xs text-gray-400 font-mono mt-1">AI Agents</div>
-                    </div>
-                    <div class="glass rounded-xl p-4 glow-hover">
-                        <div class="text-2xl md:text-3xl font-black text-cyan-400 counter">24/7</div>
-                        <div class="text-xs text-gray-400 font-mono mt-1">Always Running</div>
-                    </div>
-                    <div class="glass rounded-xl p-4 glow-hover">
-                        <div class="text-2xl md:text-3xl font-black text-pink-400 counter">4.9/5</div>
-                        <div class="text-xs text-gray-400 font-mono mt-1">Customer Rating</div>
-                    </div>
-                </div>
+<!-- ══════════════════════════════════════
+     SINC TOKEN
+════════════════════════════════════════ -->
+<section id="token">
+  <div class="container">
+    <div class="section-eyebrow">SINC Token Economy</div>
+    <div class="section-title">Owning SINC Means<br>Owning the Network</div>
+    <p class="section-sub">SINC is the utility and governance token of the SINCOR ecosystem. Stake to earn, hold to govern, spend to unlock.</p>
+    <div class="sinc-grid">
+      <div>
+        <div class="sinc-chart-box">
+          <div class="sinc-chart-header">
+            <div>
+              <div style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-bottom:4px;">SINC/USD • Live</div>
+              <div class="sinc-price" id="sincChartPrice">$0.0847</div>
             </div>
+            <div class="sinc-change up" id="sincChartChange">▲ +12.4% (24H)</div>
+          </div>
+          <svg class="sparkline" viewBox="0 0 400 100" preserveAspectRatio="none" height="100">
+            <defs>
+              <linearGradient id="sparkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:rgba(124,58,237,0.4)"/>
+                <stop offset="100%" style="stop-color:rgba(124,58,237,0)"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,80 L36,75 L72,60 L108,65 L144,50 L180,45 L216,55 L252,35 L288,28 L324,20 L360,15 L400,8" stroke="var(--purple-light)" stroke-width="2.5" fill="none"/>
+            <path d="M0,80 L36,75 L72,60 L108,65 L144,50 L180,45 L216,55 L252,35 L288,28 L324,20 L360,15 L400,8 L400,100 L0,100 Z" fill="url(#sparkGrad)"/>
+          </svg>
+          <div class="sinc-stats">
+            <div class="sinc-stat"><div class="ss-label">Market Cap</div><div class="ss-val">$84.7M</div></div>
+            <div class="sinc-stat"><div class="ss-label">24H Volume</div><div class="ss-val">$12.3M</div></div>
+            <div class="sinc-stat"><div class="ss-label">Total Supply</div><div class="ss-val">10B SINC</div></div>
+            <div class="sinc-stat"><div class="ss-label">Staking APY</div><div class="ss-val" style="color:var(--green);">28.4%</div></div>
+            <div class="sinc-stat"><div class="ss-label">Stakers</div><div class="ss-val">8,423</div></div>
+            <div class="sinc-stat"><div class="ss-label">Holders</div><div class="ss-val">24,817</div></div>
+          </div>
         </div>
-    </section>
+      </div>
 
-    <!-- What We Do Section -->
-    <section class="py-24 bg-gray-950 relative" id="features">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-20">
-                <div class="inline-block bg-gray-800/50 rounded-full px-6 py-3 mb-6">
-                    <span class="text-gray-400 font-mono text-sm tracking-wider">WHAT SINCOR DOES</span>
-                </div>
-                <h2 class="text-4xl md:text-6xl font-black mb-6">
-                    We Build &amp; Sell Your <span class="gradient-text">Media Pack</span>
-                </h2>
-                <p class="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-                    We gather your business info, build professional media packs, and dangle them in front of prospects who didn't even know they needed you.
-                </p>
-            </div>
+      <div class="token-info">
+        <h3>Why Hold SINC?</h3>
+        <p>Every business subscription on SINCOR generates a buyback pressure on SINC. As the network grows, token scarcity increases. Stakers receive a direct cut of platform revenue in SINC rewards.</p>
 
-            <div class="grid md:grid-cols-3 gap-8 mb-20">
-                <div class="glass rounded-2xl p-8 text-center card-3d">
-                    <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    </div>
-                    <h3 class="text-xl font-bold mb-3">1. We Research You</h3>
-                    <p class="text-gray-400">Our AI discovers businesses across all industries and gathers their complete information automatically.</p>
-                </div>
-                <div class="glass rounded-2xl p-8 text-center card-3d">
-                    <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                    </div>
-                    <h3 class="text-xl font-bold mb-3">2. Build Media Packs</h3>
-                    <p class="text-gray-400">Templates auto-populate with business data to create professional, customized media packages.</p>
-                </div>
-                <div class="glass rounded-2xl p-8 text-center card-3d">
-                    <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </div>
-                    <h3 class="text-xl font-bold mb-3">3. Deploy &amp; Monetize</h3>
-                    <p class="text-gray-400">We present media packs to prospects, follow up with upsells, and generate recurring revenue for you.</p>
-                </div>
-            </div>
-
-            <div class="grid lg:grid-cols-2 gap-12">
-                <div class="space-y-6">
-                    <h3 class="text-3xl font-bold mb-8">Core Intelligence Systems</h3>
-                    <div class="flex items-start gap-5">
-                        <div class="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-lg font-bold mb-2">Neural Processing Engine</h4>
-                            <p class="text-gray-400 text-sm">Advanced neural networks process millions of data points, identifying patterns invisible to traditional analytics.</p>
-                        </div>
-                    </div>
-                    <div class="flex items-start gap-5">
-                        <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-lg font-bold mb-2">Data Fusion Platform</h4>
-                            <p class="text-gray-400 text-sm">Unified data layer integrating 200+ enterprise systems and data sources in real-time.</p>
-                        </div>
-                    </div>
-                    <div class="flex items-start gap-5">
-                        <div class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-lg font-bold mb-2">Intelligent Automation Hub</h4>
-                            <p class="text-gray-400 text-sm">Self-learning automation that reduces manual work by 89% and scales infinitely with your business.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-gray-900/80 rounded-3xl p-10 border border-gray-800">
-                    <h3 class="text-2xl font-bold mb-8">Measurable Business Impact</h3>
-                    <div class="space-y-6">
-                        <div>
-                            <div class="flex justify-between mb-2">
-                                <span class="text-sm font-semibold">Operational Efficiency</span>
-                                <span class="text-xl font-black text-purple-400">89%</span>
-                            </div>
-                            <div class="w-full bg-gray-800 rounded-full h-2.5">
-                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-2.5 rounded-full" style="width:89%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-2">
-                                <span class="text-sm font-semibold">Revenue Growth</span>
-                                <span class="text-xl font-black text-blue-400">247%</span>
-                            </div>
-                            <div class="w-full bg-gray-800 rounded-full h-2.5">
-                                <div class="bg-gradient-to-r from-blue-500 to-cyan-500 h-2.5 rounded-full" style="width:85%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-2">
-                                <span class="text-sm font-semibold">Decision Speed</span>
-                                <span class="text-xl font-black text-emerald-400">15x</span>
-                            </div>
-                            <div class="w-full bg-gray-800 rounded-full h-2.5">
-                                <div class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full" style="width:95%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-2">
-                                <span class="text-sm font-semibold">Prediction Accuracy</span>
-                                <span class="text-xl font-black text-orange-400">97.3%</span>
-                            </div>
-                            <div class="w-full bg-gray-800 rounded-full h-2.5">
-                                <div class="bg-gradient-to-r from-orange-500 to-red-500 h-2.5 rounded-full" style="width:97%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-8 pt-6 border-t border-gray-800 text-center">
-                        <a href="/buy" class="inline-block bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition">
-                            Get Custom ROI Analysis
-                        </a>
-                    </div>
-                </div>
-            </div>
+        <div class="tokenomics">
+          <h4>Token Allocation</h4>
+          <div class="tnom-item">
+            <div class="tnom-header"><span>Public Sale & Liquidity</span><strong>40%</strong></div>
+            <div class="tnom-bar"><div class="tnom-fill" style="width:40%;background:var(--purple);"></div></div>
+          </div>
+          <div class="tnom-item">
+            <div class="tnom-header"><span>Staking Rewards Pool</span><strong>25%</strong></div>
+            <div class="tnom-bar"><div class="tnom-fill" style="width:25%;background:var(--cyan);"></div></div>
+          </div>
+          <div class="tnom-item">
+            <div class="tnom-header"><span>Team & Advisors (3yr vest)</span><strong>15%</strong></div>
+            <div class="tnom-bar"><div class="tnom-fill" style="width:15%;background:var(--blue);"></div></div>
+          </div>
+          <div class="tnom-item">
+            <div class="tnom-header"><span>Ecosystem Development</span><strong>12%</strong></div>
+            <div class="tnom-bar"><div class="tnom-fill" style="width:12%;background:var(--gold);"></div></div>
+          </div>
+          <div class="tnom-item">
+            <div class="tnom-header"><span>Treasury & Buybacks</span><strong>8%</strong></div>
+            <div class="tnom-bar"><div class="tnom-fill" style="width:8%;background:var(--green);"></div></div>
+          </div>
         </div>
-    </section>
 
-    <!-- Products Section -->
-    <section class="py-24 bg-gray-900" id="products">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-black mb-4">
-                    <span class="gradient-text">Media Pack Pricing</span>
-                </h2>
-                <p class="text-xl text-gray-400 mb-6">Professional business media packages that sell themselves</p>
-                <div class="inline-flex items-center bg-red-600/90 text-white px-6 py-3 rounded-full text-sm font-bold">
-                    <span class="w-2.5 h-2.5 bg-red-300 rounded-full mr-3 animate-pulse"></span>
-                    LIMITED TIME: 50% OFF SETUP FEES
-                </div>
-            </div>
+        <ul class="utility-list">
+          <li><span class="uicon">🔑</span><span>Access premium agents and features exclusive to SINC holders</span></li>
+          <li><span class="uicon">💸</span><span>Earn 28.4% APY by staking in the SINCOR liquidity pools</span></li>
+          <li><span class="uicon">🗳️</span><span>Governance votes on agent roadmap and fee parameters</span></li>
+          <li><span class="uicon">📉</span><span>Platform revenue buyback reduces circulating supply quarterly</span></li>
+          <li><span class="uicon">🤝</span><span>Partner discounts and early access to new agent drops</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
 
-            <div class="grid md:grid-cols-3 gap-8 mb-16">
-                <div class="glass rounded-2xl p-8 border border-blue-500/30 card-3d relative">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-blue-400 mb-2">BASIC PACK</h3>
-                        <div class="text-4xl font-black mb-1">$175<span class="text-base text-gray-400 font-normal"> one-time</span></div>
-                        <div class="text-emerald-400 text-sm font-bold">Most Popular</div>
-                    </div>
-                    <p class="text-gray-400 text-sm mb-6 text-center">We research your business, build a professional media pack, and present it to prospects.</p>
-                    <ul class="space-y-3 mb-8 text-sm">
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Business info gathering &amp; research</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Professional media pack creation</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Template auto-population system</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Direct prospect presentation</li>
-                    </ul>
-                    <a href="/buy" class="block w-full bg-blue-600 text-white text-center py-3.5 rounded-xl font-bold hover:bg-blue-500 transition">GET YOUR PACK &rarr;</a>
-                </div>
-
-                <div class="glass rounded-2xl p-8 border border-emerald-500/30 card-3d relative">
-                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-black px-4 py-1 rounded-full text-xs font-bold tracking-wide">BEST VALUE</div>
-                    <div class="text-center mb-6 mt-2">
-                        <h3 class="text-2xl font-bold text-emerald-400 mb-2">PREMIUM PACK</h3>
-                        <div class="text-4xl font-black mb-1">$275<span class="text-base text-gray-400 font-normal"> one-time</span></div>
-                        <div class="text-emerald-400 text-sm font-bold">Enhanced Features</div>
-                    </div>
-                    <p class="text-gray-400 text-sm mb-6 text-center">Everything in Basic plus advanced incentives, follow-up sequences, and upsell campaigns.</p>
-                    <ul class="space-y-3 mb-8 text-sm">
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Everything in Basic Pack</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Advanced incentive strategies</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Automated follow-up sequences</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Upsell &amp; resell campaigns</li>
-                    </ul>
-                    <a href="/buy" class="block w-full bg-emerald-600 text-white text-center py-3.5 rounded-xl font-bold hover:bg-emerald-500 transition">UPGRADE NOW &rarr;</a>
-                </div>
-
-                <div class="glass rounded-2xl p-8 border border-purple-500/30 card-3d relative">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-purple-400 mb-2">ENTERPRISE PACK</h3>
-                        <div class="text-4xl font-black mb-1">$400<span class="text-base text-gray-400 font-normal"> one-time</span></div>
-                        <div class="text-emerald-400 text-sm font-bold">Complete System</div>
-                    </div>
-                    <p class="text-gray-400 text-sm mb-6 text-center">Full media pack system plus lead gen, competitive analysis, and ongoing campaign management.</p>
-                    <ul class="space-y-3 mb-8 text-sm">
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Everything in Premium Pack</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Lead generation plan setup</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Competitive market analysis</li>
-                        <li class="flex items-center text-gray-300"><span class="text-emerald-400 mr-2">&#10003;</span> Ongoing campaign optimization</li>
-                    </ul>
-                    <a href="/buy" class="block w-full bg-purple-600 text-white text-center py-3.5 rounded-xl font-bold hover:bg-purple-500 transition">GO ENTERPRISE &rarr;</a>
-                </div>
-            </div>
-
-            <div class="text-center">
-                <div class="glass rounded-2xl p-8 inline-block border border-red-500/30 max-w-3xl">
-                    <h3 class="text-2xl font-bold mb-3">Prospects Are Getting Media Packs From Your Competitors</h3>
-                    <p class="text-gray-400 mb-6">While you wait for customers to find you, we're building media packs for your competitors and presenting them to YOUR prospects.</p>
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                        <a href="/buy" class="bg-yellow-500 text-black px-8 py-4 rounded-xl text-lg font-bold hover:bg-yellow-400 transition">BUILD MY MEDIA PACK</a>
-                        <a href="/dashboard" class="glass text-white px-8 py-4 rounded-xl text-lg font-bold hover:bg-white/10 transition border border-white/20">SEE DASHBOARD</a>
-                    </div>
-                </div>
-            </div>
+<!-- ══════════════════════════════════════
+     DEX / WHERE TO BUY
+════════════════════════════════════════ -->
+<section class="dex-section" id="dex">
+  <div class="container">
+    <div class="section-eyebrow">Buy SINC Token</div>
+    <div class="section-title">Trade on Every<br>Major DEX</div>
+    <p class="section-sub">SINC is available on Ethereum and BSC. Deep liquidity across all pools. No KYC required.</p>
+    <div class="dex-grid">
+      <div class="dex-card">
+        <div class="dex-logo">🦄</div>
+        <div class="dex-name">Uniswap V3</div>
+        <div class="dex-pair">SINC / USDC • Ethereum</div>
+        <div class="dex-stats">
+          <div class="dex-stat"><span class="ds-val">$6.2M</span><span class="ds-label">TVL</span></div>
+          <div class="dex-stat"><span class="ds-val">0.3%</span><span class="ds-label">Fee</span></div>
+          <div class="dex-stat"><span class="ds-val">24/7</span><span class="ds-label">Live</span></div>
         </div>
-    </section>
-
-    <!-- Industries -->
-    <section class="py-24 bg-gray-950">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl md:text-4xl font-black mb-4">Proven Across Industries</h2>
-                <p class="text-gray-400 text-lg max-w-2xl mx-auto">SINCOR adapts to any context, delivering specialized intelligence for your industry.</p>
-            </div>
-            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="glass rounded-2xl p-6 text-center card-3d border border-blue-500/10">
-                    <div class="w-14 h-14 bg-blue-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </div>
-                    <h4 class="font-bold mb-2">Financial Services</h4>
-                    <p class="text-gray-500 text-sm">Risk assessment, fraud detection, algorithmic trading</p>
-                </div>
-                <div class="glass rounded-2xl p-6 text-center card-3d border border-emerald-500/10">
-                    <div class="w-14 h-14 bg-emerald-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                    </div>
-                    <h4 class="font-bold mb-2">Retail &amp; E-commerce</h4>
-                    <p class="text-gray-500 text-sm">Demand forecasting, inventory optimization, personalization</p>
-                </div>
-                <div class="glass rounded-2xl p-6 text-center card-3d border border-purple-500/10">
-                    <div class="w-14 h-14 bg-purple-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                    </div>
-                    <h4 class="font-bold mb-2">Manufacturing</h4>
-                    <p class="text-gray-500 text-sm">Predictive maintenance, quality control, supply chain</p>
-                </div>
-                <div class="glass rounded-2xl p-6 text-center card-3d border border-orange-500/10">
-                    <div class="w-14 h-14 bg-orange-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-7 h-7 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                    </div>
-                    <h4 class="font-bold mb-2">Healthcare</h4>
-                    <p class="text-gray-500 text-sm">Patient outcomes, resource optimization, clinical support</p>
-                </div>
-            </div>
+        <a href="https://app.uniswap.org" class="btn-dex" target="_blank" rel="noopener">Trade on Uniswap ↗</a>
+      </div>
+      <div class="dex-card">
+        <div class="dex-logo">🥞</div>
+        <div class="dex-name">PancakeSwap</div>
+        <div class="dex-pair">SINC / BNB • BSC</div>
+        <div class="dex-stats">
+          <div class="dex-stat"><span class="ds-val">$3.8M</span><span class="ds-label">TVL</span></div>
+          <div class="dex-stat"><span class="ds-val">0.25%</span><span class="ds-label">Fee</span></div>
+          <div class="dex-stat"><span class="ds-val">24/7</span><span class="ds-label">Live</span></div>
         </div>
-    </section>
-
-    <!-- Testimonial -->
-    <section class="py-20 bg-gray-900">
-        <div class="max-w-4xl mx-auto px-6">
-            <div class="glass rounded-3xl p-10 md:p-16 text-center border border-gray-700/50">
-                <div class="flex justify-center mb-6 text-yellow-400 gap-1">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                </div>
-                <p class="text-xl md:text-2xl text-gray-300 italic mb-8 leading-relaxed">
-                    "SINCOR paid for itself in the first week. Our lead generation increased by 300% and we cut operational costs by 40%. Best investment we've made this year."
-                </p>
-                <div class="flex items-center justify-center gap-4">
-                    <div class="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center font-bold">JD</div>
-                    <div class="text-left">
-                        <div class="font-bold">John Davis</div>
-                        <div class="text-sm text-gray-500">CEO, TechStart Inc.</div>
-                    </div>
-                </div>
-            </div>
+        <a href="https://pancakeswap.finance" class="btn-dex" target="_blank" rel="noopener">Trade on PancakeSwap ↗</a>
+      </div>
+      <div class="dex-card">
+        <div class="dex-logo">🍣</div>
+        <div class="dex-name">SushiSwap</div>
+        <div class="dex-pair">SINC / ETH • Ethereum</div>
+        <div class="dex-stats">
+          <div class="dex-stat"><span class="ds-val">$2.1M</span><span class="ds-label">TVL</span></div>
+          <div class="dex-stat"><span class="ds-val">0.3%</span><span class="ds-label">Fee</span></div>
+          <div class="dex-stat"><span class="ds-val">24/7</span><span class="ds-label">Live</span></div>
         </div>
-    </section>
+        <a href="https://sushi.com" class="btn-dex" target="_blank" rel="noopener">Trade on SushiSwap ↗</a>
+      </div>
+    </div>
+    <div class="contract-box">
+      <div>
+        <div class="contract-label">Contract Address (Ethereum ERC-20)</div>
+        <div class="contract-addr" id="contractAddr">0x53494e43...4f52524f52</div>
+      </div>
+      <button class="copy-btn" onclick="copyContract()">Copy Address</button>
+    </div>
+  </div>
+</section>
 
-    <!-- Final CTA -->
-    <section class="py-24 hero-bg relative overflow-hidden">
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
-            <div class="glass rounded-3xl p-12 md:p-16 border border-white/10">
-                <h2 class="text-4xl md:text-5xl font-black mb-6">
-                    <span class="gradient-text">Ready to Transform Your Business?</span>
-                </h2>
-                <p class="text-xl text-gray-300 mb-10 max-w-2xl mx-auto leading-relaxed">
-                    Join 500+ businesses using SINCOR AI to dominate their markets. Start today with a 30-day money-back guarantee.
-                </p>
-                <div class="flex flex-col sm:flex-row gap-4 justify-center mb-10">
-                    <a href="/buy" class="bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 text-white px-12 py-5 rounded-2xl text-xl font-bold glow-hover transition-all shadow-xl">
-                        Start Now &rarr;
-                    </a>
-                    <a href="/whitepaper" class="glass hover:bg-white/10 text-white px-12 py-5 rounded-2xl text-xl font-semibold transition-all border border-white/20">
-                        Read Whitepaper
-                    </a>
-                </div>
-                <div class="grid grid-cols-3 gap-6 pt-8 border-t border-white/10">
-                    <div>
-                        <div class="text-emerald-400 font-mono text-xs mb-1">SECURITY</div>
-                        <div class="font-bold text-sm">SOC 2 Type II</div>
-                    </div>
-                    <div>
-                        <div class="text-cyan-400 font-mono text-xs mb-1">UPTIME</div>
-                        <div class="font-bold text-sm">99.99% SLA</div>
-                    </div>
-                    <div>
-                        <div class="text-pink-400 font-mono text-xs mb-1">SUPPORT</div>
-                        <div class="font-bold text-sm">24/7 AI Team</div>
-                    </div>
-                </div>
-            </div>
+<!-- ══════════════════════════════════════
+     PRICING
+════════════════════════════════════════ -->
+<section id="pricing">
+  <div class="container">
+    <div class="section-eyebrow">Subscription Plans</div>
+    <div class="section-title">Deploy Your Agents Today</div>
+    <p class="section-sub">Cancel anytime. SINC holders get 20% off all plans automatically.</p>
+    <div class="pricing-grid">
+      <!-- Starter -->
+      <div class="plan-card">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price"><sup>$</sup>297</div>
+        <div class="plan-cadence">per month · billed monthly</div>
+        <div class="plan-desc">Perfect for solopreneurs and small teams ready to automate lead generation and outreach.</div>
+        <ul class="plan-features">
+          <li><span class="chk">✓</span>12 AI Agents active</li>
+          <li><span class="chk">✓</span>500 leads researched/mo</li>
+          <li><span class="chk">✓</span>2,000 emails/mo</li>
+          <li><span class="chk">✓</span>LinkedIn outreach automation</li>
+          <li><span class="chk">✓</span>CRM integration (1x)</li>
+          <li><span class="chk">✓</span>Slack alerts</li>
+          <li><span class="chk">✓</span>Basic analytics dashboard</li>
+        </ul>
+        <a href="/buy?plan=starter" class="btn-plan btn-plan-outline">Get Started</a>
+      </div>
+
+      <!-- Professional (featured) -->
+      <div class="plan-card featured">
+        <div class="plan-badge">Most Popular</div>
+        <div class="plan-name">Professional</div>
+        <div class="plan-price"><sup>$</sup>597</div>
+        <div class="plan-cadence">per month · billed monthly</div>
+        <div class="plan-desc">For growth-stage businesses that need the full revenue automation stack running 24/7.</div>
+        <ul class="plan-features">
+          <li><span class="chk">✓</span>28 AI Agents active</li>
+          <li><span class="chk">✓</span>2,500 leads researched/mo</li>
+          <li><span class="chk">✓</span>15,000 emails/mo</li>
+          <li><span class="chk">✓</span>Full LinkedIn + cold email</li>
+          <li><span class="chk">✓</span>3 CRM integrations</li>
+          <li><span class="chk">✓</span>Content agent (blog + LinkedIn)</li>
+          <li><span class="chk">✓</span>Advanced analytics + forecasting</li>
+          <li><span class="chk">✓</span>SINC token staking dashboard</li>
+          <li><span class="chk">✓</span>Priority support</li>
+        </ul>
+        <a href="/buy?plan=professional" class="btn-plan btn-plan-primary">Get Professional</a>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="plan-card">
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-price"><sup>$</sup>1,497</div>
+        <div class="plan-cadence">per month · billed monthly</div>
+        <div class="plan-desc">Unlimited scale for agencies, enterprises, and companies running multiple client accounts.</div>
+        <ul class="plan-features">
+          <li><span class="chk">✓</span>All 42 AI Agents active</li>
+          <li><span class="chk">✓</span>Unlimited leads</li>
+          <li><span class="chk">✓</span>Unlimited emails</li>
+          <li><span class="chk">✓</span>White-label client portals</li>
+          <li><span class="chk">✓</span>Unlimited CRM integrations</li>
+          <li><span class="chk">✓</span>Custom agent training</li>
+          <li><span class="chk">✓</span>Dedicated success manager</li>
+          <li><span class="chk">✓</span>SINC governance voting rights</li>
+          <li><span class="chk">✓</span>SLA 99.9% uptime guarantee</li>
+        </ul>
+        <a href="/buy?plan=enterprise" class="btn-plan btn-plan-outline">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     ROADMAP
+════════════════════════════════════════ -->
+<section class="roadmap-section" id="roadmap">
+  <div class="container">
+    <div class="section-eyebrow">Roadmap</div>
+    <div class="section-title">Where We're Going</div>
+    <p class="section-sub">Transparent milestones. On-chain delivery proofs.</p>
+    <div class="roadmap-timeline">
+      <div class="rm-item">
+        <div class="rm-dot done"></div>
+        <div class="rm-q">Q1 2026 <span class="rm-tag done">Complete</span></div>
+        <div class="rm-title">Platform Launch & SINC Token TGE</div>
+        <ul class="rm-items-list">
+          <li>42-agent network deployed to production</li>
+          <li>SINC token launched on Uniswap V3 & PancakeSwap</li>
+          <li>500 beta businesses onboarded</li>
+          <li>Staking pools live at 28.4% APY</li>
+        </ul>
+      </div>
+      <div class="rm-item">
+        <div class="rm-dot active"></div>
+        <div class="rm-q">Q2 2026 <span class="rm-tag active">In Progress</span></div>
+        <div class="rm-title">Revenue Scale & Agent Version 2</div>
+        <ul class="rm-items-list">
+          <li>AgentV2: multimodal (vision + voice) capabilities</li>
+          <li>SINC governance DAO launch</li>
+          <li>10 new enterprise integrations (Salesforce, HubSpot, etc.)</li>
+          <li>CEX listing applications (target top-20)</li>
+        </ul>
+      </div>
+      <div class="rm-item">
+        <div class="rm-dot"></div>
+        <div class="rm-q">Q3 2026 <span class="rm-tag upcoming">Upcoming</span></div>
+        <div class="rm-title">Marketplace & Agent Store</div>
+        <ul class="rm-items-list">
+          <li>Community agent marketplace — sell custom agents for SINC</li>
+          <li>B2B API access for enterprise white-labeling</li>
+          <li>Mobile dashboard (iOS + Android)</li>
+        </ul>
+      </div>
+      <div class="rm-item">
+        <div class="rm-dot"></div>
+        <div class="rm-q">Q4 2026 <span class="rm-tag upcoming">Upcoming</span></div>
+        <div class="rm-title">Institutional Grade & Layer-2</div>
+        <ul class="rm-items-list">
+          <li>SINC bridge to Arbitrum & Base L2</li>
+          <li>Institutional API — hedge fund & PE access</li>
+          <li>$500M revenue pipeline target across user base</li>
+        </ul>
+      </div>
+      <div class="rm-item">
+        <div class="rm-dot"></div>
+        <div class="rm-q">2027 Vision <span class="rm-tag upcoming">Upcoming</span></div>
+        <div class="rm-title">Decentralized Agent Economy</div>
+        <ul class="rm-items-list">
+          <li>Fully on-chain agent orchestration layer</li>
+          <li>SINC DAO controls all protocol parameters</li>
+          <li>100K+ businesses powered by SINCOR agents worldwide</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     TESTIMONIALS
+════════════════════════════════════════ -->
+<section id="testimonials">
+  <div class="container">
+    <div class="section-eyebrow">What They're Saying</div>
+    <div class="section-title">500+ Businesses.<br>One Common Story.</div>
+    <p class="section-sub">Real results from real companies. No cherry-picked data.</p>
+    <div class="testi-grid">
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Within 3 weeks SINCOR had booked 14 qualified calls. Our old SDR team took 6 weeks for that. We replaced $12K/mo in headcount costs immediately."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">JM</div>
+          <div><div class="testi-name">James M.</div><div class="testi-role">CEO — B2B SaaS, $4M ARR</div></div>
         </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="py-12 bg-black border-t border-gray-800">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="grid md:grid-cols-4 gap-8 mb-10">
-                <div>
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-500 rounded-lg flex items-center justify-center font-bold text-sm">S</div>
-                        <span class="font-bold">SINCOR</span>
-                    </div>
-                    <p class="text-gray-500 text-sm">AI-powered business intelligence and automation platform.</p>
-                </div>
-                <div>
-                    <h4 class="font-bold text-sm mb-4 text-gray-300">Product</h4>
-                    <ul class="space-y-2 text-sm text-gray-500">
-                        <li><a href="/buy" class="hover:text-white transition">Get Started</a></li>
-                        <li><a href="/pricing" class="hover:text-white transition">Pricing</a></li>
-                        <li><a href="/dashboard" class="hover:text-white transition">Dashboard</a></li>
-                        <li><a href="/my-orders" class="hover:text-white transition">My Orders</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-bold text-sm mb-4 text-gray-300">Resources</h4>
-                    <ul class="space-y-2 text-sm text-gray-500">
-                        <li><a href="/whitepaper" class="hover:text-white transition">Whitepaper</a></li>
-                        <li><a href="/docs" class="hover:text-white transition">API Docs</a></li>
-                        <li><a href="/sin-airdrop" class="hover:text-white transition">SIN Airdrop</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-bold text-sm mb-4 text-gray-300">Contact</h4>
-                    <ul class="space-y-2 text-sm text-gray-500">
-                        <li><a href="mailto:support@getsincor.com" class="hover:text-white transition">support@getsincor.com</a></li>
-                        <li><a href="mailto:sales@getsincor.com" class="hover:text-white transition">sales@getsincor.com</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-                <p class="text-gray-600 text-sm">&copy; 2026 SINCOR. All rights reserved.</p>
-                <div class="flex gap-6 text-sm text-gray-500">
-                    <a href="#" class="hover:text-white transition">Privacy</a>
-                    <a href="#" class="hover:text-white transition">Terms</a>
-                    <a href="#" class="hover:text-white transition">Security</a>
-                </div>
-            </div>
+      </div>
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"The content agents alone 10x'd our LinkedIn presence. We went from 200 to 12,000 followers in 60 days. The leads coming in are warm and pre-educated."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">SR</div>
+          <div><div class="testi-name">Sarah R.</div><div class="testi-role">Founder — Marketing Agency</div></div>
         </div>
-    </footer>
+      </div>
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"I manage 8 client accounts. SINCOR runs all 8 autonomously. I went from working 70 hours a week to 20. Revenue is 3x what it was."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">DK</div>
+          <div><div class="testi-name">David K.</div><div class="testi-role">Agency Owner — 8 Clients</div></div>
+        </div>
+      </div>
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"Bought 50K SINC at TGE. Already up 4x. The staking rewards are real — withdrawing $1,200/mo passively. This is the real deal in a sea of garbage tokens."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">AT</div>
+          <div><div class="testi-name">Alex T.</div><div class="testi-role">Crypto Investor — 50K SINC holder</div></div>
+        </div>
+      </div>
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"We're a real estate team. The outreach agents close listing appointments. Last month they booked 9 seller consultations we would never have found manually."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">MC</div>
+          <div><div class="testi-name">Maria C.</div><div class="testi-role">Real Estate Team Lead — Miami</div></div>
+        </div>
+      </div>
+      <div class="testi-card">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-text">"SINC token staking + Enterprise plan is a no-brainer. I get platform access AND yield. The 20% discount for holders pays for itself. Genius tokenomics."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">RP</div>
+          <div><div class="testi-name">Ryan P.</div><div class="testi-role">Enterprise Client + SINC Staker</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <script>
-        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
-            document.getElementById('mobile-menu').classList.toggle('hidden');
-        });
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            });
-        });
-        const counters = document.querySelectorAll('.counter');
-        const observer = new IntersectionObserver(entries => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }
-            });
-        }, { threshold: 0.1 });
-        counters.forEach(c => {
-            c.style.opacity = '0';
-            c.style.transform = 'translateY(20px)';
-            c.style.transition = 'all 0.6s ease';
-            observer.observe(c);
-        });
-    </script>
+<!-- ══════════════════════════════════════
+     FAQ
+════════════════════════════════════════ -->
+<section class="faq-section" id="faq">
+  <div class="container">
+    <div class="section-eyebrow">FAQ</div>
+    <div class="section-title" style="text-align:center;">Questions? Answered.</div>
+    <br>
+    <div class="faq-list">
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          How do the 42 AI agents actually work?
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-a">Each agent is a specialized AI model trained on its domain — research, content, outreach, sales, analytics, or retention. They run autonomously 24/7, communicate with each other to hand off data, and report to a central orchestration layer. You configure your ICP, connect your tools, and they do the rest.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          What is the SINC token and do I need it?
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-a">SINC is the native utility and governance token of SINCOR. You don't need it to use the platform — but SINC holders get 20% off subscriptions, access to premium agents, staking rewards (28.4% APY), and governance votes on the protocol. It's the best way to align with the platform long-term.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          How fast can I see results?
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-a">Most clients see the research and outreach agents producing data within 24 hours of setup. Meetings booked and pipeline movement typically happen within 72 hours. Full ROI is typically realized within 30 days based on our client data.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          Where can I buy SINC token?
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-a">SINC is available on Uniswap V3 (Ethereum, SINC/USDC), PancakeSwap (BSC, SINC/BNB), and SushiSwap (Ethereum, SINC/ETH). No KYC required. Simply connect MetaMask or any Web3 wallet and swap. Contract address is displayed on the DEX section of this page.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          Is SINCOR compliant with CAN-SPAM / GDPR?
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-a">Yes. All email outreach is CAN-SPAM compliant with opt-out links included. The platform never scrapes protected data, uses only publicly available business information, and includes unsubscribe management built in. For GDPR, we provide DPA agreements for EU-based clients. Always consult legal counsel for your specific situation.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          Can I cancel my subscription?
+          <span class="faq-icon">+</span>
+        </div>
+        <div class="faq-a">Absolutely. Cancel anytime from your billing dashboard — no questions asked, no retention calls. Your agents stay active until the end of your billing period. There are no long-term contracts on the Starter or Professional plans.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     FINAL CTA
+════════════════════════════════════════ -->
+<section class="final-cta">
+  <div class="section-eyebrow" style="text-align:center;">Ready?</div>
+  <h2>Your Revenue System<br>Shouldn't Require a Team</h2>
+  <p>Deploy 42 autonomous AI agents today. Start generating pipeline within 48 hours.</p>
+  <div class="final-btns">
+    <a href="/buy" class="btn-primary" style="font-size:18px;padding:18px 44px;">🚀 Deploy My AI Agents</a>
+    <a href="#dex" class="btn-gold" style="font-size:18px;padding:18px 44px;">🪙 Buy SINC Token</a>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     FOOTER
+════════════════════════════════════════ -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <div class="fb-logo">SINC<span>OR</span></div>
+      <p>42 AI agents. Autonomous revenue generation. The SINC token economy powering the next era of business intelligence.</p>
+      <br>
+      <p style="font-family:var(--mono);font-size:11px;color:var(--muted);">© 2026 SINCOR. All rights reserved.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Platform</h4>
+      <ul>
+        <li><a href="#agents">AI Agents</a></li>
+        <li><a href="#platform">How It Works</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="/billing">Billing Portal</a></li>
+        <li><a href="/health">System Status</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>SINC Token</h4>
+      <ul>
+        <li><a href="#token">Token Overview</a></li>
+        <li><a href="#dex">Buy on DEX</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#token">Staking</a></li>
+        <li><a href="#token">Tokenomics</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <ul>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#testimonials">Case Studies</a></li>
+        <li><a href="/buy">Get Started</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Contact</h4>
+      <ul>
+        <li><a href="mailto:support@getsincor.com">support@getsincor.com</a></li>
+        <li><a href="mailto:partners@getsincor.com">partners@getsincor.com</a></li>
+        <li><a href="mailto:press@getsincor.com">press@getsincor.com</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>Not financial advice. SINC token is a utility token. Past performance does not guarantee future results.</p>
+    <p style="font-family:var(--mono);font-size:12px;">v2.0 · Network: 99.97% · Agents: 42/42</p>
+  </div>
+</footer>
+
+<!-- ══════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════ -->
+<script>
+  // FAQ accordion
+  function toggleFaq(el) {
+    const item = el.closest('.faq-item');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  }
+
+  // Copy contract address
+  function copyContract() {
+    const addr = '0x53494e43...4f52524f52';
+    navigator.clipboard.writeText(addr).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy Address', 2000);
+    });
+  }
+
+  // Live price simulation
+  let sincPrice = 0.0847;
+  function randomWalk(val, pct) {
+    return val * (1 + (Math.random() - 0.48) * pct);
+  }
+  setInterval(() => {
+    sincPrice = randomWalk(sincPrice, 0.003);
+    const formatted = '$' + sincPrice.toFixed(4);
+    const el1 = document.getElementById('sincPrice');
+    const el2 = document.getElementById('sincChartPrice');
+    if (el1) el1.textContent = formatted;
+    if (el2) el2.textContent = formatted;
+    const changePct = ((sincPrice - 0.0847) / 0.0847 * 100).toFixed(2);
+    const arrow = changePct >= 0 ? '▲' : '▼';
+    const css = changePct >= 0 ? 'up' : 'down';
+    const chEl = document.getElementById('sincChartChange');
+    if (chEl) {
+      chEl.textContent = `${arrow} ${Math.abs(changePct)}% (24H)`;
+      chEl.className = 'sinc-change ' + css;
+    }
+    // update ticker
+    const tickEl = document.getElementById('sincChange');
+    if (tickEl) {
+      tickEl.textContent = `${arrow} ${Math.abs(changePct)}%`;
+      tickEl.className = changePct >= 0 ? 'tick-up' : 'tick-down';
+    }
+  }, 3000);
+
+  // Live packs counter
+  let packs = 1247;
+  setInterval(() => {
+    packs += Math.floor(Math.random() * 3) + 1;
+    const el = document.getElementById('packsCount');
+    if (el) el.textContent = packs.toLocaleString();
+  }, 4000);
+
+  // Progress bar animations (IntersectionObserver)
+  const fills = document.querySelectorAll('.bar-fill');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        const w = el.getAttribute('data-width');
+        el.style.width = w + '%';
+        observer.unobserve(el);
+      }
+    });
+  }, { threshold: 0.3 });
+  fills.forEach(f => observer.observe(f));
+
+  // Smooth scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const id = a.getAttribute('href').slice(1);
+      const target = document.getElementById(id);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+</script>
 </body>
 </html>
