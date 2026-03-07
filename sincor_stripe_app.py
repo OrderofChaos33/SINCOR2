@@ -19,8 +19,8 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'sincor-secret-key-change-in-
 
 # Import Stripe integration
 try:
-    from src.sincor2.stripe_checkout import get_stripe_checkout
-    from src.sincor2.stripe_routes import init_stripe_routes
+    from sincor2.stripe_checkout import get_stripe_checkout
+    from sincor2.stripe_routes import init_stripe_routes
     STRIPE_AVAILABLE = True
 except (ImportError, ModuleNotFoundError) as e:
     logger.warning(f"[STRIPE] Import error: {e}")
