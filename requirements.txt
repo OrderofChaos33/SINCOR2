@@ -31,7 +31,7 @@ gunicorn>=21.0.0              # Production WSGI server
 psutil>=5.9.0                 # System and process monitoring
 
 # PDF Generation (for training guide delivery)
-weasyprint>=60.0              # HTML/CSS to PDF conversion
+# weasyprint removed - requires system C libs not available in slim Docker image
 reportlab>=4.0.0              # PDF generation library
 
 # Email Delivery
