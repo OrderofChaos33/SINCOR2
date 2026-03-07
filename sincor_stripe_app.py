@@ -40,8 +40,8 @@ if STRIPE_AVAILABLE:
 
 @app.route('/')
 def home():
-    """Home page - redirect to buy page"""
-    return redirect(url_for('buy'))
+    """Home page"""
+    return render_template('home.html')
 
 @app.route('/buy')
 def buy():
