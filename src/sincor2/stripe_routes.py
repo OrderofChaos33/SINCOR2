@@ -81,6 +81,11 @@ def init_stripe_routes(app, stripe_processor):
     @stripe_bp.route('/checkout', methods=['POST'])
     def create_checkout():
         """Create a Stripe checkout session (subscription, supports annual billing)"""
+        if not stripe_processor or not stripe_processor.enabled:
+            return jsonify({
+                'success': False,
+                'error': 'Payment processing is not yet configured. Please contact support@getsincor.com'
+            }), 503
         try:
             data = request.get_json()
             plan_id        = data.get('plan_id')
@@ -125,6 +130,8 @@ def init_stripe_routes(app, stripe_processor):
     @stripe_bp.route('/webhook', methods=['POST'])
     def webhook():
         """Handle Stripe webhooks for subscription lifecycle"""
+        if not stripe_processor or not stripe_processor.enabled:
+            return jsonify({'success': False, 'error': 'Stripe not configured'}), 503
         try:
             payload    = request.get_data()
             sig_header = request.headers.get('Stripe-Signature')
