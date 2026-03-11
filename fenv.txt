@@ -1,3 +1,0 @@
-apollo.io apikey: 6Qcid4G2SC3HpONCWubjdQ
-
-newsapi.org api: c0ae9846b58c436b9f89b30ca9bc15c2
