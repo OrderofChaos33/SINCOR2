@@ -182,3 +182,35 @@ Thumbs.db
 
 # Security System
 security_checksums.json
+
+# Sensitive credential / API-key files
+paypalpal.txt
+fenv.txt
+*.secret.txt
+
+# Deployment & session scratch files
+tmpclaude-*/
+tmpclaude*/
+deploy\ logs.txt
+
+# Backup & working copies of source files
+app.py.backup*
+app.py.pre-*
+app.py.no-*
+app.py.original
+app.py.backup-*
+app_part*.txt
+cortecs_core.py.backup*
+cortecs_core.py.mocked
+paypal_integration.py.backup*
+quick_edit.bat
+New\ Text\ Document*.txt
+
+# Generated guide PDFs (delivered to customers, not for version control)
+files/guides/*.pdf
+files/
+
+# PayPal setup documentation (may contain credential references)
+paypal-setup/
+PAYPAL_SDK_DIAGNOSIS.md
+PAYPAL_PRODUCT_CATALOG.md
