@@ -136,7 +136,7 @@
     .console-header { background: #0d0d15; padding: 10px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); }
     .dot-red { width:12px;height:12px;border-radius:50%;background:#ef4444; }
     .dot-yellow { width:12px;height:12px;border-radius:50%;background:#f59e0b; }
-    .dot-green-dot { width:12px;height:12px;border-radius:50%;background:#10b981; }
+    .dot-green { width:12px;height:12px;border-radius:50%;background:#10b981; }
     .console-title { font-family: var(--mono); font-size:12px; color: var(--muted); margin-left:8px; }
     .console-body { padding: 20px; font-family: var(--mono); font-size: 12px; line-height: 1.9; overflow-x: auto; }
     .cl { display:block; }
@@ -157,7 +157,7 @@
     .arch-agents { list-style: none; }
     .arch-agents li { font-size: 12px; color: var(--muted); padding: 3px 0; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
     .arch-agents li:last-child { border-bottom: none; }
-    .arch-agents li::before { content: 'star'; font-family: var(--mono); color: var(--purple-light); font-size: 9px; }
+    .arch-agents li::before { content: '★'; color: var(--purple-light); font-size: 9px; }
     .agents-note { background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2); border-radius: 12px; padding: 20px 28px; display: flex; align-items: center; gap: 16px; font-size: 14px; color: var(--muted); }
     .agents-note .an-icon { font-size: 24px; flex-shrink: 0; }
     .agents-note strong { color: var(--purple-light); }
@@ -293,7 +293,7 @@
 
 <!-- NAV -->
 <nav>
-  <a href="/" class="nav-logo">SINC<span class="star">&#9733;</span>OR</a>
+  <a href="/" class="nav-logo">SINCOR<span class="star"> ★</span></a>
   <ul class="nav-links" id="navLinks">
     <li><a href="#platform">How It Works</a></li>
     <li><a href="#agents">Agents</a></li>
@@ -399,7 +399,7 @@
         <div class="console-header">
           <div class="dot-red"></div>
           <div class="dot-yellow"></div>
-          <div class="dot-green-dot"></div>
+          <div class="dot-green"></div>
           <span class="console-title">sincor-agent-kernel &mdash; live output</span>
         </div>
         <div class="console-body">
@@ -533,7 +533,7 @@
       </div>
     </div>
     <div class="agents-note">
-      <div class="an-icon">&#8505;&#65039;</div>
+      <div class="an-icon">ℹ️</div>
       <div>Every agent has its own <strong>OCEAN personality vector</strong>, daily token budget, independent memory store, and career trajectory. They earn merit points toward promotion by producing high-quality outputs &mdash; scored by the Critic role in every task cycle. Agent 43 (Mesarthim) completes the founding constellation.</div>
     </div>
   </div>
@@ -859,7 +859,7 @@
 <footer>
   <div class="footer-grid">
     <div class="footer-brand">
-      <div class="fb-logo">SINC<span>&#9733;</span>OR</div>
+      <div class="fb-logo">SINCOR<span> ★</span></div>
       <p>A constellation of 43 specialized AI agents for complete business automation. Powered by Claude. Deployed on Railway. Billed through Stripe.</p>
       <br>
       <p style="font-family:var(--mono);font-size:11px;color:var(--muted);">&copy; 2026 SINCOR &middot; getsincor.com</p>
