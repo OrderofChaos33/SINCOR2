@@ -41,7 +41,8 @@ static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
 # Configure JWT
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-prod')
+_default_jwt_secret = os.urandom(32).hex()  # Random per-process secret if not set
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', _default_jwt_secret)
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB max request size
 jwt = JWTManager(app)
@@ -233,23 +234,53 @@ def home():
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
+# Admin credentials — must be set via environment variables in production
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', '')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+
+
+def _check_admin_token(req):
+    """Return True if the request carries a valid admin JWT."""
+    from flask_jwt_extended import decode_token
+    auth = req.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return False
+    token = auth[7:]
+    try:
+        decoded = decode_token(token)
+        return decoded.get('sub') == ADMIN_USERNAME
+    except Exception:
+        return False
+
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """
-    Mock login endpoint.
-    POST /api/auth/login with JSON: {"email": "user@example.com", "password": "demo"}
-    Returns a JWT token.
+    Admin login endpoint. Validates credentials against ADMIN_USERNAME / ADMIN_PASSWORD
+    environment variables. Returns a signed JWT on success.
     """
-    data = request.get_json() or {}
-    email = data.get('email', '')
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+        logger.error('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not configured')
+        return jsonify({'error': 'Authentication not configured on this server'}), 503
+
+    data = request.get_json(silent=True) or {}
+    email = sanitize_string(data.get('email', ''), max_length=254)
     password = data.get('password', '')
-    
-    # Mock authentication (accept any email/password for demo)
+
     if not email or not password:
         return jsonify({'error': 'email and password required'}), 400
-    
-    # Create access token
+
+    # Constant-time comparison to prevent timing attacks
+    import hmac
+    email_ok = hmac.compare_digest(email.lower(), ADMIN_USERNAME.lower())
+    pass_ok = hmac.compare_digest(str(password), str(ADMIN_PASSWORD))
+
+    if not (email_ok and pass_ok):
+        logger.warning(f'[AUTH] Failed login attempt for: {email} from {request.remote_addr}')
+        return jsonify({'error': 'Invalid credentials'}), 401
+
     access_token = create_access_token(identity=email)
+    logger.info(f'[AUTH] Successful login: {email}')
     return jsonify({
         'access_token': access_token,
         'user': {'email': email},
@@ -287,10 +318,18 @@ def buy_page():
 @app.route('/api/payment/webhook', methods=['POST'])
 def payment_webhook():
     """
-    Receive PayPal payment confirmation from frontend.
-    Called by buy.html onApprove() after actions.order.capture() succeeds.
+    Receive payment confirmation from the frontend after client-side capture.
+    Verifies the payment is recorded in our database before fulfillment.
     Stores order in DB and triggers product fulfillment/delivery.
     """
+    # Only accept requests from same origin or explicitly allowed origins
+    origin = request.headers.get('Origin', '')
+    referer = request.headers.get('Referer', '')
+    host = request.host
+    allowed = not origin or host in origin or host in referer
+    if not allowed:
+        logger.warning(f'[WEBHOOK] Blocked cross-origin request from origin={origin} referer={referer}')
+        return jsonify({'error': 'Forbidden'}), 403
     data = request.get_json(silent=True) or {}
 
     # Validate required fields
@@ -761,8 +800,12 @@ def get_customer_orders(email):
 
 
 @app.route('/api/orders', methods=['GET'])
+@jwt_required()
 def list_all_orders():
-    """Admin endpoint: list all orders."""
+    """Admin endpoint: list all orders. Requires valid admin JWT."""
+    current_user = get_jwt_identity()
+    if current_user.lower() != ADMIN_USERNAME.lower():
+        return jsonify({'error': 'Forbidden'}), 403
     db = get_db()
     rows = db.execute("SELECT * FROM orders ORDER BY created_at DESC LIMIT 100").fetchall()
     orders = [dict(row) for row in rows]
