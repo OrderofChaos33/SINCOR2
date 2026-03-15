@@ -138,6 +138,7 @@ docs/reality_bending_market_models.pdf
 # Backup Files
 *.bak
 *.backup
+*.old
 *_backup.py
 *.py.bak
 
