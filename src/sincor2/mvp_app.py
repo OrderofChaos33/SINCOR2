@@ -1,7 +1,7 @@
 ﻿"""
 SINCOR2 MVP - Minimal Flask Application
-A lean, deployable MVP with health checks, home page, buy flow, and basic auth.
-Full PayPal checkout → order DB → asset delivery pipeline.
+A lean, deployable MVP with health checks, home page, buy flow, and Stripe payments.
+Stripe checkout → order DB → asset delivery pipeline.
 """
 
 import os
@@ -10,13 +10,14 @@ import json
 import time
 import logging
 import sqlite3
-import asyncio
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, g, make_response, send_file
+from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
 from sincor2.pdf_generator import get_pdf_generator
@@ -40,16 +41,42 @@ template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
-# Configure JWT
-_default_jwt_secret = os.urandom(32).hex()  # Random per-process secret if not set
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', _default_jwt_secret)
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+# Configure JWT — MUST be set in Railway secrets for production
+jwt_secret = os.environ.get('JWT_SECRET_KEY')
+if not jwt_secret:
+    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('ENVIRONMENT') == 'production':
+        logger.critical('[JWT] JWT_SECRET_KEY not set in production! Generating random secret (tokens won\'t survive restarts)')
+    jwt_secret = os.urandom(32).hex()
+app.config['JWT_SECRET_KEY'] = jwt_secret
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)  # Reduced from 24h
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB max request size
 jwt = JWTManager(app)
 
-# PayPal configuration
-PAYPAL_CLIENT_ID = os.environ.get('PAYPAL_REST_API_ID', os.environ.get('PAYPAL_CLIENT_ID', 'sandbox-demo'))
-PAYPAL_SANDBOX = os.environ.get('PAYPAL_SANDBOX', 'true').lower() == 'true'
+# Rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
+
+# Stripe integration
+try:
+    from sincor2.stripe_checkout import get_stripe_checkout
+    from sincor2.stripe_routes import stripe_bp, init_stripe_routes
+    STRIPE_AVAILABLE = True
+except (ImportError, ModuleNotFoundError) as e:
+    logger.warning(f"[STRIPE] Import error: {e}")
+    STRIPE_AVAILABLE = False
+
+stripe_processor = None
+if STRIPE_AVAILABLE:
+    stripe_processor = get_stripe_checkout()
+    if stripe_processor and stripe_processor.enabled:
+        init_stripe_routes(app, stripe_processor)
+        logger.info("[APP] Stripe integration initialized and routes registered")
+    else:
+        logger.warning("[APP] Stripe not properly configured — set STRIPE_API_KEY")
 
 # PDF Generator initialization
 pdf_guides_dir = os.path.join(project_root, 'files', 'guides')
@@ -75,10 +102,14 @@ except Exception as e:
 
 @app.before_request
 def log_request():
-    """Log incoming requests and record start time for latency tracking."""
+    """Log incoming requests, record start time, enforce HTTPS in production."""
     g.start_time = time.time()
+    # Enforce HTTPS in production (Railway sets X-Forwarded-Proto)
+    if request.headers.get('X-Forwarded-Proto', 'https') == 'http':
+        url = request.url.replace('http://', 'https://', 1)
+        return redirect(url, code=301)
     if request.path not in ('/health', '/favicon.ico'):
-        logger.info(f"{request.method} {request.path} from {request.remote_addr}")
+        logger.info(f"{request.method} {request.path}")
 
 
 @app.after_request
@@ -89,6 +120,17 @@ def apply_security_headers(response):
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['X-Permitted-Cross-Domain-Policies'] = 'none'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net https://js.stripe.com 'unsafe-inline'; "
+        "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; "
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "img-src 'self' https: data:; "
+        "frame-src https://js.stripe.com; "
+        "connect-src 'self' https://api.stripe.com"
+    )
 
     # Log response timing
     elapsed = time.time() - getattr(g, 'start_time', time.time())
@@ -238,6 +280,9 @@ def home():
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', '')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
+if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+    logger.warning('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not set — admin login disabled')
+
 
 def _check_admin_token(req):
     """Return True if the request carries a valid admin JWT."""
@@ -254,6 +299,7 @@ def _check_admin_token(req):
 
 
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
     """
     Admin login endpoint. Validates credentials against ADMIN_USERNAME / ADMIN_PASSWORD
@@ -304,79 +350,82 @@ def protected():
 # BUY / PAYMENT ENDPOINTS
 # ============================================================================
 
+# Product pricing — server-side validation of amounts
+PRODUCT_PRICES = {
+    'Starter': 297,
+    'Professional': 997,
+    'Enterprise': 2997,
+}
+
+
 @app.route('/buy', methods=['GET'])
 def buy_page():
-    """Render buy page with PayPal SDK buttons and product catalog."""
-    return render_template('buy.html', paypal_client_id=PAYPAL_CLIENT_ID)
+    """Render buy page with Stripe checkout."""
+    if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
+        return render_template('buy_converting.html')
+    return render_template('buy_stripe.html')
 
 
 # ============================================================================
-# PAYMENT WEBHOOK - Called by PayPal SDK after successful capture
+# PAYMENT WEBHOOK - Called by Stripe after successful payment
 # This is the CORE endpoint that triggers asset delivery
 # ============================================================================
 
 @app.route('/api/payment/webhook', methods=['POST'])
+@limiter.limit("30 per minute")
 def payment_webhook():
     """
-    Receive payment confirmation from the frontend after client-side capture.
-    Verifies the payment is recorded in our database before fulfillment.
+    Receive Stripe webhook events for payment processing.
+    Verifies webhook signature before processing.
     Stores order in DB and triggers product fulfillment/delivery.
     """
-    # Only accept requests from same origin or explicitly allowed origins
-    origin = request.headers.get('Origin', '')
-    referer = request.headers.get('Referer', '')
-    host = request.host
-    allowed = not origin or host in origin or host in referer
-    if not allowed:
-        logger.warning(f'[WEBHOOK] Blocked cross-origin request from origin={origin} referer={referer}')
-        return jsonify({'error': 'Forbidden'}), 403
-    data = request.get_json(silent=True) or {}
+    if not stripe_processor or not stripe_processor.enabled:
+        logger.error('[WEBHOOK] Stripe not configured — cannot process webhook')
+        return jsonify({'error': 'Payment processor not configured'}), 503
 
-    # Validate required fields
-    paypal_order_id = sanitize_string(data.get('id', ''), max_length=50)
-    payer = data.get('payer', {})
-    if not isinstance(payer, dict):
-        payer = {}
-    raw_email = payer.get('email_address', '')
-    customer_email = validate_email(raw_email)
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature', '')
 
-    purchase_units = data.get('purchase_units', [{}])
-    if not isinstance(purchase_units, list) or len(purchase_units) == 0:
-        purchase_units = [{}]
-    product_name = sanitize_string(purchase_units[0].get('description', 'Unknown'))
-    amount_obj = purchase_units[0].get('amount', {}) if purchase_units else {}
+    if not sig_header:
+        logger.warning('[WEBHOOK] Missing Stripe-Signature header')
+        return jsonify({'error': 'Missing signature'}), 400
 
-    try:
-        amount = float(amount_obj.get('value', 0)) if isinstance(amount_obj, dict) else float(amount_obj or 0)
-        if amount < 0 or amount > 100000:
-            return jsonify({'error': 'Invalid payment amount'}), 400
-    except (ValueError, TypeError):
-        return jsonify({'error': 'Invalid amount format'}), 400
+    success, event_data = stripe_processor.verify_webhook(payload, sig_header)
+    if not success:
+        logger.warning('[WEBHOOK] Stripe webhook verification failed')
+        return jsonify({'error': 'Webhook verification failed'}), 400
 
-    if not paypal_order_id:
-        return jsonify({'error': 'Missing PayPal order ID'}), 400
+    event_type = event_data.get('event', 'unknown')
+    logger.info(f"[WEBHOOK] Stripe event: {event_type}")
+
+    # Only process completed payments
+    if event_type != 'payment_completed':
+        return jsonify({'success': True, 'event': event_type}), 200
+
+    customer_email = validate_email(event_data.get('customer_email', ''))
     if not customer_email:
-        return jsonify({'error': 'Invalid or missing email address'}), 400
+        logger.warning('[WEBHOOK] No valid email in payment event')
+        return jsonify({'error': 'Missing customer email'}), 400
 
-    logger.info(f"[PAYMENT] Processing: {paypal_order_id} | {product_name} | ${amount} | {customer_email}")
+    amount_cents = event_data.get('amount_total', 0)
+    amount = amount_cents / 100 if amount_cents else 0
+    session_id = sanitize_string(event_data.get('session_id', ''), max_length=100)
+    subscription_id = sanitize_string(event_data.get('subscription_id', '') or '', max_length=100)
 
-    # Generate internal order ID
-    order_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{paypal_order_id[:8]}"
+    # Determine product from amount
+    product_name = 'Unknown'
+    for name, price in PRODUCT_PRICES.items():
+        if abs(amount - price) < 1:  # Allow for rounding
+            product_name = name
+            break
 
-    # Determine product type and delivery info
+    order_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{session_id[:8]}"
     product_info = PRODUCT_CATALOG.get(product_name, {'type': 'generic'})
     order_type = product_info.get('type', 'generic')
 
-    # Build delivery URL based on product type
     if order_type == 'subscription':
         delivery_url = f"/dashboard?email={customer_email}&plan={product_name}"
         delivery_status = 'delivered'
-    elif order_type == 'bi_report':
-        delivery_url = f"/download/report/{order_id}"
-        delivery_status = 'processing'
-    elif order_type == 'content':
-        delivery_url = f"/download/content/{order_id}"
-        delivery_status = 'processing'
     else:
         delivery_url = f"/my-orders?email={customer_email}"
         delivery_status = 'processing'
@@ -390,30 +439,20 @@ def payment_webhook():
                 currency, payment_status, delivery_status, delivery_url, order_type,
                 created_at, updated_at, metadata)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (order_id, paypal_order_id, customer_email, product_name, amount,
+            (order_id, session_id, customer_email, product_name, amount,
              'USD', 'completed', delivery_status, delivery_url, order_type,
              datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
-             json.dumps({'payer': payer, 'product_info': product_info}))
+             json.dumps({'stripe_session_id': session_id, 'subscription_id': subscription_id}))
         )
         db.commit()
         logger.info(f"[ORDER] Saved: {order_id} | {product_name} | ${amount} | {customer_email}")
     except sqlite3.IntegrityError:
-        logger.warning(f"[ORDER] Duplicate order: {paypal_order_id}")
-        # Order already exists, return success anyway
-        pass
+        logger.warning(f"[ORDER] Duplicate order: {session_id}")
 
-    # Trigger product delivery based on type
-    delivery_result = trigger_fulfillment(order_id, customer_email, product_name, amount, order_type, product_info)
+    # Trigger product delivery
+    trigger_fulfillment(order_id, customer_email, product_name, amount, order_type, product_info)
 
-    return jsonify({
-        'success': True,
-        'order_id': order_id,
-        'product': product_name,
-        'delivery_status': delivery_status,
-        'delivery_url': delivery_url,
-        'message': delivery_result.get('message', 'Order received'),
-        'next_steps': delivery_result.get('next_steps', [])
-    }), 200
+    return jsonify({'success': True, 'order_id': order_id}), 200
 
 
 def trigger_fulfillment(order_id, email, product_name, amount, order_type, product_info):
@@ -514,23 +553,22 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
 @app.route('/payment/success')
 def payment_success():
     """
-    Render payment success page after PayPal capture.
-    If order found, redirect to thank-you email page; otherwise show generic success.
+    Render payment success page after Stripe checkout.
     """
+    session_id = request.args.get('session_id', '')
     order_id = request.args.get('order_id', '')
 
-    # Try to find order in DB for extra details
-    if order_id:
+    # Try to find order in DB
+    lookup_id = order_id or session_id
+    if lookup_id:
         db = get_db()
         row = db.execute(
             "SELECT * FROM orders WHERE paypal_order_id=? OR order_id=? ORDER BY created_at DESC LIMIT 1",
-            (order_id, order_id)
+            (lookup_id, lookup_id)
         ).fetchone()
         if row:
-            # Redirect to thank-you email page with personalization
-            return f'<meta http-equiv="refresh" content="0; url=/thank-you/{order_id}" />'
+            return f'<meta http-equiv="refresh" content="0; url=/thank-you/{row["order_id"]}" />'
 
-    # Fallback to generic success page if order not found
     return render_template('payment_success.html', order_data=None)
 
 
@@ -691,9 +729,18 @@ def download_guide(filename):
     if '..' in filename or '/' in filename or '\\' in filename:
         return jsonify({'error': 'Invalid filename'}), 400
 
-    # Extract order ID from filename (format: sincor-{tier}-guide-{order_id}.pdf)
     if not filename.endswith('.pdf'):
         return jsonify({'error': 'Only PDF files allowed'}), 400
+
+    # Whitelist allowed filename patterns
+    ALLOWED_GUIDE_PATTERNS = [
+        'sincor-starter-guide-',
+        'sincor-professional-guide-',
+        'sincor-enterprise-guide-',
+        'quickstart-checklist-'
+    ]
+    if not any(filename.startswith(pattern) for pattern in ALLOWED_GUIDE_PATTERNS):
+        return jsonify({'error': 'Invalid guide filename'}), 400
 
     # Check if file already exists
     filepath = Path(pdf_guides_dir) / filename
@@ -742,7 +789,7 @@ def download_guide(filename):
 
     except Exception as e:
         logger.error(f"[DOWNLOAD] Error generating guide {filename}: {e}")
-        return jsonify({'error': f'Error generating PDF: {str(e)}'}), 500
+        return jsonify({'error': 'Could not generate PDF. Please contact support.'}), 500
 
 
 @app.route('/payment/cancel')
@@ -762,10 +809,12 @@ def my_orders_page():
 
 
 @app.route('/api/orders/<email>', methods=['GET'])
+@limiter.limit("10 per minute")
 def get_customer_orders(email):
     """
     Get all orders for a customer by email.
     Returns order list with delivery status and download URLs.
+    Always returns 200 to prevent email enumeration.
     """
     email = validate_email(email)
     if not email:
@@ -791,6 +840,7 @@ def get_customer_orders(email):
             'created_at': row['created_at']
         })
 
+    # Always return 200 to prevent email enumeration
     return jsonify({
         'success': True,
         'email': email,
@@ -823,6 +873,7 @@ def sin_airdrop():
 
 
 @app.route('/api/airdrop/register', methods=['POST'])
+@limiter.limit("5 per minute")
 def register_airdrop():
     """Register wallet for SIN token airdrop."""
     data = request.get_json(silent=True) or {}
@@ -951,6 +1002,11 @@ def crypto_checkout():
     if not wallet:
         return jsonify({'error': 'Invalid wallet address'}), 400
 
+    recipient_address = os.environ.get('BASE_PAYMENT_ADDRESS')
+    if not recipient_address:
+        logger.error('[CRYPTO] BASE_PAYMENT_ADDRESS not configured')
+        return jsonify({'error': 'Crypto payments not configured'}), 503
+
     eth_price = 2500
     if currency == 'ETH':
         crypto_amount = amount / eth_price
@@ -970,7 +1026,7 @@ def crypto_checkout():
         'wallet': wallet,
         'network': 'Base',
         'chain_id': 8453,
-        'recipient_address': os.environ.get('BASE_PAYMENT_ADDRESS', '0x8825A2cf25Ad34bAbCdF292c4d27C679d563C048'),
+        'recipient_address': recipient_address,
         'message': f'Send {round(crypto_amount, 8)} {currency} to complete purchase'
     }), 201
 
@@ -1059,6 +1115,7 @@ def request_too_large(error):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV') == 'development'
+    # Never run debug in production
+    debug = os.environ.get('FLASK_ENV') == 'development' and not os.environ.get('RAILWAY_ENVIRONMENT')
     app.run(host='0.0.0.0', port=port, debug=debug)
 
