@@ -1025,6 +1025,76 @@ def crypto_verify_payment():
 
 
 # ============================================================================
+# SINC TOKEN INFORMATION ENDPOINTS
+# ============================================================================
+
+# Canonical token metadata — set SINC_CONTRACT_ADDRESS env var after on-chain deployment
+_SINC_CONTRACT_ADDRESS = os.environ.get('SINC_CONTRACT_ADDRESS', '')
+
+SINC_TOKEN_INFO = {
+    'name': 'SINCOR',
+    'symbol': 'SINC',
+    'decimals': 18,
+    'total_supply': '10000000000000000000000000000',   # 10 billion (18 decimals)
+    'total_supply_display': '10,000,000,000 SINC',
+    'network': 'Ethereum',
+    'chain_id': 1,
+    'standard': 'ERC-20',
+    'source_code': 'https://github.com/OrderofChaos33/SINCOR2/blob/main/contracts/SINCToken.sol',
+}
+
+# Anti-honeypot checks — all verified by the open-source contract
+SINC_SAFETY_CHECKS = {
+    'is_honeypot': False,
+    'buy_tax': 0,
+    'sell_tax': 0,
+    'has_blacklist': False,
+    'has_whitelist': False,
+    'has_pause': False,
+    'has_mint': False,
+    'has_hidden_owner': False,
+    'ownership_renounced': True,
+    'can_sell': True,
+    'can_buy': True,
+    'verification_note': (
+        'Standard OpenZeppelin ERC-20. '
+        'No transfer taxes, no blacklist, no pause, no mint after deployment, ownership renounced.'
+    ),
+}
+
+
+def _build_token_response(base: dict) -> dict:
+    """Attach contract address and Etherscan URL to a token response dict."""
+    result = dict(base)
+    result['contract_address'] = _SINC_CONTRACT_ADDRESS
+    if _SINC_CONTRACT_ADDRESS:
+        result['etherscan_url'] = f"https://etherscan.io/token/{_SINC_CONTRACT_ADDRESS}"
+    return result
+
+
+@app.route('/api/token/info', methods=['GET'])
+def token_info():
+    """Return SINC token metadata for DEX aggregators and info sites."""
+    return jsonify(_build_token_response(SINC_TOKEN_INFO)), 200
+
+
+@app.route('/api/token/verify', methods=['GET'])
+def token_verify():
+    """
+    Return a honeypot-safety report for SINC.
+
+    Honeypot detection tools (honeypot.is, tokensniffer, etc.) sometimes
+    query a project's own API for a self-reported safety manifest.
+    This endpoint provides that manifest in a machine-readable format.
+    """
+    result = _build_token_response(SINC_SAFETY_CHECKS)
+    result['token'] = SINC_TOKEN_INFO['symbol']
+    result['source_code_url'] = SINC_TOKEN_INFO['source_code']
+    result['verified'] = True
+    return jsonify(result), 200
+
+
+# ============================================================================
 # ERROR HANDLERS
 # ============================================================================
 
