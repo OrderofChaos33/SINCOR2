@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buy SINC Token - SINCOR Platform Token</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .glow { box-shadow: 0 0 30px rgba(139, 92, 246, 0.4); }
+        .pulse-price { animation: pulsep 2s ease-in-out infinite; }
+        @keyframes pulsep { 0%,100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+        .buy-btn {
+            position: relative; overflow: hidden;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s ease;
+        }
+        .buy-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 40px rgba(16, 185, 129, 0.5); }
+    </style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen">
+
+    <!-- Nav -->
+    <nav class="bg-gray-900 border-b border-gray-800 py-4">
+        <div class="max-w-6xl mx-auto px-4 flex items-center justify-between">
+            <a href="/" class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">SINCOR</a>
+            <div class="flex gap-6 items-center">
+                <a href="/buy" class="text-gray-300 hover:text-white transition">Platform</a>
+                <a href="/buy-sinc" class="text-purple-400 font-bold">SINC Token</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <div class="bg-gradient-to-b from-gray-900 to-gray-950 py-16">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <div class="inline-block bg-green-900 text-green-300 text-sm font-bold px-4 py-1.5 rounded-full mb-6">
+                🟢 LIVE ON BASE CHAIN
+            </div>
+            <h1 class="text-5xl md:text-6xl font-black mb-4 leading-tight">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-green-400">SINC</span> Token
+            </h1>
+            <p class="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+                The utility token powering the SINCOR ecosystem. Use SINC for platform access, premium features, and governance.
+            </p>
+        </div>
+    </div>
+
+    <!-- Live Price Card -->
+    <div class="max-w-4xl mx-auto px-4 -mt-8">
+        <div class="bg-gray-900 border border-gray-700 rounded-2xl p-8 glow pulse-price">
+            <div class="grid md:grid-cols-3 gap-6 text-center">
+                <div>
+                    <div class="text-sm text-gray-400 mb-1">Current Price</div>
+                    <div id="price-usd" class="text-4xl font-black text-green-400">$1.09</div>
+                    <div id="price-eth" class="text-sm text-gray-500">0.00047 ETH</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-400 mb-1">Tokens Available</div>
+                    <div id="available" class="text-4xl font-black text-purple-400">--</div>
+                    <div class="text-sm text-gray-500">of 100M supply</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-400 mb-1">Total Sold</div>
+                    <div id="sold" class="text-4xl font-black text-blue-400">--</div>
+                    <div class="text-sm text-gray-500">through bonding curve</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buy Section -->
+    <div class="max-w-4xl mx-auto px-4 py-12">
+        <div class="grid md:grid-cols-2 gap-8">
+
+            <!-- Buy with ETH (Bonding Curve) -->
+            <div class="bg-gray-900 border border-gray-700 rounded-2xl p-8">
+                <h2 class="text-2xl font-black mb-2">Buy with ETH</h2>
+                <p class="text-gray-400 text-sm mb-6">Direct purchase through the bonding curve on Base chain. Connect your wallet and buy instantly.</p>
+
+                <div class="mb-4">
+                    <label class="text-sm text-gray-400 block mb-1">Amount of SINC</label>
+                    <input id="buy-amount" type="number" min="1" value="100" placeholder="100"
+                        class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white text-lg focus:border-purple-500 focus:outline-none"
+                        oninput="updateCost()">
+                </div>
+
+                <div class="bg-gray-800 rounded-lg p-4 mb-6">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-gray-400">Cost</span>
+                        <span id="cost-eth" class="text-white font-bold">-- ETH</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-400">≈ USD</span>
+                        <span id="cost-usd" class="text-green-400 font-bold">--</span>
+                    </div>
+                </div>
+
+                <a id="buy-link" href="#" target="_blank"
+                   class="buy-btn block w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black py-4 px-6 rounded-xl text-center text-lg">
+                    Buy on BaseScan →
+                </a>
+                <p class="text-gray-500 text-xs mt-3 text-center">Opens BaseScan write contract — connect wallet, call buy()</p>
+            </div>
+
+            <!-- How It Works -->
+            <div class="bg-gray-900 border border-gray-700 rounded-2xl p-8">
+                <h2 class="text-2xl font-black mb-6">How It Works</h2>
+
+                <div class="space-y-6">
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-purple-900 text-purple-300 flex items-center justify-center font-black">1</div>
+                        <div>
+                            <h3 class="font-bold mb-1">Get ETH on Base</h3>
+                            <p class="text-gray-400 text-sm">Bridge ETH to Base chain via <a href="https://bridge.base.org" target="_blank" class="text-purple-400 underline">bridge.base.org</a> or buy on Coinbase.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-purple-900 text-purple-300 flex items-center justify-center font-black">2</div>
+                        <div>
+                            <h3 class="font-bold mb-1">Connect Wallet</h3>
+                            <p class="text-gray-400 text-sm">Use MetaMask, Coinbase Wallet, or any Web3 wallet on Base network.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-purple-900 text-purple-300 flex items-center justify-center font-black">3</div>
+                        <div>
+                            <h3 class="font-bold mb-1">Buy SINC</h3>
+                            <p class="text-gray-400 text-sm">Call <code class="bg-gray-800 px-1 rounded">buy(amount)</code> on the bonding curve. Tokens sent to your wallet instantly.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-green-900 text-green-300 flex items-center justify-center font-black">✓</div>
+                        <div>
+                            <h3 class="font-bold mb-1">Hold & Use</h3>
+                            <p class="text-gray-400 text-sm">Use SINC for premium platform features, sell back anytime through the curve.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 bg-gray-800 rounded-lg p-4">
+                    <h4 class="font-bold text-sm mb-2">Contract Addresses (Base)</h4>
+                    <div class="text-xs space-y-1">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">SINC Token:</span>
+                            <a href="https://basescan.org/address/0x059ADAcb7Be9C5526abB7f3e5c6d1A712d1b0c23" target="_blank" class="text-purple-400 hover:underline font-mono">0x059A...0c23</a>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Bonding Curve:</span>
+                            <a href="https://basescan.org/address/0xb627F53E08AD7d455e787d052C18D6877020E2BF" target="_blank" class="text-purple-400 hover:underline font-mono">0xb627...E2BF</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Token Details -->
+    <div class="max-w-4xl mx-auto px-4 pb-16">
+        <div class="grid md:grid-cols-3 gap-6">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 text-center">
+                <div class="text-3xl mb-3">🔒</div>
+                <h3 class="font-bold mb-2">No Backdoors</h3>
+                <p class="text-gray-400 text-sm">No mint, no pause, no owner. Verified open source. CertiK score: 97/100.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 text-center">
+                <div class="text-3xl mb-3">📈</div>
+                <h3 class="font-bold mb-2">Rising Price Floor</h3>
+                <p class="text-gray-400 text-sm">Bonding curve means price rises as demand grows. Early buyers get the best price.</p>
+            </div>
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 text-center">
+                <div class="text-3xl mb-3">💰</div>
+                <h3 class="font-bold mb-2">Sell Anytime</h3>
+                <p class="text-gray-400 text-sm">Always liquid — sell back through the bonding curve at the current price. No lockup.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="bg-gray-900 border-t border-gray-800 py-8">
+        <div class="max-w-4xl mx-auto px-4 text-center text-gray-500 text-sm">
+            <p>SINC is a utility token for the SINCOR platform. Not investment advice. <a href="https://basescan.org/address/0xb627F53E08AD7d455e787d052C18D6877020E2BF" target="_blank" class="text-purple-400 hover:underline">View contract</a></p>
+        </div>
+    </div>
+
+    <script>
+        const CURVE = '0xb627F53E08AD7d455e787d052C18D6877020E2BF';
+        const RPC = 'https://mainnet.base.org';
+        const BASE_PRICE = 470000000000000; // wei
+        const PRICE_INCREMENT = 470000000;  // wei
+        let tokensSold = 0;
+        let ethPriceUSD = 2319; // fallback
+
+        // ABI fragments for read calls
+        const CURVE_ABI = [
+            { inputs: [], name: 'tokensSold', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' },
+            { inputs: [], name: 'availableTokens', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' },
+            { inputs: [], name: 'currentPrice', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' },
+            { inputs: [{ name: 'amount', type: 'uint256' }], name: 'getBuyCost', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' }
+        ];
+
+        function encodeFunctionCall(name) {
+            const sigs = {
+                'tokensSold': '0x2f2770db',
+                'availableTokens': '0xf30ceda9',
+                'currentPrice': '0x9d1b464a',
+            };
+            return sigs[name];
+        }
+
+        function encodeGetBuyCost(amount) {
+            // getBuyCost(uint256) selector + amount padded to 32 bytes
+            const selector = '0x61fac54c';
+            const amountHex = BigInt(amount).toString(16).padStart(64, '0');
+            return selector + amountHex;
+        }
+
+        async function ethCall(to, data) {
+            const resp = await fetch(RPC, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] })
+            });
+            const json = await resp.json();
+            return json.result;
+        }
+
+        async function fetchPrices() {
+            try {
+                const [soldHex, availHex, priceHex] = await Promise.all([
+                    ethCall(CURVE, encodeFunctionCall('tokensSold')),
+                    ethCall(CURVE, encodeFunctionCall('availableTokens')),
+                    ethCall(CURVE, encodeFunctionCall('currentPrice'))
+                ]);
+
+                tokensSold = Number(BigInt(soldHex));
+                const available = Number(BigInt(availHex));
+                const priceWei = BigInt(priceHex);
+                const priceETH = Number(priceWei) / 1e18;
+
+                document.getElementById('sold').textContent = tokensSold.toLocaleString();
+                document.getElementById('available').textContent = available.toLocaleString();
+                document.getElementById('price-eth').textContent = priceETH.toFixed(6) + ' ETH';
+                document.getElementById('price-usd').textContent = '$' + (priceETH * ethPriceUSD).toFixed(2);
+
+                updateCost();
+            } catch (e) {
+                console.error('Price fetch error:', e);
+            }
+        }
+
+        async function fetchETHPrice() {
+            try {
+                // Chainlink ETH/USD on Base
+                const oracle = '0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70';
+                const data = '0xfeaf968c'; // latestRoundData()
+                const result = await ethCall(oracle, data);
+                // Parse: skip roundId (32 bytes), read answer (next 32 bytes)
+                const answerHex = '0x' + result.slice(66, 130);
+                ethPriceUSD = Number(BigInt(answerHex)) / 1e8;
+            } catch (e) {
+                console.error('ETH price error:', e);
+            }
+        }
+
+        function updateCost() {
+            const amount = parseInt(document.getElementById('buy-amount').value) || 0;
+            if (amount <= 0) {
+                document.getElementById('cost-eth').textContent = '-- ETH';
+                document.getElementById('cost-usd').textContent = '--';
+                return;
+            }
+
+            // Calculate cost locally: amount * BASE_PRICE + PRICE_INCREMENT * (amount * tokensSold + amount*(amount-1)/2)
+            const a = BigInt(amount);
+            const costWei = a * BigInt(BASE_PRICE) + BigInt(PRICE_INCREMENT) * (a * BigInt(tokensSold) + a * (a - 1n) / 2n);
+            const costETH = Number(costWei) / 1e18;
+            const costUSD = costETH * ethPriceUSD;
+
+            document.getElementById('cost-eth').textContent = costETH.toFixed(6) + ' ETH';
+            document.getElementById('cost-usd').textContent = '$' + costUSD.toFixed(2);
+
+            // Update buy link to BaseScan write contract
+            document.getElementById('buy-link').href =
+                'https://basescan.org/address/' + CURVE + '#writeContract';
+        }
+
+        // Init
+        (async () => {
+            await fetchETHPrice();
+            await fetchPrices();
+            // Refresh every 30 seconds
+            setInterval(fetchPrices, 30000);
+            setInterval(fetchETHPrice, 60000);
+        })();
+    </script>
+</body>
+</html>

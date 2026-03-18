@@ -366,6 +366,12 @@ def buy_page():
     return render_template('buy_stripe.html')
 
 
+@app.route('/buy-sinc', methods=['GET'])
+def buy_sinc_page():
+    """Render SINC token purchase page (bonding curve on Base chain)."""
+    return render_template('buy_sinc.html')
+
+
 # ============================================================================
 # PAYMENT WEBHOOK - Called by Stripe after successful payment
 # This is the CORE endpoint that triggers asset delivery
