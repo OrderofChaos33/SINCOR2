@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Buy SINC Token - SINCOR Platform Token</title>
+    <meta name="description" content="Buy SINC token directly from the bonding curve on Base L2. Connect MetaMask, pay in ETH. Starting price ~$1.09. No KYC required.">
+    <meta property="og:title" content="Buy SINC Token — SINCOR">
+    <meta property="og:description" content="Buy SINC directly from the bonding curve on Base. Connect MetaMask, pay ETH, receive SINC instantly.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Buy SINC Token — SINCOR">
+    <meta name="twitter:description" content="Buy SINC from the live bonding curve on Base L2. Starting at ~$1.09. No KYC.">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
@@ -97,11 +104,11 @@
                     </div>
                 </div>
 
-                <a id="buy-link" href="#" target="_blank"
-                   class="buy-btn block w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black py-4 px-6 rounded-xl text-center text-lg">
-                    Buy on BaseScan →
-                </a>
-                <p class="text-gray-500 text-xs mt-3 text-center">Opens BaseScan write contract — connect wallet, call buy()</p>
+                <button id="buy-btn" onclick="handleBuy()"
+                   class="buy-btn block w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black py-4 px-6 rounded-xl text-center text-lg cursor-pointer border-0">
+                    Connect Wallet & Buy
+                </button>
+                <div id="tx-status" class="text-xs mt-3 text-center text-gray-500"></div>
             </div>
 
             <!-- How It Works -->
@@ -184,46 +191,40 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js"></script>
     <script>
         const CURVE = '0xb627F53E08AD7d455e787d052C18D6877020E2BF';
+        const SINC_TOKEN = '0x059ADAcb7Be9C5526abB7f3e5c6d1A712d1b0c23';
+        const BASE_CHAIN_ID = 8453;
         const RPC = 'https://mainnet.base.org';
-        const BASE_PRICE = 470000000000000; // wei
-        const PRICE_INCREMENT = 470000000;  // wei
+        const BASE_PRICE = 470000000000000n;
+        const PRICE_INCREMENT = 470000000n;
         let tokensSold = 0;
-        let ethPriceUSD = 2319; // fallback
+        let ethPriceUSD = 2319;
+        let walletConnected = false;
+        let signer = null;
 
-        // ABI fragments for read calls
         const CURVE_ABI = [
-            { inputs: [], name: 'tokensSold', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' },
-            { inputs: [], name: 'availableTokens', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' },
-            { inputs: [], name: 'currentPrice', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' },
-            { inputs: [{ name: 'amount', type: 'uint256' }], name: 'getBuyCost', outputs: [{ type: 'uint256' }], stateMutability: 'view', type: 'function' }
+            'function buy(uint256 amount) payable',
+            'function sell(uint256 amount)',
+            'function tokensSold() view returns (uint256)',
+            'function availableTokens() view returns (uint256)',
+            'function currentPrice() view returns (uint256)',
+            'function getBuyCost(uint256 amount) view returns (uint256)'
         ];
 
+        // ── Read helpers using raw RPC (no wallet needed) ──
         function encodeFunctionCall(name) {
-            const sigs = {
-                'tokensSold': '0x2f2770db',
-                'availableTokens': '0xf30ceda9',
-                'currentPrice': '0x9d1b464a',
-            };
+            const sigs = { 'tokensSold': '0x2f2770db', 'availableTokens': '0xf30ceda9', 'currentPrice': '0x9d1b464a' };
             return sigs[name];
-        }
-
-        function encodeGetBuyCost(amount) {
-            // getBuyCost(uint256) selector + amount padded to 32 bytes
-            const selector = '0x61fac54c';
-            const amountHex = BigInt(amount).toString(16).padStart(64, '0');
-            return selector + amountHex;
         }
 
         async function ethCall(to, data) {
             const resp = await fetch(RPC, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] })
             });
-            const json = await resp.json();
-            return json.result;
+            return (await resp.json()).result;
         }
 
         async function fetchPrices() {
@@ -233,35 +234,24 @@
                     ethCall(CURVE, encodeFunctionCall('availableTokens')),
                     ethCall(CURVE, encodeFunctionCall('currentPrice'))
                 ]);
-
                 tokensSold = Number(BigInt(soldHex));
                 const available = Number(BigInt(availHex));
-                const priceWei = BigInt(priceHex);
-                const priceETH = Number(priceWei) / 1e18;
-
+                const priceETH = Number(BigInt(priceHex)) / 1e18;
                 document.getElementById('sold').textContent = tokensSold.toLocaleString();
                 document.getElementById('available').textContent = available.toLocaleString();
                 document.getElementById('price-eth').textContent = priceETH.toFixed(6) + ' ETH';
                 document.getElementById('price-usd').textContent = '$' + (priceETH * ethPriceUSD).toFixed(2);
-
                 updateCost();
-            } catch (e) {
-                console.error('Price fetch error:', e);
-            }
+            } catch (e) { console.error('Price fetch error:', e); }
         }
 
         async function fetchETHPrice() {
             try {
-                // Chainlink ETH/USD on Base
                 const oracle = '0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70';
-                const data = '0xfeaf968c'; // latestRoundData()
-                const result = await ethCall(oracle, data);
-                // Parse: skip roundId (32 bytes), read answer (next 32 bytes)
+                const result = await ethCall(oracle, '0xfeaf968c');
                 const answerHex = '0x' + result.slice(66, 130);
                 ethPriceUSD = Number(BigInt(answerHex)) / 1e8;
-            } catch (e) {
-                console.error('ETH price error:', e);
-            }
+            } catch (e) { console.error('ETH price error:', e); }
         }
 
         function updateCost() {
@@ -271,28 +261,117 @@
                 document.getElementById('cost-usd').textContent = '--';
                 return;
             }
-
-            // Calculate cost locally: amount * BASE_PRICE + PRICE_INCREMENT * (amount * tokensSold + amount*(amount-1)/2)
             const a = BigInt(amount);
-            const costWei = a * BigInt(BASE_PRICE) + BigInt(PRICE_INCREMENT) * (a * BigInt(tokensSold) + a * (a - 1n) / 2n);
+            const costWei = a * BASE_PRICE + PRICE_INCREMENT * (a * BigInt(tokensSold) + a * (a - 1n) / 2n);
             const costETH = Number(costWei) / 1e18;
-            const costUSD = costETH * ethPriceUSD;
-
             document.getElementById('cost-eth').textContent = costETH.toFixed(6) + ' ETH';
-            document.getElementById('cost-usd').textContent = '$' + costUSD.toFixed(2);
-
-            // Update buy link to BaseScan write contract
-            document.getElementById('buy-link').href =
-                'https://basescan.org/address/' + CURVE + '#writeContract';
+            document.getElementById('cost-usd').textContent = '$' + (costETH * ethPriceUSD).toFixed(2);
         }
 
-        // Init
+        // ── Wallet + Buy Flow ──
+        async function connectWallet() {
+            if (!window.ethereum) {
+                setStatus('Install MetaMask or a Web3 wallet to buy directly.', 'text-yellow-400');
+                window.open('https://metamask.io/download/', '_blank');
+                return false;
+            }
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                // Switch to Base if needed
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                if (parseInt(chainId, 16) !== BASE_CHAIN_ID) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x' + BASE_CHAIN_ID.toString(16) }]
+                        });
+                    } catch (switchError) {
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [{
+                                    chainId: '0x' + BASE_CHAIN_ID.toString(16),
+                                    chainName: 'Base',
+                                    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                                    rpcUrls: ['https://mainnet.base.org'],
+                                    blockExplorerUrls: ['https://basescan.org']
+                                }]
+                            });
+                        } else { throw switchError; }
+                    }
+                }
+                const provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                walletConnected = true;
+                document.getElementById('buy-btn').textContent = 'Buy SINC Now';
+                setStatus('Wallet connected: ' + accounts[0].slice(0,6) + '...' + accounts[0].slice(-4), 'text-green-400');
+                return true;
+            } catch (e) {
+                setStatus('Wallet connection failed: ' + e.message, 'text-red-400');
+                return false;
+            }
+        }
+
+        async function handleBuy() {
+            if (!walletConnected) {
+                const connected = await connectWallet();
+                if (!connected) return;
+            }
+            const amount = parseInt(document.getElementById('buy-amount').value) || 0;
+            if (amount <= 0) { setStatus('Enter a valid amount.', 'text-yellow-400'); return; }
+
+            try {
+                setStatus('Calculating cost...', 'text-gray-400');
+                const curve = new ethers.Contract(CURVE, CURVE_ABI, signer);
+                const cost = await curve.getBuyCost(amount);
+                // Add 1% buffer for price movement
+                const costWithBuffer = cost * 101n / 100n;
+
+                setStatus('Confirm transaction in your wallet...', 'text-purple-400');
+                document.getElementById('buy-btn').textContent = 'Confirming...';
+                document.getElementById('buy-btn').disabled = true;
+
+                const tx = await curve.buy(amount, { value: costWithBuffer });
+                setStatus('Transaction sent! Waiting for confirmation...', 'text-yellow-400');
+
+                const receipt = await tx.wait();
+                setStatus('Purchase complete! ' + amount + ' SINC sent to your wallet. <a href="https://basescan.org/tx/' + receipt.hash + '" target="_blank" class="text-purple-400 underline">View TX</a>', 'text-green-400');
+                document.getElementById('buy-btn').textContent = 'Buy More SINC';
+                document.getElementById('buy-btn').disabled = false;
+
+                // Refresh prices
+                await fetchPrices();
+            } catch (e) {
+                const msg = e.reason || e.message || 'Transaction failed';
+                setStatus(msg.length > 100 ? msg.slice(0, 100) + '...' : msg, 'text-red-400');
+                document.getElementById('buy-btn').textContent = 'Buy SINC Now';
+                document.getElementById('buy-btn').disabled = false;
+            }
+        }
+
+        function setStatus(html, colorClass) {
+            const el = document.getElementById('tx-status');
+            el.innerHTML = html;
+            el.className = 'text-xs mt-3 text-center ' + colorClass;
+        }
+
+        // ── Init ──
         (async () => {
             await fetchETHPrice();
             await fetchPrices();
-            // Refresh every 30 seconds
             setInterval(fetchPrices, 30000);
             setInterval(fetchETHPrice, 60000);
+            // Auto-detect wallet
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    walletConnected = true;
+                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    signer = await provider.getSigner();
+                    document.getElementById('buy-btn').textContent = 'Buy SINC Now';
+                    setStatus('Wallet: ' + accounts[0].slice(0,6) + '...' + accounts[0].slice(-4), 'text-green-400');
+                }
+            }
         })();
     </script>
 </body>
