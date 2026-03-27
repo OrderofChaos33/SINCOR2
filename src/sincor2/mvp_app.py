@@ -968,6 +968,78 @@ def login_page():
     return render_template('login.html')
 
 
+@app.route('/billing')
+def billing():
+    """Stripe Customer Portal — lets subscribers manage their plan/billing."""
+    customer_email = request.args.get('email', '')
+    if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
+        try:
+            import stripe as stripe_lib
+            stripe_lib.api_key = stripe_processor.api_key
+            customers = stripe_lib.Customer.list(email=customer_email, limit=1)
+            if customers and customers.data:
+                session = stripe_lib.billing_portal.Session.create(
+                    customer=customers.data[0].id,
+                    return_url=os.environ.get('STRIPE_PORTAL_RETURN_URL', 'https://getsincor.com/billing'),
+                )
+                return redirect(session.url, code=303)
+        except Exception as e:
+            logger.warning(f'[BILLING] Stripe portal error: {e}')
+    return render_template('error.html', code=200, title='Manage Your Subscription',
+                           message='To manage your subscription, email us at support@getsincor.com '
+                                   'or visit your Stripe billing portal link in your confirmation email.'), 200
+
+
+@app.route('/discovery-dashboard')
+def discovery_dashboard():
+    """Discovery dashboard page."""
+    return render_template('discovery-dashboard.html')
+
+
+@app.route('/franchise-empire')
+def franchise_empire():
+    """Franchise empire page."""
+    return render_template('franchise-empire.html')
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    """robots.txt — allow crawlers, block sensitive paths."""
+    content = (
+        'User-agent: *\n'
+        'Allow: /\n'
+        'Disallow: /api/\n'
+        'Disallow: /admin/\n'
+        'Disallow: /files/\n'
+        'Disallow: /my-orders\n'
+        'Sitemap: https://getsincor.com/sitemap.xml\n'
+    )
+    return make_response(content, 200, {'Content-Type': 'text/plain'})
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """XML sitemap for SEO."""
+    base = 'https://getsincor.com'
+    pages = [
+        ('/', '1.0', 'weekly'),
+        ('/buy', '0.9', 'weekly'),
+        ('/pricing', '0.9', 'weekly'),
+        ('/affiliate-program', '0.7', 'monthly'),
+        ('/enterprise-dashboard', '0.7', 'monthly'),
+        ('/whitepaper', '0.6', 'monthly'),
+        ('/privacy', '0.4', 'monthly'),
+        ('/terms', '0.4', 'monthly'),
+        ('/security', '0.4', 'monthly'),
+    ]
+    urls = '\n'.join(
+        f'  <url><loc>{base}{loc}</loc><priority>{pri}</priority><changefreq>{freq}</changefreq></url>'
+        for loc, pri, freq in pages
+    )
+    xml = f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{urls}\n</urlset>'
+    return make_response(xml, 200, {'Content-Type': 'application/xml'})
+
+
 # ============================================================================
 # WHITEPAPER & DOCUMENTATION
 # ============================================================================
