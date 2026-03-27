@@ -23,7 +23,13 @@ class StripeCheckout:
 
     def __init__(self, api_key: Optional[str] = None):
         """Initialize Stripe checkout processor"""
-        self.api_key = api_key or os.getenv('STRIPE_API_KEY')
+        # Support multiple env var names for the Stripe secret key
+        self.api_key = (
+            api_key
+            or os.getenv('STRIPE_API_KEY')
+            or os.getenv('STRIPE_API_SECRET')
+            or os.getenv('STRIPE_SECRET')
+        )
         self.mode = 'test' if 'sk_test' in (self.api_key or '') else 'live'
 
         if self.api_key and STRIPE_AVAILABLE:
