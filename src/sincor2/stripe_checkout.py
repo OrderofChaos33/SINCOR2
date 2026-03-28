@@ -18,6 +18,18 @@ except ImportError:
 
 logger = logging.getLogger('sincor.stripe')
 
+
+def _safe_success_url() -> str:
+    """Return a valid Stripe success URL with {CHECKOUT_SESSION_ID} template var.
+    Guards against broken env var values (e.g. missing the session_id param).
+    """
+    url = os.getenv('STRIPE_SUCCESS_URL', '')
+    if url and '{CHECKOUT_SESSION_ID}' in url:
+        return url
+    # Fallback — always valid
+    return 'https://getsincor.com/payment/success?session_id={CHECKOUT_SESSION_ID}'
+
+
 class StripeCheckout:
     """Handles Stripe payment processing"""
 
@@ -83,14 +95,8 @@ class StripeCheckout:
                 'payment_method_types': ['card'],
                 'line_items': [line_item],
                 'mode': 'subscription' if is_subscription else 'payment',
-                'success_url': os.getenv(
-                    'STRIPE_SUCCESS_URL',
-                    'https://getsincor.com/payment/success?session_id={CHECKOUT_SESSION_ID}'
-                ),
-                'cancel_url': os.getenv(
-                    'STRIPE_CANCEL_URL',
-                    'https://getsincor.com/payment/cancel'
-                ),
+                'success_url': _safe_success_url(),
+                'cancel_url': os.getenv('STRIPE_CANCEL_URL', 'https://getsincor.com/buy'),
                 # Allow coupon/promo codes at checkout
                 'allow_promotion_codes': True,
             }
