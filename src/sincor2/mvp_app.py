@@ -255,6 +255,24 @@ PRODUCT_CATALOG = {
 # HEALTH & STATUS ENDPOINTS
 # ============================================================================
 
+@app.route('/debug/stripe-env')
+def debug_stripe_env():
+    """Temporary: show what Stripe env vars the live container sees."""
+    import os
+    su = os.getenv('STRIPE_SUCCESS_URL', 'NOT_SET')
+    ak = os.getenv('STRIPE_API_KEY', 'NOT_SET')
+    ask = os.getenv('STRIPE_API_SECRET', 'NOT_SET')
+    sk = os.getenv('STRIPE_SECRET', 'NOT_SET')
+    return jsonify({
+        'STRIPE_SUCCESS_URL': su,
+        'has_session_id_var': '{CHECKOUT_SESSION_ID}' in su,
+        'STRIPE_API_KEY_set': ak != 'NOT_SET',
+        'STRIPE_API_SECRET_set': ask != 'NOT_SET',
+        'STRIPE_SECRET_set': sk != 'NOT_SET',
+        'stripe_enabled': STRIPE_AVAILABLE and stripe_processor is not None and getattr(stripe_processor, 'enabled', False),
+    })
+
+
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint for Railway and monitoring."""
