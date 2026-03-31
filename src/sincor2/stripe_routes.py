@@ -102,6 +102,7 @@ def init_stripe_routes(app, stripe_processor):
                 interval=billing,
                 customer_email=customer_email or None,
                 price_id=price_id,
+                plan_id=plan_id,
             )
 
             if result.get('success'):
@@ -208,15 +209,69 @@ def _send_email(to_email: str, subject: str, html: str, text: str = ''):
         logger.warning(f"[EMAIL] Could not send email: {e}")
 
 
+def _write_order(session_id, customer_email, plan_name, plan_id, amount, subscription_id):
+    """Write completed order to sincor orders DB."""
+    try:
+        import sqlite3 as _sqlite3
+        from datetime import datetime as _dt
+        import json as _json
+        import os as _os
+        db_path = _os.path.join(_os.path.dirname(__file__), '..', '..', 'orders.db')
+        conn = _sqlite3.connect(db_path)
+        conn.execute('''CREATE TABLE IF NOT EXISTS orders (
+            order_id TEXT PRIMARY KEY,
+            paypal_order_id TEXT,
+            customer_email TEXT,
+            product_name TEXT,
+            amount REAL,
+            currency TEXT,
+            payment_status TEXT,
+            delivery_status TEXT,
+            delivery_url TEXT,
+            order_type TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            metadata TEXT
+        )''')
+        order_id = f"STRIPE-{session_id[:20]}"
+        now = _dt.utcnow().isoformat()
+        conn.execute(
+            '''INSERT OR REPLACE INTO orders
+               (order_id, paypal_order_id, customer_email, product_name, amount,
+                currency, payment_status, delivery_status, delivery_url, order_type,
+                created_at, updated_at, metadata)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (order_id, session_id, customer_email, plan_name, amount,
+             'USD', 'completed', 'delivered', f'/my-orders?email={customer_email}',
+             plan_id or 'subscription', now, now,
+             _json.dumps({'stripe_session_id': session_id, 'subscription_id': subscription_id or ''}))
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"[ORDER] Written to DB: {order_id} for {customer_email}")
+    except Exception as e:
+        logger.error(f"[ORDER] DB write failed: {e}")
+
+
 def _process_payment_event(event_data):
     """Process Stripe events — fulfill orders, send emails, handle lifecycle"""
     event_type     = event_data.get('event')
     customer_email = event_data.get('customer_email', '')
 
     if event_type == 'payment_completed':
-        session_id = event_data.get('session_id', '')
-        amount     = (event_data.get('amount_total') or 0) / 100
-        logger.info(f"[FULFILLMENT] New subscriber: {customer_email} — ${amount:.2f}")
+        session_id      = event_data.get('session_id', '')
+        amount          = (event_data.get('amount_total') or 0) / 100
+        subscription_id = event_data.get('subscription_id', '')
+        # Read plan from metadata (works even with $0 trial)
+        metadata        = event_data.get('metadata') or {}
+        plan_id         = metadata.get('plan_id') or 'starter'
+        plan_name       = metadata.get('plan_name') or 'SINCOR Starter'
+
+        logger.info(f"[FULFILLMENT] New subscriber: {customer_email} — {plan_name} ${amount:.2f}")
+
+        # Write order to DB
+        if customer_email:
+            _write_order(session_id, customer_email, plan_name, plan_id, amount, subscription_id)
 
         # Mark as recovered so abandoned emails don't fire
         _mark_recovered(session_id)
@@ -224,7 +279,7 @@ def _process_payment_event(event_data):
         if customer_email:
             _send_email(
                 to_email=customer_email,
-                subject="Welcome to SINCOR — You're in! 🚀",
+                subject="Welcome to SINCOR - You're in! 🚀",
                 html=f"""
                 <h2>Welcome aboard!</h2>
                 <p>Your SINCOR subscription is now active. Our AI agents are warming up.</p>
@@ -235,7 +290,7 @@ def _process_payment_event(event_data):
                   <li>You'll receive your training materials shortly</li>
                 </ol>
                 <p>Questions? Reply to this email or visit <a href="https://getsincor.com/">getsincor.com</a></p>
-                <p>— The SINCOR Team</p>
+                <p>- The SINCOR Team</p>
                 """,
                 text=f"Welcome to SINCOR! Your subscription is active. Visit https://getsincor.com/ to get started.",
             )
@@ -243,7 +298,7 @@ def _process_payment_event(event_data):
     elif event_type == 'invoice_paid':
         sub_id = event_data.get('subscription_id', '')
         amount = (event_data.get('amount_paid') or 0) / 100
-        logger.info(f"[BILLING] Recurring invoice paid: {sub_id} — ${amount:.2f}")
+        logger.info(f"[BILLING] Recurring invoice paid: {sub_id} - ${amount:.2f}")
         # No email for routine renewals to avoid noise
 
     elif event_type == 'invoice_payment_failed':
@@ -254,7 +309,7 @@ def _process_payment_event(event_data):
                 to_email=customer_email,
                 subject="Action Required: SINCOR payment failed",
                 html=f"""
-                <h2>Payment issue — action required</h2>
+                <h2>Payment issue - action required</h2>
                 <p>We couldn't process your SINCOR subscription renewal.</p>
                 <p>Please update your payment method to keep your AI agents running:</p>
                 <p><a href="https://getsincor.com/billing" style="background:#7c3aed;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;">Update Payment Method</a></p>
@@ -278,11 +333,11 @@ def _process_payment_event(event_data):
             logger.info(f"[ABANDONED] Sending recovery email to {email}")
             _send_email(
                 to_email=email,
-                subject="You left something behind — come back to SINCOR",
+                subject="You left something behind - come back to SINCOR",
                 html=f"""
                 <h2>Did something come up?</h2>
                 <p>You were SO close to activating your SINCOR AI agents.</p>
-                <p>Your 30-day free trial is still waiting for you — no charge until the trial ends.</p>
+                <p>Your 30-day free trial is still waiting for you - no charge until the trial ends.</p>
                 <p><a href="https://getsincor.com/buy" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Claim Your Free Trial →</a></p>
                 <p style="color:#888;font-size:12px;">This offer expires in 48 hours.</p>
                 """,
@@ -300,7 +355,7 @@ def _process_payment_event(event_data):
                 <h2>We're sorry to see you go</h2>
                 <p>Your SINCOR subscription has been cancelled. Your access remains active until the end of your billing period.</p>
                 <p>Changed your mind? <a href="https://getsincor.com/buy">Reactivate anytime</a>.</p>
-                <p>— The SINCOR Team</p>
+                <p>- The SINCOR Team</p>
                 """,
                 text="Your SINCOR subscription has been cancelled. You can reactivate at https://getsincor.com/buy",
             )

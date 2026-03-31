@@ -52,7 +52,8 @@ class StripeCheckout:
                                 quantity: int = 1, customer_email: str = None,
                                 is_subscription: bool = True,
                                 interval: str = 'month',
-                                price_id: str = None) -> Dict:
+                                price_id: str = None,
+                                plan_id: str = None) -> Dict:
         """
         Create a Stripe checkout session.
         If price_id is provided, uses the real Stripe Price object (preferred).
@@ -93,8 +94,12 @@ class StripeCheckout:
                 'mode': 'subscription' if is_subscription else 'payment',
                 'success_url': _safe_success_url(),
                 'cancel_url': 'https://getsincor.com/buy',
-                # Allow coupon/promo codes at checkout
                 'allow_promotion_codes': True,
+                # Embed plan info in metadata so webhook can identify product regardless of amount
+                'metadata': {
+                    'plan_id': plan_id or '',
+                    'plan_name': product_name or '',
+                },
             }
 
             if customer_email:
@@ -187,6 +192,7 @@ class StripeCheckout:
             'amount_total': session.get('amount_total'),
             'currency': session.get('currency'),
             'subscription_id': session.get('subscription'),
+            'metadata': session.get('metadata') or {},
         }
 
     def _handle_session_expired(self, session: Dict) -> Tuple[bool, Dict]:
