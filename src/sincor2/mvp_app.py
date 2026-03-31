@@ -41,8 +41,8 @@ template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
-# Configure JWT — MUST be set in Railway secrets for production
-jwt_secret = os.environ.get('JWT_SECRET_KEY')
+# Configure JWT ï¿½ MUST be set in Railway secrets for production
+jwt_secret = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET')
 if not jwt_secret:
     if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('ENVIRONMENT') == 'production':
         logger.critical('[JWT] JWT_SECRET_KEY not set in production! Generating random secret (tokens won\'t survive restarts)')
@@ -76,7 +76,7 @@ if STRIPE_AVAILABLE:
         init_stripe_routes(app, stripe_processor)
         logger.info("[APP] Stripe integration initialized and routes registered")
     else:
-        logger.warning("[APP] Stripe not properly configured — set STRIPE_API_KEY")
+        logger.warning("[APP] Stripe not properly configured ï¿½ set STRIPE_API_KEY")
 
 # PDF Generator initialization
 pdf_guides_dir = os.path.join(project_root, 'files', 'guides')
@@ -279,12 +279,12 @@ def home():
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
-# Admin credentials — must be set via environment variables in production
+# Admin credentials ï¿½ must be set via environment variables in production
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', '')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
 if not ADMIN_USERNAME or not ADMIN_PASSWORD:
-    logger.warning('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not set — admin login disabled')
+    logger.warning('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not set ï¿½ admin login disabled')
 
 
 def _check_admin_token(req):
@@ -353,7 +353,7 @@ def protected():
 # BUY / PAYMENT ENDPOINTS
 # ============================================================================
 
-# Product pricing — server-side validation of amounts
+# Product pricing ï¿½ server-side validation of amounts
 PRODUCT_PRICES = {
     'Starter': 297,
     'Professional': 997,
@@ -389,7 +389,7 @@ def payment_webhook():
     Stores order in DB and triggers product fulfillment/delivery.
     """
     if not stripe_processor or not stripe_processor.enabled:
-        logger.error('[WEBHOOK] Stripe not configured — cannot process webhook')
+        logger.error('[WEBHOOK] Stripe not configured ï¿½ cannot process webhook')
         return jsonify({'error': 'Payment processor not configured'}), 503
 
     payload = request.get_data()
@@ -656,7 +656,7 @@ def admin_training_vault():
     Render the training vault dashboard for logged-in customers.
     Shows tier-specific guides, videos, industry guides, and onboarding progress.
     SECURITY: Requires a valid order token (order_id tied to email) or admin JWT.
-    Email alone is NOT sufficient — prevents trivial enumeration access.
+    Email alone is NOT sufficient ï¿½ prevents trivial enumeration access.
     """
     # Admin JWT bypass
     if _check_admin_token(request):
@@ -759,7 +759,7 @@ def download_guide(filename):
     Serve training guide PDF files.
     Generates PDF on first request, caches for subsequent requests.
     SECURITY: Requires email + order_id query params to verify the requester
-    actually owns an order — prevents downloading guides without paying.
+    actually owns an order ï¿½ prevents downloading guides without paying.
     """
     # Verify ownership: email + order_id must match a real order
     req_email = validate_email(request.args.get('email', ''))
@@ -1022,7 +1022,7 @@ def login_page():
 
 @app.route('/billing')
 def billing():
-    """Stripe Customer Portal — lets subscribers manage their plan/billing."""
+    """Stripe Customer Portal ï¿½ lets subscribers manage their plan/billing."""
     customer_email = request.args.get('email', '')
     if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         try:
@@ -1056,7 +1056,7 @@ def franchise_empire():
 
 @app.route('/robots.txt')
 def robots_txt():
-    """robots.txt — allow crawlers, block sensitive paths."""
+    """robots.txt ï¿½ allow crawlers, block sensitive paths."""
     content = (
         'User-agent: *\n'
         'Allow: /\n'
@@ -1215,7 +1215,7 @@ def crypto_verify_payment():
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid amount'}), 400
 
-    # BLOCKCHAIN VERIFICATION — check tx on Base via public RPC
+    # BLOCKCHAIN VERIFICATION ï¿½ check tx on Base via public RPC
     recipient_address = os.environ.get('BASE_PAYMENT_ADDRESS', '').lower()
     if not recipient_address:
         logger.error('[CRYPTO] BASE_PAYMENT_ADDRESS not configured')
@@ -1268,7 +1268,7 @@ def crypto_verify_payment():
         # Do NOT fulfill if verification fails
         return jsonify({'error': 'Blockchain verification failed. Please try again or contact support.'}), 503
 
-    # Verification passed — store order and fulfill
+    # Verification passed ï¿½ store order and fulfill
     order_id = f"CRYPTO-ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     product_info = PRODUCT_CATALOG.get(product_name, {'type': 'generic'})
     order_type = product_info.get('type', 'generic')

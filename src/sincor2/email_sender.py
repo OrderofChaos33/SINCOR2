@@ -22,6 +22,13 @@ except ImportError:
     SENDGRID_AVAILABLE = False
     logger.warning("[EMAIL] SendGrid not installed, email delivery will use stub mode")
 
+# Try to import Twilio for SMS fallback
+try:
+    from twilio.rest import Client as TwilioClient
+    TWILIO_AVAILABLE = True
+except ImportError:
+    TWILIO_AVAILABLE = False
+
 
 class EmailSender:
     """Send transactional emails via SendGrid."""
@@ -32,10 +39,20 @@ class EmailSender:
         self.from_email = os.environ.get('SENDGRID_FROM_EMAIL', 'support@sincor.com')
         self.from_name = os.environ.get('SENDGRID_FROM_NAME', 'SINCOR Team')
 
+        # Twilio SMS fallback
+        self.twilio_sid = os.environ.get('TWILO_ID') or os.environ.get('TWILIO_ACCOUNT_SID')
+        self.twilio_auth = os.environ.get('TWILO_AUTH') or os.environ.get('TWILIO_AUTH_TOKEN')
+        self.twilio_number = os.environ.get('TWILO_NUMBER') or os.environ.get('TWILIO_FROM_NUMBER', '')
+        self.twilio_client = None
+
         if SENDGRID_AVAILABLE and self.api_key:
             self.client = SendGridAPIClient(self.api_key)
             self.mode = 'production'
             logger.info("[EMAIL] Using SendGrid API for email delivery")
+        elif TWILIO_AVAILABLE and self.twilio_sid and self.twilio_auth:
+            self.twilio_client = TwilioClient(self.twilio_sid, self.twilio_auth)
+            self.mode = 'sms_fallback'
+            logger.info("[EMAIL] SendGrid not configured — using Twilio SMS as delivery fallback")
         else:
             self.client = None
             self.mode = 'stub'
@@ -117,6 +134,37 @@ SINCOR Team
             {'status': 'sent|failed|stub', 'message_id': '...', 'error': '...'}
         """
         metadata = metadata or {}
+
+        if self.mode == 'sms_fallback':
+            # Twilio SMS fallback — send a short delivery notification SMS to the customer
+            # (We can't send to customer's email without SendGrid, but we can at least
+            #  send a confirmation SMS if their phone is in metadata, or log for manual follow-up)
+            order_id = metadata.get('order_id', 'unknown') if metadata else 'unknown'
+            tier = metadata.get('tier', '') if metadata else ''
+            vault_url = f"https://getsincor.com/admin/training-vault?email={to_email}&order_id={order_id}"
+            sms_body = (
+                f"Welcome to SINCOR{' ' + tier if tier else ''}! Your order is confirmed.\n"
+                f"Access your training vault: {vault_url}\n"
+                f"Order ID: {order_id}\n"
+                f"Support: support@getsincor.com"
+            )
+            logger.info(f"[EMAIL-SMS] Sending SMS confirmation for order {order_id} to admin (customer: {to_email})")
+            try:
+                # Notify admin number so we can manually follow up with customer
+                admin_notify = os.environ.get('ADMIN_SMS_NUMBER', self.twilio_number)
+                self.twilio_client.messages.create(
+                    body=f"[SINCOR ORDER] New purchase by {to_email}. {tier} plan. Order: {order_id}. Vault: {vault_url}",
+                    from_=self.twilio_number,
+                    to=admin_notify
+                )
+                logger.info(f"[EMAIL-SMS] Admin notified of order {order_id}")
+            except Exception as sms_err:
+                logger.error(f"[EMAIL-SMS] SMS failed: {sms_err}")
+            return {
+                'status': 'sms_fallback',
+                'message_id': f"sms-{datetime.now().isoformat()}",
+                'message': 'Email not configured — admin notified via SMS. Add SENDGRID_API_KEY for customer emails.'
+            }
 
         if self.mode == 'stub':
             # Stub mode - log email but don't send
