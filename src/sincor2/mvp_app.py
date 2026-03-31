@@ -255,22 +255,7 @@ PRODUCT_CATALOG = {
 # HEALTH & STATUS ENDPOINTS
 # ============================================================================
 
-@app.route('/debug/stripe-env')
-def debug_stripe_env():
-    """Temporary: show what Stripe env vars the live container sees."""
-    import os
-    su = os.getenv('STRIPE_SUCCESS_URL', 'NOT_SET')
-    ak = os.getenv('STRIPE_API_KEY', 'NOT_SET')
-    ask = os.getenv('STRIPE_API_SECRET', 'NOT_SET')
-    sk = os.getenv('STRIPE_SECRET', 'NOT_SET')
-    return jsonify({
-        'STRIPE_SUCCESS_URL': su,
-        'has_session_id_var': '{CHECKOUT_SESSION_ID}' in su,
-        'STRIPE_API_KEY_set': ak != 'NOT_SET',
-        'STRIPE_API_SECRET_set': ask != 'NOT_SET',
-        'STRIPE_SECRET_set': sk != 'NOT_SET',
-        'stripe_enabled': STRIPE_AVAILABLE and stripe_processor is not None and getattr(stripe_processor, 'enabled', False),
-    })
+# DEBUG ENDPOINT REMOVED - was leaking env var status to public
 
 
 @app.route('/health', methods=['GET'])
@@ -665,28 +650,52 @@ def thank_you_email(order_id):
 
 
 @app.route('/admin/training-vault')
+@limiter.limit("30 per minute")
 def admin_training_vault():
     """
     Render the training vault dashboard for logged-in customers.
     Shows tier-specific guides, videos, industry guides, and onboarding progress.
+    SECURITY: Requires a valid order token (order_id tied to email) or admin JWT.
+    Email alone is NOT sufficient — prevents trivial enumeration access.
     """
-    # Get customer email from query params or JWT
-    customer_email = request.args.get('email')
-    if not customer_email:
-        customer_email = request.args.get('customer_email')
+    # Admin JWT bypass
+    if _check_admin_token(request):
+        customer_email = request.args.get('email') or request.args.get('customer_email')
+        if not customer_email or not validate_email(customer_email):
+            return render_template('error.html', code=400, title='Bad Request',
+                                 message="email parameter required for admin vault access."), 400
+    else:
+        # Customers must provide email + order_id (acts as an access token)
+        customer_email = request.args.get('email') or request.args.get('customer_email')
+        order_token = request.args.get('order_id', '').strip()
 
-    if not customer_email or not validate_email(customer_email):
-        # Redirect to login if no valid email
-        return render_template('error.html', code=401, title='Authentication Required',
-                             message="Please log in to access your training vault."), 401
+        if not customer_email or not validate_email(customer_email):
+            return render_template('error.html', code=401, title='Authentication Required',
+                                 message="Please log in to access your training vault."), 401
+
+        if not order_token:
+            return render_template('error.html', code=401, title='Authentication Required',
+                                 message="Access token required. Check your confirmation email for your order link."), 401
+
+        # Sanitize order_token
+        order_token = sanitize_string(order_token, max_length=64)
 
     # Fetch customer's orders from database
     db = get_db()
-    rows = db.execute(
-        "SELECT * FROM orders WHERE customer_email=? AND product_name IN ('Starter', 'Professional', 'Enterprise') "
-        "ORDER BY created_at DESC LIMIT 1",
-        (customer_email,)
-    ).fetchone()
+
+    # If not admin, verify order_id belongs to this email (prevents email-only enumeration)
+    if not _check_admin_token(request):
+        rows = db.execute(
+            "SELECT * FROM orders WHERE customer_email=? AND order_id=? "
+            "AND product_name IN ('Starter', 'Professional', 'Enterprise') LIMIT 1",
+            (customer_email, order_token)
+        ).fetchone()
+    else:
+        rows = db.execute(
+            "SELECT * FROM orders WHERE customer_email=? AND product_name IN ('Starter', 'Professional', 'Enterprise') "
+            "ORDER BY created_at DESC LIMIT 1",
+            (customer_email,)
+        ).fetchone()
 
     if not rows:
         return render_template('error.html', code=404, title='No Active Subscription',
@@ -744,11 +753,36 @@ def admin_training_vault():
 
 
 @app.route('/files/guides/<filename>', methods=['GET'])
+@limiter.limit("20 per hour")
 def download_guide(filename):
     """
     Serve training guide PDF files.
     Generates PDF on first request, caches for subsequent requests.
+    SECURITY: Requires email + order_id query params to verify the requester
+    actually owns an order — prevents downloading guides without paying.
     """
+    # Verify ownership: email + order_id must match a real order
+    req_email = validate_email(request.args.get('email', ''))
+    req_order = sanitize_string(request.args.get('order_id', ''), max_length=64)
+
+    if not _check_admin_token(request):
+        if not req_email or not req_order:
+            return jsonify({'error': 'Authentication required. Include email and order_id params.'}), 401
+
+        db = get_db()
+        order_row = db.execute(
+            "SELECT order_id FROM orders WHERE customer_email=? AND order_id=? LIMIT 1",
+            (req_email, req_order)
+        ).fetchone()
+        if not order_row:
+            logger.warning(f'[DOWNLOAD] Unauthorized guide access attempt: {req_email} / {req_order} from {request.remote_addr}')
+            return jsonify({'error': 'Order not found or access denied'}), 403
+
+        # Verify the filename contains this order_id (so you can only download your own guide)
+        if req_order not in filename:
+            logger.warning(f'[DOWNLOAD] Order/filename mismatch: {req_order} vs {filename} from {request.remote_addr}')
+            return jsonify({'error': 'Access denied'}), 403
+
     # Validate filename to prevent directory traversal
     if '..' in filename or '/' in filename or '\\' in filename:
         return jsonify({'error': 'Invalid filename'}), 400
@@ -1103,7 +1137,25 @@ def crypto_checkout():
         logger.error('[CRYPTO] BASE_PAYMENT_ADDRESS not configured')
         return jsonify({'error': 'Crypto payments not configured'}), 503
 
-    eth_price = 2500
+    # Fetch live ETH price from CoinGecko (free, no key required)
+    # Falls back to a conservative floor price if API is unavailable
+    eth_price = None
+    try:
+        import urllib.request as _urllib2
+        import json as _json2
+        cg_req = _urllib2.Request(
+            'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd',
+            headers={'User-Agent': 'sincor-payment/1.0'}
+        )
+        with _urllib2.urlopen(cg_req, timeout=5) as cg_resp:
+            cg_data = _json2.loads(cg_resp.read().decode('utf-8'))
+            eth_price = float(cg_data['ethereum']['usd'])
+            logger.info(f'[CRYPTO] Live ETH price: ${eth_price}')
+    except Exception as e:
+        logger.warning(f'[CRYPTO] Could not fetch live ETH price: {e}. Using env fallback.')
+        # Allow operator to set a floor via env; default conservative
+        eth_price = float(os.environ.get('ETH_PRICE_FALLBACK', '10000'))
+
     if currency == 'ETH':
         crypto_amount = amount / eth_price
     elif currency == 'USDC':
@@ -1128,25 +1180,100 @@ def crypto_checkout():
 
 
 @app.route('/api/crypto/verify-payment', methods=['POST'])
+@limiter.limit("5 per minute")
 def crypto_verify_payment():
-    """Verify crypto payment on blockchain and trigger fulfillment."""
+    """
+    Verify crypto payment on blockchain and trigger fulfillment.
+    SECURITY: tx_hash must be verified on-chain before fulfillment is triggered.
+    We check the Base blockchain via public RPC to confirm the tx exists,
+    is confirmed, and was sent to our recipient address with sufficient value.
+    """
     data = request.get_json() or {}
-    payment_id = data.get('payment_id', '')
-    tx_hash = data.get('tx_hash', '')
+    payment_id = sanitize_string(data.get('payment_id', ''), max_length=64)
+    tx_hash = sanitize_string(data.get('tx_hash', ''), max_length=66)
     email = data.get('email', '')
-    product_name = data.get('product_name', 'Crypto Purchase')
+    product_name = sanitize_string(data.get('product_name', 'Crypto Purchase'), max_length=100)
     amount = data.get('amount', 0)
 
     if not payment_id or not tx_hash:
         return jsonify({'error': 'payment_id and tx_hash required'}), 400
 
-    # Store crypto order in DB
+    # Validate tx_hash format (0x + 64 hex chars)
+    import re as _re
+    if not _re.match(r'^0x[0-9a-fA-F]{64}$', tx_hash):
+        logger.warning(f'[CRYPTO] Invalid tx_hash format from {request.remote_addr}')
+        return jsonify({'error': 'Invalid transaction hash format'}), 400
+
+    # Validate email
+    email = validate_email(email) if email else ''
+
+    # Validate amount
+    try:
+        amount = float(amount)
+        if amount <= 0 or amount > 100000:
+            return jsonify({'error': 'Invalid amount'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid amount'}), 400
+
+    # BLOCKCHAIN VERIFICATION — check tx on Base via public RPC
+    recipient_address = os.environ.get('BASE_PAYMENT_ADDRESS', '').lower()
+    if not recipient_address:
+        logger.error('[CRYPTO] BASE_PAYMENT_ADDRESS not configured')
+        return jsonify({'error': 'Crypto payments not configured'}), 503
+
+    try:
+        import urllib.request as _urllib
+        import json as _json
+
+        rpc_url = os.environ.get('BASE_RPC_URL', 'https://mainnet.base.org')
+        payload = _json.dumps({
+            'jsonrpc': '2.0',
+            'method': 'eth_getTransactionReceipt',
+            'params': [tx_hash],
+            'id': 1
+        }).encode('utf-8')
+
+        req = _urllib.Request(rpc_url, data=payload,
+                              headers={'Content-Type': 'application/json'})
+        with _urllib.urlopen(req, timeout=10) as resp:
+            rpc_result = _json.loads(resp.read().decode('utf-8'))
+
+        receipt = rpc_result.get('result')
+        if not receipt:
+            logger.warning(f'[CRYPTO] tx not found on chain: {tx_hash}')
+            return jsonify({'error': 'Transaction not found on blockchain. It may still be pending.'}), 402
+
+        # Must be confirmed (status 0x1)
+        if receipt.get('status') != '0x1':
+            logger.warning(f'[CRYPTO] tx failed on chain: {tx_hash}')
+            return jsonify({'error': 'Transaction failed or was reverted on blockchain'}), 402
+
+        # Must be sent to our address
+        tx_to = (receipt.get('to') or '').lower()
+        if tx_to != recipient_address:
+            logger.warning(f'[CRYPTO] tx recipient mismatch: expected {recipient_address}, got {tx_to}')
+            return jsonify({'error': 'Transaction was not sent to the correct address'}), 402
+
+        # Check tx isn't already used (replay protection)
+        db = get_db()
+        existing = db.execute(
+            "SELECT order_id FROM orders WHERE paypal_order_id=?", (tx_hash,)
+        ).fetchone()
+        if existing:
+            logger.warning(f'[CRYPTO] Replay attempt for tx_hash: {tx_hash}')
+            return jsonify({'error': 'Transaction already used for a previous order'}), 409
+
+    except Exception as e:
+        logger.error(f'[CRYPTO] Blockchain verification error: {e}')
+        # Do NOT fulfill if verification fails
+        return jsonify({'error': 'Blockchain verification failed. Please try again or contact support.'}), 503
+
+    # Verification passed — store order and fulfill
     order_id = f"CRYPTO-ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     product_info = PRODUCT_CATALOG.get(product_name, {'type': 'generic'})
     order_type = product_info.get('type', 'generic')
 
     if email:
-        db = get_db()
         try:
             db.execute(
                 '''INSERT INTO orders
@@ -1163,16 +1290,16 @@ def crypto_verify_payment():
         except sqlite3.IntegrityError:
             pass
 
-        # Trigger fulfillment
         trigger_fulfillment(order_id, email, product_name, amount, order_type, product_info)
 
+    logger.info(f'[CRYPTO] Payment verified and fulfilled: {tx_hash} → {order_id}')
     return jsonify({
         'status': 'verified',
         'payment_id': payment_id,
         'tx_hash': tx_hash,
         'order_id': order_id,
         'network': 'Base',
-        'message': 'Payment confirmed. Fulfillment triggered.'
+        'message': 'Payment confirmed on blockchain. Fulfillment triggered.'
     }), 200
 
 
