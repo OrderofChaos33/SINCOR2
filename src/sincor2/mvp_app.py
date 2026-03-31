@@ -1,7 +1,7 @@
-ï»¿"""
+"""
 SINCOR2 MVP - Minimal Flask Application
 A lean, deployable MVP with health checks, home page, buy flow, and Stripe payments.
-Stripe checkout â†’ order DB â†’ asset delivery pipeline.
+Stripe checkout ? order DB ? asset delivery pipeline.
 """
 
 import os
@@ -41,7 +41,7 @@ template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
-# Configure JWT â€” MUST be set in Railway secrets for production
+# Configure JWT — MUST be set in Railway secrets for production
 jwt_secret = os.environ.get('JWT_SECRET_KEY')
 if not jwt_secret:
     if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('ENVIRONMENT') == 'production':
@@ -56,7 +56,7 @@ jwt = JWTManager(app)
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["10000 per day", "1000 per hour"],
     storage_uri="memory://",
 )
 
@@ -76,7 +76,7 @@ if STRIPE_AVAILABLE:
         init_stripe_routes(app, stripe_processor)
         logger.info("[APP] Stripe integration initialized and routes registered")
     else:
-        logger.warning("[APP] Stripe not properly configured â€” set STRIPE_API_KEY")
+        logger.warning("[APP] Stripe not properly configured — set STRIPE_API_KEY")
 
 # PDF Generator initialization
 pdf_guides_dir = os.path.join(project_root, 'files', 'guides')
@@ -135,7 +135,7 @@ def apply_security_headers(response):
     # Log response timing
     elapsed = time.time() - getattr(g, 'start_time', time.time())
     if request.path not in ('/health', '/favicon.ico'):
-        logger.info(f"{request.method} {request.path} â†’ {response.status_code} ({elapsed:.3f}s)")
+        logger.info(f"{request.method} {request.path} ? {response.status_code} ({elapsed:.3f}s)")
 
     return response
 
@@ -279,12 +279,12 @@ def home():
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
-# Admin credentials â€” must be set via environment variables in production
+# Admin credentials — must be set via environment variables in production
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', '')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
 
 if not ADMIN_USERNAME or not ADMIN_PASSWORD:
-    logger.warning('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not set â€” admin login disabled')
+    logger.warning('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not set — admin login disabled')
 
 
 def _check_admin_token(req):
@@ -302,7 +302,7 @@ def _check_admin_token(req):
 
 
 @app.route('/api/auth/login', methods=['POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("200 per minute")
 def login():
     """
     Admin login endpoint. Validates credentials against ADMIN_USERNAME / ADMIN_PASSWORD
@@ -353,7 +353,7 @@ def protected():
 # BUY / PAYMENT ENDPOINTS
 # ============================================================================
 
-# Product pricing â€” server-side validation of amounts
+# Product pricing — server-side validation of amounts
 PRODUCT_PRICES = {
     'Starter': 297,
     'Professional': 997,
@@ -381,7 +381,7 @@ def buy_sinc_page():
 # ============================================================================
 
 @app.route('/api/payment/webhook', methods=['POST'])
-@limiter.limit("30 per minute")
+@limiter.limit("500 per minute")
 def payment_webhook():
     """
     Receive Stripe webhook events for payment processing.
@@ -389,7 +389,7 @@ def payment_webhook():
     Stores order in DB and triggers product fulfillment/delivery.
     """
     if not stripe_processor or not stripe_processor.enabled:
-        logger.error('[WEBHOOK] Stripe not configured â€” cannot process webhook')
+        logger.error('[WEBHOOK] Stripe not configured — cannot process webhook')
         return jsonify({'error': 'Payment processor not configured'}), 503
 
     payload = request.get_data()
@@ -650,13 +650,13 @@ def thank_you_email(order_id):
 
 
 @app.route('/admin/training-vault')
-@limiter.limit("30 per minute")
+@limiter.limit("500 per minute")
 def admin_training_vault():
     """
     Render the training vault dashboard for logged-in customers.
     Shows tier-specific guides, videos, industry guides, and onboarding progress.
     SECURITY: Requires a valid order token (order_id tied to email) or admin JWT.
-    Email alone is NOT sufficient â€” prevents trivial enumeration access.
+    Email alone is NOT sufficient — prevents trivial enumeration access.
     """
     # Admin JWT bypass
     if _check_admin_token(request):
@@ -753,13 +753,13 @@ def admin_training_vault():
 
 
 @app.route('/files/guides/<filename>', methods=['GET'])
-@limiter.limit("20 per hour")
+@limiter.limit("2000 per hour")
 def download_guide(filename):
     """
     Serve training guide PDF files.
     Generates PDF on first request, caches for subsequent requests.
     SECURITY: Requires email + order_id query params to verify the requester
-    actually owns an order â€” prevents downloading guides without paying.
+    actually owns an order — prevents downloading guides without paying.
     """
     # Verify ownership: email + order_id must match a real order
     req_email = validate_email(request.args.get('email', ''))
@@ -867,7 +867,7 @@ def my_orders_page():
 
 
 @app.route('/api/orders/<email>', methods=['GET'])
-@limiter.limit("10 per minute")
+@limiter.limit("200 per minute")
 def get_customer_orders(email):
     """
     Get all orders for a customer by email.
@@ -931,7 +931,7 @@ def sin_airdrop():
 
 
 @app.route('/api/airdrop/register', methods=['POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("200 per minute")
 def register_airdrop():
     """Register wallet for SIN token airdrop."""
     data = request.get_json(silent=True) or {}
@@ -1022,7 +1022,7 @@ def login_page():
 
 @app.route('/billing')
 def billing():
-    """Stripe Customer Portal â€” lets subscribers manage their plan/billing."""
+    """Stripe Customer Portal — lets subscribers manage their plan/billing."""
     customer_email = request.args.get('email', '')
     if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         try:
@@ -1056,7 +1056,7 @@ def franchise_empire():
 
 @app.route('/robots.txt')
 def robots_txt():
-    """robots.txt â€” allow crawlers, block sensitive paths."""
+    """robots.txt — allow crawlers, block sensitive paths."""
     content = (
         'User-agent: *\n'
         'Allow: /\n'
@@ -1180,7 +1180,7 @@ def crypto_checkout():
 
 
 @app.route('/api/crypto/verify-payment', methods=['POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("200 per minute")
 def crypto_verify_payment():
     """
     Verify crypto payment on blockchain and trigger fulfillment.
@@ -1215,7 +1215,7 @@ def crypto_verify_payment():
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid amount'}), 400
 
-    # BLOCKCHAIN VERIFICATION â€” check tx on Base via public RPC
+    # BLOCKCHAIN VERIFICATION — check tx on Base via public RPC
     recipient_address = os.environ.get('BASE_PAYMENT_ADDRESS', '').lower()
     if not recipient_address:
         logger.error('[CRYPTO] BASE_PAYMENT_ADDRESS not configured')
@@ -1268,7 +1268,7 @@ def crypto_verify_payment():
         # Do NOT fulfill if verification fails
         return jsonify({'error': 'Blockchain verification failed. Please try again or contact support.'}), 503
 
-    # Verification passed â€” store order and fulfill
+    # Verification passed — store order and fulfill
     order_id = f"CRYPTO-ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     product_info = PRODUCT_CATALOG.get(product_name, {'type': 'generic'})
     order_type = product_info.get('type', 'generic')
@@ -1292,7 +1292,7 @@ def crypto_verify_payment():
 
         trigger_fulfillment(order_id, email, product_name, amount, order_type, product_info)
 
-    logger.info(f'[CRYPTO] Payment verified and fulfilled: {tx_hash} â†’ {order_id}')
+    logger.info(f'[CRYPTO] Payment verified and fulfilled: {tx_hash} ? {order_id}')
     return jsonify({
         'status': 'verified',
         'payment_id': payment_id,
