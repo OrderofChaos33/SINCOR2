@@ -21,12 +21,8 @@ logger = logging.getLogger('sincor.stripe')
 
 def _safe_success_url() -> str:
     """Return a valid Stripe success URL with {CHECKOUT_SESSION_ID} template var.
-    Guards against broken env var values (e.g. missing the session_id param).
+    Hardcoded to avoid env var encoding issues (e.g. Railway URL-encoding curly braces).
     """
-    url = os.getenv('STRIPE_SUCCESS_URL', '')
-    if url and '{CHECKOUT_SESSION_ID}' in url:
-        return url
-    # Fallback — always valid
     return 'https://getsincor.com/payment/success?session_id={CHECKOUT_SESSION_ID}'
 
 
@@ -96,7 +92,7 @@ class StripeCheckout:
                 'line_items': [line_item],
                 'mode': 'subscription' if is_subscription else 'payment',
                 'success_url': _safe_success_url(),
-                'cancel_url': os.getenv('STRIPE_CANCEL_URL', 'https://getsincor.com/buy'),
+                'cancel_url': 'https://getsincor.com/buy',
                 # Allow coupon/promo codes at checkout
                 'allow_promotion_codes': True,
             }
@@ -194,7 +190,7 @@ class StripeCheckout:
         }
 
     def _handle_session_expired(self, session: Dict) -> Tuple[bool, Dict]:
-        """Checkout session expired — trigger abandoned checkout recovery email"""
+        """Checkout session expired - trigger abandoned checkout recovery email"""
         logger.info(f"[STRIPE] Session expired (abandoned checkout): {session['id']}")
         return True, {
             'event': 'checkout_abandoned',
@@ -204,7 +200,7 @@ class StripeCheckout:
         }
 
     def _handle_invoice_paid(self, invoice: Dict) -> Tuple[bool, Dict]:
-        """Recurring invoice paid — subscription renewed"""
+        """Recurring invoice paid - subscription renewed"""
         logger.info(f"[STRIPE] Invoice paid: {invoice['id']}")
         return True, {
             'event': 'invoice_paid',
@@ -216,7 +212,7 @@ class StripeCheckout:
         }
 
     def _handle_invoice_payment_failed(self, invoice: Dict) -> Tuple[bool, Dict]:
-        """Recurring invoice payment failed — alert customer"""
+        """Recurring invoice payment failed - alert customer"""
         logger.warning(f"[STRIPE] Invoice payment failed: {invoice['id']}")
         return True, {
             'event': 'invoice_payment_failed',
