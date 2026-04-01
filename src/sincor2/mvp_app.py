@@ -95,6 +95,18 @@ except Exception as e:
     logger.warning(f"[EMAIL] Email sender initialization failed: {e}")
     email_sender = None
 
+# Outreach Scheduler — autonomous lead gen (Yelp + Google Places + Resend)
+try:
+    from sincor2.outreach_scheduler import start_outreach_scheduler
+    import atexit
+    outreach_scheduler = start_outreach_scheduler(app)
+    if outreach_scheduler:
+        from sincor2.outreach_scheduler import stop_outreach_scheduler
+        atexit.register(stop_outreach_scheduler)
+except Exception as e:
+    logger.warning(f"[OUTREACH] Scheduler init failed: {e}")
+    outreach_scheduler = None
+
 
 # ============================================================================
 # SECURITY MIDDLEWARE
@@ -267,6 +279,45 @@ def health():
         'timestamp': datetime.utcnow().isoformat(),
         'version': '1.0.0-mvp'
     }), 200
+
+
+@app.route('/api/outreach/status', methods=['GET'])
+def outreach_status():
+    """Show outreach engine status (admin use)."""
+    try:
+        from sincor2.outreach_engine import get_outreach_engine
+        engine = get_outreach_engine()
+        scheduler_running = outreach_scheduler is not None and outreach_scheduler.running if outreach_scheduler else False
+        return jsonify({
+            'enabled': engine.enabled,
+            'scheduler_running': scheduler_running,
+            'yelp_configured': bool(engine.yelp_key),
+            'places_configured': bool(engine.places_key),
+            'resend_configured': bool(os.environ.get('RESEND_API_KEY')),
+            'daily_limit': engine.daily_limit,
+            'total_sent_ever': len(engine._sent_ids),
+            'next_run': str(outreach_scheduler.get_job('outreach_cycle').next_run_time) if scheduler_running else None,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/outreach/run', methods=['POST'])
+def outreach_run_now():
+    """Manually trigger one outreach cycle (admin use)."""
+    # Basic auth guard using admin credentials
+    auth = request.get_json(silent=True) or {}
+    if auth.get('admin_key') != os.environ.get('ADMIN_PASSWORD', ''):
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        from sincor2.outreach_engine import get_outreach_engine
+        import threading
+        engine = get_outreach_engine()
+        thread = threading.Thread(target=engine.run_cycle, daemon=True)
+        thread.start()
+        return jsonify({'status': 'started', 'message': 'Outreach cycle triggered in background'}), 202
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/', methods=['GET'])

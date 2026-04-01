@@ -42,5 +42,8 @@ twilio>=8.0.0                 # Twilio SMS (purchase notification fallback)
 # Payment Processing
 stripe>=7.0.0                 # Stripe payment processor API
 
+# Outreach Scheduler
+APScheduler>=3.10.0           # Background job scheduler for autonomous outreach
+
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
