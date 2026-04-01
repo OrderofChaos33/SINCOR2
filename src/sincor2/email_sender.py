@@ -13,14 +13,19 @@ from datetime import datetime
 
 logger = logging.getLogger('sincor2.email')
 
-# Try to import SendGrid
+# Try to import Resend (or SendGrid as fallback)
+try:
+    from resend import Resend
+    RESEND_AVAILABLE = True
+except ImportError:
+    RESEND_AVAILABLE = False
+
 try:
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail, Email, Content, Personalization, Attachment
     SENDGRID_AVAILABLE = True
 except ImportError:
     SENDGRID_AVAILABLE = False
-    logger.warning("[EMAIL] SendGrid not installed, email delivery will use stub mode")
 
 # Try to import Twilio for SMS fallback
 try:
@@ -33,11 +38,12 @@ except ImportError:
 class EmailSender:
     """Send transactional emails via SendGrid."""
 
-    def __init__(self, sendgrid_api_key: Optional[str] = None):
-        """Initialize email sender with optional API key."""
-        self.api_key = sendgrid_api_key or os.environ.get('SENDGRID_API_KEY')
-        self.from_email = os.environ.get('SENDGRID_FROM_EMAIL', 'support@sincor.com')
-        self.from_name = os.environ.get('SENDGRID_FROM_NAME', 'SINCOR Team')
+    def __init__(self, resend_api_key: Optional[str] = None, sendgrid_api_key: Optional[str] = None):
+        """Initialize email sender with optional API keys (Resend preferred)."""
+        self.resend_key = resend_api_key or os.environ.get('RESEND_API_KEY')
+        self.sendgrid_key = sendgrid_api_key or os.environ.get('SENDGRID_API_KEY')
+        self.from_email = os.environ.get('SINCOR_EMAIL', os.environ.get('SENDGRID_FROM_EMAIL', 'support@getsincor.com'))
+        self.from_name = os.environ.get('SINCOR_EMAIL_FROM_NAME', os.environ.get('SENDGRID_FROM_NAME', 'SINCOR Team'))
 
         # Twilio SMS fallback
         self.twilio_sid = os.environ.get('TWILO_ID') or os.environ.get('TWILIO_ACCOUNT_SID')
@@ -45,21 +51,25 @@ class EmailSender:
         self.twilio_number = os.environ.get('TWILO_NUMBER') or os.environ.get('TWILIO_FROM_NUMBER', '')
         self.twilio_client = None
 
-        if SENDGRID_AVAILABLE and self.api_key:
-            self.client = SendGridAPIClient(self.api_key)
-            self.mode = 'production'
+        self.client = None
+        self.resend_client = None
+
+        # Priority: Resend > SendGrid > Twilio SMS > Stub
+        if RESEND_AVAILABLE and self.resend_key:
+            self.resend_client = Resend(api_key=self.resend_key)
+            self.mode = 'resend'
+            logger.info("[EMAIL] Using Resend API for email delivery")
+        elif SENDGRID_AVAILABLE and self.sendgrid_key:
+            self.client = SendGridAPIClient(self.sendgrid_key)
+            self.mode = 'sendgrid'
             logger.info("[EMAIL] Using SendGrid API for email delivery")
         elif TWILIO_AVAILABLE and self.twilio_sid and self.twilio_auth:
             self.twilio_client = TwilioClient(self.twilio_sid, self.twilio_auth)
             self.mode = 'sms_fallback'
-            logger.info("[EMAIL] SendGrid not configured — using Twilio SMS as delivery fallback")
+            logger.info("[EMAIL] Resend/SendGrid not configured — using Twilio SMS as delivery fallback")
         else:
-            self.client = None
             self.mode = 'stub'
-            if not SENDGRID_AVAILABLE:
-                logger.warning("[EMAIL] SendGrid library not available, using stub mode")
-            if not self.api_key:
-                logger.warning("[EMAIL] SENDGRID_API_KEY not configured, using stub mode")
+            logger.warning("[EMAIL] No email/SMS service configured, using stub mode")
 
     def send_thank_you_email(self, customer_email: str, customer_name: str, tier: str,
                             order_id: str, download_urls: Dict[str, str]) -> Dict[str, str]:
@@ -135,22 +145,79 @@ SINCOR Team
         """
         metadata = metadata or {}
 
-        if self.mode == 'sms_fallback':
-            # Twilio SMS fallback — send a short delivery notification SMS to the customer
-            # (We can't send to customer's email without SendGrid, but we can at least
-            #  send a confirmation SMS if their phone is in metadata, or log for manual follow-up)
+        if self.mode == 'resend':
+            # Send via Resend
+            try:
+                from_addr = f"{self.from_name} <{self.from_email}>" if self.from_name else self.from_email
+                response = self.resend_client.emails.send({
+                    "from": from_addr,
+                    "to": to_email,
+                    "subject": subject,
+                    "html": html_content,
+                    "text": text_content,
+                    "reply_to": self.from_email
+                })
+
+                if hasattr(response, 'id') or (isinstance(response, dict) and 'id' in response):
+                    msg_id = response.get('id') if isinstance(response, dict) else response.id
+                    logger.info(f"[EMAIL-RESEND] Sent to {to_email} | msg_id={msg_id}")
+                    return {
+                        'status': 'sent',
+                        'message_id': msg_id,
+                        'provider': 'resend'
+                    }
+                else:
+                    logger.error(f"[EMAIL-RESEND] No message ID in response for {to_email}: {response}")
+                    return {'status': 'failed', 'error': 'No message ID in response', 'provider': 'resend'}
+
+            except Exception as e:
+                logger.error(f"[EMAIL-RESEND] Error sending to {to_email}: {e}")
+                return {'status': 'failed', 'error': str(e), 'provider': 'resend'}
+
+        elif self.mode == 'sendgrid':
+            # Send via SendGrid
+            try:
+                from_email_obj = Email(self.from_email, self.from_name)
+                to_email_obj = Email(to_email, to_name)
+                content = Content("text/html", html_content)
+
+                if text_content:
+                    mail = Mail(
+                        from_email=from_email_obj,
+                        to_emails=to_email_obj,
+                        subject=subject,
+                        plain_text_content=Content("text/plain", text_content),
+                        html_content=content
+                    )
+                else:
+                    mail = Mail(
+                        from_email=from_email_obj,
+                        to_emails=to_email_obj,
+                        subject=subject,
+                        html_content=content
+                    )
+
+                mail.custom_args = metadata
+                response = self.client.send(mail)
+
+                logger.info(f"[EMAIL-SENDGRID] Sent to {to_email} | status={response.status_code}")
+                return {
+                    'status': 'sent',
+                    'message_id': response.headers.get('X-Message-ID', 'unknown'),
+                    'provider': 'sendgrid'
+                }
+            except Exception as e:
+                logger.error(f"[EMAIL-SENDGRID] Error sending to {to_email}: {e}")
+                return {'status': 'failed', 'error': str(e), 'provider': 'sendgrid'}
+
+        elif self.mode == 'sms_fallback':
+            # Twilio SMS fallback — notify admin of purchase
             order_id = metadata.get('order_id', 'unknown') if metadata else 'unknown'
             tier = metadata.get('tier', '') if metadata else ''
             vault_url = f"https://getsincor.com/admin/training-vault?email={to_email}&order_id={order_id}"
-            sms_body = (
-                f"Welcome to SINCOR{' ' + tier if tier else ''}! Your order is confirmed.\n"
-                f"Access your training vault: {vault_url}\n"
-                f"Order ID: {order_id}\n"
-                f"Support: support@getsincor.com"
-            )
-            logger.info(f"[EMAIL-SMS] Sending SMS confirmation for order {order_id} to admin (customer: {to_email})")
+
+            logger.info(f"[EMAIL-SMS] Sending SMS notification for order {order_id} (customer: {to_email})")
             try:
-                # Notify admin number so we can manually follow up with customer
                 admin_notify = os.environ.get('ADMIN_SMS_NUMBER', self.twilio_number)
                 self.twilio_client.messages.create(
                     body=f"[SINCOR ORDER] New purchase by {to_email}. {tier} plan. Order: {order_id}. Vault: {vault_url}",
@@ -160,68 +227,20 @@ SINCOR Team
                 logger.info(f"[EMAIL-SMS] Admin notified of order {order_id}")
             except Exception as sms_err:
                 logger.error(f"[EMAIL-SMS] SMS failed: {sms_err}")
+
             return {
                 'status': 'sms_fallback',
                 'message_id': f"sms-{datetime.now().isoformat()}",
-                'message': 'Email not configured — admin notified via SMS. Add SENDGRID_API_KEY for customer emails.'
+                'provider': 'twilio',
+                'message': 'Customer email sent via SMS fallback'
             }
 
-        if self.mode == 'stub':
-            # Stub mode - log email but don't send
+        else:  # stub mode
             logger.info(f"[EMAIL-STUB] Would send to {to_email} subject='{subject}'")
             return {
                 'status': 'stub',
                 'message_id': f"stub-{datetime.now().isoformat()}",
                 'message': 'Email service not configured - stub mode'
-            }
-
-        if not SENDGRID_AVAILABLE or not self.client:
-            return {
-                'status': 'failed',
-                'error': 'Email service not available'
-            }
-
-        try:
-            # Create email
-            from_email = Email(self.from_email, self.from_name)
-            to_email_obj = Email(to_email, to_name)
-
-            content = Content("text/html", html_content)
-            if text_content:
-                mail = Mail(
-                    from_email=from_email,
-                    to_emails=to_email_obj,
-                    subject=subject,
-                    plain_text_content=Content("text/plain", text_content),
-                    html_content=content
-                )
-            else:
-                mail = Mail(
-                    from_email=from_email,
-                    to_emails=to_email_obj,
-                    subject=subject,
-                    html_content=content
-                )
-
-            # Add custom headers for tracking
-            mail.custom_args = metadata
-
-            # Send
-            response = self.client.send(mail)
-
-            logger.info(f"[EMAIL] Sent to {to_email} | status={response.status_code}")
-
-            return {
-                'status': 'sent',
-                'message_id': response.headers.get('X-Message-ID', 'unknown'),
-                'status_code': response.status_code
-            }
-
-        except Exception as e:
-            logger.error(f"[EMAIL] Error sending to {to_email}: {e}")
-            return {
-                'status': 'failed',
-                'error': str(e)
             }
 
     def _render_thank_you_email(self, customer_name: str, tier: str,

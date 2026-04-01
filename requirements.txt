@@ -35,7 +35,8 @@ psutil>=5.9.0                 # System and process monitoring
 reportlab>=4.0.0              # PDF generation library
 
 # Email Delivery
-sendgrid>=6.10.0              # SendGrid email API
+resend>=0.4.0                 # Resend email API (primary)
+sendgrid>=6.10.0              # SendGrid email API (fallback)
 twilio>=8.0.0                 # Twilio SMS (purchase notification fallback)
 
 # Payment Processing
