@@ -47,3 +47,4 @@ APScheduler>=3.10.0           # Background job scheduler for autonomous outreach
 
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
