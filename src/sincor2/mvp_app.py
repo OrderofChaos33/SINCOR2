@@ -107,6 +107,18 @@ except Exception as e:
     logger.warning(f"[OUTREACH] Scheduler init failed: {e}")
     outreach_scheduler = None
 
+# Content Agent — autonomous blog/SEO publishing every 48h
+try:
+    from sincor2.content_scheduler import start_content_scheduler, stop_content_scheduler
+    import atexit as _atexit
+    content_scheduler = start_content_scheduler(app)
+    if content_scheduler:
+        _atexit.register(stop_content_scheduler)
+        logger.info("[CONTENT] Content agent scheduler started")
+except Exception as e:
+    logger.warning(f"[CONTENT] Content scheduler init failed: {e}")
+    content_scheduler = None
+
 
 # ============================================================================
 # SECURITY MIDDLEWARE
@@ -1381,6 +1393,477 @@ def server_error(error):
 def request_too_large(error):
     """Handle oversized request payloads."""
     return jsonify({'error': 'Request too large (max 1MB)'}), 413
+
+
+# ============================================================================
+# CONTENT AGENT — STATUS + TRIGGER ENDPOINTS (Admin only)
+# ============================================================================
+
+@app.route('/admin/content/status')
+@limiter.limit("100 per minute")
+def content_status():
+    """Return content agent status: published posts, upcoming calendar, analytics."""
+    if not _check_admin_token(request):
+        return jsonify({'error': 'Admin access required'}), 403
+    try:
+        from sincor2.content_agent import get_db, CALENDAR_PATH, ContentAnalytics
+        import json as _json
+
+        with get_db() as conn:
+            posts = conn.execute(
+                "SELECT slug, title, keyword, status, word_count, published_at, wp_url "
+                "FROM posts ORDER BY created_at DESC LIMIT 20"
+            ).fetchall()
+            total_posts = conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
+
+        calendar = []
+        if CALENDAR_PATH.exists():
+            all_items = _json.loads(CALENDAR_PATH.read_text())
+            calendar = [i for i in all_items if i["status"] == "planned"][:10]
+
+        analytics = ContentAnalytics()
+        top = analytics.get_top_performers(3)
+
+        scheduler_status = "running" if (content_scheduler and content_scheduler.running) else "stopped"
+
+        return jsonify({
+            "scheduler": scheduler_status,
+            "total_posts": total_posts,
+            "recent_posts": [dict(p) for p in posts],
+            "upcoming_calendar": calendar,
+            "top_performers": top,
+        })
+    except Exception as e:
+        logger.error(f"[CONTENT] Status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/admin/content/generate', methods=['POST'])
+@limiter.limit("10 per minute")
+def content_generate():
+    """Manually trigger post generation. Body: {keyword, type, publish}"""
+    if not _check_admin_token(request):
+        return jsonify({'error': 'Admin access required'}), 403
+    try:
+        data = request.get_json() or {}
+        keyword = sanitize_string(data.get('keyword', ''), 200)
+        ctype = data.get('type', 'how-to')
+        do_publish = data.get('publish', False)
+
+        if not keyword:
+            return jsonify({'error': 'keyword required'}), 400
+        if ctype not in ('how-to', 'comparison', 'alternatives', 'case-study', 'industry-trend'):
+            return jsonify({'error': 'invalid type'}), 400
+
+        from sincor2.content_agent import generate_blog_post, save_post, WordPressPublisher, init_db
+        init_db()
+        model = os.environ.get('CONTENT_MODEL', 'claude-haiku-4-5')
+        post = generate_blog_post(keyword, ctype, model=model)
+        path = save_post(post)
+        result = {"title": post["title"], "slug": post["slug"], "word_count": post["word_count"], "path": str(path)}
+
+        if do_publish:
+            wp = WordPressPublisher()
+            wp_result = wp.publish(post)
+            result["wordpress"] = wp_result
+
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"[CONTENT] Generate error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/admin/content/calendar', methods=['GET', 'POST'])
+@limiter.limit("20 per minute")
+def content_calendar():
+    """GET: return calendar JSON. POST: regenerate calendar."""
+    if not _check_admin_token(request):
+        return jsonify({'error': 'Admin access required'}), 403
+    try:
+        from sincor2.content_agent import generate_content_calendar, CALENDAR_PATH, init_db
+        import json as _json
+        if request.method == 'POST':
+            init_db()
+            cal = generate_content_calendar()
+            return jsonify({"generated": len(cal), "calendar": cal[:20]})
+        else:
+            if not CALENDAR_PATH.exists():
+                return jsonify({"error": "No calendar found. POST to generate."}), 404
+            cal = _json.loads(CALENDAR_PATH.read_text())
+            return jsonify({"total": len(cal), "calendar": cal})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/admin/content/analytics')
+@limiter.limit("30 per minute")
+def content_analytics():
+    """Return content analytics report."""
+    if not _check_admin_token(request):
+        return jsonify({'error': 'Admin access required'}), 403
+    try:
+        from sincor2.content_agent import ContentAnalytics
+        analytics = ContentAnalytics()
+        return jsonify({
+            "top_performers": analytics.get_top_performers(10),
+            "low_performers": analytics.get_low_performers(),
+            "cta_performance": analytics.get_best_cta(),
+            "report": analytics.summary_report(),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# SUBSCRIPTION CANCELLATION
+# ============================================================================
+
+@app.route('/api/cancel-subscription', methods=['POST'])
+@limiter.limit("20 per minute")
+def cancel_subscription():
+    """
+    Cancel a SINCOR subscription.
+    - For Stripe: creates a Stripe subscription cancellation via the API.
+    - For PayPal: logs the request and emails support to process manually
+      (PayPal subscription cancellation requires asynchronous IPN/webhook confirmation).
+    Customers can also self-cancel via /billing (Stripe portal).
+    """
+    data = request.get_json(silent=True) or {}
+    email = validate_email(data.get('email', ''))
+    reason = sanitize_string(data.get('reason', 'No reason provided'), max_length=500)
+    subscription_id = sanitize_string(data.get('subscription_id', ''), max_length=200)
+
+    if not email:
+        return jsonify({'error': 'Valid email address required'}), 400
+
+    logger.info(f"[CANCEL] Cancellation request from {email} | sub_id={subscription_id} | reason={reason}")
+
+    # Try Stripe cancellation first
+    if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
+        try:
+            import stripe as stripe_lib
+            stripe_lib.api_key = stripe_processor.api_key
+
+            # Find the customer
+            customers = stripe_lib.Customer.list(email=email, limit=1)
+            if customers and customers.data:
+                customer = customers.data[0]
+                # Find active subscriptions
+                subs = stripe_lib.Subscription.list(customer=customer.id, status='active', limit=10)
+                if subs and subs.data:
+                    cancelled = []
+                    for sub in subs.data:
+                        if not subscription_id or sub.id == subscription_id:
+                            stripe_lib.Subscription.cancel(sub.id)
+                            cancelled.append(sub.id)
+                            logger.info(f"[CANCEL] Stripe sub cancelled: {sub.id} for {email}")
+
+                    if cancelled:
+                        # Notify customer
+                        email_sender = get_email_sender()
+                        if email_sender:
+                            try:
+                                email_sender.send_email(
+                                    to=email,
+                                    subject='Your SINCOR subscription has been cancelled',
+                                    html_content=f'''
+                                        <h2>Subscription Cancelled</h2>
+                                        <p>Your SINCOR subscription has been cancelled successfully.</p>
+                                        <p>You will retain access until the end of your current billing period.</p>
+                                        <p>If you cancelled by mistake or have questions, reply to this email or
+                                        contact <a href="mailto:support@getsincor.com">support@getsincor.com</a>.</p>
+                                        <p>We'd love to know how we can improve: {reason}</p>
+                                    '''
+                                )
+                            except Exception as mail_err:
+                                logger.warning(f"[CANCEL] Could not send cancellation email: {mail_err}")
+
+                        return jsonify({
+                            'success': True,
+                            'message': 'Subscription cancelled successfully. You retain access until the end of your billing period.',
+                            'cancelled_subscriptions': cancelled
+                        }), 200
+
+            # No active subscription found via Stripe
+            logger.info(f"[CANCEL] No active Stripe subscription found for {email}")
+
+        except Exception as e:
+            logger.error(f"[CANCEL] Stripe cancellation error: {e}")
+
+    # Fallback: log request and notify support
+    db = get_db()
+    try:
+        db.execute(
+            '''INSERT OR IGNORE INTO orders
+               (order_id, paypal_order_id, customer_email, product_name, amount,
+                currency, payment_status, delivery_status, delivery_url, order_type,
+                created_at, updated_at, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (
+                f"CANCEL-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}", subscription_id or 'manual',
+                email, 'CANCELLATION REQUEST', 0, 'USD', 'cancellation_requested',
+                'pending', '', 'cancellation',
+                datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
+                json.dumps({'reason': reason, 'subscription_id': subscription_id})
+            )
+        )
+        db.commit()
+    except Exception as db_err:
+        logger.warning(f"[CANCEL] Could not log cancellation to DB: {db_err}")
+
+    # Notify support
+    email_sender = get_email_sender()
+    if email_sender:
+        try:
+            support_email = os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com')
+            email_sender.send_email(
+                to=support_email,
+                subject=f'[ACTION REQUIRED] Cancellation Request: {email}',
+                html_content=f'''
+                    <h2>Subscription Cancellation Request</h2>
+                    <p><strong>Customer:</strong> {email}</p>
+                    <p><strong>Subscription ID:</strong> {subscription_id or "Not provided"}</p>
+                    <p><strong>Reason:</strong> {reason}</p>
+                    <p><strong>Time:</strong> {datetime.utcnow().isoformat()} UTC</p>
+                    <p>Please cancel this subscription in PayPal and confirm with the customer.</p>
+                '''
+            )
+        except Exception as mail_err:
+            logger.warning(f"[CANCEL] Could not notify support: {mail_err}")
+
+    return jsonify({
+        'success': True,
+        'message': 'Cancellation request received. Our team will process it within 24 hours and confirm via email. You retain access until cancelled.',
+    }), 200
+
+
+# ============================================================================
+# PAYPAL DISPUTE / IPN WEBHOOK
+# ============================================================================
+
+@app.route('/api/paypal/webhook', methods=['POST'])
+@limiter.limit("500 per minute")
+def paypal_webhook():
+    """
+    PayPal IPN / Webhook handler.
+    Handles: payment completed, subscription cancelled, refund, dispute opened.
+    PayPal sends form-encoded IPN or JSON webhook events depending on integration type.
+    Verification: IPN verification via PayPal IPN verification endpoint.
+    """
+    content_type = request.content_type or ''
+
+    # Determine if this is a JSON webhook (newer API) or IPN (form-encoded)
+    if 'application/json' in content_type:
+        event_data = request.get_json(silent=True) or {}
+        event_type = event_data.get('event_type', '')
+        resource = event_data.get('resource', {})
+        logger.info(f"[PAYPAL-WH] JSON event received: {event_type}")
+
+        if event_type == 'PAYMENT.SALE.COMPLETED':
+            _handle_paypal_payment_completed(resource)
+        elif event_type in ('BILLING.SUBSCRIPTION.CANCELLED', 'BILLING.SUBSCRIPTION.EXPIRED'):
+            _handle_paypal_subscription_cancelled(resource)
+        elif event_type == 'PAYMENT.SALE.REFUNDED':
+            _handle_paypal_refund(resource)
+        elif event_type == 'CUSTOMER.DISPUTE.CREATED':
+            _handle_paypal_dispute(resource)
+        elif event_type == 'CUSTOMER.DISPUTE.RESOLVED':
+            logger.info(f"[PAYPAL-WH] Dispute resolved: {resource.get('dispute_id', 'unknown')}")
+        else:
+            logger.info(f"[PAYPAL-WH] Unhandled event type: {event_type}")
+
+        return jsonify({'success': True}), 200
+
+    else:
+        # Legacy IPN handling (form-encoded)
+        ipn_data = request.form.to_dict()
+        txn_type = ipn_data.get('txn_type', '')
+        payment_status = ipn_data.get('payment_status', '')
+        logger.info(f"[PAYPAL-IPN] txn_type={txn_type} | payment_status={payment_status}")
+
+        # Verify IPN with PayPal
+        try:
+            import urllib.request as _ur
+            import urllib.parse as _up
+            verify_payload = b'cmd=_notify-validate&' + _up.urlencode(ipn_data).encode('utf-8')
+            paypal_sandbox = os.environ.get('PAYPAL_SANDBOX', 'false').lower() == 'true'
+            paypal_env = os.environ.get('PAYPAL_ENV', 'live')
+            if paypal_sandbox or paypal_env == 'sandbox':
+                ipn_url = 'https://ipnpb.sandbox.paypal.com/cgi-bin/webscr'
+            else:
+                ipn_url = 'https://ipnpb.paypal.com/cgi-bin/webscr'
+
+            req = _ur.Request(ipn_url, data=verify_payload,
+                              headers={'Content-Type': 'application/x-www-form-urlencoded',
+                                       'User-Agent': 'sincor-ipn/1.0'})
+            with _ur.urlopen(req, timeout=10) as resp:
+                ipn_response = resp.read().decode('utf-8')
+
+            if ipn_response.strip() != 'VERIFIED':
+                logger.warning(f"[PAYPAL-IPN] Verification FAILED. Response: {ipn_response[:50]}")
+                return make_response('INVALID', 200)
+
+        except Exception as verify_err:
+            logger.error(f"[PAYPAL-IPN] Could not verify IPN: {verify_err}")
+            return make_response('ERROR', 200)
+
+        # Process verified IPN
+        if payment_status == 'Completed':
+            _handle_paypal_ipn_payment(ipn_data)
+        elif txn_type in ('subscr_cancel', 'subscr_eot', 'subscr_failed'):
+            _handle_paypal_ipn_subscription_event(ipn_data)
+        elif payment_status == 'Refunded':
+            logger.info(f"[PAYPAL-IPN] Refund for payer {ipn_data.get('payer_email', 'unknown')}")
+
+        return make_response('OK', 200)
+
+
+def _handle_paypal_payment_completed(resource: dict):
+    """Handle PayPal PAYMENT.SALE.COMPLETED webhook event."""
+    sale_id = resource.get('id', '')
+    amount = float(resource.get('amount', {}).get('total', 0))
+    currency = resource.get('amount', {}).get('currency', 'USD')
+    payer_email = resource.get('payer', {}).get('payer_info', {}).get('email', '')
+    logger.info(f"[PAYPAL-WH] Payment completed: ${amount} {currency} | payer={payer_email} | id={sale_id}")
+
+    if payer_email and amount > 0:
+        order_id = f"PP-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{sale_id[:8]}"
+        db = get_db()
+        try:
+            db.execute(
+                '''INSERT OR IGNORE INTO orders
+                   (order_id, paypal_order_id, customer_email, product_name, amount,
+                    currency, payment_status, delivery_status, delivery_url, order_type,
+                    created_at, updated_at, metadata)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (order_id, sale_id, payer_email, 'PayPal Purchase', amount, currency,
+                 'completed', 'processing', f'/my-orders?email={payer_email}', 'paypal',
+                 datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
+                 json.dumps({'sale_id': sale_id, 'source': 'paypal_webhook'}))
+            )
+            db.commit()
+            logger.info(f"[PAYPAL-WH] Order stored: {order_id}")
+        except Exception as e:
+            logger.error(f"[PAYPAL-WH] DB error: {e}")
+
+
+def _handle_paypal_subscription_cancelled(resource: dict):
+    """Handle PayPal subscription cancellation / expiration."""
+    sub_id = resource.get('id', '')
+    payer_email = resource.get('subscriber', {}).get('email_address', '')
+    logger.info(f"[PAYPAL-WH] Subscription cancelled: {sub_id} | payer={payer_email}")
+
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE orders SET payment_status='cancelled', updated_at=? WHERE paypal_order_id=?",
+            (datetime.utcnow().isoformat(), sub_id)
+        )
+        db.commit()
+    except Exception as e:
+        logger.warning(f"[PAYPAL-WH] Could not update subscription record: {e}")
+
+
+def _handle_paypal_refund(resource: dict):
+    """Handle PayPal refund event."""
+    sale_id = resource.get('sale_id', resource.get('id', ''))
+    amount = resource.get('amount', {}).get('total', 'unknown')
+    logger.info(f"[PAYPAL-WH] Refund processed: sale_id={sale_id} | amount=${amount}")
+
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE orders SET payment_status='refunded', updated_at=? WHERE paypal_order_id=?",
+            (datetime.utcnow().isoformat(), sale_id)
+        )
+        db.commit()
+    except Exception as e:
+        logger.warning(f"[PAYPAL-WH] Could not update refund record: {e}")
+
+
+def _handle_paypal_dispute(resource: dict):
+    """Handle PayPal CUSTOMER.DISPUTE.CREATED event."""
+    dispute_id = resource.get('dispute_id', 'unknown')
+    disputed_amount = resource.get('disputed_amount', {})
+    reason = resource.get('reason', 'unknown')
+    payer_email = ''
+    for item in resource.get('disputed_transactions', []):
+        buyer = item.get('buyer', {})
+        payer_email = buyer.get('email', '')
+        if payer_email:
+            break
+
+    logger.warning(f"[PAYPAL-DISPUTE] New dispute: {dispute_id} | reason={reason} | payer={payer_email} | amount={disputed_amount}")
+
+    # Notify support immediately
+    email_sender = get_email_sender()
+    if email_sender:
+        try:
+            support_email = os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com')
+            email_sender.send_email(
+                to=support_email,
+                subject=f'[URGENT] PayPal Dispute Filed: {dispute_id}',
+                html_content=f'''
+                    <h2 style="color:red;">PayPal Dispute Filed</h2>
+                    <p><strong>Dispute ID:</strong> {dispute_id}</p>
+                    <p><strong>Reason:</strong> {reason}</p>
+                    <p><strong>Customer:</strong> {payer_email}</p>
+                    <p><strong>Amount:</strong> {disputed_amount}</p>
+                    <p><strong>Time:</strong> {datetime.utcnow().isoformat()} UTC</p>
+                    <p><strong>Action Required:</strong> Respond in PayPal Resolution Center within 10 days.
+                    <a href="https://www.paypal.com/disputes">PayPal Resolution Center</a></p>
+                '''
+            )
+            logger.info(f"[PAYPAL-DISPUTE] Support notified for dispute {dispute_id}")
+        except Exception as mail_err:
+            logger.error(f"[PAYPAL-DISPUTE] Could not notify support: {mail_err}")
+
+
+def _handle_paypal_ipn_payment(ipn_data: dict):
+    """Handle verified PayPal IPN payment_status=Completed."""
+    txn_id = ipn_data.get('txn_id', '')
+    payer_email = validate_email(ipn_data.get('payer_email', ''))
+    amount = float(ipn_data.get('mc_gross', 0))
+    currency = ipn_data.get('mc_currency', 'USD')
+
+    logger.info(f"[PAYPAL-IPN] Payment completed: txn_id={txn_id} | ${amount} | {payer_email}")
+
+    if payer_email and amount > 0:
+        order_id = f"IPN-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{txn_id[:8]}"
+        db = get_db()
+        try:
+            db.execute(
+                '''INSERT OR IGNORE INTO orders
+                   (order_id, paypal_order_id, customer_email, product_name, amount,
+                    currency, payment_status, delivery_status, delivery_url, order_type,
+                    created_at, updated_at, metadata)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (order_id, txn_id, payer_email, 'PayPal IPN Purchase', amount, currency,
+                 'completed', 'processing', f'/my-orders?email={payer_email}', 'paypal',
+                 datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
+                 json.dumps({'txn_id': txn_id, 'source': 'paypal_ipn'}))
+            )
+            db.commit()
+        except Exception as e:
+            logger.error(f"[PAYPAL-IPN] DB error: {e}")
+
+
+def _handle_paypal_ipn_subscription_event(ipn_data: dict):
+    """Handle PayPal IPN subscription cancellation / EOT / failure."""
+    txn_type = ipn_data.get('txn_type', '')
+    subscr_id = ipn_data.get('subscr_id', '')
+    payer_email = ipn_data.get('payer_email', '')
+    logger.info(f"[PAYPAL-IPN] Subscription event: {txn_type} | subscr_id={subscr_id} | {payer_email}")
+
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE orders SET payment_status='cancelled', updated_at=? WHERE paypal_order_id=?",
+            (datetime.utcnow().isoformat(), subscr_id)
+        )
+        db.commit()
+    except Exception as e:
+        logger.warning(f"[PAYPAL-IPN] Could not update subscription record: {e}")
 
 
 # ============================================================================

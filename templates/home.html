@@ -1221,9 +1221,9 @@
           <div class="sinc-chart-header">
             <div>
               <div style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-bottom:4px;">SINC/USD • Live</div>
-              <div class="sinc-price" id="sincChartPrice">$0.0847</div>
+              <div class="sinc-price" id="sincChartPrice">TBA</div>
             </div>
-            <div class="sinc-change up" id="sincChartChange">▲ +12.4% (24H)</div>
+            <div class="sinc-change up" id="sincChartChange">▲ Pre-Launch</div>
           </div>
           <svg class="sparkline" viewBox="0 0 400 100" preserveAspectRatio="none" height="100">
             <defs>
@@ -1236,12 +1236,10 @@
             <path d="M0,80 L36,75 L72,60 L108,65 L144,50 L180,45 L216,55 L252,35 L288,28 L324,20 L360,15 L400,8 L400,100 L0,100 Z" fill="url(#sparkGrad)"/>
           </svg>
           <div class="sinc-stats">
-            <div class="sinc-stat"><div class="ss-label">Market Cap</div><div class="ss-val">$84.7M</div></div>
-            <div class="sinc-stat"><div class="ss-label">24H Volume</div><div class="ss-val">$12.3M</div></div>
             <div class="sinc-stat"><div class="ss-label">Total Supply</div><div class="ss-val">10B SINC</div></div>
-            <div class="sinc-stat"><div class="ss-label">Staking APY</div><div class="ss-val" style="color:var(--green);">28.4%</div></div>
-            <div class="sinc-stat"><div class="ss-label">Stakers</div><div class="ss-val">8,423</div></div>
-            <div class="sinc-stat"><div class="ss-label">Holders</div><div class="ss-val">24,817</div></div>
+            <div class="sinc-stat"><div class="ss-label">Network</div><div class="ss-val">Base</div></div>
+            <div class="sinc-stat"><div class="ss-label">Token Type</div><div class="ss-val">ERC-20</div></div>
+            <div class="sinc-stat"><div class="ss-label">Status</div><div class="ss-val" style="color:var(--green);">Live</div></div>
           </div>
         </div>
       </div>
@@ -1276,7 +1274,7 @@
 
         <ul class="utility-list">
           <li><span class="uicon">🔑</span><span>Access premium agents and features exclusive to SINC holders</span></li>
-          <li><span class="uicon">💸</span><span>Earn 28.4% APY by staking in the SINCOR liquidity pools</span></li>
+          <li><span class="uicon">💸</span><span>Staking rewards distributed from platform revenue to SINC holders</span></li>
           <li><span class="uicon">🗳️</span><span>Governance votes on agent roadmap and fee parameters</span></li>
           <li><span class="uicon">📉</span><span>Platform revenue buyback reduces circulating supply quarterly</span></li>
           <li><span class="uicon">🤝</span><span>Partner discounts and early access to new agent drops</span></li>
@@ -1468,7 +1466,7 @@
         <ul class="rm-items-list">
           <li>Fully on-chain agent orchestration layer</li>
           <li>SINC DAO controls all protocol parameters</li>
-          <li>100K+ businesses powered by SINCOR agents worldwide</li>
+          <li>Target: 100K+ businesses powered by SINCOR agents worldwide</li>
         </ul>
       </div>
     </div>
@@ -1726,6 +1724,70 @@
       }
     });
   });
+</script>
+<!-- ══════════════════════════════════════
+     COOKIE CONSENT BANNER (GDPR)
+════════════════════════════════════════ -->
+<div id="cookie-banner" style="
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #1a1a2e;
+    color: #e2e8f0;
+    padding: 16px 24px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+">
+    <p style="margin: 0; flex: 1; min-width: 200px;">
+        We use essential cookies for authentication and optional analytics cookies to improve SINCOR.
+        See our <a href="/privacy" style="color: #a78bfa; text-decoration: underline;">Privacy Policy</a>.
+    </p>
+    <div style="display: flex; gap: 10px; flex-shrink: 0;">
+        <button onclick="acceptCookies('essential')" style="
+            background: transparent;
+            color: #a78bfa;
+            border: 1px solid #a78bfa;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        ">Essential Only</button>
+        <button onclick="acceptCookies('all')" style="
+            background: #7c3aed;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        ">Accept All</button>
+    </div>
+</div>
+<script>
+(function() {
+    var consent = localStorage.getItem('sincor_cookie_consent');
+    if (!consent) {
+        var banner = document.getElementById('cookie-banner');
+        if (banner) banner.style.display = 'flex';
+    }
+})();
+function acceptCookies(level) {
+    localStorage.setItem('sincor_cookie_consent', level);
+    localStorage.setItem('sincor_cookie_consent_date', new Date().toISOString());
+    var banner = document.getElementById('cookie-banner');
+    if (banner) banner.style.display = 'none';
+}
 </script>
 </body>
 </html>
