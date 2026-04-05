@@ -30,6 +30,7 @@ class StripeCheckout:
             api_key
             or os.getenv('STRIPE_API_KEY')
             or os.getenv('STRIPE_API_SECRET')
+            or os.getenv('STRIPE_SECRET_KEY')
             or os.getenv('STRIPE_SECRET')
         )
         self.mode = 'test' if 'sk_test' in (self.api_key or '') else 'live'
