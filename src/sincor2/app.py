@@ -1083,6 +1083,21 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 
+# ==================== STRIPE INTEGRATION ====================
+# Initialize Stripe routes
+try:
+    from sincor2.stripe_routes import init_stripe_routes
+    from sincor2.stripe_checkout import StripeCheckout
+    
+    stripe_processor = StripeCheckout()
+    init_stripe_routes(app, stripe_processor)
+    print("✓ Stripe routes initialized successfully")
+except ImportError as e:
+    print(f"✗ Stripe integration not available: {e}")
+except Exception as e:
+    print(f"✗ Stripe configuration error: {e}")
+
+
 # ==================== MAIN ====================
 
 if __name__ == '__main__':

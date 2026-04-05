@@ -276,6 +276,21 @@ def _process_payment_event(event_data):
         # Mark as recovered so abandoned emails don't fire
         _mark_recovered(session_id)
 
+        # 🚀 FIRE AUTONOMOUS FULFILLMENT ENGINE
+        if customer_email:
+            try:
+                from sincor2.fulfillment_engine import trigger_autonomous_fulfillment
+                trigger_autonomous_fulfillment(
+                    customer_email=customer_email,
+                    plan_id=plan_id or 'starter',
+                    plan_name=plan_name or 'SINCOR Starter',
+                    order_id=f"STRIPE-{session_id[:20]}",
+                    amount=amount,
+                )
+                logger.info(f"[FULFILLMENT] Autonomous engine fired for {customer_email}")
+            except Exception as e:
+                logger.error(f"[FULFILLMENT] Engine error: {e}")
+
         if customer_email:
             _send_email(
                 to_email=customer_email,
