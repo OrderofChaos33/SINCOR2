@@ -295,8 +295,8 @@ def get_current_user():
 @app.route('/')
 @limiter.exempt if limiter else lambda f: f
 def index():
-    """Main landing page with product showcase (NO RATE LIMIT)"""
-    return render_template('index.html')
+    """Main landing page — competitive intelligence (NO RATE LIMIT)"""
+    return render_template('home.html')
 
 
 @app.route('/api/waitlist', methods=['POST'])
