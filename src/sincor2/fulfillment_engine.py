@@ -220,8 +220,9 @@ Be direct, professional, and specific — no fluff."""
     try:
         report_content = await brain.claude.complete(
             prompt=report_prompt,
-            max_tokens=6000,
-            system=system_prompt
+            max_tokens=3000,  # REDUCED: Haiku handles 3K tokens fine, cuts cost in half
+            system=system_prompt,
+            model='claude-3-5-haiku-20241022'  # CHEAPEST: Haiku instead of Sonnet
         )
         logger.info(f"[FULFILL] BI report generated successfully for {customer_email}")
         return {

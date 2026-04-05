@@ -7,11 +7,20 @@ import os
 import json
 import sqlite3
 import logging
+import asyncio
 from datetime import datetime
 from flask import Blueprint, request, jsonify, redirect
 from functools import wraps
 
 logger = logging.getLogger('sincor.stripe_routes')
+
+# Import revenue orchestrator
+try:
+    from sincor2.revenue_orchestrator import orchestrator
+    ORCHESTRATOR_AVAILABLE = True
+except ImportError:
+    ORCHESTRATOR_AVAILABLE = False
+    orchestrator = None
 
 stripe_bp = Blueprint('stripe', __name__, url_prefix='/api/stripe')
 
@@ -140,6 +149,20 @@ def init_stripe_routes(app, stripe_processor):
             if success:
                 event_type = event_data.get('event', 'unknown')
                 logger.info(f"[STRIPE] Webhook received: {event_type}")
+                
+                # Route through revenue orchestrator if available
+                if ORCHESTRATOR_AVAILABLE and orchestrator:
+                    try:
+                        # Convert event to proper format and process through orchestrator
+                        stripe_event = {
+                            'type': event_type,
+                            'data': {'object': event_data}
+                        }
+                        asyncio.run(orchestrator.process_stripe_payment(stripe_event))
+                    except Exception as e:
+                        logger.warning(f"[ORCHESTRATOR] Warning: {e}")
+                
+                # Also run original fulfillment (backward compatibility)
                 _process_payment_event(event_data)
                 return jsonify({'success': True}), 200
             else:
@@ -382,4 +405,14 @@ def _process_payment_event(event_data):
 
     elif event_type == 'subscription_updated':
         logger.info(f"[BILLING] Subscription updated: {event_data.get('subscription_id')}")
+    
+    # Register dashboard endpoint
+    @stripe_bp.route('/dashboard', methods=['GET'])
+    def revenue_dashboard():
+        """Get real-time revenue metrics"""
+        if not ORCHESTRATOR_AVAILABLE or not orchestrator:
+            return jsonify({'error': 'Revenue orchestrator not available'}), 503
+        
+        dashboard_data = orchestrator.get_dashboard_data()
+        return jsonify(dashboard_data), 200
 
