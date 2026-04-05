@@ -29,6 +29,11 @@ try:
 except Exception:
     _PAYPAL_AVAILABLE = False
     SINCORPaymentProcessor = None
+    # Define dummy classes for type hints
+    class PaymentResult:
+        pass
+    class PaymentStatus:
+        pass
 
 class RevenueStream(Enum):
     INSTANT_BI = "instant_bi"
