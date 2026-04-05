@@ -15,11 +15,11 @@ logger = logging.getLogger('sincor.stripe_routes')
 
 # Import revenue orchestrator
 try:
-    from sincor2.revenue_orchestrator import orchestrator
+    from sincor2.revenue_orchestrator import get_orchestrator
     ORCHESTRATOR_AVAILABLE = True
 except ImportError:
     ORCHESTRATOR_AVAILABLE = False
-    orchestrator = None
+    get_orchestrator = None
 
 stripe_bp = Blueprint('stripe', __name__, url_prefix='/api/stripe')
 
@@ -150,7 +150,7 @@ def init_stripe_routes(app, stripe_processor):
                 logger.info(f"[STRIPE] Webhook received: {event_type}")
                 
                 # Route through revenue orchestrator if available
-                if ORCHESTRATOR_AVAILABLE and orchestrator:
+                if ORCHESTRATOR_AVAILABLE and get_orchestrator:
                     try:
                         # Log revenue synchronously (don't block response)
                         stripe_event = {

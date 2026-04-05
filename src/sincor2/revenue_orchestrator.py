@@ -352,21 +352,29 @@ class RevenueOrchestrator:
         return result
 
 
-# Initialize the orchestrator
-orchestrator = RevenueOrchestrator()
+# Initialize the orchestrator (lazy-loaded to avoid import-time failures)
+orchestrator = None
+
+def get_orchestrator():
+    """Lazy-load orchestrator on first use"""
+    global orchestrator
+    if orchestrator is None:
+        orchestrator = RevenueOrchestrator()
+    return orchestrator
 
 
 async def handle_stripe_webhook(stripe_event: Dict[str, Any]) -> Dict[str, Any]:
     """Handle incoming Stripe webhook"""
-    return await orchestrator.process_stripe_payment(stripe_event)
+    return await get_orchestrator().process_stripe_payment(stripe_event)
 
 
 def get_dashboard_data() -> Dict[str, Any]:
     """Get all revenue metrics for dashboard"""
     
-    summary_1day = orchestrator.get_revenue_summary(days=1)
-    summary_30day = orchestrator.get_revenue_summary(days=30)
-    mrr = orchestrator.get_mrr()
+    orch = get_orchestrator()
+    summary_1day = orch.get_revenue_summary(days=1)
+    summary_30day = orch.get_revenue_summary(days=30)
+    mrr = orch.get_mrr()
     
     return {
         'today': summary_1day,
