@@ -191,8 +191,17 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js" async></script>
     <script>
+        // Wait for ethers to load
+        function waitForEthers(callback) {
+            if (typeof ethers !== 'undefined') {
+                callback();
+            } else {
+                setTimeout(() => waitForEthers(callback), 100);
+            }
+        }
+
         const CURVE = '0xb627F53E08AD7d455e787d052C18D6877020E2BF';
         const SINC_TOKEN = '0x059ADAcb7Be9C5526abB7f3e5c6d1A712d1b0c23';
         const BASE_CHAIN_ID = 8453;
@@ -313,6 +322,13 @@
         }
 
         async function handleBuy() {
+            // Ensure ethers is loaded before proceeding
+            if (typeof ethers === 'undefined') {
+                setStatus('Loading web3 libraries...', 'text-yellow-400');
+                waitForEthers(() => handleBuy());
+                return;
+            }
+
             if (!walletConnected) {
                 const connected = await connectWallet();
                 if (!connected) return;
