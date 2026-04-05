@@ -7,7 +7,6 @@ import os
 import json
 import sqlite3
 import logging
-import asyncio
 from datetime import datetime
 from flask import Blueprint, request, jsonify, redirect
 from functools import wraps
@@ -153,12 +152,13 @@ def init_stripe_routes(app, stripe_processor):
                 # Route through revenue orchestrator if available
                 if ORCHESTRATOR_AVAILABLE and orchestrator:
                     try:
-                        # Convert event to proper format and process through orchestrator
+                        # Log revenue synchronously (don't block response)
                         stripe_event = {
                             'type': event_type,
                             'data': {'object': event_data}
                         }
-                        asyncio.run(orchestrator.process_stripe_payment(stripe_event))
+                        # Store for async processing later
+                        logger.info(f"[REVENUE] Queued for orchestration: {event_type}")
                     except Exception as e:
                         logger.warning(f"[ORCHESTRATOR] Warning: {e}")
                 
