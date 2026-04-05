@@ -137,6 +137,19 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-
 # Configure template folder
 app.template_folder = 'templates'
 
+# Initialize Stripe routes (MUST be after app creation, BEFORE other routes)
+try:
+    from sincor2.stripe_routes import init_stripe_routes
+    from sincor2.stripe_checkout import StripeCheckout
+    
+    stripe_processor = StripeCheckout()
+    init_stripe_routes(app, stripe_processor)
+    print("✓ Stripe routes initialized")
+except ImportError as e:
+    print(f"WARNING: Stripe not available: {e}")
+except Exception as e:
+    print(f"WARNING: Stripe initialization error: {e}")
+
 # Initialize authentication
 if AUTH_AVAILABLE:
     sincor_auth = SINCORAuth(app)
@@ -1081,21 +1094,6 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
-
-
-# ==================== STRIPE INTEGRATION ====================
-# Initialize Stripe routes
-try:
-    from sincor2.stripe_routes import init_stripe_routes
-    from sincor2.stripe_checkout import StripeCheckout
-    
-    stripe_processor = StripeCheckout()
-    init_stripe_routes(app, stripe_processor)
-    print("✓ Stripe routes initialized successfully")
-except ImportError as e:
-    print(f"✗ Stripe integration not available: {e}")
-except Exception as e:
-    print(f"✗ Stripe configuration error: {e}")
 
 
 # ==================== MAIN ====================
