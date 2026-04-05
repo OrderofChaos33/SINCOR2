@@ -19,7 +19,7 @@ const RPC_HTTP = 'https://mainnet.base.org';
 const TWILIO_SID = process.env.TWILO_ID || 'ACbfe3a0df26ca1bb5e2be2f17a42b1807';
 const TWILIO_AUTH = process.env.TWILO_AUTH || 'debe3e1104335ea04bc45ecb2eb4cc55';
 const TWILIO_FROM = process.env.TWILO_NUMBER || '+18555088949';
-const NOTIFY_TO = process.env.NOTIFY_PHONE || 'YOUR_PHONE_HERE'; // <-- SET THIS
+const NOTIFY_TO = process.env.NOTIFY_PHONE || '+18157188936';
 
 const CURVE_ABI = [
     'event Buy(address indexed buyer, uint256 amount, uint256 cost)',

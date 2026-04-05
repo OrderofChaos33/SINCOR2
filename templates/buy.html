@@ -3,981 +3,407 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Buy SINCOR - Start Making Money Today</title>
+    <title>Get Your Competitive Intelligence Report — SINCOR</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .card-hover { transition: transform 0.3s, box-shadow 0.3s; }
-        .card-hover:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        .popular-badge {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            animation: pulse 2s infinite;
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #050508;
+            --surface: #0d0d15;
+            --surface2: #12121f;
+            --border: rgba(255,255,255,0.08);
+            --purple: #7c3aed;
+            --purple-light: #a78bfa;
+            --blue: #2563eb;
+            --green: #10b981;
+            --text: #e2e8f0;
+            --muted: #64748b;
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            min-height: 100vh;
         }
+        nav {
+            background: rgba(5,5,8,0.95);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .nav-logo { font-size: 20px; font-weight: 700; color: #fff; text-decoration: none; font-family: monospace; }
+        .nav-logo span { color: var(--purple-light); }
+        .nav-back { color: var(--muted); text-decoration: none; font-size: 14px; }
+        .nav-back:hover { color: var(--text); }
+
+        .hero {
+            text-align: center;
+            padding: 72px 24px 48px;
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(16,185,129,0.15);
+            color: var(--green);
+            border: 1px solid rgba(16,185,129,0.3);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+        .hero h1 {
+            font-size: clamp(32px, 5vw, 52px);
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 16px;
+        }
+        .hero h1 span { color: var(--purple-light); }
+        .hero p {
+            font-size: 18px;
+            color: var(--muted);
+            max-width: 560px;
+            margin: 0 auto 32px;
+            line-height: 1.6;
+        }
+
+        /* Payment status */
+        #payment-status {
+            max-width: 600px;
+            margin: 0 auto 24px;
+            padding: 0 24px;
+        }
+        .status-ok {
+            background: rgba(16,185,129,0.1);
+            border: 1px solid rgba(16,185,129,0.3);
+            color: var(--green);
+            padding: 16px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .status-err {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.3);
+            color: #f87171;
+            padding: 16px;
+            border-radius: 10px;
+        }
+
+        .plans-wrap {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 0 24px 80px;
+        }
+        .plans-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+        @media (max-width: 600px) {
+            .plans-grid { grid-template-columns: 1fr; }
+        }
+
+        .plan {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 36px 28px;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+        .plan:hover { border-color: rgba(124,58,237,0.4); }
+        .plan.featured {
+            border-color: var(--purple);
+            background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(37,99,235,0.06));
+        }
+        .plan-badge-top {
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--purple);
+            color: #fff;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .plan-label {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .plan-price {
+            font-size: 56px;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .plan-price sup { font-size: 22px; vertical-align: super; }
+        .plan-period {
+            font-size: 14px;
+            color: var(--muted);
+            margin-bottom: 16px;
+        }
+        .plan-desc {
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.6;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .plan-features {
+            list-style: none;
+            margin-bottom: 28px;
+        }
+        .plan-features li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 9px;
+            color: var(--text);
+        }
+        .chk { color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+        .btn-buy {
+            display: block;
+            width: 100%;
+            padding: 15px 24px;
+            border-radius: 10px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .btn-buy-primary { background: var(--purple); color: #fff; }
+        .btn-buy-primary:hover { background: #6d28d9; transform: translateY(-1px); }
+        .btn-buy-outline { background: transparent; color: var(--purple-light); border: 1px solid rgba(124,58,237,0.5); }
+        .btn-buy-outline:hover { border-color: var(--purple); color: #fff; }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(5,5,8,0.85);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(124,58,237,0.3);
+            border-top-color: var(--purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* What you get */
+        .what-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 36px;
+            margin-bottom: 32px;
+        }
+        .what-box h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+        .what-box .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+        .what-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .what-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px;
+        }
+        .what-item .icon { font-size: 22px; margin-bottom: 8px; }
+        .what-item h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+        .what-item p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+        .guarantee {
+            background: rgba(16,185,129,0.07);
+            border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+        .guarantee h4 { color: var(--green); font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+        .guarantee p { color: var(--muted); font-size: 14px; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body>
 
-    <!-- Hero Section -->
-    <div class="gradient-bg text-white py-20">
-        <div class="max-w-6xl mx-auto px-4 text-center">
-            <div class="inline-block bg-green-500 text-white px-4 py-2 rounded-full font-bold text-sm mb-4">
-                ✓ NOW LIVE — EARLY ACCESS
-            </div>
-            <h1 class="text-5xl md:text-7xl font-black mb-6">
-                42 AI Agents.<br/>Automated Lead Gen, Content & Outreach.
-            </h1>
-            <p class="text-2xl md:text-3xl mb-4 opacity-90 font-bold">
-                Deploy a swarm of AI agents that prospect, write, and follow up — 24/7.<br/>
-                No hiring. No training. Up and running in minutes.
-            </p>
-            <p class="text-xl opacity-90 mb-8">
-                ⚡ Instant Setup • 💰 30-Day Money-Back Guarantee • 🔒 Bank-Level Security
-            </p>
-        </div>
+    <nav>
+        <a href="/" class="nav-logo">SINC<span>OR</span></a>
+        <a href="/" class="nav-back">← Back to Home</a>
+    </nav>
+
+    <div class="hero">
+        <div class="badge">✓ Reports delivered within 24 hours</div>
+        <h1>Get Your <span>Competitive Intelligence</span><br>Report Today</h1>
+        <p>See exactly what your competitors are charging, how they market, what customers say about them — and where you can win.</p>
     </div>
 
-    <!-- Payment Status Message -->
-    <div id="payment-status" class="max-w-4xl mx-auto px-4 py-4"></div>
+    <div id="payment-status"></div>
 
-    <!-- Social Proof Bar -->
-    <div class="bg-white py-8 border-y-2 border-gray-200">
-        <div class="max-w-6xl mx-auto px-4">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div>
-                    <div class="text-3xl font-black text-blue-600">42</div>
-                    <div class="text-sm text-gray-600">Specialized AI Agents</div>
+    <div class="plans-wrap">
+
+        <div class="plans-grid">
+
+            <!-- One-Time Report -->
+            <div class="plan">
+                <div class="plan-label">One-Time Report</div>
+                <div class="plan-price"><sup>$</sup>49</div>
+                <div class="plan-period">one-time payment · 24hr delivery</div>
+                <div class="plan-desc">Full competitive analysis of your market. Know what rivals charge, how they market, and where the gaps are.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Top 3–5 competitors analyzed</li>
+                    <li><span class="chk">✓</span>Pricing &amp; service comparison</li>
+                    <li><span class="chk">✓</span>Review &amp; reputation breakdown</li>
+                    <li><span class="chk">✓</span>SEO &amp; online presence snapshot</li>
+                    <li><span class="chk">✓</span>Marketing &amp; ad activity</li>
+                    <li><span class="chk">✓</span>3 specific opportunities to act on</li>
+                    <li><span class="chk">✓</span>PDF delivered to your email</li>
+                </ul>
+                <button class="btn-buy btn-buy-outline" onclick="startCheckout('starter', 'Competitive Intelligence Report', 4900, false)">
+                    Get My Report — $49
+                </button>
+            </div>
+
+            <!-- Monthly Subscription -->
+            <div class="plan featured">
+                <div class="plan-badge-top">Best Value</div>
+                <div class="plan-label">Monthly Intelligence</div>
+                <div class="plan-price"><sup>$</sup>149</div>
+                <div class="plan-period">per month · cancel anytime</div>
+                <div class="plan-desc">Fresh competitive intel every month. Track changes, catch new competitors, stay ahead all year.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Everything in the one-time report</li>
+                    <li><span class="chk">✓</span>New report delivered every month</li>
+                    <li><span class="chk">✓</span>Competitor change tracking</li>
+                    <li><span class="chk">✓</span>New market entrant alerts</li>
+                    <li><span class="chk">✓</span>Pricing trend analysis</li>
+                    <li><span class="chk">✓</span>Priority email support</li>
+                    <li><span class="chk">✓</span>Cancel anytime, no contract</li>
+                </ul>
+                <button class="btn-buy btn-buy-primary" onclick="startCheckout('professional', 'SINCOR Monthly Intelligence', 14900, true)">
+                    Start Monthly Intel — $149/mo
+                </button>
+            </div>
+
+        </div>
+
+        <!-- What you get -->
+        <div class="what-box">
+            <h3>📊 What's Inside Every Report</h3>
+            <p class="sub">Built from live data on your specific market — not generic AI output.</p>
+            <div class="what-grid">
+                <div class="what-item">
+                    <div class="icon">💰</div>
+                    <h4>Pricing Intel</h4>
+                    <p>What competitors charge and how they package services.</p>
                 </div>
-                <div>
-                    <div class="text-3xl font-black text-green-600">24/7</div>
-                    <div class="text-sm text-gray-600">Always Working</div>
+                <div class="what-item">
+                    <div class="icon">⭐</div>
+                    <h4>Reputation Data</h4>
+                    <p>Review scores, complaints, and what customers love about rivals.</p>
                 </div>
-                <div>
-                    <div class="text-3xl font-black text-purple-600">3</div>
-                    <div class="text-sm text-gray-600">Flexible Plans</div>
+                <div class="what-item">
+                    <div class="icon">🔍</div>
+                    <h4>Online Presence</h4>
+                    <p>Website quality, SEO keywords, Google rankings.</p>
                 </div>
-                <div>
-                    <div class="text-3xl font-black text-red-600">30-Day</div>
-                    <div class="text-sm text-gray-600">Money-Back Guarantee</div>
+                <div class="what-item">
+                    <div class="icon">📣</div>
+                    <h4>Marketing Activity</h4>
+                    <p>How they advertise and what content performs.</p>
+                </div>
+                <div class="what-item">
+                    <div class="icon">🎯</div>
+                    <h4>Market Gaps</h4>
+                    <p>Specific opportunities your competitors are missing.</p>
+                </div>
+                <div class="what-item">
+                    <div class="icon">📋</div>
+                    <h4>Action Plan</h4>
+                    <p>3 things you can do in the next 30 days to win.</p>
                 </div>
             </div>
         </div>
+
+        <!-- Guarantee -->
+        <div class="guarantee">
+            <h4>🛡️ 30-Day Money-Back Guarantee</h4>
+            <p>If your report doesn't give you at least one actionable insight, email us for a full refund. No questions asked.</p>
+        </div>
+
     </div>
 
-
-    <!-- Monthly Plans -->
-    <div class="max-w-7xl mx-auto px-4 py-20">
-        <div class="text-center mb-16">
-            <h2 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-                Choose Your Plan
-            </h2>
-            <p class="text-xl text-gray-600">
-                Cancel anytime. No contracts. Full refund within 30 days.
-            </p>
-        </div>
-
-        <div class="grid md:grid-cols-3 gap-8 mb-20">
-
-            <!-- Starter -->
-            <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border-2 border-gray-200">
-                <div class="text-center mb-8">
-                    <div class="text-sm font-bold text-blue-600 uppercase mb-2">Starter - Best For Testing</div>
-                    <div class="text-6xl font-black text-gray-900 mb-2">$297</div>
-                    <div class="text-gray-500 text-lg">/month</div>
-                    <div class="text-green-600 font-bold mt-2">Lead gen + outreach automation</div>
-                </div>
-
-                <div class="space-y-4 mb-8">
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>10 AI Agents</b> - Lead discovery & basic outreach</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Automatic lead generation (50-100/week)</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Email campaigns & follow-ups</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Email support (24h response)</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Cancel anytime. 30-day refund guarantee.</span>
-                    </div>
-                </div>
-
-                <div id="paypal-starter" class="mb-4"></div>
-                <p class="text-center text-xs text-gray-500">Secure payment via PayPal</p>
-            </div>
-
-            <!-- Professional (MOST POPULAR) -->
-            <div class="bg-white rounded-3xl shadow-2xl p-8 card-hover border-4 border-purple-500 relative transform scale-105">
-                <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 popular-badge text-white px-6 py-2 rounded-full font-bold text-sm">
-                    🔥 MOST POPULAR
-                </div>
-
-                <div class="text-center mb-8 mt-4">
-                    <div class="text-sm font-bold text-purple-600 uppercase mb-2">Professional - Most Popular</div>
-                    <div class="text-6xl font-black text-gray-900 mb-2">$997</div>
-                    <div class="text-gray-500 text-lg">/month</div>
-                    <div class="text-green-600 font-bold mt-2">Full lead gen + content + analytics</div>
-                </div>
-
-                <div class="space-y-4 mb-8">
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>25 AI Agents</b> - Lead gen, content, email, social media</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">200-400 qualified leads per week</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Automated blog posts, email sequences, social content</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>Priority support</b> (2h response) + onboarding call</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Real-time analytics dashboard</span>
-                    </div>
-                </div>
-
-                <div id="paypal-professional" class="mb-4"></div>
-                <p class="text-center text-xs text-gray-500">Secure payment via PayPal</p>
-            </div>
-
-            <!-- Enterprise -->
-            <div class="bg-white rounded-3xl shadow-xl p-8 card-hover border-2 border-gray-200">
-                <div class="text-center mb-8">
-                    <div class="text-sm font-bold text-purple-600 uppercase mb-2">Enterprise</div>
-                    <div class="text-6xl font-black text-gray-900 mb-2">$2,997</div>
-                    <div class="text-gray-500 text-lg">/month</div>
-                    <div class="text-green-600 font-bold mt-2">All 42 agents + dedicated success manager</div>
-                </div>
-
-                <div class="space-y-4 mb-8">
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>All 42 AI Agents</b> - Every automation capability</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">500-1000+ leads per week</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Full automation: sales, operations, content, intelligence</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700"><b>Dedicated success manager</b> + 24/7 support</span>
-                    </div>
-                    <div class="flex items-start">
-                        <span class="text-green-500 mr-3 text-xl">✓</span>
-                        <span class="text-gray-700">Custom workflow development</span>
-                    </div>
-                </div>
-
-                <div id="paypal-enterprise" class="mb-4"></div>
-                <p class="text-center text-xs text-gray-500">Secure payment via PayPal</p>
-            </div>
-        </div>
-
-        <!-- Content Generation Packages -->
-        <div class="border-t-4 border-purple-200 pt-20 mb-20">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-                    Professional Content Packages
-                </h2>
-                <p class="text-xl text-gray-600">
-                    AI-generated content that converts. Delivered in 2-7 days.
-                </p>
-            </div>
-
-            <div class="grid md:grid-cols-4 gap-6 mb-8">
-                <!-- Micro Package -->
-                <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 shadow-lg card-hover">
-                    <div class="mb-4">
-                        <div class="text-4xl mb-3">✍️</div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">Micro Package</h3>
-                        <div class="text-3xl font-black text-blue-600 mb-2">$500</div>
-                        <p class="text-gray-600 text-sm mb-4">1-5 pieces of premium content</p>
-                    </div>
-
-                    <div class="space-y-2 mb-4 text-xs text-gray-700">
-                        <div>✓ Blog posts, landing pages</div>
-                        <div>✓ Product descriptions</div>
-                        <div>✓ Email campaigns</div>
-                        <div>✓ 3-day delivery</div>
-                    </div>
-
-                    <div id="paypal-content-micro" class="mb-2"></div>
-                    <p class="text-center text-xs text-gray-500">One-time payment</p>
-                </div>
-
-                <!-- Standard Package -->
-                <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 shadow-lg card-hover border-2 border-green-400">
-                    <div class="mb-4">
-                        <div class="text-4xl mb-3">📝</div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">Standard Package</h3>
-                        <div class="text-3xl font-black text-green-600 mb-2">$2,500</div>
-                        <p class="text-gray-600 text-sm mb-4">10-20 high-quality pieces</p>
-                    </div>
-
-                    <div class="space-y-2 mb-4 text-xs text-gray-700">
-                        <div>✓ Complete content library</div>
-                        <div>✓ SEO optimized</div>
-                        <div>✓ Multiple formats</div>
-                        <div>✓ 7-day delivery</div>
-                    </div>
-
-                    <div id="paypal-content-standard" class="mb-2"></div>
-                    <p class="text-center text-xs text-gray-500">Best value</p>
-                </div>
-
-                <!-- Professional Package -->
-                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 shadow-lg card-hover">
-                    <div class="mb-4">
-                        <div class="text-4xl mb-3">🎯</div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">Professional</h3>
-                        <div class="text-3xl font-black text-purple-600 mb-2">$6,000</div>
-                        <p class="text-gray-600 text-sm mb-4">30-50 expert-level pieces</p>
-                    </div>
-
-                    <div class="space-y-2 mb-4 text-xs text-gray-700">
-                        <div>✓ Full content strategy</div>
-                        <div>✓ Industry-specific</div>
-                        <div>✓ White papers & case studies</div>
-                        <div>✓ 14-day delivery</div>
-                    </div>
-
-                    <div id="paypal-content-professional" class="mb-2"></div>
-                    <p class="text-center text-xs text-gray-500">Premium quality</p>
-                </div>
-
-                <!-- Enterprise Package -->
-                <div class="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-2xl p-6 shadow-lg card-hover">
-                    <div class="mb-4">
-                        <div class="text-4xl mb-3">🚀</div>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2">Enterprise</h3>
-                        <div class="text-3xl font-black text-indigo-600 mb-2">$15,000</div>
-                        <p class="text-gray-600 text-sm mb-4">100+ custom pieces</p>
-                    </div>
-
-                    <div class="space-y-2 mb-4 text-xs text-gray-700">
-                        <div>✓ Complete content ecosystem</div>
-                        <div>✓ Custom voice & style</div>
-                        <div>✓ eBooks & whitepapers</div>
-                        <div>✓ 21-day delivery</div>
-                    </div>
-
-                    <div id="paypal-content-enterprise" class="mb-2"></div>
-                    <p class="text-center text-xs text-gray-500">Full-service</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- One-Time Services -->
-        <div class="border-t-4 border-gray-200 pt-20">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-black text-gray-900 mb-4">
-                    Business Intelligence Reports
-                </h2>
-                <p class="text-xl text-gray-600">
-                    Get instant insights without a subscription. Delivered in 48 hours.
-                </p>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-8">
-
-                <!-- BI Report -->
-                <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-8 shadow-lg card-hover">
-                    <div class="mb-6">
-                        <div class="text-4xl mb-4">📊</div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Business Intelligence Report</h3>
-                        <div class="text-4xl font-black text-blue-600 mb-2">$497</div>
-                        <p class="text-gray-600">Comprehensive analysis of your business metrics, opportunities, and blind spots</p>
-                    </div>
-
-                    <div class="space-y-2 mb-6 text-sm text-gray-700">
-                        <div>✓ Revenue analysis & forecasting</div>
-                        <div>✓ Growth opportunities identified</div>
-                        <div>✓ Competitive positioning</div>
-                        <div>✓ 20+ page detailed report</div>
-                    </div>
-
-                    <div id="paypal-bi-report" class="mb-3"></div>
-                    <p class="text-center text-xs text-gray-500">One-time payment</p>
-                </div>
-
-                <!-- Competitive Analysis -->
-                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 shadow-lg card-hover">
-                    <div class="mb-6">
-                        <div class="text-4xl mb-4">🎯</div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Competitive Analysis</h3>
-                        <div class="text-4xl font-black text-purple-600 mb-2">$147</div>
-                        <p class="text-gray-600">Deep dive into your competitors' strategies, pricing, and market positioning</p>
-                    </div>
-
-                    <div class="space-y-2 mb-6 text-sm text-gray-700">
-                        <div>✓ Top 5 competitors analyzed</div>
-                        <div>✓ Pricing strategy breakdown</div>
-                        <div>✓ Market gaps identified</div>
-                        <div>✓ Actionable recommendations</div>
-                    </div>
-
-                    <div id="paypal-competitive" class="mb-3"></div>
-                    <p class="text-center text-xs text-gray-500">One-time payment</p>
-                </div>
-
-                <!-- Growth Forecast -->
-                <div class="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-8 shadow-lg card-hover">
-                    <div class="mb-6">
-                        <div class="text-4xl mb-4">📈</div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">90-Day Growth Forecast</h3>
-                        <div class="text-4xl font-black text-green-600 mb-2">$247</div>
-                        <p class="text-gray-600">Predictive analytics and growth projections with specific action steps</p>
-                    </div>
-
-                    <div class="space-y-2 mb-6 text-sm text-gray-700">
-                        <div>✓ Revenue projections (3 months)</div>
-                        <div>✓ Growth strategy roadmap</div>
-                        <div>✓ Resource allocation plan</div>
-                        <div>✓ Risk assessment & mitigation</div>
-                    </div>
-
-                    <div id="paypal-growth" class="mb-3"></div>
-                    <p class="text-center text-xs text-gray-500">One-time payment</p>
-                </div>
-            </div>
-        </div>
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div style="color: var(--text); font-weight: 600;">Redirecting to secure checkout...</div>
     </div>
 
-    <!-- Social Proof Stats -->
-    <div class="bg-gradient-to-r from-purple-600 to-purple-500 text-white py-12 mb-20">
-        <div class="max-w-6xl mx-auto px-4">
-            <div class="grid md:grid-cols-4 gap-8 text-center">
-                <div>
-                    <div class="text-5xl font-black mb-2">42</div>
-                    <div class="text-purple-100 text-sm">Specialized AI Agents</div>
-                </div>
-                <div>
-                    <div class="text-5xl font-black mb-2">24/7</div>
-                    <div class="text-purple-100 text-sm">Always Running</div>
-                </div>
-                <div>
-                    <div class="text-5xl font-black mb-2">3</div>
-                    <div class="text-purple-100 text-sm">Flexible Plans</div>
-                </div>
-                <div>
-                    <div class="text-5xl font-black mb-2">30-Day</div>
-                    <div class="text-purple-100 text-sm">Money-Back Guarantee</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Early Access CTA (testimonials section - will replace with real reviews once collected) -->
-    <div class="max-w-6xl mx-auto px-4 mb-20">
-        <div class="text-center mb-12">
-            <h2 class="text-4xl font-black text-gray-900 mb-4">Early Access — Be First In</h2>
-            <p class="text-xl text-gray-600">SINCOR is launching now. Early customers get direct access to the team and help shaping the product.</p>
-        </div>
-        <div class="grid md:grid-cols-3 gap-8">
-            <div class="bg-white rounded-2xl p-8 shadow-lg text-center">
-                <div class="text-4xl mb-4">🤝</div>
-                <h3 class="text-xl font-bold mb-3">Direct Founder Access</h3>
-                <p class="text-gray-600">Early customers get a direct line to the team. Real support, real humans, no ticket queue.</p>
-            </div>
-            <div class="bg-white rounded-2xl p-8 shadow-lg text-center">
-                <div class="text-4xl mb-4">🔧</div>
-                <h3 class="text-xl font-bold mb-3">Shape the Roadmap</h3>
-                <p class="text-gray-600">Tell us what you need. Early customers directly influence which agents and features get built next.</p>
-            </div>
-            <div class="bg-white rounded-2xl p-8 shadow-lg text-center">
-                <div class="text-4xl mb-4">💰</div>
-                <h3 class="text-xl font-bold mb-3">30-Day Money Back</h3>
-                <p class="text-gray-600">If SINCOR doesn't work for your business in the first 30 days, we refund you. No questions asked.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- FAQ Section -->
-    <div class="max-w-4xl mx-auto px-4 mb-20">
-        <div class="text-center mb-12">
-            <h2 class="text-4xl font-black text-gray-900 mb-4">Frequently Asked Questions</h2>
-        </div>
-
-        <div class="space-y-6">
-            <div class="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 class="text-xl font-bold text-gray-900 mb-3">How quickly will I see results?</h3>
-                <p class="text-gray-600">Most customers see measurable results within 24-48 hours. Your AI agents start working immediately after signup and begin generating leads, content, and insights right away.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 class="text-xl font-bold text-gray-900 mb-3">What if I'm not satisfied?</h3>
-                <p class="text-gray-600">We offer a 30-day money-back guarantee. If you're not completely satisfied with SINCOR, we'll refund every penny. No questions asked.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 class="text-xl font-bold text-gray-900 mb-3">Do I need technical knowledge to use SINCOR?</h3>
-                <p class="text-gray-600">Not at all. SINCOR is designed for business owners, not developers. Setup takes under 5 minutes and our AI agents handle all the technical complexity.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 class="text-xl font-bold text-gray-900 mb-3">Can I upgrade or downgrade my plan?</h3>
-                <p class="text-gray-600">Yes! You can change your plan at any time. Upgrades take effect immediately, and downgrades apply at your next billing cycle.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 class="text-xl font-bold text-gray-900 mb-3">What industries does SINCOR work for?</h3>
-                <p class="text-gray-600">SINCOR works for virtually any business: SaaS, e-commerce, consulting, agencies, healthcare, fintech, and more. Our AI agents adapt to your specific industry and goals.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Trust Section -->
-    <div class="bg-gray-900 text-white py-16">
-        <div class="max-w-6xl mx-auto px-4">
-            <div class="grid md:grid-cols-4 gap-8 text-center">
-                <div>
-                    <div class="text-4xl mb-3">🔒</div>
-                    <div class="font-bold mb-2">100% Secure</div>
-                    <div class="text-sm text-gray-400">PayPal encrypted checkout</div>
-                </div>
-                <div>
-                    <div class="text-4xl mb-3">⚡</div>
-                    <div class="font-bold mb-2">Instant Access</div>
-                    <div class="text-sm text-gray-400">Setup in under 5 minutes</div>
-                </div>
-                <div>
-                    <div class="text-4xl mb-3">💰</div>
-                    <div class="font-bold mb-2">Money Back</div>
-                    <div class="text-sm text-gray-400">30-day full refund guarantee</div>
-                </div>
-                <div>
-                    <div class="text-4xl mb-3">🏆</div>
-                    <div class="font-bold mb-2">Cancel Anytime</div>
-                    <div class="text-sm text-gray-400">No contracts or commitments</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer CTA -->
-    <div class="gradient-bg text-white py-16 text-center">
-        <h3 class="text-3xl font-bold mb-4">Ready to automate your business?</h3>
-        <p class="text-xl mb-8">Deploy 42 AI agents and start automating today.</p>
-        <a href="#" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;" class="bg-white text-purple-600 px-10 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition inline-block">
-            Choose Your Plan ↑
-        </a>
-    </div>
-
-    <!-- Load PayPal SDK with proper environment detection -->
     <script>
-        // Detect environment and load PayPal SDK
-        (function() {
-            // Show loading message
-            const statusEl = document.getElementById('payment-status');
-            statusEl.innerHTML = '<div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded text-center">Loading payment system...</div>';
-
-            // Use client ID from backend (Railway production env var or sandbox fallback)
-            const clientId = '{{ paypal_client_id }}';
-
-            console.log('PayPal Client ID:', clientId);
-
-            const script = document.createElement('script');
-            script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture`;
-            script.onload = function() {
-                console.log('PayPal SDK loaded successfully');
-                statusEl.innerHTML = '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded text-center">Payment system ready! Select a plan below.</div>';
-                setTimeout(() => statusEl.innerHTML = '', 3000);
-                initializePayPalButtons();
-            };
-            script.onerror = function() {
-                console.error('Failed to load PayPal SDK - using fallback buttons');
-                statusEl.innerHTML = '<div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded text-center"><strong>🚀 Early Access</strong> - Join our waitlist to get priority access when payments launch</div>';
-
-                // Show "Join Waitlist" fallback buttons
-                document.querySelectorAll('[id^="paypal-"]').forEach(el => {
-                    const productName = el.id.replace('paypal-', '');
-                    const planName = productName.charAt(0).toUpperCase() + productName.slice(1);
-                    el.innerHTML = `
-                        <button onclick="joinWaitlist('${planName}')"
-                           class="block w-full bg-gradient-to-r from-purple-600 to-purple-500 text-white px-6 py-3 rounded-xl font-bold text-center hover:from-purple-700 hover:to-purple-600 transition shadow-lg">
-                            🎯 Join Waitlist - ${planName}
-                        </button>
-                    `;
-                });
-            };
-            document.head.appendChild(script);
-        })();
-
-        function joinWaitlist(planName) {
-            const email = prompt(`Join the ${planName} waitlist!\n\nEnter your email to get early access when payments launch:`);
-            if (email && email.includes('@')) {
-                alert(`✓ You're on the waitlist!\n\nWe'll send you an email when ${planName} is ready to purchase.\n\nEmail: ${email}`);
-                console.log(`Waitlist signup: ${email} for ${planName}`);
-            } else if (email) {
-                alert('Please enter a valid email address');
-            }
+        // Check URL params for payment status
+        const params = new URLSearchParams(window.location.search);
+        const statusEl = document.getElementById('payment-status');
+        if (params.get('cancelled') === '1') {
+            statusEl.innerHTML = '<div class="status-err">Checkout was cancelled. Your card was not charged. Click any plan below to try again.</div>';
         }
 
-        function initializePayPalButtons() {
-            // Starter - $297/month
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '297.00', currency_code: 'USD' },
-                            description: 'SINCOR Starter Plan - Monthly Subscription',
-                            custom_id: 'starter-monthly-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        // Store order details in sessionStorage for success page
-                        const orderData = {
-                            id: details.id,
-                            plan: 'Starter',
-                            amount: '297.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        };
-                        sessionStorage.setItem('orderDetails', JSON.stringify(orderData));
+        async function startCheckout(planId, planName, priceCents, isSubscription) {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.classList.add('active');
 
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Starter',
-                                    amount: {value: '297.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
+            try {
+                const resp = await fetch('/api/stripe/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plan_id: planId,
+                        plan_name: planName,
+                        price_cents: priceCents,
+                        is_subscription: isSubscription,
+                        billing: 'month',
+                    })
+                });
 
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
+                const data = await resp.json();
+
+                if (data.success && data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                } else {
+                    overlay.classList.remove('active');
+                    statusEl.innerHTML = '<div class="status-err">Payment error: ' + (data.error || 'Unknown error. Please try again or email support@getsincor.com') + '</div>';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
-            }).render('#paypal-starter');
-
-            // Professional - $997/month
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '997.00', currency_code: 'USD' },
-                            description: 'SINCOR Professional Plan - Monthly Subscription',
-                            custom_id: 'professional-monthly-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Professional',
-                            amount: '997.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Professional',
-                                    amount: {value: '997.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-professional');
-
-            // Enterprise - $2,997/month
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '2997.00', currency_code: 'USD' },
-                            description: 'SINCOR Enterprise Plan - Monthly Subscription',
-                            custom_id: 'enterprise-monthly-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Enterprise',
-                            amount: '2997.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Enterprise',
-                                    amount: {value: '2997.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-enterprise');
-
-            // BI Report - $497
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '497.00', currency_code: 'USD' },
-                            description: 'Business Intelligence Report',
-                            custom_id: 'bi-report-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Business Intelligence Report',
-                            amount: '497.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Business Intelligence Report',
-                                    amount: {value: '497.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-bi-report');
-
-            // Competitive Analysis - $147
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '147.00', currency_code: 'USD' },
-                            description: 'Competitive Analysis Report',
-                            custom_id: 'competitive-analysis-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Competitive Analysis',
-                            amount: '147.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Competitive Analysis',
-                                    amount: {value: '147.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-competitive');
-
-            // Growth Forecast - $247
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '247.00', currency_code: 'USD' },
-                            description: '90-Day Growth Forecast',
-                            custom_id: 'growth-forecast-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: '90-Day Growth Forecast',
-                            amount: '247.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: '90-Day Growth Forecast',
-                                    amount: {value: '247.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-growth');
-
-            // Content Package - Micro - $500
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '500.00', currency_code: 'USD' },
-                            description: 'Content Package - Micro',
-                            custom_id: 'content-micro-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Content Package - Micro',
-                            amount: '500.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Content Package - Micro',
-                                    amount: {value: '500.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-content-micro');
-
-            // Content Package - Standard - $2,500
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '2500.00', currency_code: 'USD' },
-                            description: 'Content Package - Standard',
-                            custom_id: 'content-standard-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Content Package - Standard',
-                            amount: '2500.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Content Package - Standard',
-                                    amount: {value: '2500.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-content-standard');
-
-            // Content Package - Professional - $6,000
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '6000.00', currency_code: 'USD' },
-                            description: 'Content Package - Professional',
-                            custom_id: 'content-professional-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Content Package - Professional',
-                            amount: '6000.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Content Package - Professional',
-                                    amount: {value: '6000.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-content-professional');
-
-            // Content Package - Enterprise - $15,000
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: { value: '15000.00', currency_code: 'USD' },
-                            description: 'Content Package - Enterprise',
-                            custom_id: 'content-enterprise-' + Date.now()
-                        }]
-                    });
-                },
-                onApprove: function(data, actions) {
-                    return actions.order.capture().then(function(details) {
-                        sessionStorage.setItem('orderDetails', JSON.stringify({
-                            id: details.id,
-                            plan: 'Content Package - Enterprise',
-                            amount: '15000.00',
-                            email: details.payer.email_address,
-                            timestamp: new Date().toISOString()
-                        }));
-
-                        // Trigger backend fulfillment
-                        fetch('/api/payment/webhook', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                id: details.id,
-                                payer: {email_address: details.payer.email_address},
-                                purchase_units: [{
-                                    description: 'Content Package - Enterprise',
-                                    amount: {value: '15000.00'}
-                                }]
-                            })
-                        }).catch(err => console.error('Fulfillment error:', err));
-
-                        window.location.href = '/payment/success?order_id=' + details.id;
-                    });
-                },
-                onError: function(err) {
-                    console.error('PayPal Error:', err);
-                    alert('Payment failed. Please try again or contact support.');
-                }
-            }).render('#paypal-content-enterprise');
+            } catch (err) {
+                overlay.classList.remove('active');
+                statusEl.innerHTML = '<div class="status-err">Connection error. Please refresh and try again, or email support@getsincor.com</div>';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         }
     </script>
 </body>

@@ -15,11 +15,16 @@ logger = logging.getLogger('sincor.stripe_routes')
 
 stripe_bp = Blueprint('stripe', __name__, url_prefix='/api/stripe')
 
-# Real Stripe Price IDs (live mode)
+# Stripe Price IDs (live mode)
+# IMPORTANT: Update these with new price IDs after creating products in Stripe dashboard:
+#   - starter: $49 one-time (Payment, not subscription)
+#   - professional: $149/month (Subscription, recurring)
+# Create at: https://dashboard.stripe.com/products
+# If env vars are set, they override these defaults.
 PRICE_IDS = {
-    'starter':      'price_1T84ngDuhR2MxqDMrEdObjnD',
-    'professional': 'price_1T84oyDuhR2MxqDMPmMKJkfQ',
-    'enterprise':   'price_1T84qHDuhR2MxqDMG1LNnMbm',
+    'starter':      os.environ.get('STRIPE_PRICE_STARTER')      or 'price_1T84ngDuhR2MxqDMrEdObjnD',
+    'professional': os.environ.get('STRIPE_PRICE_PROFESSIONAL')  or 'price_1T84oyDuhR2MxqDMPmMKJkfQ',
+    'enterprise':   os.environ.get('STRIPE_PRICE_ENTERPRISE')    or 'price_1T84qHDuhR2MxqDMG1LNnMbm',
 }
 
 # ----- Abandoned checkout SQLite helpers -----

@@ -87,21 +87,10 @@ class StripeCheckout:
                 session_params['customer_email'] = customer_email
 
             if is_subscription:
-                # $10 intro: 30-day trial + $10 add-on invoice item charged immediately
+                # Charge immediately on subscription start (no trial, no intro pricing)
+                # Customer pays $149 now, then $149/month recurring
                 session_params['subscription_data'] = {
-                    'trial_period_days': 30,
                     'metadata': meta,
-                    'add_invoice_items': [
-                        {
-                            'price_data': {
-                                'currency': 'usd',
-                                'unit_amount': 1000,  # $10.00
-                                'product_data': {
-                                    'name': f'{product_name} — First Month Intro',
-                                },
-                            }
-                        }
-                    ],
                 }
 
             session = stripe.checkout.Session.create(**session_params)

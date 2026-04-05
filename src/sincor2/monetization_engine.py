@@ -22,7 +22,13 @@ from sincor2.infinite_scaling_engine import InfiniteScalingEngine, AgentArchetyp
 from sincor2.real_time_intelligence import RealTimeIntelligenceEngine, IntelligenceSource
 from sincor2.predictive_analytics_engine import PredictiveAnalyticsEngine, PredictionType
 from sincor2.quality_scoring_engine import SelfImprovingQualityEngine, QualityDimension
-from sincor2.paypal_integration import SINCORPaymentProcessor, PaymentResult, PaymentStatus
+# PayPal import wrapped to prevent crash when credentials not set
+try:
+    from sincor2.paypal_integration import SINCORPaymentProcessor, PaymentResult, PaymentStatus
+    _PAYPAL_AVAILABLE = True
+except Exception:
+    _PAYPAL_AVAILABLE = False
+    SINCORPaymentProcessor = None
 
 class RevenueStream(Enum):
     INSTANT_BI = "instant_bi"

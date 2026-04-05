@@ -33,16 +33,23 @@ class OutreachEngine:
     PLACES_FIND_URL = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json'
     PLACES_DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json'
 
-    # Target business categories — small local businesses that benefit from analytics
+    # Target business categories — ICP: med spas, gyms, real estate agents
+    # These are high-ticket service businesses that care about competitive intel
     TARGET_CATEGORIES = [
-        ('restaurants', 'Chicago, IL'),
-        ('hair', 'Chicago, IL'),
-        ('auto_repair', 'Chicago, IL'),
-        ('dentists', 'Chicago, IL'),
+        ('medspas', 'Chicago, IL'),
+        ('medspa', 'Chicago, IL'),
         ('gyms', 'Chicago, IL'),
-        ('spas', 'Chicago, IL'),
-        ('plumbers', 'Chicago, IL'),
-        ('electricians', 'Chicago, IL'),
+        ('fitness', 'Chicago, IL'),
+        ('real_estate', 'Chicago, IL'),
+        ('yoga', 'Chicago, IL'),
+        ('pilates', 'Chicago, IL'),
+        ('personal_trainers', 'Chicago, IL'),
+        ('medspas', 'Dallas, TX'),
+        ('gyms', 'Dallas, TX'),
+        ('real_estate', 'Dallas, TX'),
+        ('medspas', 'Miami, FL'),
+        ('gyms', 'Miami, FL'),
+        ('real_estate', 'Miami, FL'),
     ]
 
     def __init__(self):
@@ -164,32 +171,39 @@ class OutreachEngine:
 
     def _build_email_html(self, lead: Dict) -> str:
         name = lead.get('name', 'there')
-        website = lead.get('website', '')
-        site_line = f'<p>We noticed your website: <a href="{website}">{website}</a></p>' if website else ''
+        rating = lead.get('rating', '')
+        category = lead.get('category', '')
+        
+        # Personalize based on what we know about them
+        rating_line = ''
+        if rating:
+            if float(rating) >= 4.5:
+                rating_line = f'<p>Congrats on your strong {rating}⭐ rating — you\'re clearly doing something right.</p>'
+            elif float(rating) < 4.0:
+                rating_line = f'<p>I noticed your {rating}⭐ rating. I can show you exactly what your highest-rated competitors are doing differently.</p>'
+
         return f"""
-<html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+<html>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
 <p>Hi {name} team,</p>
-<p>I'm Court from <a href="https://getsincor.com">SINCOR</a> — we help local businesses
-understand their data and grow revenue without guessing.</p>
-{site_line}
-<p>We've built an AI-powered analytics tool specifically for businesses like yours.
-In under 10 minutes, it can show you:</p>
-<ul>
-  <li>Where you're leaving money on the table</li>
-  <li>What your top competitors are doing differently</li>
-  <li>A 90-day revenue forecast based on local market data</li>
-</ul>
-<p>The first report is on us — no strings attached. Want to see it?</p>
-<p>Just reply to this email or check it out at
-<a href="https://getsincor.com">getsincor.com</a>.</p>
-<p>Best,<br>Court<br>SINCOR<br>
+<p>Quick question: do you know what your top 3 competitors are charging right now?</p>
+{rating_line}
+<p>I'm Court at <a href="https://getsincor.com">SINCOR</a>. We build competitive intelligence
+reports for local service businesses — so you can see exactly what your rivals are doing
+(pricing, marketing, reviews, everything) in one clear PDF.</p>
+<p>It's $49 as a one-time report, or $149/month if you want fresh intel every month.</p>
+<p>Most of our clients say the first report pays for itself the same week — usually by
+catching a pricing gap they didn't know existed.</p>
+<p>Interested? Just reply here and I'll get your report started. Takes 5 minutes on your end.</p>
+<p>— Court<br>
+SINCOR | getsincor.com<br>
 <a href="mailto:support@getsincor.com">support@getsincor.com</a></p>
-<hr>
-<p style="font-size:11px;color:#888;">
-You're receiving this because your business appeared in a local directory.
-Reply STOP to opt out.
+<hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
+<p style="font-size:11px;color:#999;">
+Your business appeared in a local directory. Not interested? Reply STOP and I won't reach out again.
 </p>
-</body></html>
+</body>
+</html>
 """
 
     def send_outreach_email(self, lead: Dict, resend_client) -> bool:
@@ -206,17 +220,19 @@ Reply STOP to opt out.
             html = self._build_email_html(lead)
             text = (
                 f"Hi {lead.get('name', 'there')} team,\n\n"
-                "I'm Court from SINCOR (getsincor.com). We help local businesses understand "
-                "their data and grow revenue.\n\n"
-                "Free first report — no strings. Interested?\n\n"
-                "Reply or visit: https://getsincor.com\n\n"
-                "Best, Court\n"
+                "Quick question: do you know what your top 3 competitors are charging right now?\n\n"
+                "I'm Court at SINCOR. We build competitive intelligence reports for local service "
+                "businesses — pricing, reviews, marketing, everything in one PDF.\n\n"
+                "$49 one-time or $149/month for monthly intel.\n\n"
+                "Most clients say it pays for itself the same week.\n\n"
+                "Interested? Just reply and I'll get your report started.\n\n"
+                "— Court\nSINCOR | getsincor.com\n"
                 "---\nReply STOP to opt out."
             )
             response = resend_client.emails.send({
                 'from': from_addr,
                 'to': email,
-                'subject': f"Free business insight for {lead.get('name', 'your business')}",
+                'subject': f"What are your competitors charging? (for {lead.get('name', 'your business')})",
                 'html': html,
                 'text': text,
                 'reply_to': self.from_email,
