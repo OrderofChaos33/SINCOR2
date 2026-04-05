@@ -13,13 +13,15 @@ from functools import wraps
 
 logger = logging.getLogger('sincor.stripe_routes')
 
-# Import revenue orchestrator
-try:
-    from sincor2.revenue_orchestrator import get_orchestrator
-    ORCHESTRATOR_AVAILABLE = True
-except ImportError:
-    ORCHESTRATOR_AVAILABLE = False
-    get_orchestrator = None
+# Import revenue orchestrator (temporarily disabled due to initialization issues)
+ORCHESTRATOR_AVAILABLE = False
+get_orchestrator = None
+# try:
+#     from sincor2.revenue_orchestrator import get_orchestrator
+#     ORCHESTRATOR_AVAILABLE = True
+# except Exception:
+#     ORCHESTRATOR_AVAILABLE = False
+#     get_orchestrator = None
 
 stripe_bp = Blueprint('stripe', __name__, url_prefix='/api/stripe')
 
