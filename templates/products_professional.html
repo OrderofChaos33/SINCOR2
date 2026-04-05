@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Professional — Scale Your Operations — $997/month</title>
+  <meta name="description" content="24 AI agents. Scale your operations autonomously. Full funnel automation from lead to close. For growing agencies and mid-market companies.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508;
+      --surface: #0d0d15;
+      --border: rgba(255,255,255,0.08);
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --blue: #2563eb;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      background: rgba(5,5,8,0.92);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .nav-back:hover { color: var(--text); }
+    
+    .hero {
+      padding: 80px 32px 60px;
+      max-width: 1000px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .hero-eyebrow {
+      display: inline-block;
+      background: rgba(37,99,235,0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(37,99,235,0.3);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 52px);
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .hero h1 .grad { color: #60a5fa; }
+    .hero p {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .price-card {
+      background: linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(59,130,246,0.05) 100%);
+      border: 1px solid rgba(37,99,235,0.3);
+      border-radius: 12px;
+      padding: 40px;
+      margin: 40px 0;
+      text-align: left;
+    }
+    .price-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .price-amount {
+      font-size: 48px;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-bottom: 8px;
+    }
+    .price-period {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    
+    .features {
+      margin: 60px 0;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .features h2 {
+      font-size: 24px;
+      margin-bottom: 30px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .feature-card h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #60a5fa;
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    
+    .agents-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      margin: 40px 0;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .agents-list h3 {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .agent-category {
+      margin-bottom: 20px;
+    }
+    .agent-category-title {
+      font-size: 12px;
+      color: #60a5fa;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .agent-item {
+      font-size: 14px;
+      color: var(--text);
+      padding: 8px;
+      border-left: 2px solid var(--blue);
+      padding-left: 12px;
+    }
+    
+    .cta-section {
+      margin: 60px 0;
+      text-align: center;
+    }
+    .btn {
+      display: inline-block;
+      padding: 16px 40px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s;
+      font-size: 16px;
+    }
+    .btn-primary {
+      background: var(--blue);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #60a5fa;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      border-color: #60a5fa;
+      color: #60a5fa;
+    }
+    
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 32px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    
+    @media (max-width: 640px) {
+      nav { padding: 12px 16px; }
+      .hero { padding: 60px 20px 40px; }
+      .price-card { padding: 24px; }
+      .agents-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-logo">SINCOR</a>
+    <a href="/" class="nav-back">← Back to home</a>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-eyebrow">Professional Plan</div>
+    <h1>Scale Your <span class="grad">Operations Autonomously</span></h1>
+    <p>24 AI agents working 24/7. Full funnel automation. For growing agencies and mid-market companies ready to scale without hiring.</p>
+
+    <div class="price-card">
+      <div class="price-label">Monthly Subscription</div>
+      <div class="price-amount">$997</div>
+      <div class="price-period">billed monthly, cancel anytime</div>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>What's Included</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>24 Specialized Agents</h3>
+        <p>2-3 agents from each category. Specialized teams for research, content, outreach, sales, analytics, and retention.</p>
+      </div>
+      <div class="feature-card">
+        <h3>5,000 Leads/Month</h3>
+        <p>10x lead generation capacity. Research agents find, qualify, and enrich leads automatically.</p>
+      </div>
+      <div class="feature-card">
+        <h3>20,000 Emails/Month</h3>
+        <p>Full-funnel email automation. Outreach, follow-ups, nurture sequences — all autonomous.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Advanced Analytics</h3>
+        <p>Detailed dashboards. Funnel analysis, conversion tracking, agent performance metrics, forecasting.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Agent Marketplace</h3>
+        <p>5% commission on agent-to-agent value trades. Your agents earn revenue.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Custom Workflows</h3>
+        <p>Design custom agent workflows. Agents collaborate exactly how you need them to.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="agents-list">
+    <h3>Your 24 Agent Team</h3>
+    
+    <div class="agent-category">
+      <div class="agent-category-title">🔍 Research (4 agents)</div>
+      <div class="agents-grid">
+        <div class="agent-item">ICP Profile Builder</div>
+        <div class="agent-item">Competitor Intelligence</div>
+        <div class="agent-item">Market Trend Scanner</div>
+        <div class="agent-item">Lead Enrichment</div>
+      </div>
+    </div>
+
+    <div class="agent-category">
+      <div class="agent-category-title">✍️ Content (4 agents)</div>
+      <div class="agents-grid">
+        <div class="agent-item">Blog & SEO Writer</div>
+        <div class="agent-item">LinkedIn Composer</div>
+        <div class="agent-item">Email Newsletter</div>
+        <div class="agent-item">Case Study Generator</div>
+      </div>
+    </div>
+
+    <div class="agent-category">
+      <div class="agent-category-title">📧 Outreach (4 agents)</div>
+      <div class="agents-grid">
+        <div class="agent-item">Cold Email Sequencer</div>
+        <div class="agent-item">LinkedIn Auto-Connect</div>
+        <div class="agent-item">Follow-Up Orchestrator</div>
+        <div class="agent-item">Multi-Channel Coordinator</div>
+      </div>
+    </div>
+
+    <div class="agent-category">
+      <div class="agent-category-title">💰 Sales (3 agents)</div>
+      <div class="agents-grid">
+        <div class="agent-item">Deal Scoring</div>
+        <div class="agent-item">CRM Auto-Updater</div>
+        <div class="agent-item">Upsell Identifier</div>
+      </div>
+    </div>
+
+    <div class="agent-category">
+      <div class="agent-category-title">📊 Analytics (5 agents)</div>
+      <div class="agents-grid">
+        <div class="agent-item">Revenue Dashboard</div>
+        <div class="agent-item">Funnel Leak Detector</div>
+        <div class="agent-item">Campaign ROI Tracker</div>
+        <div class="agent-item">Forecast Engine</div>
+        <div class="agent-item">Attribution Modeler</div>
+      </div>
+    </div>
+
+    <div class="agent-category">
+      <div class="agent-category-title">🔄 Retention (4 agents)</div>
+      <div class="agents-grid">
+        <div class="agent-item">NPS & Feedback Collector</div>
+        <div class="agent-item">Success Story Miner</div>
+        <div class="agent-item">Health Score Monitor</div>
+        <div class="agent-item">Renewal Nudge Agent</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <h2>Ready to Scale?</h2>
+    <p style="color: var(--muted); margin: 20px 0;">Start your free 7-day trial. All 24 agents included.</p>
+    <a href="/buy?plan=professional" class="btn btn-primary">Deploy Now</a>
+    <a href="/products/enterprise" class="btn btn-secondary" style="margin-left: 12px;">See Enterprise Plan</a>
+  </section>
+
+  <footer>
+    <p>SINCOR Professional Plan — 24 AI Agents, Full Funnel Automation, Agent Marketplace</p>
+    <p>Questions? <a href="mailto:hello@getsincor.com" style="color: #60a5fa;">Contact us</a></p>
+  </footer>
+</body>
+</html>

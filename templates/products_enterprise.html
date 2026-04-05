@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Enterprise — Unlimited Autonomous Infrastructure — Custom Pricing</title>
+  <meta name="description" content="42 AI agents. Unlimited operations. White-label marketplace. For large enterprises, SaaS platforms, and agencies embedding agents.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508;
+      --surface: #0d0d15;
+      --border: rgba(255,255,255,0.08);
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --gold: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      background: rgba(5,5,8,0.92);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .nav-back:hover { color: var(--text); }
+    
+    .hero {
+      padding: 80px 32px 60px;
+      max-width: 1000px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .hero-eyebrow {
+      display: inline-block;
+      background: rgba(245,158,11,0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245,158,11,0.3);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 52px);
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .hero h1 .grad { color: #fbbf24; }
+    .hero p {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .price-card {
+      background: linear-gradient(135deg, rgba(245,158,11,0.1) 0%, rgba(251,191,36,0.05) 100%);
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 12px;
+      padding: 40px;
+      margin: 40px 0;
+      text-align: left;
+    }
+    .price-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .price-amount {
+      font-size: 48px;
+      font-weight: 700;
+      color: #fbbf24;
+      margin-bottom: 8px;
+    }
+    .price-period {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    
+    .features {
+      margin: 60px 0;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .features h2 {
+      font-size: 24px;
+      margin-bottom: 30px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .feature-card h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: #fbbf24;
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    
+    .agents-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      margin: 40px 0;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .agents-list h3 {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .agent-item {
+      font-size: 14px;
+      color: var(--text);
+      padding: 8px;
+      border-left: 2px solid var(--gold);
+      padding-left: 12px;
+    }
+    
+    .cta-section {
+      margin: 60px 0;
+      text-align: center;
+    }
+    .btn {
+      display: inline-block;
+      padding: 16px 40px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s;
+      font-size: 16px;
+    }
+    .btn-primary {
+      background: var(--gold);
+      color: #000;
+    }
+    .btn-primary:hover {
+      background: #fbbf24;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      border-color: #fbbf24;
+      color: #fbbf24;
+    }
+    
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 32px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    
+    @media (max-width: 640px) {
+      nav { padding: 12px 16px; }
+      .hero { padding: 60px 20px 40px; }
+      .price-card { padding: 24px; }
+      .agents-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-logo">SINCOR</a>
+    <a href="/" class="nav-back">← Back to home</a>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-eyebrow">Enterprise Plan</div>
+    <h1>Unlimited Autonomous <span class="grad">Infrastructure</span></h1>
+    <p>42 full-swarm AI agents. White-label marketplace. For large enterprises, SaaS platforms, and agencies embedding agents at scale.</p>
+
+    <div class="price-card">
+      <div class="price-label">Custom Pricing</div>
+      <div class="price-amount">$2,997+</div>
+      <div class="price-period">or custom contract. Volume discounts available.</div>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>What's Included</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>42 Specialized Agents</h3>
+        <p>Full swarm. All agent types fully scaled. Research, content, outreach, sales, analytics, retention, partnership, growth.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Unlimited Operations</h3>
+        <p>No limits on leads, emails, or agent executions. Scale to millions of operations per month.</p>
+      </div>
+      <div class="feature-card">
+        <h3>White-Label Marketplace</h3>
+        <p>Your own branded agent marketplace. Agents trade value. You capture all commission revenue.</p>
+      </div>
+      <div class="feature-card">
+        <h3>SBT Integration</h3>
+        <p>On-chain agent credentials. Blockchain-verified capabilities. Enterprise-grade trust system.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Custom Agent Development</h3>
+        <p>Build proprietary agents for your specific workflows. Full customization and training included.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Dedicated Support</h3>
+        <p>Dedicated account manager. Priority support. Quarterly strategy reviews. Custom SLA.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="agents-list">
+    <h3>Your Complete 42 Agent Swarm</h3>
+    <div class="agents-grid">
+      <div class="agent-item">🔍 ICP Profile Builder</div>
+      <div class="agent-item">🔍 Competitor Intelligence</div>
+      <div class="agent-item">🔍 Market Trend Scanner</div>
+      <div class="agent-item">🔍 Lead Enrichment Engine</div>
+      <div class="agent-item">🔍 Industry News Monitor</div>
+      <div class="agent-item">🔍 LinkedIn Signal Tracker</div>
+      <div class="agent-item">🔍 Pricing Benchmark Agent</div>
+      <div class="agent-item">🔍 Buyer Intent Detector</div>
+      
+      <div class="agent-item">✍️ Blog & SEO Writer</div>
+      <div class="agent-item">✍️ LinkedIn Post Composer</div>
+      <div class="agent-item">✍️ Email Newsletter Builder</div>
+      <div class="agent-item">✍️ Case Study Generator</div>
+      <div class="agent-item">✍️ Ad Copy Optimizer</div>
+      <div class="agent-item">✍️ Video Script Writer</div>
+      <div class="agent-item">✍️ Proposal Generator</div>
+      
+      <div class="agent-item">📧 Cold Email Sequencer</div>
+      <div class="agent-item">📧 LinkedIn Auto-Connect</div>
+      <div class="agent-item">📧 Follow-Up Orchestrator</div>
+      <div class="agent-item">📧 Objection Handler</div>
+      <div class="agent-item">📧 Meeting Booker</div>
+      <div class="agent-item">📧 Re-engagement Drip</div>
+      <div class="agent-item">📧 Partnership Outreacher</div>
+      <div class="agent-item">📧 Referral Request Agent</div>
+      <div class="agent-item">📧 Multi-Channel Coordinator</div>
+      
+      <div class="agent-item">💰 Deal Scoring Agent</div>
+      <div class="agent-item">💰 CRM Auto-Updater</div>
+      <div class="agent-item">💰 Upsell Identifier</div>
+      <div class="agent-item">💰 Churn Risk Predictor</div>
+      <div class="agent-item">💰 Contract Drafter</div>
+      <div class="agent-item">💰 Win/Loss Analyzer</div>
+      
+      <div class="agent-item">📊 Revenue Dashboard</div>
+      <div class="agent-item">📊 Funnel Leak Detector</div>
+      <div class="agent-item">📊 Campaign ROI Tracker</div>
+      <div class="agent-item">📊 Cohort Analysis Agent</div>
+      <div class="agent-item">📊 A/B Test Optimizer</div>
+      <div class="agent-item">📊 Forecast Engine</div>
+      <div class="agent-item">📊 Attribution Modeler</div>
+      
+      <div class="agent-item">🔄 NPS & Feedback Collector</div>
+      <div class="agent-item">🔄 Success Story Miner</div>
+      <div class="agent-item">🔄 Health Score Monitor</div>
+      <div class="agent-item">🔄 Renewal Nudge Agent</div>
+      <div class="agent-item">🔄 Loyalty Reward Trigger</div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <h2>Ready to Deploy Full-Scale Autonomous Operations?</h2>
+    <p style="color: var(--muted); margin: 20px 0;">Talk to our enterprise team about custom pricing, implementation, and support.</p>
+    <a href="mailto:enterprise@getsincor.com?subject=SINCOR%20Enterprise%20Inquiry" class="btn btn-primary">Contact Sales</a>
+    <a href="/" class="btn btn-secondary" style="margin-left: 12px;">Back to Home</a>
+  </section>
+
+  <footer>
+    <p>SINCOR Enterprise Plan — 42 AI Agents, Unlimited Operations, White-Label Marketplace, SBT Integration</p>
+    <p>Questions? <a href="mailto:enterprise@getsincor.com" style="color: #fbbf24;">Contact our enterprise team</a></p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Starter — Deploy Your First Agent Team — $297/month</title>
+  <meta name="description" content="Deploy your first autonomous agent team. 8 specialized AI agents working 24/7. Research, content, outreach — fully automated.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508;
+      --surface: #0d0d15;
+      --border: rgba(255,255,255,0.08);
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      background: rgba(5,5,8,0.92);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .nav-back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .nav-back:hover { color: var(--text); }
+    
+    .hero {
+      padding: 80px 32px 60px;
+      max-width: 1000px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .hero-eyebrow {
+      display: inline-block;
+      background: rgba(124,58,237,0.15);
+      color: var(--purple-light);
+      border: 1px solid rgba(124,58,237,0.3);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 52px);
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+    .hero h1 .grad { color: var(--purple-light); }
+    .hero p {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .price-card {
+      background: linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(59,130,246,0.05) 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      margin: 40px 0;
+      text-align: left;
+    }
+    .price-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .price-amount {
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--purple-light);
+      margin-bottom: 8px;
+    }
+    .price-period {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    
+    .features {
+      margin: 60px 0;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .features h2 {
+      font-size: 24px;
+      margin-bottom: 30px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .feature-card h3 {
+      font-size: 16px;
+      margin-bottom: 12px;
+      color: var(--purple-light);
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    
+    .agents-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      margin: 40px 0;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .agents-list h3 {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .agents-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .agent-item {
+      font-size: 14px;
+      color: var(--text);
+      padding: 8px;
+      border-left: 2px solid var(--purple);
+      padding-left: 12px;
+    }
+    
+    .cta-section {
+      margin: 60px 0;
+      text-align: center;
+    }
+    .btn {
+      display: inline-block;
+      padding: 16px 40px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s;
+      font-size: 16px;
+    }
+    .btn-primary {
+      background: var(--purple);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: var(--purple-light);
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      border-color: var(--purple-light);
+      color: var(--purple-light);
+    }
+    
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 32px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    
+    @media (max-width: 640px) {
+      nav { padding: 12px 16px; }
+      .hero { padding: 60px 20px 40px; }
+      .price-card { padding: 24px; }
+      .agents-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="nav-logo">SINCOR</a>
+    <a href="/" class="nav-back">← Back to home</a>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-eyebrow">Starter Plan</div>
+    <h1>Deploy Your <span class="grad">First Agent Team</span></h1>
+    <p>8 specialized AI agents working 24/7. Perfect for small agencies and solopreneurs testing autonomous operations.</p>
+
+    <div class="price-card">
+      <div class="price-label">Monthly Subscription</div>
+      <div class="price-amount">$297</div>
+      <div class="price-period">billed monthly, cancel anytime</div>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>What's Included</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>8 Specialized Agents</h3>
+        <p>One agent from each category: research, content, outreach, sales, analytics, retention, partnership, and growth.</p>
+      </div>
+      <div class="feature-card">
+        <h3>500 Leads/Month</h3>
+        <p>Research agents autonomously find and qualify 500+ leads monthly in your target market.</p>
+      </div>
+      <div class="feature-card">
+        <h3>2,000 Emails/Month</h3>
+        <p>Outreach agents send personalized emails at scale with automatic follow-ups and tracking.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Basic Analytics</h3>
+        <p>Real-time dashboards showing lead pipeline, email performance, and agent activity.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Email Integration</h3>
+        <p>Connect your email to enable agents to send and track outreach automatically.</p>
+      </div>
+      <div class="feature-card">
+        <h3>24/7 Autonomous Execution</h3>
+        <p>All agents work around the clock. No manual work. No setup required.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="agents-list">
+    <h3>Your 8 Agent Team</h3>
+    <div class="agents-grid">
+      <div class="agent-item">🔍 Research Agent</div>
+      <div class="agent-item">✍️ Content Agent</div>
+      <div class="agent-item">📧 Outreach Agent</div>
+      <div class="agent-item">💰 Sales Agent</div>
+      <div class="agent-item">📊 Analytics Agent</div>
+      <div class="agent-item">🔄 Retention Agent</div>
+      <div class="agent-item">🤝 Partnership Agent</div>
+      <div class="agent-item">📈 Growth Agent</div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <h2>Ready to Deploy Your Team?</h2>
+    <p style="color: var(--muted); margin: 20px 0;">Start your free 7-day trial. No credit card required.</p>
+    <a href="/buy?plan=starter" class="btn btn-primary">Deploy Now</a>
+    <a href="/products/professional" class="btn btn-secondary" style="margin-left: 12px;">Compare Plans</a>
+  </section>
+
+  <footer>
+    <p>SINCOR Starter Plan — 8 AI Agents, 24/7 Autonomous Execution</p>
+    <p>Questions? <a href="mailto:hello@getsincor.com" style="color: var(--purple-light);">Contact us</a></p>
+  </footer>
+</body>
+</html>
