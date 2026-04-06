@@ -119,6 +119,18 @@ except Exception as e:
     logger.warning(f"[CONTENT] Content scheduler init failed: {e}")
     content_scheduler = None
 
+# Polyclaw Autonomous Trading Agent — scans Polymarket for arbitrage, executes 24/7
+try:
+    from sincor2.polyclaw_scheduler import start_polyclaw_scheduler, stop_polyclaw_scheduler
+    import atexit as _atexit_poly
+    polyclaw_scheduler = start_polyclaw_scheduler(app)
+    if polyclaw_scheduler:
+        _atexit_poly.register(stop_polyclaw_scheduler)
+        logger.info("[POLYCLAW] Polyclaw trading agent scheduler started")
+except Exception as e:
+    logger.warning(f"[POLYCLAW] Polyclaw scheduler init failed: {e}")
+    polyclaw_scheduler = None
+
 
 # ============================================================================
 # SECURITY MIDDLEWARE
@@ -309,6 +321,39 @@ def outreach_status():
             'daily_limit': engine.daily_limit,
             'total_sent_ever': len(engine._sent_ids),
             'next_run': str(outreach_scheduler.get_job('outreach_cycle').next_run_time) if scheduler_running else None,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/polyclaw/status', methods=['GET'])
+def polyclaw_status():
+    """Show Polyclaw autonomous trading agent status."""
+    try:
+        from pathlib import Path
+        trades_log = Path.home() / ".openclaw" / "workspace" / "polyclaw_trades.jsonl"
+        
+        scheduler_running = polyclaw_scheduler is not None and polyclaw_scheduler.running if polyclaw_scheduler else False
+        
+        total_trades = 0
+        total_profit = 0.0
+        if trades_log.exists():
+            for line in trades_log.read_text().strip().split('\n'):
+                if line:
+                    trade = json.loads(line)
+                    total_trades += 1
+                    total_profit += trade.get('net_profit_percent', 0)
+        
+        return jsonify({
+            'enabled': os.getenv('POLYCLAW_ENABLED', 'true').lower() == 'true',
+            'scheduler_running': scheduler_running,
+            'auto_execute': os.getenv('POLYCLAW_AUTO_EXECUTE', 'true').lower() == 'true',
+            'risk_level': os.getenv('POLYCLAW_RISK_LEVEL', 'medium'),
+            'alert_threshold': float(os.getenv('POLYCLAW_ALERT_THRESHOLD', '0.5')),
+            'scan_interval': int(os.getenv('POLYCLAW_SCAN_INTERVAL', '60')),
+            'total_trades_executed': total_trades,
+            'total_profit_percent': round(total_profit, 2),
+            'wallet_address': '0x35cb3bf1b29F81d325EB9A7225a3E87fE7B37D6f',
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
