@@ -551,6 +551,59 @@
 </head>
 <body>
 
+<!-- TICKER -->
+<div style="background: rgba(10,14,39,0.95); border-bottom: 1px solid var(--border); padding: 8px 0; overflow: hidden; position: relative;">
+  <div style="display: flex; gap: 60px; animation: ticker-scroll 30s linear infinite; padding: 0 40px;">
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">BTC</span>
+      <span style="color: var(--text-dim);">$94,325</span>
+      <span style="color: var(--cyan);">+2.45%</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">ETH</span>
+      <span style="color: var(--text-dim);">$3,485</span>
+      <span style="color: var(--cyan);">+1.82%</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">BASE</span>
+      <span style="color: var(--text-dim);">Chain Ready</span>
+      <span style="color: var(--pink);">⚡ Live</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">SINC</span>
+      <span style="color: var(--text-dim);">$0.0847</span>
+      <span style="color: var(--cyan);">+0.3%</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">POL</span>
+      <span style="color: var(--text-dim);">$0.0899</span>
+      <span style="color: var(--cyan);">+1.2%</span>
+    </div>
+    <!-- DUPLICATE FOR INFINITE SCROLL -->
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">BTC</span>
+      <span style="color: var(--text-dim);">$94,325</span>
+      <span style="color: var(--cyan);">+2.45%</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">ETH</span>
+      <span style="color: var(--text-dim);">$3,485</span>
+      <span style="color: var(--cyan);">+1.82%</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
+      <span style="color: var(--purple-light); font-weight: 700;">BASE</span>
+      <span style="color: var(--text-dim);">Chain Ready</span>
+      <span style="color: var(--pink);">⚡ Live</span>
+    </div>
+  </div>
+  <style>
+    @keyframes ticker-scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+  </style>
+</div>
+
 <nav>
   <a href="/" class="nav-logo">≈ SINCOR</a>
   <ul class="nav-links">
