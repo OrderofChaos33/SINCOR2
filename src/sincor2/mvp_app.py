@@ -131,6 +131,26 @@ except Exception as e:
     logger.warning(f"[POLYCLAW] Polyclaw scheduler init failed: {e}")
     polyclaw_scheduler = None
 
+# DeFi Execution Engine — Arbitrage + Liquidations + Flash Loans + HFQ
+try:
+    import threading
+    from pathlib import Path
+    defi_engine_script = Path(__file__).parent.parent.parent / ".." / ".openclaw" / "workspace" / "defi_execution_engine.py"
+    if defi_engine_script.exists():
+        logger.info("[DEFI] DeFi Execution Engine: INITIALIZING")
+        # Run async to avoid blocking startup
+        defi_thread = threading.Thread(
+            target=lambda: __import__('subprocess').run(
+                [__import__('sys').executable, str(defi_engine_script)],
+                daemon=True
+            ),
+            daemon=True
+        )
+        defi_thread.start()
+        logger.info("[DEFI] DeFi Execution Engine: LIVE (Arbitrage + Liquidations + Flash Loans + HFQ)")
+except Exception as e:
+    logger.warning(f"[DEFI] DeFi engine init failed: {e}")
+
 
 # ============================================================================
 # SECURITY MIDDLEWARE
