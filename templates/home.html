@@ -3,446 +3,743 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SINCOR — Deploy Your Autonomous Agent Swarm</title>
-  <meta name="description" content="42 AI agents working 24/7. $297/mo Starter, $997/mo Professional, $2,997/mo Enterprise. Deploy autonomous teams for research, content, outreach, sales, analytics, retention.">
+  <title>SINCOR — The Future of Autonomous Work</title>
+  <meta name="description" content="42 AI agents, zero humans. Deploy your autonomous revenue team. From $297/mo.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     :root {
-      --bg: #050508;
-      --surface: #0d0d15;
-      --border: rgba(255,255,255,0.08);
-      --purple: #7c3aed;
-      --purple-light: #a78bfa;
-      --text: #e2e8f0;
-      --muted: #64748b;
+      --bg: #0a0e27;
+      --bg-dark: #050814;
+      --surface: #0f1629;
+      --surface-light: #1a202c;
+      --border: rgba(139,92,246,0.1);
+      --border-bright: rgba(139,92,246,0.3);
+      --purple: #8b5cf6;
+      --purple-dark: #6d28d9;
+      --purple-light: #c4b5fd;
+      --cyan: #06b6d4;
+      --cyan-dark: #0891b2;
+      --pink: #ec4899;
+      --text: #f1f5f9;
+      --text-dim: #cbd5e1;
+      --text-muted: #94a3b8;
+      --glow: 0 0 30px rgba(139,92,246,0.3);
+      --glow-intense: 0 0 60px rgba(139,92,246,0.5);
     }
+    
     html { scroll-behavior: smooth; }
     body {
-      background: var(--bg);
+      background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg) 100%);
       color: var(--text);
       font-family: 'Space Grotesk', sans-serif;
       line-height: 1.6;
+      overflow-x: hidden;
+      position: relative;
     }
-
+    
+    /* ANIMATED BACKGROUND */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(139,92,246,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(6,182,212,0.1) 0%, transparent 50%);
+      animation: glow-shift 8s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    @keyframes glow-shift {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    
+    /* GRID OVERLAY */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image:
+        linear-gradient(0deg, transparent 24%, rgba(139,92,246,0.05) 25%, rgba(139,92,246,0.05) 26%, transparent 27%, transparent 74%, rgba(139,92,246,0.05) 75%, rgba(139,92,246,0.05) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(139,92,246,0.05) 25%, rgba(139,92,246,0.05) 26%, transparent 27%, transparent 74%, rgba(139,92,246,0.05) 75%, rgba(139,92,246,0.05) 76%, transparent 77%, transparent);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    main { position: relative; z-index: 2; }
+    
     /* NAV */
     nav {
       position: sticky;
       top: 0;
       z-index: 99;
-      background: rgba(5,5,8,0.95);
-      backdrop-filter: blur(24px);
+      background: rgba(10,14,39,0.8);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
       border-bottom: 1px solid var(--border);
-      padding: 14px 32px;
+      padding: 16px 40px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
+    
     .nav-logo {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 700;
-      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
       text-decoration: none;
+      letter-spacing: 2px;
     }
+    
     .nav-links {
       display: flex;
-      gap: 32px;
+      gap: 40px;
       list-style: none;
     }
+    
     .nav-links a {
-      color: var(--muted);
+      color: var(--text-muted);
       text-decoration: none;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
-      transition: color 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.3s;
+      position: relative;
     }
-    .nav-links a:hover { color: var(--text); }
+    
+    .nav-links a::before {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--purple), var(--cyan));
+      transition: width 0.3s;
+    }
+    
+    .nav-links a:hover {
+      color: var(--text);
+    }
+    
+    .nav-links a:hover::before {
+      width: 100%;
+    }
+    
     .nav-cta {
-      background: var(--purple);
-      color: #fff;
+      background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+      color: white;
       border: none;
-      padding: 10px 24px;
+      padding: 12px 28px;
       border-radius: 8px;
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       text-decoration: none;
-      transition: all 0.2s;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: var(--glow);
     }
-    .nav-cta:hover { background: #6d28d9; transform: translateY(-1px); }
-
+    
+    .nav-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--glow-intense);
+      background: linear-gradient(135deg, var(--cyan), var(--cyan-dark));
+    }
+    
     /* HERO */
     .hero {
-      min-height: 90vh;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 80px 24px 60px;
+      padding: 100px 40px 80px;
+      position: relative;
     }
+    
+    .hero-badge {
+      display: inline-block;
+      background: rgba(139,92,246,0.1);
+      border: 1px solid var(--border-bright);
+      color: var(--purple-light);
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 30px;
+      animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+    
     h1 {
-      font-size: clamp(40px, 6vw, 64px);
+      font-size: clamp(48px, 8vw, 84px);
       font-weight: 700;
-      margin-bottom: 20px;
       line-height: 1.1;
+      margin-bottom: 24px;
+      letter-spacing: -2px;
     }
+    
+    .gradient-text {
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan), var(--pink));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: gradient-shift 6s ease infinite;
+      background-size: 200% 200%;
+    }
+    
+    @keyframes gradient-shift {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    
     .hero-sub {
       font-size: 20px;
-      color: var(--muted);
-      margin-bottom: 40px;
-      max-width: 700px;
+      color: var(--text-muted);
+      margin-bottom: 50px;
+      max-width: 800px;
+      line-height: 1.8;
     }
-    .hero-btns {
+    
+    .hero-buttons {
       display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
+      gap: 20px;
       justify-content: center;
-      margin-bottom: 60px;
+      flex-wrap: wrap;
+      margin-bottom: 80px;
     }
+    
     .btn {
-      display: inline-block;
-      padding: 14px 32px;
-      border-radius: 8px;
+      padding: 16px 40px;
+      border-radius: 10px;
       font-weight: 600;
       text-decoration: none;
-      font-size: 16px;
-      transition: all 0.2s;
-      border: none;
+      font-size: 15px;
       cursor: pointer;
+      border: none;
       font-family: 'Space Grotesk', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.3s;
     }
+    
     .btn-primary {
-      background: var(--purple);
-      color: #fff;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      color: white;
+      box-shadow: var(--glow);
     }
+    
     .btn-primary:hover {
-      background: #6d28d9;
-      transform: translateY(-2px);
+      transform: translateY(-4px);
+      box-shadow: var(--glow-intense);
     }
+    
     .btn-secondary {
       background: transparent;
       color: var(--text);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--border-bright);
     }
+    
     .btn-secondary:hover {
-      border-color: var(--purple-light);
-      color: var(--purple-light);
+      border-color: var(--cyan);
+      background: rgba(6,182,212,0.1);
+      color: var(--cyan);
     }
-
-    /* SECTIONS */
-    .section {
-      padding: 80px 24px;
+    
+    /* STATS */
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 30px;
+      max-width: 1000px;
+    }
+    
+    .stat-item {
+      background: rgba(139,92,246,0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px 20px;
+      transition: all 0.3s;
+    }
+    
+    .stat-item:hover {
+      background: rgba(139,92,246,0.1);
+      border-color: var(--border-bright);
+      transform: translateY(-4px);
+      box-shadow: var(--glow);
+    }
+    
+    .stat-number {
+      font-size: 44px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 12px;
+    }
+    
+    /* SECTION */
+    section {
+      padding: 100px 40px;
       max-width: 1200px;
       margin: 0 auto;
     }
-    .section-title {
-      font-size: clamp(32px, 4vw, 48px);
+    
+    .section-label {
+      display: inline-block;
+      font-size: 11px;
+      color: var(--purple-light);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 16px;
       font-weight: 700;
-      margin-bottom: 40px;
-      text-align: center;
     }
-    .section-sub {
-      font-size: 18px;
-      color: var(--muted);
-      text-align: center;
-      margin-bottom: 60px;
-      max-width: 700px;
-      margin-left: auto;
-      margin-right: auto;
+    
+    .section-title {
+      font-size: clamp(36px, 5vw, 64px);
+      font-weight: 700;
+      margin-bottom: 50px;
+      line-height: 1.2;
     }
-
-    /* PRICING GRID */
+    
+    /* PRICING */
     .pricing-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 32px;
       margin-bottom: 60px;
     }
+    
     .price-card {
-      background: linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(59,130,246,0.05) 100%);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 40px 24px;
-      text-align: center;
+      background: linear-gradient(135deg, rgba(139,92,246,0.05) 0%, rgba(6,182,212,0.02) 100%);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 32px;
+      position: relative;
+      transition: all 0.3s;
+      overflow: hidden;
     }
-    .price-card h3 {
-      font-size: 20px;
-      margin-bottom: 12px;
-      color: var(--purple-light);
+    
+    .price-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--purple), transparent);
     }
-    .price-amount {
-      font-size: 48px;
+    
+    .price-card:hover {
+      border-color: var(--border-bright);
+      background: linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(6,182,212,0.05) 100%);
+      transform: translateY(-8px);
+      box-shadow: var(--glow);
+    }
+    
+    .price-card.featured {
+      border-color: var(--purple);
+      box-shadow: var(--glow);
+    }
+    
+    .price-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 11px;
       font-weight: 700;
-      color: var(--purple-light);
-      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 20px;
     }
+    
+    .price-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    
+    .price-amount {
+      font-size: 56px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 4px;
+    }
+    
     .price-period {
-      color: var(--muted);
+      color: var(--text-muted);
       font-size: 14px;
-      margin-bottom: 24px;
+      margin-bottom: 30px;
     }
+    
     .price-features {
-      text-align: left;
-      margin-bottom: 24px;
-      font-size: 14px;
-      color: var(--muted);
-    }
-    .price-features li {
       list-style: none;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
+      margin-bottom: 30px;
     }
-    .price-features li:before {
-      content: "✓ ";
-      color: var(--purple-light);
+    
+    .price-features li {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+    
+    .price-features li::before {
+      content: '→ ';
+      color: var(--cyan);
       font-weight: 700;
       margin-right: 8px;
     }
-
-    /* FEATURES */
+    
+    .price-cta {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.3s;
+      box-shadow: var(--glow);
+      text-decoration: none;
+      display: block;
+      text-align: center;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    
+    .price-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--glow-intense);
+      background: linear-gradient(135deg, var(--cyan), var(--cyan-dark));
+    }
+    
+    /* FEATURES GRID */
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 24px;
     }
-    .feature-card {
-      background: var(--surface);
+    
+    .feature-item {
+      background: rgba(139,92,246,0.03);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 24px;
+      border-radius: 12px;
+      padding: 32px;
+      transition: all 0.3s;
     }
-    .feature-card h4 {
+    
+    .feature-item:hover {
+      background: rgba(139,92,246,0.08);
+      border-color: var(--border-bright);
+      transform: translateY(-4px);
+      box-shadow: var(--glow);
+    }
+    
+    .feature-icon {
+      font-size: 40px;
+      margin-bottom: 16px;
+    }
+    
+    .feature-item h4 {
       font-size: 18px;
       margin-bottom: 12px;
       color: var(--purple-light);
     }
-    .feature-card p {
+    
+    .feature-item p {
       font-size: 14px;
-      color: var(--muted);
+      color: var(--text-muted);
       line-height: 1.6;
     }
-
-    /* CTA BOXES */
+    
+    /* CTA BOX */
     .cta-box {
-      background: linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(59,130,246,0.05) 100%);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 40px;
+      background: linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(6,182,212,0.05) 100%);
+      border: 1.5px solid var(--border-bright);
+      border-radius: 16px;
+      padding: 60px 40px;
       text-align: center;
-      margin: 40px 0;
+      margin: 80px 0;
     }
+    
     .cta-box h3 {
-      font-size: 24px;
-      margin-bottom: 16px;
+      font-size: 36px;
+      margin-bottom: 20px;
     }
+    
     .cta-box p {
       font-size: 16px;
-      color: var(--muted);
-      margin-bottom: 24px;
+      color: var(--text-muted);
+      margin-bottom: 30px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
-
+    
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
     /* FOOTER */
     footer {
       border-top: 1px solid var(--border);
-      padding: 40px 24px;
+      padding: 40px;
       text-align: center;
-      color: var(--muted);
+      color: var(--text-muted);
       font-size: 12px;
     }
-
+    
     @media (max-width: 768px) {
-      nav { flex-direction: column; gap: 16px; }
+      nav { flex-direction: column; gap: 20px; padding: 16px 20px; }
       .nav-links { flex-direction: column; gap: 12px; }
-      .hero-btns { flex-direction: column; }
+      .hero { padding: 60px 20px 40px; }
+      h1 { font-size: 40px; }
+      .hero-buttons { flex-direction: column; }
       .btn { width: 100%; }
-      .pricing-grid { grid-template-columns: 1fr; }
+      section { padding: 60px 20px; }
+      .cta-box { padding: 40px 20px; }
     }
   </style>
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
-  <a href="/" class="nav-logo">SINCOR</a>
+  <a href="/" class="nav-logo">≈ SINCOR</a>
   <ul class="nav-links">
-    <li><a href="#pricing">Pricing</a></li>
-    <li><a href="#features">Features</a></li>
-    <li><a href="#how">How It Works</a></li>
+    <li><a href="#pricing">PRICING</a></li>
+    <li><a href="#features">FEATURES</a></li>
+    <li><a href="#how">HOW IT WORKS</a></li>
   </ul>
   <a href="/signup" class="nav-cta">Start Free Trial</a>
 </nav>
 
+<main>
+
 <!-- HERO -->
 <section class="hero">
-  <h1>Deploy Your <span style="color: var(--purple-light);">Autonomous Revenue-Generating Team</span></h1>
-  <p class="hero-sub">42 AI agents working 24/7 across research, content, outreach, sales, analytics, and retention. From $297/mo.</p>
+  <div class="hero-badge">⚡ 42 AGENTS • ZERO HUMANS • INFINITE SCALE</div>
+  <h1>The Future of <span class="gradient-text">Autonomous Work</span></h1>
+  <p class="hero-sub">Deploy your revenue-generating AI team. Research, content, outreach, sales, analytics, retention. All autonomous. All 24/7.</p>
   
-  <div class="hero-btns">
-    <a href="/signup" class="btn btn-primary">Start Free 7-Day Trial</a>
-    <a href="#pricing" class="btn btn-secondary">See Pricing →</a>
+  <div class="hero-buttons">
+    <a href="/signup" class="btn btn-primary">→ Deploy Now</a>
+    <a href="#pricing" class="btn btn-secondary">See Pricing</a>
   </div>
-
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 24px; margin-top: 60px; max-width: 900px; width: 100%;">
-    <div style="text-align: center;">
-      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">42</div>
-      <div style="font-size: 12px; color: var(--muted);">AI Agents</div>
+  
+  <div class="hero-stats">
+    <div class="stat-item">
+      <div class="stat-number">42</div>
+      <div class="stat-label">AI Agents</div>
     </div>
-    <div style="text-align: center;">
-      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">24/7</div>
-      <div style="font-size: 12px; color: var(--muted);">Autonomous</div>
+    <div class="stat-item">
+      <div class="stat-number">24/7</div>
+      <div class="stat-label">Autonomous</div>
     </div>
-    <div style="text-align: center;">
-      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">10x</div>
-      <div style="font-size: 12px; color: var(--muted);">Output</div>
+    <div class="stat-item">
+      <div class="stat-number">10x</div>
+      <div class="stat-label">Output</div>
     </div>
-    <div style="text-align: center;">
-      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">3mo</div>
-      <div style="font-size: 12px; color: var(--muted);">ROI Payback</div>
+    <div class="stat-item">
+      <div class="stat-number">$297</div>
+      <div class="stat-label">Starting At</div>
     </div>
   </div>
 </section>
 
 <!-- PRICING -->
-<section id="pricing" class="section">
-  <h2 class="section-title">Simple, Transparent Pricing</h2>
-  <p class="section-sub">Choose your agent team size. All include 24/7 autonomous execution, real-time dashboards, and dedicated support.</p>
-
+<section id="pricing">
+  <div class="section-label">→ PRICING</div>
+  <h2 class="section-title">Choose Your Team Size</h2>
+  
   <div class="pricing-grid">
     <!-- STARTER -->
     <div class="price-card">
-      <h3>Starter</h3>
+      <div class="price-title">Starter</div>
       <div class="price-amount">$297</div>
-      <div class="price-period">/month</div>
+      <div class="price-period">/month • 8 agents</div>
       <ul class="price-features">
-        <li>8 AI Agents</li>
         <li>50-100 leads/week</li>
         <li>2,000 emails/month</li>
         <li>Basic analytics</li>
         <li>Email support</li>
+        <li>Cancel anytime</li>
       </ul>
-      <a href="/signup?plan=starter" class="btn btn-primary" style="width: 100%;">Get Started</a>
+      <a href="/signup?plan=starter" class="price-cta">Deploy Team →</a>
     </div>
-
+    
     <!-- PROFESSIONAL -->
-    <div class="price-card" style="border: 2px solid var(--purple); background: linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(59,130,246,0.1) 100%);">
-      <div style="background: var(--purple); color: #fff; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; display: inline-block; margin-bottom: 12px;">MOST POPULAR</div>
-      <h3>Professional</h3>
+    <div class="price-card featured">
+      <div class="price-badge">Most Popular</div>
+      <div class="price-title">Professional</div>
       <div class="price-amount">$997</div>
-      <div class="price-period">/month</div>
+      <div class="price-period">/month • 24 agents</div>
       <ul class="price-features">
-        <li>24 AI Agents</li>
         <li>5,000 leads/month</li>
         <li>20,000 emails/month</li>
         <li>Advanced analytics</li>
         <li>Agent marketplace</li>
         <li>Priority support</li>
       </ul>
-      <a href="/signup?plan=professional" class="btn btn-primary" style="width: 100%;">Get Started</a>
+      <a href="/signup?plan=professional" class="price-cta">Deploy Team →</a>
     </div>
-
+    
     <!-- ENTERPRISE -->
     <div class="price-card">
-      <h3>Enterprise</h3>
-      <div class="price-amount">$2,997+</div>
-      <div class="price-period">/month</div>
+      <div class="price-title">Enterprise</div>
+      <div class="price-amount">$2,997</div>
+      <div class="price-period">+ /month • 42 agents</div>
       <ul class="price-features">
-        <li>42 AI Agents</li>
         <li>Unlimited operations</li>
         <li>White-label</li>
         <li>SBT integration</li>
         <li>Custom agents</li>
         <li>Dedicated support</li>
       </ul>
-      <a href="/buy?plan=enterprise" class="btn btn-primary" style="width: 100%;">Contact Sales</a>
+      <a href="/buy?plan=enterprise" class="price-cta">Talk To Sales →</a>
     </div>
   </div>
-
+  
   <div class="cta-box">
-    <h3>🎯 All Plans Include</h3>
-    <p>7-day free trial • 30-day money-back guarantee • Cancel anytime • 24/7 autonomous execution • Real-time dashboards</p>
-    <a href="/signup" class="btn btn-primary">Start Your Free Trial →</a>
+    <h3>🚀 All Plans Include</h3>
+    <p>7-day free trial • 30-day money-back guarantee • 24/7 autonomous execution • Real-time dashboards • Cancel anytime</p>
+    <div class="cta-buttons">
+      <a href="/signup?plan=starter" class="btn btn-primary">Start Starter</a>
+      <a href="/signup?plan=professional" class="btn btn-primary">Start Professional</a>
+      <a href="/buy?plan=enterprise" class="btn btn-secondary">Enterprise Demo</a>
+    </div>
   </div>
 </section>
 
 <!-- FEATURES -->
-<section id="features" class="section">
-  <h2 class="section-title">What You Get</h2>
+<section id="features">
+  <div class="section-label">→ CAPABILITIES</div>
+  <h2 class="section-title">What Your Agents Do</h2>
   
   <div class="features-grid">
-    <div class="feature-card">
-      <h4>🔍 Research Agents</h4>
-      <p>Find ICP profiles, competitor intel, market trends, and qualified leads automatically. 24/7 intelligence gathering.</p>
+    <div class="feature-item">
+      <div class="feature-icon">🔍</div>
+      <h4>Research Agents</h4>
+      <p>ICP discovery, competitor analysis, market trends, lead enrichment. Find your perfect customers autonomously.</p>
     </div>
-    <div class="feature-card">
-      <h4>✍️ Content Agents</h4>
-      <p>Blog posts, LinkedIn content, email sequences, case studies. All written, optimized, and published autonomously.</p>
+    <div class="feature-item">
+      <div class="feature-icon">✍️</div>
+      <h4>Content Agents</h4>
+      <p>Blog posts, LinkedIn content, email sequences, case studies. Professional content at scale, 24/7.</p>
     </div>
-    <div class="feature-card">
-      <h4>📧 Outreach Agents</h4>
-      <p>Cold email, LinkedIn, follow-ups, multi-channel coordination. Personalized at scale, always on.</p>
+    <div class="feature-item">
+      <div class="feature-icon">📧</div>
+      <h4>Outreach Agents</h4>
+      <p>Cold email, LinkedIn, follow-ups, multi-channel. Personalized prospecting that never sleeps.</p>
     </div>
-    <div class="feature-card">
-      <h4>💰 Sales Agents</h4>
-      <p>Deal scoring, CRM updates, upsell detection, churn prevention. Never miss an opportunity again.</p>
+    <div class="feature-item">
+      <div class="feature-icon">💰</div>
+      <h4>Sales Agents</h4>
+      <p>Deal scoring, CRM automation, upsell detection, churn prevention. Close deals while you sleep.</p>
     </div>
-    <div class="feature-card">
-      <h4>📊 Analytics Agents</h4>
-      <p>Revenue dashboards, funnel analysis, campaign ROI, forecasting. Real-time insights into what's working.</p>
+    <div class="feature-item">
+      <div class="feature-icon">📊</div>
+      <h4>Analytics Agents</h4>
+      <p>Revenue dashboards, funnel analysis, ROI tracking, forecasting. Real-time visibility into everything.</p>
     </div>
-    <div class="feature-card">
-      <h4>🔄 Retention Agents</h4>
-      <p>NPS collection, success stories, health monitoring, renewal reminders. Keep customers happy and loyal.</p>
+    <div class="feature-item">
+      <div class="feature-icon">🔄</div>
+      <h4>Retention Agents</h4>
+      <p>NPS collection, success monitoring, health scores, renewals. Keep customers for life.</p>
     </div>
   </div>
 </section>
 
 <!-- HOW IT WORKS -->
-<section id="how" class="section">
-  <h2 class="section-title">How It Works</h2>
-  <p class="section-sub">Simple. No setup. Just deploy.</p>
-
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;">
+<section id="how">
+  <div class="section-label">→ ONBOARDING</div>
+  <h2 class="section-title">4 Steps to Revenue</h2>
+  
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; margin-bottom: 60px;">
     <div style="text-align: center;">
-      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">1</div>
-      <h4>Sign Up</h4>
-      <p style="font-size: 14px; color: var(--muted);">Choose your tier and start your free trial.</p>
+      <div style="font-size: 56px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px; font-family: 'JetBrains Mono';">01</div>
+      <h4 style="font-size: 18px; margin-bottom: 12px;">Sign Up</h4>
+      <p style="font-size: 14px; color: var(--text-muted);">Pick your plan. Start your 7-day free trial instantly.</p>
     </div>
     <div style="text-align: center;">
-      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">2</div>
-      <h4>Deploy</h4>
-      <p style="font-size: 14px; color: var(--muted);">Connect your tools (email, CRM, social). Takes 5 min.</p>
+      <div style="font-size: 56px; font-weight: 700; color: var(--cyan); margin-bottom: 16px; font-family: 'JetBrains Mono';">02</div>
+      <h4 style="font-size: 18px; margin-bottom: 12px;">Configure</h4>
+      <p style="font-size: 14px; color: var(--text-muted);">Connect your email, CRM, and tools. Takes 5 minutes.</p>
     </div>
     <div style="text-align: center;">
-      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">3</div>
-      <h4>Agents Go Live</h4>
-      <p style="font-size: 14px; color: var(--muted);">Your 8-42 agents start working 24/7.</p>
+      <div style="font-size: 56px; font-weight: 700; color: var(--pink); margin-bottom: 16px; font-family: 'JetBrains Mono';">03</div>
+      <h4 style="font-size: 18px; margin-bottom: 12px;">Deploy</h4>
+      <p style="font-size: 14px; color: var(--text-muted);">Agents go live. Start working 24/7 immediately.</p>
     </div>
     <div style="text-align: center;">
-      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">4</div>
-      <h4>Measure & Scale</h4>
-      <p style="font-size: 14px; color: var(--muted);">Watch your pipeline grow. Upgrade when ready.</p>
+      <div style="font-size: 56px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px; font-family: 'JetBrains Mono';">04</div>
+      <h4 style="font-size: 18px; margin-bottom: 12px;">Scale</h4>
+      <p style="font-size: 14px; color: var(--text-muted);">Upgrade anytime. Add more agents as you grow.</p>
     </div>
   </div>
-
+  
   <div class="cta-box">
-    <h3>Ready to Deploy Your Team?</h3>
-    <p>Start with Starter ($297/mo) or jump to Professional ($997/mo). Cancel anytime.</p>
-    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-      <a href="/signup?plan=starter" class="btn btn-primary">Deploy Starter →</a>
-      <a href="/signup?plan=professional" class="btn btn-primary">Deploy Professional →</a>
-      <a href="/buy?plan=enterprise" class="btn btn-secondary">Talk to Sales</a>
+    <h3>✨ Ready to Deploy Your Future?</h3>
+    <p>Stop hiring. Start deploying autonomous teams. 7 days free. No credit card required.</p>
+    <div class="cta-buttons">
+      <a href="/signup" class="btn btn-primary">Deploy Your Team Now →</a>
+      <a href="#pricing" class="btn btn-secondary">See Pricing</a>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
+</main>
+
 <footer>
   <p>SINCOR — Deploy Autonomous Revenue-Generating Teams</p>
-  <p style="margin-top: 12px;">© 2026 SINCOR. All rights reserved. | <a href="/privacy" style="color: var(--purple-light);">Privacy</a> | <a href="/terms" style="color: var(--purple-light);">Terms</a></p>
+  <p style="margin-top: 16px;">© 2026 SINCOR. All rights reserved. | <a href="/privacy" style="color: var(--purple-light); text-decoration: none;">Privacy</a> | <a href="/terms" style="color: var(--purple-light); text-decoration: none;">Terms</a></p>
 </footer>
 
 </body>
