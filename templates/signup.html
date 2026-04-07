@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join SINCOR — Deploy Your AI Team</title>
+  <meta name="description" content="Start your autonomous AI agent team today. Free 7-day trial.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508;
+      --surface: #0d0d15;
+      --border: rgba(255,255,255,0.08);
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 500px;
+      width: 100%;
+    }
+    
+    .card {
+      background: linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(59,130,246,0.05) 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 48px 32px;
+      text-align: center;
+    }
+    
+    .logo {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 32px;
+    }
+    
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, var(--purple-light), #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 16px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      line-height: 1.5;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      transition: all 0.3s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: var(--purple);
+      background: rgba(124,58,237,0.05);
+    }
+    
+    input::placeholder {
+      color: var(--muted);
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 14px 24px;
+      margin-top: 8px;
+      border: none;
+      border-radius: 8px;
+      background: var(--purple);
+      color: white;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn:hover {
+      background: var(--purple-light);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(124,58,237,0.3);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .features {
+      margin-top: 40px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+      text-align: left;
+    }
+    
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    
+    .feature-icon {
+      margin-right: 12px;
+      color: var(--purple-light);
+      font-weight: 700;
+    }
+    
+    .feature-text {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    
+    .legal {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    
+    .legal a {
+      color: var(--purple-light);
+      text-decoration: none;
+    }
+    
+    .legal a:hover {
+      text-decoration: underline;
+    }
+    
+    .error {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    
+    .error.show {
+      display: block;
+    }
+    
+    @media (max-width: 640px) {
+      .card { padding: 40px 24px; }
+      h1 { font-size: 24px; }
+      .subtitle { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="logo">SINCOR</div>
+      <h1>Join the Revolution</h1>
+      <p class="subtitle">Deploy your autonomous AI team today. Free 7-day trial, no credit card required.</p>
+      
+      <form id="signupForm">
+        <div class="error" id="errorMsg"></div>
+        
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input 
+            type="email" 
+            id="email" 
+            name="email" 
+            placeholder="you@company.com" 
+            required
+            autocomplete="email"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input 
+            type="text" 
+            id="name" 
+            name="name" 
+            placeholder="Your name" 
+            required
+          >
+        </div>
+        
+        <button type="submit" class="btn" id="submitBtn">Get Started Free →</button>
+      </form>
+      
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text"><b>8-42 AI Agents</b> working 24/7 for you</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text"><b>No credit card</b> for 7-day trial</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text"><b>Cancel anytime</b> — no contracts</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">✓</div>
+          <div class="feature-text"><b>24/7 support</b> — we're here for you</div>
+        </div>
+      </div>
+      
+      <div class="legal">
+        By signing up, you agree to our <a href="/privacy">Privacy Policy</a> and <a href="/terms">Terms of Service</a>.
+        We respect your inbox — no spam, ever.
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const submitBtn = document.getElementById('submitBtn');
+      const errorMsg = document.getElementById('errorMsg');
+      
+      // Clear errors
+      errorMsg.classList.remove('show');
+      errorMsg.textContent = '';
+      
+      // Validate
+      if (!email || !name) {
+        errorMsg.textContent = 'Please fill in all fields.';
+        errorMsg.classList.add('show');
+        return;
+      }
+      
+      // Disable button
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Loading...';
+      
+      try {
+        // Send signup data to backend
+        const response = await fetch('/api/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Signup failed');
+        }
+        
+        // Redirect to buy page
+        window.location.href = `/buy?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`;
+      
+      } catch (err) {
+        errorMsg.textContent = err.message || 'Something went wrong. Please try again.';
+        errorMsg.classList.add('show');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Get Started Free →';
+      }
+    });
+  </script>
+</body>
+</html>

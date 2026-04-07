@@ -359,6 +359,38 @@ def polyclaw_status():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/signup', methods=['POST'])
+def api_signup():
+    """Signup endpoint — collect email + name, return confirmation."""
+    try:
+        data = request.get_json() or {}
+        email = data.get('email', '').strip()
+        name = data.get('name', '').strip()
+        
+        if not email or not name:
+            return jsonify({'error': 'Email and name required'}), 400
+        
+        if '@' not in email:
+            return jsonify({'error': 'Invalid email address'}), 400
+        
+        # Log signup (for future lead tracking)
+        logger.info(f"[SIGNUP] New signup: {name} ({email})")
+        
+        # TODO: Store in database for CRM integration
+        # TODO: Send welcome email
+        
+        return jsonify({
+            'success': True,
+            'message': 'Signup successful! Redirecting to checkout...',
+            'email': email,
+            'name': name
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"[SIGNUP] Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/outreach/run', methods=['POST'])
 def outreach_run_now():
     """Manually trigger one outreach cycle (admin use)."""
@@ -467,6 +499,12 @@ PRODUCT_PRICES = {
     'Professional': 997,
     'Enterprise': 2997,
 }
+
+
+@app.route('/signup', methods=['GET'])
+def signup_page():
+    """Render signup page."""
+    return render_template('signup.html')
 
 
 @app.route('/buy', methods=['GET'])
