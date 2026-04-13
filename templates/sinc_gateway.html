@@ -1,0 +1,141 @@
+<!-- SINC Token Gateway Widget - Embed in home.html -->
+<!-- Drop this section wherever you want the swap to appear on the page -->
+
+<section id="sinc" style="padding: 80px 40px; max-width: 900px; margin: 0 auto;">
+  <div style="text-align: center; margin-bottom: 48px;">
+    <div style="display: inline-block; background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.3); color: #22d3ee; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 16px;">⚡ SINC TOKEN</div>
+    <h2 style="font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin-bottom: 12px;">SINCOR Utility Token</h2>
+    <p style="color: #64748b; font-size: 16px; max-width: 500px; margin: 0 auto;">SINC is the SINCOR ecosystem token. Use it for platform access, service payments, and partner transactions.</p>
+  </div>
+
+  <!-- Token Stats -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 40px;">
+    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';" id="sinc-price">—</div>
+      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">SINC Price (USDC)</div>
+    </div>
+    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';">100M</div>
+      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">Total Supply</div>
+    </div>
+    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';">Base</div>
+      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">Network</div>
+    </div>
+    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
+      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';">Utility</div>
+      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">Token Type</div>
+    </div>
+  </div>
+
+  <!-- Swap Widget -->
+  <div style="background: linear-gradient(135deg, rgba(34,211,238,0.08), rgba(124,58,237,0.05)); border: 1px solid rgba(34,211,238,0.2); border-radius: 16px; padding: 40px; max-width: 480px; margin: 0 auto 40px;">
+    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 24px; text-align: center;">Swap SINC ↔ USDC</h3>
+    
+    <div style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">You Send</label>
+      <div style="display: flex; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+        <input type="number" id="swap-input" placeholder="0.00" style="flex: 1; padding: 16px; background: transparent; border: none; color: #e2e8f0; font-family: 'JetBrains Mono'; font-size: 20px; outline: none;" oninput="calculateSwap()">
+        <select id="swap-from" style="padding: 16px; background: rgba(124,58,237,0.2); border: none; border-left: 1px solid rgba(255,255,255,0.08); color: #e2e8f0; font-weight: 700; font-size: 14px; cursor: pointer;" onchange="calculateSwap()">
+          <option value="sinc">SINC</option>
+          <option value="usdc">USDC</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin: 8px 0; cursor: pointer;" onclick="flipSwap()">
+      <span style="font-size: 20px; color: #22d3ee;">⇅</span>
+    </div>
+
+    <div style="margin-bottom: 24px;">
+      <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">You Receive</label>
+      <div style="display: flex; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+        <input type="number" id="swap-output" placeholder="0.00" readonly style="flex: 1; padding: 16px; background: transparent; border: none; color: #a78bfa; font-family: 'JetBrains Mono'; font-size: 20px; outline: none;">
+        <div style="padding: 16px; background: rgba(124,58,237,0.2); border-left: 1px solid rgba(255,255,255,0.08); color: #e2e8f0; font-weight: 700; font-size: 14px;" id="swap-to-label">USDC</div>
+      </div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.02); border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #64748b;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+        <span>Rate</span><span id="swap-rate" style="color: #e2e8f0;">1 SINC = — USDC</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span>Network</span><span style="color: #22d3ee;">Base</span>
+      </div>
+    </div>
+
+    <button onclick="executeSwap()" style="width: 100%; padding: 16px; background: linear-gradient(135deg, #22d3ee, #7c3aed); border: none; border-radius: 10px; color: white; font-weight: 700; font-size: 16px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: all 0.3s;">
+      Connect Wallet to Swap
+    </button>
+  </div>
+
+  <!-- Disclaimer -->
+  <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+    <p style="font-size: 12px; color: #64748b; line-height: 1.7;">
+      SINC is a utility token. It is not an investment vehicle and does not represent equity, profit share, or financial returns. SINC is used for access to SINCOR platform services. Swaps are subject to market conditions and available liquidity. Not available where prohibited by law. This is not financial advice.
+    </p>
+  </div>
+</section>
+
+<script>
+  // SINC swap logic - connects to Uniswap on Base
+  const SINC_CONTRACT = ''; // Will be set after contract deployment
+  const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // USDC on Base
+  
+  let sincPrice = 0.001; // Default until live price loaded
+  let swapFromToken = 'sinc';
+
+  async function loadSincPrice() {
+    try {
+      // Load price from Uniswap/coingecko once contract is deployed
+      // For now show placeholder
+      document.getElementById('sinc-price').textContent = '—';
+      document.getElementById('swap-rate').textContent = '1 SINC = — USDC';
+    } catch(e) {
+      console.log('Price loading...');
+    }
+  }
+
+  function calculateSwap() {
+    const input = parseFloat(document.getElementById('swap-input').value) || 0;
+    let output = 0;
+    
+    if (swapFromToken === 'sinc') {
+      output = input * sincPrice;
+      document.getElementById('swap-output').value = output > 0 ? output.toFixed(6) : '';
+    } else {
+      output = input / sincPrice;
+      document.getElementById('swap-output').value = output > 0 ? output.toFixed(2) : '';
+    }
+  }
+
+  function flipSwap() {
+    swapFromToken = swapFromToken === 'sinc' ? 'usdc' : 'sinc';
+    document.getElementById('swap-from').value = swapFromToken;
+    document.getElementById('swap-to-label').textContent = swapFromToken === 'sinc' ? 'USDC' : 'SINC';
+    document.getElementById('swap-input').value = '';
+    document.getElementById('swap-output').value = '';
+  }
+
+  async function executeSwap() {
+    if (!window.ethereum) {
+      alert('Please install MetaMask or another Web3 wallet to swap.');
+      return;
+    }
+    
+    try {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      // Redirect to Uniswap with SINC pre-selected once contract is deployed
+      if (SINC_CONTRACT) {
+        window.open(`https://app.uniswap.org/#/swap?inputCurrency=${swapFromToken === 'sinc' ? SINC_CONTRACT : USDC_CONTRACT}&outputCurrency=${swapFromToken === 'sinc' ? USDC_CONTRACT : SINC_CONTRACT}&chain=base`, '_blank');
+      } else {
+        alert('SINC token is being deployed. Check back soon.');
+      }
+    } catch(e) {
+      console.error('Wallet connection failed:', e);
+    }
+  }
+
+  // Load price on page load
+  loadSincPrice();
+</script>

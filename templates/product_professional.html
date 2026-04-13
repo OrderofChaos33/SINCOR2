@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Professional — 24 AI Agents Working 24/7</title>
+  <meta name="description" content="Deploy 24 autonomous AI agents across your entire business operation. $997/month.">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg: #050508; --surface: #0d0d15; --border: rgba(255,255,255,0.08); --purple: #7c3aed; --purple-light: #a78bfa; --cyan: #22d3ee; --pink: #ec4899; --text: #e2e8f0; --muted: #64748b; }
+    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; }
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 1px solid var(--border); }
+    .logo { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .nav-cta { background: var(--purple); color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; }
+    .hero { padding: 80px 40px; text-align: center; max-width: 900px; margin: 0 auto; }
+    .badge { display: inline-block; background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.3); color: var(--pink); padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 24px; }
+    .popular { display: inline-block; background: var(--pink); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-left: 8px; }
+    h1 { font-size: clamp(36px, 6vw, 64px); font-weight: 700; line-height: 1.1; margin-bottom: 20px; }
+    .gradient-text { background: linear-gradient(135deg, var(--pink), var(--purple-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero-sub { font-size: 18px; color: var(--muted); max-width: 600px; margin: 0 auto 40px; }
+    .price-block { background: linear-gradient(135deg, rgba(236,72,153,0.1), rgba(124,58,237,0.05)); border: 1px solid rgba(236,72,153,0.3); border-radius: 16px; padding: 40px; max-width: 480px; margin: 0 auto 60px; }
+    .price-amount { font-size: 56px; font-weight: 700; font-family: 'JetBrains Mono'; }
+    .price-period { color: var(--muted); font-size: 16px; margin-bottom: 8px; }
+    .price-sub { color: var(--pink); font-size: 14px; margin-bottom: 32px; }
+    .cta-btn { display: block; background: linear-gradient(135deg, var(--pink), var(--purple)); color: white; padding: 16px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 18px; text-align: center; transition: all 0.3s; }
+    .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(236,72,153,0.4); }
+    .credit-note { color: var(--muted); font-size: 13px; margin-top: 12px; text-align: center; }
+    .section { padding: 80px 40px; max-width: 1100px; margin: 0 auto; }
+    .section-label { color: var(--pink); font-size: 12px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 12px; }
+    h2 { font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin-bottom: 48px; }
+    .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+    .agent-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+    .agent-icon { font-size: 32px; margin-bottom: 12px; }
+    .agent-name { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .agent-desc { color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .vs-starter { background: rgba(124,58,237,0.1); border: 1px solid var(--border); border-radius: 12px; padding: 40px; margin-bottom: 60px; }
+    .vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+    .vs-col h3 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+    .vs-item { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 12px; color: var(--muted); }
+    .vs-item.pro { color: var(--text); }
+    .vs-item::before { content: "→"; color: var(--pink); font-weight: 700; }
+    .vs-item.starter::before { content: "→"; color: var(--muted); }
+    .includes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .include-item { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+    .include-item::before { content: "✓"; color: var(--pink); font-weight: 700; }
+    .disclaimer { padding: 40px; max-width: 900px; margin: 0 auto; border-top: 1px solid var(--border); }
+    .disclaimer p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+    footer { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+    footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">SINCOR</div>
+  <a href="/signup?plan=professional" class="nav-cta">Deploy Now →</a>
+</nav>
+
+<section class="hero">
+  <div class="badge">⚡ PROFESSIONAL PLAN <span class="popular">MOST POPULAR</span></div>
+  <h1>24 AI Agents.<br><span class="gradient-text">Full Operation.</span></h1>
+  <p class="hero-sub">Your entire business operation — research, content, outreach, sales, analytics, retention — fully automated at scale.</p>
+  
+  <div class="price-block">
+    <div class="price-amount">$997</div>
+    <div class="price-period">/month</div>
+    <div class="price-sub">24 agents · 5,000 leads/month · 20,000 emails/month</div>
+    <a href="/signup?plan=professional" class="cta-btn">Deploy Your Team →</a>
+    <p class="credit-note">Credit card required. Cancel anytime.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-label">→ PROFESSIONAL VS STARTER</div>
+  <h2>What You're Getting More Of</h2>
+  <div class="vs-starter">
+    <div class="vs-grid">
+      <div class="vs-col">
+        <h3 style="color: var(--muted);">Starter (8 agents)</h3>
+        <div class="vs-item starter">50-100 leads/week</div>
+        <div class="vs-item starter">2,000 emails/month</div>
+        <div class="vs-item starter">8 agents</div>
+        <div class="vs-item starter">Basic analytics</div>
+        <div class="vs-item starter">Email support</div>
+      </div>
+      <div class="vs-col">
+        <h3 style="color: var(--pink);">Professional (24 agents)</h3>
+        <div class="vs-item pro">5,000 leads/month</div>
+        <div class="vs-item pro">20,000 emails/month</div>
+        <div class="vs-item pro">24 agents (3x more)</div>
+        <div class="vs-item pro">Advanced analytics + forecasting</div>
+        <div class="vs-item pro">Priority support + agent marketplace</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0;">
+  <div class="section-label">→ YOUR 24 AGENTS</div>
+  <h2>The Full Team</h2>
+  <div class="agents-grid">
+    <div class="agent-card"><div class="agent-icon">🔍</div><div class="agent-name">Research Agent x3</div><div class="agent-desc">Deep ICP discovery, competitor intelligence, market trend analysis, lead enrichment at scale.</div></div>
+    <div class="agent-card"><div class="agent-icon">✍️</div><div class="agent-name">Content Agent x4</div><div class="agent-desc">Blog posts, social content, email sequences, case studies, whitepapers. Daily publishing cadence.</div></div>
+    <div class="agent-card"><div class="agent-icon">📧</div><div class="agent-name">Outreach Agent x4</div><div class="agent-desc">Cold email, LinkedIn, follow-ups, multi-channel sequences. 20,000 touchpoints per month.</div></div>
+    <div class="agent-card"><div class="agent-icon">💰</div><div class="agent-name">Sales Agent x3</div><div class="agent-desc">Lead scoring, CRM automation, deal acceleration, upsell detection, churn prevention.</div></div>
+    <div class="agent-card"><div class="agent-icon">📊</div><div class="agent-name">Analytics Agent x3</div><div class="agent-desc">Revenue dashboards, funnel analysis, ROI tracking, predictive forecasting, real-time reporting.</div></div>
+    <div class="agent-card"><div class="agent-icon">🔄</div><div class="agent-name">Retention Agent x3</div><div class="agent-desc">NPS collection, customer health scoring, renewal campaigns, churn risk flagging.</div></div>
+    <div class="agent-card"><div class="agent-icon">🤝</div><div class="agent-name">Partnership Agent x2</div><div class="agent-desc">Partner identification, co-marketing coordination, channel development, integration partnerships.</div></div>
+    <div class="agent-card"><div class="agent-icon">📈</div><div class="agent-name">Growth Agent x2</div><div class="agent-desc">Growth experiments, conversion optimization, funnel testing, acquisition channel analysis.</div></div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0;">
+  <div class="section-label">→ WHAT'S INCLUDED</div>
+  <h2>Everything You Need to Scale</h2>
+  <div class="includes-grid">
+    <div class="include-item">24 autonomous agents</div>
+    <div class="include-item">5,000 leads/month</div>
+    <div class="include-item">20,000 emails/month</div>
+    <div class="include-item">Advanced analytics dashboard</div>
+    <div class="include-item">Predictive forecasting</div>
+    <div class="include-item">Agent marketplace access</div>
+    <div class="include-item">Priority support</div>
+    <div class="include-item">Cancel anytime</div>
+  </div>
+  <div style="margin-top: 48px; text-align: center;">
+    <a href="/signup?plan=professional" class="cta-btn" style="max-width: 420px; display: inline-block;">Deploy 24 Agents for $997/month →</a>
+    <p class="credit-note" style="margin-top: 12px;">Credit card required. Cancel anytime. No contracts.</p>
+  </div>
+</section>
+
+<div class="disclaimer">
+  <p>SINCOR provides autonomous AI agent software for business automation. Results vary based on industry, market conditions, and implementation. No specific revenue outcomes are guaranteed. Past performance does not predict future results. All email outreach complies with CAN-SPAM and applicable regulations. By purchasing, you agree to our <a href="/terms" style="color: var(--purple-light);">Terms of Service</a> and <a href="/privacy" style="color: var(--purple-light);">Privacy Policy</a>.</p>
+</div>
+
+<footer>
+  <p style="margin-bottom: 12px;">© 2026 SINCOR. All rights reserved.</p>
+  <a href="/privacy">Privacy Policy</a>
+  <a href="/terms">Terms of Service</a>
+  <a href="/products/starter">Starter Plan</a>
+  <a href="/products/enterprise">Enterprise Plan</a>
+</footer>
+
+</body>
+</html>

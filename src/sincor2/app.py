@@ -660,6 +660,34 @@ def pricing():
     return render_template('pricing.html')
 
 
+@app.route('/products/starter')
+@limiter.exempt if limiter else lambda f: f
+def product_starter():
+    """Starter plan landing page"""
+    return render_template('product_starter.html')
+
+
+@app.route('/products/professional')
+@limiter.exempt if limiter else lambda f: f
+def product_professional():
+    """Professional plan landing page"""
+    return render_template('product_professional.html')
+
+
+@app.route('/products/enterprise')
+@limiter.exempt if limiter else lambda f: f
+def product_enterprise():
+    """Enterprise plan landing page"""
+    return render_template('product_enterprise.html')
+
+
+@app.route('/sinc')
+@limiter.exempt if limiter else lambda f: f
+def sinc_token():
+    """SINC token gateway page"""
+    return render_template('sinc_gateway.html')
+
+
 @app.route('/buy')
 @limiter.exempt if limiter else lambda f: f
 def buy():
