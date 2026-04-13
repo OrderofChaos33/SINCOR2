@@ -1162,6 +1162,30 @@ def security():
     return render_template('security.html')
 
 
+@app.route('/products/starter')
+def product_starter():
+    """Starter plan landing page."""
+    return render_template('product_starter.html')
+
+
+@app.route('/products/professional')
+def product_professional():
+    """Professional plan landing page."""
+    return render_template('product_professional.html')
+
+
+@app.route('/products/enterprise')
+def product_enterprise():
+    """Enterprise plan landing page."""
+    return render_template('product_enterprise.html')
+
+
+@app.route('/sinc')
+def sinc_token():
+    """SINC token gateway page."""
+    return render_template('sinc_gateway.html')
+
+
 @app.route('/media-packs')
 def media_packs():
     """Media packs showcase page."""
