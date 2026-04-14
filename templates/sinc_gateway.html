@@ -82,17 +82,29 @@
   const SINC_CONTRACT = '0x49E392de962Fa835B862F59E78611c69E930b5C4'; // Base mainnet
   const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // USDC on Base
   
-  let sincPrice = 0.001; // Default until live price loaded
+  let sincPrice = 1.10; // Seeded at $1.10 via Aerodrome SINC/USDC pool
   let swapFromToken = 'sinc';
 
   async function loadSincPrice() {
     try {
-      // Load price from Uniswap/coingecko once contract is deployed
-      // For now show placeholder
-      document.getElementById('sinc-price').textContent = '—';
-      document.getElementById('swap-rate').textContent = '1 SINC = — USDC';
+      // Load live price from Dexscreener
+      const res = await fetch('https://api.dexscreener.com/latest/dex/tokens/0x49E392de962Fa835B862F59E78611c69E930b5C4');
+      const data = await res.json();
+      if (data.pairs && data.pairs.length > 0) {
+        const price = parseFloat(data.pairs[0].priceUsd);
+        if (price > 0) {
+          sincPrice = price;
+          document.getElementById('sinc-price').textContent = '$' + price.toFixed(4);
+          document.getElementById('swap-rate').textContent = '1 SINC = $' + price.toFixed(4) + ' USDC';
+          return;
+        }
+      }
+      // Fallback to seeded price
+      document.getElementById('sinc-price').textContent = '$1.10';
+      document.getElementById('swap-rate').textContent = '1 SINC = $1.10 USDC';
     } catch(e) {
-      console.log('Price loading...');
+      document.getElementById('sinc-price').textContent = '$1.10';
+      document.getElementById('swap-rate').textContent = '1 SINC = $1.10 USDC';
     }
   }
 
@@ -127,7 +139,8 @@
       await window.ethereum.request({ method: 'eth_requestAccounts' });
       // Redirect to Uniswap with SINC pre-selected once contract is deployed
       if (SINC_CONTRACT) {
-        window.open(`https://app.uniswap.org/#/swap?inputCurrency=${swapFromToken === 'sinc' ? SINC_CONTRACT : USDC_CONTRACT}&outputCurrency=${swapFromToken === 'sinc' ? USDC_CONTRACT : SINC_CONTRACT}&chain=base`, '_blank');
+        // Route to Aerodrome (primary pool) or Uniswap as fallback
+        window.open(`https://aerodrome.finance/swap?from=${swapFromToken === 'sinc' ? SINC_CONTRACT : USDC_CONTRACT}&to=${swapFromToken === 'sinc' ? USDC_CONTRACT : SINC_CONTRACT}`, '_blank');
       } else {
         alert('SINC token is being deployed. Check back soon.');
       }

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR — Deploy Your Autonomous Agent Swarm</title>
+  <meta name="description" content="42 AI agents working 24/7. $297/mo Starter, $997/mo Professional, $2,997/mo Enterprise. Deploy autonomous teams for research, content, outreach, sales, analytics, retention.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050508;
+      --surface: #0d0d15;
+      --border: rgba(255,255,255,0.08);
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 99;
+      background: rgba(5,5,8,0.95);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+    }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--purple);
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-cta:hover { background: #6d28d9; transform: translateY(-1px); }
+
+    /* HERO */
+    .hero {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px 60px;
+    }
+    h1 {
+      font-size: clamp(40px, 6vw, 64px);
+      font-weight: 700;
+      margin-bottom: 20px;
+      line-height: 1.1;
+    }
+    .hero-sub {
+      font-size: 20px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      max-width: 700px;
+    }
+    .hero-btns {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 60px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 16px;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .btn-primary {
+      background: var(--purple);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #6d28d9;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      border-color: var(--purple-light);
+      color: var(--purple-light);
+    }
+
+    /* SECTIONS */
+    .section {
+      padding: 80px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section-title {
+      font-size: clamp(32px, 4vw, 48px);
+      font-weight: 700;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    .section-sub {
+      font-size: 18px;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 60px;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* PRICING GRID */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin-bottom: 60px;
+    }
+    .price-card {
+      background: linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(59,130,246,0.05) 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px 24px;
+      text-align: center;
+    }
+    .price-card h3 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      color: var(--purple-light);
+    }
+    .price-amount {
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--purple-light);
+      margin-bottom: 8px;
+    }
+    .price-period {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .price-features {
+      text-align: left;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .price-features li {
+      list-style: none;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .price-features li:before {
+      content: "✓ ";
+      color: var(--purple-light);
+      font-weight: 700;
+      margin-right: 8px;
+    }
+
+    /* FEATURES */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .feature-card h4 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: var(--purple-light);
+    }
+    .feature-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* CTA BOXES */
+    .cta-box {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(59,130,246,0.05) 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      margin: 40px 0;
+    }
+    .cta-box h3 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    .cta-box p {
+      font-size: 16px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 768px) {
+      nav { flex-direction: column; gap: 16px; }
+      .nav-links { flex-direction: column; gap: 12px; }
+      .hero-btns { flex-direction: column; }
+      .btn { width: 100%; }
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">SINCOR</a>
+  <ul class="nav-links">
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#how">How It Works</a></li>
+  </ul>
+  <a href="/signup" class="nav-cta">Start Free Trial</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <h1>Deploy Your <span style="color: var(--purple-light);">Autonomous Revenue-Generating Team</span></h1>
+  <p class="hero-sub">42 AI agents working 24/7 across research, content, outreach, sales, analytics, and retention. From $297/mo.</p>
+  
+  <div class="hero-btns">
+    <a href="/signup" class="btn btn-primary">Start Free 7-Day Trial</a>
+    <a href="#pricing" class="btn btn-secondary">See Pricing →</a>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 24px; margin-top: 60px; max-width: 900px; width: 100%;">
+    <div style="text-align: center;">
+      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">42</div>
+      <div style="font-size: 12px; color: var(--muted);">AI Agents</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">24/7</div>
+      <div style="font-size: 12px; color: var(--muted);">Autonomous</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">10x</div>
+      <div style="font-size: 12px; color: var(--muted);">Output</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 32px; font-weight: 700; color: var(--purple-light);">3mo</div>
+      <div style="font-size: 12px; color: var(--muted);">ROI Payback</div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="section">
+  <h2 class="section-title">Simple, Transparent Pricing</h2>
+  <p class="section-sub">Choose your agent team size. All include 24/7 autonomous execution, real-time dashboards, and dedicated support.</p>
+
+  <div class="pricing-grid">
+    <!-- STARTER -->
+    <div class="price-card">
+      <h3>Starter</h3>
+      <div class="price-amount">$297</div>
+      <div class="price-period">/month</div>
+      <ul class="price-features">
+        <li>8 AI Agents</li>
+        <li>50-100 leads/week</li>
+        <li>2,000 emails/month</li>
+        <li>Basic analytics</li>
+        <li>Email support</li>
+      </ul>
+      <a href="/signup?plan=starter" class="btn btn-primary" style="width: 100%;">Get Started</a>
+    </div>
+
+    <!-- PROFESSIONAL -->
+    <div class="price-card" style="border: 2px solid var(--purple); background: linear-gradient(135deg, rgba(124,58,237,0.2) 0%, rgba(59,130,246,0.1) 100%);">
+      <div style="background: var(--purple); color: #fff; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 700; display: inline-block; margin-bottom: 12px;">MOST POPULAR</div>
+      <h3>Professional</h3>
+      <div class="price-amount">$997</div>
+      <div class="price-period">/month</div>
+      <ul class="price-features">
+        <li>24 AI Agents</li>
+        <li>5,000 leads/month</li>
+        <li>20,000 emails/month</li>
+        <li>Advanced analytics</li>
+        <li>Agent marketplace</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="/signup?plan=professional" class="btn btn-primary" style="width: 100%;">Get Started</a>
+    </div>
+
+    <!-- ENTERPRISE -->
+    <div class="price-card">
+      <h3>Enterprise</h3>
+      <div class="price-amount">$2,997+</div>
+      <div class="price-period">/month</div>
+      <ul class="price-features">
+        <li>42 AI Agents</li>
+        <li>Unlimited operations</li>
+        <li>White-label</li>
+        <li>SBT integration</li>
+        <li>Custom agents</li>
+        <li>Dedicated support</li>
+      </ul>
+      <a href="/buy?plan=enterprise" class="btn btn-primary" style="width: 100%;">Contact Sales</a>
+    </div>
+  </div>
+
+  <div class="cta-box">
+    <h3>🎯 All Plans Include</h3>
+    <p>7-day free trial • 30-day money-back guarantee • Cancel anytime • 24/7 autonomous execution • Real-time dashboards</p>
+    <a href="/signup" class="btn btn-primary">Start Your Free Trial →</a>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="section">
+  <h2 class="section-title">What You Get</h2>
+  
+  <div class="features-grid">
+    <div class="feature-card">
+      <h4>🔍 Research Agents</h4>
+      <p>Find ICP profiles, competitor intel, market trends, and qualified leads automatically. 24/7 intelligence gathering.</p>
+    </div>
+    <div class="feature-card">
+      <h4>✍️ Content Agents</h4>
+      <p>Blog posts, LinkedIn content, email sequences, case studies. All written, optimized, and published autonomously.</p>
+    </div>
+    <div class="feature-card">
+      <h4>📧 Outreach Agents</h4>
+      <p>Cold email, LinkedIn, follow-ups, multi-channel coordination. Personalized at scale, always on.</p>
+    </div>
+    <div class="feature-card">
+      <h4>💰 Sales Agents</h4>
+      <p>Deal scoring, CRM updates, upsell detection, churn prevention. Never miss an opportunity again.</p>
+    </div>
+    <div class="feature-card">
+      <h4>📊 Analytics Agents</h4>
+      <p>Revenue dashboards, funnel analysis, campaign ROI, forecasting. Real-time insights into what's working.</p>
+    </div>
+    <div class="feature-card">
+      <h4>🔄 Retention Agents</h4>
+      <p>NPS collection, success stories, health monitoring, renewal reminders. Keep customers happy and loyal.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="section">
+  <h2 class="section-title">How It Works</h2>
+  <p class="section-sub">Simple. No setup. Just deploy.</p>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px;">
+    <div style="text-align: center;">
+      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">1</div>
+      <h4>Sign Up</h4>
+      <p style="font-size: 14px; color: var(--muted);">Choose your tier and start your free trial.</p>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">2</div>
+      <h4>Deploy</h4>
+      <p style="font-size: 14px; color: var(--muted);">Connect your tools (email, CRM, social). Takes 5 min.</p>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">3</div>
+      <h4>Agents Go Live</h4>
+      <p style="font-size: 14px; color: var(--muted);">Your 8-42 agents start working 24/7.</p>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 48px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px;">4</div>
+      <h4>Measure & Scale</h4>
+      <p style="font-size: 14px; color: var(--muted);">Watch your pipeline grow. Upgrade when ready.</p>
+    </div>
+  </div>
+
+  <div class="cta-box">
+    <h3>Ready to Deploy Your Team?</h3>
+    <p>Start with Starter ($297/mo) or jump to Professional ($997/mo). Cancel anytime.</p>
+    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+      <a href="/signup?plan=starter" class="btn btn-primary">Deploy Starter →</a>
+      <a href="/signup?plan=professional" class="btn btn-primary">Deploy Professional →</a>
+      <a href="/buy?plan=enterprise" class="btn btn-secondary">Talk to Sales</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>SINCOR — Deploy Autonomous Revenue-Generating Teams</p>
+  <p style="margin-top: 12px;">© 2026 SINCOR. All rights reserved. | <a href="/privacy" style="color: var(--purple-light);">Privacy</a> | <a href="/terms" style="color: var(--purple-light);">Terms</a></p>
+</footer>
+
+</body>
+</html>
