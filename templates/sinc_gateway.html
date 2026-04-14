@@ -88,10 +88,12 @@
   async function loadSincPrice() {
     try {
       // Load live price from Dexscreener
-      const res = await fetch('https://api.dexscreener.com/latest/dex/tokens/0x49E392de962Fa835B862F59E78611c69E930b5C4');
+      // Use pair address for faster/more reliable lookup
+      const res = await fetch('https://api.dexscreener.com/latest/dex/pairs/base/0xC0305DE73c4Eddf569144008e53b8d8d34011d82');
       const data = await res.json();
-      if (data.pairs && data.pairs.length > 0) {
-        const price = parseFloat(data.pairs[0].priceUsd);
+      const pairData = data.pair || (data.pairs && data.pairs[0]);
+      if (pairData) {
+        const price = parseFloat(pairData.priceUsd);
         if (price > 0) {
           sincPrice = price;
           document.getElementById('sinc-price').textContent = '$' + price.toFixed(4);
