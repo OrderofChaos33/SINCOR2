@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200" height="48">
+  <defs>
+    <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#c4b5fd"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon mark -->
+  <rect x="0" y="8" width="32" height="32" rx="8" fill="url(#lg)"/>
+  <text x="16" y="30" text-anchor="middle" fill="#050814" font-family="Inter,Arial,sans-serif" font-weight="900" font-size="18">S</text>
+  <!-- Wordmark -->
+  <text x="44" y="31" fill="url(#lg)" font-family="Inter,Arial,sans-serif" font-weight="700" font-size="22" letter-spacing="2">SINCOR</text>
+</svg>
