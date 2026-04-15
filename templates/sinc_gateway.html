@@ -1,156 +1,717 @@
-<!-- SINC Token Gateway Widget - Embed in home.html -->
-<!-- Drop this section wherever you want the swap to appear on the page -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINC Token — SINCOR Ecosystem</title>
+  <meta name="description" content="SINC is the native utility token of the SINCOR autonomous AI agent platform. Live on Base. LP locked. 0% tax.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-<section id="sinc" style="padding: 80px 40px; max-width: 900px; margin: 0 auto;">
-  <div style="text-align: center; margin-bottom: 48px;">
-    <div style="display: inline-block; background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.3); color: #22d3ee; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 16px;">⚡ SINC TOKEN</div>
-    <h2 style="font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin-bottom: 12px;">SINCOR Utility Token</h2>
-    <p style="color: #64748b; font-size: 16px; max-width: 500px; margin: 0 auto;">SINC is the SINCOR ecosystem token. Use it for platform access, service payments, and partner transactions.</p>
+    :root {
+      --bg: #0a0e27;
+      --bg-dark: #050814;
+      --surface: #0f1629;
+      --surface-light: #1a202c;
+      --border: rgba(139,92,246,0.1);
+      --border-bright: rgba(139,92,246,0.3);
+      --purple: #8b5cf6;
+      --purple-dark: #6d28d9;
+      --purple-light: #c4b5fd;
+      --cyan: #06b6d4;
+      --cyan-dark: #0891b2;
+      --pink: #ec4899;
+      --text: #f1f5f9;
+      --text-dim: #cbd5e1;
+      --text-muted: #94a3b8;
+      --glow: 0 0 30px rgba(139,92,246,0.3);
+      --glow-intense: 0 0 60px rgba(139,92,246,0.5);
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background:
+        radial-gradient(circle at 20% 50%, rgba(139,92,246,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(6,182,212,0.1) 0%, transparent 50%);
+      animation: glow-shift 8s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-image:
+        linear-gradient(0deg, transparent 24%, rgba(139,92,246,0.05) 25%, rgba(139,92,246,0.05) 26%, transparent 27%, transparent 74%, rgba(139,92,246,0.05) 75%, rgba(139,92,246,0.05) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(139,92,246,0.05) 25%, rgba(139,92,246,0.05) 26%, transparent 27%, transparent 74%, rgba(139,92,246,0.05) 75%, rgba(139,92,246,0.05) 76%, transparent 77%, transparent);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes glow-shift {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    .content { position: relative; z-index: 2; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 16px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(5,8,20,0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-size: 20px; font-weight: 700;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-links a {
+      color: var(--text-muted); text-decoration: none;
+      font-size: 14px; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      padding: 8px 20px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      border-radius: 8px;
+      color: white !important;
+      font-weight: 600 !important;
+    }
+
+    /* HERO */
+    .hero {
+      padding: 160px 40px 80px;
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(6,182,212,0.1);
+      border: 1px solid rgba(6,182,212,0.3);
+      color: var(--cyan);
+      padding: 6px 16px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+      margin-bottom: 24px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cyan);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+    .hero h1 {
+      font-size: clamp(40px, 6vw, 72px);
+      font-weight: 700; line-height: 1.1;
+      margin-bottom: 24px;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 18px; color: var(--text-dim);
+      max-width: 560px; margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+    .hero-cta { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      padding: 14px 32px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      border: none; border-radius: 10px;
+      color: white; font-weight: 700; font-size: 16px;
+      cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: all 0.3s; box-shadow: var(--glow);
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--glow-intense); }
+    .btn-secondary {
+      padding: 14px 32px;
+      background: transparent;
+      border: 1px solid var(--border-bright);
+      border-radius: 10px;
+      color: var(--text); font-weight: 600; font-size: 16px;
+      cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: all 0.3s;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .btn-secondary:hover { border-color: var(--purple); color: var(--purple-light); }
+
+    /* STATS STRIP */
+    .stats-strip {
+      max-width: 1100px; margin: 0 auto 80px;
+      padding: 0 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    .stat-card:hover {
+      border-color: var(--border-bright);
+      box-shadow: var(--glow);
+      transform: translateY(-2px);
+    }
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px; font-weight: 700;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+    .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* MAIN GRID */
+    .main-grid {
+      max-width: 1100px; margin: 0 auto 80px;
+      padding: 0 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+    @media (max-width: 768px) {
+      .main-grid { grid-template-columns: 1fr; }
+      nav { padding: 16px 20px; }
+      .nav-links { display: none; }
+      .hero { padding: 120px 20px 60px; }
+      .stats-strip { padding: 0 20px; }
+      .main-grid { padding: 0 20px; }
+      .contract-section { padding: 0 20px; }
+      .footer-links-grid { padding: 0 20px; }
+    }
+
+    /* SWAP CARD */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px;
+      transition: all 0.3s;
+    }
+    .card:hover { border-color: var(--border-bright); }
+    .card-title {
+      font-size: 20px; font-weight: 700;
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .card-subtitle { font-size: 14px; color: var(--text-muted); margin-bottom: 28px; }
+
+    .swap-field { margin-bottom: 12px; }
+    .swap-label {
+      font-size: 11px; font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 8px; display: block;
+    }
+    .swap-input-wrap {
+      display: flex;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .swap-input-wrap:focus-within { border-color: var(--purple); }
+    .swap-input-wrap input {
+      flex: 1; padding: 16px;
+      background: transparent; border: none;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px; outline: none;
+    }
+    .swap-input-wrap select,
+    .swap-token-badge {
+      padding: 16px 18px;
+      background: rgba(139,92,246,0.15);
+      border: none; border-left: 1px solid var(--border);
+      color: var(--text); font-weight: 700; font-size: 14px;
+      cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+    }
+    .swap-flip {
+      text-align: center; padding: 6px 0; cursor: pointer;
+      color: var(--cyan); font-size: 22px;
+      transition: transform 0.3s;
+    }
+    .swap-flip:hover { transform: rotate(180deg); }
+
+    .swap-info {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 20px;
+    }
+    .swap-info-row {
+      display: flex; justify-content: space-between;
+      font-size: 13px; color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .swap-info-row:last-child { margin-bottom: 0; }
+    .swap-info-row span:last-child { color: var(--text); }
+    .swap-info-row .cyan { color: var(--cyan); }
+
+    /* TOKEN INFO CARD */
+    .info-list { list-style: none; }
+    .info-list li {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 15px;
+    }
+    .info-list li:last-child { border-bottom: none; }
+    .info-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: rgba(139,92,246,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .info-text-label { font-size: 12px; color: var(--text-muted); }
+    .info-text-value { font-weight: 600; color: var(--text); }
+    .info-text-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+    .tag {
+      display: inline-block;
+      padding: 2px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .tag-green { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .tag-cyan { background: rgba(6,182,212,0.15); color: var(--cyan); }
+    .tag-purple { background: rgba(139,92,246,0.15); color: var(--purple-light); }
+
+    /* CONTRACT SECTION */
+    .contract-section {
+      max-width: 1100px; margin: 0 auto 80px;
+      padding: 0 40px;
+    }
+    .contract-box {
+      background: var(--surface);
+      border: 1px solid var(--border-bright);
+      border-radius: 16px; padding: 32px;
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 24px;
+      flex-wrap: wrap;
+    }
+    .contract-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .contract-addr {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px; color: var(--purple-light);
+      word-break: break-all;
+    }
+    .copy-btn {
+      padding: 10px 20px;
+      background: rgba(139,92,246,0.15);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px; color: var(--purple-light);
+      font-weight: 600; font-size: 13px;
+      cursor: pointer; white-space: nowrap;
+      font-family: 'Space Grotesk', sans-serif;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: rgba(139,92,246,0.25); }
+
+    /* FOOTER LINKS */
+    .footer-links-grid {
+      max-width: 1100px; margin: 0 auto 80px;
+      padding: 0 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .footer-link-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px 24px;
+      text-decoration: none; color: var(--text);
+      display: flex; align-items: center; gap: 14px;
+      transition: all 0.3s;
+    }
+    .footer-link-card:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-2px);
+      box-shadow: var(--glow);
+    }
+    .footer-link-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: rgba(139,92,246,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .footer-link-name { font-weight: 600; font-size: 14px; }
+    .footer-link-sub { font-size: 12px; color: var(--text-muted); }
+
+    /* DISCLAIMER */
+    .disclaimer {
+      max-width: 700px; margin: 0 auto 80px;
+      padding: 0 40px;
+      text-align: center;
+      font-size: 12px; color: var(--text-muted);
+      line-height: 1.8;
+    }
+    .disclaimer a { color: var(--purple-light); }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; font-size: 14px; }
+    footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+<div class="content">
+
+  <!-- NAV -->
+  <nav>
+    <a href="/" class="nav-logo">SINCOR ⚡</a>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/sinc">SINC Token</a>
+      <a href="/signup" class="nav-cta">Get Started</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="badge">
+      <div class="badge-dot"></div>
+      LIVE ON BASE
+    </div>
+    <h1>The <span>SINCOR</span><br>Ecosystem Token</h1>
+    <p>SINC powers the autonomous AI economy. Use it for platform access, agent services, and DeFi operations — all on Base.</p>
+    <div class="hero-cta">
+      <a href="https://aerodrome.finance/swap?from=eth&to=0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="btn-primary">
+        🪐 Buy SINC on Aerodrome
+      </a>
+      <a href="https://basescan.org/token/0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="btn-secondary">
+        View on Basescan ↗
+      </a>
+    </div>
   </div>
 
-  <!-- Token Stats -->
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 40px;">
-    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
-      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';" id="sinc-price">—</div>
-      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">SINC Price (USDC)</div>
+  <!-- STATS -->
+  <div class="stats-strip">
+    <div class="stat-card">
+      <div class="stat-value" id="sinc-price">$—</div>
+      <div class="stat-label">Live Price</div>
     </div>
-    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
-      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';">100M</div>
-      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">Total Supply</div>
+    <div class="stat-card">
+      <div class="stat-value">100M</div>
+      <div class="stat-label">Total Supply</div>
     </div>
-    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
-      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';">Base</div>
-      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">Network</div>
+    <div class="stat-card">
+      <div class="stat-value" id="sinc-liq">$—</div>
+      <div class="stat-label">Liquidity</div>
     </div>
-    <div style="background: #0d0d15; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center;">
-      <div style="font-size: 24px; font-weight: 700; font-family: 'JetBrains Mono';">Utility</div>
-      <div style="color: #64748b; font-size: 12px; margin-top: 4px;">Token Type</div>
+    <div class="stat-card">
+      <div class="stat-value">Base</div>
+      <div class="stat-label">Network</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">0%</div>
+      <div class="stat-label">Buy / Sell Tax</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">🔒</div>
+      <div class="stat-label">LP Locked</div>
     </div>
   </div>
 
-  <!-- Swap Widget -->
-  <div style="background: linear-gradient(135deg, rgba(34,211,238,0.08), rgba(124,58,237,0.05)); border: 1px solid rgba(34,211,238,0.2); border-radius: 16px; padding: 40px; max-width: 480px; margin: 0 auto 40px;">
-    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 24px; text-align: center;">Swap SINC ↔ USDC</h3>
-    
-    <div style="margin-bottom: 16px;">
-      <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">You Send</label>
-      <div style="display: flex; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
-        <input type="number" id="swap-input" placeholder="0.00" style="flex: 1; padding: 16px; background: transparent; border: none; color: #e2e8f0; font-family: 'JetBrains Mono'; font-size: 20px; outline: none;" oninput="calculateSwap()">
-        <select id="swap-from" style="padding: 16px; background: rgba(124,58,237,0.2); border: none; border-left: 1px solid rgba(255,255,255,0.08); color: #e2e8f0; font-weight: 700; font-size: 14px; cursor: pointer;" onchange="calculateSwap()">
-          <option value="sinc">SINC</option>
-          <option value="usdc">USDC</option>
-        </select>
+  <!-- MAIN GRID: SWAP + INFO -->
+  <div class="main-grid">
+
+    <!-- SWAP CARD -->
+    <div class="card">
+      <div class="card-title">⇄ Swap SINC</div>
+      <div class="card-subtitle">Trade via Aerodrome on Base — 0% tax, no slippage surprises</div>
+
+      <div class="swap-field">
+        <span class="swap-label">You Send</span>
+        <div class="swap-input-wrap">
+          <input type="number" id="swap-input" placeholder="0.00" oninput="calculateSwap()">
+          <select id="swap-from" class="swap-token-badge" onchange="swapFromToken=this.value; updateLabels(); calculateSwap();">
+            <option value="sinc">SINC</option>
+            <option value="usdc">USDC</option>
+          </select>
+        </div>
       </div>
+
+      <div class="swap-flip" onclick="flipSwap()">⇅</div>
+
+      <div class="swap-field">
+        <span class="swap-label">You Receive</span>
+        <div class="swap-input-wrap">
+          <input type="number" id="swap-output" placeholder="0.00" readonly style="color: var(--purple-light);">
+          <div class="swap-token-badge" id="swap-to-label">USDC</div>
+        </div>
+      </div>
+
+      <div class="swap-info">
+        <div class="swap-info-row">
+          <span>Rate</span>
+          <span id="swap-rate">1 SINC = $— USDC</span>
+        </div>
+        <div class="swap-info-row">
+          <span>Network</span>
+          <span class="cyan">Base (Chain ID 8453)</span>
+        </div>
+        <div class="swap-info-row">
+          <span>DEX</span>
+          <span>Aerodrome Finance</span>
+        </div>
+        <div class="swap-info-row">
+          <span>Tax</span>
+          <span style="color:#4ade80;">0% / 0%</span>
+        </div>
+      </div>
+
+      <button onclick="executeSwap()" class="btn-primary" style="width:100%; justify-content: center;">
+        Connect Wallet to Swap
+      </button>
     </div>
 
-    <div style="text-align: center; margin: 8px 0; cursor: pointer;" onclick="flipSwap()">
-      <span style="font-size: 20px; color: #22d3ee;">⇅</span>
-    </div>
+    <!-- TOKEN INFO -->
+    <div class="card">
+      <div class="card-title">🪐 Token Details</div>
+      <div class="card-subtitle">Verified, locked, and audited on Base mainnet</div>
 
-    <div style="margin-bottom: 24px;">
-      <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">You Receive</label>
-      <div style="display: flex; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
-        <input type="number" id="swap-output" placeholder="0.00" readonly style="flex: 1; padding: 16px; background: transparent; border: none; color: #a78bfa; font-family: 'JetBrains Mono'; font-size: 20px; outline: none;">
-        <div style="padding: 16px; background: rgba(124,58,237,0.2); border-left: 1px solid rgba(255,255,255,0.08); color: #e2e8f0; font-weight: 700; font-size: 14px;" id="swap-to-label">USDC</div>
-      </div>
+      <ul class="info-list">
+        <li>
+          <div class="info-icon">📛</div>
+          <div>
+            <div class="info-text-label">Name / Symbol</div>
+            <div class="info-text-value">SINC — SINCOR Utility Token</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">⛓️</div>
+          <div>
+            <div class="info-text-label">Network</div>
+            <div class="info-text-value">Base Mainnet (EVM, Chain ID 8453)</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">🔢</div>
+          <div>
+            <div class="info-text-label">Total Supply</div>
+            <div class="info-text-value">100,000,000 SINC</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">💧</div>
+          <div>
+            <div class="info-text-label">Liquidity Pool</div>
+            <div class="info-text-value">SINC/USDC on Aerodrome Finance <span class="tag tag-green">Locked</span></div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">🔍</div>
+          <div>
+            <div class="info-text-label">Security</div>
+            <div class="info-text-value">
+              <span class="tag tag-green">Not Honeypot</span>&nbsp;
+              <span class="tag tag-green">0% Tax</span>&nbsp;
+              <span class="tag tag-cyan">GoPlus Verified</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">📋</div>
+          <div>
+            <div class="info-text-label">Contract</div>
+            <div class="info-text-value mono">0x49E392de962Fa835B862F59E78611c69E930b5C4</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">🏦</div>
+          <div>
+            <div class="info-text-label">Type</div>
+            <div class="info-text-value">
+              <span class="tag tag-purple">Utility Token</span>&nbsp;
+              <span class="tag tag-cyan">ERC-20</span>
+            </div>
+          </div>
+        </li>
+      </ul>
     </div>
-
-    <div style="background: rgba(255,255,255,0.02); border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #64748b;">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-        <span>Rate</span><span id="swap-rate" style="color: #e2e8f0;">1 SINC = — USDC</span>
-      </div>
-      <div style="display: flex; justify-content: space-between;">
-        <span>Network</span><span style="color: #22d3ee;">Base</span>
-      </div>
-    </div>
-
-    <button onclick="executeSwap()" style="width: 100%; padding: 16px; background: linear-gradient(135deg, #22d3ee, #7c3aed); border: none; border-radius: 10px; color: white; font-weight: 700; font-size: 16px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: all 0.3s;">
-      Connect Wallet to Swap
-    </button>
   </div>
 
-  <!-- Disclaimer -->
-  <div style="text-align: center; max-width: 600px; margin: 0 auto;">
-    <p style="font-size: 12px; color: #64748b; line-height: 1.7;">
-      SINC is a utility token. It is not an investment vehicle and does not represent equity, profit share, or financial returns. SINC is used for access to SINCOR platform services. Swaps are subject to market conditions and available liquidity. Not available where prohibited by law. This is not financial advice.
-    </p>
+  <!-- CONTRACT ADDRESS -->
+  <div class="contract-section">
+    <div class="contract-box">
+      <div>
+        <div class="contract-label">Contract Address (Base)</div>
+        <div class="contract-addr">0x49E392de962Fa835B862F59E78611c69E930b5C4</div>
+      </div>
+      <button class="copy-btn" onclick="copyContract()">📋 Copy Address</button>
+    </div>
   </div>
-</section>
+
+  <!-- LINKS -->
+  <div class="footer-links-grid">
+    <a href="https://dexscreener.com/base/0xc0305de73c4eddf569144008e53b8d8d34011d82" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">📊</div>
+      <div>
+        <div class="footer-link-name">Dexscreener</div>
+        <div class="footer-link-sub">Live chart & trades</div>
+      </div>
+    </a>
+    <a href="https://aerodrome.finance/swap?from=eth&to=0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">🔄</div>
+      <div>
+        <div class="footer-link-name">Aerodrome</div>
+        <div class="footer-link-sub">Primary DEX — buy SINC</div>
+      </div>
+    </a>
+    <a href="https://basescan.org/token/0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">🔍</div>
+      <div>
+        <div class="footer-link-name">Basescan</div>
+        <div class="footer-link-sub">Explorer & contract</div>
+      </div>
+    </a>
+    <a href="https://www.dextools.io/app/en/base/pair-explorer/0xc0305de73c4eddf569144008e53b8d8d34011d82" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">🛠️</div>
+      <div>
+        <div class="footer-link-name">DEXTools</div>
+        <div class="footer-link-sub">Pair explorer</div>
+      </div>
+    </a>
+    <a href="https://www.geckoterminal.com/base/pools/0xC0305DE73c4Eddf569144008e53b8d8d34011d82" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">🦎</div>
+      <div>
+        <div class="footer-link-name">GeckoTerminal</div>
+        <div class="footer-link-sub">Pool analytics</div>
+      </div>
+    </a>
+    <a href="/signup" class="footer-link-card">
+      <div class="footer-link-icon">⚡</div>
+      <div>
+        <div class="footer-link-name">SINCOR Platform</div>
+        <div class="footer-link-sub">Use SINC for agent access</div>
+      </div>
+    </a>
+  </div>
+
+  <!-- DISCLAIMER -->
+  <div class="disclaimer">
+    SINC is a utility token. It is not an investment vehicle and does not represent equity, profit share, or financial returns of any kind. SINC is used solely for access to SINCOR platform services and ecosystem functions. Purchasing SINC involves risk, including possible total loss of value. This page is not financial advice. Not available where prohibited by law. <a href="/">Learn more about SINCOR →</a>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <a href="/" style="font-weight:700; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">SINCOR ⚡</a>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <a href="/">Home</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/sinc">SINC Token</a>
+      <a href="/signup">Get Started</a>
+    </div>
+    <span style="font-size:13px; color:var(--text-muted);">© 2026 Sincor Business Solutions</span>
+  </footer>
+
+</div>
 
 <script>
-  // SINC swap logic - connects to Uniswap on Base
-  const SINC_CONTRACT = '0x49E392de962Fa835B862F59E78611c69E930b5C4'; // Base mainnet
-  const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // USDC on Base
-  
-  let sincPrice = 1.10; // Seeded at $1.10 via Aerodrome SINC/USDC pool
+  const SINC_CONTRACT = '0x49E392de962Fa835B862F59E78611c69E930b5C4';
+  const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+  const POOL = '0xC0305DE73c4Eddf569144008e53b8d8d34011d82';
+  let sincPrice = 1.10;
   let swapFromToken = 'sinc';
 
-  async function loadSincPrice() {
+  async function loadPrice() {
     try {
-      // Load live price from Dexscreener
-      // Use pair address for faster/more reliable lookup
-      const res = await fetch('https://api.dexscreener.com/latest/dex/pairs/base/0xC0305DE73c4Eddf569144008e53b8d8d34011d82');
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/base/${POOL}`);
       const data = await res.json();
-      const pairData = data.pair || (data.pairs && data.pairs[0]);
-      if (pairData) {
-        const price = parseFloat(pairData.priceUsd);
-        if (price > 0) {
-          sincPrice = price;
-          document.getElementById('sinc-price').textContent = '$' + price.toFixed(4);
-          document.getElementById('swap-rate').textContent = '1 SINC = $' + price.toFixed(4) + ' USDC';
-          return;
+      const pair = data.pair || (data.pairs && data.pairs[0]);
+      if (pair) {
+        const p = parseFloat(pair.priceUsd);
+        const liq = parseFloat(pair.liquidity?.usd || 0);
+        if (p > 0) {
+          sincPrice = p;
+          document.getElementById('sinc-price').textContent = '$' + p.toFixed(4);
+          document.getElementById('swap-rate').textContent = '1 SINC = $' + p.toFixed(4) + ' USDC';
         }
+        document.getElementById('sinc-liq').textContent = '$' + liq.toFixed(2);
       }
-      // Fallback to seeded price
-      document.getElementById('sinc-price').textContent = '$1.10';
-      document.getElementById('swap-rate').textContent = '1 SINC = $1.10 USDC';
     } catch(e) {
       document.getElementById('sinc-price').textContent = '$1.10';
-      document.getElementById('swap-rate').textContent = '1 SINC = $1.10 USDC';
     }
   }
 
   function calculateSwap() {
     const input = parseFloat(document.getElementById('swap-input').value) || 0;
-    let output = 0;
-    
-    if (swapFromToken === 'sinc') {
-      output = input * sincPrice;
-      document.getElementById('swap-output').value = output > 0 ? output.toFixed(6) : '';
-    } else {
-      output = input / sincPrice;
-      document.getElementById('swap-output').value = output > 0 ? output.toFixed(2) : '';
-    }
+    const out = swapFromToken === 'sinc' ? input * sincPrice : input / sincPrice;
+    document.getElementById('swap-output').value = out > 0 ? out.toFixed(swapFromToken === 'sinc' ? 4 : 2) : '';
+  }
+
+  function updateLabels() {
+    document.getElementById('swap-to-label').textContent = swapFromToken === 'sinc' ? 'USDC' : 'SINC';
   }
 
   function flipSwap() {
     swapFromToken = swapFromToken === 'sinc' ? 'usdc' : 'sinc';
     document.getElementById('swap-from').value = swapFromToken;
-    document.getElementById('swap-to-label').textContent = swapFromToken === 'sinc' ? 'USDC' : 'SINC';
+    updateLabels();
     document.getElementById('swap-input').value = '';
     document.getElementById('swap-output').value = '';
   }
 
-  async function executeSwap() {
-    if (!window.ethereum) {
-      alert('Please install MetaMask or another Web3 wallet to swap.');
-      return;
-    }
-    
-    try {
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
-      // Redirect to Uniswap with SINC pre-selected once contract is deployed
-      if (SINC_CONTRACT) {
-        // Route to Aerodrome (primary pool) or Uniswap as fallback
-        window.open(`https://aerodrome.finance/swap?from=${swapFromToken === 'sinc' ? SINC_CONTRACT : USDC_CONTRACT}&to=${swapFromToken === 'sinc' ? USDC_CONTRACT : SINC_CONTRACT}`, '_blank');
-      } else {
-        alert('SINC token is being deployed. Check back soon.');
-      }
-    } catch(e) {
-      console.error('Wallet connection failed:', e);
-    }
+  function executeSwap() {
+    const from = swapFromToken === 'sinc' ? SINC_CONTRACT : USDC_CONTRACT;
+    const to = swapFromToken === 'sinc' ? USDC_CONTRACT : SINC_CONTRACT;
+    window.open(`https://aerodrome.finance/swap?from=${from}&to=${to}`, '_blank');
   }
 
-  // Load price on page load
-  loadSincPrice();
+  function copyContract() {
+    navigator.clipboard.writeText(SINC_CONTRACT).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = '✅ Copied!';
+      setTimeout(() => btn.textContent = '📋 Copy Address', 2000);
+    });
+  }
+
+  loadPrice();
+  setInterval(loadPrice, 30000);
 </script>
+</body>
+</html>
