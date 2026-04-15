@@ -1286,16 +1286,6 @@ def sitemap_xml():
 # WHITEPAPER & DOCUMENTATION
 # ============================================================================
 
-@app.route('/terms')
-def terms():
-    """Terms of Service."""
-    return render_template('terms.html')
-
-@app.route('/privacy')
-def privacy():
-    """Privacy Policy."""
-    return render_template('privacy.html')
-
 @app.route('/whitepaper')
 def whitepaper():
     """Render whitepaper page."""
