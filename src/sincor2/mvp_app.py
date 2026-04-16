@@ -1291,6 +1291,19 @@ def axiom():
     """AXIOM (AXM) token page."""
     return render_template('axiom.html')
 
+@app.route('/site-index')
+@app.route('/pages')
+def site_index():
+    """Full site index / directory of all pages."""
+    return render_template('sitemap.html')
+
+@app.route('/go')
+@app.route('/start')
+@app.route('/sales')
+def sales_landing():
+    """High-conversion sales landing page."""
+    return render_template('sales.html')
+
 @app.route('/whitepaper')
 def whitepaper():
     """Render whitepaper page."""

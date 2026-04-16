@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>42 AI Agents Working For Your Business 24/7 — SINCOR</title>
+  <meta name="description" content="Deploy a swarm of 42 autonomous AI agents that do your outreach, content, sales, analytics and more — 24/7, no hiring, no payroll. Starting at $297/mo.">
+  <link rel="icon" href="/static/sincor_logo.jpg">
+  <meta property="og:title" content="Replace Your Entire Marketing Team With 42 AI Agents">
+  <meta property="og:description" content="$297/mo. No hiring. No payroll. Agents work 24/7 doing outreach, content, social, sales, analytics. Start today.">
+  <meta property="og:image" content="/static/sincor_logo.jpg">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050814; --card: #0d1220; --border: rgba(255,255,255,0.07);
+      --blue: #3b82f6; --blue-light: #60a5fa; --cyan: #22d3ee;
+      --green: #10b981; --red: #ef4444; --gold: #f59e0b;
+      --text: #e2e8f0; --muted: #64748b;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; }
+
+    /* NAV */
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 48px; border-bottom: 1px solid var(--border); background: rgba(5,8,20,0.97); position: sticky; top: 0; z-index: 100; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+    .nav-logo span { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-cta { background: var(--green); color: #000; padding: 10px 24px; border-radius: 8px; font-weight: 800; font-size: 14px; text-decoration: none; }
+
+    /* HERO */
+    .hero { padding: 80px 48px 64px; max-width: 900px; margin: 0 auto; text-align: center; position: relative; }
+    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 800px; height: 600px; background: radial-gradient(ellipse at center top, rgba(16,185,129,0.12) 0%, transparent 60%); pointer-events: none; }
+    .urgent-bar { display: inline-flex; align-items: center; gap: 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 6px 18px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 28px; }
+    .pulse { width: 7px; height: 7px; background: var(--red); border-radius: 50%; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(1.5);} }
+    h1 { font-size: clamp(36px, 6vw, 72px); font-weight: 800; line-height: 1.05; margin-bottom: 24px; }
+    .green { color: var(--green); }
+    .hero-sub { font-size: 20px; color: var(--muted); max-width: 620px; margin: 0 auto 40px; }
+    .hero-cta { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+    .btn-primary { background: var(--green); color: #000; padding: 18px 44px; border-radius: 10px; font-size: 18px; font-weight: 800; text-decoration: none; display: inline-block; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 40px rgba(16,185,129,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(16,185,129,0.6); }
+    .btn-secondary { border: 1px solid rgba(255,255,255,0.15); color: var(--text); padding: 18px 32px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; }
+    .trust-row { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+    .trust-item { display: flex; align-items: center; gap: 6px; }
+    .trust-item span:first-child { color: var(--green); }
+
+    /* PAIN SECTION */
+    .section { padding: 64px 48px; max-width: 1100px; margin: 0 auto; }
+    .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+    .section-title { font-size: clamp(28px, 4vw, 44px); font-weight: 700; line-height: 1.2; margin-bottom: 16px; }
+    .section-sub { font-size: 16px; color: var(--muted); max-width: 560px; margin-bottom: 40px; }
+    .divider { border: none; border-top: 1px solid var(--border); }
+
+    /* VS TABLE */
+    .vs-table { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+    .vs-col { padding: 0; }
+    .vs-header { padding: 18px 24px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .vs-header.bad { background: rgba(239,68,68,0.1); color: #fca5a5; border-right: 1px solid var(--border); }
+    .vs-header.good { background: rgba(16,185,129,0.1); color: var(--green); }
+    .vs-row-bad, .vs-row-good { padding: 14px 24px; font-size: 14px; display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid var(--border); }
+    .vs-row-bad { border-right: 1px solid var(--border); color: var(--muted); }
+    .vs-row-good { color: var(--text); }
+    .vs-icon { flex-shrink: 0; margin-top: 1px; }
+
+    /* AGENT GRID */
+    .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+    .agent-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; text-align: center; transition: border-color 0.2s, transform 0.2s; }
+    .agent-card:hover { border-color: rgba(16,185,129,0.3); transform: translateY(-2px); }
+    .agent-emoji { font-size: 28px; margin-bottom: 10px; }
+    .agent-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .agent-task { font-size: 11px; color: var(--muted); }
+
+    /* PRICING */
+    .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+    .price-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 36px 30px; position: relative; }
+    .price-card.featured { border-color: var(--green); box-shadow: 0 0 40px rgba(16,185,129,0.15); }
+    .popular-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--green); color: #000; padding: 4px 18px; border-radius: 20px; font-size: 12px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
+    .price-tier { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+    .price-amount { font-size: 52px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+    .price-amount span { font-size: 20px; font-weight: 500; color: var(--muted); }
+    .price-agents { font-size: 14px; color: var(--muted); margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .price-features { list-style: none; margin-bottom: 28px; }
+    .price-features li { display: flex; gap: 10px; font-size: 14px; padding: 7px 0; }
+    .price-features li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; }
+    .btn-price { display: block; text-align: center; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 700; text-decoration: none; transition: transform 0.2s; }
+    .btn-price:hover { transform: translateY(-1px); }
+    .btn-green { background: var(--green); color: #000; }
+    .btn-outline { border: 1px solid rgba(255,255,255,0.15); color: var(--text); }
+    .hiring-cost { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: #fca5a5; }
+
+    /* ROI CALC */
+    .roi-box { background: var(--card); border: 1px solid rgba(16,185,129,0.25); border-radius: 20px; padding: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
+    .roi-number { font-size: 64px; font-weight: 800; color: var(--green); line-height: 1; }
+    .roi-label { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    .roi-sub { font-size: 14px; color: var(--muted); }
+    .roi-math { display: flex; flex-direction: column; gap: 12px; }
+    .roi-line { display: flex; justify-content: space-between; font-size: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .roi-line:last-child { border-bottom: none; font-weight: 700; font-size: 16px; }
+    .roi-line .bad { color: #fca5a5; }
+    .roi-line .good { color: var(--green); }
+
+    /* FAQ */
+    .faq { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+    .faq-item { border-bottom: 1px solid var(--border); }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-q { padding: 20px 24px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .faq-q:hover { background: rgba(255,255,255,0.03); }
+    .faq-a { padding: 0 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.7; display: none; }
+    .faq-item.open .faq-a { display: block; }
+    .faq-arrow { transition: transform 0.2s; }
+    .faq-item.open .faq-arrow { transform: rotate(180deg); }
+
+    /* FINAL CTA */
+    .final-cta { padding: 80px 48px; text-align: center; background: radial-gradient(ellipse at center, rgba(16,185,129,0.08) 0%, transparent 60%); }
+    .final-cta h2 { font-size: clamp(32px, 5vw, 56px); font-weight: 800; margin-bottom: 20px; }
+    .final-cta p { font-size: 18px; color: var(--muted); margin-bottom: 40px; }
+    footer { border-top: 1px solid var(--border); padding: 28px 48px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .footer-links { display: flex; gap: 20px; }
+    .footer-links a { color: var(--muted); text-decoration: none; font-size: 13px; }
+    .footer-copy { font-size: 13px; color: var(--muted); }
+
+    @media(max-width:768px) {
+      nav { padding: 14px 20px; }
+      .hero, .section, .final-cta { padding-left: 20px; padding-right: 20px; }
+      .vs-table { grid-template-columns: 1fr; }
+      .vs-row-bad { border-right: none; border-bottom: 1px solid var(--border); }
+      .roi-box { grid-template-columns: 1fr; }
+      footer { padding: 24px 20px; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="/static/sincor_logo.jpg" alt="SINCOR">
+    <span>SINCOR</span>
+  </a>
+  <a href="/signup" class="nav-cta">Start Now — $297/mo →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="urgent-bar"><span class="pulse"></span> No free trials — credit card required. Serious inquiries only.</div>
+  <h1>Your Business Runs on <span class="green">42 AI Agents</span> Working 24/7</h1>
+  <p class="hero-sub">Outreach. Content. Social. Sales. Analytics. Retention. All autonomous. All running while you sleep. Starting at $297/month — less than a single part-time hire.</p>
+  <div class="hero-cta">
+    <a href="/signup" class="btn-primary">Deploy Your Agents Now →</a>
+    <a href="/pricing" class="btn-secondary">Compare Plans</a>
+  </div>
+  <div class="trust-row">
+    <div class="trust-item"><span>✓</span> No contracts, cancel anytime</div>
+    <div class="trust-item"><span>✓</span> Live in under 5 minutes</div>
+    <div class="trust-item"><span>✓</span> Real agents, not templates</div>
+    <div class="trust-item"><span>✓</span> 24/7 autonomous execution</div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- PAIN / GAIN -->
+<div class="section">
+  <div class="section-label" style="color:var(--red)">The Problem</div>
+  <h2 class="section-title">You're Losing to Businesses Running AI Right Now</h2>
+  <p class="section-sub">While you're manually posting, cold-calling, and chasing leads — your competition is running autonomous agents doing it 24/7 at a fraction of the cost.</p>
+  <div class="vs-table">
+    <div class="vs-col">
+      <div class="vs-header bad">❌ Without SINCOR</div>
+      <div class="vs-row-bad"><span class="vs-icon">😴</span> Marketing stops when you sleep</div>
+      <div class="vs-row-bad"><span class="vs-icon">💸</span> $4,000+/mo per marketing hire</div>
+      <div class="vs-row-bad"><span class="vs-icon">🐌</span> Days to create content and outreach</div>
+      <div class="vs-row-bad"><span class="vs-icon">🎯</span> Manual lead gen — slow and inconsistent</div>
+      <div class="vs-row-bad"><span class="vs-icon">📊</span> No real-time analytics or adjustments</div>
+      <div class="vs-row-bad"><span class="vs-icon">🔄</span> Churn happens before you notice it</div>
+    </div>
+    <div class="vs-col">
+      <div class="vs-header good">✅ With SINCOR</div>
+      <div class="vs-row-good"><span class="vs-icon">⚡</span> Agents run 24/7/365 — no breaks</div>
+      <div class="vs-row-good"><span class="vs-icon">💰</span> $297–$2,997/mo for an entire swarm</div>
+      <div class="vs-row-good"><span class="vs-icon">🚀</span> Content and outreach deployed in minutes</div>
+      <div class="vs-row-good"><span class="vs-icon">🎯</span> Automated prospecting across every channel</div>
+      <div class="vs-row-good"><span class="vs-icon">📊</span> Live dashboards, instant pivot capability</div>
+      <div class="vs-row-good"><span class="vs-icon">🔄</span> Retention agents catch churn before it happens</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- AGENTS -->
+<div class="section">
+  <div class="section-label" style="color:var(--blue-light)">The Swarm</div>
+  <h2 class="section-title">42 Agents. Every Role Your Business Needs.</h2>
+  <p class="section-sub">Each agent has a specific job. Together they form a complete autonomous growth engine — research, content, outreach, social, sales, analytics, retention, and more.</p>
+  <div class="agent-grid">
+    <div class="agent-card"><div class="agent-emoji">🔍</div><div class="agent-name">Research Agent</div><div class="agent-task">Market intelligence 24/7</div></div>
+    <div class="agent-card"><div class="agent-emoji">✍️</div><div class="agent-name">Content Agent</div><div class="agent-task">Blog posts, copy, scripts</div></div>
+    <div class="agent-card"><div class="agent-emoji">📱</div><div class="agent-name">Social Agent</div><div class="agent-task">Posts across all platforms</div></div>
+    <div class="agent-card"><div class="agent-emoji">📧</div><div class="agent-name">Outreach Agent</div><div class="agent-task">Cold email at scale</div></div>
+    <div class="agent-card"><div class="agent-emoji">🤝</div><div class="agent-name">Partnership Agent</div><div class="agent-task">Finds + vets partners</div></div>
+    <div class="agent-card"><div class="agent-emoji">📈</div><div class="agent-name">Growth Agent</div><div class="agent-task">Identifies growth levers</div></div>
+    <div class="agent-card"><div class="agent-emoji">💼</div><div class="agent-name">Sales Agent</div><div class="agent-task">Qualifies + nurtures leads</div></div>
+    <div class="agent-card"><div class="agent-emoji">📊</div><div class="agent-name">Analytics Agent</div><div class="agent-task">KPI tracking + reports</div></div>
+    <div class="agent-card"><div class="agent-emoji">🔁</div><div class="agent-name">Retention Agent</div><div class="agent-task">Reduces churn proactively</div></div>
+    <div class="agent-card"><div class="agent-emoji">🎯</div><div class="agent-name">SEO Agent</div><div class="agent-task">Rankings + backlinks</div></div>
+    <div class="agent-card"><div class="agent-emoji">💬</div><div class="agent-name">Community Agent</div><div class="agent-task">Manages forums + Discord</div></div>
+    <div class="agent-card"><div class="agent-emoji">🌐</div><div class="agent-name">PR Agent</div><div class="agent-task">Press + media coverage</div></div>
+    <div class="agent-card"><div class="agent-emoji">🛍️</div><div class="agent-name">Product Agent</div><div class="agent-task">Feature + roadmap input</div></div>
+    <div class="agent-card"><div class="agent-emoji">🏆</div><div class="agent-name">Competitor Agent</div><div class="agent-task">Competitive intel daily</div></div>
+    <div class="agent-card"><div class="agent-emoji">📞</div><div class="agent-name">Follow-Up Agent</div><div class="agent-task">Never lets leads go cold</div></div>
+    <div class="agent-card" style="border-color:rgba(16,185,129,0.2);"><div class="agent-emoji">➕</div><div class="agent-name">+27 More</div><div class="agent-task">Enterprise tier — full 42-agent swarm</div></div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ROI -->
+<div class="section">
+  <div class="section-label" style="color:var(--gold)">The Math</div>
+  <h2 class="section-title">$297/mo vs. $15,000+/mo in Hiring</h2>
+  <p class="section-sub">One marketing hire costs more per month than a full year of SINCOR. This isn't close.</p>
+  <div class="roi-box">
+    <div>
+      <div class="roi-number">97%</div>
+      <div class="roi-label">Cost reduction vs. equivalent human team</div>
+      <div class="roi-sub">42 agents doing the work of 5–8 full-time employees at 1/50th the cost. No benefits. No sick days. No turnover.</div>
+    </div>
+    <div class="roi-math">
+      <div class="roi-line"><span>1 Marketing Manager</span><span class="bad">$5,000/mo</span></div>
+      <div class="roi-line"><span>1 Content Writer</span><span class="bad">$4,000/mo</span></div>
+      <div class="roi-line"><span>1 Sales Rep</span><span class="bad">$4,500/mo</span></div>
+      <div class="roi-line"><span>1 Social Media Manager</span><span class="bad">$3,500/mo</span></div>
+      <div class="roi-line"><span>Human team total</span><span class="bad">$17,000/mo</span></div>
+      <div class="roi-line"><span>SINCOR Enterprise (42 agents)</span><span class="good">$2,997/mo</span></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- PRICING -->
+<div class="section">
+  <div class="section-label" style="color:var(--green)">Pricing</div>
+  <h2 class="section-title">Simple Pricing. Massive Leverage.</h2>
+  <p class="section-sub">All plans include real autonomous agents — not templates, not wizards. Credit card required. Cancel anytime.</p>
+  <div class="pricing-grid">
+
+    <div class="price-card">
+      <div class="price-tier">Starter</div>
+      <div class="price-amount">$297<span>/mo</span></div>
+      <div class="price-agents">8 Autonomous Agents</div>
+      <div class="hiring-cost">Replaces $8,000+/mo in hiring</div>
+      <ul class="price-features">
+        <li>Research + Content Agents</li>
+        <li>Outreach + Social Agents</li>
+        <li>Partnership + Growth Agents</li>
+        <li>Sales + Analytics Agents</li>
+        <li>Live dashboard access</li>
+        <li>Email support</li>
+      </ul>
+      <a href="/signup?plan=starter" class="btn-price btn-outline">Get Started →</a>
+    </div>
+
+    <div class="price-card featured">
+      <div class="popular-badge">Most Popular</div>
+      <div class="price-tier">Professional</div>
+      <div class="price-amount">$997<span>/mo</span></div>
+      <div class="price-agents">24 Autonomous Agents</div>
+      <div class="hiring-cost">Replaces $20,000+/mo in hiring</div>
+      <ul class="price-features">
+        <li>Everything in Starter</li>
+        <li>16 additional specialist agents</li>
+        <li>Agent marketplace access</li>
+        <li>A/B testing automation</li>
+        <li>CRM integration</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="/signup?plan=professional" class="btn-price btn-green">Deploy 24 Agents →</a>
+    </div>
+
+    <div class="price-card">
+      <div class="price-tier">Enterprise</div>
+      <div class="price-amount">$2,997<span>/mo</span></div>
+      <div class="price-agents">42 Autonomous Agents</div>
+      <div class="hiring-cost">Replaces $50,000+/mo in hiring</div>
+      <ul class="price-features">
+        <li>Full 42-agent swarm</li>
+        <li>White-label deployment</li>
+        <li>Custom agent creation</li>
+        <li>Soulbound Token (SBT) access</li>
+        <li>Executive reporting</li>
+        <li>Dedicated success manager</li>
+      </ul>
+      <a href="/signup?plan=enterprise" class="btn-price btn-outline">Go Enterprise →</a>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- FAQ -->
+<div class="section">
+  <div class="section-label" style="color:var(--muted)">FAQ</div>
+  <h2 class="section-title">Common Questions</h2>
+  <div class="faq">
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">Are these real AI agents or just templates? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Real autonomous agents. Each one runs on a scheduled cadence, executes actual tasks (sending emails, publishing content, scraping data), and reports results to your dashboard. No click-through wizards.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">How long does setup take? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Under 5 minutes. Sign up, enter your credit card and business details, and your agents activate immediately. No onboarding call required.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">Why is there no free trial? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">We run real infrastructure for every deployment. Credit card required filters out non-serious inquiries and lets us guarantee quality execution for every customer. You can cancel after your first month with no penalty.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">Can I cancel anytime? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Yes. No contracts, no cancellation fees. Cancel from your dashboard at any time. Your agents run until the end of your billing period.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">What industries does this work for? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Any B2B or B2C business that needs consistent outreach, content, and analytics. E-commerce, SaaS, agencies, consultants, real estate, law firms, healthcare practices — agents adapt to your vertical.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggle(this)">What's the difference between tiers? <span class="faq-arrow">▼</span></div>
+      <div class="faq-a">Agent count: 8 (Starter) → 24 (Professional) → 42 (Enterprise). Enterprise also includes white-label rights, custom agent creation, and a dedicated success manager. All tiers run 24/7 on real infrastructure.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FINAL CTA -->
+<div class="final-cta">
+  <h2>Your Competitors Are Already Doing This.<br><span class="green">Don't Fall Behind.</span></h2>
+  <p>$297/month. 8 agents. Running 24/7. Deploy in 5 minutes.</p>
+  <a href="/signup" class="btn-primary" style="font-size:20px; padding:20px 52px;">Deploy Your Agents Now →</a>
+  <div class="trust-row" style="margin-top:24px;">
+    <div class="trust-item"><span>✓</span> No contracts</div>
+    <div class="trust-item"><span>✓</span> Cancel anytime</div>
+    <div class="trust-item"><span>✓</span> Real agents, not templates</div>
+    <div class="trust-item"><span>✓</span> 24/7 execution</div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/sinc">SINC</a>
+    <a href="/axiom">AXIOM</a>
+    <a href="/terms">Terms</a>
+    <a href="/privacy">Privacy</a>
+  </div>
+  <div class="footer-copy">© 2026 SINCOR Business Solutions</div>
+</footer>
+
+<script>
+function toggle(el) {
+  const item = el.closest('.faq-item');
+  item.classList.toggle('open');
+}
+</script>
+</body>
+</html>

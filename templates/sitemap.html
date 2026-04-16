@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Index — SINCOR Business Solutions</title>
+  <link rel="icon" href="/static/sincor_logo.jpg">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg:#050814; --card:#0d1220; --border:rgba(255,255,255,0.07); --blue:#3b82f6; --blue-light:#60a5fa; --cyan:#22d3ee; --green:#10b981; --purple:#a78bfa; --gold:#f59e0b; --text:#e2e8f0; --muted:#64748b; }
+    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; min-height: 100vh; }
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); background: rgba(5,8,20,0.96); backdrop-filter: blur(12px); }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+    .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero { padding: 60px 48px 40px; text-align: center; }
+    h1 { font-size: 48px; font-weight: 700; margin-bottom: 12px; }
+    .grad { background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .sub { color: var(--muted); font-size: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; max-width: 1200px; margin: 48px auto; padding: 0 48px; }
+    .section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .section-title.blue { color: var(--blue-light); }
+    .section-title.cyan { color: var(--cyan); }
+    .section-title.green { color: var(--green); }
+    .section-title.purple { color: var(--purple); }
+    .section-title.gold { color: var(--gold); }
+    .section-title.muted { color: var(--muted); }
+    .link-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); text-decoration: none; transition: background 0.15s; border-radius: 6px; padding: 8px 6px; }
+    .link-row:last-child { border-bottom: none; }
+    .link-row:hover { background: rgba(255,255,255,0.04); }
+    .link-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+    .link-text { flex: 1; }
+    .link-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .link-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .link-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
+    .badge-live { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-new { background: rgba(59,130,246,0.15); color: var(--blue-light); border: 1px solid rgba(59,130,246,0.3); }
+    .badge-hot { background: rgba(245,158,11,0.15); color: var(--gold); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-api { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+    footer { border-top: 1px solid var(--border); padding: 24px 48px; text-align: center; color: var(--muted); font-size: 13px; }
+    @media(max-width:768px){ nav{padding:16px 20px;} .grid{padding:0 20px;} .hero{padding:40px 20px 24px;} }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="/static/sincor_logo.jpg" alt="SINCOR">
+    <span>SINCOR</span>
+  </a>
+</nav>
+
+<div class="hero">
+  <h1>Site <span class="grad">Index</span></h1>
+  <p class="sub">Everything at getsincor.com — platform, tokens, docs, tools.</p>
+</div>
+
+<div class="grid">
+
+  <!-- MAIN PAGES -->
+  <div class="section">
+    <div class="section-title blue">Main Pages</div>
+    <a href="/" class="link-row">
+      <span class="link-icon">🏠</span>
+      <div class="link-text"><div class="link-name">Home</div><div class="link-desc">Platform overview, agent swarm, pricing CTA</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/pricing" class="link-row">
+      <span class="link-icon">💰</span>
+      <div class="link-text"><div class="link-name">Pricing</div><div class="link-desc">$297 / $997 / $2,997 tiers</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/signup" class="link-row">
+      <span class="link-icon">⚡</span>
+      <div class="link-text"><div class="link-name">Sign Up</div><div class="link-desc">Start your agent swarm — credit card required</div></div>
+      <span class="link-badge badge-hot">CTA</span>
+    </a>
+    <a href="/contact" class="link-row">
+      <span class="link-icon">📬</span>
+      <div class="link-text"><div class="link-name">Contact</div><div class="link-desc">Get in touch with the team</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/docs" class="link-row">
+      <span class="link-icon">📖</span>
+      <div class="link-text"><div class="link-name">Docs</div><div class="link-desc">Platform documentation</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/whitepaper" class="link-row">
+      <span class="link-icon">📄</span>
+      <div class="link-text"><div class="link-name">Whitepaper</div><div class="link-desc">Technical overview</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+  </div>
+
+  <!-- PRODUCT TIERS -->
+  <div class="section">
+    <div class="section-title cyan">Product Tiers</div>
+    <a href="/products/starter" class="link-row">
+      <span class="link-icon">🟣</span>
+      <div class="link-text"><div class="link-name">Starter — $297/mo</div><div class="link-desc">8 autonomous agents, core automation suite</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/products/professional" class="link-row">
+      <span class="link-icon">🔵</span>
+      <div class="link-text"><div class="link-name">Professional — $997/mo</div><div class="link-desc">24 agents, marketplace access, Most Popular</div></div>
+      <span class="link-badge badge-hot">Hot</span>
+    </a>
+    <a href="/products/enterprise" class="link-row">
+      <span class="link-icon">🟡</span>
+      <div class="link-text"><div class="link-name">Enterprise — $2,997/mo</div><div class="link-desc">42 agents, white-label, custom agents, SBT</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/dashboard" class="link-row">
+      <span class="link-icon">📊</span>
+      <div class="link-text"><div class="link-name">Dashboard</div><div class="link-desc">Customer agent control panel</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/enterprise-dashboard" class="link-row">
+      <span class="link-icon">🏢</span>
+      <div class="link-text"><div class="link-name">Enterprise Dashboard</div><div class="link-desc">White-label management, executive reporting</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/affiliate-program" class="link-row">
+      <span class="link-icon">🤝</span>
+      <div class="link-text"><div class="link-name">Affiliate Program</div><div class="link-desc">Earn recurring commission</div></div>
+      <span class="link-badge badge-new">New</span>
+    </a>
+  </div>
+
+  <!-- TOKENS -->
+  <div class="section">
+    <div class="section-title green">Tokens</div>
+    <a href="/sinc" class="link-row">
+      <span class="link-icon">🌐</span>
+      <div class="link-text"><div class="link-name">SINC Token</div><div class="link-desc">Platform utility token — 100M supply, Base, Aerodrome</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/axiom" class="link-row">
+      <span class="link-icon">⚡</span>
+      <div class="link-text"><div class="link-name">AXIOM (AXM)</div><div class="link-desc">Intelligence token — 1B supply, Uni V4, LP locked forever</div></div>
+      <span class="link-badge badge-new">New</span>
+    </a>
+    <a href="/sin-airdrop" class="link-row">
+      <span class="link-icon">🎁</span>
+      <div class="link-text"><div class="link-name">SINC Airdrop</div><div class="link-desc">Register for SINC token distribution</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/buy-sinc" class="link-row">
+      <span class="link-icon">💱</span>
+      <div class="link-text"><div class="link-name">Buy SINC</div><div class="link-desc">Direct purchase flow</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+  </div>
+
+  <!-- TOOLS & SPECIAL -->
+  <div class="section">
+    <div class="section-title purple">Tools & Special</div>
+    <a href="/franchise-empire" class="link-row">
+      <span class="link-icon">👑</span>
+      <div class="link-text"><div class="link-name">Franchise Empire</div><div class="link-desc">White-label + reseller program</div></div>
+      <span class="link-badge badge-hot">Hot</span>
+    </a>
+    <a href="/discovery-dashboard" class="link-row">
+      <span class="link-icon">🔭</span>
+      <div class="link-text"><div class="link-name">Discovery Dashboard</div><div class="link-desc">Market intelligence + opportunity finder</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/media-packs" class="link-row">
+      <span class="link-icon">🎨</span>
+      <div class="link-text"><div class="link-name">Media Packs</div><div class="link-desc">Brand assets, logos, press kit</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/admin/training-vault" class="link-row">
+      <span class="link-icon">🔐</span>
+      <div class="link-text"><div class="link-name">Training Vault</div><div class="link-desc">Agent training materials (admin)</div></div>
+      <span class="link-badge badge-api">Admin</span>
+    </a>
+  </div>
+
+  <!-- LEGAL -->
+  <div class="section">
+    <div class="section-title muted">Legal & Technical</div>
+    <a href="/terms" class="link-row">
+      <span class="link-icon">📋</span>
+      <div class="link-text"><div class="link-name">Terms of Service</div><div class="link-desc">Platform terms and conditions</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/privacy" class="link-row">
+      <span class="link-icon">🔒</span>
+      <div class="link-text"><div class="link-name">Privacy Policy</div><div class="link-desc">Data handling and privacy</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/security" class="link-row">
+      <span class="link-icon">🛡️</span>
+      <div class="link-text"><div class="link-name">Security</div><div class="link-desc">Security practices and disclosure</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/sitemap.xml" class="link-row">
+      <span class="link-icon">🗺️</span>
+      <div class="link-text"><div class="link-name">sitemap.xml</div><div class="link-desc">Machine-readable sitemap for search engines</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/robots.txt" class="link-row">
+      <span class="link-icon">🤖</span>
+      <div class="link-text"><div class="link-name">robots.txt</div><div class="link-desc">Crawler instructions</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/health" class="link-row">
+      <span class="link-icon">💚</span>
+      <div class="link-text"><div class="link-name">/health</div><div class="link-desc">Service health check endpoint</div></div>
+      <span class="link-badge badge-api">API</span>
+    </a>
+  </div>
+
+  <!-- API ENDPOINTS -->
+  <div class="section">
+    <div class="section-title purple">API Endpoints</div>
+    <a href="/api/orders" class="link-row">
+      <span class="link-icon">📦</span>
+      <div class="link-text"><div class="link-name">GET /api/orders</div><div class="link-desc">Order management</div></div>
+      <span class="link-badge badge-api">API</span>
+    </a>
+    <a href="#" class="link-row">
+      <span class="link-icon">💳</span>
+      <div class="link-text"><div class="link-name">POST /api/signup</div><div class="link-desc">Create new subscription</div></div>
+      <span class="link-badge badge-api">API</span>
+    </a>
+    <a href="#" class="link-row">
+      <span class="link-icon">🔑</span>
+      <div class="link-text"><div class="link-name">POST /api/auth/login</div><div class="link-desc">Authenticate and get JWT</div></div>
+      <span class="link-badge badge-api">API</span>
+    </a>
+    <a href="#" class="link-row">
+      <span class="link-icon">🔗</span>
+      <div class="link-text"><div class="link-name">POST /api/crypto/checkout</div><div class="link-desc">Crypto payment initiation</div></div>
+      <span class="link-badge badge-api">API</span>
+    </a>
+    <a href="/api/outreach/status" class="link-row">
+      <span class="link-icon">📡</span>
+      <div class="link-text"><div class="link-name">GET /api/outreach/status</div><div class="link-desc">Agent outreach status</div></div>
+      <span class="link-badge badge-api">API</span>
+    </a>
+  </div>
+
+</div>
+
+<footer>
+  © 2026 SINCOR Business Solutions · <a href="/" style="color:var(--blue-light);text-decoration:none;">getsincor.com</a> · <a href="/sitemap.xml" style="color:var(--muted);text-decoration:none;">sitemap.xml</a>
+</footer>
+</body>
+</html>
