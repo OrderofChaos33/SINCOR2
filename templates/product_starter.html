@@ -3,188 +3,357 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SINCOR Starter — 8 AI Agents Working 24/7</title>
-  <meta name="description" content="Deploy 8 autonomous AI agents for research, content, outreach and sales. $297/month.">
+  <title>SINCOR Starter — 8 AI Agents Working 24/7 for $297/mo</title>
+  <meta name="description" content="Deploy 8 autonomous AI agents. Research, content, outreach, and sales — fully automated. $297/month, no contracts, cancel anytime.">
+  <link rel="icon" href="/static/sincor_logo.jpg">
+  <meta property="og:image" content="/static/sincor_logo.jpg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #050508;
-      --surface: #0d0d15;
-      --border: rgba(255,255,255,0.08);
+      --bg: #050814;
+      --surface: #0a0e1a;
+      --card: #0f1420;
+      --border: rgba(255,255,255,0.07);
+      --border-bright: rgba(124,58,237,0.35);
       --purple: #7c3aed;
       --purple-light: #a78bfa;
       --cyan: #22d3ee;
+      --green: #10b981;
       --text: #e2e8f0;
       --muted: #64748b;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; }
-    
-    nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 1px solid var(--border); }
-    .logo { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .nav-cta { background: var(--purple); color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; }
+    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; min-height: 100vh; }
 
-    .hero { padding: 80px 40px; text-align: center; max-width: 900px; margin: 0 auto; }
-    .badge { display: inline-block; background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); color: var(--purple-light); padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 24px; }
-    h1 { font-size: clamp(36px, 6vw, 64px); font-weight: 700; line-height: 1.1; margin-bottom: 20px; }
-    .gradient-text { background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .hero-sub { font-size: 18px; color: var(--muted); max-width: 600px; margin: 0 auto 40px; }
-    
-    .price-block { background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(34,211,238,0.05)); border: 1px solid var(--border); border-radius: 16px; padding: 40px; max-width: 480px; margin: 0 auto 60px; }
-    .price-amount { font-size: 56px; font-weight: 700; font-family: 'JetBrains Mono'; }
-    .price-period { color: var(--muted); font-size: 16px; margin-bottom: 8px; }
-    .price-sub { color: var(--purple-light); font-size: 14px; margin-bottom: 32px; }
-    .cta-btn { display: block; background: var(--purple); color: white; padding: 16px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 18px; text-align: center; transition: all 0.3s; }
-    .cta-btn:hover { background: var(--purple-light); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(124,58,237,0.4); }
-    .credit-note { color: var(--muted); font-size: 13px; margin-top: 12px; text-align: center; }
+    /* NAV */
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(5,8,20,0.95); backdrop-filter: blur(12px); z-index: 100; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(212,175,55,0.4); }
+    .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta { background: var(--purple); color: white !important; padding: 10px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; transition: opacity 0.2s !important; }
+    .nav-cta:hover { opacity: 0.85; }
 
-    .agents-section { padding: 80px 40px; max-width: 1100px; margin: 0 auto; }
-    .section-label { color: var(--purple-light); font-size: 12px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 12px; }
-    h2 { font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin-bottom: 48px; }
-    .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
-    .agent-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
-    .agent-icon { font-size: 32px; margin-bottom: 12px; }
-    .agent-name { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
-    .agent-desc { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
-    .agent-metrics { display: flex; gap: 16px; }
-    .metric { font-size: 13px; color: var(--purple-light); font-weight: 600; }
+    /* HERO */
+    .hero { padding: 90px 48px 60px; text-align: center; max-width: 860px; margin: 0 auto; position: relative; }
+    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 600px; height: 400px; background: radial-gradient(ellipse at center, rgba(124,58,237,0.15) 0%, transparent 70%); pointer-events: none; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.3); color: var(--purple-light); padding: 6px 18px; border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 28px; }
+    .badge-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(1.4); } }
+    h1 { font-size: clamp(38px, 6vw, 68px); font-weight: 700; line-height: 1.1; margin-bottom: 22px; }
+    .grad { background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-sub { font-size: 18px; color: var(--muted); max-width: 620px; margin: 0 auto 40px; }
+    .hero-price { display: inline-flex; align-items: baseline; gap: 6px; margin-bottom: 36px; }
+    .price-num { font-size: 72px; font-weight: 700; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-family: 'JetBrains Mono', monospace; }
+    .price-mo { font-size: 22px; color: var(--muted); }
+    .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+    .btn-primary { background: linear-gradient(135deg, var(--purple), #5b21b6); color: white; padding: 16px 40px; border-radius: 10px; font-size: 16px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 30px rgba(124,58,237,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(124,58,237,0.6); }
+    .btn-ghost { border: 1px solid var(--border-bright); color: var(--purple-light); padding: 16px 32px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; transition: background 0.2s; }
+    .btn-ghost:hover { background: rgba(124,58,237,0.1); }
+    .trust-line { font-size: 13px; color: var(--muted); }
+    .trust-line span { color: var(--green); }
 
-    .includes { padding: 60px 40px; max-width: 900px; margin: 0 auto; }
-    .includes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-    .include-item { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-    .include-item::before { content: "✓"; color: var(--purple-light); font-weight: 700; }
+    /* AGENT GRID */
+    .section { padding: 60px 48px; max-width: 1100px; margin: 0 auto; }
+    .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--purple-light); margin-bottom: 12px; }
+    .section-title { font-size: clamp(28px, 4vw, 42px); font-weight: 700; line-height: 1.2; margin-bottom: 14px; }
+    .section-sub { font-size: 16px; color: var(--muted); max-width: 580px; margin-bottom: 48px; }
+    .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+    .agent-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; position: relative; overflow: hidden; transition: border-color 0.2s, transform 0.2s; }
+    .agent-card:hover { border-color: var(--border-bright); transform: translateY(-3px); }
+    .agent-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(124,58,237,0.05), transparent); }
+    .agent-icon { font-size: 32px; margin-bottom: 14px; display: block; }
+    .agent-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .agent-desc { font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .agent-stat { margin-top: 16px; font-size: 13px; color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
 
-    .disclaimer { padding: 40px; max-width: 900px; margin: 0 auto; border-top: 1px solid var(--border); }
-    .disclaimer p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+    /* METRICS */
+    .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin: 48px 0; }
+    .metric { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 20px; text-align: center; }
+    .metric-num { font-size: 42px; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .metric-label { font-size: 13px; color: var(--muted); margin-top: 6px; }
 
-    footer { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
-    footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
-    footer a:hover { color: var(--text); }
+    /* HOW IT WORKS */
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0; margin-top: 40px; position: relative; }
+    .steps::before { content: ''; position: absolute; top: 32px; left: 15%; right: 15%; height: 1px; background: linear-gradient(90deg, transparent, var(--border-bright), transparent); }
+    .step { text-align: center; padding: 20px; }
+    .step-num { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--purple), #5b21b6); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; margin: 0 auto 18px; box-shadow: 0 0 24px rgba(124,58,237,0.4); }
+    .step-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .step-desc { font-size: 14px; color: var(--muted); }
+
+    /* PRICING CARD */
+    .pricing-card { background: var(--card); border: 1px solid var(--border-bright); border-radius: 24px; padding: 48px 40px; max-width: 520px; margin: 0 auto; position: relative; overflow: hidden; }
+    .pricing-card::before { content: ''; position: absolute; top: -100px; right: -100px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(124,58,237,0.15), transparent 70%); pointer-events: none; }
+    .pricing-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+    .plan-name { font-size: 24px; font-weight: 700; }
+    .plan-badge { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: var(--green); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+    .pricing-amount { font-size: 64px; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .pricing-period { font-size: 18px; color: var(--muted); }
+    .features-list { list-style: none; margin: 28px 0 36px; }
+    .features-list li { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+    .features-list li:last-child { border-bottom: none; }
+    .check { color: var(--green); font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+
+    /* COMPARISON */
+    .compare { background: var(--card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; margin-top: 48px; }
+    .compare-header { display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 20px 28px; background: rgba(124,58,237,0.08); border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 700; color: var(--muted); }
+    .compare-row { display: grid; grid-template-columns: 2fr 1fr 1fr; padding: 16px 28px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .compare-row:last-child { border-bottom: none; }
+    .compare-row .feat { color: var(--text); }
+    .compare-row .yes { color: var(--green); font-weight: 700; }
+    .compare-row .no { color: var(--muted); }
+    .compare-row .highlight { color: var(--purple-light); font-weight: 600; }
+
+    /* FAQ */
+    .faq { margin-top: 48px; }
+    .faq-item { border-bottom: 1px solid var(--border); padding: 20px 0; }
+    .faq-q { font-size: 16px; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+    .faq-a { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* CTA BANNER */
+    .cta-banner { background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(34,211,238,0.08)); border: 1px solid var(--border-bright); border-radius: 24px; padding: 60px 48px; text-align: center; margin: 60px 48px; }
+    .cta-banner h2 { font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin-bottom: 16px; }
+    .cta-banner p { color: var(--muted); font-size: 16px; margin-bottom: 36px; }
+
+    /* FOOTER */
+    footer { border-top: 1px solid var(--border); padding: 32px 48px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { color: var(--muted); text-decoration: none; font-size: 13px; }
+    .footer-links a:hover { color: var(--text); }
+    .footer-copy { font-size: 13px; color: var(--muted); }
+
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .hero, .section { padding-left: 20px; padding-right: 20px; }
+      .steps::before { display: none; }
+      .cta-banner { margin: 40px 20px; padding: 40px 24px; }
+      footer { padding: 24px 20px; flex-direction: column; align-items: flex-start; }
+      .compare-header, .compare-row { grid-template-columns: 1.5fr 1fr 1fr; font-size: 12px; padding: 12px 16px; }
+    }
   </style>
 </head>
 <body>
 
 <nav>
-  <div class="logo">SINCOR</div>
-  <a href="/signup?plan=starter" class="nav-cta">Deploy Now →</a>
+  <a href="/" class="nav-logo">
+    <img src="/static/sincor_logo.jpg" alt="SINCOR">
+    <span>SINCOR</span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/products/professional">Professional</a>
+    <a href="/products/enterprise">Enterprise</a>
+    <a href="/signup" class="nav-cta">Deploy Now →</a>
+  </div>
 </nav>
 
-<section class="hero">
-  <div class="badge">⚡ STARTER PLAN</div>
-  <h1>8 AI Agents.<br><span class="gradient-text">Working 24/7.</span></h1>
-  <p class="hero-sub">Research, content, outreach, and sales — all autonomous. Your business runs while you sleep.</p>
-  
-  <div class="price-block">
-    <div class="price-amount">$297</div>
-    <div class="price-period">/month</div>
-    <div class="price-sub">8 agents · 50-100 leads/week · 2,000 emails/month</div>
-    <a href="/signup?plan=starter" class="cta-btn">Deploy Your Team →</a>
-    <p class="credit-note">Credit card required. Cancel anytime.</p>
+<!-- HERO -->
+<div class="hero">
+  <div class="badge"><span class="badge-dot"></span> Starter Plan — Live & Ready</div>
+  <h1>Your First <span class="grad">AI Revenue Team</span> Goes Live Tonight</h1>
+  <p class="hero-sub">8 specialized AI agents handling research, content, outreach, and sales. Fully autonomous. Running 24/7 while you sleep, travel, or build the next thing.</p>
+  <div class="hero-price">
+    <span class="price-num">$297</span>
+    <span class="price-mo">/month</span>
   </div>
-</section>
+  <div class="cta-row">
+    <a href="/signup?plan=starter" class="btn-primary">Deploy My Team → <span>⚡</span></a>
+    <a href="/pricing" class="btn-ghost">Compare Plans</a>
+  </div>
+  <p class="trust-line"><span>✓</span> Credit card required &nbsp;•&nbsp; <span>✓</span> Instant activation &nbsp;•&nbsp; <span>✓</span> Cancel anytime</p>
+</div>
 
-<section class="agents-section">
-  <div class="section-label">→ YOUR 8 AGENTS</div>
-  <h2>Meet Your Team</h2>
-  
+<!-- METRICS -->
+<div class="section">
+  <div class="metrics-row">
+    <div class="metric"><div class="metric-num">8</div><div class="metric-label">AI Agents Deployed</div></div>
+    <div class="metric"><div class="metric-num">24/7</div><div class="metric-label">Always Working</div></div>
+    <div class="metric"><div class="metric-num">100+</div><div class="metric-label">Leads Per Week</div></div>
+    <div class="metric"><div class="metric-num">2K</div><div class="metric-label">Emails Per Month</div></div>
+  </div>
+</div>
+
+<!-- AGENTS -->
+<div class="section">
+  <div class="section-label">Your Agent Team</div>
+  <h2 class="section-title">8 Agents. <span class="grad">One Mission.</span> Your Revenue.</h2>
+  <p class="section-sub">Each agent is purpose-built for a specific function. Together they form a complete, autonomous revenue operation.</p>
+
   <div class="agents-grid">
     <div class="agent-card">
-      <div class="agent-icon">🔍</div>
+      <span class="agent-icon">🔍</span>
       <div class="agent-name">Research Agent</div>
-      <div class="agent-desc">Discovers your ideal customers, analyzes competitors, tracks market trends, and enriches leads with verified contact data.</div>
-      <div class="agent-metrics">
-        <span class="metric">50-100 leads/week</span>
-      </div>
+      <div class="agent-desc">Identifies your ideal customers, analyzes competitors, monitors market trends, and enriches leads with verified data.</div>
+      <div class="agent-stat">→ 50–100 qualified leads/week</div>
     </div>
     <div class="agent-card">
-      <div class="agent-icon">✍️</div>
+      <span class="agent-icon">✍️</span>
       <div class="agent-name">Content Agent</div>
-      <div class="agent-desc">Writes blog posts, LinkedIn updates, email sequences, and case studies. Professional content at scale, every day.</div>
-      <div class="agent-metrics">
-        <span class="metric">Daily content</span>
-      </div>
+      <div class="agent-desc">Writes blog posts, LinkedIn updates, email sequences, and case studies that actually sound like you — not a robot.</div>
+      <div class="agent-stat">→ 20+ pieces of content/month</div>
     </div>
     <div class="agent-card">
-      <div class="agent-icon">📧</div>
+      <span class="agent-icon">📧</span>
       <div class="agent-name">Outreach Agent</div>
-      <div class="agent-desc">Sends personalized cold emails and follow-ups to your target prospects. Multi-channel, non-stop prospecting.</div>
-      <div class="agent-metrics">
-        <span class="metric">2,000 emails/month</span>
-      </div>
+      <div class="agent-desc">Sends personalized cold emails, LinkedIn messages, and multi-step follow-up sequences — never spam, always on-brand.</div>
+      <div class="agent-stat">→ 2,000 emails/month</div>
     </div>
     <div class="agent-card">
-      <div class="agent-icon">💰</div>
+      <span class="agent-icon">💰</span>
       <div class="agent-name">Sales Agent</div>
-      <div class="agent-desc">Scores inbound leads, manages follow-up sequences, and identifies upsell opportunities in your pipeline.</div>
-      <div class="agent-metrics">
-        <span class="metric">Pipeline automation</span>
-      </div>
+      <div class="agent-desc">Scores inbound leads, routes hot prospects, updates your CRM, and flags upsell opportunities before they slip away.</div>
+      <div class="agent-stat">→ Zero deals fall through cracks</div>
     </div>
     <div class="agent-card">
-      <div class="agent-icon">📊</div>
+      <span class="agent-icon">📊</span>
       <div class="agent-name">Analytics Agent</div>
-      <div class="agent-desc">Tracks revenue, funnel performance, and ROI across all channels. Real-time dashboards updated continuously.</div>
-      <div class="agent-metrics">
-        <span class="metric">Real-time reports</span>
-      </div>
+      <div class="agent-desc">Tracks funnel performance, measures ROI, generates weekly reports, and surfaces what's working so you double down.</div>
+      <div class="agent-stat">→ Real-time revenue dashboard</div>
     </div>
     <div class="agent-card">
-      <div class="agent-icon">🔄</div>
+      <span class="agent-icon">🔄</span>
       <div class="agent-name">Retention Agent</div>
-      <div class="agent-desc">Monitors customer health scores, collects NPS, flags churn risks, and triggers renewal campaigns automatically.</div>
-      <div class="agent-metrics">
-        <span class="metric">Churn prevention</span>
-      </div>
+      <div class="agent-desc">Monitors customer health scores, collects NPS, sends renewal reminders, and catches churn signals before they cost you.</div>
+      <div class="agent-stat">→ Customers stay longer, spend more</div>
     </div>
     <div class="agent-card">
-      <div class="agent-icon">🤝</div>
+      <span class="agent-icon">🤝</span>
       <div class="agent-name">Partnership Agent</div>
-      <div class="agent-desc">Identifies potential partners, manages introductions, and tracks partnership pipeline for co-marketing opportunities.</div>
-      <div class="agent-metrics">
-        <span class="metric">Growth partnerships</span>
-      </div>
+      <div class="agent-desc">Identifies strategic partners, drafts outreach, manages co-marketing coordination, and tracks relationship pipelines.</div>
+      <div class="agent-stat">→ New channels on autopilot</div>
     </div>
     <div class="agent-card">
-      <div class="agent-icon">📈</div>
-      <div class="agent-name">Growth Agent</div>
-      <div class="agent-desc">Runs growth experiments, A/B tests messaging, tracks conversion rates, and optimizes your acquisition funnel.</div>
-      <div class="agent-metrics">
-        <span class="metric">Funnel optimization</span>
-      </div>
+      <span class="agent-icon">📱</span>
+      <div class="agent-name">Social Agent</div>
+      <div class="agent-desc">Publishes to LinkedIn, Twitter, and other platforms on a consistent schedule — no more "we need to post more" guilt.</div>
+      <div class="agent-stat">→ Daily presence, zero effort</div>
     </div>
   </div>
-</section>
+</div>
 
-<section class="includes">
-  <div class="section-label">→ WHAT'S INCLUDED</div>
-  <h2>Everything You Need</h2>
-  <div class="includes-grid">
-    <div class="include-item">8 autonomous agents</div>
-    <div class="include-item">50-100 leads per week</div>
-    <div class="include-item">2,000 emails/month</div>
-    <div class="include-item">Real-time analytics dashboard</div>
-    <div class="include-item">Email support</div>
-    <div class="include-item">Cancel anytime</div>
-    <div class="include-item">Continuous 24/7 execution</div>
-    <div class="include-item">Onboarding included</div>
-  </div>
-  
-  <div style="margin-top: 48px; text-align: center;">
-    <a href="/signup?plan=starter" class="cta-btn" style="max-width: 400px; display: inline-block;">Deploy Your Team for $297/month →</a>
-    <p class="credit-note" style="margin-top: 12px;">Credit card required. Cancel anytime. No contracts.</p>
-  </div>
-</section>
+<!-- HOW IT WORKS -->
+<div class="section">
+  <div class="section-label">Setup</div>
+  <h2 class="section-title">Live in <span class="grad">Under 10 Minutes</span></h2>
+  <p class="section-sub">No onboarding calls. No implementation fees. No waiting weeks to see results.</p>
 
-<div class="disclaimer">
-  <p>SINCOR provides autonomous AI agent software for business automation. Results vary based on industry, market conditions, and implementation. No specific revenue outcomes are guaranteed. Past performance does not predict future results. SINCOR agents perform automated research, content creation, and outreach functions. All email outreach complies with CAN-SPAM and applicable regulations. By purchasing, you agree to our <a href="/terms" style="color: var(--purple-light);">Terms of Service</a> and <a href="/privacy" style="color: var(--purple-light);">Privacy Policy</a>.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-title">Sign Up</div>
+      <div class="step-desc">Pick Starter. Enter your credit card. Agents spin up immediately.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-title">Connect</div>
+      <div class="step-desc">Link your email, CRM, LinkedIn. Takes 5 minutes with OAuth.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-title">Deploy</div>
+      <div class="step-desc">Agents go live instantly. They start researching, writing, and outreaching.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-title">Scale</div>
+      <div class="step-desc">Watch the dashboard. Upgrade to Professional when you're ready for more.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING CARD -->
+<div class="section">
+  <div class="section-label">Pricing</div>
+  <h2 class="section-title" style="text-align:center; margin-bottom:40px;">Simple. <span class="grad">No Surprises.</span></h2>
+  <div class="pricing-card">
+    <div class="pricing-header">
+      <div class="plan-name">Starter</div>
+      <div class="plan-badge">PERFECT TO START</div>
+    </div>
+    <div>
+      <span class="pricing-amount">$297</span>
+      <span class="pricing-period">/month</span>
+    </div>
+    <ul class="features-list">
+      <li><span class="check">✓</span> 8 autonomous AI agents deployed</li>
+      <li><span class="check">✓</span> 50–100 qualified leads per week</li>
+      <li><span class="check">✓</span> 2,000 outreach emails per month</li>
+      <li><span class="check">✓</span> Real-time analytics dashboard</li>
+      <li><span class="check">✓</span> CRM & email integrations</li>
+      <li><span class="check">✓</span> 24/7 autonomous execution</li>
+      <li><span class="check">✓</span> Email support</li>
+      <li><span class="check">✓</span> Cancel anytime — no contracts</li>
+    </ul>
+    <a href="/signup?plan=starter" class="btn-primary" style="width:100%; justify-content:center; font-size:17px;">Deploy My 8 Agents Now →</a>
+    <p style="text-align:center; font-size:13px; color:var(--muted); margin-top:14px;">Credit card required • Instant activation • No setup fees</p>
+  </div>
+
+  <!-- COMPARE -->
+  <div class="compare">
+    <div class="compare-header">
+      <div>Feature</div>
+      <div>Starter</div>
+      <div>vs Hiring</div>
+    </div>
+    <div class="compare-row"><div class="feat">Monthly cost</div><div class="highlight">$297</div><div class="no">$8,000+</div></div>
+    <div class="compare-row"><div class="feat">Hours worked</div><div class="highlight">720/mo</div><div class="no">160/mo</div></div>
+    <div class="compare-row"><div class="feat">Sick days / vacation</div><div class="yes">Never</div><div class="no">Yes</div></div>
+    <div class="compare-row"><div class="feat">Setup time</div><div class="highlight">10 min</div><div class="no">Weeks</div></div>
+    <div class="compare-row"><div class="feat">Scales on demand</div><div class="yes">Yes</div><div class="no">No</div></div>
+    <div class="compare-row"><div class="feat">Works while you sleep</div><div class="yes">Yes</div><div class="no">No</div></div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="section">
+  <div class="section-label">FAQ</div>
+  <h2 class="section-title" style="margin-bottom:32px;">Common <span class="grad">Questions</span></h2>
+  <div class="faq">
+    <div class="faq-item">
+      <div class="faq-q">Do the agents actually work, or is this just automation?</div>
+      <div class="faq-a">These are autonomous AI agents — not rules-based bots. They make decisions, adapt to responses, and improve over time. They don't just send emails; they research prospects, personalize outreach, and route results back into your pipeline.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What happens if I want to upgrade?</div>
+      <div class="faq-a">Upgrade to Professional (24 agents) or Enterprise (42 agents) at any time. You're billed the difference for the remaining month. No lock-in, no penalties.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is there a free trial?</div>
+      <div class="faq-a">No. We require a credit card to filter out non-serious inquiries. This ensures our infrastructure is dedicated to customers who are serious about growth. $297 to have 8 agents working 24/7 is already 97% cheaper than a single part-time hire.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What integrations do you support?</div>
+      <div class="faq-a">Gmail, Outlook, Salesforce, HubSpot, LinkedIn, Slack, Notion, and more. Standard OAuth setup — takes minutes.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Can I cancel?</div>
+      <div class="faq-a">Yes, anytime. No cancellation fee. Your agents stop at the end of the billing period. Most customers don't cancel — they upgrade.</div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA BANNER -->
+<div class="cta-banner">
+  <h2>Stop Hiring. Start <span class="grad">Deploying.</span></h2>
+  <p>Your competitors are already automating. 8 agents for $297/month is the most asymmetric bet in business right now.</p>
+  <a href="/signup?plan=starter" class="btn-primary" style="font-size:17px;">Get Started for $297/mo →</a>
 </div>
 
 <footer>
-  <p style="margin-bottom: 12px;">© 2026 SINCOR. All rights reserved.</p>
-  <a href="/privacy">Privacy Policy</a>
-  <a href="/terms">Terms of Service</a>
-  <a href="/products/professional">Professional Plan</a>
-  <a href="/products/enterprise">Enterprise Plan</a>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/products/professional">Professional</a>
+    <a href="/products/enterprise">Enterprise</a>
+    <a href="/sinc">SINC Token</a>
+    <a href="/terms">Terms</a>
+    <a href="/privacy">Privacy</a>
+  </div>
+  <div class="footer-copy">© 2026 SINCOR Business Solutions. All rights reserved.</div>
 </footer>
 
 </body>

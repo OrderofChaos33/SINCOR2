@@ -3,137 +3,327 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SINCOR Enterprise — 42 AI Agents + White-Label</title>
-  <meta name="description" content="Full autonomous operation with 42 AI agents, white-label, SBT integration, and custom agent builds. $2,997/month.">
+  <title>SINCOR Enterprise — 42 AI Agents + White-Label + Custom</title>
+  <meta name="description" content="Deploy the full 42-agent SINCOR swarm. Unlimited operations, white-label, custom agents, SBT integration, dedicated support. $2,997/month.">
+  <link rel="icon" href="/static/sincor_logo.jpg">
+  <meta property="og:image" content="/static/sincor_logo.jpg">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root { --bg: #050508; --surface: #0d0d15; --border: rgba(255,255,255,0.08); --purple: #7c3aed; --purple-light: #a78bfa; --cyan: #22d3ee; --gold: #f59e0b; --text: #e2e8f0; --muted: #64748b; }
+    :root {
+      --bg: #050814;
+      --surface: #0a0e1a;
+      --card: #0f1420;
+      --border: rgba(255,255,255,0.07);
+      --border-gold: rgba(245,158,11,0.4);
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --cyan: #22d3ee;
+      --green: #10b981;
+      --gold: #f59e0b;
+      --gold-light: #fcd34d;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
     body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; }
-    nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 1px solid var(--border); }
-    .logo { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .nav-cta { background: linear-gradient(135deg, var(--gold), #f97316); color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; }
-    .hero { padding: 80px 40px; text-align: center; max-width: 900px; margin: 0 auto; }
-    .badge { display: inline-block; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: var(--gold); padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 24px; }
-    h1 { font-size: clamp(36px, 6vw, 64px); font-weight: 700; line-height: 1.1; margin-bottom: 20px; }
-    .gradient-text { background: linear-gradient(135deg, var(--gold), #f97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .hero-sub { font-size: 18px; color: var(--muted); max-width: 600px; margin: 0 auto 40px; }
-    .price-block { background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(249,115,22,0.05)); border: 1px solid rgba(245,158,11,0.3); border-radius: 16px; padding: 40px; max-width: 480px; margin: 0 auto 60px; }
-    .price-amount { font-size: 56px; font-weight: 700; font-family: 'JetBrains Mono'; }
-    .price-period { color: var(--muted); font-size: 16px; margin-bottom: 8px; }
-    .price-sub { color: var(--gold); font-size: 14px; margin-bottom: 32px; }
-    .cta-btn { display: block; background: linear-gradient(135deg, var(--gold), #f97316); color: white; padding: 16px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 18px; text-align: center; transition: all 0.3s; }
-    .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(245,158,11,0.4); }
-    .credit-note { color: var(--muted); font-size: 13px; margin-top: 12px; text-align: center; }
-    .section { padding: 80px 40px; max-width: 1100px; margin: 0 auto; }
-    .section-label { color: var(--gold); font-size: 12px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 12px; }
-    h2 { font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin-bottom: 48px; }
-    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
-    .feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; }
-    .feature-icon { font-size: 40px; margin-bottom: 16px; }
-    .feature-name { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
-    .feature-desc { color: var(--muted); font-size: 14px; line-height: 1.7; }
-    .includes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-    .include-item { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-    .include-item::before { content: "✓"; color: var(--gold); font-weight: 700; }
-    .contact-block { background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(124,58,237,0.05)); border: 1px solid rgba(245,158,11,0.2); border-radius: 16px; padding: 48px; text-align: center; margin: 40px auto; max-width: 700px; }
-    .disclaimer { padding: 40px; max-width: 900px; margin: 0 auto; border-top: 1px solid var(--border); }
-    .disclaimer p { font-size: 12px; color: var(--muted); line-height: 1.7; }
-    footer { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
-    footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(5,8,20,0.96); backdrop-filter: blur(12px); z-index: 100; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(212,175,55,0.6); }
+    .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta { background: linear-gradient(135deg, var(--gold), #d97706); color: #050814 !important; padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+
+    /* HERO — gold/enterprise feel */
+    .hero { padding: 90px 48px 60px; text-align: center; max-width: 960px; margin: 0 auto; position: relative; }
+    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 800px; height: 450px; background: radial-gradient(ellipse at center, rgba(245,158,11,0.1) 0%, transparent 65%); pointer-events: none; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.35); color: var(--gold-light); padding: 6px 18px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 28px; }
+    .badge-dot { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:0.3;} }
+    h1 { font-size: clamp(40px, 6vw, 72px); font-weight: 700; line-height: 1.1; margin-bottom: 22px; }
+    .grad { background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .grad2 { background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-sub { font-size: 20px; color: var(--muted); max-width: 700px; margin: 0 auto 40px; }
+    .hero-price { display: inline-flex; align-items: baseline; gap: 6px; margin-bottom: 36px; }
+    .price-num { font-size: 72px; font-weight: 700; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-family: 'JetBrains Mono', monospace; }
+    .price-mo { font-size: 22px; color: var(--muted); }
+    .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+    .btn-primary { background: linear-gradient(135deg, var(--gold), #d97706); color: #050814; padding: 16px 44px; border-radius: 10px; font-size: 17px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 40px rgba(245,158,11,0.35); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(245,158,11,0.55); }
+    .btn-ghost { border: 1px solid var(--border-gold); color: var(--gold-light); padding: 16px 32px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; transition: background 0.2s; }
+    .btn-ghost:hover { background: rgba(245,158,11,0.08); }
+    .trust-line { font-size: 13px; color: var(--muted); }
+    .trust-line span { color: var(--green); }
+
+    .section { padding: 60px 48px; max-width: 1140px; margin: 0 auto; }
+    .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; }
+    .section-title { font-size: clamp(28px, 4vw, 44px); font-weight: 700; line-height: 1.2; margin-bottom: 14px; }
+    .section-sub { font-size: 16px; color: var(--muted); max-width: 640px; margin-bottom: 48px; }
+
+    .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin: 48px 0; }
+    .metric { background: var(--card); border: 1px solid var(--border-gold); border-radius: 14px; padding: 28px 20px; text-align: center; position: relative; overflow: hidden; }
+    .metric::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent); }
+    .metric-num { font-size: 42px; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .metric-label { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+    /* 42 AGENT SHOWCASE */
+    .agent-swarm { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+    .agent-tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; transition: border-color 0.2s; }
+    .agent-tile:hover { border-color: rgba(245,158,11,0.3); }
+    .agent-tile.exclusive { border-color: rgba(245,158,11,0.2); background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent); }
+    .agent-tile-icon { font-size: 24px; margin-bottom: 8px; }
+    .agent-tile-name { font-size: 13px; font-weight: 700; color: var(--text); }
+    .agent-tile-badge { display: inline-block; background: rgba(245,158,11,0.15); color: var(--gold); padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 700; margin-top: 4px; }
+
+    /* EXCLUSIVE FEATURES */
+    .excl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 40px; }
+    .excl-box { background: var(--card); border: 1px solid var(--border-gold); border-radius: 20px; padding: 36px 32px; position: relative; overflow: hidden; }
+    .excl-box::before { content: ''; position: absolute; top: -80px; right: -80px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(245,158,11,0.08), transparent 70%); }
+    .excl-icon { font-size: 44px; margin-bottom: 18px; }
+    .excl-title { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+    .excl-desc { font-size: 15px; color: var(--muted); line-height: 1.65; }
+    .excl-detail { margin-top: 18px; font-size: 13px; color: var(--gold); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+    /* PRICING */
+    .pricing-card { background: var(--card); border: 2px solid var(--border-gold); border-radius: 28px; padding: 52px 44px; max-width: 600px; margin: 0 auto; position: relative; overflow: hidden; }
+    .pricing-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent); pointer-events: none; }
+    .pricing-card::after { content: 'ENTERPRISE'; position: absolute; top: 28px; right: -30px; background: linear-gradient(135deg, var(--gold), #d97706); color: #050814; padding: 6px 48px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; transform: rotate(35deg); }
+    .plan-name { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .plan-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+    .pricing-amount { font-size: 64px; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .pricing-period { font-size: 18px; color: var(--muted); }
+    .features-list { list-style: none; margin: 28px 0 36px; }
+    .features-list li { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+    .features-list li:last-child { border-bottom: none; }
+    .check { color: var(--green); flex-shrink: 0; margin-top: 2px; }
+    .check-gold { color: var(--gold); flex-shrink: 0; margin-top: 2px; }
+
+    .compare { background: var(--card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; margin-top: 48px; }
+    .compare-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 18px 28px; background: rgba(245,158,11,0.05); border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; color: var(--muted); }
+    .compare-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 14px 28px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .compare-row:last-child { border-bottom: none; }
+    .feat { color: var(--text); }
+    .yes { color: var(--green); font-weight: 700; }
+    .no { color: var(--muted); }
+    .active { color: var(--gold); font-weight: 700; }
+
+    .faq { margin-top: 48px; }
+    .faq-item { border-bottom: 1px solid var(--border); padding: 20px 0; }
+    .faq-q { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+    .faq-a { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    .cta-banner { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(124,58,237,0.06)); border: 1px solid var(--border-gold); border-radius: 28px; padding: 70px 48px; text-align: center; margin: 60px 48px; }
+    .cta-banner h2 { font-size: clamp(32px, 5vw, 52px); font-weight: 700; margin-bottom: 18px; }
+    .cta-banner p { color: var(--muted); font-size: 17px; margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 48px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { color: var(--muted); text-decoration: none; font-size: 13px; }
+    .footer-copy { font-size: 13px; color: var(--muted); }
+
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .hero, .section { padding-left: 20px; padding-right: 20px; }
+      .cta-banner { margin: 40px 20px; padding: 40px 24px; }
+      footer { padding: 24px 20px; flex-direction: column; }
+      .compare-header, .compare-row { grid-template-columns: 1.5fr 0.6fr 0.6fr 0.7fr; font-size: 11px; padding: 10px 12px; }
+      .pricing-card::after { display: none; }
+    }
   </style>
 </head>
 <body>
 
 <nav>
-  <div class="logo">SINCOR</div>
-  <a href="/contact?plan=enterprise" class="nav-cta">Talk to Sales →</a>
+  <a href="/" class="nav-logo">
+    <img src="/static/sincor_logo.jpg" alt="SINCOR">
+    <span>SINCOR</span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/products/starter">Starter</a>
+    <a href="/products/professional">Professional</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/signup?plan=enterprise" class="nav-cta">Talk to Sales →</a>
+  </div>
 </nav>
 
-<section class="hero">
-  <div class="badge">⚡ ENTERPRISE PLAN</div>
-  <h1>42 AI Agents.<br><span class="gradient-text">Unlimited Scale.</span></h1>
-  <p class="hero-sub">Full autonomous operation, white-label capability, SBT integration, and custom agent builds — all managed end-to-end.</p>
-  
-  <div class="price-block">
-    <div class="price-amount">$2,997</div>
-    <div class="price-period">/month</div>
-    <div class="price-sub">42 agents · Unlimited operations · White-label</div>
-    <a href="/contact?plan=enterprise" class="cta-btn">Talk to Sales →</a>
-    <p class="credit-note">Custom onboarding included. Enterprise billing available.</p>
+<div class="hero">
+  <div class="badge"><span class="badge-dot"></span> Enterprise — Maximum Force</div>
+  <h1>The Full <span class="grad">42-Agent Swarm.</span><br>Unleashed.</h1>
+  <p class="hero-sub">This isn't software. It's an autonomous workforce. 42 specialized AI agents running every function of your business — unlimited operations, white-label capability, custom agent development, and dedicated support. Built for organizations that mean business.</p>
+  <div class="hero-price">
+    <span class="price-num">$2,997</span>
+    <span class="price-mo">/month</span>
   </div>
-</section>
-
-<section class="section">
-  <div class="section-label">→ ENTERPRISE CAPABILITIES</div>
-  <h2>Built for Scale</h2>
-  <div class="features-grid">
-    <div class="feature-card">
-      <div class="feature-icon">🏷️</div>
-      <div class="feature-name">White-Label</div>
-      <div class="feature-desc">Deploy SINCOR under your own brand. Sell autonomous agent services to your clients with your logo, your domain, your pricing.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🤖</div>
-      <div class="feature-name">42 Agents</div>
-      <div class="feature-desc">Full swarm deployment across every business function. Research, content, outreach, sales, analytics, retention, partnerships, growth — all 42 working simultaneously.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🔧</div>
-      <div class="feature-name">Custom Agents</div>
-      <div class="feature-desc">Need an agent built for a specific function? We build custom agents tailored to your workflow, data, and business requirements.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🏅</div>
-      <div class="feature-name">SBT Integration</div>
-      <div class="feature-desc">Soulbound Token integration for verified agent credentials, enterprise compliance, and on-chain accountability of agent operations.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">♾️</div>
-      <div class="feature-name">Unlimited Operations</div>
-      <div class="feature-desc">No caps on leads, emails, content, or agent actions. Complete autonomous operation at whatever volume your business requires.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🛡️</div>
-      <div class="feature-name">Dedicated Support</div>
-      <div class="feature-desc">Dedicated account manager, direct engineering access, custom SLAs, and priority response for any issues or optimization needs.</div>
-    </div>
+  <div class="cta-row">
+    <a href="/signup?plan=enterprise" class="btn-primary">Deploy Full Swarm → 🔥</a>
+    <a href="/products/professional" class="btn-ghost">See Professional First</a>
   </div>
-</section>
-
-<section class="section" style="padding-top: 0;">
-  <div class="section-label">→ WHAT'S INCLUDED</div>
-  <h2>The Full Package</h2>
-  <div class="includes-grid">
-    <div class="include-item">42 autonomous agents</div>
-    <div class="include-item">Unlimited leads + emails</div>
-    <div class="include-item">White-label deployment</div>
-    <div class="include-item">Custom agent builds</div>
-    <div class="include-item">SBT integration</div>
-    <div class="include-item">Dedicated account manager</div>
-    <div class="include-item">Custom SLA</div>
-    <div class="include-item">Enterprise billing</div>
-    <div class="include-item">API access</div>
-    <div class="include-item">Priority engineering support</div>
-  </div>
-</section>
-
-<div class="contact-block">
-  <h3 style="font-size: 28px; margin-bottom: 12px;">Ready to Deploy at Enterprise Scale?</h3>
-  <p style="color: var(--muted); margin-bottom: 32px;">Enterprise setup is handled by our team. Talk to sales to configure your deployment, discuss custom requirements, and get started.</p>
-  <a href="/contact?plan=enterprise" class="cta-btn" style="max-width: 360px; display: inline-block;">Schedule Enterprise Call →</a>
+  <p class="trust-line"><span>✓</span> Credit card required &nbsp;•&nbsp; <span>✓</span> Instant activation &nbsp;•&nbsp; <span>✓</span> Cancel anytime</p>
 </div>
 
-<div class="disclaimer">
-  <p>SINCOR provides autonomous AI agent software for business automation. Results vary based on industry, market conditions, and implementation. No specific revenue outcomes are guaranteed. White-label deployment is subject to our partner terms. Custom agent builds require scoping and may have additional lead time. All operations comply with applicable regulations. By purchasing, you agree to our <a href="/terms" style="color: var(--purple-light);">Terms of Service</a> and <a href="/privacy" style="color: var(--purple-light);">Privacy Policy</a>.</p>
+<!-- METRICS -->
+<div class="section">
+  <div class="metrics-row">
+    <div class="metric"><div class="metric-num">42</div><div class="metric-label">AI Agents Deployed</div></div>
+    <div class="metric"><div class="metric-num">∞</div><div class="metric-label">Operations/Month</div></div>
+    <div class="metric"><div class="metric-num">∞</div><div class="metric-label">Emails/Month</div></div>
+    <div class="metric"><div class="metric-num">100%</div><div class="metric-label">White-Label Ready</div></div>
+    <div class="metric"><div class="metric-num">24/7</div><div class="metric-label">Dedicated Support</div></div>
+  </div>
+</div>
+
+<!-- AGENT SHOWCASE -->
+<div class="section">
+  <div class="section-label">The Full 42-Agent Swarm</div>
+  <h2 class="section-title">Every Function. <span class="grad">Every Channel.</span><br><span class="grad2">Every Hour.</span></h2>
+  <p class="section-sub">The complete SINCOR agent ecosystem. No caps, no limits, no functions left unautomated.</p>
+
+  <div class="agent-swarm">
+    <div class="agent-tile"><div class="agent-tile-icon">🔍</div><div class="agent-tile-name">Research ×5</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">✍️</div><div class="agent-tile-name">Content ×5</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">📧</div><div class="agent-tile-name">Outreach ×5</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">💰</div><div class="agent-tile-name">Sales ×5</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">📊</div><div class="agent-tile-name">Analytics ×3</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">🔄</div><div class="agent-tile-name">Retention ×3</div></div>
+    <div class="agent-tile exclusive"><div class="agent-tile-icon">🏷️</div><div class="agent-tile-name">White-Label</div><div class="agent-tile-badge">ENTERPRISE</div></div>
+    <div class="agent-tile exclusive"><div class="agent-tile-icon">⚙️</div><div class="agent-tile-name">Custom Agents</div><div class="agent-tile-badge">ENTERPRISE</div></div>
+    <div class="agent-tile exclusive"><div class="agent-tile-icon">🔗</div><div class="agent-tile-name">SBT Integration</div><div class="agent-tile-badge">ENTERPRISE</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">🎯</div><div class="agent-tile-name">ABM ×2</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">🌐</div><div class="agent-tile-name">SEO ×2</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">📱</div><div class="agent-tile-name">Social ×3</div></div>
+    <div class="agent-tile"><div class="agent-tile-icon">🤝</div><div class="agent-tile-name">Partnerships ×3</div></div>
+    <div class="agent-tile exclusive"><div class="agent-tile-icon">🛡️</div><div class="agent-tile-name">Compliance</div><div class="agent-tile-badge">ENTERPRISE</div></div>
+    <div class="agent-tile exclusive"><div class="agent-tile-icon">👔</div><div class="agent-tile-name">Executive Reporting</div><div class="agent-tile-badge">ENTERPRISE</div></div>
+    <div class="agent-tile exclusive"><div class="agent-tile-icon">🔥</div><div class="agent-tile-name">Priority Queue</div><div class="agent-tile-badge">ENTERPRISE</div></div>
+  </div>
+</div>
+
+<!-- ENTERPRISE EXCLUSIVES -->
+<div class="section">
+  <div class="section-label">Enterprise-Only Capabilities</div>
+  <h2 class="section-title">What Only <span class="grad">Enterprise</span> Gets</h2>
+  <div class="excl-grid">
+    <div class="excl-box">
+      <div class="excl-icon">🏷️</div>
+      <div class="excl-title">White-Label Platform</div>
+      <div class="excl-desc">Deploy SINCOR under your own brand. Custom domain, your logo, your colors. Sell it as your own AI product to your clients or embed it in your service delivery.</div>
+      <div class="excl-detail">→ Full brand replacement, custom domain</div>
+    </div>
+    <div class="excl-box">
+      <div class="excl-icon">⚙️</div>
+      <div class="excl-title">Custom Agent Development</div>
+      <div class="excl-desc">Need an agent for something specific? Our team builds custom agents to your specification. Industry-specific workflows, proprietary integrations, bespoke logic.</div>
+      <div class="excl-detail">→ Up to 5 custom agents included</div>
+    </div>
+    <div class="excl-box">
+      <div class="excl-icon">🔗</div>
+      <div class="excl-title">SBT Integration</div>
+      <div class="excl-desc">Deep integration with your existing tech stack — ERP, HRIS, custom databases, proprietary APIs. The agents adapt to your systems, not the other way around.</div>
+      <div class="excl-detail">→ Custom API & webhook integration</div>
+    </div>
+    <div class="excl-box">
+      <div class="excl-icon">🛡️</div>
+      <div class="excl-title">Compliance & Governance</div>
+      <div class="excl-desc">Dedicated compliance agent monitors all outreach for regulatory adherence. Audit logs, approval workflows, GDPR/CCPA controls. Built for regulated industries.</div>
+      <div class="excl-detail">→ Full audit trail & data governance</div>
+    </div>
+    <div class="excl-box">
+      <div class="excl-icon">👔</div>
+      <div class="excl-title">Executive Intelligence</div>
+      <div class="excl-desc">Board-ready reports, market intelligence briefings, competitive analysis, forecasting — automatically generated and delivered on your schedule.</div>
+      <div class="excl-detail">→ Weekly executive briefings automated</div>
+    </div>
+    <div class="excl-box">
+      <div class="excl-icon">🎯</div>
+      <div class="excl-title">Dedicated Success Manager</div>
+      <div class="excl-desc">A human expert who knows your deployment inside and out. Monthly strategy reviews, optimization recommendations, and direct escalation path.</div>
+      <div class="excl-detail">→ Named contact, &lt;1hr response SLA</div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<div class="section">
+  <div class="section-label">Pricing</div>
+  <h2 class="section-title" style="text-align:center; margin-bottom:40px;">Everything. <span class="grad">Unlimited.</span></h2>
+  <div class="pricing-card">
+    <div class="plan-name">Enterprise</div>
+    <div class="plan-sub">The full platform — all 42 agents, unlimited operations, white-label, custom</div>
+    <div><span class="pricing-amount">$2,997</span><span class="pricing-period">/month</span></div>
+    <ul class="features-list">
+      <li><span class="check-gold">★</span> 42 autonomous AI agents — full swarm</li>
+      <li><span class="check-gold">★</span> Unlimited leads, emails, operations</li>
+      <li><span class="check-gold">★</span> White-label — deploy under your brand</li>
+      <li><span class="check-gold">★</span> Custom agent development (up to 5)</li>
+      <li><span class="check-gold">★</span> SBT & enterprise system integration</li>
+      <li><span class="check-gold">★</span> Compliance & audit agent</li>
+      <li><span class="check-gold">★</span> Executive reporting automation</li>
+      <li><span class="check-gold">★</span> Dedicated success manager</li>
+      <li><span class="check-gold">★</span> &lt;1hr support SLA</li>
+      <li><span class="check">✓</span> Everything in Professional included</li>
+      <li><span class="check">✓</span> Cancel anytime — no lock-in</li>
+    </ul>
+    <a href="/signup?plan=enterprise" class="btn-primary" style="width:100%; justify-content:center; font-size:17px;">Deploy the Full Swarm →</a>
+    <p style="text-align:center; font-size:13px; color:var(--muted); margin-top:14px;">Credit card required • Instant activation • Dedicated onboarding included</p>
+  </div>
+
+  <div class="compare">
+    <div class="compare-header">
+      <div>Feature</div><div>Starter</div><div>Professional</div><div style="color:var(--gold)">Enterprise</div>
+    </div>
+    <div class="compare-row"><div class="feat">AI Agents</div><div class="no">8</div><div class="no">24</div><div class="active">42</div></div>
+    <div class="compare-row"><div class="feat">Monthly operations</div><div class="no">Limited</div><div class="no">High</div><div class="active">Unlimited</div></div>
+    <div class="compare-row"><div class="feat">White-label</div><div class="no">—</div><div class="no">—</div><div class="yes">✓ Full</div></div>
+    <div class="compare-row"><div class="feat">Custom agents</div><div class="no">—</div><div class="no">—</div><div class="active">Up to 5</div></div>
+    <div class="compare-row"><div class="feat">SBT integration</div><div class="no">—</div><div class="no">—</div><div class="yes">✓</div></div>
+    <div class="compare-row"><div class="feat">Compliance agent</div><div class="no">—</div><div class="no">—</div><div class="yes">✓</div></div>
+    <div class="compare-row"><div class="feat">Dedicated support</div><div class="no">Email</div><div class="no">Priority</div><div class="active">Named CSM</div></div>
+    <div class="compare-row"><div class="feat">Price</div><div class="no">$297</div><div class="no">$997</div><div class="active">$2,997</div></div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="section">
+  <div class="section-label">FAQ</div>
+  <h2 class="section-title" style="margin-bottom:32px;">Enterprise <span class="grad">Questions</span></h2>
+  <div class="faq">
+    <div class="faq-item">
+      <div class="faq-q">Who is Enterprise designed for?</div>
+      <div class="faq-a">Companies doing $1M+ in revenue who want to scale without proportional headcount growth. Agencies who want to white-label and resell. Enterprises with complex tech stacks that need deep integration. Organizations in regulated industries that need compliance controls.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What does "white-label" actually mean?</div>
+      <div class="faq-a">You get the full SINCOR platform running under your brand — your logo, your domain, your color scheme. Your clients see your product, not SINCOR. You can charge whatever you want for it. Many Enterprise customers resell it at 3–5x their subscription cost.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">How does custom agent development work?</div>
+      <div class="faq-a">You describe what you need — the workflow, the inputs, the expected outputs. Our team scopes it, builds it, deploys it alongside your existing agents, and maintains it. Up to 5 custom agents are included in Enterprise. Additional custom agents can be added at an agreed fee.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What is SBT integration?</div>
+      <div class="faq-a">SBT (System-By-Target) integration means our agents connect directly to your existing business systems — your CRM, ERP, databases, or proprietary APIs. The agents work inside your data ecosystem rather than requiring you to migrate to ours.</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Is there a contract or minimum term?</div>
+      <div class="faq-a">No contracts. Month-to-month. You can cancel anytime. That said, most Enterprise customers see ROI in month 1 and have never looked back.</div>
+    </div>
+  </div>
+</div>
+
+<div class="cta-banner">
+  <h2>42 Agents. <span class="grad">Zero Limits.</span></h2>
+  <p>At $2,997/month, you're replacing a department — not just a tool. The math is obvious. The question is whether you're ready to operate at a different level.</p>
+  <a href="/signup?plan=enterprise" class="btn-primary" style="font-size:18px;">Deploy the Full Swarm for $2,997/mo →</a>
 </div>
 
 <footer>
-  <p style="margin-bottom: 12px;">© 2026 SINCOR. All rights reserved.</p>
-  <a href="/privacy">Privacy Policy</a>
-  <a href="/terms">Terms of Service</a>
-  <a href="/products/starter">Starter Plan</a>
-  <a href="/products/professional">Professional Plan</a>
+  <div class="footer-links">
+    <a href="/">Home</a><a href="/pricing">Pricing</a><a href="/products/starter">Starter</a><a href="/products/professional">Professional</a><a href="/sinc">SINC Token</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a>
+  </div>
+  <div class="footer-copy">© 2026 SINCOR Business Solutions. All rights reserved.</div>
 </footer>
 
 </body>
