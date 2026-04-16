@@ -1286,6 +1286,11 @@ def sitemap_xml():
 # WHITEPAPER & DOCUMENTATION
 # ============================================================================
 
+@app.route('/axiom')
+def axiom():
+    """AXIOM (AXM) token page."""
+    return render_template('axiom.html')
+
 @app.route('/whitepaper')
 def whitepaper():
     """Render whitepaper page."""

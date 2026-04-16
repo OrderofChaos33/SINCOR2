@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIOM (AXM) — The Intelligence Token</title>
+  <meta name="description" content="AXIOM (AXM) is the autonomous intelligence token on Base. 1B supply, locked LP forever, 80% trading fees flow back to the ecosystem. Live on Uniswap V4.">
+  <link rel="icon" href="/static/axiom_logo.jpg">
+  <meta property="og:title" content="AXIOM (AXM) — The Intelligence Token">
+  <meta property="og:description" content="1B supply. Locked LP forever. 80% trading fees flow to the ecosystem. Live on Base.">
+  <meta property="og:image" content="/static/axiom_logo.jpg">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050814;
+      --surface: #0a0e1a;
+      --card: #0d1220;
+      --border: rgba(255,255,255,0.07);
+      --border-blue: rgba(59,130,246,0.35);
+      --blue: #3b82f6;
+      --blue-light: #60a5fa;
+      --cyan: #22d3ee;
+      --purple: #7c3aed;
+      --purple-light: #a78bfa;
+      --green: #10b981;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; min-height: 100vh; }
+
+    /* NAV */
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(5,8,20,0.96); backdrop-filter: blur(12px); z-index: 100; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(59,130,246,0.5); }
+    .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-links { display: flex; align-items: center; gap: 24px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta { background: linear-gradient(135deg, var(--blue), #1d4ed8); color: white !important; padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+
+    /* HERO */
+    .hero { padding: 80px 48px 50px; text-align: center; max-width: 900px; margin: 0 auto; position: relative; }
+    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 700px; height: 500px; background: radial-gradient(ellipse at center top, rgba(59,130,246,0.15) 0%, transparent 65%); pointer-events: none; }
+    .axiom-logo { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(59,130,246,0.5); box-shadow: 0 0 60px rgba(59,130,246,0.3); margin-bottom: 28px; }
+    .live-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: var(--green); padding: 5px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 24px; }
+    .live-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(1.4);} }
+    h1 { font-size: clamp(42px, 7vw, 80px); font-weight: 700; line-height: 1.05; margin-bottom: 16px; }
+    .grad { background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-sub { font-size: 18px; color: var(--muted); max-width: 580px; margin: 0 auto 40px; }
+
+    /* STATS ROW */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; max-width: 900px; margin: 0 auto 48px; }
+    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px 16px; text-align: center; }
+    .stat-val { font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+
+    /* BUY BUTTONS */
+    .buy-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+    .btn-buy { background: linear-gradient(135deg, var(--blue), #1d4ed8); color: white; padding: 15px 36px; border-radius: 10px; font-size: 16px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 30px rgba(59,130,246,0.35); }
+    .btn-buy:hover { transform: translateY(-2px); box-shadow: 0 0 50px rgba(59,130,246,0.55); }
+    .btn-outline { border: 1px solid var(--border-blue); color: var(--blue-light); padding: 15px 28px; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; transition: background 0.2s; }
+    .btn-outline:hover { background: rgba(59,130,246,0.1); }
+
+    /* CONTRACT */
+    .contract-box { background: var(--card); border: 1px solid var(--border-blue); border-radius: 14px; padding: 18px 24px; max-width: 600px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .contract-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+    .contract-addr { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--blue-light); word-break: break-all; }
+    .copy-btn { background: rgba(59,130,246,0.15); border: 1px solid var(--border-blue); color: var(--blue-light); padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.2s; flex-shrink: 0; }
+    .copy-btn:hover { background: rgba(59,130,246,0.25); }
+
+    /* CONTENT SECTIONS */
+    .section { padding: 56px 48px; max-width: 1100px; margin: 0 auto; }
+    .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--blue-light); margin-bottom: 12px; }
+    .section-title { font-size: clamp(26px, 4vw, 40px); font-weight: 700; line-height: 1.2; margin-bottom: 14px; }
+    .section-sub { font-size: 16px; color: var(--muted); max-width: 580px; margin-bottom: 40px; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+    /* TOKENOMICS */
+    .toke-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+    .toke-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px 22px; text-align: center; }
+    .toke-card.highlight { border-color: rgba(59,130,246,0.3); background: linear-gradient(135deg, rgba(59,130,246,0.06), transparent); }
+    .toke-icon { font-size: 36px; margin-bottom: 14px; }
+    .toke-val { font-size: 28px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--blue-light); margin-bottom: 6px; }
+    .toke-name { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .toke-desc { font-size: 13px; color: var(--muted); }
+
+    /* WHY AXIOM */
+    .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+    .why-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 30px 26px; transition: border-color 0.2s; }
+    .why-card:hover { border-color: var(--border-blue); }
+    .why-icon { font-size: 36px; margin-bottom: 14px; }
+    .why-title { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+    .why-desc { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* LINKS */
+    .links-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .link-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; display: flex; align-items: center; gap: 16px; text-decoration: none; transition: border-color 0.2s, transform 0.2s; }
+    .link-card:hover { border-color: var(--border-blue); transform: translateY(-2px); }
+    .link-icon { font-size: 28px; flex-shrink: 0; }
+    .link-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .link-sub { font-size: 12px; color: var(--muted); }
+
+    /* DISCLAIMER */
+    .disclaimer { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 14px; padding: 20px 28px; margin: 40px 48px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+    /* FOOTER */
+    footer { border-top: 1px solid var(--border); padding: 32px 48px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .footer-links { display: flex; gap: 24px; flex-wrap: wrap; }
+    .footer-links a { color: var(--muted); text-decoration: none; font-size: 13px; }
+    .footer-copy { font-size: 13px; color: var(--muted); }
+
+    @media (max-width: 768px) {
+      nav { padding: 16px 20px; }
+      .hero, .section { padding-left: 20px; padding-right: 20px; }
+      .disclaimer { margin: 24px 20px; }
+      footer { padding: 24px 20px; flex-direction: column; }
+      .contract-box { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="/static/sincor_logo.jpg" alt="SINCOR">
+    <span>SINCOR</span>
+  </a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/sinc">SINC Token</a>
+    <a href="/pricing">Pricing</a>
+    <a href="https://app.uniswap.org/swap?outputCurrency=0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822&chain=base" target="_blank" class="nav-cta">Buy AXM →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <img src="/static/axiom_logo.jpg" alt="AXIOM" class="axiom-logo">
+  <div class="live-badge"><span class="live-dot"></span> Live on Base — Uniswap V4</div>
+  <h1>AXIOM<br><span class="grad">Intelligence Token</span></h1>
+  <p class="hero-sub">The autonomous AI execution token. 1B supply, LP locked forever, 80% of all trading fees flow to the ecosystem. Built on Base.</p>
+</div>
+
+<!-- STATS -->
+<div class="stats-row" style="padding: 0 48px;">
+  <div class="stat"><div class="stat-val" id="axm-price">—</div><div class="stat-label">Price</div></div>
+  <div class="stat"><div class="stat-val">1B</div><div class="stat-label">Total Supply</div></div>
+  <div class="stat"><div class="stat-val">AXM</div><div class="stat-label">Ticker</div></div>
+  <div class="stat"><div class="stat-val">∞</div><div class="stat-label">LP Locked</div></div>
+  <div class="stat"><div class="stat-val">80%</div><div class="stat-label">Fees to Ecosystem</div></div>
+  <div class="stat"><div class="stat-val">Base</div><div class="stat-label">Network</div></div>
+</div>
+
+<!-- BUY + CONTRACT -->
+<div style="padding: 32px 48px 0; max-width: 900px; margin: 0 auto;">
+  <div class="buy-row">
+    <a href="https://app.uniswap.org/swap?outputCurrency=0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822&chain=base" target="_blank" class="btn-buy">⚡ Buy on Uniswap V4</a>
+    <a href="https://dexscreener.com/base/0xff7af6ffca25a9dc0fc990d998acf24cc60b7822" target="_blank" class="btn-outline">📊 Dexscreener</a>
+    <a href="https://basescan.org/token/0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822" target="_blank" class="btn-outline">🔍 Basescan</a>
+  </div>
+  <div class="contract-box">
+    <div>
+      <div class="contract-label">Contract Address (Base)</div>
+      <div class="contract-addr" id="axm-addr">0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</div>
+    </div>
+    <button class="copy-btn" onclick="navigator.clipboard.writeText('0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822').then(()=>{this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy Address',1500)})">Copy Address</button>
+  </div>
+</div>
+
+<hr class="divider" style="margin-top:48px;">
+
+<!-- TOKENOMICS -->
+<div class="section">
+  <div class="section-label">Tokenomics</div>
+  <h2 class="section-title">Built for <span class="grad">Long-Term Value</span></h2>
+  <p class="section-sub">Every design decision prioritizes sustainable value accumulation — no rug risk, no inflation, no games.</p>
+  <div class="toke-grid">
+    <div class="toke-card highlight">
+      <div class="toke-icon">🔒</div>
+      <div class="toke-val">∞</div>
+      <div class="toke-name">LP Locked Forever</div>
+      <div class="toke-desc">Liquidity is permanently locked on Uniswap V4. No one can pull the pool — not even the deployer.</div>
+    </div>
+    <div class="toke-card highlight">
+      <div class="toke-icon">💰</div>
+      <div class="toke-val">80%</div>
+      <div class="toke-name">Fees to Ecosystem</div>
+      <div class="toke-desc">80% of all trading fees flow to the ecosystem treasury forever. Every trade strengthens the foundation.</div>
+    </div>
+    <div class="toke-card">
+      <div class="toke-icon">📊</div>
+      <div class="toke-val">1B</div>
+      <div class="toke-name">Fixed Supply</div>
+      <div class="toke-desc">1,000,000,000 AXM. No minting. No inflation. Supply is permanently fixed at launch.</div>
+    </div>
+    <div class="toke-card">
+      <div class="toke-icon">🌐</div>
+      <div class="toke-val">Base</div>
+      <div class="toke-name">Base Network</div>
+      <div class="toke-desc">Deployed on Coinbase's L2. Fast, cheap, secure. The fastest-growing chain in crypto.</div>
+    </div>
+    <div class="toke-card">
+      <div class="toke-icon">0%</div>
+      <div class="toke-val">0%</div>
+      <div class="toke-name">No Buy/Sell Tax</div>
+      <div class="toke-desc">No hidden taxes. Buy and sell freely. What you see is what you get.</div>
+    </div>
+    <div class="toke-card">
+      <div class="toke-icon">✅</div>
+      <div class="toke-val">Uni V4</div>
+      <div class="toke-name">Uniswap V4 Pool</div>
+      <div class="toke-desc">Trading on the most advanced DEX architecture in DeFi. Lowest slippage, best execution.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- WHY AXIOM -->
+<div class="section">
+  <div class="section-label">Why AXIOM</div>
+  <h2 class="section-title">The Token Behind <span class="grad">Autonomous Intelligence</span></h2>
+  <p class="section-sub">AXIOM isn't a meme. It's the execution layer for AI-driven value creation in the SINCOR ecosystem.</p>
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-icon">🤖</div>
+      <div class="why-title">AI-Native Token</div>
+      <div class="why-desc">AXIOM is purpose-built for the autonomous agent economy. As AI execution scales, AXM captures value from every interaction.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🔗</div>
+      <div class="why-title">SINCOR Ecosystem</div>
+      <div class="why-desc">AXM is the secondary token of the SINCOR platform — the same platform running 42 autonomous agents for paying customers right now.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">⚡</div>
+      <div class="why-title">Real Utility</div>
+      <div class="why-desc">Used for premium agent access, priority execution, and platform governance. Not a promise — built into the protocol.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">📈</div>
+      <div class="why-title">Fee Accumulation</div>
+      <div class="why-desc">Every trade generates fees. 80% flows to the ecosystem treasury. The more volume, the stronger the foundation.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🛡️</div>
+      <div class="why-title">Rug-Proof Design</div>
+      <div class="why-desc">LP locked forever. No mint function. No admin keys. Transparent on-chain. Verified on Basescan. This token can't be manipulated.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-icon">🌊</div>
+      <div class="why-title">Growing Ecosystem</div>
+      <div class="why-desc">SINC token, AXIOM, Bankr x402 services, and the SINCOR agent platform — all building together on Base.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- LINKS -->
+<div class="section">
+  <div class="section-label">Links & Resources</div>
+  <h2 class="section-title">Trade. <span class="grad">Verify. Track.</span></h2>
+  <div class="links-grid">
+    <a href="https://app.uniswap.org/swap?outputCurrency=0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822&chain=base" target="_blank" class="link-card">
+      <div class="link-icon">🦄</div>
+      <div><div class="link-name">Buy on Uniswap V4</div><div class="link-sub">Primary trading venue</div></div>
+    </a>
+    <a href="https://dexscreener.com/base/0xff7af6ffca25a9dc0fc990d998acf24cc60b7822" target="_blank" class="link-card">
+      <div class="link-icon">📊</div>
+      <div><div class="link-name">Dexscreener</div><div class="link-sub">Price & volume charts</div></div>
+    </a>
+    <a href="https://basescan.org/token/0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822" target="_blank" class="link-card">
+      <div class="link-icon">🔍</div>
+      <div><div class="link-name">Basescan</div><div class="link-sub">On-chain verification</div></div>
+    </a>
+    <a href="https://pumpclaw.com/token/0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822" target="_blank" class="link-card">
+      <div class="link-icon">🐾</div>
+      <div><div class="link-name">PumpClaw</div><div class="link-sub">Launch profile</div></div>
+    </a>
+    <a href="/sinc" class="link-card">
+      <div class="link-icon">🌐</div>
+      <div><div class="link-name">SINC Token</div><div class="link-sub">Platform utility token</div></div>
+    </a>
+    <a href="/" class="link-card">
+      <div class="link-icon">🤖</div>
+      <div><div class="link-name">SINCOR Platform</div><div class="link-sub">42 autonomous AI agents</div></div>
+    </a>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <strong>Disclaimer:</strong> AXIOM (AXM) is a utility token in the SINCOR ecosystem. This is not financial advice and does not constitute an offer or solicitation to purchase securities. Cryptocurrency involves significant risk including total loss of capital. Past performance does not guarantee future results. Only invest what you can afford to lose. AXIOM has not been registered with any securities regulator. Do your own research.
+</div>
+
+<footer>
+  <div class="footer-links">
+    <a href="/">Home</a>
+    <a href="/sinc">SINC Token</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/terms">Terms</a>
+    <a href="/privacy">Privacy</a>
+  </div>
+  <div class="footer-copy">© 2026 SINCOR Business Solutions. AXM contract: 0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</div>
+</footer>
+
+<script>
+// Live price feed for AXM
+async function fetchAXMPrice() {
+  try {
+    const res = await fetch('https://api.dexscreener.com/latest/dex/tokens/0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822');
+    const data = await res.json();
+    const pair = data.pairs && data.pairs[0];
+    if (pair) {
+      const price = parseFloat(pair.priceUsd);
+      document.getElementById('axm-price').textContent = price < 0.01 ? '$' + price.toFixed(6) : '$' + price.toFixed(4);
+    }
+  } catch(e) {}
+}
+fetchAXMPrice();
+setInterval(fetchAXMPrice, 30000);
+</script>
+
+</body>
+</html>
