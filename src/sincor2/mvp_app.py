@@ -552,11 +552,12 @@ def onboarding_page():
     """Customer intake form — shown after signup/payment."""
     import secrets
     email = request.args.get('email', '')
+    order_id = request.args.get('order_id', '')
     # Simple CSRF token via session
     csrf = secrets.token_hex(32)
     from flask import session
     session['csrf_token'] = csrf
-    return render_template('onboarding.html', email=email, csrf_token=csrf)
+    return render_template('onboarding.html', email=email, order_id=order_id, csrf_token=csrf)
 
 
 @app.route('/api/onboarding', methods=['POST'])
@@ -628,7 +629,24 @@ def submit_onboarding():
         db.commit()
         logger.info(f'[ONBOARDING] Profile saved: {profile_id} company={company_name} use_case={primary_use_case}')
         session.pop('csrf_token', None)  # Consume token
-        return jsonify({'status': 'ok', 'profile_id': profile_id})
+
+        # Send personalized welcome email if email_sender available
+        order_id_ref = clean(data.get('order_id', ''), 100)
+        if email_sender and email:
+            try:
+                email_sender.send_welcome_email(
+                    customer_email=email,
+                    customer_name=f'{first_name} {last_name}'.strip(),
+                    company_name=company_name,
+                    use_case=primary_use_case,
+                    order_id=order_id_ref
+                )
+                logger.info(f'[ONBOARDING] Welcome email sent to {email}')
+            except Exception as e:
+                logger.warning(f'[ONBOARDING] Welcome email failed: {e}')
+
+        return jsonify({'status': 'ok', 'profile_id': profile_id,
+                        'redirect': f'/thank-you/{order_id_ref}' if order_id_ref else '/dashboard'})
     except Exception as e:
         logger.error(f'[ONBOARDING] DB error: {e}')
         return jsonify({'error': 'Server error, please try again'}), 500
@@ -881,7 +899,10 @@ def payment_success():
             (lookup_id, lookup_id)
         ).fetchone()
         if row:
-            return f'<meta http-equiv="refresh" content="0; url=/thank-you/{row["order_id"]}" />'
+            email = row['customer_email'] if isinstance(row, dict) else row[3]
+            oid = row['order_id'] if isinstance(row, dict) else row[1]
+            # Redirect to onboarding intake form first, then thank-you
+            return redirect(f'/onboarding?email={email}&order_id={oid}')
 
     return render_template('payment_success.html', order_data=None)
 

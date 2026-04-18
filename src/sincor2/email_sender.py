@@ -126,6 +126,77 @@ SINCOR Team
             metadata={'order_id': order_id, 'tier': tier, 'type': 'thank_you'}
         )
 
+    def send_welcome_email(self, customer_email: str, customer_name: str,
+                            company_name: str, use_case: str, order_id: str = '') -> Dict[str, str]:
+        """
+        Send personalized welcome email after customer completes onboarding intake form.
+        Uses their real name, company, and stated use case for personalization.
+        """
+        first_name = customer_name.split()[0] if customer_name else 'there'
+        subject = f"{first_name}, your SINCOR agent team is being configured"
+
+        html_content = f"""
+        <div style="font-family:Inter,system-ui,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0f;color:#e2e8f0;padding:40px 32px;border-radius:12px">
+          <div style="margin-bottom:32px">
+            <span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:8px 16px;border-radius:8px;font-weight:700;font-size:14px">SINCOR</span>
+          </div>
+          <h1 style="font-size:24px;font-weight:700;color:#f1f5f9;margin-bottom:16px">Hi {first_name}, your agents are spinning up 🚀</h1>
+          <p style="color:#94a3b8;line-height:1.7;margin-bottom:24px">
+            Thanks for telling us about <strong style="color:#f1f5f9">{company_name}</strong>. We've configured your agent team
+            around your primary goal: <strong style="color:#a78bfa">{use_case}</strong>.
+          </p>
+          <div style="background:#111827;border:1px solid #1e293b;border-radius:12px;padding:24px;margin-bottom:24px">
+            <h2 style="font-size:16px;font-weight:600;color:#f1f5f9;margin-bottom:16px">What happens next:</h2>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;gap:12px;align-items:flex-start">
+                <span style="color:#6366f1;font-weight:700;min-width:24px">1.</span>
+                <span style="color:#94a3b8">Your agents start working within <strong style="color:#f1f5f9">24 hours</strong> — no setup required from you</span>
+              </div>
+              <div style="display:flex;gap:12px;align-items:flex-start">
+                <span style="color:#6366f1;font-weight:700;min-width:24px">2.</span>
+                <span style="color:#94a3b8">You'll receive a <strong style="color:#f1f5f9">first activity report</strong> within 48 hours showing exactly what your agents accomplished</span>
+              </div>
+              <div style="display:flex;gap:12px;align-items:flex-start">
+                <span style="color:#6366f1;font-weight:700;min-width:24px">3.</span>
+                <span style="color:#94a3b8">Log into your <strong style="color:#f1f5f9">dashboard anytime</strong> to see live agent activity and results</span>
+              </div>
+            </div>
+          </div>
+          <a href="https://getsincor.com/dashboard" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px">View Your Dashboard →</a>
+          <p style="color:#475569;font-size:13px;margin-top:32px;line-height:1.6">
+            Questions? Reply to this email anytime — a real human reads every message.<br>
+            <a href="https://getsincor.com/terms" style="color:#6366f1">Terms</a> &nbsp;·&nbsp;
+            <a href="https://getsincor.com/privacy" style="color:#6366f1">Privacy</a>
+          </p>
+        </div>
+        """
+
+        text_content = f"""Hi {first_name},
+
+Your SINCOR agent team is being configured for {company_name}.
+
+Focus: {use_case}
+
+What happens next:
+1. Agents start working within 24 hours
+2. First activity report arrives within 48 hours
+3. Log in anytime: https://getsincor.com/dashboard
+
+Questions? Just reply to this email.
+
+The SINCOR Team
+https://getsincor.com
+"""
+
+        return self.send_email(
+            to_email=customer_email,
+            to_name=customer_name,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+            metadata={'order_id': order_id, 'type': 'welcome', 'company': company_name}
+        )
+
     def send_email(self, to_email: str, to_name: str, subject: str,
                   html_content: str, text_content: Optional[str] = None,
                   metadata: Optional[Dict] = None) -> Dict[str, str]:

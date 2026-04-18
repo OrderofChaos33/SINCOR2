@@ -60,6 +60,7 @@
   <form id="intake-form" novalidate>
     <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token }}"/>
     <input type="hidden" name="email" id="email_hidden" value="{{ email or '' }}"/>
+    <input type="hidden" name="order_id" value="{{ order_id or '' }}"/>
 
     <div class="row">
       <div class="group" id="f-fname">
@@ -205,6 +206,8 @@ form.addEventListener('submit', async (e) => {
     if (res.ok) {
       form.style.display = 'none';
       document.getElementById('success-msg').style.display = 'block';
+      // Redirect after 2 seconds
+      setTimeout(() => { window.location.href = json.redirect || '/dashboard'; }, 2000);
     } else {
       btn.disabled = false;
       btn.textContent = 'Complete Setup → Launch My Agents';
