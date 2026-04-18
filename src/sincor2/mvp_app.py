@@ -482,7 +482,7 @@ def _check_admin_token(req):
 
 
 @app.route('/api/auth/login', methods=['POST'])
-@limiter.limit("200 per minute")
+@limiter.limit("5 per minute")  # Brute-force protection
 def login():
     """
     Admin login endpoint. Validates credentials against ADMIN_USERNAME / ADMIN_PASSWORD
@@ -1494,7 +1494,7 @@ def crypto_checkout():
             'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd',
             headers={'User-Agent': 'sincor-payment/1.0'}
         )
-        with _urllib2.urlopen(cg_req, timeout=5) as cg_resp:
+        with _urllib2.urlopen(cg_req, timeout=5) as cg_resp:  # nosec B310 — hardcoded CoinGecko URL
             cg_data = _json2.loads(cg_resp.read().decode('utf-8'))
             eth_price = float(cg_data['ethereum']['usd'])
             logger.info(f'[CRYPTO] Live ETH price: ${eth_price}')
@@ -1582,7 +1582,7 @@ def crypto_verify_payment():
 
         req = _urllib.Request(rpc_url, data=payload,
                               headers={'Content-Type': 'application/json'})
-        with _urllib.urlopen(req, timeout=10) as resp:
+        with _urllib.urlopen(req, timeout=10) as resp:  # nosec B310 — hardcoded Alchemy RPC URL
             rpc_result = _json.loads(resp.read().decode('utf-8'))
 
         receipt = rpc_result.get('result')
@@ -1684,7 +1684,7 @@ def request_too_large(error):
 # ============================================================================
 
 @app.route('/admin/content/status')
-@limiter.limit("100 per minute")
+@limiter.limit("10 per minute")
 def content_status():
     """Return content agent status: published posts, upcoming calendar, analytics."""
     if not _check_admin_token(request):
@@ -1980,7 +1980,7 @@ def paypal_webhook():
             req = _ur.Request(ipn_url, data=verify_payload,
                               headers={'Content-Type': 'application/x-www-form-urlencoded',
                                        'User-Agent': 'sincor-ipn/1.0'})
-            with _ur.urlopen(req, timeout=10) as resp:
+            with _ur.urlopen(req, timeout=10) as resp:  # nosec B310 — hardcoded PayPal IPN URL
                 ipn_response = resp.read().decode('utf-8')
 
             if ipn_response.strip() != 'VERIFIED':
@@ -2158,5 +2158,5 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     # Never run debug in production
     debug = os.environ.get('FLASK_ENV') == 'development' and not os.environ.get('RAILWAY_ENVIRONMENT')
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host='0.0.0.0', port=port, debug=debug)  # nosec B104 — required for Railway deployment
 
