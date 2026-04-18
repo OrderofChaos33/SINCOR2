@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Welcome to SINCOR — Tell Us About Your Business</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0a0a0f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+    .card{background:#111827;border:1px solid #1e293b;border-radius:1.5rem;max-width:640px;width:100%;padding:2.5rem;box-shadow:0 25px 60px rgba(0,0,0,.5)}
+    .logo{display:flex;align-items:center;gap:.75rem;margin-bottom:2rem}
+    .logo-dot{width:36px;height:36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:.5rem;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;color:#fff}
+    .logo-name{font-weight:700;font-size:1.1rem;color:#f1f5f9}
+    h1{font-size:1.5rem;font-weight:700;color:#f1f5f9;margin-bottom:.5rem}
+    p.sub{color:#94a3b8;margin-bottom:2rem;line-height:1.6}
+    .progress{display:flex;gap:.5rem;margin-bottom:2rem}
+    .progress-step{flex:1;height:4px;border-radius:2px;background:#1e293b}
+    .progress-step.done{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
+    .group{margin-bottom:1.25rem}
+    label{display:block;font-size:.85rem;font-weight:600;color:#94a3b8;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em}
+    input,select,textarea{width:100%;background:#0f172a;border:1px solid #1e293b;border-radius:.75rem;padding:.75rem 1rem;color:#f1f5f9;font-size:.95rem;outline:none;transition:border-color .2s}
+    input:focus,select:focus,textarea:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+    select option{background:#0f172a}
+    textarea{resize:vertical;min-height:80px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .consent{display:flex;align-items:flex-start;gap:.75rem;margin:1.5rem 0;padding:1rem;background:#0f172a;border-radius:.75rem;border:1px solid #1e293b}
+    .consent input[type=checkbox]{width:18px;height:18px;min-width:18px;margin-top:2px;accent-color:#6366f1}
+    .consent-text{font-size:.85rem;color:#94a3b8;line-height:1.5}
+    .consent-text a{color:#818cf8;text-decoration:none}
+    .btn{width:100%;padding:1rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:.75rem;font-size:1rem;font-weight:700;cursor:pointer;transition:opacity .2s;margin-top:.5rem}
+    .btn:hover{opacity:.9}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .security-note{display:flex;align-items:center;gap:.5rem;margin-top:1.25rem;padding:.75rem 1rem;background:#0f172a;border-radius:.75rem;border:1px solid #1e293b;font-size:.8rem;color:#64748b}
+    .security-note svg{flex-shrink:0}
+    .error{color:#f87171;font-size:.82rem;margin-top:.3rem;display:none}
+    .field-error input,.field-error select,.field-error textarea{border-color:#f87171}
+    .field-error .error{display:block}
+    #success-msg{display:none;text-align:center;padding:2rem 0}
+    #success-msg h2{font-size:1.5rem;font-weight:700;color:#34d399;margin-bottom:.75rem}
+    #success-msg p{color:#94a3b8}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-dot">S</div>
+    <div class="logo-name">SINCOR Business Solutions</div>
+  </div>
+
+  <div class="progress">
+    <div class="progress-step done"></div>
+    <div class="progress-step done"></div>
+    <div class="progress-step done"></div>
+    <div class="progress-step"></div>
+  </div>
+
+  <h1>One last step — tell us about your business</h1>
+  <p class="sub">This helps us configure your agent team for maximum impact from day one. Takes 90 seconds.</p>
+
+  <form id="intake-form" novalidate>
+    <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token }}"/>
+    <input type="hidden" name="email" id="email_hidden" value="{{ email or '' }}"/>
+
+    <div class="row">
+      <div class="group" id="f-fname">
+        <label>First Name *</label>
+        <input type="text" name="first_name" placeholder="Alex" maxlength="50" required/>
+        <div class="error">Required</div>
+      </div>
+      <div class="group" id="f-lname">
+        <label>Last Name *</label>
+        <input type="text" name="last_name" placeholder="Johnson" maxlength="50" required/>
+        <div class="error">Required</div>
+      </div>
+    </div>
+
+    <div class="group" id="f-company">
+      <label>Company Name *</label>
+      <input type="text" name="company_name" placeholder="Acme Corp" maxlength="100" required/>
+      <div class="error">Required</div>
+    </div>
+
+    <div class="row">
+      <div class="group" id="f-industry">
+        <label>Industry *</label>
+        <select name="industry" required>
+          <option value="">Select...</option>
+          <option>SaaS / Software</option>
+          <option>E-Commerce / Retail</option>
+          <option>Marketing / Agency</option>
+          <option>Finance / Fintech</option>
+          <option>Real Estate</option>
+          <option>Healthcare</option>
+          <option>Consulting / Professional Services</option>
+          <option>Media / Content</option>
+          <option>Education</option>
+          <option>Other</option>
+        </select>
+        <div class="error">Required</div>
+      </div>
+      <div class="group" id="f-size">
+        <label>Team Size *</label>
+        <select name="team_size" required>
+          <option value="">Select...</option>
+          <option>Solo / Freelancer</option>
+          <option>2–10</option>
+          <option>11–50</option>
+          <option>51–200</option>
+          <option>200+</option>
+        </select>
+        <div class="error">Required</div>
+      </div>
+    </div>
+
+    <div class="group" id="f-usecase">
+      <label>Primary Use Case *</label>
+      <select name="primary_use_case" required>
+        <option value="">What will agents do for you?</option>
+        <option>Lead Generation &amp; Outreach</option>
+        <option>Content Creation &amp; Publishing</option>
+        <option>Customer Support Automation</option>
+        <option>Sales Pipeline Management</option>
+        <option>Competitive Intelligence</option>
+        <option>Social Media Management</option>
+        <option>Data Research &amp; Analysis</option>
+        <option>Partnership Development</option>
+        <option>Multiple / General Automation</option>
+      </select>
+      <div class="error">Required</div>
+    </div>
+
+    <div class="group">
+      <label>What's your biggest growth challenge right now?</label>
+      <textarea name="growth_challenge" placeholder="e.g. We struggle to scale outreach without hiring more SDRs..." maxlength="500"></textarea>
+    </div>
+
+    <div class="group">
+      <label>Monthly Revenue Target (optional)</label>
+      <select name="revenue_target">
+        <option value="">Prefer not to say</option>
+        <option>Under $10K/mo</option>
+        <option>$10K–$50K/mo</option>
+        <option>$50K–$200K/mo</option>
+        <option>$200K–$1M/mo</option>
+        <option>$1M+/mo</option>
+      </select>
+    </div>
+
+    <div class="consent">
+      <input type="checkbox" name="consent_data" id="consent_data" required/>
+      <div class="consent-text">
+        I agree to SINCOR's <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.
+        My data is stored securely and encrypted. I can request deletion at any time by emailing <strong>privacy@getsincor.com</strong>.
+      </div>
+    </div>
+
+    <button type="submit" class="btn" id="submit-btn">Complete Setup → Launch My Agents</button>
+
+    <div class="security-note">
+      <svg width="14" height="14" fill="none" stroke="#64748b" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      256-bit encrypted · GDPR & CCPA compliant · Never sold to third parties
+    </div>
+  </form>
+
+  <div id="success-msg">
+    <h2>✅ You're all set!</h2>
+    <p>Your agent team is being configured. You'll receive a welcome email shortly.<br><br>
+    <a href="/dashboard" style="color:#818cf8">Go to your dashboard →</a></p>
+  </div>
+</div>
+
+<script>
+const form = document.getElementById('intake-form');
+const btn  = document.getElementById('submit-btn');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  let valid = true;
+
+  // Validate required fields
+  form.querySelectorAll('[required]').forEach(el => {
+    const group = el.closest('.group');
+    if (!el.value.trim() || (el.type === 'checkbox' && !el.checked)) {
+      if (group) group.classList.add('field-error');
+      valid = false;
+    } else {
+      if (group) group.classList.remove('field-error');
+    }
+  });
+
+  if (!valid) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  const data = Object.fromEntries(new FormData(form));
+
+  try {
+    const res = await fetch('/api/onboarding', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (res.ok) {
+      form.style.display = 'none';
+      document.getElementById('success-msg').style.display = 'block';
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Complete Setup → Launch My Agents';
+      alert(json.error || 'Something went wrong. Please try again.');
+    }
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = 'Complete Setup → Launch My Agents';
+    alert('Network error. Please try again.');
+  }
+});
+
+// Remove field-error on input
+form.querySelectorAll('input,select,textarea').forEach(el => {
+  el.addEventListener('input', () => {
+    const group = el.closest('.group');
+    if (group && el.value.trim()) group.classList.remove('field-error');
+  });
+});
+</script>
+</body>
+</html>

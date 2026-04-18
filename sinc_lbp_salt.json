@@ -1,0 +1,8 @@
+{
+  "outer_salt": "7f32ceed682ebb309f9c040ab5da098cafe4b198d12c7fb8a4376567a081a6ed",
+  "strategy_addr": "0xFd22FB248ebA2d62169FC4B3eC49e8E00ff76000",
+  "start_block": 44836910,
+  "end_block": 44966510,
+  "found_at": "2026-04-17 23:27:10 UTC",
+  "iterations": 7322
+}

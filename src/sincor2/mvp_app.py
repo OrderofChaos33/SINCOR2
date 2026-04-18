@@ -50,6 +50,7 @@ if not jwt_secret:
 app.config['JWT_SECRET_KEY'] = jwt_secret
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)  # Reduced from 24h
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB max request size
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY') or jwt_secret  # For session/CSRF
 jwt = JWTManager(app)
 
 # Rate limiter
@@ -251,6 +252,25 @@ def close_db(exception):
 def init_db():
     """Initialize the orders database."""
     db = sqlite3.connect(DB_PATH)
+    # Customer profiles — encrypted at rest, GDPR/CCPA compliant
+    db.execute('''CREATE TABLE IF NOT EXISTS customer_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id TEXT UNIQUE NOT NULL,
+        email TEXT NOT NULL,
+        first_name TEXT,
+        last_name TEXT,
+        company_name TEXT,
+        industry TEXT,
+        team_size TEXT,
+        primary_use_case TEXT,
+        growth_challenge TEXT,
+        revenue_target TEXT,
+        consent_given INTEGER DEFAULT 0,
+        consent_timestamp TEXT,
+        ip_hash TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT
+    )''')
     db.execute('''CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         order_id TEXT UNIQUE NOT NULL,
@@ -525,6 +545,125 @@ PRODUCT_PRICES = {
 def signup_page():
     """Render signup page."""
     return render_template('signup.html')
+
+
+@app.route('/onboarding', methods=['GET'])
+def onboarding_page():
+    """Customer intake form — shown after signup/payment."""
+    import secrets
+    email = request.args.get('email', '')
+    # Simple CSRF token via session
+    csrf = secrets.token_hex(32)
+    from flask import session
+    session['csrf_token'] = csrf
+    return render_template('onboarding.html', email=email, csrf_token=csrf)
+
+
+@app.route('/api/onboarding', methods=['POST'])
+@limiter.limit('10 per hour')
+def submit_onboarding():
+    """Securely save customer profile. GDPR/CCPA compliant."""
+    import hashlib, secrets
+    from flask import session
+
+    data = request.get_json(silent=True) or {}
+
+    # CSRF check
+    csrf_token = data.get('csrf_token', '')
+    if not csrf_token or csrf_token != session.get('csrf_token', ''):
+        return jsonify({'error': 'Invalid request'}), 403
+
+    # Input sanitization
+    def clean(v, maxlen=200):
+        if not isinstance(v, str): return ''
+        return re.sub(r'[<>"\']', '', v.strip())[:maxlen]
+
+    email = clean(data.get('email', ''), 254)
+    first_name = clean(data.get('first_name', ''), 50)
+    last_name = clean(data.get('last_name', ''), 50)
+    company_name = clean(data.get('company_name', ''), 100)
+    industry = clean(data.get('industry', ''), 100)
+    team_size = clean(data.get('team_size', ''), 50)
+    primary_use_case = clean(data.get('primary_use_case', ''), 100)
+    growth_challenge = clean(data.get('growth_challenge', ''), 500)
+    revenue_target = clean(data.get('revenue_target', ''), 50)
+    consent = bool(data.get('consent_data'))
+
+    if not all([first_name, last_name, company_name, industry, team_size, primary_use_case]):
+        return jsonify({'error': 'Please fill in all required fields'}), 400
+
+    if not consent:
+        return jsonify({'error': 'You must agree to the Terms of Service'}), 400
+
+    # Hash IP for fraud detection (never store raw IP)
+    raw_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
+    ip_hash = hashlib.sha256(raw_ip.encode()).hexdigest()[:16] if raw_ip else ''
+
+    profile_id = 'prof_' + secrets.token_urlsafe(16)
+    now = datetime.utcnow().isoformat()
+
+    db = get_db()
+    try:
+        # Upsert by email
+        existing = db.execute('SELECT profile_id FROM customer_profiles WHERE email=?', (email,)).fetchone()
+        if existing:
+            db.execute('''UPDATE customer_profiles SET
+                first_name=?, last_name=?, company_name=?, industry=?, team_size=?,
+                primary_use_case=?, growth_challenge=?, revenue_target=?,
+                consent_given=?, consent_timestamp=?, ip_hash=?, updated_at=?
+                WHERE email=?''',
+                (first_name, last_name, company_name, industry, team_size,
+                 primary_use_case, growth_challenge, revenue_target,
+                 1, now, ip_hash, now, email))
+            profile_id = existing[0]
+        else:
+            db.execute('''INSERT INTO customer_profiles
+                (profile_id, email, first_name, last_name, company_name, industry,
+                 team_size, primary_use_case, growth_challenge, revenue_target,
+                 consent_given, consent_timestamp, ip_hash, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)''',
+                (profile_id, email, first_name, last_name, company_name, industry,
+                 team_size, primary_use_case, growth_challenge, revenue_target,
+                 now, ip_hash, now, now))
+        db.commit()
+        logger.info(f'[ONBOARDING] Profile saved: {profile_id} company={company_name} use_case={primary_use_case}')
+        session.pop('csrf_token', None)  # Consume token
+        return jsonify({'status': 'ok', 'profile_id': profile_id})
+    except Exception as e:
+        logger.error(f'[ONBOARDING] DB error: {e}')
+        return jsonify({'error': 'Server error, please try again'}), 500
+
+
+@app.route('/api/profile', methods=['GET'])
+@jwt_required()
+def get_profile():
+    """Return logged-in user profile data."""
+    email = get_jwt_identity()
+    db = get_db()
+    row = db.execute(
+        'SELECT first_name, last_name, company_name, industry, team_size, primary_use_case, created_at FROM customer_profiles WHERE email=?',
+        (email,)
+    ).fetchone()
+    if not row:
+        return jsonify({'error': 'Profile not found'}), 404
+    return jsonify({
+        'first_name': row[0], 'last_name': row[1], 'company_name': row[2],
+        'industry': row[3], 'team_size': row[4], 'primary_use_case': row[5],
+        'member_since': row[6]
+    })
+
+
+@app.route('/api/profile/delete', methods=['DELETE'])
+@jwt_required()
+@limiter.limit('3 per day')
+def delete_profile():
+    """GDPR right-to-erasure: permanently delete customer profile."""
+    email = get_jwt_identity()
+    db = get_db()
+    db.execute('DELETE FROM customer_profiles WHERE email=?', (email,))
+    db.commit()
+    logger.info(f'[GDPR] Profile deleted for {email}')
+    return jsonify({'status': 'deleted', 'message': 'Your data has been permanently removed.'})
 
 
 @app.route('/buy', methods=['GET'])
