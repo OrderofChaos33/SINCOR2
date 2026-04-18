@@ -3,7 +3,7 @@
 Flask>=3.0.0,<4.0.0
 
 # Essential dependencies
-requests>=2.33.0              # HTTP requests for API integrations (fixes CWE-670, CWE-201, CWE-377)
+requests>=2.31.0              # HTTP requests for API integrations
 httpx>=0.25.0                # Async HTTP client for concurrent operations
 PyJWT>=2.12.0                  # JWT authentication
 Jinja2>=3.1.0                 # Template engine
@@ -47,3 +47,4 @@ APScheduler>=3.10.0           # Background job scheduler for autonomous outreach
 
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
+aiohttp>=3.13.4 # not directly required, pinned by Snyk to avoid a vulnerability
