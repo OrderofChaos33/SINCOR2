@@ -1,576 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SINCOR Control Center</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SINCOR Dashboard — Your Agent Team</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#070710;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+    :root{--purple:#6366f1;--purple2:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f87171;--surface:#111827;--border:#1e293b}
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
+    /* NAV */
+    nav{background:#0d0d1a;border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+    .nav-logo{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1rem;color:#f1f5f9}
+    .nav-logo-dot{width:30px;height:30px;background:linear-gradient(135deg,var(--purple),var(--purple2));border-radius:.4rem;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem}
+    .nav-right{display:flex;align-items:center;gap:1rem}
+    .nav-email{color:#64748b;font-size:.82rem}
+    .status-pill{display:flex;align-items:center;gap:.4rem;background:#0f2a1a;border:1px solid #166534;border-radius:999px;padding:.25rem .75rem;font-size:.78rem;color:#34d399;font-weight:600}
+    .status-dot{width:6px;height:6px;background:#34d399;border-radius:50%;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-        .header {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 20px 30px;
-            margin-bottom: 20px;
-            color: white;
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-        }
+    /* LAYOUT */
+    .container{max-width:1100px;margin:0 auto;padding:2rem 1.5rem}
 
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 5px;
-        }
+    /* WELCOME */
+    .welcome{margin-bottom:2rem}
+    .welcome h1{font-size:1.6rem;font-weight:700;color:#f1f5f9;margin-bottom:.35rem}
+    .welcome p{color:#94a3b8;font-size:.95rem}
 
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
+    /* STATS GRID */
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.25rem 1.5rem}
+    .stat-icon{font-size:1.4rem;margin-bottom:.5rem}
+    .stat-value{font-size:1.75rem;font-weight:800;color:#f1f5f9;line-height:1}
+    .stat-label{font-size:.8rem;color:#64748b;margin:.25rem 0}
+    .stat-delta{font-size:.75rem;color:#34d399;font-weight:600}
 
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
+    /* AGENT GRID */
+    .section-title{font-size:1rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem}
+    .agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:2rem}
+    .agent-card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.25rem;display:flex;gap:1rem;align-items:flex-start;transition:border-color .2s}
+    .agent-card:hover{border-color:var(--purple)}
+    .agent-icon{font-size:1.5rem;width:40px;text-align:center;flex-shrink:0}
+    .agent-name{font-weight:700;color:#f1f5f9;font-size:.9rem;margin-bottom:.25rem;display:flex;align-items:center;gap:.5rem}
+    .active-badge{background:#0f2a1a;border:1px solid #166534;color:#34d399;font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px}
+    .agent-task{color:#94a3b8;font-size:.82rem;line-height:1.5}
 
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-            transition: transform 0.3s ease;
-        }
+    /* UPGRADE BANNER */
+    .upgrade{background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.1));border:1px solid rgba(99,102,241,.3);border-radius:1rem;padding:1.5rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
+    .upgrade h3{font-size:1rem;font-weight:700;color:#f1f5f9;margin-bottom:.25rem}
+    .upgrade p{color:#94a3b8;font-size:.85rem}
+    .upgrade-btn{background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;border:none;border-radius:.75rem;padding:.75rem 1.5rem;font-weight:700;font-size:.9rem;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
 
-        .card:hover {
-            transform: translateY(-5px);
-        }
+    /* QUICK LINKS */
+    .quick-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-bottom:2rem}
+    .quick-link{background:var(--surface);border:1px solid var(--border);border-radius:.75rem;padding:1rem 1.25rem;text-decoration:none;color:#e2e8f0;display:flex;align-items:center;gap:.75rem;font-size:.875rem;font-weight:500;transition:all .2s}
+    .quick-link:hover{border-color:var(--purple);color:#a78bfa}
+    .quick-link-icon{font-size:1.2rem}
 
-        .card h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+    /* FOOTER */
+    footer{text-align:center;padding:2rem;color:#334155;font-size:.8rem;border-top:1px solid var(--border);margin-top:2rem}
+    footer a{color:#475569;text-decoration:none}
 
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .status-ok {
-            background: #10b981;
-            box-shadow: 0 0 10px #10b981;
-        }
-
-        .status-warning {
-            background: #f59e0b;
-            box-shadow: 0 0 10px #f59e0b;
-        }
-
-        .status-error {
-            background: #ef4444;
-            box-shadow: 0 0 10px #ef4444;
-        }
-
-        .metric {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .metric:last-child {
-            border-bottom: none;
-        }
-
-        .metric-label {
-            font-weight: 500;
-            color: #374151;
-        }
-
-        .metric-value {
-            font-size: 1.2em;
-            font-weight: 700;
-            color: #667eea;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 20px;
-            background: #e5e7eb;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 8px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            transition: width 0.5s ease;
-        }
-
-        .gauge-container {
-            width: 100%;
-            height: 150px;
-            position: relative;
-            margin: 20px 0;
-        }
-
-        .gauge {
-            width: 100%;
-            height: 100%;
-        }
-
-        .button-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .btn {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            font-size: 0.85em;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-
-        .btn-warning {
-            background: #f59e0b;
-            color: white;
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .chart-container {
-            height: 200px;
-            margin: 15px 0;
-        }
-
-        .alert {
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-weight: 500;
-        }
-
-        .alert-success {
-            background: #d1fae5;
-            color: #065f46;
-            border-left: 4px solid #10b981;
-        }
-
-        .alert-warning {
-            background: #fef3c7;
-            color: #92400e;
-            border-left: 4px solid #f59e0b;
-        }
-
-        .alert-error {
-            background: #fee2e2;
-            color: #991b1b;
-            border-left: 4px solid #ef4444;
-        }
-
-        .live-feed {
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.85em;
-            background: #1f2937;
-            color: #10b981;
-            padding: 15px;
-            border-radius: 8px;
-        }
-
-        .live-feed-item {
-            padding: 5px 0;
-            border-bottom: 1px solid #374151;
-        }
-
-        .dial-container {
-            display: flex;
-            justify-content: space-around;
-            margin: 20px 0;
-        }
-
-        .dial {
-            text-align: center;
-        }
-
-        .dial-value {
-            font-size: 2em;
-            font-weight: 700;
-            color: #667eea;
-        }
-
-        .dial-label {
-            font-size: 0.9em;
-            color: #6b7280;
-            margin-top: 5px;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .pulsing {
-            animation: pulse 2s infinite;
-        }
-    </style>
+    @media(max-width:600px){
+      .upgrade{flex-direction:column}
+      .welcome h1{font-size:1.3rem}
+    }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚀 SINCOR Control Center</h1>
-        <p>Real-time Platform Monitoring & Control Dashboard</p>
+
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-dot">S</div>
+    SINCOR
+  </div>
+  <div class="nav-right">
+    {% if email %}<span class="nav-email">{{ email }}</span>{% endif %}
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      {{ num_agents }} Agents Active
     </div>
+  </div>
+</nav>
 
-    <div class="dashboard-grid">
-        <!-- System Status Card -->
-        <div class="card">
-            <h3>
-                <span class="status-indicator status-ok" id="system-status-indicator"></span>
-                System Status
-            </h3>
-            <div class="metric">
-                <span class="metric-label">Security Score</span>
-                <span class="metric-value" id="security-score">95/100</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Uptime</span>
-                <span class="metric-value" id="uptime">--</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Active Sessions</span>
-                <span class="metric-value" id="active-sessions">0</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Total Requests</span>
-                <span class="metric-value" id="total-requests">0</span>
-            </div>
-        </div>
+<div class="container">
 
-        <!-- CPU & Memory Card -->
-        <div class="card">
-            <h3>
-                <span class="status-indicator status-ok" id="resources-indicator"></span>
-                System Resources
-            </h3>
-            <div class="metric">
-                <span class="metric-label">CPU Usage</span>
-                <span class="metric-value" id="cpu-usage">0%</span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="cpu-bar" style="width: 0%"></div>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Memory Usage</span>
-                <span class="metric-value" id="memory-usage">0%</span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="memory-bar" style="width: 0%"></div>
-            </div>
-        </div>
+  <!-- Welcome -->
+  <div class="welcome">
+    <h1>{% if fname %}Welcome back, {{ fname }} 👋{% else %}Your Agent Dashboard 👋{% endif %}</h1>
+    <p>
+      {% if company and company != 'Your Company' %}
+        <strong style="color:#a78bfa">{{ company }}</strong> · 
+      {% endif %}
+      {{ tier }} Plan · {{ num_agents }} autonomous agents working 24/7
+      {% if member_since %} · Member since {{ member_since }}{% endif %}
+    </p>
+  </div>
 
-        <!-- Security Features Card -->
-        <div class="card">
-            <h3>
-                <span class="status-indicator status-ok"></span>
-                Security Features
-            </h3>
-            <div class="metric">
-                <span class="metric-label">Authentication</span>
-                <span class="metric-value">✅ ACTIVE</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Rate Limiting</span>
-                <span class="metric-value">✅ ACTIVE</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Input Validation</span>
-                <span class="metric-value">✅ ACTIVE</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Security Headers</span>
-                <span class="metric-value">✅ ACTIVE</span>
-            </div>
-        </div>
-
-        <!-- Rate Limits Card -->
-        <div class="card">
-            <h3>
-                <span class="status-indicator status-ok"></span>
-                Rate Limit Status
-            </h3>
-            <div class="metric">
-                <span class="metric-label">Auth Endpoint</span>
-                <span class="metric-value" id="auth-rate">5/min</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Payment Endpoint</span>
-                <span class="metric-value" id="payment-rate">10/min</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Public Endpoint</span>
-                <span class="metric-value" id="public-rate">20/min</span>
-            </div>
-            <div class="metric">
-                <span class="metric-label">Total Blocked</span>
-                <span class="metric-value" id="blocked-requests">0</span>
-            </div>
-        </div>
+  <!-- Stats -->
+  <div class="stats">
+    {% for s in stats %}
+    <div class="stat-card">
+      <div class="stat-icon">{{ s.icon }}</div>
+      <div class="stat-value">{{ s.value }}</div>
+      <div class="stat-label">{{ s.label }}</div>
+      <div class="stat-delta">{{ s.delta }}</div>
     </div>
+    {% endfor %}
+  </div>
 
-    <!-- Dials Section -->
-    <div class="card">
-        <h3>Real-Time Performance Dials</h3>
-        <div class="dial-container">
-            <div class="dial">
-                <div class="dial-value pulsing" id="dial-requests">0</div>
-                <div class="dial-label">Requests/sec</div>
-            </div>
-            <div class="dial">
-                <div class="dial-value pulsing" id="dial-errors">0</div>
-                <div class="dial-label">Errors/min</div>
-            </div>
-            <div class="dial">
-                <div class="dial-value pulsing" id="dial-response-time">0ms</div>
-                <div class="dial-label">Avg Response</div>
-            </div>
-            <div class="dial">
-                <div class="dial-value pulsing" id="dial-threats">0</div>
-                <div class="dial-label">Threats Blocked</div>
-            </div>
-        </div>
+  <!-- Upgrade banner (only for Starter) -->
+  {% if tier == 'Starter' %}
+  <div class="upgrade">
+    <div>
+      <h3>🚀 Unlock 24 agents with Professional</h3>
+      <p>Double your output — sales pipeline, advanced research, and priority support included.</p>
     </div>
+    <a href="/products/professional" class="upgrade-btn">Upgrade to Professional →</a>
+  </div>
+  {% endif %}
 
-    <!-- Control Buttons -->
-    <div class="dashboard-grid">
-        <div class="card">
-            <h3>System Controls</h3>
-            <div class="button-grid">
-                <button class="btn btn-primary" onclick="refreshMetrics()">🔄 Refresh Data</button>
-                <button class="btn btn-success" onclick="runHealthCheck()">💚 Health Check</button>
-                <button class="btn btn-warning" onclick="viewLogs()">📋 View Logs</button>
-                <button class="btn btn-primary" onclick="runTests()">🧪 Run Tests</button>
-            </div>
+  <!-- Agent Activity -->
+  <div class="section-title">Your Agent Team — Live Activity</div>
+  <div class="agents">
+    {% for agent in agents %}
+    <div class="agent-card">
+      <div class="agent-icon">{{ agent.icon }}</div>
+      <div>
+        <div class="agent-name">
+          {{ agent.name }}
+          <span class="active-badge">● ACTIVE</span>
         </div>
-
-        <div class="card">
-            <h3>Quick Actions</h3>
-            <div class="button-grid">
-                <button class="btn btn-primary" onclick="clearCache()">🗑️ Clear Cache</button>
-                <button class="btn btn-success" onclick="exportMetrics()">📊 Export Data</button>
-                <button class="btn btn-warning" onclick="resetLimits()">⚡ Reset Limits</button>
-                <button class="btn btn-danger" onclick="emergencyMode()">🚨 Emergency</button>
-            </div>
-        </div>
+        <div class="agent-task">{{ agent.task }}</div>
+      </div>
     </div>
+    {% endfor %}
+  </div>
 
-    <!-- Live Activity Feed -->
-    <div class="card">
-        <h3>Live Activity Feed</h3>
-        <div class="live-feed" id="activity-feed">
-            <div class="live-feed-item">[SYSTEM] Dashboard initialized...</div>
-        </div>
-    </div>
+  <!-- Quick Links -->
+  <div class="section-title">Quick Access</div>
+  <div class="quick-links">
+    <a href="/admin/training-vault{% if email %}?email={{ email }}{% endif %}" class="quick-link">
+      <span class="quick-link-icon">📚</span> Training Vault
+    </a>
+    <a href="/contact" class="quick-link">
+      <span class="quick-link-icon">💬</span> Support
+    </a>
+    <a href="/billing" class="quick-link">
+      <span class="quick-link-icon">💳</span> Billing
+    </a>
+    <a href="/docs" class="quick-link">
+      <span class="quick-link-icon">📖</span> Documentation
+    </a>
+    <a href="/sinc" class="quick-link">
+      <span class="quick-link-icon">🪙</span> SINC Token
+    </a>
+    <a href="/api/profile/delete" class="quick-link" style="color:#ef4444" onclick="return confirm('Permanently delete your data?')">
+      <span class="quick-link-icon">🗑</span> Delete My Data
+    </a>
+  </div>
 
-    <!-- Alerts Section -->
-    <div class="dashboard-grid">
-        <div class="card">
-            <h3>System Alerts</h3>
-            <div class="alert alert-success">
-                ✅ All security features operational
-            </div>
-            <div class="alert alert-warning" id="warning-alert" style="display:none;">
-                ⚠️ High memory usage detected
-            </div>
-        </div>
+</div>
 
-        <div class="card">
-            <h3>Recent Events</h3>
-            <div id="recent-events">
-                <div class="metric">
-                    <span class="metric-label">Last Login</span>
-                    <span class="metric-value" id="last-login">Never</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Last API Call</span>
-                    <span class="metric-value" id="last-api">--</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Last Threat</span>
-                    <span class="metric-value" id="last-threat">None</span>
-                </div>
-            </div>
-        </div>
-    </div>
+<footer>
+  © 2026 SINCOR Business Solutions ·
+  <a href="/terms">Terms</a> ·
+  <a href="/privacy">Privacy</a> ·
+  <a href="/security">Security</a>
+</footer>
 
-    <script>
-        // Live metrics update
-        function updateMetrics() {
-            fetch('/api/monitoring/metrics')
-                .then(res => res.json())
-                .then(data => {
-                    // Update CPU
-                    const cpu = data.cpu?.percent || 0;
-                    document.getElementById('cpu-usage').textContent = cpu.toFixed(1) + '%';
-                    document.getElementById('cpu-bar').style.width = cpu + '%';
-
-                    // Update Memory
-                    const memory = data.memory?.percent || 0;
-                    document.getElementById('memory-usage').textContent = memory.toFixed(1) + '%';
-                    document.getElementById('memory-bar').style.width = memory + '%';
-
-                    // Update uptime
-                    if (data.uptime) {
-                        document.getElementById('uptime').textContent = data.uptime.formatted;
-                    }
-
-                    // Update status indicators
-                    updateStatusIndicators(cpu, memory);
-
-                    // Add to activity feed
-                    addToFeed('📊 Metrics updated');
-                })
-                .catch(err => {
-                    console.error('Failed to fetch metrics:', err);
-                    addToFeed('❌ Metrics fetch failed');
-                });
-        }
-
-        function updateStatusIndicators(cpu, memory) {
-            const indicator = document.getElementById('resources-indicator');
-            if (cpu > 80 || memory > 80) {
-                indicator.className = 'status-indicator status-error';
-            } else if (cpu > 60 || memory > 60) {
-                indicator.className = 'status-indicator status-warning';
-            } else {
-                indicator.className = 'status-indicator status-ok';
-            }
-        }
-
-        function addToFeed(message) {
-            const feed = document.getElementById('activity-feed');
-            const timestamp = new Date().toLocaleTimeString();
-            const item = document.createElement('div');
-            item.className = 'live-feed-item';
-            item.textContent = `[${timestamp}] ${message}`;
-            feed.insertBefore(item, feed.firstChild);
-
-            // Keep only last 20 items
-            while (feed.children.length > 20) {
-                feed.removeChild(feed.lastChild);
-            }
-        }
-
-        // Control functions
-        function refreshMetrics() {
-            addToFeed('🔄 Refreshing metrics...');
-            updateMetrics();
-        }
-
-        function runHealthCheck() {
-            addToFeed('💚 Running health check...');
-            fetch('/api/monitoring/status')
-                .then(res => res.json())
-                .then(data => {
-                    addToFeed(`✅ Health check passed: ${data.status}`);
-                })
-                .catch(() => addToFeed('❌ Health check failed'));
-        }
-
-        function viewLogs() {
-            addToFeed('📋 Opening logs...');
-            alert('Logs available in /logs/ directory');
-        }
-
-        function runTests() {
-            addToFeed('🧪 Running test suite...');
-            alert('Run: python run_all_tests.py');
-        }
-
-        function clearCache() {
-            addToFeed('🗑️ Cache cleared');
-        }
-
-        function exportMetrics() {
-            addToFeed('📊 Exporting metrics...');
-        }
-
-        function resetLimits() {
-            addToFeed('⚡ Rate limits reset');
-        }
-
-        function emergencyMode() {
-            if (confirm('Enter emergency mode? This will restrict all non-critical access.')) {
-                addToFeed('🚨 EMERGENCY MODE ACTIVATED');
-            }
-        }
-
-        // Simulate live data
-        function simulateLiveData() {
-            const requests = Math.floor(Math.random() * 100);
-            const errors = Math.floor(Math.random() * 10);
-            const responseTime = Math.floor(Math.random() * 100);
-            const threats = Math.floor(Math.random() * 5);
-
-            document.getElementById('dial-requests').textContent = requests;
-            document.getElementById('dial-errors').textContent = errors;
-            document.getElementById('dial-response-time').textContent = responseTime + 'ms';
-            document.getElementById('dial-threats').textContent = threats;
-
-            document.getElementById('total-requests').textContent = Math.floor(Math.random() * 10000);
-            document.getElementById('blocked-requests').textContent = Math.floor(Math.random() * 100);
-        }
-
-        // Initialize
-        updateMetrics();
-        setInterval(updateMetrics, 5000);  // Update every 5 seconds
-        setInterval(simulateLiveData, 2000);  // Update dials every 2 seconds
-
-        addToFeed('🚀 SINCOR Control Center online');
-        addToFeed('✅ All systems operational');
-    </script>
 </body>
 </html>
