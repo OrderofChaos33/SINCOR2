@@ -14,8 +14,13 @@ from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect
+from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+try:
+    from authlib.integrations.flask_client import OAuth
+    OAUTH_AVAILABLE = True
+except ImportError:
+    OAUTH_AVAILABLE = False
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
@@ -51,7 +56,36 @@ app.config['JWT_SECRET_KEY'] = jwt_secret
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)  # Reduced from 24h
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB max request size
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY') or jwt_secret  # For session/CSRF
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
 jwt = JWTManager(app)
+
+# OAuth (Google + GitHub)
+oauth = None
+if OAUTH_AVAILABLE:
+    oauth = OAuth(app)
+    _gcid = os.environ.get('GOOGLE_CLIENT_ID', '')
+    _gcs  = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+    _ghid = os.environ.get('GITHUB_CLIENT_ID', '')
+    _ghs  = os.environ.get('GITHUB_CLIENT_SECRET', '')
+    if _gcid and _gcs:
+        oauth.register('google',
+            client_id=_gcid,
+            client_secret=_gcs,
+            server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+            client_kwargs={'scope': 'openid email profile'},
+        )
+        logger.info('[OAUTH] Google OAuth registered')
+    if _ghid and _ghs:
+        oauth.register('github',
+            client_id=_ghid,
+            client_secret=_ghs,
+            access_token_url='https://github.com/login/oauth/access_token',
+            authorize_url='https://github.com/login/oauth/authorize',
+            api_base_url='https://api.github.com/',
+            client_kwargs={'scope': 'user:email'},
+        )
+        logger.info('[OAUTH] GitHub OAuth registered')
 
 # Rate limiter
 limiter = Limiter(
@@ -545,6 +579,94 @@ PRODUCT_PRICES = {
 def signup_page():
     """Render signup page."""
     return render_template('signup.html')
+
+
+# ── OAuth Routes ────────────────────────────────────────────────────────────
+@app.route('/auth/google')
+def auth_google():
+    """Redirect to Google OAuth."""
+    if not oauth or not hasattr(oauth, 'google'):
+        return jsonify({'error': 'Google OAuth not configured'}), 503
+    redirect_uri = url_for('auth_google_callback', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route('/auth/google/callback')
+def auth_google_callback():
+    """Handle Google OAuth callback."""
+    try:
+        if not oauth or not hasattr(oauth, 'google'):
+            return redirect('/signup?error=oauth_unavailable')
+        token = oauth.google.authorize_access_token()
+        user_info = token.get('userinfo') or oauth.google.userinfo()
+        email = user_info.get('email', '')
+        name  = user_info.get('name', email.split('@')[0])
+        if not email:
+            return redirect('/signup?error=no_email')
+        session['user_email'] = email
+        session['user_name']  = name
+        access_token = create_access_token(identity=email)
+        logger.info(f'[OAUTH] Google login: {email}')
+        resp = make_response(redirect('/dashboard'))
+        resp.set_cookie('access_token', access_token, httponly=True,
+                        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
+                        samesite='Lax', max_age=28800)
+        return resp
+    except Exception as e:
+        logger.error(f'[OAUTH] Google callback error: {e}')
+        return redirect(f'/signup?error=oauth_failed')
+
+
+@app.route('/auth/github')
+def auth_github():
+    """Redirect to GitHub OAuth."""
+    if not oauth or not hasattr(oauth, 'github'):
+        return jsonify({'error': 'GitHub OAuth not configured'}), 503
+    redirect_uri = url_for('auth_github_callback', _external=True)
+    return oauth.github.authorize_redirect(redirect_uri)
+
+
+@app.route('/auth/github/callback')
+def auth_github_callback():
+    """Handle GitHub OAuth callback."""
+    try:
+        if not oauth or not hasattr(oauth, 'github'):
+            return redirect('/signup?error=oauth_unavailable')
+        token = oauth.github.authorize_access_token()
+        resp  = oauth.github.get('user')
+        user_info = resp.json()
+        email = user_info.get('email', '')
+        if not email:
+            # Fetch primary email separately
+            emails_resp = oauth.github.get('user/emails')
+            for e in emails_resp.json():
+                if e.get('primary'):
+                    email = e.get('email', '')
+                    break
+        name = user_info.get('name') or user_info.get('login', '')
+        if not email:
+            return redirect('/signup?error=no_email')
+        session['user_email'] = email
+        session['user_name']  = name
+        access_token = create_access_token(identity=email)
+        logger.info(f'[OAUTH] GitHub login: {email}')
+        resp2 = make_response(redirect('/dashboard'))
+        resp2.set_cookie('access_token', access_token, httponly=True,
+                         secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
+                         samesite='Lax', max_age=28800)
+        return resp2
+    except Exception as e:
+        logger.error(f'[OAUTH] GitHub callback error: {e}')
+        return redirect(f'/signup?error=oauth_failed')
+
+
+@app.route('/auth/logout')
+def auth_logout():
+    """Clear session and JWT cookie."""
+    session.clear()
+    resp = make_response(redirect('/'))
+    resp.delete_cookie('access_token')
+    return resp
 
 
 @app.route('/onboarding', methods=['GET'])

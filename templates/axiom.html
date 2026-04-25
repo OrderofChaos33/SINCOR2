@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -34,8 +34,8 @@
     .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
     .nav-logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(59,130,246,0.5); }
     .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .nav-links { display: flex; align-items: center; gap: 24px; }
-    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-links { display: flex; align-items: center; gap: 10px; }
+    .nav-links a { color: var(--text); text-decoration: none; font-size: 13px; font-weight: 700; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.25); padding: 10px 18px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); }
     .nav-cta { background: linear-gradient(135deg, var(--blue), #1d4ed8); color: white !important; padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; }
 
@@ -124,13 +124,13 @@
 
 <nav>
   <a href="/" class="nav-logo">
-    <img src="/static/sincor_logo.jpg" alt="SINCOR">
+    <img src="/static/sinc_logo.jpg" alt="SINCOR">
     <span>SINCOR</span>
   </a>
   <div class="nav-links">
-    <a href="/">Home</a>
-    <a href="/sinc">SINC Token</a>
-    <a href="/pricing">Pricing</a>
+    <a href="/">🏠 Home</a>
+    <a href="/sinc-gateway">🌐 SINC Token</a>
+    <a href="/#pricing">💰 Pricing</a>
     <a href="https://app.uniswap.org/swap?outputCurrency=0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822&chain=base" target="_blank" class="nav-cta">Buy AXM →</a>
   </div>
 </nav>

@@ -119,33 +119,38 @@
     }
     
     .nav-links a {
-      color: var(--text-muted);
+      color: var(--text);
       text-decoration: none;
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      transition: all 0.3s;
+      letter-spacing: 1.5px;
+      transition: all 0.2s;
       position: relative;
-    }
-    
-    .nav-links a::before {
-      content: '';
-      position: absolute;
-      bottom: -4px;
-      left: 0;
-      width: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--purple), var(--cyan));
-      transition: width 0.3s;
+      background: rgba(139,92,246,0.08);
+      border: 1px solid rgba(139,92,246,0.25);
+      padding: 10px 18px;
+      border-radius: 8px;
+      display: inline-block;
     }
     
     .nav-links a:hover {
-      color: var(--text);
+      color: white;
+      background: rgba(139,92,246,0.25);
+      border-color: var(--purple);
+      box-shadow: 0 0 15px rgba(139,92,246,0.3);
+      transform: translateY(-1px);
     }
     
-    .nav-links a:hover::before {
-      width: 100%;
+    .nav-links a.nav-highlight {
+      background: linear-gradient(135deg, rgba(6,182,212,0.15), rgba(139,92,246,0.15));
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    
+    .nav-links a.nav-highlight:hover {
+      background: linear-gradient(135deg, rgba(6,182,212,0.35), rgba(139,92,246,0.35));
+      box-shadow: 0 0 15px rgba(6,182,212,0.4);
     }
     
     .nav-cta {
@@ -544,7 +549,8 @@
     
     @media (max-width: 768px) {
       nav { flex-direction: column; gap: 20px; padding: 16px 20px; }
-      .nav-links { flex-direction: column; gap: 12px; }
+      .nav-links { flex-direction: column; gap: 8px; width: 100%; }
+      .nav-links a { text-align: center; padding: 12px 16px; }
       .hero { padding: 60px 20px 40px; }
       h1 { font-size: 40px; }
       .hero-buttons { flex-direction: column; }
@@ -610,14 +616,16 @@
 </div>
 
 <nav>
-  <a href="/" class="nav-logo" style="display:flex;align-items:center;gap:10px;">
-      <img src="/static/sincor_logo.jpg" alt="SINCOR" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid rgba(212,175,55,0.4);">≈ SINCOR</a>
-  <ul class="nav-links">
-    <li><a href="#pricing">PRICING</a></li>
-    <li><a href="#features">FEATURES</a></li>
-    <li><a href="#how">HOW IT WORKS</a></li>
+  <a href="/" class="nav-logo" style="display:flex;align-items:center;gap:12px;">
+      <img src="/static/sinc_logo.jpg" alt="SINCOR" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid rgba(139,92,246,0.5);box-shadow:0 0 12px rgba(139,92,246,0.4);"> SINCOR</a>
+  <ul class="nav-links" style="gap:10px;">
+    <li><a href="#pricing">💰 Pricing</a></li>
+    <li><a href="#features">⚡ Features</a></li>
+    <li><a href="/axiom" class="nav-highlight">🪙 AXIOM Token</a></li>
+    <li><a href="/sinc-gateway">🌐 SINC Token</a></li>
+    <li><a href="#how">📖 How It Works</a></li>
   </ul>
-  <a href="/signup" class="nav-cta">Get Started</a>
+  <a href="/signup" class="nav-cta">🚀 Deploy Now</a>
 </nav>
 
 <main>
