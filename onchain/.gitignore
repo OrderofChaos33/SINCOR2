@@ -1,0 +1,7 @@
+out/
+cache/
+broadcast/
+lib/
+.env
+deployments/*.json
+!deployments/.gitkeep
