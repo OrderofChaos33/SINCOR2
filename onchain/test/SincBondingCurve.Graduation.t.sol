@@ -9,8 +9,8 @@ import {MockSinc} from "./mocks/MockSinc.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 
 contract SincBondingCurveGraduationTest is Test {
-    address constant POOL_MANAGER = 0x498581ff718922c3F8E6A244956AF099B2652B2B;
-    address constant POSITION_MANAGER = 0x7C5f5A4bbd8fD63184577525326123B519429bDc;
+    address constant POOL_MANAGER = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+    address constant POSITION_MANAGER = 0x7C5f5A4bBd8fD63184577525326123B519429bDc;
     address constant DEAD = 0x000000000000000000000000000000000000dEaD;
     uint256 constant GRADUATION_THRESHOLD_ETH = 0.5 ether;  // ~$1500 at $3000/ETH
 
@@ -44,7 +44,7 @@ contract SincBondingCurveGraduationTest is Test {
 
     function test_GraduateAtomic_PoolInitialized_LPBurned_TreasuryFunded() public {
         // Skip if hook isn't deployed (this test runs after Task 14 wires it in)
-        if (curve.hook() == address(0)) {
+        if (address(curve.hook()) == address(0)) {
             return;
         }
         // Buy until threshold
@@ -68,7 +68,7 @@ contract SincBondingCurveGraduationTest is Test {
         // Setup graduation
         vm.deal(address(this), 1 ether);
         curve.buy{value: 0.6 ether}(0.6 ether, address(0));
-        if (curve.hook() == address(0)) return;
+        if (address(curve.hook()) == address(0)) return;
         curve.graduate();
 
         vm.deal(address(this), 1 ether);
