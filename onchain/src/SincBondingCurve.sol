@@ -57,21 +57,36 @@ contract SincBondingCurve {
         require(msg.value >= ethIn, "Insufficient ETH");
         require(ethIn > 0, "Zero ETH");
 
-        sincOut = getBuyAmount(ethIn);
+        // Referral split: 3% to referrer (or treasury fallback), 97% stays in curve
+        uint256 referralCut = (ethIn * 3) / 100;
+        uint256 curveCut = ethIn - referralCut;
+
+        // Price SINC against the ETH that actually enters the curve (curveCut),
+        // keeping the AMM invariant consistent with ethAccumulated.
+        sincOut = getBuyAmount(curveCut);
         require(sincOut > 0, "Zero SINC out");
         require(sincOut <= sinc.balanceOf(address(this)), "Insufficient SINC in curve");
 
+        address referralRecipient = (referrer != address(0) && referrer != msg.sender)
+            ? referrer
+            : treasury;
+
         sincSold += sincOut;
-        ethAccumulated += ethIn;
+        ethAccumulated += curveCut;
 
         require(sinc.transfer(msg.sender, sincOut), "SINC transfer failed");
 
+        // Pay referrer (or treasury fallback)
+        (bool refOk,) = referralRecipient.call{value: referralCut}("");
+        require(refOk, "Referral payment failed");
+
+        // Refund excess ETH
         if (msg.value > ethIn) {
             (bool ok,) = msg.sender.call{value: msg.value - ethIn}("");
             require(ok, "Refund failed");
         }
 
-        emit Buy(msg.sender, ethIn, sincOut, referrer);
+        emit Buy(msg.sender, ethIn, sincOut, referralRecipient);
     }
 
     function sell(uint256 sincIn) external returns (uint256 ethOut) {
