@@ -17,6 +17,8 @@ contract SincBondingCurve {
     uint256 public sincSold;
     uint256 public ethAccumulated;
     bool public graduated;
+    mapping(address => bool) public hasGenesisNFT;
+    uint256 public nextBuyOrderNumber = 1;
 
     event Buy(address indexed buyer, uint256 ethIn, uint256 sincOut, address referrer);
     event Sell(address indexed seller, uint256 sincIn, uint256 ethOut);
@@ -75,6 +77,12 @@ contract SincBondingCurve {
         ethAccumulated += curveCut;
 
         require(sinc.transfer(msg.sender, sincOut), "SINC transfer failed");
+
+        // Auto-mint Genesis NFT on first buy only
+        if (!hasGenesisNFT[msg.sender]) {
+            hasGenesisNFT[msg.sender] = true;
+            nft.mint(msg.sender, nextBuyOrderNumber++);
+        }
 
         // Pay referrer (or treasury fallback)
         (bool refOk,) = referralRecipient.call{value: referralCut}("");
