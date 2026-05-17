@@ -3,6 +3,13 @@ pragma solidity 0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SincGenesisNFT} from "./SincGenesisNFT.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract SincBondingCurve {
     IERC20 public immutable sinc;
@@ -20,13 +27,37 @@ contract SincBondingCurve {
     mapping(address => bool) public hasGenesisNFT;
     uint256 public nextBuyOrderNumber = 1;
 
+    IPoolManager public immutable poolManager;
+    IPositionManager public immutable positionManager;
+    IHooks public hook;  // set once via setHook before any buy
+    address public constant WETH = 0x4200000000000000000000000000000000000006;
+    address public constant DEAD = 0x000000000000000000000000000000000000dEaD;
+    uint256 public constant GRADUATION_THRESHOLD = 0.5 ether;
+    uint24 public constant POOL_FEE = 3000;
+    int24 public constant TICK_SPACING = 60;
+
     event Buy(address indexed buyer, uint256 ethIn, uint256 sincOut, address referrer);
     event Sell(address indexed seller, uint256 sincIn, uint256 ethOut);
+    event Graduated(uint256 ethToLP, uint256 ethToTreasury, uint256 sincToLP, uint256 lpTokenId);
 
-    constructor(address _sinc, address _treasury, address _nft) {
+    constructor(
+        address _sinc,
+        address _treasury,
+        address _nft,
+        address _poolManager,
+        address _positionManager
+    ) {
         sinc = IERC20(_sinc);
         treasury = _treasury;
         nft = SincGenesisNFT(_nft);
+        poolManager = IPoolManager(_poolManager);
+        positionManager = IPositionManager(_positionManager);
+    }
+
+    function setHook(address _hook) external {
+        require(hook == IHooks(address(0)), "Hook already set");
+        require(_hook != address(0), "Zero hook");
+        hook = IHooks(_hook);
     }
 
     function currentPriceWei() public view returns (uint256) {
@@ -112,6 +143,83 @@ contract SincBondingCurve {
         require(ok, "ETH transfer failed");
 
         emit Sell(msg.sender, sincIn, ethOut);
+    }
+
+    function graduate() external {
+        require(!graduated, "Already graduated");
+        require(ethAccumulated >= GRADUATION_THRESHOLD, "Below threshold");
+        require(hook != IHooks(address(0)), "Hook not set");
+
+        graduated = true;
+
+        uint256 ethToLP = (ethAccumulated * 80) / 100;
+        uint256 ethToTreasury = ethAccumulated - ethToLP;
+        uint256 sincToLP = sinc.balanceOf(address(this));
+
+        (Currency currency0, Currency currency1) = address(sinc) < WETH
+            ? (Currency.wrap(address(sinc)), Currency.wrap(WETH))
+            : (Currency.wrap(WETH), Currency.wrap(address(sinc)));
+
+        PoolKey memory poolKey = PoolKey({
+            currency0: currency0,
+            currency1: currency1,
+            fee: POOL_FEE,
+            tickSpacing: TICK_SPACING,
+            hooks: hook
+        });
+
+        uint160 sqrtPriceX96 = _computeSqrtPriceX96(ethToLP, sincToLP);
+
+        // IPoolManager.initialize signature (from lib/v4-core/src/interfaces/IPoolManager.sol):
+        //   function initialize(PoolKey memory key, uint160 sqrtPriceX96) external returns (int24 tick);
+        poolManager.initialize(poolKey, sqrtPriceX96);
+
+        sinc.approve(address(positionManager), sincToLP);
+
+        uint256 lpTokenId = positionManager.nextTokenId();
+        bytes memory actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR));
+        bytes[] memory params = new bytes[](2);
+        params[0] = abi.encode(
+            poolKey,
+            int24(-887220),  // TickMath.MIN_TICK aligned to spacing 60
+            int24(887220),
+            sincToLP,
+            uint128(sincToLP),
+            uint128(ethToLP),
+            address(this),
+            bytes("")
+        );
+        params[1] = abi.encode(currency0, currency1);
+
+        positionManager.modifyLiquidities{value: ethToLP}(abi.encode(actions, params), block.timestamp + 60);
+
+        IERC721(address(positionManager)).transferFrom(address(this), DEAD, lpTokenId);
+
+        (bool ok,) = treasury.call{value: ethToTreasury}("");
+        require(ok, "Treasury transfer failed");
+
+        emit Graduated(ethToLP, ethToTreasury, sincToLP, lpTokenId);
+    }
+
+    function _computeSqrtPriceX96(uint256 ethReserve, uint256 sincReserve) internal pure returns (uint160) {
+        uint256 priceRatio = (ethReserve * 1e18) / sincReserve;
+        uint256 sqrtPrice = _sqrt(priceRatio);
+        return uint160((sqrtPrice * (1 << 96)) / 1e9);
+    }
+
+    function _sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+        return y;
+    }
+
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 
     receive() external payable {}

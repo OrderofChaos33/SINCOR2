@@ -18,7 +18,7 @@ contract SincBondingCurveNFTMintTest is Test {
         sinc = new MockSinc(address(this));
         address predictedCurve = computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
         nft = new SincGenesisNFT(predictedCurve);
-        curve = new SincBondingCurve(address(sinc), treasury, address(nft));
+        curve = new SincBondingCurve(address(sinc), treasury, address(nft), address(0x1111), address(0x2222));
         sinc.transfer(address(curve), 65_000_000 * 10**8);
     }
 

@@ -13,7 +13,7 @@ contract SincBondingCurveNoRugTest is Test {
         MockSinc sinc = new MockSinc(address(this));
         address predictedCurve = computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
         SincGenesisNFT nft = new SincGenesisNFT(predictedCurve);
-        curve = new SincBondingCurve(address(sinc), address(this), address(nft));
+        curve = new SincBondingCurve(address(sinc), address(this), address(nft), address(0x1111), address(0x2222));
     }
 
     function test_NoWithdrawEthFunction() public {

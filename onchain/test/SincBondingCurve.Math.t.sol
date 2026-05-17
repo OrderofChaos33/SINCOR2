@@ -21,7 +21,7 @@ contract SincBondingCurveMathTest is Test {
         // Simpler: predict curve address with CREATE2, but for tests use a 2-step deploy.
         address predictedCurve = computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
         nft = new SincGenesisNFT(predictedCurve);
-        curve = new SincBondingCurve(address(sinc), treasury, address(nft));
+        curve = new SincBondingCurve(address(sinc), treasury, address(nft), address(0x1111), address(0x2222));
         require(address(curve) == predictedCurve, "address prediction failed");
         sinc.transfer(address(curve), CURVE_SUPPLY);
     }
