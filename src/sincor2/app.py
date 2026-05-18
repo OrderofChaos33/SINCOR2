@@ -1145,10 +1145,18 @@ if __name__ == '__main__':
         print(f"Database: {waitlist_manager.db_path}")
 
     if AUTH_AVAILABLE:
-        print("\nDefault admin credentials:")
+        env = os.environ.get('FLASK_ENV', os.environ.get('ENVIRONMENT', 'production')).lower()
+        is_prod = env not in ('development', 'dev', 'test', 'testing', 'local')
+        admin_pw_set = bool(os.environ.get('ADMIN_PASSWORD')) and os.environ.get('ADMIN_PASSWORD') != 'changeme123'
+        print("\nAdmin credentials:")
         print(f"  Username: {os.environ.get('ADMIN_USERNAME', 'admin')}")
-        print(f"  Password: {os.environ.get('ADMIN_PASSWORD', 'changeme123')}")
-        print("  CHANGE THESE IN PRODUCTION!")
+        if admin_pw_set:
+            print(f"  Password: <configured via ADMIN_PASSWORD env var>")
+        elif is_prod:
+            print(f"  Password: NOT CONFIGURED — admin auth is REJECTED in production")
+            print(f"  ⚠️  Set ADMIN_PASSWORD env var to a strong value before launch.")
+        else:
+            print(f"  Password: changeme123  (dev default — DO NOT use in production)")
 
     if RATE_LIMIT_AVAILABLE:
         print("\nRate Limiting Active:")

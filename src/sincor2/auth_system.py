@@ -87,7 +87,23 @@ class SINCORAuth:
 
         # Get admin credentials from environment
         valid_username = os.environ.get('ADMIN_USERNAME', 'admin')
-        valid_password = os.environ.get('ADMIN_PASSWORD', 'changeme123')
+        valid_password = os.environ.get('ADMIN_PASSWORD')
+
+        # SECURITY: In production, refuse all auth attempts if ADMIN_PASSWORD
+        # is unset OR equals the well-known dev placeholder. Prevents the
+        # admin panel being accessible with "changeme123" when Railway env
+        # vars are missing. Dev/test environments still fall through to the
+        # placeholder so local startup isn't blocked.
+        env = os.environ.get('FLASK_ENV', os.environ.get('ENVIRONMENT', 'production')).lower()
+        is_production = env not in ('development', 'dev', 'test', 'testing', 'local')
+        if is_production and (not valid_password or valid_password == 'changeme123'):
+            return {
+                'success': False,
+                'error': 'Admin authentication is misconfigured. Set ADMIN_PASSWORD to a strong, non-default value.',
+                'error_code': 'admin_password_misconfigured',
+            }
+        if not valid_password:
+            valid_password = 'changeme123'
 
         if username == valid_username and password == valid_password:
             # Create access and refresh tokens
