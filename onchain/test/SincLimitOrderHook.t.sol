@@ -27,16 +27,17 @@ contract SincLimitOrderHookTest is Test {
     }
 
     function _mineHookAddr(bytes memory creationCode, address deployer) internal pure returns (address, bytes32) {
-        // Required permission bits — placeholder; real script in Task 17 uses Hooks.*_FLAG constants
-        uint160 requiredBits = 0x2400;  // beforeSwap | afterSwap (rough mask; refine in Task 17)
-        for (uint256 i = 0; i < 100000; i++) {
+        // AFTER_INITIALIZE (0x1000) | BEFORE_SWAP (0x80) | AFTER_SWAP (0x40) = 0x10C0
+        // Mask is the lower 14 bits per Uniswap v4 hook addressing scheme.
+        uint160 requiredBits = uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
+        for (uint256 i = 0; i < 200000; i++) {
             bytes32 salt = bytes32(i);
             address predicted = address(uint160(uint256(keccak256(abi.encodePacked(
                 bytes1(0xff), deployer, salt, keccak256(creationCode)
             )))));
-            if ((uint160(predicted) & 0xFFFF) == requiredBits) return (predicted, salt);
+            if ((uint160(predicted) & 0x3FFF) == requiredBits) return (predicted, salt);
         }
-        revert("Salt not found in 100k tries");
+        revert("Salt not found in 200k tries");
     }
 
     function _deployWithCreate2(bytes memory creationCode, bytes32 salt) internal returns (address addr) {

@@ -8,6 +8,7 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 
 contract SincLimitOrderHookAntiSandwichTest is Test {
     address constant POOL_MANAGER = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
@@ -65,13 +66,14 @@ contract SincLimitOrderHookAntiSandwichTest is Test {
     }
 
     function _findSalt(bytes memory creationCode) internal view returns (bytes32) {
-        uint160 requiredBits = 0x2400;
+        // AFTER_INITIALIZE | BEFORE_SWAP | AFTER_SWAP = 0x10C0; 14-bit mask.
+        uint160 requiredBits = uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG);
         for (uint256 i = 0; i < 1000000; i++) {
             bytes32 salt = bytes32(i);
             address predicted = address(uint160(uint256(keccak256(abi.encodePacked(
                 bytes1(0xff), address(this), salt, keccak256(creationCode)
             )))));
-            if ((uint160(predicted) & 0xFFFF) == requiredBits) return salt;
+            if ((uint160(predicted) & 0x3FFF) == requiredBits) return salt;
         }
         revert("salt not found");
     }
