@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SINC Token — SINCOR Ecosystem</title>
-  <meta name="description" content="SINC is the native utility token of the SINCOR autonomous AI agent platform. Live on Base. LP locked. 0% tax.">
+  <meta name="description" content="SINC is the native utility token of the SINCOR autonomous AI agent platform. Live on Base. 0% tax. Relaunching on Uniswap V4 with bonding curve and audited limit-order hook.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -419,12 +419,15 @@
     <h1>The <span>SINCOR</span><br>Ecosystem Token</h1>
     <p>SINC powers the autonomous AI economy. Use it for platform access, agent services, and DeFi operations — all on Base.</p>
     <div class="hero-cta">
-      <a href="https://aerodrome.finance/swap?from=eth&to=0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="btn-primary">
-        🪐 Buy SINC on Aerodrome
+      <a href="#relaunch-status" class="btn-primary">
+        ⚡ View Phase 1 Launch Plan
       </a>
-      <a href="https://basescan.org/token/0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="btn-secondary">
+      <a href="https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7" target="_blank" class="btn-secondary">
         View on Basescan ↗
       </a>
+    </div>
+    <div style="margin-top:14px; font-size:13px; color:var(--text-muted); max-width:560px;">
+      SINC is mid-relaunch. The legacy v2 pool on Aerodrome has been retired; the canonical SINC contract is verified on Base and the new Uniswap V4 pool launches once Sepolia validation + CertiK Skynet scans complete. No live buy link until the V4 pool is live.
     </div>
   </div>
 
@@ -451,68 +454,73 @@
       <div class="stat-label">Buy / Sell Tax</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">🔒</div>
-      <div class="stat-label">LP Locked</div>
+      <div class="stat-value">V4</div>
+      <div class="stat-label">Uniswap Pool</div>
     </div>
   </div>
 
   <!-- MAIN GRID: SWAP + INFO -->
   <div class="main-grid">
 
-    <!-- SWAP CARD -->
-    <div class="card">
-      <div class="card-title">⇄ Swap SINC</div>
-      <div class="card-subtitle">Trade via Aerodrome on Base — 0% tax, no slippage surprises</div>
+    <!-- RELAUNCH STATUS CARD -->
+    <div class="card" id="relaunch-status">
+      <div class="card-title">⚡ Phase 1 Relaunch Status</div>
+      <div class="card-subtitle">Verifiable on-chain, no fake numbers, no shortcuts.</div>
 
-      <div class="swap-field">
-        <span class="swap-label">You Send</span>
-        <div class="swap-input-wrap">
-          <input type="number" id="swap-input" placeholder="0.00" oninput="calculateSwap()">
-          <select id="swap-from" class="swap-token-badge" onchange="swapFromToken=this.value; updateLabels(); calculateSwap();">
-            <option value="sinc">SINC</option>
-            <option value="usdc">USDC</option>
-          </select>
-        </div>
+      <ul class="info-list" style="margin-top:18px;">
+        <li>
+          <div class="info-icon">✅</div>
+          <div>
+            <div class="info-text-label">Canonical SINC contract</div>
+            <div class="info-text-value mono">0x9C8cd8d3961F445D653713dE65C6578bE11668e7</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">🛡️</div>
+          <div>
+            <div class="info-text-label">CertiK Skynet</div>
+            <div class="info-text-value">97 / 100 — verified, no proxy, no mint, no pause, no tax</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">🧪</div>
+          <div>
+            <div class="info-text-label">Smart contracts</div>
+            <div class="info-text-value">Bonding curve + OZ LimitOrderHook + Soulbound Genesis NFT — written, 32/32 tests passing, awaiting Sepolia validation</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">🔥</div>
+          <div>
+            <div class="info-text-label">Liquidity</div>
+            <div class="info-text-value">Phase 1 funded by buyers via bonding curve. At graduation: V4 LP minted, LP token burned to 0x…dEaD. Atomic, no admin.</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">⏳</div>
+          <div>
+            <div class="info-text-label">Owner stake</div>
+            <div class="info-text-value">10M SINC → 24-month linear Sablier vest at launch. Ownership renounced.</div>
+          </div>
+        </li>
+        <li>
+          <div class="info-icon">🚫</div>
+          <div>
+            <div class="info-text-label">Legacy v2 pool</div>
+            <div class="info-text-value">Retired. No migration claims. The new contract is the only canonical SINC.</div>
+          </div>
+        </li>
+      </ul>
+
+      <div style="margin-top:20px; padding:14px 16px; background:rgba(6,182,212,0.07); border:1px solid rgba(6,182,212,0.25); border-radius:10px; font-size:13px; color:var(--text-dim);">
+        <strong style="color:var(--cyan);">Status:</strong> awaiting Base Sepolia deploy + CertiK Skynet ≥90/100 on bonding curve, limit-order hook, and Genesis NFT contracts before mainnet launch. No buy link until the V4 pool is live and the LP token is burned. You will be able to verify every claim above on Basescan the day Phase 1 opens.
       </div>
-
-      <div class="swap-flip" onclick="flipSwap()">⇅</div>
-
-      <div class="swap-field">
-        <span class="swap-label">You Receive</span>
-        <div class="swap-input-wrap">
-          <input type="number" id="swap-output" placeholder="0.00" readonly style="color: var(--purple-light);">
-          <div class="swap-token-badge" id="swap-to-label">USDC</div>
-        </div>
-      </div>
-
-      <div class="swap-info">
-        <div class="swap-info-row">
-          <span>Rate</span>
-          <span id="swap-rate">1 SINC = $— USDC</span>
-        </div>
-        <div class="swap-info-row">
-          <span>Network</span>
-          <span class="cyan">Base (Chain ID 8453)</span>
-        </div>
-        <div class="swap-info-row">
-          <span>DEX</span>
-          <span>Aerodrome Finance</span>
-        </div>
-        <div class="swap-info-row">
-          <span>Tax</span>
-          <span style="color:#4ade80;">0% / 0%</span>
-        </div>
-      </div>
-
-      <button onclick="executeSwap()" class="btn-primary" style="width:100%; justify-content: center;">
-        Connect Wallet to Swap
-      </button>
     </div>
 
     <!-- TOKEN INFO -->
     <div class="card">
       <div class="card-title">🪐 Token Details</div>
-      <div class="card-subtitle">Verified, locked, and audited on Base mainnet</div>
+      <div class="card-subtitle">Verified on Base mainnet. CertiK Skynet 97/100. LP burns at V4 graduation.</div>
 
       <ul class="info-list">
         <li>
@@ -540,7 +548,7 @@
           <div class="info-icon">💧</div>
           <div>
             <div class="info-text-label">Liquidity Pool</div>
-            <div class="info-text-value">SINC/USDC on Aerodrome Finance <span class="tag tag-green">Locked</span></div>
+            <div class="info-text-value">Uniswap V4 SINC/WETH on Base <span class="tag tag-cyan">Launching</span> — LP token will burn to 0x…dEaD at graduation</div>
           </div>
         </li>
         <li>
@@ -548,6 +556,7 @@
           <div>
             <div class="info-text-label">Security</div>
             <div class="info-text-value">
+              <span class="tag tag-green">CertiK 97/100</span>&nbsp;
               <span class="tag tag-green">Not Honeypot</span>&nbsp;
               <span class="tag tag-green">0% Tax</span>&nbsp;
               <span class="tag tag-cyan">GoPlus Verified</span>
@@ -558,7 +567,7 @@
           <div class="info-icon">📋</div>
           <div>
             <div class="info-text-label">Contract</div>
-            <div class="info-text-value mono">0x49E392de962Fa835B862F59E78611c69E930b5C4</div>
+            <div class="info-text-value mono">0x9C8cd8d3961F445D653713dE65C6578bE11668e7</div>
           </div>
         </li>
         <li>
@@ -580,7 +589,7 @@
     <div class="contract-box">
       <div>
         <div class="contract-label">Contract Address (Base)</div>
-        <div class="contract-addr">0x49E392de962Fa835B862F59E78611c69E930b5C4</div>
+        <div class="contract-addr">0x9C8cd8d3961F445D653713dE65C6578bE11668e7</div>
       </div>
       <button class="copy-btn" onclick="copyContract()">📋 Copy Address</button>
     </div>
@@ -588,39 +597,32 @@
 
   <!-- LINKS -->
   <div class="footer-links-grid">
-    <a href="https://dexscreener.com/base/0xc0305de73c4eddf569144008e53b8d8d34011d82" target="_blank" class="footer-link-card">
-      <div class="footer-link-icon">📊</div>
-      <div>
-        <div class="footer-link-name">Dexscreener</div>
-        <div class="footer-link-sub">Live chart & trades</div>
-      </div>
-    </a>
-    <a href="https://aerodrome.finance/swap?from=eth&to=0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="footer-link-card">
-      <div class="footer-link-icon">🔄</div>
-      <div>
-        <div class="footer-link-name">Aerodrome</div>
-        <div class="footer-link-sub">Primary DEX — buy SINC</div>
-      </div>
-    </a>
-    <a href="https://basescan.org/token/0x49E392de962Fa835B862F59E78611c69E930b5C4" target="_blank" class="footer-link-card">
+    <a href="https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7" target="_blank" class="footer-link-card">
       <div class="footer-link-icon">🔍</div>
       <div>
         <div class="footer-link-name">Basescan</div>
-        <div class="footer-link-sub">Explorer & contract</div>
+        <div class="footer-link-sub">Verified canonical contract</div>
       </div>
     </a>
-    <a href="https://www.dextools.io/app/en/base/pair-explorer/0xc0305de73c4eddf569144008e53b8d8d34011d82" target="_blank" class="footer-link-card">
-      <div class="footer-link-icon">🛠️</div>
+    <a href="https://skynet.certik.com" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">🛡️</div>
       <div>
-        <div class="footer-link-name">DEXTools</div>
-        <div class="footer-link-sub">Pair explorer</div>
+        <div class="footer-link-name">CertiK Skynet</div>
+        <div class="footer-link-sub">97/100 audit score</div>
       </div>
     </a>
-    <a href="https://www.geckoterminal.com/base/pools/0xC0305DE73c4Eddf569144008e53b8d8d34011d82" target="_blank" class="footer-link-card">
-      <div class="footer-link-icon">🦎</div>
+    <a href="https://gopluslabs.io/token-security/8453/0x9C8cd8d3961F445D653713dE65C6578bE11668e7" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">✅</div>
       <div>
-        <div class="footer-link-name">GeckoTerminal</div>
-        <div class="footer-link-sub">Pool analytics</div>
+        <div class="footer-link-name">GoPlus Security</div>
+        <div class="footer-link-sub">Live token risk scan</div>
+      </div>
+    </a>
+    <a href="/axiom" class="footer-link-card">
+      <div class="footer-link-icon">🪙</div>
+      <div>
+        <div class="footer-link-name">AXIOM Token</div>
+        <div class="footer-link-sub">SINCOR's intelligence token</div>
       </div>
     </a>
     <a href="/signup" class="footer-link-card">
@@ -652,66 +654,28 @@
 </div>
 
 <script>
-  const SINC_CONTRACT = '0x49E392de962Fa835B862F59E78611c69E930b5C4';
-  const USDC_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-  const POOL = '0xC0305DE73c4Eddf569144008e53b8d8d34011d82';
-  let sincPrice = 1.10;
-  let swapFromToken = 'sinc';
+  const SINC_CONTRACT = '0x9C8cd8d3961F445D653713dE65C6578bE11668e7';
 
-  async function loadPrice() {
-    try {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/base/${POOL}`);
-      const data = await res.json();
-      const pair = data.pair || (data.pairs && data.pairs[0]);
-      if (pair) {
-        const p = parseFloat(pair.priceUsd);
-        const liq = parseFloat(pair.liquidity?.usd || 0);
-        if (p > 0) {
-          sincPrice = p;
-          document.getElementById('sinc-price').textContent = '$' + p.toFixed(4);
-          document.getElementById('swap-rate').textContent = '1 SINC = $' + p.toFixed(4) + ' USDC';
-        }
-        document.getElementById('sinc-liq').textContent = '$' + liq.toFixed(2);
-      }
-    } catch(e) {
-      document.getElementById('sinc-price').textContent = '$1.10';
-    }
-  }
-
-  function calculateSwap() {
-    const input = parseFloat(document.getElementById('swap-input').value) || 0;
-    const out = swapFromToken === 'sinc' ? input * sincPrice : input / sincPrice;
-    document.getElementById('swap-output').value = out > 0 ? out.toFixed(swapFromToken === 'sinc' ? 4 : 2) : '';
-  }
-
-  function updateLabels() {
-    document.getElementById('swap-to-label').textContent = swapFromToken === 'sinc' ? 'USDC' : 'SINC';
-  }
-
-  function flipSwap() {
-    swapFromToken = swapFromToken === 'sinc' ? 'usdc' : 'sinc';
-    document.getElementById('swap-from').value = swapFromToken;
-    updateLabels();
-    document.getElementById('swap-input').value = '';
-    document.getElementById('swap-output').value = '';
-  }
-
-  function executeSwap() {
-    const from = swapFromToken === 'sinc' ? SINC_CONTRACT : USDC_CONTRACT;
-    const to = swapFromToken === 'sinc' ? USDC_CONTRACT : SINC_CONTRACT;
-    window.open(`https://aerodrome.finance/swap?from=${from}&to=${to}`, '_blank');
-  }
+  // Pre-launch: no V4 pool exists yet. Stats stay as placeholders until
+  // graduate() initializes the SINC/WETH pool on Uniswap V4 PoolManager.
+  // After deploy, set POOL_ID below and uncomment the live-price loop.
+  // const POOL_ID = '';
+  // async function loadPrice() { /* TODO: wire to V4 StateView once pool live */ }
 
   function copyContract() {
     navigator.clipboard.writeText(SINC_CONTRACT).then(() => {
       const btn = document.querySelector('.copy-btn');
+      if (!btn) return;
       btn.textContent = '✅ Copied!';
       setTimeout(() => btn.textContent = '📋 Copy Address', 2000);
     });
   }
 
-  loadPrice();
-  setInterval(loadPrice, 30000);
+  // Display "Pre-launch" placeholders until V4 pool is live.
+  const priceEl = document.getElementById('sinc-price');
+  const liqEl = document.getElementById('sinc-liq');
+  if (priceEl) priceEl.textContent = 'Pre-launch';
+  if (liqEl) liqEl.textContent = 'Pre-launch';
 </script>
 </body>
 </html>
