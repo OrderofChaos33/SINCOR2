@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -419,15 +419,15 @@
     <h1>The <span>SINCOR</span><br>Ecosystem Token</h1>
     <p>SINC powers the autonomous AI economy. Use it for platform access, agent services, and DeFi operations — all on Base.</p>
     <div class="hero-cta">
-      <a href="#relaunch-status" class="btn-primary">
-        ⚡ View Phase 1 Launch Plan
+      <a href="#buy-sinc" class="btn-primary">
+        🪙 Buy SINC
       </a>
       <a href="https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7" target="_blank" class="btn-secondary">
         View on Basescan ↗
       </a>
     </div>
     <div style="margin-top:14px; font-size:13px; color:var(--text-muted); max-width:560px;">
-      SINC is mid-relaunch. The legacy v2 pool on Aerodrome has been retired; the canonical SINC contract is verified on Base and the new Uniswap V4 pool launches once Sepolia validation + CertiK Skynet scans complete. No live buy link until the V4 pool is live.
+      SINC is LIVE on Uniswap V4 — bonding curve at <span class='mono'>0x75dE341a2BC81806198364F125d4Cde36527619C</span>. Audited limit-order hook, soulbound Genesis NFT, LP burns to 0xdEaD at graduation. <a href='https://basescan.org/address/0x75dE341a2BC81806198364F125d4Cde36527619C' target='_blank' style='color:var(--cyan);'>Verify curve →</a>
     </div>
   </div>
 
@@ -486,7 +486,7 @@
           <div class="info-icon">🧪</div>
           <div>
             <div class="info-text-label">Smart contracts</div>
-            <div class="info-text-value">Bonding curve + OZ LimitOrderHook + Soulbound Genesis NFT — written, 32/32 tests passing, awaiting Sepolia validation</div>
+            <div class="info-text-value">Bonding curve, OZ LimitOrderHook, Soulbound Genesis NFT — DEPLOYED, CertiK Skynet submitted. <a href='https://basescan.org/address/0x75dE341a2BC81806198364F125d4Cde36527619C' target='_blank' style='color:var(--cyan);'>Curve</a> / <a href='https://basescan.org/address/0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09' target='_blank' style='color:var(--cyan);'>NFT</a> / <a href='https://basescan.org/address/0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0' target='_blank' style='color:var(--cyan);'>Hook</a></div>
           </div>
         </li>
         <li>
@@ -513,7 +513,7 @@
       </ul>
 
       <div style="margin-top:20px; padding:14px 16px; background:rgba(6,182,212,0.07); border:1px solid rgba(6,182,212,0.25); border-radius:10px; font-size:13px; color:var(--text-dim);">
-        <strong style="color:var(--cyan);">Status:</strong> awaiting Base Sepolia deploy + CertiK Skynet ≥90/100 on bonding curve, limit-order hook, and Genesis NFT contracts before mainnet launch. No buy link until the V4 pool is live and the LP token is burned. You will be able to verify every claim above on Basescan the day Phase 1 opens.
+        <strong style='color:var(--cyan);'>Status:</strong> Phase 1 LIVE on Base mainnet. Bonding curve deployed at <span class='mono'>0x75dE341a2BC81806198364F125d4Cde36527619C</span>. Audited hook at <span class='mono'>0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</span>. Soulbound Genesis NFT at <span class='mono'>0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09</span>. CertiK Skynet scans submitted (scoring in progress). Every claim verifiable on Basescan.
       </div>
     </div>
 
@@ -674,8 +674,8 @@
   // Display "Pre-launch" placeholders until V4 pool is live.
   const priceEl = document.getElementById('sinc-price');
   const liqEl = document.getElementById('sinc-liq');
-  if (priceEl) priceEl.textContent = 'Pre-launch';
-  if (liqEl) liqEl.textContent = 'Pre-launch';
+  if (priceEl) priceEl.textContent = 'Live on V4';
+  if (liqEl) liqEl.textContent = 'In curve';
 </script>
 </body>
 </html>

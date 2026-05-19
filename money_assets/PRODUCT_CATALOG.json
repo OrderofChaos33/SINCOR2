@@ -1,20 +1,43 @@
 {
+  "generated_at": "2026-05-14T14:02:17.419238",
+  "total_products": 3,
+  "total_value": "$541 in digital products",
   "products": [
     {
-      "name": "BI Template Pack",
-      "price": "7",
-      "file": "instant_bi_template_pack.md"
+      "name": "Instant BI Template Pack",
+      "price": "$97",
+      "file": "instant_bi_template_pack.md",
+      "sell_on": [
+        "Gumroad",
+        "Etsy",
+        "Your website"
+      ]
     },
     {
       "name": "AI Agent Bundle",
-      "price": "97",
-      "file": "ai_agent_bundle.md"
+      "price": "$297",
+      "file": "ai_agent_bundle.md",
+      "sell_on": [
+        "Gumroad",
+        "Your website"
+      ]
     },
     {
       "name": "Growth Forecast Template",
-      "price": "47",
-      "file": "growth_forecast_template.md"
+      "price": "$147",
+      "file": "growth_forecast_template.md",
+      "sell_on": [
+        "Gumroad",
+        "Etsy",
+        "Your website"
+      ]
     }
   ],
-  "total_value": "41"
+  "next_steps": [
+    "1. Review all product files in money_assets/ folder",
+    "2. Create Gumroad account (gumroad.com)",
+    "3. List each product with descriptions provided",
+    "4. Share links on social media / email list",
+    "5. Make first sale within 48 hours"
+  ]
 }
