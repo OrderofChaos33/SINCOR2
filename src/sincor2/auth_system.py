@@ -17,8 +17,11 @@ from flask_jwt_extended import (
 )
 from functools import wraps
 
+# Environment values considered non-production, where strict JWT secret
+# enforcement is relaxed for local development and tests.
 NON_PRODUCTION_ENVS = frozenset(('development', 'dev', 'test', 'testing', 'local'))
 WEAK_DEFAULT_JWT_SECRET = 'dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars'
+MIN_JWT_SECRET_LENGTH = 32
 
 
 class SINCORAuth:
@@ -34,13 +37,13 @@ class SINCORAuth:
     def init_app(self, app):
         """Initialize JWT authentication with Flask app"""
 
-        env = os.environ.get('FLASK_ENV', os.environ.get('ENVIRONMENT', 'production')).lower()
+        env = (os.getenv('FLASK_ENV') or os.getenv('ENVIRONMENT') or 'production').lower()
         is_production = env not in NON_PRODUCTION_ENVS
         jwt_secret = os.environ.get('JWT_SECRET_KEY')
         jwt_secret_is_weak = (
             not jwt_secret
             or jwt_secret == WEAK_DEFAULT_JWT_SECRET
-            or len(jwt_secret) < 32
+            or len(jwt_secret) < MIN_JWT_SECRET_LENGTH
         )
 
         # In production, fail closed if JWT secret is weak/missing:
