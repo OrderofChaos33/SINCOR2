@@ -99,11 +99,11 @@ class SINCORAuth:
                 'error_code': 'token_revoked'
             }), 401
 
-    def _jwt_misconfigured_response(self, token_issuance: bool = False):
+    def _jwt_misconfigured_response(self, is_token_issuance: bool = False):
         """Return a standard response when JWT production config is invalid."""
         if not (self.app and self.app.config.get('JWT_MISCONFIGURED')):
             return None
-        action = "Token issuance" if token_issuance else "Authentication"
+        action = "Token issuance" if is_token_issuance else "Authentication"
         return {
             'success': False,
             'error': f'{action} temporarily unavailable due to JWT_SECRET_KEY misconfiguration in production.',
@@ -118,7 +118,7 @@ class SINCORAuth:
         For now, uses environment variables for admin credentials
         """
 
-        jwt_error = self._jwt_misconfigured_response(token_issuance=False)
+        jwt_error = self._jwt_misconfigured_response(is_token_issuance=False)
         if jwt_error:
             return jwt_error
 
@@ -170,7 +170,7 @@ class SINCORAuth:
     def create_tokens(self, username: str, role: str = 'user') -> dict:
         """Create access and refresh tokens for a user"""
 
-        jwt_error = self._jwt_misconfigured_response(token_issuance=True)
+        jwt_error = self._jwt_misconfigured_response(is_token_issuance=True)
         if jwt_error:
             return jwt_error
 
