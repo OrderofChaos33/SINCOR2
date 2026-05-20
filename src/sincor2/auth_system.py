@@ -17,6 +17,9 @@ from flask_jwt_extended import (
 )
 from functools import wraps
 
+NON_PRODUCTION_ENVS = frozenset(('development', 'dev', 'test', 'testing', 'local'))
+WEAK_DEFAULT_JWT_SECRET = 'dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars'
+
 
 class SINCORAuth:
     """SINCOR Authentication Manager"""
@@ -32,12 +35,11 @@ class SINCORAuth:
         """Initialize JWT authentication with Flask app"""
 
         env = os.environ.get('FLASK_ENV', os.environ.get('ENVIRONMENT', 'production')).lower()
-        is_production = env not in ('development', 'dev', 'test', 'testing', 'local')
+        is_production = env not in NON_PRODUCTION_ENVS
         jwt_secret = os.environ.get('JWT_SECRET_KEY')
-        weak_default_secret = 'dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars'
         jwt_secret_is_weak = (
             not jwt_secret
-            or jwt_secret == weak_default_secret
+            or jwt_secret == WEAK_DEFAULT_JWT_SECRET
             or len(jwt_secret) < 32
         )
 
@@ -48,7 +50,7 @@ class SINCORAuth:
             app.config['JWT_SECRET_KEY'] = secrets.token_hex(32)
             app.config['JWT_MISCONFIGURED'] = True
         else:
-            app.config['JWT_SECRET_KEY'] = jwt_secret or weak_default_secret
+            app.config['JWT_SECRET_KEY'] = jwt_secret or WEAK_DEFAULT_JWT_SECRET
             app.config['JWT_MISCONFIGURED'] = False
 
         # JWT Configuration
@@ -94,6 +96,17 @@ class SINCORAuth:
                 'error_code': 'token_revoked'
             }), 401
 
+    def _jwt_misconfigured_response(self, token_issuance: bool = False):
+        """Return a standard response when JWT production config is invalid."""
+        if not (self.app and self.app.config.get('JWT_MISCONFIGURED')):
+            return None
+        action = "Token issuance" if token_issuance else "Authentication"
+        return {
+            'success': False,
+            'error': f'{action} temporarily unavailable due to JWT_SECRET_KEY misconfiguration in production.',
+            'error_code': 'jwt_secret_misconfigured',
+        }
+
     def authenticate_user(self, username: str, password: str) -> dict:
         """
         Authenticate user credentials
@@ -102,12 +115,9 @@ class SINCORAuth:
         For now, uses environment variables for admin credentials
         """
 
-        if self.app and self.app.config.get('JWT_MISCONFIGURED'):
-            return {
-                'success': False,
-                'error': 'Authentication is disabled. Configure JWT_SECRET_KEY with at least 32 characters in production.',
-                'error_code': 'jwt_secret_misconfigured',
-            }
+        jwt_error = self._jwt_misconfigured_response(token_issuance=False)
+        if jwt_error:
+            return jwt_error
 
         # Get admin credentials from environment
         valid_username = os.environ.get('ADMIN_USERNAME', 'admin')
@@ -157,12 +167,9 @@ class SINCORAuth:
     def create_tokens(self, username: str, role: str = 'user') -> dict:
         """Create access and refresh tokens for a user"""
 
-        if self.app and self.app.config.get('JWT_MISCONFIGURED'):
-            return {
-                'success': False,
-                'error': 'Token issuance disabled. Configure JWT_SECRET_KEY with at least 32 characters in production.',
-                'error_code': 'jwt_secret_misconfigured',
-            }
+        jwt_error = self._jwt_misconfigured_response(token_issuance=True)
+        if jwt_error:
+            return jwt_error
 
         access_token = create_access_token(
             identity=username,
