@@ -15,11 +15,11 @@ const CURVE = '0xb627F53E08AD7d455e787d052C18D6877020E2BF';
 const RPC_WS = 'wss://base-mainnet.public.blastapi.io'; // Free WebSocket RPC
 const RPC_HTTP = 'https://mainnet.base.org';
 
-// Twilio (from .env)
-const TWILIO_SID = process.env.TWILO_ID || 'ACbfe3a0df26ca1bb5e2be2f17a42b1807';
-const TWILIO_AUTH = process.env.TWILO_AUTH || 'debe3e1104335ea04bc45ecb2eb4cc55';
-const TWILIO_FROM = process.env.TWILO_NUMBER || '+18555088949';
-const NOTIFY_TO = process.env.NOTIFY_PHONE || '+18157188936';
+// Twilio (from .env — all values required in environment, no defaults)
+const TWILIO_SID = process.env.TWILO_ID;
+const TWILIO_AUTH = process.env.TWILO_AUTH;
+const TWILIO_FROM = process.env.TWILO_NUMBER;
+const NOTIFY_TO = process.env.NOTIFY_PHONE;
 
 const CURVE_ABI = [
     'event Buy(address indexed buyer, uint256 amount, uint256 cost)',
@@ -30,8 +30,8 @@ const CURVE_ABI = [
 ];
 
 function sendSMS(message) {
-    if (NOTIFY_TO === 'YOUR_PHONE_HERE') {
-        console.log('[SMS SKIPPED - no phone set]', message);
+    if (!TWILIO_SID || !TWILIO_AUTH || !TWILIO_FROM || !NOTIFY_TO) {
+        console.log('[SMS SKIPPED - Twilio env vars not set]', message);
         return;
     }
 
@@ -71,7 +71,7 @@ function sendSMS(message) {
 async function startWatcher() {
     console.log('=== SINC Buy Watcher ===');
     console.log('Curve:', CURVE);
-    console.log('Notify:', NOTIFY_TO === 'YOUR_PHONE_HERE' ? 'NOT SET (console only)' : NOTIFY_TO);
+    console.log('Notify:', NOTIFY_TO ? NOTIFY_TO : 'NOT SET (console only)');
     console.log('');
 
     // Use HTTP polling (WebSocket public endpoints are unreliable)
