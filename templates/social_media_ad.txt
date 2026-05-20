@@ -1,17 +1,17 @@
-🚗 Attention {{ city }} Business Owners! 🚗
+🚨 ANNOUNCEMENT: SINC v3 A2A LIVE NOW 🚨
 
-Is your company vehicle sending the RIGHT message about {{ business_type | business_type_friendly }}?
+SINC v3 just went live on Base.
 
-{{ hbpc.hooks | select_by_persona(persona) }}
+✅ SinC-urve
+✅ Audited limit-order hooks
+✅ Soulbound Genesis NFT for first buyers
 
-✨ Professional detailing that:
-{{ hbpc.benefits | select_by_persona(persona) }}
+Token:
+0x9C8cd8d3961F445D653713dE65C6578bE11668e7
 
-🏆 {{ hbpc.proofs | select_by_persona(persona) }}
+SinCurve:
+0x75dE341a2BC81806198364F125d4Cde36527619C
 
-💼 Special offer for {{ business_name }}:
-15% off first service + FREE assessment
+getsincor.com/sinc
 
-{{ hbpc.ctas | select_by_persona(persona) }}
-
-#{{ city }}Business #AutoDetailing #ProfessionalImage #{{ business_type.replace('_', '') }}
+#SINC #SINCOR #Base #DeFi #Web3 #Crypto
