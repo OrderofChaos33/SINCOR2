@@ -9,3 +9,30 @@ node_modules/
 *.log
 *.jsonl
 code/
+
+# Secrets — NEVER ship to Railway
+onchain/.env
+onchain/.deployer_keystore
+github_pat.txt
+*.pat
+pk*.txt
+Axiom*.txt
+
+# Foundry build artifacts (rebuild on Railway not needed — Railway runs Python only)
+onchain/broadcast/
+onchain/cache/
+onchain/out/
+onchain/lib/
+onchain/.foundry-history
+
+# Backups
+sincor-clean.BAK.*/
+templates/*.bak.*
+*.bak
+
+# Large/unused
+outputs/
+scripts/
+docs/superpowers/specs/
+docs/superpowers/plans/
+.vscode/

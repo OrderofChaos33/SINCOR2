@@ -3,8 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SINC Token — SINCOR Ecosystem</title>
-  <meta name="description" content="SINC is the native utility token of the SINCOR autonomous AI agent platform. Live on Base. 0% tax. Relaunching on Uniswap V4 with bonding curve and audited limit-order hook.">
+  <title>SINC Token — Live on Base | SINCOR Autonomous Agent Platform</title>
+  <meta name="description" content="Buy SINC live on Base via the audited bonding curve. 0% tax, CertiK 97, OZ LimitOrderHook, soulbound Genesis NFT for first buyers. Contracts verified on Sourcify.">
+  <meta name="keywords" content="SINC token, SINCOR, Base chain, Uniswap V4, bonding curve, AI agents, x402, autonomous AI">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://getsincor.com/sinc">
+
+  <!-- OpenGraph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://getsincor.com/sinc">
+  <meta property="og:title" content="SINC Token — Live on Base | Buy from the Audited Bonding Curve">
+  <meta property="og:description" content="Buy SINC directly from the curve. CertiK 97 token, Sourcify-verified contracts, LP burns at graduation. Powers the SINCOR autonomous AI agent economy.">
+  <meta property="og:image" content="https://getsincor.com/static/sincor_logo_new.jpg">
+  <meta property="og:site_name" content="SINCOR">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SINC Token — Live on Base">
+  <meta name="twitter:description" content="Buy SINC from the audited bonding curve. CertiK 97. Sourcify verified. SINCOR autonomous AI agent platform.">
+  <meta name="twitter:image" content="https://getsincor.com/static/sincor_logo_new.jpg">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "SINCOR",
+    "url": "https://getsincor.com",
+    "potentialAction": {
+      "@type": "BuyAction",
+      "target": "https://getsincor.com/sinc#buy-sinc"
+    }
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -442,6 +474,11 @@
       <button id="buy-go" style="width:100%; padding:12px; background:linear-gradient(135deg, var(--purple), var(--cyan)); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Buy SINC</button>
     </div>
     <div id="buy-status" style="margin-top:12px; font-size:13px; color:var(--cyan); min-height:18px;"></div>
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
+      <a href="https://twitter.com/intent/tweet?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20Sourcify-verified%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%20%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#1d9bf0; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">𝕏 Share on X</a>
+      <a href="https://warpcast.com/~/compose?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C&embeds[]=https://getsincor.com/sinc" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#8a63d2; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">⌐◨-◨ Share on Farcaster</a>
+      <a href="https://t.me/share/url?url=https%3A%2F%2Fgetsincor.com%2Fsinc&text=SINC%20live%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20Sourcify-verified" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#0088cc; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">✈ Share on Telegram</a>
+    </div>
   </div>
 
   <!-- STATS -->
@@ -706,11 +743,15 @@
     if (el) { el.textContent = msg; el.style.color = color || 'var(--cyan)'; }
   }
 
-  // Encode buy(uint256,address) calldata: selector + 32 bytes ethIn + 32 bytes referrer
+  // Read ?ref= query param (referrer wallet earns 3% of buys via this link)
+  const refAddr = (new URLSearchParams(location.search)).get('ref');
+  const validRef = refAddr && /^0x[a-fA-F0-9]{40}$/.test(refAddr) ? refAddr.toLowerCase() : null;
+
+  // Encode buy(uint256,address) calldata
   function encodeBuy(ethInWeiHex) {
-    const selector = '0x7deb6025'; // keccak256("buy(uint256,address)")[:4]
+    const selector = '0x7deb6025';
     const ethInPadded = ethInWeiHex.replace('0x','').padStart(64,'0');
-    const referrer = '0000000000000000000000000000000000000000000000000000000000000000';
+    const referrer = (validRef ? validRef.replace('0x','') : '0000000000000000000000000000000000000000').padStart(64,'0');
     return selector + ethInPadded + referrer;
   }
 
@@ -745,7 +786,14 @@
         acctEl.textContent = acct.slice(0,6) + '...' + acct.slice(-4);
         connectBtn.style.display = 'none';
         buyForm.style.display = 'block';
-        bs('Connected on Base. Enter ETH amount.', '#10b981');
+        // Show personal referral link (3% kickback on every buy through it)
+        const refLink = `https://getsincor.com/sinc?ref=${acct}`;
+        const refDiv = document.createElement('div');
+        refDiv.style.cssText = 'margin-top:14px; padding:12px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:8px; font-size:12px; color:var(--text-dim);';
+        refDiv.innerHTML = `<div style="font-weight:600; color:var(--purple-light); margin-bottom:4px;">💸 Your referral link — earn 3% of every buy</div><div style="word-break:break-all; font-family:'JetBrains Mono',monospace; color:var(--cyan); cursor:pointer;" title="Click to copy" onclick="navigator.clipboard.writeText('${refLink}'); this.style.color='#10b981'; this.textContent='✓ copied!'; setTimeout(()=>{this.style.color='var(--cyan)'; this.textContent='${refLink}';},1500);">${refLink}</div>`;
+        buyForm.appendChild(refDiv);
+        const status = validRef ? `Connected. Buying via referrer ${validRef.slice(0,6)}...${validRef.slice(-4)} (they get 3%).` : 'Connected on Base. Enter ETH amount.';
+        bs(status, '#10b981');
       } catch (e) {
         bs('Error: ' + (e.message || e), '#ef4444');
       }
