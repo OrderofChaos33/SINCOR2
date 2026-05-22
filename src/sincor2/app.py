@@ -688,6 +688,13 @@ def sinc_token():
     return render_template('sinc_gateway.html')
 
 
+@app.route('/why-no-dex')
+@limiter.exempt if limiter else lambda f: f
+def why_no_dex():
+    """SEO explainer: why SINC shows 'no route' on DEXes"""
+    return render_template('why_no_dex.html')
+
+
 @app.route('/buy')
 @limiter.exempt if limiter else lambda f: f
 def buy():

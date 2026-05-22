@@ -463,8 +463,14 @@
     </div>
   </div>
 
+  <!-- "NO ROUTE ON DEX" EXPLAINER BANNER -->
+  <div style="max-width:720px; margin:24px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(245,158,11,0.08), rgba(245,158,11,0.04)); border:1px solid rgba(245,158,11,0.3); border-radius:12px; font-size:14px; color:var(--text);">
+    <div style="font-weight:600; color:#fbbf24; margin-bottom:6px;">⚠️ Trying to swap on Uniswap or Aerodrome and seeing "No route found"?</div>
+    <div style="color:var(--text-dim); line-height:1.5;">That's expected — SINC isn't on a DEX yet. The bonding curve below <strong style="color:var(--text);">IS</strong> the buy mechanism. Once the curve graduates, a Uniswap V4 pool auto-creates and LP is burned. Until then, buy directly from the curve here. <a href="#buy-sinc" style="color:var(--cyan);">Buy below ↓</a></div>
+  </div>
+
   <!-- BUY WIDGET -->
-  <div id="buy-sinc" style="max-width:560px; margin:32px auto; padding:24px; background:var(--surface); border:1px solid var(--border-bright); border-radius:14px;">
+  <div id="buy-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid var(--purple); border-radius:14px; box-shadow:0 0 40px rgba(139,92,246,0.15);">
     <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">🪙 Buy SINC from the curve</div>
     <div style="font-size:13px; color:var(--text-muted); margin-bottom:18px;">Connect your wallet on Base, enter ETH amount, sign one tx. First buyer per wallet auto-mints a soulbound Genesis NFT.</div>
     <button id="buy-connect" style="width:100%; padding:12px; background:var(--purple); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Connect Wallet</button>
