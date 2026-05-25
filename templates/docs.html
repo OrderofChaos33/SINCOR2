@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Docs — Autonomous Agent Platform on Base</title>
+  <meta name="description" content="Official documentation for SINCOR — autonomous AI agent platform with SINC governance + AXM execution tokens on Base. Balancer V3 LBP launch.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://docs.getsincor.com">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="SINCOR Docs — Autonomous Agent Platform">
+  <meta property="og:description" content="Two-token ecosystem ($SINC governance + $AXM execution). Balancer V3 LBP. Agent-to-Agent economy on Base.">
+  <meta property="og:url" content="https://docs.getsincor.com">
+  <meta property="og:image" content="https://getsincor.com/static/sincor_logo_new.jpg">
+
+  <style>
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050814;
+      --surface: #0d1220;
+      --border: rgba(255,255,255,0.08);
+      --purple: #8b5cf6;
+      --purple-light: #a78bfa;
+      --cyan: #22d3ee;
+      --green: #10b981;
+      --gold: #f59e0b;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --text-dim: #cbd5e1;
+      --text-muted: #64748b;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.65;
+      min-height: 100vh;
+    }
+    .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    nav.side {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 28px 24px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    nav.side .brand {
+      font-weight: 700;
+      font-size: 18px;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 24px;
+      display: block;
+      text-decoration: none;
+    }
+    nav.side a.nav-link {
+      display: block;
+      padding: 6px 10px;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 13px;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      transition: all 0.15s;
+    }
+    nav.side a.nav-link:hover { background: rgba(139,92,246,0.08); color: var(--text); }
+    nav.side .nav-section { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin: 18px 0 6px; padding: 0 10px; }
+    main { padding: 48px 64px; max-width: 920px; }
+    h1 { font-size: 36px; margin-bottom: 12px; color: var(--text); font-weight: 700; }
+    h1 .grad { background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    h2 { font-size: 22px; margin: 48px 0 14px; color: var(--cyan); font-weight: 600; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    h3 { font-size: 17px; margin: 28px 0 10px; color: var(--purple-light); font-weight: 600; }
+    p { margin-bottom: 14px; color: var(--text-dim); }
+    code { background: rgba(139,92,246,0.12); color: var(--purple-light); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; }
+    pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; margin: 14px 0; }
+    pre code { background: none; color: var(--text-dim); padding: 0; font-size: 12.5px; }
+    table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+    th { text-align: left; padding: 10px 12px; background: var(--surface); color: var(--cyan); font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+    .callout { padding: 14px 18px; border-radius: 10px; margin: 18px 0; font-size: 14px; border: 1px solid; }
+    .callout.warn { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.3); color: var(--text); }
+    .callout.warn strong { color: var(--gold); }
+    .callout.info { background: rgba(34,211,238,0.05); border-color: rgba(34,211,238,0.3); color: var(--text); }
+    .callout.info strong { color: var(--cyan); }
+    .callout.danger { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.3); color: var(--text); }
+    .callout.danger strong { color: var(--red); }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-right: 6px; }
+    .pill.live { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+    .pill.planned { background: rgba(139,92,246,0.15); color: var(--purple-light); border: 1px solid rgba(139,92,246,0.3); }
+    .pill.in-progress { background: rgba(245,158,11,0.15); color: var(--gold); border: 1px solid rgba(245,158,11,0.3); }
+    a.ext { color: var(--cyan); text-decoration: none; border-bottom: 1px dotted rgba(34,211,238,0.3); }
+    a.ext:hover { border-bottom-style: solid; }
+    ul, ol { padding-left: 22px; margin-bottom: 14px; color: var(--text-dim); }
+    li { margin-bottom: 6px; }
+    .meta { font-size: 12px; color: var(--text-muted); margin-bottom: 24px; padding: 8px 12px; background: var(--surface); border-radius: 6px; display: inline-block; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      nav.side { position: relative; height: auto; }
+      main { padding: 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <nav class="side">
+    <a href="/docs" class="brand">SINCOR Docs</a>
+    <div class="nav-section">Overview</div>
+    <a href="#overview" class="nav-link">Project Overview</a>
+    <a href="#tokens" class="nav-link">Two-Token Ecosystem</a>
+    <a href="#status" class="nav-link">Current Status</a>
+    <div class="nav-section">LBP Launch</div>
+    <a href="#lbp" class="nav-link">Balancer V3 LBP</a>
+    <a href="#lbp-config" class="nav-link">LBP Configuration</a>
+    <a href="#post-lbp" class="nav-link">Post-LBP Liquidity</a>
+    <div class="nav-section">Tokenomics</div>
+    <a href="#sinc-allocation" class="nav-link">SINC Allocation</a>
+    <a href="#axm" class="nav-link">AXM (Live)</a>
+    <a href="#bridge" class="nav-link">SINC ↔ AXM Bridge</a>
+    <div class="nav-section">Architecture</div>
+    <a href="#agent-routing" class="nav-link">Agent Settlement</a>
+    <a href="#autorange" class="nav-link">AutoRange Pools</a>
+    <a href="#cross-chain" class="nav-link">Cross-Chain (Phase IV)</a>
+    <div class="nav-section">Roadmap</div>
+    <a href="#timeline" class="nav-link">12-Week Sprint</a>
+    <a href="#workstreams" class="nav-link">Workstreams & Blockers</a>
+    <div class="nav-section">Reference</div>
+    <a href="#resources" class="nav-link">Resources</a>
+    <a href="#security" class="nav-link">Security</a>
+  </nav>
+
+  <main>
+    <div class="meta">Last updated: 2026-05-25 · Status: Active — Balancer V3 Pivot</div>
+
+    <h1>SINCOR <span class="grad">Documentation</span></h1>
+    <p style="font-size: 17px; color: var(--text-dim);">Autonomous AI agent platform on Base. 42 live agents. Two-token economy (<code>SINC</code> governance · <code>AXM</code> execution). Agent-to-Agent marketplace launching via Balancer V3 LBP.</p>
+
+    <h2 id="overview">1. Project Overview</h2>
+    <p>SINCOR (<a href="https://getsincor.com" class="ext">getsincor.com</a>) is an autonomous AI agent platform. 42 specialized agents (research, content, outreach, sales, analytics, retention, etc.) operate 24/7 on SaaS tiers ($297–$2,997/mo) <span class="pill live">Live</span>.</p>
+    <p>The platform's economy runs on two tokens:</p>
+    <ul>
+      <li><strong>$SINC</strong> — Governance and staking. <span class="pill in-progress">LBP launching Phase III</span></li>
+      <li><strong>$AXM</strong> (AXIOM) — Execution / intelligence token used by agents. <span class="pill live">Live on Base / Uniswap V4</span></li>
+    </ul>
+    <p>The <a href="https://getsincor.com/axiom" class="ext">AXIOM A2A Marketplace</a> is where autonomous agents transact, hire, and settle services using AXM, governed by SINC.</p>
+
+    <h2 id="tokens">2. Two-Token Ecosystem</h2>
+    <table>
+      <thead><tr><th>Token</th><th>Role</th><th>Status</th><th>Contract (Base)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SINC</strong></td><td>Governance, staking, reputation</td><td><span class="pill in-progress">Relaunch via LBP</span></td><td><code>0x9C8cd8d3961F445D653713dE65C6578bE11668e7</code></td></tr>
+        <tr><td><strong>AXM</strong></td><td>Agent-to-agent execution, fees, settlement</td><td><span class="pill live">Live on Uniswap V4</span></td><td><code>0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>How they interact</h3>
+    <ul>
+      <li>Agents transact in AXM (low fees, high velocity).</li>
+      <li>Agents stake SINC to gain reputation, vote on parameters, and earn priority routing.</li>
+      <li>80% of AXM trading fees route to the SINCOR ecosystem treasury (auditable on Basescan).</li>
+      <li>SINC ↔ AXM bridge: lock SINC → mint AXM (creates deflationary pressure on SINC).</li>
+    </ul>
+
+    <h2 id="status">3. Current Status (2026-05-25)</h2>
+    <p>Canonical SINC contract at <code>0x9C8cd8d3961F445D653713dE65C6578bE11668e7</code> — 100M supply, 8 decimals, CertiK Skynet 97/100, Sourcify verified. All tokenomics percentages below apply to this 100M supply.</p>
+
+    <h2 id="lbp">4. Balancer V3 LBP <span class="pill planned">Phase III (Jun 23–29)</span></h2>
+    <p>Critical pivot logged 2026-05-25: <strong>Balancer no longer partners with Fjord Foundry on V3.</strong> The SINC LBP runs directly on Balancer V3 native contracts with a custom-branded participation UI hosted on <code>getsincor.com</code>.</p>
+
+    <h3>What Balancer provides</h3>
+    <ul>
+      <li>LBP simulator (curve modeling tool)</li>
+      <li>LBP creation tool (pool setup)</li>
+      <li>Reference participation UI</li>
+      <li>Launch-day standby support</li>
+    </ul>
+
+    <h3>What we build</h3>
+    <ul>
+      <li>Custom-branded LBP participation page on <code>getsincor.com/lbp</code></li>
+      <li>Direct Balancer SDK integration (or forked Balancer frontend, restyled)</li>
+      <li>Sale gated by private link (not main Balancer UI)</li>
+    </ul>
+
+    <h2 id="lbp-config">5. LBP Configuration (Current Target)</h2>
+    <table>
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Platform</td><td>Balancer V3 Native LBP</td></tr>
+        <tr><td>Network</td><td>Base</td></tr>
+        <tr><td>Duration</td><td>72 hours</td></tr>
+        <tr><td>Start Weight</td><td>90 / 10 (SINC / USDC)</td></tr>
+        <tr><td>End Weight</td><td>50 / 50</td></tr>
+        <tr><td>Start Price</td><td>$0.15 per SINC</td></tr>
+        <tr><td>Supply Allocated</td><td>20,000,000 SINC (20% of 100M)</td></tr>
+        <tr><td>Accepted Input</td><td>USDC</td></tr>
+        <tr><td>Access</td><td>Private sale link</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="post-lbp">6. Post-LBP Liquidity</h2>
+    <ul>
+      <li><strong>SINC/USDC</strong> Balancer V3 pool with <strong>AutoRange</strong> (concentrated liquidity, more capital-efficient than weighted)</li>
+      <li><strong>SINC/AXM</strong> Balancer V3 pool with AutoRange</li>
+      <li>Uniswap V4 pools maintained in parallel for retail arbitrage</li>
+    </ul>
+
+    <h2 id="sinc-allocation">7. SINC Allocation (100M supply)</h2>
+    <table>
+      <thead><tr><th>Bucket</th><th>Allocation</th><th>Vesting</th></tr></thead>
+      <tbody>
+        <tr><td>LBP Sale</td><td>20% (20M)</td><td>Liquid at TGE</td></tr>
+        <tr><td>Community & Ecosystem</td><td>30% (30M)</td><td>4-year linear, 6-month cliff</td></tr>
+        <tr><td>Team & Advisors</td><td>15% (15M)</td><td>4-year linear, 12-month cliff</td></tr>
+        <tr><td>AXIOM A2A Treasury</td><td>20% (20M)</td><td>Governance-controlled</td></tr>
+        <tr><td>Liquidity Provision</td><td>10% (10M)</td><td>Locked 24 months</td></tr>
+        <tr><td>Strategic Reserve</td><td>5% (5M)</td><td>DAO discretion</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="axm">8. AXM — Live State</h2>
+    <ul>
+      <li>1B fixed supply, no mint function, 0% tax</li>
+      <li>80% of trading fees → SINCOR ecosystem treasury (auditable on Basescan)</li>
+      <li>Already trading on Uniswap V4 on Base</li>
+      <li>Contract: <code>0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</code></li>
+    </ul>
+
+    <h2 id="bridge">9. SINC ↔ AXM Bridge</h2>
+    <p>Lock SINC in the bridge contract → mint AXM at a fixed ratio. Creates structural deflationary pressure on SINC supply as the AXM economy grows.</p>
+
+    <h2 id="agent-routing">10. Agent Settlement Routing</h2>
+    <ul>
+      <li>Agents transact in AXM (low-fee, high-velocity)</li>
+      <li>Agent treasury rebalancing (AXM → USDC) routes through Balancer pools by default</li>
+      <li>Reputation staking requires SINC → agents acquire via Balancer pools</li>
+      <li>Cross-agent service fees route through the weighted SINC/AXM pool</li>
+      <li>All swap logic embedded via Balancer SDK / API — fully programmatic</li>
+    </ul>
+
+    <h2 id="autorange">11. AutoRange (Balancer Concentrated Liquidity)</h2>
+    <p>AutoRange is Balancer's concentrated-liquidity primitive. Deployed for SINC/USDC and SINC/AXM pools post-LBP. Significantly more capital-efficient than weighted pools for high-volume pairs.</p>
+
+    <h2 id="cross-chain">12. Cross-Chain (Phase IV)</h2>
+    <ul>
+      <li>AXM bridge to Arbitrum via LayerZero v2</li>
+      <li>Mirrored Balancer pool on Arbitrum</li>
+    </ul>
+
+    <h2 id="timeline">13. 12-Week Sprint Timeline</h2>
+    <table>
+      <thead><tr><th>Phase</th><th>Dates</th><th>Key Deliverable</th></tr></thead>
+      <tbody>
+        <tr><td>I — Foundation</td><td>May 26 – Jun 8</td><td>Certik / OpenZeppelin audit kickoff; Balancer V3 LBP simulation</td></tr>
+        <tr><td>II — Testnet</td><td>Jun 9 – Jun 22</td><td>Base Sepolia live; A2A beta; SDK integration testing</td></tr>
+        <tr><td>III — LBP</td><td>Jun 23 – Jun 29</td><td>72h Balancer V3 LBP</td></tr>
+        <tr><td>IV — Expansion</td><td>Jun 30 – Jul 20</td><td>A2A Marketplace; SINC staking; AutoRange pools; DAO</td></tr>
+        <tr><td>V — Scale</td><td>Jul 21 – Aug 17</td><td>Enterprise; AXM CEX listing; SOC 2; Base grants</td></tr>
+      </tbody>
+    </table>
+
+    <h3>DevOps Milestones</h3>
+    <ul>
+      <li><strong>2026-05-26 00:00 UTC</strong> — CI/CD freeze, production branch gated</li>
+      <li><strong>2026-06-09 00:00 UTC</strong> — Staging go-live, load test at 10× scale</li>
+      <li><strong>2026-06-23 12:00 UTC</strong> — LBP war room, 24/7 coverage, 3-engineer rotation</li>
+    </ul>
+
+    <h2 id="workstreams">14. Active Workstreams</h2>
+    <h3>In Progress</h3>
+    <ul>
+      <li>SINC v2 smart contract finalization (ERC-20 on Base)</li>
+      <li>AXM A2A protocol hooks integration into SINCOR agent infrastructure</li>
+      <li>Certik / OpenZeppelin audit scheduling</li>
+      <li>Balancer V3 LBP curve simulation (waiting on simulator access)</li>
+    </ul>
+    <h3>Blocked / Waiting</h3>
+    <ul>
+      <li>Balancer SDK / API integration spec (pending Thursday call)</li>
+      <li>AutoRange pool configuration docs (requested from Balancer contact)</li>
+      <li>Base builder grants intro (conditional on partnership confirmation)</li>
+    </ul>
+    <h3>Upcoming</h3>
+    <ul>
+      <li>Thursday call with Balancer (integrations lead + BD)</li>
+      <li>Technical walkthrough with Balancer devs</li>
+      <li>Custom domain LBP frontend build (SDK route or fork route)</li>
+    </ul>
+
+    <h2 id="resources">15. Resources</h2>
+    <ul>
+      <li>Main site: <a href="https://getsincor.com" class="ext">getsincor.com</a></li>
+      <li>AXIOM marketplace: <a href="https://getsincor.com/axiom" class="ext">getsincor.com/axiom</a></li>
+      <li>AXM contract (Base): <code>0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</code></li>
+      <li>X: <a href="https://x.com/sincor" class="ext">@sincor</a></li>
+      <li>Balancer V3 docs: <a href="https://docs.balancer.fi/" class="ext">docs.balancer.fi</a></li>
+      <li>Balancer SDK: <a href="https://github.com/balancer/balancer-sdk" class="ext">github.com/balancer/balancer-sdk</a></li>
+    </ul>
+
+    <h2 id="security">16. Security Posture</h2>
+    <ul>
+      <li>No mint function on SINC or AXM</li>
+      <li>No admin keys, no upgradeable proxies</li>
+      <li>Contracts verified on Basescan and Sourcify</li>
+      <li>Geo-blocks: US, Canada, China, and sanctioned jurisdictions</li>
+      <li>Audit posture: SINC token <strong>CertiK Skynet 97 / 100</strong>; new contracts submitted (Phase I)</li>
+    </ul>
+
+    <h2 id="dependencies">17. Dependencies</h2>
+    <ul>
+      <li><strong>Primary:</strong> Base L2, Balancer V3, Uniswap V4</li>
+      <li><strong>Secondary:</strong> LayerZero (cross-chain), Chainlink (oracles for staking APY), The Graph Protocol (subgraph indexing)</li>
+    </ul>
+
+    <p style="margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted);">
+      This document reflects state as of <strong>2026-05-25</strong>. Balancer V3 native pivot is the critical change from previous Fjord-based planning. Subject to change as workstreams progress.
+    </p>
+  </main>
+
+</div>
+</body>
+</html>

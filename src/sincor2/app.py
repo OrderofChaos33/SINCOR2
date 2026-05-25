@@ -695,6 +695,14 @@ def why_no_dex():
     return render_template('why_no_dex.html')
 
 
+@app.route('/docs')
+@app.route('/docs/')
+@limiter.exempt if limiter else lambda f: f
+def docs():
+    """SINCOR project documentation"""
+    return render_template('docs.html')
+
+
 @app.route('/buy')
 @limiter.exempt if limiter else lambda f: f
 def buy():
