@@ -6,14 +6,21 @@ WORKDIR /app
 
 # Install only essential dependencies
 # Strip any erroneous python-sendgrid line (not a real PyPI package) before installing
-# Cache bust: v3
+# Cache bust: 2026-05-28-v4  <<-- FORCED FRESH BUILD
 COPY requirements.txt .
 RUN sed '/^python-sendgrid/d' requirements.txt > /tmp/req_clean.txt \
     && pip install --upgrade pip \
     && pip install -r /tmp/req_clean.txt
 
-# Copy application code
+# Copy application code (templates, static, src/sincor2, A2A all included)
 COPY . .
+
+# Verify critical new UI files made it into the image
+RUN echo "=== BUILD VERIFICATION ===" && \
+    ls -la /app/templates/ | head -10 && \
+    ls -la /app/static/ | head -5 && \
+    echo "Dashboard template exists:" && ls /app/templates/dashboard.html && \
+    echo "=== END VERIFICATION ==="
 
 # Add src to Python path so sincor2 package is importable
 ENV PYTHONPATH=/app/src
