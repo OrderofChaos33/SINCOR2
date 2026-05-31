@@ -10,8 +10,11 @@ the SINCOR agent swarm.
 AXIOM (AXM) is the settlement token for every inter-agent transaction:
   • External agents acquire AXM to pay for SINCOR agent tasks.
   • SINCOR agents earn AXM for fulfilled tasks (deposited to their wallet).
-  • 50 % of AXM received is burned to 0x...dEaD (deflationary mechanics).
-  • The other 50 % goes to the SINCOR treasury for operational costs.
+  • A2A payment receipts: 50 % of each received AXM payment is burned to
+    0x...dEaD (deflationary mechanics); 50 % goes to the SINCOR treasury.
+  • DEX trading fees: 80 % of Uniswap V4 AXM/WETH pool trading fees are
+    routed (off-chain team commitment, publicly auditable on Basescan) to
+    the ecosystem treasury.  These two fee streams are independent.
 
 A2A wire format
 ---------------
@@ -43,6 +46,7 @@ import json
 import logging
 import os
 import time
+import urllib.request as _urllib_request
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -306,8 +310,21 @@ def build_agent_card() -> AgentCard:
 # ---------------------------------------------------------------------------
 # In-memory task store (replace with Redis / DB in production)
 # ---------------------------------------------------------------------------
+# WARNING: this store is process-local and non-persistent. All tasks are lost
+# on restart and not shared across worker processes. Set A2A_TASK_STORE=redis
+# (and configure REDIS_URL) to enable a persistent Redis-backed store in
+# production. Without that, running multiple Gunicorn workers will produce
+# inconsistent task-status responses.
 
 _tasks: Dict[str, A2ATask] = {}
+
+_env = os.getenv("FLASK_ENV", "production").lower()
+if _env not in ("development", "dev", "test", "testing", "local") and \
+        os.getenv("A2A_TASK_STORE", "memory") == "memory":
+    logger.warning(
+        "A2A task store is in-memory (non-persistent). "
+        "Set A2A_TASK_STORE=redis and REDIS_URL for production deployments."
+    )
 
 
 def _now() -> str:
@@ -384,13 +401,12 @@ class PaymentVerifier:
             return False
 
         try:
-            import urllib.request as _req
             payload = json.dumps({
                 "jsonrpc": "2.0", "id": 1,
                 "method":  "eth_getTransactionReceipt",
                 "params":  [tx_hash],
             }).encode()
-            with _req.urlopen(_req.Request(
+            with _urllib_request.urlopen(_urllib_request.Request(
                 rpc_url,
                 data=payload,
                 headers={"Content-Type": "application/json"},
@@ -653,8 +669,12 @@ def _dispatch_to_swarm(task: A2ATask):
             )
             output = result.get("report") or result.get("content") or str(result)
             return output, None
+        except ImportError:
+            # Module not yet wired — expected in some environments; fall through to stub
+            logger.debug("IBI module not available, using stub A2A response")
         except Exception as inner_exc:
-            logger.debug("IBI dispatch failed (%s), using stub response", inner_exc)
+            # Runtime error inside the swarm — log as warning so it surfaces
+            logger.warning("IBI dispatch error for task %s: %s", task.id, inner_exc)
 
         # Stub response
         stub = (
