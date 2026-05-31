@@ -137,6 +137,15 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-
 # Configure template folder
 app.template_folder = 'templates'
 
+# Initialize A2A (Agent-to-Agent) integration routes
+try:
+    from sincor2.a2a_integration import A2ARouter
+    a2a_router = A2ARouter()
+    app.register_blueprint(a2a_router.blueprint)
+    print("✓ A2A integration routes registered")
+except Exception as e:
+    print(f"WARNING: A2A integration not available: {e}")
+
 # Initialize Stripe routes (MUST be after app creation, BEFORE other routes)
 try:
     from sincor2.stripe_routes import init_stripe_routes
@@ -686,6 +695,13 @@ def product_enterprise():
 def sinc_token():
     """SINC token gateway page"""
     return render_template('sinc_gateway.html')
+
+
+@app.route('/axiom')
+@limiter.exempt if limiter else lambda f: f
+def axiom_token():
+    """AXIOM (AXM) token page — autonomous intelligence token on Base"""
+    return render_template('axiom.html')
 
 
 @app.route('/buy')
