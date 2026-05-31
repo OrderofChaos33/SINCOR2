@@ -68,7 +68,7 @@ See [`onchain/README.md`](onchain/README.md) for full contract architecture, sup
 
 ## Agent-to-Agent (A2A) Integration
 
-SINCOR implements the [Google A2A protocol](https://google.github.io/A2A) — the emerging standard for machine-to-machine agent interoperability. Any external AI agent that speaks JSON-RPC 2.0 can discover, call, and collaborate with the SINCOR swarm.
+SINCOR implements the [A2A protocol v1.0.1](https://a2aproject.github.io/A2A) — the emerging standard for machine-to-machine agent interoperability. Any external AI agent that speaks JSON-RPC 2.0 can discover, call, and collaborate with the SINCOR swarm.
 
 **AXIOM is the settlement layer**: external agents pay in AXM for SINCOR agent work; SINCOR burns 50 % on-chain as each payment arrives, making supply deflationary as usage grows.
 

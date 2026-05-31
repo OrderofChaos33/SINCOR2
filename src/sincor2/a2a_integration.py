@@ -48,6 +48,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 import urllib.request as _urllib_request
 import uuid
@@ -95,6 +96,11 @@ class TaskState(str, Enum):
     INPUT_NEEDED    = "input_required"
     CANCELLED       = "canceled"
 
+    @classmethod
+    def terminal_states(cls) -> frozenset:
+        """Return the set of states from which no further transitions are allowed."""
+        return frozenset({cls.COMPLETED, cls.FAILED, cls.CANCELED, cls.REJECTED})
+
 
 @dataclass
 class AgentSkill:
@@ -104,8 +110,14 @@ class AgentSkill:
     description: str
     tags: List[str]
     examples: List[str]
-    input_modes:  List[str] = field(default_factory=lambda: ["text/plain", "application/json"])
-    output_modes: List[str] = field(default_factory=lambda: ["text/plain", "application/json"])
+    input_modes:  List[str] = field(default_factory=list)
+    output_modes: List[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.input_modes:
+            self.input_modes = ["text/plain", "application/json"]
+        if not self.output_modes:
+            self.output_modes = ["text/plain", "application/json"]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -456,21 +468,26 @@ def build_agent_card() -> AgentCard:
 # ---------------------------------------------------------------------------
 # In-memory stores (replace with Redis / DB in production)
 # ---------------------------------------------------------------------------
-# WARNING: this store is process-local and non-persistent. All tasks are lost
-# on restart and not shared across worker processes. Set A2A_TASK_STORE=redis
-# (and configure REDIS_URL) to enable a persistent Redis-backed store in
-# production. Without that, running multiple Gunicorn workers will produce
-# inconsistent task-status responses.
+# NOTE: this store is process-local and non-persistent. All tasks are lost on
+# restart and not shared across worker processes. Set A2A_TASK_STORE=redis (and
+# configure REDIS_URL) to enable a persistent Redis-backed store in production.
+# Without that, running multiple Gunicorn workers will produce inconsistent
+# task-status responses.
+#
+# Thread-safety: all access to _tasks and _push_configs must be guarded by
+# _store_lock. Use the _get_task / _update_task / _new_task helpers below.
 
 _tasks: Dict[str, A2ATask] = {}
 _push_configs: Dict[str, Dict[str, Any]] = {}  # task_id → push notification config
+_store_lock: threading.Lock = threading.Lock()
 
 _env = os.getenv("FLASK_ENV", "production").lower()
 if _env not in ("development", "dev", "test", "testing", "local") and \
         os.getenv("A2A_TASK_STORE", "memory") == "memory":
-    logger.warning(
+    logger.error(
         "A2A task store is in-memory (non-persistent). "
-        "Set A2A_TASK_STORE=redis and REDIS_URL for production deployments."
+        "Set A2A_TASK_STORE=redis and REDIS_URL for production deployments. "
+        "Tasks will be lost on restart and are not shared across workers."
     )
 
 
@@ -504,18 +521,21 @@ def _new_task(skill_id: str, input_text: str, caller_id: str,
         axm_paid=axm_paid,
         tx_hash=tx_hash,
     )
-    _tasks[task_id] = task
+    with _store_lock:
+        _tasks[task_id] = task
     return task
 
 
 def _get_task(task_id: str) -> Optional[A2ATask]:
-    return _tasks.get(task_id)
+    with _store_lock:
+        return _tasks.get(task_id)
 
 
 def _update_task(task: A2ATask, **kwargs: Any) -> A2ATask:
-    for k, v in kwargs.items():
-        setattr(task, k, v)
-    task.updated_at = _now()
+    with _store_lock:
+        for k, v in kwargs.items():
+            setattr(task, k, v)
+        task.updated_at = _now()
     return task
 
 
@@ -530,9 +550,18 @@ class PaymentVerifier:
     In production this should call an RPC node or use the web3.py library.
     The lightweight version here checks a local cache and falls through to
     a configurable RPC endpoint via HTTP.
+
+    Validation checks (production mode):
+      1. Transaction receipt exists and status == 0x1 (success).
+      2. A Transfer(address,address,uint256) log from the AXM contract is present
+         with `to` == expected_to (treasury wallet) and value >= expected_amount_wei.
     """
 
+    # ERC-20 Transfer event topic: keccak256("Transfer(address,address,uint256)")
+    _TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+
     _verified: Dict[str, bool] = {}
+    _lock: threading.Lock = threading.Lock()
 
     @classmethod
     def is_verified(cls, tx_hash: str, expected_amount_wei: int,
@@ -549,14 +578,17 @@ class PaymentVerifier:
             logger.warning("PaymentVerifier: skipping on-chain check (non-prod env)")
             return True
 
-        if tx_hash in cls._verified:
-            return cls._verified[tx_hash]
+        with cls._lock:
+            cached = cls._verified.get(tx_hash)
+        if cached is not None:
+            return cached
 
         rpc_url = os.getenv("BASE_RPC_URL")
         if not rpc_url:
             logger.error("BASE_RPC_URL not set — cannot verify AXM payment")
             return False
 
+        result = False
         try:
             payload = json.dumps({
                 "jsonrpc": "2.0", "id": 1,
@@ -571,12 +603,61 @@ class PaymentVerifier:
                 data = json.loads(resp.read())
             receipt = data.get("result")
             if not receipt or receipt.get("status") != "0x1":
-                return False
-            cls._verified[tx_hash] = True
-            return True
+                logger.warning("PaymentVerifier: tx %s not successful", tx_hash)
+            else:
+                result = cls._validate_transfer_log(
+                    receipt.get("logs", []),
+                    expected_to=expected_to,
+                    expected_amount_wei=expected_amount_wei,
+                )
         except Exception as exc:
             logger.error("PaymentVerifier RPC error: %s", exc)
-            return False
+
+        if result:
+            with cls._lock:
+                cls._verified[tx_hash] = True
+        return result
+
+    @classmethod
+    def _validate_transfer_log(
+        cls,
+        logs: List[Dict[str, Any]],
+        expected_to: str,
+        expected_amount_wei: int,
+    ) -> bool:
+        """
+        Scan the receipt logs for an ERC-20 Transfer from the AXM contract
+        whose `to` address matches *expected_to* and whose value is at least
+        *expected_amount_wei*.
+        """
+        axm_addr = AXIOM_CONTRACT.lower()
+        expected_to_norm = expected_to.lower()
+        # Transfer(address indexed from, address indexed to, uint256 value)
+        # topics[0] = event sig, topics[1] = from, topics[2] = to
+        # data = value (32-byte big-endian hex)
+        for log in logs:
+            if log.get("address", "").lower() != axm_addr:
+                continue
+            topics = log.get("topics", [])
+            if len(topics) < 3 or topics[0].lower() != cls._TRANSFER_TOPIC:
+                continue
+            # topics[2] is 32-byte padded address; last 20 bytes = actual address
+            to_addr = ("0x" + topics[2][-40:]).lower()
+            if to_addr != expected_to_norm:
+                continue
+            raw_value = log.get("data", "0x0")
+            try:
+                value = int(raw_value, 16)
+            except ValueError:
+                continue
+            if value >= expected_amount_wei:
+                return True
+        logger.warning(
+            "PaymentVerifier: no qualifying AXM Transfer log found in tx; "
+            "expected ≥%d wei to %s from contract %s",
+            expected_amount_wei, expected_to, AXIOM_CONTRACT,
+        )
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -792,12 +873,18 @@ def _extract_send_params(body: Dict[str, Any]):
 
     Returns (rpc_id, skill_id, context_id, caller_id, input_text, tx_hash,
              axm_paid, history_length, error_response).
+
+    Parameter precedence (first non-empty value wins):
+      - Canonical A2A v1.0.1: ``params.message`` object (camelCase fields).
+      - Legacy flat params: top-level camelCase fields in ``params``.
+      - Legacy snake_case: top-level snake_case fields in ``params``.
+    All three shapes are accepted so existing integrations continue to work.
     """
     rpc_id = body.get("id")
     params = body.get("params") or body  # tolerate bare params
 
-    # --- v1.0.1: params = {message: Message, configuration?: SendMessageConfiguration}
-    # --- legacy: params has skillId / sessionId / callerId at top level
+    # v1.0.1: params = {message: Message, configuration?: SendMessageConfiguration}
+    # legacy: params has skillId / sessionId / callerId at top level
     msg_obj      = params.get("message") or {}
     configuration = params.get("configuration") or {}
 
@@ -1056,9 +1143,7 @@ def _handle_cancel(body: Dict[str, Any]) -> Dict[str, Any]:
     task    = _get_task(task_id or "")
     if not task:
         return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
-    terminal = {TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED,
-                TaskState.REJECTED}
-    if task.state in terminal:
+    if task.state in TaskState.terminal_states():
         return _err("Task already in terminal state, cannot cancel",
                     code=-32003, rpc_id=rpc_id)
     _update_task(task, state=TaskState.CANCELED)
@@ -1074,7 +1159,8 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
     page_size   = int(params.get("pageSize") or 50)
     page_token  = params.get("pageToken")  # simple offset-based for now
 
-    tasks = list(_tasks.values())
+    with _store_lock:
+        tasks = list(_tasks.values())
     if context_id:
         tasks = [t for t in tasks if t.context_id == context_id]
     if state_filter:
@@ -1104,7 +1190,8 @@ def _handle_push_config_set(body: Dict[str, Any]) -> Dict[str, Any]:
     }
     if not task_id or not config["url"]:
         return _err("taskId and url are required", code=-32602, rpc_id=rpc_id)
-    _push_configs[task_id] = config
+    with _store_lock:
+        _push_configs[task_id] = config
     logger.info("Push notification config set for task %s → %s", task_id, config["url"])
     return _rpc_ok(config, rpc_id=rpc_id)
 
@@ -1114,7 +1201,8 @@ def _handle_push_config_get(body: Dict[str, Any]) -> Dict[str, Any]:
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("taskId") or params.get("id", "")
-    config  = _push_configs.get(task_id)
+    with _store_lock:
+        config = _push_configs.get(task_id)
     if not config:
         return _err(f"No push config for task {task_id}", code=-32602, rpc_id=rpc_id)
     return _rpc_ok(config, rpc_id=rpc_id)
@@ -1125,15 +1213,18 @@ def _handle_push_config_delete(body: Dict[str, Any]) -> Dict[str, Any]:
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("taskId") or params.get("id", "")
-    _push_configs.pop(task_id, None)
+    with _store_lock:
+        _push_configs.pop(task_id, None)
     return _rpc_ok({}, rpc_id=rpc_id)
 
 
 def _handle_push_config_list(body: Dict[str, Any]) -> Dict[str, Any]:
     """Handle tasks/pushNotificationConfig/list."""
     rpc_id = body.get("id")
+    with _store_lock:
+        configs = list(_push_configs.values())
     return _rpc_ok(
-        {"configs": list(_push_configs.values())},
+        {"configs": configs},
         rpc_id=rpc_id,
     )
 
@@ -1151,8 +1242,7 @@ def _handle_resubscribe(body: Dict[str, Any]) -> Generator[str, None, None]:
         yield _sse_event(_err(f"Task {task_id} not found", -32602, rpc_id))
         return
 
-    terminal = {TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED,
-                TaskState.REJECTED}
+    terminal = TaskState.terminal_states()
     final = task.state in terminal
 
     status_event: Dict[str, Any] = {
