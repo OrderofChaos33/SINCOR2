@@ -8,7 +8,7 @@ ADDED: Rate Limiting for DDoS protection
 
 import os
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import requests
@@ -312,7 +312,19 @@ def _build_oauth_redirect_uri(callback_endpoint):
 
 
 def _oauth_failure_redirect(provider, reason):
-    return redirect(f"{url_for('signup')}?oauth={provider}&error={reason}")
+    allowed_providers = {'google', 'github'}
+    allowed_reasons = {
+        'not_configured',
+        'invalid_state',
+        'missing_code',
+        'missing_access_token',
+        'token_exchange_failed',
+        'oauth_error'
+    }
+
+    safe_provider = provider if provider in allowed_providers else 'oauth'
+    safe_reason = reason if reason in allowed_reasons else 'oauth_error'
+    return redirect(url_for('signup', oauth=safe_provider, error=safe_reason))
 
 
 def _store_oauth_user(provider, email, name, provider_user_id, avatar_url=None):
@@ -325,7 +337,7 @@ def _store_oauth_user(provider, email, name, provider_user_id, avatar_url=None):
         'name': name or email.split('@')[0],
         'provider_user_id': str(provider_user_id),
         'avatar_url': avatar_url,
-        'connected_at': datetime.utcnow().isoformat() + 'Z'
+        'connected_at': datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -378,7 +390,8 @@ def auth_google_callback():
 
     code = request.args.get('code')
     if not code:
-        return _oauth_failure_redirect('google', request.args.get('error', 'missing_code'))
+        failure_reason = 'oauth_error' if request.args.get('error') else 'missing_code'
+        return _oauth_failure_redirect('google', failure_reason)
 
     google_client_id = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
     google_client_secret = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
@@ -402,9 +415,10 @@ def auth_google_callback():
         if not access_token:
             return _oauth_failure_redirect('google', 'missing_access_token')
 
+        auth_header = 'Bearer ' + access_token
         profile_response = requests.get(
             'https://openidconnect.googleapis.com/v1/userinfo',
-            headers={'Authorization': 'Bearer ' + access_token},
+            headers={'Authorization': auth_header},
             timeout=15
         )
         profile_response.raise_for_status()
@@ -417,7 +431,11 @@ def auth_google_callback():
             provider_user_id=profile.get('sub'),
             avatar_url=profile.get('picture')
         )
-    except (requests.RequestException, ValueError):
+    except requests.RequestException as oauth_error:
+        print(f"Google OAuth request failed: {oauth_error}")
+        return _oauth_failure_redirect('google', 'token_exchange_failed')
+    except ValueError as oauth_error:
+        print(f"Google OAuth profile validation failed: {oauth_error}")
         return _oauth_failure_redirect('google', 'token_exchange_failed')
 
     return redirect(f"{url_for('dashboard')}?oauth=google")
@@ -453,7 +471,8 @@ def auth_github_callback():
 
     code = request.args.get('code')
     if not code:
-        return _oauth_failure_redirect('github', request.args.get('error', 'missing_code'))
+        failure_reason = 'oauth_error' if request.args.get('error') else 'missing_code'
+        return _oauth_failure_redirect('github', failure_reason)
 
     github_client_id = os.environ.get('GITHUB_OAUTH_CLIENT_ID')
     github_client_secret = os.environ.get('GITHUB_OAUTH_CLIENT_SECRET')
@@ -478,8 +497,9 @@ def auth_github_callback():
         if not access_token:
             return _oauth_failure_redirect('github', 'missing_access_token')
 
+        auth_header = 'Bearer ' + access_token
         headers = {
-            'Authorization': 'Bearer ' + access_token,
+            'Authorization': auth_header,
             'Accept': 'application/vnd.github+json'
         }
 
@@ -506,7 +526,11 @@ def auth_github_callback():
             provider_user_id=profile.get('id'),
             avatar_url=profile.get('avatar_url')
         )
-    except (requests.RequestException, ValueError):
+    except requests.RequestException as oauth_error:
+        print(f"GitHub OAuth request failed: {oauth_error}")
+        return _oauth_failure_redirect('github', 'token_exchange_failed')
+    except ValueError as oauth_error:
+        print(f"GitHub OAuth profile validation failed: {oauth_error}")
         return _oauth_failure_redirect('github', 'token_exchange_failed')
 
     return redirect(f"{url_for('dashboard')}?oauth=github")
