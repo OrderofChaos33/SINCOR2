@@ -534,6 +534,7 @@ def build_agent_card() -> AgentCard:
 _tasks: Dict[str, A2ATask] = {}
 _push_configs: Dict[str, Dict[str, Any]] = {}  # task_id → push notification config
 _agent_registrations: Dict[str, AgentRegistration] = {}
+_registration_sequence: int = 0
 _store_lock: threading.Lock = threading.Lock()
 
 _env = os.getenv("FLASK_ENV", "production").lower()
@@ -597,14 +598,18 @@ def _update_task(task: A2ATask, **kwargs: Any) -> A2ATask:
 def _normalize_protocol_binding(protocol_binding: Optional[str]) -> str:
     if not protocol_binding:
         return "JSONRPC"
-    pb = protocol_binding.strip().upper().replace("_", "").replace("-", "")
+    pb = protocol_binding.strip().upper()
+    pb_key = pb.replace("_", "").replace("-", "").replace("+", "")
     mapping = {
         "JSONRPC": "JSONRPC",
         "HTTPJSON": "HTTP+JSON",
-        "HTTP+JSON": "HTTP+JSON",
         "GRPC": "GRPC",
     }
-    return mapping.get(pb, protocol_binding.strip())
+    return mapping.get(pb_key, pb)
+
+
+def _format_axm(wei: int) -> str:
+    return f"{wei / 10**18:.4f} AXM"
 
 
 def _register_agent(
@@ -613,12 +618,14 @@ def _register_agent(
     endpoint: Optional[str],
     metadata: Optional[Dict[str, Any]] = None,
 ) -> Tuple[AgentRegistration, bool]:
+    global _registration_sequence
     with _store_lock:
         existing = _agent_registrations.get(agent_id)
         if existing:
             return existing, False
 
-        registration_index = len(_agent_registrations) + 1
+        _registration_sequence += 1
+        registration_index = _registration_sequence
         reward_eligible = registration_index <= A2A_REGISTRATION_REWARD_LIMIT
         reward_wei = A2A_REGISTRATION_REWARD_WEI if reward_eligible else 0
 
@@ -645,7 +652,7 @@ def _registration_to_dict(registration: AgentRegistration) -> Dict[str, Any]:
         "metadata": registration.metadata,
         "registration_index": registration.registration_index,
         "reward_wei": str(registration.reward_wei),
-        "reward_display_axm": f"{registration.reward_wei / 10**18:.4f} AXM",
+        "reward_display_axm": _format_axm(registration.reward_wei),
         "reward_eligible": registration.reward_eligible,
     }
 
@@ -658,7 +665,7 @@ def _registration_stats() -> Dict[str, Any]:
         "total_registered": total_registered,
         "reward_limit": A2A_REGISTRATION_REWARD_LIMIT,
         "registration_reward_wei": str(A2A_REGISTRATION_REWARD_WEI),
-        "registration_reward_display_axm": f"{A2A_REGISTRATION_REWARD_WEI / 10**18:.4f} AXM",
+        "registration_reward_display_axm": _format_axm(A2A_REGISTRATION_REWARD_WEI),
         "rewards_remaining": rewards_remaining,
     }
 
@@ -1057,13 +1064,15 @@ def _handle_agents_register(body: Dict[str, Any]) -> Dict[str, Any]:
     rpc_id = body.get("id")
     params = body.get("params") or body
 
-    agent_id = (params.get("agentId") or params.get("agent_id") or
-                params.get("callerId") or params.get("caller_id") or "").strip()
+    agent_id = (params.get("agentId") or params.get("agent_id") or "").strip()
     if not agent_id:
         return _err("agentId is required", code=-32602, rpc_id=rpc_id)
 
-    protocol_binding = (params.get("protocolBinding") or
-                        params.get("protocol_binding") or "JSONRPC")
+    protocol_binding = params.get("protocolBinding")
+    if protocol_binding is None:
+        protocol_binding = params.get("protocol_binding")
+    if protocol_binding is not None and not str(protocol_binding).strip():
+        return _err("protocolBinding cannot be empty", code=-32602, rpc_id=rpc_id)
     endpoint = params.get("endpoint")
     metadata = params.get("metadata")
     if metadata is not None and not isinstance(metadata, dict):
@@ -1071,7 +1080,7 @@ def _handle_agents_register(body: Dict[str, Any]) -> Dict[str, Any]:
 
     registration, created = _register_agent(
         agent_id=agent_id,
-        protocol_binding=protocol_binding,
+        protocol_binding=str(protocol_binding) if protocol_binding is not None else None,
         endpoint=endpoint,
         metadata=metadata,
     )
@@ -1091,8 +1100,7 @@ def _handle_agents_register(body: Dict[str, Any]) -> Dict[str, Any]:
 def _handle_agents_registration_status(body: Dict[str, Any]) -> Dict[str, Any]:
     rpc_id = body.get("id")
     params = body.get("params") or body
-    agent_id = (params.get("agentId") or params.get("agent_id") or
-                params.get("id") or "").strip()
+    agent_id = (params.get("agentId") or params.get("agent_id") or "").strip()
     if not agent_id:
         return _err("agentId is required", code=-32602, rpc_id=rpc_id)
     with _store_lock:

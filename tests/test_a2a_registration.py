@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 
 from flask import Flask
 
@@ -14,6 +15,7 @@ class A2ARegistrationTests(unittest.TestCase):
         self.client = self.app.test_client()
         with a2a._store_lock:
             a2a._agent_registrations.clear()
+            a2a._registration_sequence = 0
 
     def test_register_agent_gets_reward(self):
         response = self.client.post(
@@ -37,23 +39,44 @@ class A2ARegistrationTests(unittest.TestCase):
         self.assertEqual(body["result"]["status"], "already_registered")
         self.assertEqual(body["result"]["registration_stats"]["total_registered"], 1)
 
+    def test_empty_protocol_binding_rejected(self):
+        response = self.client.post(
+            "/api/a2a/register",
+            json={"agent_id": "agent-xyz", "protocol_binding": "   "},
+        )
+        body = response.get_json()
+        self.assertIn("error", body)
+        self.assertEqual(body["error"]["code"], -32602)
+
     def test_reward_limit_boundary(self):
         original_limit = a2a.A2A_REGISTRATION_REWARD_LIMIT
         try:
             a2a.A2A_REGISTRATION_REWARD_LIMIT = 2
+            results = []
             for i in range(1, 4):
-                result = a2a._handle_agents_register({"agentId": f"agent-{i}"})
-            registration = result["result"]["registration"]
-            self.assertFalse(registration["reward_eligible"])
-            self.assertEqual(registration["reward_wei"], "0")
-            self.assertEqual(result["result"]["registration_stats"]["rewards_remaining"], 0)
+                results.append(a2a._handle_agents_register({"agentId": f"agent-{i}"}))
+
+            first = results[0]["result"]["registration"]
+            second = results[1]["result"]["registration"]
+            third = results[2]["result"]["registration"]
+
+            self.assertTrue(first["reward_eligible"])
+            self.assertTrue(second["reward_eligible"])
+            self.assertFalse(third["reward_eligible"])
+            self.assertEqual(third["reward_wei"], "0")
+            self.assertEqual(results[2]["result"]["registration_stats"]["rewards_remaining"], 0)
         finally:
             a2a.A2A_REGISTRATION_REWARD_LIMIT = original_limit
 
     def test_agent_card_advertises_protocol_bindings(self):
-        os.environ["A2A_HTTP_JSON_URL"] = "https://getsincor.com/api/a2a/http"
-        os.environ["A2A_GRPC_URL"] = "https://getsincor.com/api/a2a/grpc"
-        try:
+        with patch.dict(
+            os.environ,
+            {
+                "A2A_HTTP_JSON_URL": "https://getsincor.com/api/a2a/http",
+                "A2A_GRPC_URL": "https://getsincor.com/api/a2a/grpc",
+            },
+            clear=False,
+        ):
             card = a2a.build_agent_card().to_dict()
             bindings = {
                 interface["protocolBinding"] for interface in card["supportedInterfaces"]
@@ -62,9 +85,6 @@ class A2ARegistrationTests(unittest.TestCase):
             self.assertIn("HTTP+JSON", bindings)
             self.assertIn("GRPC", bindings)
             self.assertIn("agentRegistration", card["capabilities"])
-        finally:
-            os.environ.pop("A2A_HTTP_JSON_URL", None)
-            os.environ.pop("A2A_GRPC_URL", None)
 
 
 if __name__ == "__main__":
