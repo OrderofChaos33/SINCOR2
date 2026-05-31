@@ -7,8 +7,12 @@ ADDED: Rate Limiting for DDoS protection
 """
 
 import os
+import secrets
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+from urllib.parse import urlencode
+
+import requests
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Load environment variables from .env file
@@ -299,6 +303,32 @@ def get_current_user():
         }), 500
 
 
+def _build_oauth_redirect_uri(callback_endpoint):
+    """Build OAuth callback URI using PLATFORM_URL when configured."""
+    platform_url = os.environ.get('PLATFORM_URL', '').strip().rstrip('/')
+    if platform_url:
+        return f"{platform_url}{url_for(callback_endpoint)}"
+    return url_for(callback_endpoint, _external=True)
+
+
+def _oauth_failure_redirect(provider, reason):
+    return redirect(f"{url_for('signup')}?oauth={provider}&error={reason}")
+
+
+def _store_oauth_user(provider, email, name, provider_user_id, avatar_url=None):
+    if not email:
+        raise ValueError("OAuth provider did not return an email address")
+
+    session['oauth_user'] = {
+        'provider': provider,
+        'email': email,
+        'name': name or email.split('@')[0],
+        'provider_user_id': str(provider_user_id),
+        'avatar_url': avatar_url,
+        'connected_at': datetime.utcnow().isoformat() + 'Z'
+    }
+
+
 # ==================== PUBLIC ROUTES ====================
 
 @app.route('/')
@@ -306,6 +336,180 @@ def get_current_user():
 def index():
     """Main landing page — competitive intelligence (NO RATE LIMIT)"""
     return render_template('home.html')
+
+
+@app.route('/signup')
+@limiter.exempt if limiter else lambda f: f
+def signup():
+    """Signup page with OAuth options."""
+    return render_template('signup.html')
+
+
+@app.route('/auth/google')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_google():
+    """Start Google OAuth flow."""
+    google_client_id = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
+    if not google_client_id:
+        return _oauth_failure_redirect('google', 'not_configured')
+
+    state = secrets.token_urlsafe(32)
+    session['google_oauth_state'] = state
+
+    params = {
+        'client_id': google_client_id,
+        'redirect_uri': _build_oauth_redirect_uri('auth_google_callback'),
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'access_type': 'online',
+        'prompt': 'select_account'
+    }
+    return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}")
+
+
+@app.route('/auth/google/callback')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_google_callback():
+    """Handle Google OAuth callback."""
+    expected_state = session.pop('google_oauth_state', None)
+    if not expected_state or expected_state != request.args.get('state'):
+        return _oauth_failure_redirect('google', 'invalid_state')
+
+    code = request.args.get('code')
+    if not code:
+        return _oauth_failure_redirect('google', request.args.get('error', 'missing_code'))
+
+    google_client_id = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
+    google_client_secret = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
+    if not google_client_id or not google_client_secret:
+        return _oauth_failure_redirect('google', 'not_configured')
+
+    try:
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'client_id': google_client_id,
+                'client_secret': google_client_secret,
+                'code': code,
+                'grant_type': 'authorization_code',
+                'redirect_uri': _build_oauth_redirect_uri('auth_google_callback')
+            },
+            timeout=15
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json().get('access_token')
+        if not access_token:
+            return _oauth_failure_redirect('google', 'missing_access_token')
+
+        profile_response = requests.get(
+            'https://openidconnect.googleapis.com/v1/userinfo',
+            headers={'Authorization': 'Bearer ' + access_token},
+            timeout=15
+        )
+        profile_response.raise_for_status()
+        profile = profile_response.json()
+
+        _store_oauth_user(
+            provider='google',
+            email=profile.get('email'),
+            name=profile.get('name'),
+            provider_user_id=profile.get('sub'),
+            avatar_url=profile.get('picture')
+        )
+    except (requests.RequestException, ValueError):
+        return _oauth_failure_redirect('google', 'token_exchange_failed')
+
+    return redirect(f"{url_for('dashboard')}?oauth=google")
+
+
+@app.route('/auth/github')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_github():
+    """Start GitHub OAuth flow."""
+    github_client_id = os.environ.get('GITHUB_OAUTH_CLIENT_ID')
+    if not github_client_id:
+        return _oauth_failure_redirect('github', 'not_configured')
+
+    state = secrets.token_urlsafe(32)
+    session['github_oauth_state'] = state
+
+    params = {
+        'client_id': github_client_id,
+        'redirect_uri': _build_oauth_redirect_uri('auth_github_callback'),
+        'scope': 'read:user user:email',
+        'state': state
+    }
+    return redirect(f"https://github.com/login/oauth/authorize?{urlencode(params)}")
+
+
+@app.route('/auth/github/callback')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_github_callback():
+    """Handle GitHub OAuth callback."""
+    expected_state = session.pop('github_oauth_state', None)
+    if not expected_state or expected_state != request.args.get('state'):
+        return _oauth_failure_redirect('github', 'invalid_state')
+
+    code = request.args.get('code')
+    if not code:
+        return _oauth_failure_redirect('github', request.args.get('error', 'missing_code'))
+
+    github_client_id = os.environ.get('GITHUB_OAUTH_CLIENT_ID')
+    github_client_secret = os.environ.get('GITHUB_OAUTH_CLIENT_SECRET')
+    if not github_client_id or not github_client_secret:
+        return _oauth_failure_redirect('github', 'not_configured')
+
+    try:
+        token_response = requests.post(
+            'https://github.com/login/oauth/access_token',
+            data={
+                'client_id': github_client_id,
+                'client_secret': github_client_secret,
+                'code': code,
+                'state': expected_state,
+                'redirect_uri': _build_oauth_redirect_uri('auth_github_callback')
+            },
+            headers={'Accept': 'application/json'},
+            timeout=15
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json().get('access_token')
+        if not access_token:
+            return _oauth_failure_redirect('github', 'missing_access_token')
+
+        headers = {
+            'Authorization': 'Bearer ' + access_token,
+            'Accept': 'application/vnd.github+json'
+        }
+
+        profile_response = requests.get('https://api.github.com/user', headers=headers, timeout=15)
+        profile_response.raise_for_status()
+        profile = profile_response.json()
+
+        email_response = requests.get('https://api.github.com/user/emails', headers=headers, timeout=15)
+        email_response.raise_for_status()
+        emails = email_response.json()
+
+        primary_email = next(
+            (item.get('email') for item in emails if item.get('primary') and item.get('verified')),
+            None
+        ) or next(
+            (item.get('email') for item in emails if item.get('verified')),
+            profile.get('email')
+        )
+
+        _store_oauth_user(
+            provider='github',
+            email=primary_email,
+            name=profile.get('name') or profile.get('login'),
+            provider_user_id=profile.get('id'),
+            avatar_url=profile.get('avatar_url')
+        )
+    except (requests.RequestException, ValueError):
+        return _oauth_failure_redirect('github', 'token_exchange_failed')
+
+    return redirect(f"{url_for('dashboard')}?oauth=github")
 
 
 @app.route('/api/waitlist', methods=['POST'])
@@ -917,6 +1121,8 @@ def test_environment():
         'GOOGLE_API_KEY',
         'GOOGLE_OAUTH_CLIENT_ID',
         'GOOGLE_OAUTH_CLIENT_SECRET',
+        'GITHUB_OAUTH_CLIENT_ID',
+        'GITHUB_OAUTH_CLIENT_SECRET',
         'PAYPAL_ENV',
         'PAYPAL_REST_API_ID',
         'PAYPAL_REST_API_SECRET',
