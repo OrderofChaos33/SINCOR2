@@ -97,41 +97,41 @@ def test_waitlist_add():
 @test("Monetization Engine Initialization")
 def test_monetization_init():
     """Test Monetization Engine initialization"""
+    if not (os.getenv('PAYPAL_REST_API_ID') and os.getenv('PAYPAL_REST_API_SECRET')):
+        print("[SKIP] PayPal credentials not set (expected in dev)")
+        return
+
     try:
         from monetization_engine import MonetizationEngine
         engine = MonetizationEngine()
         print("[OK] Monetization engine initialized")
     except Exception as e:
-        if 'PAYPAL' in str(e).upper() or "'NoneType' object is not callable" in str(e):
-            print("[SKIP] PayPal credentials not set (expected in dev)")
-        else:
-            raise
+        raise
 
 
 @test("PayPal Sync Wrapper Availability")
 def test_paypal_sync():
     """Test PayPal sync wrapper availability"""
+    if not (os.getenv('PAYPAL_REST_API_ID') and os.getenv('PAYPAL_REST_API_SECRET')):
+        print("[SKIP] PayPal credentials not set (expected in dev)")
+        return
+
     try:
         from paypal_integration_sync import PayPalIntegrationSync
         paypal = PayPalIntegrationSync()
         print("[SKIP] PayPal requires credentials (expected)")
     except Exception as e:
-        if 'PAYPAL' in str(e).upper():
-            print("[SKIP] PayPal credentials not set (expected in dev)")
-        else:
-            raise
+        raise
 
 
 @test("PayPal Sync Methods")
 def test_paypal_methods():
     """Test PayPal sync methods exist"""
-    try:
-        from paypal_integration_sync import PayPalIntegrationSync
-    except Exception as e:
-        if 'PAYPAL' in str(e).upper():
-            print("[SKIP] PayPal credentials not set (expected in dev)")
-            return
-        raise
+    if not (os.getenv('PAYPAL_REST_API_ID') and os.getenv('PAYPAL_REST_API_SECRET')):
+        print("[SKIP] PayPal credentials not set (expected in dev)")
+        return
+
+    from paypal_integration_sync import PayPalIntegrationSync
 
     # Check methods exist (don't call them without credentials)
     assert hasattr(PayPalIntegrationSync, 'create_payment_sync'), "Should have create_payment_sync"
@@ -147,13 +147,11 @@ def test_paypal_methods():
 @test("Payment Request Model")
 def test_payment_request():
     """Test Payment Request model"""
-    try:
-        from paypal_integration import PaymentRequest
-    except Exception as e:
-        if 'PAYPAL' in str(e).upper():
-            print("[SKIP] PayPal credentials not set (expected in dev)")
-            return
-        raise
+    if not (os.getenv('PAYPAL_REST_API_ID') and os.getenv('PAYPAL_REST_API_SECRET')):
+        print("[SKIP] PayPal credentials not set (expected in dev)")
+        return
+
+    from paypal_integration import PaymentRequest
 
     # Create a test payment request
     request = PaymentRequest(

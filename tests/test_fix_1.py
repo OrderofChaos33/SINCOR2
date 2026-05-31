@@ -25,31 +25,35 @@ def test_imports():
         print(f"❌ app.py import failed: {e}")
         return False
 
-    try:
-        from paypal_integration_sync import PayPalIntegrationSync, SINCORPaymentProcessorSync
-        print("✅ paypal_integration_sync.py imports successfully")
-    except Exception as e:
-        if 'PAYPAL' in str(e).upper():
-            print("⚠️ paypal_integration_sync.py requires PayPal credentials (expected in dev)")
-        else:
+    paypal_configured = bool(
+        os.getenv('PAYPAL_REST_API_ID') and os.getenv('PAYPAL_REST_API_SECRET')
+    )
+    if paypal_configured:
+        try:
+            from paypal_integration_sync import PayPalIntegrationSync, SINCORPaymentProcessorSync
+            print("✅ paypal_integration_sync.py imports successfully")
+        except Exception as e:
             print(f"❌ paypal_integration_sync.py import failed: {e}")
             return False
 
-    try:
-        from paypal_integration import PaymentRequest, PaymentStatus
-        print("✅ paypal_integration.py imports successfully")
-    except Exception as e:
-        if 'PAYPAL' in str(e).upper():
-            print("⚠️ paypal_integration.py requires PayPal credentials (expected in dev)")
-        else:
+        try:
+            from paypal_integration import PaymentRequest, PaymentStatus
+            print("✅ paypal_integration.py imports successfully")
+        except Exception as e:
             print(f"❌ paypal_integration.py import failed: {e}")
             return False
+    else:
+        print("⚠️ PayPal credentials not set; skipping PayPal import checks")
 
     return True
 
 def test_sync_methods():
     """Test that sync methods exist"""
     print("\nTesting sync methods...")
+
+    if not (os.getenv('PAYPAL_REST_API_ID') and os.getenv('PAYPAL_REST_API_SECRET')):
+        print("⚠️ PayPal credentials not set; skipping sync payment method execution")
+        return True
 
     try:
         from paypal_integration_sync import PayPalIntegrationSync
@@ -65,9 +69,6 @@ def test_sync_methods():
         return True
 
     except Exception as e:
-        if 'PAYPAL' in str(e).upper():
-            print("⚠️ Sync method execution requires PayPal credentials (expected in dev)")
-            return True
         print(f"❌ Sync methods test failed: {e}")
         return False
 
