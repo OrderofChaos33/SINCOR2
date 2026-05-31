@@ -76,7 +76,14 @@ AXM_PRICE_PER_TASK = int(os.getenv("AXM_PRICE_PER_TASK", str(1 * 10**18)))  # 1 
 PLATFORM_URL     = os.getenv("PLATFORM_URL", "https://getsincor.com")
 PLATFORM_NAME    = "SINCOR Agent Swarm"
 PLATFORM_VERSION = "2.0.0"
-A2A_PROTOCOL_VERSION = "1.0"          # A2A spec version advertised in AgentCard
+A2A_PROTOCOL_VERSION = "1.0.1"        # A2A spec version advertised in AgentCard
+
+# Tunable limits
+BASE_RPC_TIMEOUT     = int(os.getenv("BASE_RPC_TIMEOUT", "10"))   # seconds
+TASK_LIST_MAX_PAGE   = int(os.getenv("TASK_LIST_MAX_PAGE", "1000"))
+
+# Non-production environments where on-chain / payment checks are skipped
+_DEV_ENVS: frozenset = frozenset({"development", "dev", "test", "testing", "local"})
 
 # ---------------------------------------------------------------------------
 # A2A data models (v1.0.1)
@@ -482,7 +489,7 @@ _push_configs: Dict[str, Dict[str, Any]] = {}  # task_id → push notification c
 _store_lock: threading.Lock = threading.Lock()
 
 _env = os.getenv("FLASK_ENV", "production").lower()
-if _env not in ("development", "dev", "test", "testing", "local") and \
+if _env not in _DEV_ENVS and \
         os.getenv("A2A_TASK_STORE", "memory") == "memory":
     logger.error(
         "A2A task store is in-memory (non-persistent). "
@@ -574,7 +581,7 @@ class PaymentVerifier:
         doesn't require live RPC calls.
         """
         env = os.getenv("FLASK_ENV", "production").lower()
-        if env in ("development", "dev", "test", "testing", "local"):
+        if env in _DEV_ENVS:
             logger.warning("PaymentVerifier: skipping on-chain check (non-prod env)")
             return True
 
@@ -599,7 +606,7 @@ class PaymentVerifier:
                 rpc_url,
                 data=payload,
                 headers={"Content-Type": "application/json"},
-            ), timeout=10) as resp:
+            ), timeout=BASE_RPC_TIMEOUT) as resp:
                 data = json.loads(resp.read())
             receipt = data.get("result")
             if not receipt or receipt.get("status") != "0x1":
@@ -933,7 +940,7 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
 
     # --- Payment gate (skip for axiom-payment skill and in dev) ----------
     env = os.getenv("FLASK_ENV", "production").lower()
-    skip_payment = env in ("development", "dev", "test", "testing", "local")
+    skip_payment = env in _DEV_ENVS
 
     if not skip_payment and skill_id != "axiom-payment":
         if not tx_hash:
@@ -1042,7 +1049,7 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
         return
 
     env = os.getenv("FLASK_ENV", "production").lower()
-    skip_payment = env in ("development", "dev", "test", "testing", "local")
+    skip_payment = env in _DEV_ENVS
     if not skip_payment and skill_id != "axiom-payment":
         if not tx_hash:
             yield _sse_event(_err(
@@ -1157,6 +1164,11 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
     context_id  = params.get("contextId")
     state_filter = params.get("state")
     page_size   = int(params.get("pageSize") or 50)
+    if page_size > TASK_LIST_MAX_PAGE:
+        return _err(
+            f"pageSize exceeds maximum ({TASK_LIST_MAX_PAGE})",
+            code=-32602, rpc_id=rpc_id,
+        )
     page_token  = params.get("pageToken")  # simple offset-based for now
 
     with _store_lock:
