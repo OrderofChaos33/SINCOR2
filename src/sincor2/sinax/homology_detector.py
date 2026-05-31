@@ -38,6 +38,9 @@ import numpy as np
 
 from sincor2.sinax.proof_manifold import ManifoldPoint, ProofManifold
 
+# Maximum characters used when truncating proof-state strings to labels
+MAX_STATE_LABEL_LEN = 80
+
 
 # ---------------------------------------------------------------------------
 # Data containers
@@ -383,7 +386,7 @@ class HomologyDetector:
         )
         for hc in significant[:5]:  # top 5 most significant holes
             if hc.representative_states:
-                anchor = hc.representative_states[0][:60].replace("\n", " ")
+                anchor = hc.representative_states[0][:MAX_STATE_LABEL_LEN].replace("\n", " ")
                 dim_label = {1: "bridge lemma", 2: "existence lemma"}.get(
                     hc.dimension, "auxiliary lemma"
                 )

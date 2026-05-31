@@ -33,6 +33,9 @@ import numpy as np
 
 from sincor2.sinax.proof_manifold import ManifoldPoint, ProofManifold
 
+# Maximum characters used when truncating proof-state strings to labels
+MAX_STATE_LABEL_LEN = 80
+
 
 # ---------------------------------------------------------------------------
 # Data containers
@@ -235,7 +238,7 @@ class MorseFilter:
 
         for idx, (state, pt) in enumerate(zip(proof_states, points)):
             h_val = self._h(pt)
-            landscape[state[:80]] = h_val
+            landscape[state[:MAX_STATE_LABEL_LEN]] = h_val
 
             neighbours = self.manifold.nearest_neighbours(pt, k=self.neighbour_k)
             grad = _discrete_gradient(pt, neighbours, self._h)
@@ -256,7 +259,7 @@ class MorseFilter:
                 complexity_value=h_val,
                 influence_radius=influence,
                 simplification_power=simplification,
-                label=state[:80],
+                label=state[:MAX_STATE_LABEL_LEN],
             )
             critical_points.append(cp)
 

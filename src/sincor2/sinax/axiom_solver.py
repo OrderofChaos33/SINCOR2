@@ -34,7 +34,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
 from sincor2.sinax.geodesic_flow import GeodesicFlowEngine, GeodesicPath, FlowConfig
-from sincor2.sinax.homology_detector import HomologyDetector, HomologyReport
+from sincor2.sinax.homology_detector import HomologyDetector, HomologyReport, MAX_STATE_LABEL_LEN
 from sincor2.sinax.morse_filter import MorseDecomposition, MorseFilter
 from sincor2.sinax.proof_manifold import ProofManifold
 
@@ -320,8 +320,8 @@ class AxiomSolver:
             f"Proof Navigation Report (ID pending)",
             f"{'='*60}",
             f"",
-            f"START : {start[:100]}",
-            f"TARGET: {target[:100]}",
+            f"START : {start[:MAX_STATE_LABEL_LEN]}",
+            f"TARGET: {target[:MAX_STATE_LABEL_LEN]}",
             f"",
             f"MANIFOLD JOURNEY",
             f"-" * 40,
@@ -347,13 +347,13 @@ class AxiomSolver:
             lines.append("")
             lines.append("KEY LEMMAS (critical minima of the proof landscape):")
             for lemma in morse.key_lemmas[:5]:
-                lines.append(f"  * {lemma[:80]}")
+                lines.append(f"  * {lemma[:MAX_STATE_LABEL_LEN]}")
 
         if morse.branch_points:
             lines.append("")
             lines.append("BRANCH POINTS (proof strategy divergences):")
             for bp in morse.branch_points[:3]:
-                lines.append(f"  ~ {bp[:80]}")
+                lines.append(f"  ~ {bp[:MAX_STATE_LABEL_LEN]}")
 
         if homology.has_holes:
             lines.append("")

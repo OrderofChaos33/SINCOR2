@@ -6,8 +6,11 @@ ADDED: JWT Authentication for admin endpoints
 ADDED: Rate Limiting for DDoS protection
 """
 
+import logging
 import os
 from datetime import datetime
+
+_log = logging.getLogger(__name__)
 from flask import Flask, render_template, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -1170,7 +1173,8 @@ def sinax_solve():
         result = ptn.solve(start_state=start, target_state=target, context_states=context)
         return jsonify(result.to_dict())
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        _log.exception("sinax_solve error")
+        return jsonify({'error': 'Proof search failed'}), 500
 
 
 @app.route('/api/sinax/embed', methods=['POST'])
@@ -1191,7 +1195,8 @@ def sinax_embed():
     try:
         return jsonify(ptn.embed(state))
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        _log.exception("sinax_embed error")
+        return jsonify({'error': 'Embedding failed'}), 500
 
 
 @app.route('/api/sinax/geodesic', methods=['POST'])
@@ -1213,7 +1218,8 @@ def sinax_geodesic():
     try:
         return jsonify(ptn.geodesic(start, target))
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        _log.exception("sinax_geodesic error")
+        return jsonify({'error': 'Geodesic computation failed'}), 500
 
 
 @app.route('/api/sinax/homology', methods=['POST'])
@@ -1234,7 +1240,8 @@ def sinax_homology():
     try:
         return jsonify(ptn.homology(states))
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        _log.exception("sinax_homology error")
+        return jsonify({'error': 'Homology analysis failed'}), 500
 
 
 @app.route('/api/sinax/morse', methods=['POST'])
@@ -1255,7 +1262,8 @@ def sinax_morse():
     try:
         return jsonify(ptn.morse(states))
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        _log.exception("sinax_morse error")
+        return jsonify({'error': 'Morse decomposition failed'}), 500
 
 
 @app.route('/api/sinax/training-signal', methods=['POST'])
@@ -1276,7 +1284,8 @@ def sinax_training_signal():
     try:
         return jsonify(ptn.training_signal(states))
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        _log.exception("sinax_training_signal error")
+        return jsonify({'error': 'Training signal extraction failed'}), 500
 
 
 @app.route('/api/sinax/status')
