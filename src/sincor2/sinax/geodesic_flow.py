@@ -68,7 +68,7 @@ class FlowConfig:
 def _straight_line_flow(
     z: np.ndarray,
     target: np.ndarray,
-    t: float,          # noqa: ARG001 - reserved for learned time-dependent fields
+    _t: float,          # reserved for learned time-dependent fields
 ) -> np.ndarray:
     """
     Simplest flow field: a unit vector pointing from z toward target.

@@ -9,14 +9,14 @@ ADDED: Rate Limiting for DDoS protection
 import logging
 import os
 from datetime import datetime
-
-_log = logging.getLogger(__name__)
 from flask import Flask, render_template, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()
+
+_log = logging.getLogger(__name__)
 
 # Import authentication system
 try:
