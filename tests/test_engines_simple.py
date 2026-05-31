@@ -5,7 +5,15 @@ Tests that engines load and are configured correctly
 """
 
 import sys
+import os
 from datetime import datetime
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+SRC_DIR = os.path.join(ROOT_DIR, 'src')
+PKG_DIR = os.path.join(SRC_DIR, 'sincor2')
+for path in (SRC_DIR, PKG_DIR):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 print('='*70)
 print('SINCOR ENGINE VERIFICATION')
