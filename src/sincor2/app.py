@@ -130,6 +130,21 @@ except Exception as e:
     FULFILLMENT_AVAILABLE = False
     fulfillment_system = None
 
+# Import SINAX Proof Topology Navigator
+try:
+    from sincor2.sinax.ptn import ProofTopologyNavigator
+    ptn = ProofTopologyNavigator()
+    PTN_AVAILABLE = True
+    print("SINAX Proof Topology Navigator Loaded Successfully")
+except ImportError as e:
+    print(f"SINAX PTN not available: {e}")
+    PTN_AVAILABLE = False
+    ptn = None
+except Exception as e:
+    print(f"SINAX PTN error: {e}")
+    PTN_AVAILABLE = False
+    ptn = None
+
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-in-production')
@@ -1125,6 +1140,159 @@ def monetization_status():
         'rate_limit_available': RATE_LIMIT_AVAILABLE,
         'environment_configured': bool(os.environ.get('PAYPAL_REST_API_ID')),
         'production_mode': os.environ.get('PAYPAL_ENV', 'sandbox') == 'live'
+    })
+
+
+# ==================== SINAX PROOF TOPOLOGY NAVIGATOR ====================
+
+@app.route('/api/sinax/solve', methods=['POST'])
+def sinax_solve():
+    """
+    Full PTN proof search (all 4 layers).
+
+    POST body (JSON):
+      start_state  : str  — initial proof state
+      target_state : str  — desired final state
+      context      : list[str] (optional) — additional lemmas/hypotheses
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    start = data.get('start_state', '').strip()
+    target = data.get('target_state', '').strip()
+    context = data.get('context', [])
+
+    if not start or not target:
+        return jsonify({'error': 'start_state and target_state are required'}), 400
+
+    try:
+        result = ptn.solve(start_state=start, target_state=target, context_states=context)
+        return jsonify(result.to_dict())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sinax/embed', methods=['POST'])
+def sinax_embed():
+    """
+    Layer 1 — Embedding Manifold.
+
+    POST body (JSON): { "proof_state": "..." }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    state = data.get('proof_state', '').strip()
+    if not state:
+        return jsonify({'error': 'proof_state is required'}), 400
+
+    try:
+        return jsonify(ptn.embed(state))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sinax/geodesic', methods=['POST'])
+def sinax_geodesic():
+    """
+    Layer 2 — Geodesic Flow Engine.
+
+    POST body (JSON): { "start_state": "...", "target_state": "..." }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    start = data.get('start_state', '').strip()
+    target = data.get('target_state', '').strip()
+    if not start or not target:
+        return jsonify({'error': 'start_state and target_state are required'}), 400
+
+    try:
+        return jsonify(ptn.geodesic(start, target))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sinax/homology', methods=['POST'])
+def sinax_homology():
+    """
+    Layer 3 — Homology Detector.
+
+    POST body (JSON): { "proof_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('proof_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'proof_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.homology(states))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sinax/morse', methods=['POST'])
+def sinax_morse():
+    """
+    Layer 4 — Morse Theory Filter.
+
+    POST body (JSON): { "proof_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('proof_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'proof_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.morse(states))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sinax/training-signal', methods=['POST'])
+def sinax_training_signal():
+    """
+    Verified Data Flywheel — extract manifold geometry from verified proofs.
+
+    POST body (JSON): { "verified_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('verified_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'verified_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.training_signal(states))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sinax/status')
+def sinax_status():
+    """SINAX PTN health check."""
+    return jsonify({
+        'ptn_available': PTN_AVAILABLE,
+        'manifold_dim': ptn.manifold.dim if PTN_AVAILABLE else None,
+        'endpoints': [
+            '/api/sinax/solve',
+            '/api/sinax/embed',
+            '/api/sinax/geodesic',
+            '/api/sinax/homology',
+            '/api/sinax/morse',
+            '/api/sinax/training-signal',
+        ],
     })
 
 
