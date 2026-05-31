@@ -5,9 +5,8 @@ Tests all routes, fulfillment system, and purchase flow
 
 import sys
 import asyncio
-from datetime import datetime
-
 import os
+from datetime import datetime
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 SRC_DIR = os.path.join(ROOT_DIR, 'src')
