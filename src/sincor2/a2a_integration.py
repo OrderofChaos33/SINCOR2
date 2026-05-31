@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-SINCOR Agent-to-Agent (A2A) Integration
-=========================================
-Implements the Google A2A protocol (https://google.github.io/A2A) so that any
-compliant external agent — Hermes, Claude, OpenAI-compatible, OpenClaw, or any
-custom agent that speaks JSON-RPC 2.0 — can discover, call, and collaborate with
-the SINCOR agent swarm.
+SINCOR Agent-to-Agent (A2A) Integration — A2A v1.0.1 Compliant
+================================================================
+Implements the A2A protocol v1.0.1 (https://a2aproject.github.io/A2A) so that
+any compliant external agent — Hermes, Claude, OpenAI-compatible, OpenClaw, or
+any custom agent that speaks JSON-RPC 2.0 — can discover, call, and collaborate
+with the SINCOR agent swarm.
 
 AXIOM (AXM) is the settlement token for every inter-agent transaction:
   • External agents acquire AXM to pay for SINCOR agent tasks.
@@ -16,13 +16,16 @@ AXIOM (AXM) is the settlement token for every inter-agent transaction:
     routed (off-chain team commitment, publicly auditable on Basescan) to
     the ecosystem treasury.  These two fee streams are independent.
 
-A2A wire format
----------------
-Discovery : GET /.well-known/agent.json  → AgentCard JSON
-Submit    : POST /api/a2a/tasks/send     → JSON-RPC 2.0
-Stream    : POST /api/a2a/tasks/sendSubscribe (SSE, optional)
-Cancel    : POST /api/a2a/tasks/cancel
-Status    : GET  /api/a2a/tasks/{id}
+A2A wire format (v1.0.1)
+-------------------------
+Discovery : GET  /.well-known/agent-card.json  → AgentCard JSON (v1.0.1)
+           GET  /.well-known/agent.json         → AgentCard JSON (legacy alias)
+JSON-RPC  : POST /api/a2a                       → JSON-RPC 2.0 dispatcher
+  Methods : message/send, message/stream (SSE), tasks/get, tasks/cancel,
+            tasks/list, tasks/pushNotificationConfig/set,
+            tasks/pushNotificationConfig/get, tasks/resubscribe (SSE)
+Legacy    : POST /api/a2a/tasks/send   GET /api/a2a/tasks/<id>
+            POST /api/a2a/tasks/cancel GET /api/a2a/agents  POST /api/a2a/quote
 
 The AgentCard advertises all 43 SINCOR agents as individual skills.
 External agents select the skill they need and submit a task with their
@@ -72,23 +75,30 @@ AXM_PRICE_PER_TASK = int(os.getenv("AXM_PRICE_PER_TASK", str(1 * 10**18)))  # 1 
 PLATFORM_URL     = os.getenv("PLATFORM_URL", "https://getsincor.com")
 PLATFORM_NAME    = "SINCOR Agent Swarm"
 PLATFORM_VERSION = "2.0.0"
+A2A_PROTOCOL_VERSION = "1.0"          # A2A spec version advertised in AgentCard
 
 # ---------------------------------------------------------------------------
-# A2A data models
+# A2A data models (v1.0.1)
 # ---------------------------------------------------------------------------
 
 class TaskState(str, Enum):
-    SUBMITTED   = "submitted"
-    WORKING     = "working"
-    INPUT_NEEDED = "input-needed"
-    COMPLETED   = "completed"
-    FAILED      = "failed"
-    CANCELLED   = "cancelled"
+    """A2A v1.0.1 task lifecycle states."""
+    SUBMITTED       = "submitted"
+    WORKING         = "working"
+    COMPLETED       = "completed"
+    FAILED          = "failed"
+    CANCELED        = "canceled"        # v1.0.1 spelling (was "cancelled")
+    INPUT_REQUIRED  = "input_required"  # v1.0.1 (was "input-needed")
+    REJECTED        = "rejected"        # new in v1.0.1
+    AUTH_REQUIRED   = "auth_required"   # new in v1.0.1
+    # Legacy aliases kept for backward compatibility
+    INPUT_NEEDED    = "input_required"
+    CANCELLED       = "canceled"
 
 
 @dataclass
 class AgentSkill:
-    """One advertised capability in the AgentCard."""
+    """One advertised capability in the AgentCard (A2A v1.0.1 AgentSkill)."""
     id: str
     name: str
     description: str
@@ -110,49 +120,171 @@ class AgentSkill:
 
 
 @dataclass
-class AgentCard:
-    """
-    A2A Agent Card (served at /.well-known/agent.json).
-    Describes the SINCOR agent swarm to external agent clients.
-    """
-    name:         str
-    description:  str
-    url:          str
-    version:      str
-    skills:       List[AgentSkill]
-    provider:     Dict[str, str]
-    authentication: Dict[str, Any]
-    capabilities: Dict[str, bool]
+class AgentInterface:
+    """A2A v1.0.1 AgentInterface — one transport binding exposed by this agent."""
+    url: str
+    protocol_binding: str   # "JSONRPC", "GRPC", "HTTP+JSON"
+    protocol_version: str   # e.g. "1.0"
+    tenant: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "url":             self.url,
+            "protocolBinding": self.protocol_binding,
+            "protocolVersion": self.protocol_version,
+        }
+        if self.tenant:
+            d["tenant"] = self.tenant
+        return d
+
+
+@dataclass
+class AgentCard:
+    """
+    A2A v1.0.1 Agent Card.
+    Served at /.well-known/agent-card.json (and legacy /.well-known/agent.json).
+    Describes the SINCOR agent swarm to external agent clients.
+    """
+    name:                  str
+    description:           str
+    version:               str
+    supported_interfaces:  List[AgentInterface]
+    provider:              Dict[str, str]
+    capabilities:          Dict[str, Any]
+    default_input_modes:   List[str]
+    default_output_modes:  List[str]
+    skills:                List[AgentSkill]
+    security_schemes:      Dict[str, Any] = field(default_factory=dict)
+    security_requirements: List[Dict[str, Any]] = field(default_factory=list)
+    documentation_url:     Optional[str] = None
+    icon_url:              Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "name":               self.name,
+            "description":        self.description,
+            "version":            self.version,
+            "supportedInterfaces": [i.to_dict() for i in self.supported_interfaces],
+            "provider":           self.provider,
+            "capabilities":       self.capabilities,
+            "defaultInputModes":  self.default_input_modes,
+            "defaultOutputModes": self.default_output_modes,
+            "skills":             [s.to_dict() for s in self.skills],
+        }
+        if self.security_schemes:
+            d["securitySchemes"] = self.security_schemes
+        if self.security_requirements:
+            d["security"] = self.security_requirements
+        if self.documentation_url:
+            d["documentationUrl"] = self.documentation_url
+        if self.icon_url:
+            d["iconUrl"] = self.icon_url
+        return d
+
+    # Legacy helper — returns a flat dict matching the old agent.json shape so
+    # clients pinned to the pre-v1.0.1 format keep working.
+    def to_legacy_dict(self) -> Dict[str, Any]:
+        url = (self.supported_interfaces[0].url
+               if self.supported_interfaces else PLATFORM_URL)
         return {
             "name":           self.name,
             "description":    self.description,
-            "url":            self.url,
+            "url":            url,
             "version":        self.version,
             "skills":         [s.to_dict() for s in self.skills],
             "provider":       self.provider,
-            "authentication": self.authentication,
+            "authentication": {
+                "schemes":     list(self.security_schemes.keys()),
+                "description": (
+                    "Pass your API key in the X-API-Key header. "
+                    "Obtain a key at https://getsincor.com/api-keys."
+                ),
+            },
             "capabilities":   self.capabilities,
         }
 
 
+
+@dataclass
+class A2AMessage:
+    """A2A v1.0.1 Message object."""
+    message_id: str
+    role: str                           # "user" or "agent"
+    parts: List[Dict[str, Any]]         # list of Part dicts (text, data, file)
+    context_id: Optional[str] = None
+    task_id: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    extensions: List[str] = field(default_factory=list)
+    reference_task_ids: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "messageId": self.message_id,
+            "role":      self.role,
+            "parts":     self.parts,
+        }
+        if self.context_id:
+            d["contextId"] = self.context_id
+        if self.task_id:
+            d["taskId"] = self.task_id
+        if self.metadata:
+            d["metadata"] = self.metadata
+        if self.extensions:
+            d["extensions"] = self.extensions
+        if self.reference_task_ids:
+            d["referenceTaskIds"] = self.reference_task_ids
+        return d
+
+
+@dataclass
+class A2AArtifact:
+    """A2A v1.0.1 Artifact — an output produced by a task."""
+    artifact_id: str
+    parts: List[Dict[str, Any]]
+    name: Optional[str] = None
+    description: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    extensions: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "artifactId": self.artifact_id,
+            "parts":      self.parts,
+        }
+        if self.name:
+            d["name"] = self.name
+        if self.description:
+            d["description"] = self.description
+        if self.metadata:
+            d["metadata"] = self.metadata
+        if self.extensions:
+            d["extensions"] = self.extensions
+        return d
+
+
 @dataclass
 class A2ATask:
-    """In-flight A2A task."""
+    """In-flight A2A task (v1.0.1)."""
     id:             str
-    session_id:     str
+    context_id:     str                 # A2A v1.0.1 contextId (was sessionId)
     skill_id:       str
     input_text:     str
     caller_id:      str                 # wallet address or agent identifier
     state:          TaskState
     created_at:     str
     updated_at:     str
-    output:         Optional[str] = None
+    history:        List[A2AMessage] = field(default_factory=list)
+    artifacts:      List[A2AArtifact] = field(default_factory=list)
+    output:         Optional[str] = None   # convenience; surfaced via artifacts
     error:          Optional[str] = None
     axm_paid:       int = 0             # AXM paid in wei (18 dec)
     tx_hash:        Optional[str] = None
     metadata:       Dict[str, Any] = field(default_factory=dict)
+
+    # Keep session_id as an alias for backward compat code paths
+    @property
+    def session_id(self) -> str:
+        return self.context_id
 
 
 # ---------------------------------------------------------------------------
@@ -271,7 +403,8 @@ SINCOR_SKILLS: List[AgentSkill] = [
 # ---------------------------------------------------------------------------
 
 def build_agent_card() -> AgentCard:
-    """Return the canonical SINCOR AgentCard for /.well-known/agent.json."""
+    """Return the canonical SINCOR AgentCard (A2A v1.0.1) for /.well-known/agent-card.json."""
+    rpc_url = f"{PLATFORM_URL}/api/a2a"
     return AgentCard(
         name=PLATFORM_NAME,
         description=(
@@ -283,32 +416,45 @@ def build_agent_card() -> AgentCard:
             "AXIOM is the oil in the engine: every inter-agent transaction settles in "
             "AXM, 50 % is burned on-chain, keeping supply deflationary as usage grows."
         ),
-        url=PLATFORM_URL,
         version=PLATFORM_VERSION,
-        skills=SINCOR_SKILLS,
+        supported_interfaces=[
+            AgentInterface(
+                url=rpc_url,
+                protocol_binding="JSONRPC",
+                protocol_version=A2A_PROTOCOL_VERSION,
+            ),
+        ],
         provider={
             "organization": "SINCOR",
             "url":          PLATFORM_URL,
         },
-        authentication={
-            "schemes": ["ApiKey"],
-            "description": (
-                "Pass your API key in the X-API-Key header.  "
-                "Obtain a key at https://getsincor.com/api-keys.  "
-                "Each task also requires a confirmed AXM payment on Base — "
-                "see the AXIOM skill for the x402 payment flow."
-            ),
-        },
         capabilities={
-            "streaming":        True,
-            "pushNotifications": False,
-            "stateTransition":  True,
+            "streaming":             True,
+            "pushNotifications":     False,
+            "stateTransitionHistory": True,
         },
+        default_input_modes=["text/plain", "application/json"],
+        default_output_modes=["text/plain", "application/json"],
+        skills=SINCOR_SKILLS,
+        security_schemes={
+            "apiKey": {
+                "type": "apiKey",
+                "in":   "header",
+                "name": "X-API-Key",
+                "description": (
+                    "Obtain a key at https://getsincor.com/api-keys. "
+                    "Each task also requires a confirmed AXM payment on Base — "
+                    "see the axiom-payment skill for the x402 payment flow."
+                ),
+            },
+        },
+        security_requirements=[{"apiKey": []}],
+        documentation_url=f"{PLATFORM_URL}/docs/a2a",
     )
 
 
 # ---------------------------------------------------------------------------
-# In-memory task store (replace with Redis / DB in production)
+# In-memory stores (replace with Redis / DB in production)
 # ---------------------------------------------------------------------------
 # WARNING: this store is process-local and non-persistent. All tasks are lost
 # on restart and not shared across worker processes. Set A2A_TASK_STORE=redis
@@ -317,6 +463,7 @@ def build_agent_card() -> AgentCard:
 # inconsistent task-status responses.
 
 _tasks: Dict[str, A2ATask] = {}
+_push_configs: Dict[str, Dict[str, Any]] = {}  # task_id → push notification config
 
 _env = os.getenv("FLASK_ENV", "production").lower()
 if _env not in ("development", "dev", "test", "testing", "local") and \
@@ -335,15 +482,25 @@ def _new_task(skill_id: str, input_text: str, caller_id: str,
               session_id: str, axm_paid: int = 0,
               tx_hash: Optional[str] = None) -> A2ATask:
     task_id = str(uuid.uuid4())
+    context_id = session_id or task_id
+    # Record the initial user message in history
+    user_msg = A2AMessage(
+        message_id=str(uuid.uuid4()),
+        role="user",
+        parts=[{"text": input_text}],
+        context_id=context_id,
+        task_id=task_id,
+    )
     task = A2ATask(
         id=task_id,
-        session_id=session_id or task_id,
+        context_id=context_id,
         skill_id=skill_id,
         input_text=input_text,
         caller_id=caller_id,
         state=TaskState.SUBMITTED,
         created_at=_now(),
         updated_at=_now(),
+        history=[user_msg],
         axm_paid=axm_paid,
         tx_hash=tx_hash,
     )
@@ -443,26 +600,73 @@ class A2ARouter:
     def _register_routes(self) -> None:
         bp = self.blueprint
 
-        # ── Discovery ────────────────────────────────────────────────────────
-        @bp.route("/.well-known/agent.json", methods=["GET"])
-        def agent_card():
+        # ── Discovery — A2A v1.0.1 canonical path ────────────────────────────
+        @bp.route("/.well-known/agent-card.json", methods=["GET"])
+        def agent_card_v1():
             from flask import jsonify
             return jsonify(build_agent_card().to_dict())
 
-        # ── Task submission ───────────────────────────────────────────────────
+        # ── Discovery — legacy path (backward compat) ─────────────────────────
+        @bp.route("/.well-known/agent.json", methods=["GET"])
+        def agent_card_legacy():
+            from flask import jsonify
+            return jsonify(build_agent_card().to_legacy_dict())
+
+        # ── Unified JSON-RPC dispatcher (A2A v1.0.1) ─────────────────────────
+        @bp.route("/api/a2a", methods=["POST"])
+        def rpc_dispatch():
+            from flask import Response, jsonify, request, stream_with_context
+            body   = request.get_json(force=True, silent=True) or {}
+            method = body.get("method", "")
+            rpc_id = body.get("id")
+            params = body.get("params") or {}
+
+            # Streaming methods → SSE response
+            if method in ("message/stream", "tasks/resubscribe"):
+                gen = (_handle_stream(body) if method == "message/stream"
+                       else _handle_resubscribe(body))
+                return Response(
+                    stream_with_context(gen),
+                    mimetype="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "X-Accel-Buffering": "no",
+                    },
+                )
+
+            # Non-streaming methods
+            dispatch: Dict[str, Any] = {
+                "message/send":                        _handle_send,
+                "tasks/get":                           _handle_get_rpc,
+                "tasks/cancel":                        _handle_cancel,
+                "tasks/list":                          _handle_list,
+                "tasks/pushNotificationConfig/set":    _handle_push_config_set,
+                "tasks/pushNotificationConfig/get":    _handle_push_config_get,
+                "tasks/pushNotificationConfig/delete": _handle_push_config_delete,
+                "tasks/pushNotificationConfig/list":   _handle_push_config_list,
+            }
+
+            handler = dispatch.get(method)
+            if handler is None:
+                return jsonify(_err(
+                    f"Method '{method}' not found",
+                    code=-32601, rpc_id=rpc_id,
+                )), 404
+
+            return jsonify(handler(body))
+
+        # ── Legacy REST endpoints (backward compat) ───────────────────────────
         @bp.route("/api/a2a/tasks/send", methods=["POST"])
         def tasks_send():
             from flask import jsonify, request
             body = request.get_json(force=True, silent=True) or {}
             return jsonify(_handle_send(body))
 
-        # ── Task status ───────────────────────────────────────────────────────
         @bp.route("/api/a2a/tasks/<task_id>", methods=["GET"])
-        def tasks_get(task_id: str):
+        def tasks_get_rest(task_id: str):
             from flask import jsonify
             return jsonify(_handle_get(task_id))
 
-        # ── Task cancel ───────────────────────────────────────────────────────
         @bp.route("/api/a2a/tasks/cancel", methods=["POST"])
         def tasks_cancel():
             from flask import jsonify, request
@@ -528,47 +732,105 @@ def _err(message: str, code: int = -32603, rpc_id: Any = None) -> Dict[str, Any]
     }
 
 
-def _task_to_rpc(task: A2ATask) -> Dict[str, Any]:
-    return {
+def _sse_event(data: Dict[str, Any]) -> str:
+    """Format a dict as a single SSE data event."""
+    return f"data: {json.dumps(data)}\n\n"
+
+
+def _task_to_rpc(task: A2ATask, history_length: Optional[int] = None) -> Dict[str, Any]:
+    """Serialise a task to the A2A v1.0.1 Task JSON shape."""
+    # Build status message from most recent agent output
+    status_message: Optional[Dict[str, Any]] = None
+    if task.output:
+        status_message = {
+            "messageId":  str(uuid.uuid4()),
+            "role":       "agent",
+            "parts":      [{"text": task.output}],
+            "contextId":  task.context_id,
+            "taskId":     task.id,
+        }
+    elif task.error:
+        status_message = {
+            "messageId":  str(uuid.uuid4()),
+            "role":       "agent",
+            "parts":      [{"text": f"Error: {task.error}"}],
+            "contextId":  task.context_id,
+            "taskId":     task.id,
+        }
+
+    d: Dict[str, Any] = {
         "id":        task.id,
-        "sessionId": task.session_id,
+        "contextId": task.context_id,
         "status": {
             "state":     task.state.value,
-            "updatedAt": task.updated_at,
-            "message": (
-                {"role": "agent", "parts": [{"type": "text", "text": task.output}]}
-                if task.output else None
-            ),
+            "timestamp": task.updated_at,
         },
-        "metadata": task.metadata,
+        "artifacts": [a.to_dict() for a in task.artifacts],
+        "metadata":  task.metadata,
     }
+    if status_message:
+        d["status"]["message"] = status_message
+
+    # Include history if requested
+    if history_length is None or history_length > 0:
+        msgs = task.history
+        if history_length is not None:
+            msgs = msgs[-history_length:]
+        d["history"] = [m.to_dict() for m in msgs]
+    else:
+        d["history"] = []
+
+    return d
 
 
 # ---------------------------------------------------------------------------
-# Business logic
+# Business logic — v1.0.1 method handlers
 # ---------------------------------------------------------------------------
 
-def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/send JSON-RPC call."""
+def _extract_send_params(body: Dict[str, Any]):
+    """Parse params from a message/send or legacy tasks/send body.
+
+    Returns (rpc_id, skill_id, context_id, caller_id, input_text, tx_hash,
+             axm_paid, history_length, error_response).
+    """
     rpc_id = body.get("id")
     params = body.get("params") or body  # tolerate bare params
 
-    # --- Extract fields --------------------------------------------------
-    skill_id   = params.get("skillId") or params.get("skill_id", "")
-    session_id = params.get("sessionId") or params.get("session_id", str(uuid.uuid4()))
-    caller_id  = params.get("callerId") or params.get("caller_id", "anonymous")
-    tx_hash    = params.get("txHash") or params.get("tx_hash")
-    axm_paid   = int(params.get("axmPaidWei") or params.get("axm_paid_wei") or 0)
+    # --- v1.0.1: params = {message: Message, configuration?: SendMessageConfiguration}
+    # --- legacy: params has skillId / sessionId / callerId at top level
+    msg_obj      = params.get("message") or {}
+    configuration = params.get("configuration") or {}
 
-    # Message may be A2A Message object or plain string
-    message = params.get("message") or {}
-    if isinstance(message, str):
-        input_text = message
+    skill_id   = (params.get("skillId") or params.get("skill_id") or
+                  (msg_obj.get("metadata") or {}).get("skillId", ""))
+    context_id = (params.get("contextId") or params.get("sessionId") or
+                  params.get("session_id") or msg_obj.get("contextId") or
+                  str(uuid.uuid4()))
+    caller_id  = (params.get("callerId") or params.get("caller_id") or
+                  msg_obj.get("metadata", {}).get("callerId", "anonymous"))
+    tx_hash    = (params.get("txHash") or params.get("tx_hash") or
+                  (msg_obj.get("metadata") or {}).get("txHash"))
+    axm_paid   = int(params.get("axmPaidWei") or params.get("axm_paid_wei") or
+                     (msg_obj.get("metadata") or {}).get("axmPaidWei", 0))
+    history_length: Optional[int] = configuration.get("historyLength")
+
+    # Resolve input text from Message.parts or plain string
+    if isinstance(msg_obj, str):
+        input_text = msg_obj
     else:
-        parts = message.get("parts") or []
+        parts = msg_obj.get("parts") or []
         input_text = " ".join(
             p.get("text", "") for p in parts if isinstance(p, dict)
         )
+
+    return (rpc_id, skill_id, context_id, caller_id, input_text,
+            tx_hash, axm_paid, history_length)
+
+
+def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle message/send (and legacy tasks/send) JSON-RPC call."""
+    (rpc_id, skill_id, context_id, caller_id, input_text,
+     tx_hash, axm_paid, history_length) = _extract_send_params(body)
 
     if not input_text:
         return _err("No input text found in message.parts", code=-32602, rpc_id=rpc_id)
@@ -605,49 +867,338 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         skill_id=skill_id,
         input_text=input_text,
         caller_id=caller_id,
-        session_id=session_id,
+        session_id=context_id,
         axm_paid=axm_paid,
         tx_hash=tx_hash,
     )
     logger.info("A2A task %s created  skill=%s caller=%s", task.id, skill_id, caller_id)
 
-    # Dispatch to the swarm (async in production; sync stub here)
+    _update_task(task, state=TaskState.WORKING)
     output, error = _dispatch_to_swarm(task)
     if error:
         _update_task(task, state=TaskState.FAILED, error=error)
     else:
+        # Store output as an artifact
+        if output:
+            artifact = A2AArtifact(
+                artifact_id=str(uuid.uuid4()),
+                parts=[{"text": output}],
+                name="result",
+            )
+            task.artifacts.append(artifact)
+            # Also append the agent reply to history
+            agent_msg = A2AMessage(
+                message_id=str(uuid.uuid4()),
+                role="agent",
+                parts=[{"text": output}],
+                context_id=task.context_id,
+                task_id=task.id,
+            )
+            task.history.append(agent_msg)
         _update_task(task, state=TaskState.COMPLETED, output=output)
 
-    return _rpc_ok(_task_to_rpc(task), rpc_id=rpc_id)
+    return _rpc_ok(_task_to_rpc(task, history_length=history_length), rpc_id=rpc_id)
+
+
+def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
+    """
+    Handle message/stream — yields SSE events for the A2A v1.0.1 streaming flow.
+
+    Event sequence:
+      1. TaskStatusUpdateEvent: state=submitted
+      2. TaskStatusUpdateEvent: state=working
+      3. (dispatch to swarm)
+      4. TaskArtifactUpdateEvent: artifact with result
+      5. TaskStatusUpdateEvent: state=completed (or failed), final=true
+    """
+    (rpc_id, skill_id, context_id, caller_id, input_text,
+     tx_hash, axm_paid, _) = _extract_send_params(body)
+
+    def _status_event(task: A2ATask, final: bool = False,
+                      msg_text: Optional[str] = None) -> str:
+        status: Dict[str, Any] = {
+            "state":     task.state.value,
+            "timestamp": task.updated_at,
+        }
+        if msg_text:
+            status["message"] = {
+                "messageId": str(uuid.uuid4()),
+                "role":      "agent",
+                "parts":     [{"text": msg_text}],
+                "contextId": task.context_id,
+                "taskId":    task.id,
+            }
+        event: Dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "id":      rpc_id,
+            "result":  {
+                "taskStatus": {
+                    "taskId":    task.id,
+                    "contextId": task.context_id,
+                    "status":    status,
+                    "final":     final,
+                },
+            },
+        }
+        return _sse_event(event)
+
+    if not input_text:
+        yield _sse_event(_err("No input text in message.parts", -32602, rpc_id))
+        return
+
+    skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
+    if not skill:
+        valid = [s.id for s in SINCOR_SKILLS]
+        yield _sse_event(_err(
+            f"Unknown skill '{skill_id}'. Valid: {valid}", -32602, rpc_id
+        ))
+        return
+
+    env = os.getenv("FLASK_ENV", "production").lower()
+    skip_payment = env in ("development", "dev", "test", "testing", "local")
+    if not skip_payment and skill_id != "axiom-payment":
+        if not tx_hash:
+            yield _sse_event(_err(
+                "Payment required. See /api/a2a/quote.", -32000, rpc_id
+            ))
+            return
+        if not PaymentVerifier.is_verified(tx_hash, AXM_PRICE_PER_TASK):
+            yield _sse_event(_err(
+                f"Payment tx {tx_hash} unverified on Base.", -32001, rpc_id
+            ))
+            return
+
+    task = _new_task(
+        skill_id=skill_id,
+        input_text=input_text,
+        caller_id=caller_id,
+        session_id=context_id,
+        axm_paid=axm_paid,
+        tx_hash=tx_hash,
+    )
+    logger.info("A2A stream task %s  skill=%s caller=%s", task.id, skill_id, caller_id)
+
+    # Event 1: submitted
+    yield _status_event(task)
+
+    # Event 2: working
+    _update_task(task, state=TaskState.WORKING)
+    yield _status_event(task)
+
+    # Dispatch
+    output, error = _dispatch_to_swarm(task)
+
+    if error:
+        _update_task(task, state=TaskState.FAILED, error=error)
+        yield _status_event(task, final=True, msg_text=f"Error: {error}")
+        return
+
+    # Event 3: artifact
+    if output:
+        artifact = A2AArtifact(
+            artifact_id=str(uuid.uuid4()),
+            parts=[{"text": output}],
+            name="result",
+        )
+        task.artifacts.append(artifact)
+        agent_msg = A2AMessage(
+            message_id=str(uuid.uuid4()),
+            role="agent",
+            parts=[{"text": output}],
+            context_id=task.context_id,
+            task_id=task.id,
+        )
+        task.history.append(agent_msg)
+        artifact_event: Dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "id":      rpc_id,
+            "result":  {
+                "taskArtifact": {
+                    "taskId":    task.id,
+                    "contextId": task.context_id,
+                    "artifact":  artifact.to_dict(),
+                    "final":     False,
+                },
+            },
+        }
+        yield _sse_event(artifact_event)
+
+    # Event 4: completed
+    _update_task(task, state=TaskState.COMPLETED, output=output)
+    yield _status_event(task, final=True)
 
 
 def _handle_get(task_id: str) -> Dict[str, Any]:
+    """Handle legacy GET /api/a2a/tasks/<task_id>."""
     task = _get_task(task_id)
     if not task:
         return _err(f"Task {task_id} not found", code=-32602)
     return _rpc_ok(_task_to_rpc(task))
 
 
+def _handle_get_rpc(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle tasks/get JSON-RPC call."""
+    rpc_id  = body.get("id")
+    params  = body.get("params") or body
+    task_id = params.get("id") or params.get("taskId", "")
+    history_length: Optional[int] = params.get("historyLength")
+    task = _get_task(task_id)
+    if not task:
+        return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
+    return _rpc_ok(_task_to_rpc(task, history_length=history_length), rpc_id=rpc_id)
+
+
 def _handle_cancel(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle tasks/cancel JSON-RPC call (and legacy REST cancel)."""
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("id") or params.get("taskId")
     task    = _get_task(task_id or "")
     if not task:
         return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
-    if task.state in (TaskState.COMPLETED, TaskState.FAILED):
-        return _err("Task already terminal, cannot cancel", code=-32003, rpc_id=rpc_id)
-    _update_task(task, state=TaskState.CANCELLED)
+    terminal = {TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED,
+                TaskState.REJECTED}
+    if task.state in terminal:
+        return _err("Task already in terminal state, cannot cancel",
+                    code=-32003, rpc_id=rpc_id)
+    _update_task(task, state=TaskState.CANCELED)
     return _rpc_ok(_task_to_rpc(task), rpc_id=rpc_id)
 
 
+def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle tasks/list JSON-RPC call."""
+    rpc_id = body.get("id")
+    params = body.get("params") or body
+    context_id  = params.get("contextId")
+    state_filter = params.get("state")
+    page_size   = int(params.get("pageSize") or 50)
+    page_token  = params.get("pageToken")  # simple offset-based for now
+
+    tasks = list(_tasks.values())
+    if context_id:
+        tasks = [t for t in tasks if t.context_id == context_id]
+    if state_filter:
+        tasks = [t for t in tasks if t.state.value == state_filter]
+
+    # Pagination
+    offset = int(page_token or 0)
+    page   = tasks[offset: offset + page_size]
+    next_token = str(offset + page_size) if offset + page_size < len(tasks) else None
+
+    result: Dict[str, Any] = {"tasks": [_task_to_rpc(t, history_length=0) for t in page]}
+    if next_token:
+        result["nextPageToken"] = next_token
+    return _rpc_ok(result, rpc_id=rpc_id)
+
+
+def _handle_push_config_set(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle tasks/pushNotificationConfig/set."""
+    rpc_id  = body.get("id")
+    params  = body.get("params") or body
+    task_id = params.get("taskId") or params.get("id", "")
+    config  = {
+        "taskId":    task_id,
+        "url":       params.get("url", ""),
+        "token":     params.get("token"),
+        "headers":   params.get("headers", {}),
+    }
+    if not task_id or not config["url"]:
+        return _err("taskId and url are required", code=-32602, rpc_id=rpc_id)
+    _push_configs[task_id] = config
+    logger.info("Push notification config set for task %s → %s", task_id, config["url"])
+    return _rpc_ok(config, rpc_id=rpc_id)
+
+
+def _handle_push_config_get(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle tasks/pushNotificationConfig/get."""
+    rpc_id  = body.get("id")
+    params  = body.get("params") or body
+    task_id = params.get("taskId") or params.get("id", "")
+    config  = _push_configs.get(task_id)
+    if not config:
+        return _err(f"No push config for task {task_id}", code=-32602, rpc_id=rpc_id)
+    return _rpc_ok(config, rpc_id=rpc_id)
+
+
+def _handle_push_config_delete(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle tasks/pushNotificationConfig/delete."""
+    rpc_id  = body.get("id")
+    params  = body.get("params") or body
+    task_id = params.get("taskId") or params.get("id", "")
+    _push_configs.pop(task_id, None)
+    return _rpc_ok({}, rpc_id=rpc_id)
+
+
+def _handle_push_config_list(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle tasks/pushNotificationConfig/list."""
+    rpc_id = body.get("id")
+    return _rpc_ok(
+        {"configs": list(_push_configs.values())},
+        rpc_id=rpc_id,
+    )
+
+
+def _handle_resubscribe(body: Dict[str, Any]) -> Generator[str, None, None]:
+    """
+    Handle tasks/resubscribe — re-attach to an existing task's event stream.
+    Immediately emits the current task status and then the final artifact if done.
+    """
+    rpc_id  = body.get("id")
+    params  = body.get("params") or body
+    task_id = params.get("id") or params.get("taskId", "")
+    task    = _get_task(task_id)
+    if not task:
+        yield _sse_event(_err(f"Task {task_id} not found", -32602, rpc_id))
+        return
+
+    terminal = {TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELED,
+                TaskState.REJECTED}
+    final = task.state in terminal
+
+    status_event: Dict[str, Any] = {
+        "jsonrpc": "2.0",
+        "id":      rpc_id,
+        "result":  {
+            "taskStatus": {
+                "taskId":    task.id,
+                "contextId": task.context_id,
+                "status": {
+                    "state":     task.state.value,
+                    "timestamp": task.updated_at,
+                },
+                "final": final,
+            },
+        },
+    }
+    yield _sse_event(status_event)
+
+    if final and task.artifacts:
+        for artifact in task.artifacts:
+            artifact_event: Dict[str, Any] = {
+                "jsonrpc": "2.0",
+                "id":      rpc_id,
+                "result":  {
+                    "taskArtifact": {
+                        "taskId":    task.id,
+                        "contextId": task.context_id,
+                        "artifact":  artifact.to_dict(),
+                        "final":     True,
+                    },
+                },
+            }
+            yield _sse_event(artifact_event)
+
+
 # ---------------------------------------------------------------------------
-# Swarm dispatch stub
+# Swarm dispatch
 # ---------------------------------------------------------------------------
 
 def _dispatch_to_swarm(task: A2ATask):
     """
     Route the task to the internal SINCOR swarm.
+
+    Callers are responsible for transitioning the task to WORKING before
+    calling this function and to COMPLETED/FAILED afterwards.
 
     In production this calls the existing swarm_coordination.TaskMarket or the
     instant_business_intelligence / content_agent modules directly.
@@ -657,8 +1208,6 @@ def _dispatch_to_swarm(task: A2ATask):
     Returns (output: str | None, error: str | None).
     """
     try:
-        _update_task(task, state=TaskState.WORKING)
-
         # Try to import the swarm's IBI module for real responses
         try:
             from sincor2.instant_business_intelligence import BusinessIntelligenceEngine
