@@ -145,7 +145,7 @@ Create `railway.json`:
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "gunicorn app:app",
+    "startCommand": "gunicorn sincor2.mvp_app:app",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
@@ -157,7 +157,7 @@ Create `railway.json`:
 Create `Procfile`:
 
 ```
-web: gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120
+web: gunicorn sincor2.mvp_app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120
 ```
 
 ### Option 2: Heroku
@@ -203,7 +203,7 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "4"]
+CMD ["gunicorn", "sincor2.mvp_app:app", "--bind", "0.0.0.0:5000", "--workers", "4"]
 EOF
 
 # 2. Create .dockerignore
@@ -277,7 +277,7 @@ User=root
 WorkingDirectory=/root/sincor2
 Environment="PATH=/root/sincor2/venv/bin"
 EnvironmentFile=/root/sincor2/.env
-ExecStart=/root/sincor2/venv/bin/gunicorn app:app --workers 4 --bind 127.0.0.1:5000
+ExecStart=/root/sincor2/venv/bin/gunicorn sincor2.mvp_app:app --workers 4 --bind 127.0.0.1:5000
 
 [Install]
 WantedBy=multi-user.target
@@ -382,7 +382,7 @@ tmp_upload_dir = None
 Run with:
 
 ```bash
-gunicorn -c gunicorn.conf.py app:app
+gunicorn -c gunicorn.conf.py sincor2.mvp_app:app
 ```
 
 ---

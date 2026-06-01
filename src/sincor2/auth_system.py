@@ -5,16 +5,17 @@ JWT-based authentication for protecting admin and sensitive endpoints
 
 import os
 from datetime import timedelta
-from flask import jsonify, request
+from functools import wraps
+
+from flask import jsonify
 from flask_jwt_extended import (
     JWTManager,
     create_access_token,
     create_refresh_token,
-    jwt_required,
+    get_jwt,
     get_jwt_identity,
-    get_jwt
+    jwt_required,
 )
-from functools import wraps
 
 
 class SINCORAuth:
@@ -99,7 +100,10 @@ class SINCORAuth:
         if is_production and (not valid_password or valid_password == 'changeme123'):
             return {
                 'success': False,
-                'error': 'Admin authentication is misconfigured. Set ADMIN_PASSWORD to a strong, non-default value.',
+                'error': (
+                    'Admin authentication is misconfigured. '
+                    'Set ADMIN_PASSWORD to a strong, non-default value.'
+                ),
                 'error_code': 'admin_password_misconfigured',
             }
         if not valid_password:
@@ -206,7 +210,7 @@ def test_auth():
     if admin_pass and admin_pass != 'changeme123':
         print(f"[OK] Admin credentials configured: {admin_user}")
     else:
-        print(f"[WARNING] Using default admin password (INSECURE)")
+        print("[WARNING] Using default admin password (INSECURE)")
 
     print("\n[OK] Authentication system ready")
     print("\nDefault credentials:")

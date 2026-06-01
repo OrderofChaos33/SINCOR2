@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+from flask import Blueprint, redirect, render_template
+
+pages_bp = Blueprint("pages", __name__)
+
+
+@pages_bp.get("/")
+def home():
+    return render_template("home.html")
+
+
+@pages_bp.get("/sinc")
+def sinc_gateway():
+    return render_template("sinc_gateway.html")
+
+
+@pages_bp.get("/mvp")
+def mvp_dashboard():
+    return render_template("index_mvp.html")
+
+
+@pages_bp.get("/signup")
+def signup():
+    return render_template("signup.html")
+
+
+@pages_bp.get("/wallet-connect")
+def wallet_connect():
+    return redirect("/sinc", code=302)

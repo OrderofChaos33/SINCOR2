@@ -207,13 +207,28 @@ cp .env.example .env
 # Edit .env with your API keys (Anthropic, Stripe, BASE_RPC_URL, etc.)
 ```
 
-Then run locally:
+Then run locally (supported command):
 ```bash
 python run.py
 ```
 
 Full deployment instructions are in [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md).
 Smart contract build/test/deploy: see [`onchain/README.md`](onchain/README.md).
+
+## Runtime entrypoints
+
+- **Supported local run command:** `python run.py`
+- **Supported production run command:** `gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --preload sincor2.mvp_app:app`
+- **Canonical Flask app module:** `sincor2.mvp_app:app`
+
+## Testing
+
+- **PR-required suite:** `pytest` (uses `tests/pytest` deterministic unit/integration/smoke tests)
+- **Nightly/broader suite:** `python tests/run_all_tests.py`
+
+## Environment variables
+
+The single source of truth for required/optional variables is [`./.env.example`](./.env.example).
 
 ---
 
