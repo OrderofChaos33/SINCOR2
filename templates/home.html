@@ -689,8 +689,8 @@
   <ul class="nav-links" style="gap:10px;">
     <li><a href="#pricing">💰 Pricing</a></li>
     <li><a href="#features">⚡ Features</a></li>
-    <li><a href="#sinax">🧠 SINAX</a></li>
-    <li><a href="#tech">🛰️ Tech Map</a></li>
+    <li><a href="#sinax" aria-label="SINAX intelligence layer section">🧠 SINAX</a></li>
+    <li><a href="#tech" aria-label="Technology architecture diagram section">🛰️ Tech Map</a></li>
     <li><a href="/axiom" class="nav-highlight">🪙 AXIOM Token</a></li>
     <li><a href="/sinc">🌐 SINC Token</a></li>
     <li><a href="#how">📖 How It Works</a></li>
@@ -850,19 +850,19 @@
   <p style="font-size: 18px; color: var(--text-muted); max-width: 920px;">
     High-level architecture from user request to autonomous execution and on-chain settlement.
   </p>
-  <div class="tech-diagram" aria-label="SINCOR technology diagram">
+  <div class="tech-diagram" role="img" aria-label="SINCOR technology flow from client and wallet to API, orchestration, AI agents, SINAX exchange, token settlement on Base, and reporting">
     <div class="diagram-node">Client / Wallet</div>
-    <div class="diagram-arrow">→</div>
+    <div class="diagram-arrow" aria-hidden="true">→</div>
     <div class="diagram-node">Flask API + Auth</div>
-    <div class="diagram-arrow">→</div>
+    <div class="diagram-arrow" aria-hidden="true">→</div>
     <div class="diagram-node">Orchestrator</div>
-    <div class="diagram-arrow">→</div>
+    <div class="diagram-arrow" aria-hidden="true">→</div>
     <div class="diagram-node">42 AI Agents</div>
-    <div class="diagram-arrow">→</div>
+    <div class="diagram-arrow" aria-hidden="true">→</div>
     <div class="diagram-node">SINAX Exchange Layer</div>
-    <div class="diagram-arrow">→</div>
+    <div class="diagram-arrow" aria-hidden="true">→</div>
     <div class="diagram-node">SINC / AXIOM on Base</div>
-    <div class="diagram-arrow">→</div>
+    <div class="diagram-arrow" aria-hidden="true">→</div>
     <div class="diagram-node">Analytics + Reporting</div>
   </div>
 </section>
