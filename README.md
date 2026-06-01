@@ -155,9 +155,10 @@ Instead of a single general-purpose AI, SINCOR2 provides a full team of purpose-
 - **Swarm Coordination**: Contract-net style task market for autonomous work distribution
 - **Memory Architecture**: Multi-tier (episodic, semantic, procedural, autobiographical) with hybrid retrieval
 - **Business Engine**: Dynamic pricing, monetization orchestrator, recursive value products, and infinite scaling logic
-- **Production Infrastructure**: Flask + Gunicorn, JWT auth, rate limiting, Pydantic validation, structured logging, and full Stripe integration
+- **Production Infrastructure**: Flask + Gunicorn, JWT auth, rate limiting, Pydantic validation, structured logging, Stripe + PayPal payments
 - **On-chain Layer**: SINC + AXIOM tokens on Base; bonding curve, Uniswap V4 hook, Genesis NFT
 - **A2A Protocol**: Google A2A-compliant — any external agent can call SINCOR via JSON-RPC 2.0 + AXIOM payment
+- **SINAX Engine**: Proof Topology Navigator — 4-layer topological reasoning system for autonomous proof search and knowledge synthesis
 
 ---
 
@@ -179,8 +180,39 @@ Full agent definitions and archetypes are available in the [`agents/`](agents/) 
 - **Dynamic Pricing Engine** – Real-time pricing adjusted by complexity, urgency, and demand
 - **Predictive Analytics** – Forward-looking forecasts with confidence scoring
 - **Quality Scoring System** – Multi-source, self-improving evaluation of all outputs
-- **Stripe Subscriptions** – Live payments with Customer Portal and webhook handling
+- **Stripe & PayPal Payments** – Live payment processing with Customer Portal and webhook handling
 - **AXIOM A2A Gateway** – Any compliant external agent can invoke the swarm; pays in AXM, receives intelligence in return
+
+---
+
+## SINAX — Proof Topology Navigator
+
+SINAX is the formal reasoning engine embedded in SINCOR2. It replaces linear tactic sequences with a four-layer topological pipeline for autonomous proof search and knowledge synthesis.
+
+| Layer | Component | Description |
+|-------|-----------|-------------|
+| 1 | `ProofManifold` | Embeds proof states onto a Riemannian manifold |
+| 2 | `GeodesicFlowEngine` | Computes geodesic paths between proof states |
+| 3 | `HomologyDetector` | Identifies topological holes and suggests bridging lemmas |
+| 4 | `MorseFilter` | Retains only critical-point waypoints via Morse theory |
+
+The top-level `ProofTopologyNavigator` (PTN) wraps all four layers behind a single callable:
+
+```python
+from sincor2.sinax import ProofTopologyNavigator
+
+ptn = ProofTopologyNavigator()
+result = ptn.solve(
+    start_state="⊢ ∀ n : ℕ, n + 0 = n",
+    target_state="closed",
+)
+print(result.proof_narrative)
+print(result.tactic_sequence)
+```
+
+SINAX also exposes `solve_batch()` for parallel proof transfer across related theorems and a `training_signal()` method to feed curvature/homology data back into the Verified Data Flywheel.
+
+Source: [`src/sincor2/sinax/`](src/sincor2/sinax/)
 
 ---
 
