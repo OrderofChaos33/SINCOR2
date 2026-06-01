@@ -1382,6 +1382,9 @@ _PTN_SKILL_IDS = frozenset({
     "proof-topology-morse",
 })
 
+# Maximum characters of a proof state shown inline in dispatch output.
+_MAX_STATE_DISPLAY_LEN = 120
+
 
 def _dispatch_ptn(task: A2ATask) -> str:
     """
@@ -1396,7 +1399,6 @@ def _dispatch_ptn(task: A2ATask) -> str:
 
     Returns a formatted text result suitable for inclusion in an A2A artifact.
     """
-    import json as _json
     from sincor2.sinax import ProofTopologyNavigator
 
     nav = ProofTopologyNavigator()
@@ -1405,12 +1407,12 @@ def _dispatch_ptn(task: A2ATask) -> str:
     # Try to parse JSON payload; fall back to treating input as a plain state string.
     payload: Dict[str, Any] = {}
     try:
-        parsed = _json.loads(raw)
+        parsed = json.loads(raw)
         if isinstance(parsed, dict):
             payload = parsed
         elif isinstance(parsed, list):
             payload = {"states": parsed}
-    except (_json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError):
         payload = {}
 
     sid = task.skill_id
@@ -1422,7 +1424,7 @@ def _dispatch_ptn(task: A2ATask) -> str:
         lines = [
             "SINAX — Proof State Embedding (Layer 1)",
             "=" * 45,
-            f"State    : {state[:120]}",
+            f"State    : {state[:_MAX_STATE_DISPLAY_LEN]}",
             f"Curvature: {result['curvature']:.6f}",
             f"Dim      : {len(result['coordinates'])}",
             f"Coords[0:4]: {result['coordinates'][:4]}",

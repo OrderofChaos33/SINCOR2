@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, Response, jsonify, request
 
-logger = logging.getLogger("sincor.sinax_bp")
+logger = logging.getLogger("sincor2.sinax_bp")
 
 sinax_bp = Blueprint("sinax", __name__, url_prefix="/api/ptn")
 
@@ -55,7 +55,7 @@ def ptn_health() -> Response:
         return jsonify({"status": "ok", "layer": "SINAX/PTN"})
     except Exception as exc:  # pragma: no cover
         logger.error("SINAX health check failed: %s", exc)
-        return jsonify({"status": "error", "detail": str(exc)}), 500  # type: ignore[return-value]
+        return jsonify({"status": "error", "detail": "SINAX initialisation failed"}), 500  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
