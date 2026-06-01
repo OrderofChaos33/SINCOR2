@@ -6,14 +6,21 @@ ADDED: JWT Authentication for admin endpoints
 ADDED: Rate Limiting for DDoS protection
 """
 
+import logging
 import os
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+import secrets
+from datetime import datetime, timezone
+from urllib.parse import urlencode
+
+import requests
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()
+
+_log = logging.getLogger(__name__)
 
 # Import authentication system
 try:
@@ -129,6 +136,21 @@ except Exception as e:
     print(f"Fulfillment system error: {e}")
     FULFILLMENT_AVAILABLE = False
     fulfillment_system = None
+
+# Import SINAX Proof Topology Navigator
+try:
+    from sincor2.sinax.ptn import ProofTopologyNavigator
+    ptn = ProofTopologyNavigator()
+    PTN_AVAILABLE = True
+    print("SINAX Proof Topology Navigator Loaded Successfully")
+except ImportError as e:
+    print(f"SINAX PTN not available: {e}")
+    PTN_AVAILABLE = False
+    ptn = None
+except Exception as e:
+    print(f"SINAX PTN error: {e}")
+    PTN_AVAILABLE = False
+    ptn = None
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -299,6 +321,44 @@ def get_current_user():
         }), 500
 
 
+def _build_oauth_redirect_uri(callback_endpoint):
+    """Build OAuth callback URI using PLATFORM_URL when configured."""
+    platform_url = os.environ.get('PLATFORM_URL', '').strip().rstrip('/')
+    if platform_url:
+        return f"{platform_url}{url_for(callback_endpoint)}"
+    return url_for(callback_endpoint, _external=True)
+
+
+def _oauth_failure_redirect(provider, reason):
+    allowed_providers = {'google', 'github'}
+    allowed_reasons = {
+        'not_configured',
+        'invalid_state',
+        'missing_code',
+        'missing_access_token',
+        'token_exchange_failed',
+        'oauth_error'
+    }
+
+    safe_provider = provider if provider in allowed_providers else 'oauth'
+    safe_reason = reason if reason in allowed_reasons else 'oauth_error'
+    return redirect(url_for('signup', oauth=safe_provider, error=safe_reason))
+
+
+def _store_oauth_user(provider, email, name, provider_user_id, avatar_url=None):
+    if not email:
+        raise ValueError("OAuth provider did not return an email address")
+
+    session['oauth_user'] = {
+        'provider': provider,
+        'email': email,
+        'name': name or email.split('@')[0],
+        'provider_user_id': str(provider_user_id),
+        'avatar_url': avatar_url,
+        'connected_at': datetime.now(timezone.utc).isoformat()
+    }
+
+
 # ==================== PUBLIC ROUTES ====================
 
 @app.route('/')
@@ -306,6 +366,199 @@ def get_current_user():
 def index():
     """Main landing page — competitive intelligence (NO RATE LIMIT)"""
     return render_template('home.html')
+
+
+@app.route('/signup')
+@limiter.exempt if limiter else lambda f: f
+def signup():
+    """Signup page with OAuth options."""
+    return render_template('signup.html')
+
+
+@app.route('/wallet-connect')
+@limiter.exempt if limiter else lambda f: f
+def wallet_connect():
+    """Legacy wallet-connect URL mapped to the live SINC gateway page."""
+    return redirect('/sinc', code=302)
+
+
+@app.route('/auth/google')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_google():
+    """Start Google OAuth flow."""
+    google_client_id = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
+    if not google_client_id:
+        return _oauth_failure_redirect('google', 'not_configured')
+
+    state = secrets.token_urlsafe(32)
+    session['google_oauth_state'] = state
+
+    params = {
+        'client_id': google_client_id,
+        'redirect_uri': _build_oauth_redirect_uri('auth_google_callback'),
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'access_type': 'online',
+        'prompt': 'select_account'
+    }
+    return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}")
+
+
+@app.route('/auth/google/callback')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_google_callback():
+    """Handle Google OAuth callback."""
+    expected_state = session.pop('google_oauth_state', None)
+    if not expected_state or expected_state != request.args.get('state'):
+        return _oauth_failure_redirect('google', 'invalid_state')
+
+    code = request.args.get('code')
+    if not code:
+        failure_reason = 'oauth_error' if request.args.get('error') else 'missing_code'
+        return _oauth_failure_redirect('google', failure_reason)
+
+    google_client_id = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
+    google_client_secret = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
+    if not google_client_id or not google_client_secret:
+        return _oauth_failure_redirect('google', 'not_configured')
+
+    try:
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'client_id': google_client_id,
+                'client_secret': google_client_secret,
+                'code': code,
+                'grant_type': 'authorization_code',
+                'redirect_uri': _build_oauth_redirect_uri('auth_google_callback')
+            },
+            timeout=15
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json().get('access_token')
+        if not access_token:
+            return _oauth_failure_redirect('google', 'missing_access_token')
+
+        auth_header = 'Bearer ' + access_token
+        profile_response = requests.get(
+            'https://openidconnect.googleapis.com/v1/userinfo',
+            headers={'Authorization': auth_header},
+            timeout=15
+        )
+        profile_response.raise_for_status()
+        profile = profile_response.json()
+
+        _store_oauth_user(
+            provider='google',
+            email=profile.get('email'),
+            name=profile.get('name'),
+            provider_user_id=profile.get('sub'),
+            avatar_url=profile.get('picture')
+        )
+    except requests.RequestException as oauth_error:
+        print(f"Google OAuth request failed: {oauth_error}")
+        return _oauth_failure_redirect('google', 'token_exchange_failed')
+    except ValueError as oauth_error:
+        print(f"Google OAuth profile validation failed: {oauth_error}")
+        return _oauth_failure_redirect('google', 'token_exchange_failed')
+
+    return redirect(f"{url_for('dashboard')}?oauth=google")
+
+
+@app.route('/auth/github')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_github():
+    """Start GitHub OAuth flow."""
+    github_client_id = os.environ.get('GITHUB_OAUTH_CLIENT_ID')
+    if not github_client_id:
+        return _oauth_failure_redirect('github', 'not_configured')
+
+    state = secrets.token_urlsafe(32)
+    session['github_oauth_state'] = state
+
+    params = {
+        'client_id': github_client_id,
+        'redirect_uri': _build_oauth_redirect_uri('auth_github_callback'),
+        'scope': 'read:user user:email',
+        'state': state
+    }
+    return redirect(f"https://github.com/login/oauth/authorize?{urlencode(params)}")
+
+
+@app.route('/auth/github/callback')
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def auth_github_callback():
+    """Handle GitHub OAuth callback."""
+    expected_state = session.pop('github_oauth_state', None)
+    if not expected_state or expected_state != request.args.get('state'):
+        return _oauth_failure_redirect('github', 'invalid_state')
+
+    code = request.args.get('code')
+    if not code:
+        failure_reason = 'oauth_error' if request.args.get('error') else 'missing_code'
+        return _oauth_failure_redirect('github', failure_reason)
+
+    github_client_id = os.environ.get('GITHUB_OAUTH_CLIENT_ID')
+    github_client_secret = os.environ.get('GITHUB_OAUTH_CLIENT_SECRET')
+    if not github_client_id or not github_client_secret:
+        return _oauth_failure_redirect('github', 'not_configured')
+
+    try:
+        token_response = requests.post(
+            'https://github.com/login/oauth/access_token',
+            data={
+                'client_id': github_client_id,
+                'client_secret': github_client_secret,
+                'code': code,
+                'state': expected_state,
+                'redirect_uri': _build_oauth_redirect_uri('auth_github_callback')
+            },
+            headers={'Accept': 'application/json'},
+            timeout=15
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json().get('access_token')
+        if not access_token:
+            return _oauth_failure_redirect('github', 'missing_access_token')
+
+        auth_header = 'Bearer ' + access_token
+        headers = {
+            'Authorization': auth_header,
+            'Accept': 'application/vnd.github+json'
+        }
+
+        profile_response = requests.get('https://api.github.com/user', headers=headers, timeout=15)
+        profile_response.raise_for_status()
+        profile = profile_response.json()
+
+        email_response = requests.get('https://api.github.com/user/emails', headers=headers, timeout=15)
+        email_response.raise_for_status()
+        emails = email_response.json()
+
+        primary_email = next(
+            (item.get('email') for item in emails if item.get('primary') and item.get('verified')),
+            None
+        ) or next(
+            (item.get('email') for item in emails if item.get('verified')),
+            profile.get('email')
+        )
+
+        _store_oauth_user(
+            provider='github',
+            email=primary_email,
+            name=profile.get('name') or profile.get('login'),
+            provider_user_id=profile.get('id'),
+            avatar_url=profile.get('avatar_url')
+        )
+    except requests.RequestException as oauth_error:
+        print(f"GitHub OAuth request failed: {oauth_error}")
+        return _oauth_failure_redirect('github', 'token_exchange_failed')
+    except ValueError as oauth_error:
+        print(f"GitHub OAuth profile validation failed: {oauth_error}")
+        return _oauth_failure_redirect('github', 'token_exchange_failed')
+
+    return redirect(f"{url_for('dashboard')}?oauth=github")
 
 
 @app.route('/api/waitlist', methods=['POST'])
@@ -336,6 +589,38 @@ def join_waitlist():
 
     except Exception as e:
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'})
+
+
+@app.route('/api/signup', methods=['POST'])
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def api_signup():
+    """Compatibility signup endpoint mapping to waitlist"""
+    try:
+        if not WAITLIST_AVAILABLE:
+            return jsonify({'success': False, 'error': 'Signup system temporarily unavailable'}), 503
+
+        signup_data = request.get_json()
+        if not signup_data or not signup_data.get('email'):
+            return jsonify({'success': False, 'error': 'Email address is required'}), 400
+
+        if VALIDATION_AVAILABLE:
+            validated_data, error = validate_request(WaitlistSignup, signup_data)
+            if error:
+                return jsonify({'success': False, 'error': 'Invalid signup data'}), 400
+            signup_data = validated_data
+
+        result = waitlist_manager.add_to_waitlist(signup_data)
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': 'Successfully added to waitlist'
+            }), 200
+
+        return jsonify({'success': False, 'error': 'Signup failed'}), 400
+
+    except Exception as e:
+        app.logger.exception('Signup compatibility endpoint failed: %s', e)
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 
 @app.route('/api/products')
@@ -917,6 +1202,8 @@ def test_environment():
         'GOOGLE_API_KEY',
         'GOOGLE_OAUTH_CLIENT_ID',
         'GOOGLE_OAUTH_CLIENT_SECRET',
+        'GITHUB_OAUTH_CLIENT_ID',
+        'GITHUB_OAUTH_CLIENT_SECRET',
         'PAYPAL_ENV',
         'PAYPAL_REST_API_ID',
         'PAYPAL_REST_API_SECRET',
@@ -1125,6 +1412,165 @@ def monetization_status():
         'rate_limit_available': RATE_LIMIT_AVAILABLE,
         'environment_configured': bool(os.environ.get('PAYPAL_REST_API_ID')),
         'production_mode': os.environ.get('PAYPAL_ENV', 'sandbox') == 'live'
+    })
+
+
+# ==================== SINAX PROOF TOPOLOGY NAVIGATOR ====================
+
+@app.route('/api/sinax/solve', methods=['POST'])
+def sinax_solve():
+    """
+    Full PTN proof search (all 4 layers).
+
+    POST body (JSON):
+      start_state  : str  — initial proof state
+      target_state : str  — desired final state
+      context      : list[str] (optional) — additional lemmas/hypotheses
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    start = data.get('start_state', '').strip()
+    target = data.get('target_state', '').strip()
+    context = data.get('context', [])
+
+    if not start or not target:
+        return jsonify({'error': 'start_state and target_state are required'}), 400
+
+    try:
+        result = ptn.solve(start_state=start, target_state=target, context_states=context)
+        return jsonify(result.to_dict())
+    except Exception as e:
+        _log.exception("sinax_solve error")
+        return jsonify({'error': 'Proof search failed'}), 500
+
+
+@app.route('/api/sinax/embed', methods=['POST'])
+def sinax_embed():
+    """
+    Layer 1 — Embedding Manifold.
+
+    POST body (JSON): { "proof_state": "..." }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    state = data.get('proof_state', '').strip()
+    if not state:
+        return jsonify({'error': 'proof_state is required'}), 400
+
+    try:
+        return jsonify(ptn.embed(state))
+    except Exception as e:
+        _log.exception("sinax_embed error")
+        return jsonify({'error': 'Embedding failed'}), 500
+
+
+@app.route('/api/sinax/geodesic', methods=['POST'])
+def sinax_geodesic():
+    """
+    Layer 2 — Geodesic Flow Engine.
+
+    POST body (JSON): { "start_state": "...", "target_state": "..." }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    start = data.get('start_state', '').strip()
+    target = data.get('target_state', '').strip()
+    if not start or not target:
+        return jsonify({'error': 'start_state and target_state are required'}), 400
+
+    try:
+        return jsonify(ptn.geodesic(start, target))
+    except Exception as e:
+        _log.exception("sinax_geodesic error")
+        return jsonify({'error': 'Geodesic computation failed'}), 500
+
+
+@app.route('/api/sinax/homology', methods=['POST'])
+def sinax_homology():
+    """
+    Layer 3 — Homology Detector.
+
+    POST body (JSON): { "proof_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('proof_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'proof_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.homology(states))
+    except Exception as e:
+        _log.exception("sinax_homology error")
+        return jsonify({'error': 'Homology analysis failed'}), 500
+
+
+@app.route('/api/sinax/morse', methods=['POST'])
+def sinax_morse():
+    """
+    Layer 4 — Morse Theory Filter.
+
+    POST body (JSON): { "proof_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('proof_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'proof_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.morse(states))
+    except Exception as e:
+        _log.exception("sinax_morse error")
+        return jsonify({'error': 'Morse decomposition failed'}), 500
+
+
+@app.route('/api/sinax/training-signal', methods=['POST'])
+def sinax_training_signal():
+    """
+    Verified Data Flywheel — extract manifold geometry from verified proofs.
+
+    POST body (JSON): { "verified_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('verified_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'verified_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.training_signal(states))
+    except Exception as e:
+        _log.exception("sinax_training_signal error")
+        return jsonify({'error': 'Training signal extraction failed'}), 500
+
+
+@app.route('/api/sinax/status')
+def sinax_status():
+    """SINAX PTN health check."""
+    return jsonify({
+        'ptn_available': PTN_AVAILABLE,
+        'manifold_dim': ptn.manifold.dim if PTN_AVAILABLE else None,
+        'endpoints': [
+            '/api/sinax/solve',
+            '/api/sinax/embed',
+            '/api/sinax/geodesic',
+            '/api/sinax/homology',
+            '/api/sinax/morse',
+            '/api/sinax/training-signal',
+        ],
     })
 
 

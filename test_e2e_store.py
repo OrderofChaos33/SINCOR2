@@ -5,7 +5,15 @@ Tests all routes, fulfillment system, and purchase flow
 
 import sys
 import asyncio
+import os
 from datetime import datetime
+
+ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
+SRC_DIR = os.path.join(ROOT_DIR, 'src')
+PKG_DIR = os.path.join(SRC_DIR, 'sincor2')
+for path in (SRC_DIR, PKG_DIR):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 print("="*70)
 print("SINCOR STORE & CHECKOUT - END-TO-END TEST")
