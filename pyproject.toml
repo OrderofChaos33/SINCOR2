@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "proof-topology-navigator"
+name = "ptn"
 version = "1.0.0"
 description = "Proof Topology Navigator (PTN) - A differential-geometric framework for automated theorem proving."
 readme = "README.md"
@@ -70,6 +70,7 @@ Issues = "https://github.com/OrderofChaos33/SINCOR2/issues"
 
 [project.scripts]
 sincor2 = "sincor2.app:main"
+ptn = "sincor2.app:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

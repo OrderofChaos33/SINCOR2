@@ -30,6 +30,8 @@ The **Proof Topology Navigator (PTN)** is a next-generation automated theorem pr
 
 PTN is designed as a drop-in enhancement module for the [AxiomSolver](https://github.com/axiom-ai/axiomsolver) ecosystem, extending its multi-agent architecture with topological reasoning capabilities while maintaining full compatibility with Lean 4 formal verification.
 
+> Repository note: this PTN implementation is currently hosted in the `OrderofChaos33/SINCOR2` repository.
+
 ---
 
 ## Core Innovation
