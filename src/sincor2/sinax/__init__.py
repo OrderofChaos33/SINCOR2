@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """
 SINAX — Geometric Proof Navigation Layer
 ==========================================
@@ -21,7 +20,12 @@ Architecture
                   ├── curvature        — Curvature Analyzer
                   ├── lemma_discovery  — Lemma Discovery Engine
                   ├── integration      — A2A-Agnostic Integration Layer
-                  └── visualization    — Visualization Layer
+                  ├── visualization    — Visualization Layer
+                  ├── proof_manifold   — Layer 1: Embedding Manifold
+                  ├── geodesic_flow    — Layer 2: Geodesic Flow Engine
+                  ├── homology_detector — Layer 3: Homology Detector
+                  ├── morse_filter     — Layer 4: Morse Theory Filter
+                  └── ptn              — Proof Topology Navigator
 
 Contract
 --------
@@ -53,6 +57,11 @@ Quick start
 
     # Dashboard
     summary = get_dashboard().render_summary()
+
+    # PTN top-level API
+    from sincor2.sinax import ProofTopologyNavigator
+    nav = ProofTopologyNavigator(manifold_dim=64)
+    result = nav.solve("⊢ n + 0 = n", "closed")
 """
 
 from __future__ import annotations
@@ -138,6 +147,14 @@ from .visualization import (
     get_dashboard,
 )
 
+# Proof Topology Navigator (PTN) layers
+from .proof_manifold import ProofManifold, ManifoldPoint, ManifoldRegion
+from .geodesic_flow import GeodesicFlowEngine, GeodesicPath, FlowConfig
+from .homology_detector import HomologyDetector, HomologyReport, HomologyClass
+from .morse_filter import MorseFilter, MorseDecomposition, CriticalPoint
+from .axiom_solver import AxiomSolver, ProofResult
+from .ptn import ProofTopologyNavigator
+
 __all__ = [
     # Config
     "SINAX_ENABLED",
@@ -198,29 +215,7 @@ __all__ = [
     "SINAXDashboard",
     "TrajectoryVisualizer",
     "get_dashboard",
-=======
-#!/usr/bin/env python3
-"""
-SINAX — Proof Topology Navigator
-
-Package exports:
-    ProofTopologyNavigator  — top-level PTN API
-    AxiomSolver             — full end-to-end solver
-    ProofManifold           — Layer 1: Embedding Manifold
-    GeodesicFlowEngine      — Layer 2: Geodesic Flow Engine
-    HomologyDetector        — Layer 3: Homology Detector
-    MorseFilter             — Layer 4: Morse Theory Filter
-    ProofResult             — result container
-"""
-
-from sincor2.sinax.proof_manifold import ProofManifold, ManifoldPoint, ManifoldRegion
-from sincor2.sinax.geodesic_flow import GeodesicFlowEngine, GeodesicPath, FlowConfig
-from sincor2.sinax.homology_detector import HomologyDetector, HomologyReport, HomologyClass
-from sincor2.sinax.morse_filter import MorseFilter, MorseDecomposition, CriticalPoint
-from sincor2.sinax.axiom_solver import AxiomSolver, ProofResult
-from sincor2.sinax.ptn import ProofTopologyNavigator
-
-__all__ = [
+    # PTN layers
     "ProofTopologyNavigator",
     "AxiomSolver",
     "ProofResult",
@@ -236,5 +231,4 @@ __all__ = [
     "MorseFilter",
     "MorseDecomposition",
     "CriticalPoint",
->>>>>>> origin/main
 ]
