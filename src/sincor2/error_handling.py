@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,13 @@ class ApiError(Exception):
 
 
 
-def api_error(code: str, message: str, status: int = 400, details: dict[str, Any] | None = None):
+def api_error(
+    code: str,
+    message: str,
+    status: int = 400,
+    details: dict[str, Any] | None = None,
+) -> tuple[Response, int]:
+    """Return a normalized API error payload with correlation metadata."""
     payload = {
         "status": "error",
         "code": code,

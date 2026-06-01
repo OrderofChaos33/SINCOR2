@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import decode_token, get_jwt_identity, jwt_required
+from flask_jwt_extended.exceptions import JWTDecodeError
 
 from sincor2.error_handling import ApiError
 
@@ -35,7 +36,12 @@ def verify_token():
     if not token:
         raise ApiError("invalid_request", "token is required", status=400)
 
-    decode_token(token)
+    try:
+        decode_token(token)
+    except JWTDecodeError as exc:
+        raise ApiError("invalid_token", "Token is invalid or expired", status=401) from exc
+    except Exception as exc:  # pragma: no cover
+        raise ApiError("invalid_token", "Token is invalid or expired", status=401) from exc
     return jsonify({"status": "ok", "code": "token_valid", "message": "Token is valid"})
 
 

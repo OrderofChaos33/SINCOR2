@@ -16,6 +16,8 @@ def configure_logging() -> None:
 
 class _RequestIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
+        # Our formatter requires request_id for every record; set a fallback for
+        # startup/background logs that are emitted outside request context.
         if not hasattr(record, "request_id"):
             record.request_id = "-"
         return True
@@ -23,6 +25,7 @@ class _RequestIdFilter(logging.Filter):
 
 
 def run_startup_initializers(app: Flask, settings: Settings) -> None:
+    """Initialize logging and bind validated runtime settings to the Flask app."""
     configure_logging()
     logging.getLogger().addFilter(_RequestIdFilter())
     app.logger.info("Startup complete", extra={"request_id": "startup"})

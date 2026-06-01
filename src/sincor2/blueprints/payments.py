@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
 from flask import Blueprint, current_app, jsonify, request
@@ -11,7 +11,8 @@ from sincor2.validation_models import PaymentCreateRequest, validate_request
 payments_bp = Blueprint("payments", __name__, url_prefix="/api/payment")
 
 
-def _json_default_amount(amount: Decimal) -> str:
+def _format_decimal_amount(amount: Decimal) -> str:
+    """Normalize decimal amounts to two fixed digits for API responses."""
     return str(amount.quantize(Decimal("0.01")))
 
 
@@ -43,7 +44,7 @@ def paypal_create_order():
     amount_raw = payload.get("amount")
     try:
         amount = Decimal(str(amount_raw))
-    except Exception as exc:
+    except (InvalidOperation, TypeError, ValueError) as exc:
         raise ApiError("invalid_amount", "Amount must be numeric", status=400) from exc
 
     if amount <= 0:
@@ -56,7 +57,7 @@ def paypal_create_order():
             {
                 "success": True,
                 "order_id": order_id,
-                "amount": _json_default_amount(amount),
+                "amount": _format_decimal_amount(amount),
                 "currency": currency,
                 "approval_url": f"https://www.paypal.com/checkoutnow?token={order_id}",
             }

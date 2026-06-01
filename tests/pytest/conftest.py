@@ -4,6 +4,16 @@ import os
 import pytest
 
 
+class MockStripeCheckout:
+    def create_checkout_session(self, **kwargs):
+        return {
+            "success": True,
+            "session_id": "cs_test_123",
+            "checkout_url": "https://example.com/checkout/cs_test_123",
+            **kwargs,
+        }
+
+
 @pytest.fixture(autouse=True)
 def env_defaults(monkeypatch):
     monkeypatch.setenv("FLASK_ENV", "test")
@@ -18,16 +28,7 @@ def env_defaults(monkeypatch):
 def app(monkeypatch):
     from sincor2 import app as app_module
 
-    class _StripeMock:
-        def create_checkout_session(self, **kwargs):
-            return {
-                "success": True,
-                "session_id": "cs_test_123",
-                "checkout_url": "https://example.com/checkout/cs_test_123",
-                **kwargs,
-            }
-
-    monkeypatch.setattr(app_module, "StripeCheckout", lambda api_key=None: _StripeMock())
+    monkeypatch.setattr(app_module, "StripeCheckout", lambda api_key=None: MockStripeCheckout())
     flask_app = app_module.create_app()
     flask_app.config.update(TESTING=True)
     return flask_app

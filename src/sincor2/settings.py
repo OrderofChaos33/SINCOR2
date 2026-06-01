@@ -19,6 +19,8 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
 
 @dataclass(frozen=True)
 class Settings:
+    """Typed runtime settings loaded from environment variables with validation."""
+
     environment: str
     debug: bool
     secret_key: str

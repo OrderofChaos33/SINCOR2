@@ -228,7 +228,7 @@ Smart contract build/test/deploy: see [`onchain/README.md`](onchain/README.md).
 
 ## Environment variables
 
-The single source of truth for required/optional variables is [`/tmp/workspace/OrderofChaos33/SINCOR2/.env.example`](./.env.example).
+The single source of truth for required/optional variables is [`./.env.example`](./.env.example).
 
 ---
 
