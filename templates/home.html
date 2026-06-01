@@ -28,6 +28,8 @@
       --purple-light: #c4b5fd;
       --cyan: #06b6d4;
       --cyan-dark: #0891b2;
+      --blue-button: #0b2e6d;
+      --blue-button-dark: #082455;
       --pink: #ec4899;
       --text: #f1f5f9;
       --text-dim: #cbd5e1;
@@ -154,7 +156,7 @@
     }
     
     .nav-cta {
-      background: linear-gradient(135deg, var(--purple), var(--purple-dark));
+      background: linear-gradient(135deg, var(--blue-button), var(--blue-button-dark));
       color: white;
       border: none;
       padding: 12px 28px;
@@ -172,8 +174,8 @@
     
     .nav-cta:hover {
       transform: translateY(-2px);
-      box-shadow: var(--glow-intense);
-      background: linear-gradient(135deg, var(--cyan), var(--cyan-dark));
+      box-shadow: 0 0 40px rgba(11,46,109,0.45);
+      background: linear-gradient(135deg, #123b86, var(--blue-button));
     }
     
     /* HERO */
@@ -261,26 +263,26 @@
     }
     
     .btn-primary {
-      background: linear-gradient(135deg, var(--purple), var(--pink));
+      background: linear-gradient(135deg, var(--blue-button), var(--blue-button-dark));
       color: white;
-      box-shadow: var(--glow);
+      box-shadow: 0 0 24px rgba(11,46,109,0.35);
     }
     
     .btn-primary:hover {
       transform: translateY(-4px);
-      box-shadow: var(--glow-intense);
+      box-shadow: 0 0 40px rgba(11,46,109,0.45);
     }
     
     .btn-secondary {
-      background: transparent;
-      color: var(--text);
-      border: 1.5px solid var(--border-bright);
+      background: linear-gradient(135deg, var(--blue-button), var(--blue-button-dark));
+      color: white;
+      border: 1.5px solid rgba(255,255,255,0.25);
     }
     
     .btn-secondary:hover {
-      border-color: var(--cyan);
-      background: rgba(6,182,212,0.1);
-      color: var(--cyan);
+      border-color: rgba(255,255,255,0.45);
+      background: linear-gradient(135deg, #123b86, var(--blue-button));
+      color: white;
     }
     
     /* STATS */
@@ -446,7 +448,7 @@
     .price-cta {
       width: 100%;
       padding: 14px;
-      background: linear-gradient(135deg, var(--purple), var(--pink));
+      background: linear-gradient(135deg, var(--blue-button), var(--blue-button-dark));
       color: white;
       border: none;
       border-radius: 8px;
@@ -455,7 +457,7 @@
       text-transform: uppercase;
       letter-spacing: 1px;
       transition: all 0.3s;
-      box-shadow: var(--glow);
+      box-shadow: 0 0 24px rgba(11,46,109,0.35);
       text-decoration: none;
       display: block;
       text-align: center;
@@ -464,8 +466,8 @@
     
     .price-cta:hover {
       transform: translateY(-2px);
-      box-shadow: var(--glow-intense);
-      background: linear-gradient(135deg, var(--cyan), var(--cyan-dark));
+      box-shadow: 0 0 40px rgba(11,46,109,0.45);
+      background: linear-gradient(135deg, #123b86, var(--blue-button));
     }
     
     /* FEATURES GRID */
@@ -625,7 +627,7 @@
     <li><a href="/sinc">🌐 SINC Token</a></li>
     <li><a href="#how">📖 How It Works</a></li>
   </ul>
-  <a href="/signup" class="nav-cta">🚀 Deploy Now</a>
+  <a href="/wallet-connect" class="nav-cta">🔗 Connect Wallet</a>
 </nav>
 
 <main>
@@ -633,11 +635,11 @@
 <!-- HERO -->
 <section class="hero">
   <div class="hero-badge">⚡ 42 AGENTS • ZERO HUMANS • INFINITE SCALE</div>
-  <h1>The Future of <span class="gradient-text">Autonomous Work</span></h1>
-  <p class="hero-sub">Deploy your revenue-generating AI team. Research, content, outreach, sales, analytics, retention. All autonomous. All 24/7.</p>
+  <h1>WELCOME AGENTS, <span class="gradient-text">&amp; humans</span></h1>
+  <p class="hero-sub">Eliminating human suffering ✓ Empowering businesses &amp; owners ✓ Changing work as we know it ✓</p>
   
   <div class="hero-buttons">
-    <a href="/signup" class="btn btn-primary">→ Deploy Now — Starting at $297/mo</a>
+    <a href="/wallet-connect" class="btn btn-primary">→ Connect Wallet — Buy SINC</a>
     <a href="#pricing" class="btn btn-secondary">See Pricing</a>
   </div>
   

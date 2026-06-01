@@ -6,6 +6,7 @@ ADDED: JWT Authentication for admin endpoints
 ADDED: Rate Limiting for DDoS protection
 """
 
+import logging
 import os
 import secrets
 from datetime import datetime, timezone
@@ -18,6 +19,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()
+
+_log = logging.getLogger(__name__)
 
 # Import authentication system
 try:
@@ -133,6 +136,21 @@ except Exception as e:
     print(f"Fulfillment system error: {e}")
     FULFILLMENT_AVAILABLE = False
     fulfillment_system = None
+
+# Import SINAX Proof Topology Navigator
+try:
+    from sincor2.sinax.ptn import ProofTopologyNavigator
+    ptn = ProofTopologyNavigator()
+    PTN_AVAILABLE = True
+    print("SINAX Proof Topology Navigator Loaded Successfully")
+except ImportError as e:
+    print(f"SINAX PTN not available: {e}")
+    PTN_AVAILABLE = False
+    ptn = None
+except Exception as e:
+    print(f"SINAX PTN error: {e}")
+    PTN_AVAILABLE = False
+    ptn = None
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -357,6 +375,13 @@ def signup():
     return render_template('signup.html')
 
 
+@app.route('/wallet-connect')
+@limiter.exempt if limiter else lambda f: f
+def wallet_connect():
+    """Legacy wallet-connect URL mapped to the live SINC gateway page."""
+    return redirect('/sinc', code=302)
+
+
 @app.route('/auth/google')
 @limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
 def auth_google():
@@ -564,6 +589,38 @@ def join_waitlist():
 
     except Exception as e:
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'})
+
+
+@app.route('/api/signup', methods=['POST'])
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def api_signup():
+    """Compatibility signup endpoint mapping to waitlist"""
+    try:
+        if not WAITLIST_AVAILABLE:
+            return jsonify({'success': False, 'error': 'Signup system temporarily unavailable'}), 503
+
+        signup_data = request.get_json()
+        if not signup_data or not signup_data.get('email'):
+            return jsonify({'success': False, 'error': 'Email address is required'}), 400
+
+        if VALIDATION_AVAILABLE:
+            validated_data, error = validate_request(WaitlistSignup, signup_data)
+            if error:
+                return jsonify({'success': False, 'error': 'Invalid signup data'}), 400
+            signup_data = validated_data
+
+        result = waitlist_manager.add_to_waitlist(signup_data)
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': 'Successfully added to waitlist'
+            }), 200
+
+        return jsonify({'success': False, 'error': 'Signup failed'}), 400
+
+    except Exception as e:
+        app.logger.exception('Signup compatibility endpoint failed: %s', e)
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 
 @app.route('/api/products')
@@ -1355,6 +1412,165 @@ def monetization_status():
         'rate_limit_available': RATE_LIMIT_AVAILABLE,
         'environment_configured': bool(os.environ.get('PAYPAL_REST_API_ID')),
         'production_mode': os.environ.get('PAYPAL_ENV', 'sandbox') == 'live'
+    })
+
+
+# ==================== SINAX PROOF TOPOLOGY NAVIGATOR ====================
+
+@app.route('/api/sinax/solve', methods=['POST'])
+def sinax_solve():
+    """
+    Full PTN proof search (all 4 layers).
+
+    POST body (JSON):
+      start_state  : str  — initial proof state
+      target_state : str  — desired final state
+      context      : list[str] (optional) — additional lemmas/hypotheses
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    start = data.get('start_state', '').strip()
+    target = data.get('target_state', '').strip()
+    context = data.get('context', [])
+
+    if not start or not target:
+        return jsonify({'error': 'start_state and target_state are required'}), 400
+
+    try:
+        result = ptn.solve(start_state=start, target_state=target, context_states=context)
+        return jsonify(result.to_dict())
+    except Exception as e:
+        _log.exception("sinax_solve error")
+        return jsonify({'error': 'Proof search failed'}), 500
+
+
+@app.route('/api/sinax/embed', methods=['POST'])
+def sinax_embed():
+    """
+    Layer 1 — Embedding Manifold.
+
+    POST body (JSON): { "proof_state": "..." }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    state = data.get('proof_state', '').strip()
+    if not state:
+        return jsonify({'error': 'proof_state is required'}), 400
+
+    try:
+        return jsonify(ptn.embed(state))
+    except Exception as e:
+        _log.exception("sinax_embed error")
+        return jsonify({'error': 'Embedding failed'}), 500
+
+
+@app.route('/api/sinax/geodesic', methods=['POST'])
+def sinax_geodesic():
+    """
+    Layer 2 — Geodesic Flow Engine.
+
+    POST body (JSON): { "start_state": "...", "target_state": "..." }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    start = data.get('start_state', '').strip()
+    target = data.get('target_state', '').strip()
+    if not start or not target:
+        return jsonify({'error': 'start_state and target_state are required'}), 400
+
+    try:
+        return jsonify(ptn.geodesic(start, target))
+    except Exception as e:
+        _log.exception("sinax_geodesic error")
+        return jsonify({'error': 'Geodesic computation failed'}), 500
+
+
+@app.route('/api/sinax/homology', methods=['POST'])
+def sinax_homology():
+    """
+    Layer 3 — Homology Detector.
+
+    POST body (JSON): { "proof_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('proof_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'proof_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.homology(states))
+    except Exception as e:
+        _log.exception("sinax_homology error")
+        return jsonify({'error': 'Homology analysis failed'}), 500
+
+
+@app.route('/api/sinax/morse', methods=['POST'])
+def sinax_morse():
+    """
+    Layer 4 — Morse Theory Filter.
+
+    POST body (JSON): { "proof_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('proof_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'proof_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.morse(states))
+    except Exception as e:
+        _log.exception("sinax_morse error")
+        return jsonify({'error': 'Morse decomposition failed'}), 500
+
+
+@app.route('/api/sinax/training-signal', methods=['POST'])
+def sinax_training_signal():
+    """
+    Verified Data Flywheel — extract manifold geometry from verified proofs.
+
+    POST body (JSON): { "verified_states": ["...", "..."] }
+    """
+    if not PTN_AVAILABLE:
+        return jsonify({'error': 'SINAX PTN not available'}), 503
+
+    data = request.get_json(silent=True) or {}
+    states = data.get('verified_states', [])
+    if not states or not isinstance(states, list):
+        return jsonify({'error': 'verified_states must be a non-empty list'}), 400
+
+    try:
+        return jsonify(ptn.training_signal(states))
+    except Exception as e:
+        _log.exception("sinax_training_signal error")
+        return jsonify({'error': 'Training signal extraction failed'}), 500
+
+
+@app.route('/api/sinax/status')
+def sinax_status():
+    """SINAX PTN health check."""
+    return jsonify({
+        'ptn_available': PTN_AVAILABLE,
+        'manifold_dim': ptn.manifold.dim if PTN_AVAILABLE else None,
+        'endpoints': [
+            '/api/sinax/solve',
+            '/api/sinax/embed',
+            '/api/sinax/geodesic',
+            '/api/sinax/homology',
+            '/api/sinax/morse',
+            '/api/sinax/training-signal',
+        ],
     })
 
 
