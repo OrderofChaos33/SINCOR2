@@ -236,7 +236,7 @@ The single source of truth for required/optional variables is [`./.env.example`]
 
 SINCOR2 is **live and production-ready**. The platform is actively processing real customer subscriptions.
 
-**Repository cleaned** for public viewing — internal development notes and duplicate files have been removed.
+*Author:Court Jansma, SINCOR Business Solutions 2026*
 
 ---
 
