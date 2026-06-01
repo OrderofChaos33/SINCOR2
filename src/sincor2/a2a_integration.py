@@ -414,6 +414,85 @@ SINCOR_SKILLS: List[AgentSkill] = [
             "Verify tx 0xabc… on Base for 1 AXM and unlock task T-123.",
         ],
     ),
+    # ------------------------------------------------------------------
+    # SINAX / Proof Topology Navigator (PTN) skills
+    # ------------------------------------------------------------------
+    AgentSkill(
+        id="proof-topology-solve",
+        name="Proof Topology Navigator — Full Solve",
+        description=(
+            "End-to-end automated theorem proving via SINAX's Proof Topology Navigator "
+            "(PTN).  Embeds the start and target proof states onto a Riemannian manifold, "
+            "computes the geodesic flow, runs homology detection, and applies Morse-theory "
+            "filtering to produce a minimal tactic sequence and a human-readable proof "
+            "narrative.  Powered by SINAX — SINCOR's unique geometric proof navigation layer."
+        ),
+        tags=["SINAX", "PTN", "theorem-proving", "Lean", "formal-verification", "geodesic"],
+        examples=[
+            "Prove: start=⊢ ∀ n : ℕ, n + 0 = n  target=closed",
+            '{"start": "⊢ P ∧ Q", "target": "closed", "context": ["h : P", "h2 : Q"]}',
+        ],
+    ),
+    AgentSkill(
+        id="proof-topology-embed",
+        name="Proof Topology Navigator — State Embedding",
+        description=(
+            "Layer 1 of the PTN pipeline.  Maps a Lean/formal proof state onto the "
+            "learned Riemannian proof manifold and returns its coordinates and local "
+            "curvature score (branching complexity).  Useful for comparing proof states "
+            "or seeding the manifold before a full solve.  Powered by SINAX."
+        ),
+        tags=["SINAX", "PTN", "embedding", "manifold", "curvature"],
+        examples=[
+            "Embed proof state: ⊢ n + 0 = n",
+            "What are the manifold coordinates of ⊢ ∀ x : ℝ, x * 1 = x?",
+        ],
+    ),
+    AgentSkill(
+        id="proof-topology-geodesic",
+        name="Proof Topology Navigator — Geodesic Flow",
+        description=(
+            "Layer 2 of the PTN pipeline.  Computes the geodesic (shortest continuous "
+            "path) between two proof states on the learned manifold and returns the "
+            "decoded tactic sequence, path length, and convergence status.  Short paths "
+            "indicate that the two states are topologically close.  Powered by SINAX."
+        ),
+        tags=["SINAX", "PTN", "geodesic", "tactic-sequence", "proof-path"],
+        examples=[
+            '{"start": "⊢ n + 0 = n", "target": "closed"}',
+            "Find the geodesic from ⊢ P → Q to ⊢ ¬Q → ¬P",
+        ],
+    ),
+    AgentSkill(
+        id="proof-topology-homology",
+        name="Proof Topology Navigator — Homology Analysis",
+        description=(
+            "Layer 3 of the PTN pipeline.  Computes persistent homology over a set of "
+            "proof states and detects topological holes — regions where proofs consistently "
+            "fail.  Returns Betti numbers, hole-filling lemma suggestions, and connected "
+            "component counts.  Powered by SINAX."
+        ),
+        tags=["SINAX", "PTN", "homology", "lemma-discovery", "topology"],
+        examples=[
+            '["⊢ P", "⊢ P ∧ Q", "⊢ Q → R", "⊢ R"]',
+            "Analyse the homology of these failed proof states: ...",
+        ],
+    ),
+    AgentSkill(
+        id="proof-topology-morse",
+        name="Proof Topology Navigator — Morse Decomposition",
+        description=(
+            "Layer 4 of the PTN pipeline.  Applies Morse theory to a set of proof states "
+            "to identify critical points: key lemmas (local minima), branch points (saddle "
+            "points), and a lower bound on minimal proof length via the Morse inequalities.  "
+            "Powered by SINAX."
+        ),
+        tags=["SINAX", "PTN", "morse-theory", "critical-points", "proof-complexity"],
+        examples=[
+            '["⊢ base case", "⊢ inductive step", "⊢ conclusion"]',
+            "Decompose the Morse landscape for: ⊢ ∀ n, fib n > 0",
+        ],
+    ),
 ]
 
 
@@ -1295,6 +1374,143 @@ def _handle_resubscribe(body: Dict[str, Any]) -> Generator[str, None, None]:
 # Swarm dispatch
 # ---------------------------------------------------------------------------
 
+_PTN_SKILL_IDS = frozenset({
+    "proof-topology-solve",
+    "proof-topology-embed",
+    "proof-topology-geodesic",
+    "proof-topology-homology",
+    "proof-topology-morse",
+})
+
+
+def _dispatch_ptn(task: A2ATask) -> str:
+    """
+    Dispatch a SINAX / PTN skill task and return a human-readable result string.
+
+    Input format (flexible):
+      • Plain text: treated as the ``start_state`` for a solve task, or as
+        the proof-state string for embed / homology / morse tasks.
+      • JSON object with keys ``start``, ``target``, ``context``
+        (for solve/geodesic) or ``states`` / ``proof_states``
+        (for homology/morse/embed).
+
+    Returns a formatted text result suitable for inclusion in an A2A artifact.
+    """
+    import json as _json
+    from sincor2.sinax import ProofTopologyNavigator
+
+    nav = ProofTopologyNavigator()
+    raw = task.input_text.strip()
+
+    # Try to parse JSON payload; fall back to treating input as a plain state string.
+    payload: Dict[str, Any] = {}
+    try:
+        parsed = _json.loads(raw)
+        if isinstance(parsed, dict):
+            payload = parsed
+        elif isinstance(parsed, list):
+            payload = {"states": parsed}
+    except (_json.JSONDecodeError, ValueError):
+        payload = {}
+
+    sid = task.skill_id
+
+    # --- proof-topology-embed -------------------------------------------
+    if sid == "proof-topology-embed":
+        state = payload.get("state") or raw
+        result = nav.embed(state)
+        lines = [
+            "SINAX — Proof State Embedding (Layer 1)",
+            "=" * 45,
+            f"State    : {state[:120]}",
+            f"Curvature: {result['curvature']:.6f}",
+            f"Dim      : {len(result['coordinates'])}",
+            f"Coords[0:4]: {result['coordinates'][:4]}",
+        ]
+        return "\n".join(str(l) for l in lines)
+
+    # --- proof-topology-geodesic ----------------------------------------
+    if sid == "proof-topology-geodesic":
+        start  = payload.get("start") or payload.get("start_state") or raw
+        target = payload.get("target") or payload.get("target_state") or "closed"
+        result = nav.geodesic(start, target)
+        lines = [
+            "SINAX — Geodesic Flow (Layer 2)",
+            "=" * 45,
+            f"Start    : {result['start_state'][:100]}",
+            f"Target   : {result['target_state'][:100]}",
+            f"Converged: {result['converged']}",
+            f"Teleported: {result['teleported']}",
+            f"Path length: {result['path_length']:.6f}",
+            f"Steps    : {result['num_steps']}",
+            f"Tactics  : {' → '.join(result['tactics']) or '(none)'}",
+        ]
+        return "\n".join(lines)
+
+    # --- proof-topology-homology ----------------------------------------
+    if sid == "proof-topology-homology":
+        states: List[str] = (
+            payload.get("states")
+            or payload.get("proof_states")
+            or [raw]
+        )
+        if isinstance(states, str):
+            states = [states]
+        result = nav.homology(states)
+        lines = [
+            "SINAX — Homology Analysis (Layer 3)",
+            "=" * 45,
+            f"States analysed : {result['num_states']}",
+            f"Components (β₀) : {result['num_components']}",
+            f"Has holes       : {result['has_holes']}",
+            f"Betti numbers   : {result['betti_numbers']}",
+        ]
+        if result["hole_filling_suggestions"]:
+            lines.append("Hole-filling lemma suggestions:")
+            for s in result["hole_filling_suggestions"][:5]:
+                lines.append(f"  • {s}")
+        return "\n".join(lines)
+
+    # --- proof-topology-morse -------------------------------------------
+    if sid == "proof-topology-morse":
+        states = (
+            payload.get("states")
+            or payload.get("proof_states")
+            or [raw]
+        )
+        if isinstance(states, str):
+            states = [states]
+        result = nav.morse(states)
+        lines = [
+            "SINAX — Morse Decomposition (Layer 4)",
+            "=" * 45,
+            f"Critical points     : {result['num_critical_points']}",
+            f"Min proof-length LB : {result['min_proof_length_bound']}",
+        ]
+        if result["key_lemmas"]:
+            lines.append("Key lemmas (minima):")
+            for l in result["key_lemmas"][:5]:
+                lines.append(f"  ✓ {l[:100]}")
+        if result["branch_points"]:
+            lines.append("Branch points (saddles):")
+            for b in result["branch_points"][:3]:
+                lines.append(f"  ~ {b[:100]}")
+        return "\n".join(lines)
+
+    # --- proof-topology-solve (default) ---------------------------------
+    start  = payload.get("start") or payload.get("start_state") or raw
+    target = payload.get("target") or payload.get("target_state") or "closed"
+    context: Optional[List[str]] = payload.get("context") or payload.get("context_states")
+    proof  = nav.solve(start_state=start, target_state=target, context_states=context)
+    return proof.proof_narrative + (
+        f"\n\nResult summary:\n"
+        f"  Succeeded  : {proof.succeeded}\n"
+        f"  Tactics    : {' → '.join(proof.tactic_sequence) or '(none)'}\n"
+        f"  Elapsed    : {proof.elapsed_seconds:.4f}s\n"
+        f"  Proof ID   : {proof.proof_id}"
+    )
+
+
 def _dispatch_to_swarm(task: A2ATask):
     """
     Route the task to the internal SINCOR swarm.
@@ -1310,6 +1526,11 @@ def _dispatch_to_swarm(task: A2ATask):
     Returns (output: str | None, error: str | None).
     """
     try:
+        # SINAX / PTN skills are handled directly — no external dependency needed.
+        if task.skill_id in _PTN_SKILL_IDS:
+            output = _dispatch_ptn(task)
+            return output, None
+
         # Try to import the swarm's IBI module for real responses
         try:
             from sincor2.instant_business_intelligence import BusinessIntelligenceEngine

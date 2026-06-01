@@ -14,6 +14,7 @@ from sincor2.blueprints.auth import auth_bp
 from sincor2.blueprints.monitoring import monitoring_bp
 from sincor2.blueprints.pages import pages_bp
 from sincor2.blueprints.payments import payments_bp
+from sincor2.blueprints.sinax import sinax_bp
 from sincor2.blueprints.waitlist import waitlist_bp
 from sincor2.error_handling import register_error_handlers
 from sincor2.settings import Settings
@@ -67,6 +68,7 @@ def create_app() -> Flask:
     app.register_blueprint(payments_bp)
     app.register_blueprint(waitlist_bp)
     app.register_blueprint(monitoring_bp)
+    app.register_blueprint(sinax_bp)
 
     app.register_blueprint(A2ARouter().blueprint)
 
