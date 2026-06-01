@@ -33,4 +33,4 @@ EXPOSE 8080
 
 # Run with gunicorn for production stability
 # Use shell form so $PORT env var is expanded at runtime
-CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --preload run:app
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --preload sincor2.mvp_app:app
