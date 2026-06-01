@@ -318,7 +318,7 @@ def signup():
 @app.route('/wallet-connect')
 @limiter.exempt if limiter else lambda f: f
 def wallet_connect():
-    """Compatibility route for wallet connect path"""
+    """Legacy wallet-connect URL mapped to the live SINC gateway page."""
     return redirect('/sinc', code=302)
 
 
@@ -367,14 +367,21 @@ def api_signup():
         if VALIDATION_AVAILABLE:
             validated_data, error = validate_request(WaitlistSignup, signup_data)
             if error:
-                return jsonify({'success': False, 'error': error}), 400
+                return jsonify({'success': False, 'error': 'Invalid signup data'}), 400
             signup_data = validated_data
 
         result = waitlist_manager.add_to_waitlist(signup_data)
-        return jsonify(result), 200 if result.get('success') else 400
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': 'Successfully added to waitlist'
+            }), 200
+
+        return jsonify({'success': False, 'error': 'Signup failed'}), 400
 
     except Exception as e:
-        return jsonify({'success': False, 'error': f'Server error: {str(e)}'}), 500
+        app.logger.exception('Signup compatibility endpoint failed: %s', e)
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 
 @app.route('/api/products')
