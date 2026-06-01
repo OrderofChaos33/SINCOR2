@@ -546,33 +546,56 @@
 
     /* TECH DIAGRAM */
     .tech-diagram {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-      gap: 14px;
       margin-top: 34px;
-      align-items: center;
+      display: grid;
+      gap: 16px;
+    }
+
+    .tech-layer {
+      background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(6,182,212,0.04));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .tech-layer-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .layer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
     }
 
     .diagram-node {
-      background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(6,182,212,0.08));
+      background: linear-gradient(135deg, rgba(139,92,246,0.14), rgba(6,182,212,0.08));
       border: 1px solid var(--border-bright);
-      border-radius: 12px;
-      padding: 18px 14px;
-      text-align: center;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: var(--text-dim);
-      min-height: 84px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      border-radius: 10px;
+      padding: 14px 12px;
+      min-height: 78px;
     }
 
-    .diagram-arrow {
-      text-align: center;
-      color: var(--cyan);
-      font-size: 28px;
-      font-weight: 700;
+    .diagram-node strong {
+      display: block;
+      color: var(--purple-light);
+      font-size: 12px;
+      margin-bottom: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .diagram-node span {
+      color: var(--text-dim);
+      font-size: 12px;
+      line-height: 1.55;
+      display: block;
     }
     
     /* CTA BOX */
@@ -736,21 +759,22 @@
   <div class="section-label">→ PLATFORM INFO</div>
   <h2 class="section-title">How SINCOR Creates Revenue</h2>
   <p style="font-size: 18px; color: var(--text-muted); max-width: 900px;">
-    SINCOR combines autonomous AI operators, tokenized incentives, and an always-on execution pipeline.
-    You get strategic research, content output, outreach, and analytics running in parallel without building a large internal team.
+    SINCOR combines autonomous operator swarms, conversion-first workflows, and token-driven platform economics into one operating system for growth.
+    Instead of hiring disconnected teams for research, prospecting, writing, analytics, and optimization, organizations launch a synchronized execution layer where each agent specializes in one part of the funnel and continuously feeds the next stage with context-rich outputs.
+    The result is a compounding revenue engine that moves from market intelligence to outbound action, pipeline advancement, and retained customer value without the normal downtime that slows human teams.
   </p>
   <div class="overview-grid">
     <div class="info-card">
       <h4>Always-On Agent Operations</h4>
-      <p>Specialized agents run continuously across prospecting, messaging, reporting, and optimization with no time-zone downtime.</p>
+      <p>Specialized agents run continuously across lead scoring, personalized messaging, deliverability monitoring, campaign QA, and performance tuning. Each cycle closes with feedback loops so targeting, copy, and timing improve every day without requiring additional headcount.</p>
     </div>
     <div class="info-card">
       <h4>On-Chain Economic Engine</h4>
-      <p>SINC and AXIOM connect platform usage to public, auditable token utility and treasury flows on Base.</p>
+      <p>SINC and AXIOM connect platform usage to public, auditable utility on Base. Settlement paths, treasury visibility, and incentive mechanics are designed so every workload can be mapped to measurable value movement rather than hidden black-box software spend.</p>
     </div>
     <div class="info-card">
       <h4>Production-Ready Delivery</h4>
-      <p>Security controls, Stripe billing, and orchestrated workflows are already live so teams can deploy fast and scale safely.</p>
+      <p>Security controls, payment rails, audit logging, and orchestrated task pipelines are already operational. Teams can onboard quickly while keeping governance, reliability, and observability standards expected in production customer environments.</p>
     </div>
   </div>
 </section>
@@ -824,21 +848,22 @@
   <div class="section-label">→ SINAX LAYER</div>
   <h2 class="section-title">What SINAX Adds</h2>
   <p style="font-size: 18px; color: var(--text-muted); max-width: 920px;">
-    SINAX is the intelligence exchange layer that helps internal and external agents coordinate work, settle value, and share outputs.
-    It bridges business execution with token utility so usage scales with the ecosystem.
+    SINAX is the coordination and settlement fabric that allows internal SINCOR agents, partner systems, and external automation stacks to exchange tasks with verifiable context.
+    It standardizes how jobs are routed, how completions are validated, and how value is attributed across contributors, making enterprise execution interoperable instead of siloed.
+    By linking workload throughput with token utility, SINAX turns operational demand into a measurable ecosystem signal that can scale across partners and vertical-specific deployments.
   </p>
   <div class="sinax-grid">
     <div class="info-card">
       <h4>Agent-to-Agent Routing</h4>
-      <p>Tasks are routed to the best-fit agent specialization with response contracts and traceable execution handoffs.</p>
+      <p>Incoming work is classified by intent, complexity, and required SLA, then routed to the best-fit specialization. Every handoff includes structured context, expected outputs, and verification checkpoints so downstream agents can execute without losing decision history.</p>
     </div>
     <div class="info-card">
       <h4>Token-Aware Settlement</h4>
-      <p>Usage can be metered and settled through ecosystem token rails, connecting delivered work to measurable on-chain activity.</p>
+      <p>Usage can be metered at the workflow and outcome level, then settled through ecosystem token rails. This creates transparent attribution for completed work and allows treasury and incentive policies to reward quality, speed, and sustained performance.</p>
     </div>
     <div class="info-card">
       <h4>Interoperable Expansion</h4>
-      <p>SINAX is designed for integration with external AI systems so partners can request work and consume outputs programmatically.</p>
+      <p>SINAX is designed to integrate with external AI systems, CRMs, and partner apps through machine-readable interfaces. Third-party teams can request services, receive normalized outputs, and compose SINCOR capabilities directly into their own production environments.</p>
     </div>
   </div>
 </section>
@@ -848,22 +873,42 @@
   <div class="section-label">→ TECH STACK VISUAL</div>
   <h2 class="section-title">SINCOR Tech Flow</h2>
   <p style="font-size: 18px; color: var(--text-muted); max-width: 920px;">
-    High-level architecture from user request to autonomous execution and on-chain settlement.
+    Layered architecture from user interaction to orchestration, AI execution, settlement, and observability.
+    Each layer exposes explicit responsibilities so teams can understand reliability, security, and scaling behavior at every step of the platform lifecycle.
   </p>
-  <div class="tech-diagram" role="img" aria-label="SINCOR technology flow from client and wallet to API, orchestration, AI agents, SINAX exchange, token settlement on Base, and reporting">
-    <div class="diagram-node">Client / Wallet</div>
-    <div class="diagram-arrow" aria-hidden="true">→</div>
-    <div class="diagram-node">Flask API + Auth</div>
-    <div class="diagram-arrow" aria-hidden="true">→</div>
-    <div class="diagram-node">Orchestrator</div>
-    <div class="diagram-arrow" aria-hidden="true">→</div>
-    <div class="diagram-node">42 AI Agents</div>
-    <div class="diagram-arrow" aria-hidden="true">→</div>
-    <div class="diagram-node">SINAX Exchange Layer</div>
-    <div class="diagram-arrow" aria-hidden="true">→</div>
-    <div class="diagram-node">SINC / AXIOM on Base</div>
-    <div class="diagram-arrow" aria-hidden="true">→</div>
-    <div class="diagram-node">Analytics + Reporting</div>
+  <div class="tech-diagram" role="img" aria-label="SINCOR layered architecture including experience layer, application and security layer, orchestration layer, AI execution layer, SINAX coordination layer, on-chain settlement layer, and analytics operations layer">
+    <div class="tech-layer">
+      <div class="tech-layer-title">Layer 01 • Experience + Access</div>
+      <div class="layer-grid">
+        <div class="diagram-node"><strong>Web Interface</strong><span>Landing flows, onboarding surfaces, and operator controls for account and campaign setup.</span></div>
+        <div class="diagram-node"><strong>Wallet & Identity</strong><span>Wallet-connect flows, session integrity, and account mapping to billing and token utilities.</span></div>
+        <div class="diagram-node"><strong>Checkout + Plans</strong><span>Subscription entry points that map plan tiers directly to agent capacity and throughput limits.</span></div>
+      </div>
+    </div>
+    <div class="tech-layer">
+      <div class="tech-layer-title">Layer 02 • Application + Security Core</div>
+      <div class="layer-grid">
+        <div class="diagram-node"><strong>Flask API Gateway</strong><span>Unified HTTP interfaces for dashboard actions, workflow triggers, and platform services.</span></div>
+        <div class="diagram-node"><strong>Auth + Policy Controls</strong><span>Access controls, guarded routes, and request validation for reliable multi-tenant execution.</span></div>
+        <div class="diagram-node"><strong>Billing Integrations</strong><span>Stripe-linked account lifecycle handling, entitlement checks, and plan-aware provisioning.</span></div>
+      </div>
+    </div>
+    <div class="tech-layer">
+      <div class="tech-layer-title">Layer 03 • Orchestration + AI Runtime</div>
+      <div class="layer-grid">
+        <div class="diagram-node"><strong>Workflow Orchestrator</strong><span>Task graph scheduling, retries, dependency handling, and service-level routing logic.</span></div>
+        <div class="diagram-node"><strong>42 Specialized Agents</strong><span>Research, content, outreach, analytics, and retention agents running as coordinated teams.</span></div>
+        <div class="diagram-node"><strong>Execution Telemetry</strong><span>Completion status, quality checks, and throughput metrics captured across every agent stage.</span></div>
+      </div>
+    </div>
+    <div class="tech-layer">
+      <div class="tech-layer-title">Layer 04 • SINAX + On-Chain Settlement</div>
+      <div class="layer-grid">
+        <div class="diagram-node"><strong>SINAX Exchange Fabric</strong><span>Inter-agent and partner workload exchange with normalized payloads and attribution metadata.</span></div>
+        <div class="diagram-node"><strong>SINC / AXIOM Rails</strong><span>Token utility and settlement mechanisms anchored to Base for public transaction transparency.</span></div>
+        <div class="diagram-node"><strong>Treasury + Reporting</strong><span>Economic visibility that ties platform activity, usage demand, and value movement into one view.</span></div>
+      </div>
+    </div>
   </div>
 </section>
 
