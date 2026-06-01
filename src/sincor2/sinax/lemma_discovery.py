@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass, field
@@ -362,10 +363,6 @@ class LemmaDiscoveryEngine:
             verification_result=VerificationResult.PENDING,
             source_node_ids=[n.node_id for n in cluster],
         )
-
-
-import math  # noqa: E402 (after dataclass field default)
-
 
 # ---------------------------------------------------------------------------
 # Singleton

@@ -807,12 +807,12 @@ class TestIntegration:
         assert "verification_result" in result
 
     def test_local_adapter_cancel_task(self):
-        from sincor2.sinax.integration import LocalAdapter, Task, TaskType
+        from sincor2.sinax.integration import LocalAdapter, Task, TaskType, TaskStatus
         adapter = LocalAdapter()
         task = Task(task_type=TaskType.STATUS)
         # Mark as in-progress manually before cancelling
         adapter._tasks[task.task_id] = task
-        task.status = __import__("sincor2.sinax.integration", fromlist=["TaskStatus"]).TaskStatus.IN_PROGRESS
+        task.status = TaskStatus.IN_PROGRESS
         cancelled = adapter.cancel_task(task.task_id)
         assert cancelled is True
 
