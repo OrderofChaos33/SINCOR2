@@ -345,10 +345,13 @@ class ProofGraphStore:
                     edge = edges[0]  # pick first (lowest cost heuristic)
                     new_path = path + [(target_id, edge.edge_id)]
                     if target_id == end_id:
-                        # Materialise
+                        # Materialise as [(node, edge_to_next), ..., (last_node, None)]
+                        # new_path stores (node_id, edge_id_used_to_ARRIVE_at_node).
+                        # We want edge_to_next, so take edge_id from new_path[i+1].
                         result = []
-                        for nid, eid in new_path[:-1]:
-                            result.append((self._nodes[nid], self._edges[eid]))
+                        for i, (nid, _) in enumerate(new_path[:-1]):
+                            next_eid = new_path[i + 1][1]
+                            result.append((self._nodes[nid], self._edges[next_eid]))
                         result.append((self._nodes[end_id], None))
                         return result
                     visited.add(target_id)
