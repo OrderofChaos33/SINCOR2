@@ -9,7 +9,7 @@ ADDED: Rate Limiting for DDoS protection
 import logging
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Load environment variables from .env file
@@ -326,6 +326,20 @@ def index():
     return render_template('home.html')
 
 
+@app.route('/signup')
+@limiter.exempt if limiter else lambda f: f
+def signup():
+    """Public signup page"""
+    return render_template('signup.html')
+
+
+@app.route('/wallet-connect')
+@limiter.exempt if limiter else lambda f: f
+def wallet_connect():
+    """Legacy wallet-connect URL mapped to the live SINC gateway page."""
+    return redirect('/sinc', code=302)
+
+
 @app.route('/api/waitlist', methods=['POST'])
 @limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
 def join_waitlist():
@@ -354,6 +368,38 @@ def join_waitlist():
 
     except Exception as e:
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'})
+
+
+@app.route('/api/signup', methods=['POST'])
+@limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
+def api_signup():
+    """Compatibility signup endpoint mapping to waitlist"""
+    try:
+        if not WAITLIST_AVAILABLE:
+            return jsonify({'success': False, 'error': 'Signup system temporarily unavailable'}), 503
+
+        signup_data = request.get_json()
+        if not signup_data or not signup_data.get('email'):
+            return jsonify({'success': False, 'error': 'Email address is required'}), 400
+
+        if VALIDATION_AVAILABLE:
+            validated_data, error = validate_request(WaitlistSignup, signup_data)
+            if error:
+                return jsonify({'success': False, 'error': 'Invalid signup data'}), 400
+            signup_data = validated_data
+
+        result = waitlist_manager.add_to_waitlist(signup_data)
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': 'Successfully added to waitlist'
+            }), 200
+
+        return jsonify({'success': False, 'error': 'Signup failed'}), 400
+
+    except Exception as e:
+        app.logger.exception('Signup compatibility endpoint failed: %s', e)
+        return jsonify({'success': False, 'error': 'Server error'}), 500
 
 
 @app.route('/api/products')
