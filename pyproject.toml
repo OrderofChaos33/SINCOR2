@@ -3,16 +3,16 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sincor2"
+name = "proof-topology-navigator"
 version = "1.0.0"
-description = "SINCOR Master Platform - A comprehensive platform for intelligent commerce, monetization, and content management."
+description = "Proof Topology Navigator (PTN) - A differential-geometric framework for automated theorem proving."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "OrderofChaos33"}
 ]
-keywords = ["commerce", "monetization", "ai", "flask", "ecommerce"]
+keywords = ["theorem-proving", "lean4", "differential-geometry", "machine-learning", "topology"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -63,10 +63,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OrderofChaos33/sincor2"
-Repository = "https://github.com/OrderofChaos33/sincor2.git"
-Documentation = "https://github.com/OrderofChaos33/sincor2"
-Issues = "https://github.com/OrderofChaos33/sincor2/issues"
+Homepage = "https://github.com/OrderofChaos33/SINCOR2"
+Repository = "https://github.com/OrderofChaos33/SINCOR2.git"
+Documentation = "https://github.com/OrderofChaos33/SINCOR2"
+Issues = "https://github.com/OrderofChaos33/SINCOR2/issues"
 
 [project.scripts]
 sincor2 = "sincor2.app:main"
