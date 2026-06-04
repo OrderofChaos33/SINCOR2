@@ -21,7 +21,7 @@ The platform:
 
 ## The Role: Scaling to Serve the Most Agents and People Possible
 
-We believe from our Independent platform-potential investigation and subsequent execution plan 6/4/2026 We are geared for maximize total service capacity for both agents and human. This transition expansion is the most exciting announcement to date.
+We believe from our Independent platform-potential investigation and subsequent execution plan 6/4/2026 that we are geared to maximize total service capacity for both agents and humans. This transition expansion is the most exciting announcement to date.
 
 ### Why scale matters
 
