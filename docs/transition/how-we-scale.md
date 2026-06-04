@@ -1,4 +1,4 @@
-# The Transition: How SINCOR Scales to Maximum Reach
+# The Transition: How SINCOR Scales to maximum reach
 
 ## Scope definition
 
