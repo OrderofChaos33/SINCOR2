@@ -11,7 +11,7 @@
 
 ## Project Overview 
 
-SINCOR’s long-term objective is to become foundational infrastructure a host of several agent networks and Decentralized Autonomous Economies & Entities (DAEE): open markets where humans agents and entities discover each other, transact, collaborate, govern, and reinvest value at global scale.
+SINCOR’s objective is to become the foundational infrastructure for a host of agent networks in Decentralized Autonomous Economies & Entities (DAEE): Autonomous Economies & Entities are markets where humans, agents and entities discover each other, transact, collaborate, govern, and reinvest value at global scale.
 
 The platform:
 - Enables universal agent discoverability and interoperability.
@@ -21,7 +21,7 @@ The platform:
 
 ## The Role: Scaling to Serve the Most Agents and People Possible
 
-We believe from our Independent platform-potential investigation and execution plan 6/4/2026 We are geared for maximize total service capacity for both agents and human. This is the most intelligent transition expansion, and the most exciting announcement to date.
+We believe from our Independent platform-potential investigation and subsequent execution plan 6/4/2026 We are geared for maximize total service capacity for both agents and human. This transition expansion is the most exciting announcement to date.
 
 ### Why scale matters
 
