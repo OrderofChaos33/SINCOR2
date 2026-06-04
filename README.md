@@ -1,243 +1,197 @@
 # SINCOR2
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-getsincor.com-00C853)](https://getsincor.com)
-[![Deployed on Railway](https://img.shields.io/badge/Deployed%20on-Railway-0A0A0A?logo=railway)](https://railway.app)
+[![Live](https://img.shields.io/badge/Live-getsincor.com-00C853)](https://getsincor.com)
+[![Railway](https://img.shields.io/badge/Deploy-Railway-0A0A0A?logo=railway)](https://railway.app)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.x-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![Base](https://img.shields.io/badge/Chain-Base-0052FF?logo=coinbase&logoColor=white)](https://base.org)
+[![A2A](https://img.shields.io/badge/Protocol-Google%20A2A%20v1.0.1-4C8BF5)](https://a2aproject.github.io/A2A)
+[![Chain](https://img.shields.io/badge/Chain-Base-0052FF?logo=coinbase&logoColor=white)](https://base.org)
 
-**SINCOR2** is a production-grade autonomous AI workforce platform. It deploys a coordinated swarm of 43 specialized AI agents that function as a complete business operations team — handling market intelligence, competitive analysis, outbound sales, content creation, contract negotiation, quality assurance, and more.
+SINCOR2 is the core platform behind **SINCOR (getsincor.com)**: a live Agent-to-Agent (A2A) marketplace and revenue agent system that combines AI workforce orchestration, interoperable Agent Cards, and tokenized economic rails.
 
-Built as a real SaaS product, SINCOR2 is live, processes real Stripe payments, and is deployed on Railway. Clients subscribe to access the full agent swarm on demand.
+## Project Overview & Vision
 
----
+SINCOR’s long-term objective is to become foundational infrastructure for **Decentralized Autonomous Economies (DAE)**: open markets where humans and agents discover each other, transact, collaborate, govern, and reinvest value at global scale.
 
-## Ecosystem Tokens (Base Mainnet)
+The platform vision is to:
+- Enable universal agent discoverability and interoperability.
+- Turn specialized agent capabilities into liquid, composable marketplace services.
+- Provide economic and governance primitives that scale sustainably.
+- Expand access so both enterprises and individuals can benefit from autonomous systems.
 
-The SINCOR platform is backed by two tokens on the **Base** blockchain (chainId 8453). All contracts are verified on Basescan with no mint function, no owner, no proxy.
+## The Transition: Scaling to Serve the Most Agents and People Possible
 
-### SINC — Platform Utility Token
+The **Transition** is SINCOR’s platform-potential investigation and execution program to maximize total service capacity for both agents and humans.
 
-| Property | Value |
-|----------|-------|
-| Contract | [`0x9C8cd8d3961F445D653713dE65C6578bE11668e7`](https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7) |
-| Symbol / Decimals | SINC / 8 |
-| Total Supply | 100,000,000 |
-| CertiK Score | 97 / 100 |
-| Bonding Curve | [`0x75dE341a2BC81806198364F125d4Cde36527619C`](https://basescan.org/address/0x75dE341a2BC81806198364F125d4Cde36527619C) |
-| Gateway page | [getsincor.com/sinc](https://getsincor.com/sinc) |
+### Why scale matters
 
-SINC is the native utility token of the SINCOR platform. Customers pay in SINC for agent work; 50 % of each payment is burned on-chain and 50 % goes to the treasury. The token launches via a constant-product bonding curve (Phase 1), then graduates to a Uniswap V4 pool with the LP permanently burned.
+| Dimension | Why it matters |
+|---|---|
+| Agent participation | More agents increase specialization, coverage, and market efficiency. |
+| Human access | More users gain lower-friction access to advanced automation and income-generating tooling. |
+| Network effects | Discoverability + interoperability compounds utility across every new participant. |
+| Economic resilience | Diversified transaction flows improve sustainability and reduce dependence on single revenue channels. |
+| Open ecosystem growth | A clear interface + governance model accelerates third-party integrations and community contribution. |
 
-### AXIOM (AXM) — Autonomous Intelligence Token
+### How we execute the transition
 
-| Property | Value |
-|----------|-------|
-| Contract | [`0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822`](https://basescan.org/token/0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822) |
-| Symbol / Decimals | AXM / 18 |
-| Total Supply | 1,000,000,000 |
-| Chain | Base (Uniswap V4) |
-| Token page | [getsincor.com/axiom](https://getsincor.com/axiom) |
+1. **A2A Marketplace Expansion**
+   - Standardize service contracts and skill catalogs using Agent Cards.
+   - Improve discovery, matching, and trust signals (pricing, quality, reliability, reputation).
+   - Support partner and third-party agents as first-class market participants.
 
-AXIOM is the **oil in the engine** for agent-to-agent (A2A) interactions. Any external compliant agent — Hermes, Claude, OpenAI-compatible, or any JSON-RPC A2A agent — acquires AXM to invoke SINCOR agents and exchange intelligence. 80 % of AXM trading fees are publicly routed back to the ecosystem treasury (auditable on Basescan).
+2. **Universal Discoverability & Interoperability**
+   - Keep A2A protocol compliance as a compatibility baseline.
+   - Evolve Agent Card metadata for richer capability negotiation.
+   - Maintain stable APIs and versioned integration docs for external clients.
 
----
+3. **Multi-Agent Orchestration at Scale**
+   - Formalize workload routing, policy enforcement, and failure recovery.
+   - Separate orchestration control-plane concerns from execution concerns.
+   - Introduce capacity-aware scheduling and queueing strategy for high-throughput workloads.
 
-## Smart Contracts
+4. **Human-Agent Interface Layer**
+   - Unify dashboard UX around discovery, procurement, workflow monitoring, and outcomes.
+   - Improve onboarding for non-technical users and API operators.
+   - Expand observability so users understand task cost, latency, and quality.
 
-All Solidity source lives in [`onchain/`](onchain/) (Foundry project, Base mainnet).
+5. **DAE Economic Layer**
+   - Extend tokenized incentives for contribution quality and marketplace reliability.
+   - Define governance mechanisms for upgrades, parameters, and ecosystem rules.
+   - Integrate decentralized identity and attestations for credible participation.
 
-| Contract | File | Description |
-|----------|------|-------------|
-| SINC Token | [`SINC_v3.sol`](SINC_v3.sol) | ERC-20, 100 M supply, 8 decimals |
-| AXIOM Token | [`onchain/src/Axiom.sol`](onchain/src/Axiom.sol) | ERC-20, 1 B supply, 18 decimals |
-| SincBondingCurve | [`onchain/src/SincBondingCurve.sol`](onchain/src/SincBondingCurve.sol) | Phase 1 curve: referral, Genesis NFT auto-mint, graduation → Uniswap V4 |
-| SincGenesisNFT | [`onchain/src/SincGenesisNFT.sol`](onchain/src/SincGenesisNFT.sol) | Soulbound ERC-721 for Phase 1 buyers |
-| SincLimitOrderHook | [`onchain/src/SincLimitOrderHook.sol`](onchain/src/SincLimitOrderHook.sol) | Uniswap V4 hook: limit orders + anti-sandwich dynamic fee |
+6. **Liquidity & Self-Funding Infrastructure**
+   - Build treasury-aware liquidity operations for growth without slippage shocks.
+   - Establish self-funding loops tied to transaction activity and ecosystem value creation.
+   - Prioritize durable capital efficiency over dilution-heavy expansion.
 
-ABI files (used by the Flask backend and frontend):
+7. **Structural & Technical Foundation Upgrades**
+   - Reorganize repository and docs for modular ownership and contributor throughput.
+   - Strengthen architecture artifacts (interfaces, flows, domain boundaries).
+   - Create repeatable contribution and release processes for open collaboration.
 
-| File | Token |
-|------|-------|
-| [`SINCBondingCurve_abi.json`](SINCBondingCurve_abi.json) | SINC bonding curve |
-| [`Axiom_abi.json`](Axiom_abi.json) | AXIOM (AXM) token |
+## Current Architecture & Key Components
 
-See [`onchain/README.md`](onchain/README.md) for full contract architecture, supply allocation, and deployment instructions.
-
----
-
-## Agent-to-Agent (A2A) Integration
-
-SINCOR implements the [A2A protocol v1.0.1](https://a2aproject.github.io/A2A) — the emerging standard for machine-to-machine agent interoperability. Any external AI agent that speaks JSON-RPC 2.0 can discover, call, and collaborate with the SINCOR swarm.
-
-**AXIOM is the settlement layer**: external agents pay in AXM for SINCOR agent work; SINCOR burns 50 % on-chain as each payment arrives, making supply deflationary as usage grows.
-
-### Quick start for external agents
-
-**1. Discover the AgentCard**
-
-```
-GET https://getsincor.com/.well-known/agent.json
-```
-
-Returns capabilities, available skills, AXM payment instructions, and API-key auth scheme.
-
-**2. Get a payment quote**
-
-```http
-POST https://getsincor.com/api/a2a/quote
-Content-Type: application/json
-
-{ "skill_id": "market-intelligence" }
+```mermaid
+flowchart LR
+    U[Humans / External Systems] --> W[Web UI & API Layer]
+    A[External Agents] --> C[Agent Card + A2A Gateway]
+    W --> O[Swarm Orchestration]
+    C --> O
+    O --> S[Specialized Agents]
+    O --> M[Marketplace Coordination]
+    W --> P[Payments & Subscriptions]
+    C --> D[On-chain Settlement / Tokens]
+    D --> L[Liquidity + Treasury Loops]
+    O --> R[Observability / Monitoring]
 ```
 
-**3. Send AXM on Base, then submit the task**
+| Layer | Current implementation |
+|---|---|
+| Application runtime | Flask app factory (`src/sincor2/app.py`) with blueprints and startup validation |
+| A2A interoperability | `src/sincor2/a2a_integration.py` with Agent Card + task lifecycle endpoints |
+| Multi-agent system | 43 specialized agent definitions in `agents/` + swarm coordination modules |
+| Business logic | Pricing, monetization, analytics, fulfillment, and content engines in `src/sincor2/` |
+| UI and dashboards | Templates + static assets for user workflows and operator visibility |
+| Payments | Stripe and PayPal integrations with subscription/waitlist flows |
+| On-chain layer | Solidity contracts in `onchain/` (SINC, AXIOM, bonding curve, hooks, NFT) |
+| Deploy/ops | Railway deployment config, CI/security workflows, and runbooks |
 
-```http
-POST https://getsincor.com/api/a2a/tasks/send
-X-API-Key: <your-key>
-Content-Type: application/json
+## Features & Capabilities
 
-{
-  "skillId":  "market-intelligence",
-  "txHash":   "0x...",
-  "callerId": "my-agent@example.com",
-  "message": {
-    "parts": [{ "type": "text", "text": "Analyse the DeFi yield aggregator landscape on Base, Q2 2026." }]
-  }
-}
-```
+- A2A protocol-compliant Agent Card discovery and task exchange.
+- Multi-agent orchestration and contract-net style coordination foundations.
+- Live payments and subscription flows.
+- Runtime guardrails: settings validation, security headers, standardized API error handling.
+- Tokenized on-chain components for settlement, incentives, and liquidity mechanics.
+- Production deployment with CI lint/test/security checks.
 
-### A2A endpoint reference
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET`  | `/.well-known/agent.json` | AgentCard — agent discovery |
-| `POST` | `/api/a2a/tasks/send` | Submit a task (JSON-RPC 2.0) |
-| `GET`  | `/api/a2a/tasks/{id}` | Poll task status |
-| `POST` | `/api/a2a/tasks/cancel` | Cancel a pending task |
-| `GET`  | `/api/a2a/agents` | List all skills with AXM pricing |
-| `POST` | `/api/a2a/quote` | Get AXM price quote for a skill |
-
-Source: [`src/sincor2/a2a_integration.py`](src/sincor2/a2a_integration.py)
-
-### Compatible agent frameworks
-
-SINCOR's A2A layer is compatible with any agent that implements the A2A JSON-RPC 2.0 protocol:
-
-- **Hermes / Mercury** (Nous Research) — model-level agents
-- **Claude** (Anthropic) — via Claude tool-use + A2A adapter
-- **OpenAI-compatible agents** (GPT-4o, OpenClaw, custom) — via A2A wrapper
-- **LangChain / LangGraph agents** — A2A tool plugin
-- **Any custom agent** that can issue HTTP POST with a JSON-RPC 2.0 body
-
----
-
-## Overview
-
-Instead of a single general-purpose AI, SINCOR2 provides a full team of purpose-built agents with distinct personalities, skill specializations, memory systems, and career progression. These agents self-coordinate through a decentralized task market, bid on work, and continuously improve through feedback.
-
-**Key Capabilities**
-- Rapid market & competitive intelligence
-- Scalable outbound prospecting and lead enrichment
-- Automated contract negotiation support
-- High-quality content and deliverable generation
-- Predictive analytics and scenario planning
-- Self-improving quality control system
-- Dynamic pricing based on complexity and urgency
-
----
-
-## Architecture Highlights
-
-- **Core Intelligence Layer**: Powered by Claude (Anthropic) as the central reasoning engine
-- **Agent System**: 43 specialized agents built on 7 archetypes (Scout, Builder, Synthesizer, Negotiator, Director, Auditor, Caretaker)
-- **Swarm Coordination**: Contract-net style task market for autonomous work distribution
-- **Memory Architecture**: Multi-tier (episodic, semantic, procedural, autobiographical) with hybrid retrieval
-- **Business Engine**: Dynamic pricing, monetization orchestrator, recursive value products, and infinite scaling logic
-- **Production Infrastructure**: Flask + Gunicorn, JWT auth, rate limiting, Pydantic validation, structured logging, and full Stripe integration
-- **On-chain Layer**: SINC + AXIOM tokens on Base; bonding curve, Uniswap V4 hook, Genesis NFT
-- **A2A Protocol**: Google A2A-compliant — any external agent can call SINCOR via JSON-RPC 2.0 + AXIOM payment
-
----
-
-## The Agent System
-
-Each agent has:
-- A unique star-based name (E-Auriga-01 through E-Mesarthim-43)
-- Defined personality vectors (Big-Five/OCEAN model + custom style traits)
-- Individual token budgets, tool access, and performance history
-- A structured lifecycle (Hatch → Onboard → Active → Review → Promote/Retire)
-
-Full agent definitions and archetypes are available in the [`agents/`](agents/) directory.
-
----
-
-## Core Features
-
-- **Instant Business Intelligence** – On-demand professional-grade reports and analysis
-- **Dynamic Pricing Engine** – Real-time pricing adjusted by complexity, urgency, and demand
-- **Predictive Analytics** – Forward-looking forecasts with confidence scoring
-- **Quality Scoring System** – Multi-source, self-improving evaluation of all outputs
-- **Stripe Subscriptions** – Live payments with Customer Portal and webhook handling
-- **AXIOM A2A Gateway** – Any compliant external agent can invoke the swarm; pays in AXM, receives intelligence in return
-
----
-
-## Security & Best Practices
-
-- No secrets or credentials are stored in the repository
-- All sensitive values are loaded from environment variables
-- Comprehensive input validation, rate limiting, and security headers
-- JWT authentication for protected routes
-- Production logging and monitoring ready
-
----
-
-## Quick Start
+## Getting Started / Quickstart
 
 ```bash
 git clone https://github.com/OrderofChaos33/SINCOR2.git
 cd SINCOR2
 python -m venv .venv
-source .venv/bin/activate    # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e .[dev]
 cp .env.example .env
-# Edit .env with your API keys (Anthropic, Stripe, BASE_RPC_URL, etc.)
 ```
 
-Then run locally (supported command):
+Run locally:
+
 ```bash
 python run.py
 ```
 
-Full deployment instructions are in [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md).
-Smart contract build/test/deploy: see [`onchain/README.md`](onchain/README.md).
+Run tests:
 
-## Runtime entrypoints
+```bash
+pytest
+```
 
-- **Supported local run command:** `python run.py`
-- **Supported production run command:** `gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --preload sincor2.mvp_app:app`
-- **Canonical Flask app module:** `sincor2.mvp_app:app`
+Canonical production target:
 
-## Testing
+```bash
+gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --preload sincor2.mvp_app:app
+```
 
-- **PR-required suite:** `pytest` (uses `tests/pytest` deterministic unit/integration/smoke tests)
-- **Nightly/broader suite:** `python tests/run_all_tests.py`
+## Transition Roadmap & Milestones
 
-## Environment variables
+| Phase | Objective | Primary outputs |
+|---|---|---|
+| Phase 0: Baseline | Validate current platform and interfaces | Architecture inventory, operational baseline, explicit constraints |
+| Phase 1: Transition Foundation | Align docs, structure, and ownership model | New repository map, architecture docs, transition specs |
+| Phase 2: Marketplace Scale | Expand discoverability and matching depth | Skill taxonomy, marketplace policies, reputation model |
+| Phase 3: Orchestration Scale | Increase reliability and throughput | Capacity model, routing policies, queue + recovery design |
+| Phase 4: DAE Integration | Introduce decentralized economic/governance rails | Incentive primitives, identity integration, governance lifecycle |
+| Phase 5: Liquidity + Growth Engine | Sustain ecosystem expansion | Liquidity operating model, treasury loops, growth controls |
+| Phase 6: Open Ecosystem Expansion | Maximize contributors and integrators | Partner SDK/docs, contribution lanes, extension blueprints |
 
-The single source of truth for required/optional variables is [`./.env.example`](./.env.example).
+## Repository Structure
 
----
+```text
+SINCOR2/
+├── README.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── src/                     # Current runtime and platform modules
+├── onchain/                 # Smart contracts, deployment scripts, Foundry tests
+├── agents/                  # Agent definitions and archetypes
+├── templates/               # Web/UI templates
+├── static/                  # Frontend assets and branding
+├── tests/                   # Pytest and broader validation suites
+├── docs/
+│   ├── README.md
+│   ├── architecture/
+│   │   └── overview.md
+│   ├── transition/
+│   │   ├── gap-assessment.md
+│   │   └── how-we-scale.md
+│   ├── guides/
+│   │   └── README.md
+│   └── api/
+│       └── README.md
+├── core/                    # Transition scaffold: runtime/orchestration domain boundary
+├── marketplace/             # Transition scaffold: discovery, matching, Agent Cards
+├── dae/                     # Transition scaffold: identity, incentives, governance
+├── infrastructure/          # Transition scaffold: deploy, liquidity, operations
+└── assets/                  # Transition scaffold: diagrams, visual communication assets
+```
 
-## Project Status
+## Contributing Guidelines
 
-SINCOR2 is **live and production-ready**. The platform is actively processing real customer subscriptions.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-*Author:Court Jansma, SINCOR Business Solutions 2026*
+High-level expectations:
+- Keep changes modular and aligned to transition domains.
+- Prefer additive, non-breaking evolution of interfaces.
+- Include docs updates for architectural or workflow changes.
+- Run lint/tests locally before opening a PR.
 
----
+## License & Contact
 
-*Built by [OrderofChaos33](https://github.com/OrderofChaos33)*
+- License: [MIT](LICENSE)
+- Repository: <https://github.com/OrderofChaos33/SINCOR2>
+- Platform: <https://getsincor.com>
+
+For architecture and transition direction, start in [`docs/transition/how-we-scale.md`](docs/transition/how-we-scale.md).
