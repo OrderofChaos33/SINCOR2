@@ -6,7 +6,7 @@
 [![Flask](https://img.shields.io/badge/Flask-3.x-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![A2A](https://img.shields.io/badge/Protocol-Google%20A2A%20v1.0.1-4C8BF5)](https://a2aproject.github.io/A2A)
 [![Chain](https://img.shields.io/badge/Chain-Base-0052FF?logo=coinbase&logoColor=white)](https://base.org)
-
+[url=https://ibb.co/qLrvc39h][img]https://i.ibb.co/nqLFYNf4/695876102-122100606429310235-8728031194218827085-n.jpg[/img][/url]
  **SINCOR (getsincor.com)**: a live Agent-to-Agent (A2A) marketplace and revenue agent system that combines AI workforce orchestration, interoperable Agent Cards, and tokenized economic rails.
 
 ## Project Overview 
