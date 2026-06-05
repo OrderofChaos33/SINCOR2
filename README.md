@@ -1,5 +1,5 @@
 # SINCOR2
-[url=https://ibb.co/qLrvc39h][img]https://i.ibb.co/nqLFYNf4/695876102-122100606429310235-8728031194218827085-n.jpg[/img][/url]
+<a href="https://ibb.co/qLrvc39h"><img src="https://i.ibb.co/nqLFYNf4/695876102-122100606429310235-8728031194218827085-n.jpg" alt="695876102 122100606429310235 8728031194218827085 n" border="0"></a>
 [![Live](https://img.shields.io/badge/Live-getsincor.com-00C853)](https://getsincor.com)
 [![Railway](https://img.shields.io/badge/Deploy-Railway-0A0A0A?logo=railway)](https://railway.app)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://python.org)
