@@ -193,5 +193,5 @@ High-level expectations:
 - License: [MIT](LICENSE)
 - Repository: <https://github.com/OrderofChaos33/SINCOR2>
 - Platform: <https://getsincor.com>
-
+<a href="https://ibb.co/cKhxX4PC"><img src="https://i.ibb.co/TDMrq9Zb/e4a54a0a-e11e-4d19-a5bc-62ff680fbeb7.jpg" alt="e4a54a0a e11e 4d19 a5bc 62ff680fbeb7" border="0"></a>
 For architecture and transition direction, start in [`docs/transition/how-we-scale.md`](docs/transition/how-we-scale.md).
