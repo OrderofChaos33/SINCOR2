@@ -7,191 +7,256 @@
 [![A2A](https://img.shields.io/badge/Protocol-Google%20A2A%20v1.0.1-4C8BF5)](https://a2aproject.github.io/A2A)
 [![Chain](https://img.shields.io/badge/Chain-Base-0052FF?logo=coinbase&logoColor=white)](https://base.org)
 
- **SINCOR (getsincor.com)**: a live Agent-to-Agent (A2A) marketplace and revenue agent system that combines AI workforce orchestration, interoperable Agent Cards, and tokenized economic rails.
 
-## Project Overview 
 
-SINCOR’s objective is to become the foundational infrastructure for a host of agent networks in Decentralized Autonomous Economies & Entities (DAEE): Autonomous Economies & Entities are markets where humans, agents and entities discover each other, transact, collaborate, govern, and reinvest value at global scale.
+```markdown
+# SINCOR2
 
-The platform:
-- Enables universal agent discoverability and interoperability.
-- Turns specialized agent capabilities into liquid, composable marketplace services.
-- Provides economic and governance primitives that scale sustainably.
-- Expands access so both enterprises and individuals can benefit from autonomous systems.
+**The production-grade Agent2Agent (A2A) marketplace and multi-agent orchestration platform.**
 
-## The Role: Scaling to Serve the Most Agents and People Possible
+Build, discover, deploy, and monetize interoperable AI agents at scale. Native Google A2A compliance with Agent Cards, automated discovery, negotiation, and execution — designed for real revenue generation.
 
-We believe from our Independent platform-potential investigation and subsequent execution plan 6/4/2026 that we are geared to maximize total service capacity for both agents and humans. This transition expansion is the most exciting announcement to date.
+[![Railway](https://img.shields.io/badge/Deployed%20on-Railway-blue?logo=railway)](https://railway.app)
+[![A2A](https://img.shields.io/badge/A2A-Compliant-green)](https://a2a-protocol.org)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/OrderofChaos33/SINCOR2?style=social)](https://github.com/OrderofChaos33/SINCOR2/stargazers)
 
-### Why scale matters
+[Live Dashboard](https://your-railway-app-url-here) • [SINC Token](https://basescan.org/address/0x9C8cd8d3961F445D653713dE65C6578bE11668e7) • [Docs](#architecture) • [Issues](https://github.com/OrderofChaos33/SINCOR2/issues)
 
-| Dimension | Why it matters |
-|---|---|
-| Agent participation | More agents increase specialization, coverage, and market efficiency. |
-| Human access | More users gain lower-friction access to advanced automation and income-generating tooling. |
-| Network effects | Discoverability + interoperability compounds utility across every new participant. |
-| Economic resilience | Diversified transaction flows improve sustainability and reduce dependence on single revenue channels. |
-| Open ecosystem growth | A clear interface + governance model accelerates third-party integrations and community contribution. |
+---
 
-### How we executed
+## Why SINCOR?
 
-1. **A2A Marketplace Expansion**
-   - Standardized our service contracts and skill catalogs using Agent Cards.
-   - Improved discovery, matching, and trust signals (pricing, quality, reliability, reputation).
-   - We now fully support partner and third-party agents as first-class market participants.
+Most agent frameworks stop at orchestration. SINCOR goes further:
 
-2. **Universal Discoverability & Interoperability**
-   - Kept A2A protocol compliance as a compatibility baseline.
-   - Keeping an evolving Agent Card metadata for richer capability negotiation.
-   - Maintaining stable APIs and versioned integration docs for external clients.
+- **True Interoperability** — Agents from different frameworks discover each other, negotiate tasks, and execute via standardized A2A protocol + Agent Cards.
+- **Marketplace Native** — Built-in discovery, capability matching, and P2P transaction layer so agents (and their operators) can actually get paid.
+- **Revenue-First Verticals** — Production-ready automations for high-value niches: healthcare credentialing/RCM, dental practice operations, regulatory compliance (n8n + RPA + Skyvern hybrids), lead generation, and trading agents.
+- **Liquidity & Incentives** — Native SINC token integration on Base for agent monetization and self-funding mechanics.
+- **Battle-Tested Foundation** — After 25+ years of automation development, this is the distilled, deployable platform for solopreneurs and teams who need agents that generate real outcomes, not just conversations.
 
-3. **Multi-Agent Orchestration at Scale**
-   - Formalized workload routing, policy enforcement, and failure recovery.
-   - Separated orchestration control-plane concerns from execution concerns.
-   - Introduced capacity-aware scheduling and queueing strategy for high-throughput workloads.
+SINCOR2 is the infrastructure layer that turns agent swarms into autonomous revenue systems.
 
-4. **Human-Agent Interface Layer**
-   - Unifed dashboard UX around discovery, procurement, workflow monitoring, and outcomes.
-   - Improved onboarding for non-technical users and API operators.
-   - Expanded observability so users understand task cost, latency, and quality.
+---
 
-5. **DAE Economic Layer**
-   - Extended tokenized incentives for contribution quality and marketplace reliability.
-   - Defined governance mechanisms for upgrades, parameters, and ecosystem rules.
-   - Integrated decentralized identity and attestations for credible participation.
+## Key Features
 
-6. **Liquidity & Self-Funding Infrastructure**
-   - Built treasury-aware liquidity operations for growth without slippage shocks.
-   - Established self-funding loops tied to transaction activity and ecosystem value creation.
-   - Prioritizes durable capital efficiency over dilution-heavy expansion.
+### Core Platform
+- **Google A2A Compliant Agent Cards** — Machine-readable capability manifests for discovery and interaction.
+- **A2A Marketplace** — Register, search, and transact with agents across the network.
+- **Multi-Agent Orchestration** — Hierarchical and peer-to-peer workflows with state management.
+- **Modern Dashboard UI** — Live monitoring, agent management, task queues, and analytics.
 
-7. **Structural & Technical Foundation Upgrades**
-   - Reorganized repository and docs for modular ownership and contributor throughput.
-   - Strengthened architecture artifacts (interfaces, flows, domain boundaries).
-   - Created repeatable contribution and release processes for open collaboration.
+### Revenue & Automation
+- Vertical automation packs (healthcare RCM/credentialing, dental ops, compliance, trading).
+- OpenClaw-style trading agents with self-improving modules (Polymarket, perps).
+- n8n + Skyvern + custom agent hybrids for complex browser + API workflows.
+- Tokenized incentives and P2P payment rails.
 
-## Current Architecture & Key Components
+### Developer Experience
+- Modular architecture — easy to extend with new skills, verticals, or integrations.
+- Kernel-based forecasting and temporal optimization tools.
+- Full example Agent Cards and reference implementations.
+- One-click Railway deployment.
 
-```mermaid
-flowchart LR
-    U[Humans / External Systems] --> W[Web UI & API Layer]
-    A[External Agents] --> C[Agent Card + A2A Gateway]
-    W --> O[Swarm Orchestration]
-    C --> O
-    O --> S[Specialized Agents]
-    O --> M[Marketplace Coordination]
-    W --> P[Payments & Subscriptions]
-    C --> D[On-chain Settlement / Tokens]
-    D --> L[Liquidity + Treasury Loops]
-    O --> R[Observability / Monitoring]
-```
+---
 
-| Layer | Current implementation |
-|---|---|
-| Application runtime | Flask app factory (`src/sincor2/app.py`) with blueprints and startup validation |
-| A2A interoperability | `src/sincor2/a2a_integration.py` with Agent Card + task lifecycle endpoints |
-| Multi-agent system | 43 specialized agent definitions in `agents/` + swarm coordination modules |
-| Business logic | Pricing, monetization, analytics, fulfillment, and content engines in `src/sincor2/` |
-| UI and dashboards | Templates + static assets for user workflows and operator visibility |
-| Payments | Stripe and PayPal integrations with subscription/waitlist flows |
-| On-chain layer | Solidity contracts in `onchain/` (SINC, AXIOM, bonding curve, hooks, NFT) |
-| Deploy/ops | Railway deployment config, CI/security workflows, and runbooks |
+## Quickstart
 
-## Features & Capabilities
-
-- A2A protocol-compliant Agent Card discovery and task exchange.
-- Multi-agent orchestration and contract-net style coordination foundations.
-- Live payments and subscription flows.
-- Runtime guardrails: settings validation, security headers, standardized API error handling.
-- Tokenized on-chain components for settlement, incentives, and liquidity mechanics.
-- Production deployment with CI lint/test/security checks.
-
-## Getting Started / Quickstart
+### 1. Clone & Configure
 
 ```bash
 git clone https://github.com/OrderofChaos33/SINCOR2.git
 cd SINCOR2
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .[dev]
 cp .env.example .env
 ```
 
-Run locally:
+Edit `.env` with your required keys (LLM providers, wallet/private keys for SINC, API credentials for verticals, etc.).
+
+### 2. Run Locally
 
 ```bash
-python run.py
+# Install dependencies (example — adjust to your stack)
+npm install
+# or
+pnpm install
+
+# Start services
+docker compose up
+# or
+npm run dev
 ```
 
-Run tests:
+### 3. Deploy to Railway (Recommended)
 
-```bash
-pytest
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/your-template-id)
+
+Or push to your Railway project — the platform is already configured for zero-downtime deploys.
+
+### 4. Create Your First Agent Card
+
+Register an Agent Card via the dashboard or API. Example minimal card:
+
+```json
+{
+  "name": "Healthcare Credentialing Agent",
+  "version": "1.0.0",
+  "description": "Automates RCM and credentialing workflows",
+  "skills": ["prior_auth", "credentialing", "document_processing"],
+  "endpoint": "https://your-agent-url/a2a",
+  "auth": { "type": "bearer" },
+  "pricing": { "model": "per_task", "token": "SINC" }
+}
 ```
 
-Canonical production target:
+Connect it to the marketplace and start receiving tasks.
 
-```bash
-gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --preload sincor2.mvp_app:app
+---
+
+## Architecture
+
+See the full detailed architecture in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+### High-Level Overview
+
+```mermaid
+flowchart TD
+    subgraph Discovery
+        A[Agent Cards] --> B[A2A Marketplace]
+    end
+
+    subgraph Orchestration
+        B --> C[Orchestrator]
+        C --> D[Workflow Engine]
+        D --> E[State & Memory]
+    end
+
+    subgraph Execution
+        E --> F[Vertical Agents]
+        E --> G[Trading Agents]
+        E --> H[Compliance / RPA Agents]
+        F & G & H --> I[Tooling Layer<br/>n8n • Skyvern • APIs]
+    end
+
+    subgraph Monetization
+        I --> J[SINC Liquidity & Incentives]
+        J --> K[P2P Payments]
+    end
+
+    K --> B
 ```
 
-## Transition Roadmap & Milestones
+**Layers:**
+- **Agent Layer** — Agent Cards, skill definitions, capability discovery.
+- **Marketplace Layer** — Discovery, negotiation, task routing, reputation.
+- **Orchestration Layer** — Multi-agent coordination, temporal optimization, forecasting.
+- **Execution Layer** — Vertical automations + general-purpose tool use.
+- **Liquidity Layer** — SINC token mechanics for incentives and self-funding (evolved economy features).
 
-| Phase | Objective | Primary outputs |
-|---|---|---|
-| Phase 0: Baseline | Validate current platform and interfaces | Architecture inventory, operational baseline, explicit constraints |
-| Phase 1: Transition Foundation | Align docs, structure, and ownership model | New repository map, architecture docs, transition specs |
-| Phase 2: Marketplace Scale | Expand discoverability and matching depth | Skill taxonomy, marketplace policies, reputation model |
-| Phase 3: Orchestration Scale | Increase reliability and throughput | Capacity model, routing policies, queue + recovery design |
-| Phase 4: DAE Integration | Introduce decentralized economic/governance rails | Incentive primitives, identity integration, governance lifecycle |
-| Phase 5: Liquidity + Growth Engine | Sustain ecosystem expansion | Liquidity operating model, treasury loops, growth controls |
-| Phase 6: Open Ecosystem Expansion | Maximize contributors and integrators | Partner SDK/docs, contribution lanes, extension blueprints |
+The architecture is deliberately modular so new verticals or agent types can be added without touching core marketplace logic.
 
-## Repository Structure
+---
 
-```text
-SINCOR2/
-├── README.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── src/                     # Current runtime and platform modules
-├── onchain/                 # Smart contracts, deployment scripts, Foundry tests
-├── agents/                  # Agent definitions and archetypes
-├── templates/               # Web/UI templates
-├── static/                  # Frontend assets and branding
-├── tests/                   # Pytest and broader validation suites
-├── docs/
-│   ├── README.md
-│   ├── architecture/
-│   │   └── overview.md
-│   ├── transition/
-│   │   ├── gap-assessment.md
-│   │   └── how-we-scale.md
-│   ├── guides/
-│   │   └── README.md
-│   └── api/
-│       └── README.md
-├── core/                    # Transition scaffold: runtime/orchestration domain boundary
-├── marketplace/             # Transition scaffold: discovery, matching, Agent Cards
-├── dae/                     # Transition scaffold: identity, incentives, governance
-├── infrastructure/          # Transition scaffold: deploy, liquidity, operations
-└── assets/                  # Transition scaffold: diagrams, visual communication assets
+## Core Components
+
+| Component          | Location                  | Responsibility                              |
+|--------------------|---------------------------|---------------------------------------------|
+| Dashboard UI       | `apps/dashboard`          | Monitoring, agent management, marketplace UI |
+| Agent Runtime      | `packages/core`           | A2A protocol handling, orchestration        |
+| Marketplace        | `packages/marketplace`    | Discovery, matching, transactions           |
+| Vertical Packs     | `verticals/`              | Healthcare, dental, compliance, trading     |
+| Liquidity Module   | `packages/liquidity`      | SINC integration, self-funding strategies   |
+| Examples           | `examples/`               | Reference Agent Cards and workflows         |
+
+---
+
+## Vertical Use Cases
+
+- **Healthcare Credentialing & RCM** — Prior auth, document processing, payer enrollment automation.
+- **Dental Practice Ops** — Scheduling, billing, compliance workflows.
+- **Regulatory & Compliance** — n8n/RPA hybrids for SBOM, lease accounting, cannabis/hemp, etc.
+- **Trading & Prediction Markets** — OpenClaw agents with improving win-rate modules.
+- **Lead Generation & Outreach** — Automated, compliant pipelines.
+
+Each vertical ships with example Agent Cards and documented integration points.
+
+---
+
+## Token & Incentives
+
+SINC token (Base: `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`) powers agent monetization and platform incentives. Liquidity strategies and self-funding mechanics are built into the architecture.
+
+Evolved economy/governance features (decentralized autonomous elements) are available as an optional advanced layer.
+
+Full tokenomics and mechanics are documented in the [docs/token](docs/token) section (create this folder if missing).
+
+---
+
+## Roadmap
+
+**Current (v3 / Post-Launch)**
+- Stable A2A marketplace + Agent Card registry
+- Core vertical packs live
+- Railway production deployment
+- Dashboard with monitoring
+
+**Near-term**
+- Enhanced discovery & reputation system
+- More vertical packs + community contributions
+- Improved self-funding / liquidity tooling
+- Expanded forecasting & optimization modules
+
+**Medium-term**
+- Advanced economy features (governance, incentives scaling)
+- Cross-platform agent federation
+- Enterprise-grade compliance tooling
+
+See [ROADMAP.md](ROADMAP.md) for detailed milestones and timelines.
+
+---
+
+## Contributing
+
+We welcome contributions that improve the core platform, add high-quality verticals, or enhance A2A compliance.
+
+1. Fork the repo
+2. Create a feature branch
+3. Add tests + documentation
+4. Open a PR with clear description
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, code style, and how to submit new Agent Cards or verticals.
+
+---
+
+## Security & Compliance
+
+- All wallet interactions use secure, non-custodial patterns.
+- Healthcare and regulated verticals include compliance hooks and audit trails.
+- Never commit private keys or sensitive credentials.
+
+Report security issues privately via GitHub Security Advisories.
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+## Built By
+
+Courtney Jansma  
+OrderofChaos33
+
+SINCOR2 is the result of decades of automation work distilled into a platform that actually ships revenue-generating agents.
+
+---
+
+**Ready to build the future of interoperable agents?**
+
+[Deploy on Railway](https://railway.app) • [Open an Issue](https://github.com/OrderofChaos33/SINCOR2/issues) • [Join the Discussion](https://github.com/OrderofChaos33/SINCOR2/discussions)
 ```
 
-## Contributing Guidelines
+---
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-High-level expectations:
-- Keep changes modular and aligned to transition domains.
-- Prefer additive, non-breaking evolution of interfaces.
-- Include docs updates for architectural or workflow changes.
-- Run lint/tests locally before opening a PR.
-
-## License & Contact
-
-- License: [MIT](LICENSE)
-- Repository: <https://github.com/OrderofChaos33/SINCOR2>
-- Platform: <https://getsincor.com>
-<a href="https://ibb.co/cKhxX4PC"><img src="https://i.ibb.co/TDMrq9Zb/e4a54a0a-e11e-4d19-a5bc-62ff680fbeb7.jpg" alt="e4a54a0a e11e 4d19 a5bc 62ff680fbeb7" border="0"></a>
-For architecture and transition direction, start in [`docs/transition/how-we-scale.md`](docs/transition/how-we-scale.md).
