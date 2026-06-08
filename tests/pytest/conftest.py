@@ -26,21 +26,42 @@ def env_defaults(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def isolated_waitlist_db(tmp_path, monkeypatch):
-    """Give every test its own fresh waitlist SQLite database."""
+    """Give every test its own fresh waitlist SQLite database.
+
+    Patches both the module-level symbol (used by direct imports) and the
+    name bound in app.py (used by the Flask app.extensions dict at create
+    time) so that all code paths see the same isolated instance.
+    """
     from sincor2 import waitlist_system
+    from sincor2 import app as app_module
 
     db_path = str(tmp_path / "waitlist_test.db")
     fresh_manager = waitlist_system.WaitlistManager(db_path=db_path)
     monkeypatch.setattr(waitlist_system, "waitlist_manager", fresh_manager)
+    monkeypatch.setattr(app_module, "waitlist_manager", fresh_manager)
 
 
 @pytest.fixture
-def app(monkeypatch):
+def app(monkeypatch, tmp_path):
     from sincor2 import app as app_module
+    from sincor2 import waitlist_system
 
+    # Patch StripeCheckout before creating the app so the app doesn't try to
+    # contact Stripe during startup.
     monkeypatch.setattr(app_module, "StripeCheckout", lambda api_key=None: MockStripeCheckout())
+
+    # Ensure each test gets a fresh, isolated waitlist DB regardless of the
+    # autouse fixture ordering (app is set up before isolated_waitlist_db).
+    db_path = str(tmp_path / "app_waitlist.db")
+    fresh_manager = waitlist_system.WaitlistManager(db_path=db_path)
+    monkeypatch.setattr(waitlist_system, "waitlist_manager", fresh_manager)
+    monkeypatch.setattr(app_module, "waitlist_manager", fresh_manager)
+
     flask_app = app_module.create_app()
     flask_app.config.update(TESTING=True)
+    # Override the extension with the fresh manager in case create_app() bound
+    # the original module-level instance before our monkeypatch took effect.
+    flask_app.extensions["waitlist_manager"] = fresh_manager
     return flask_app
 
 
