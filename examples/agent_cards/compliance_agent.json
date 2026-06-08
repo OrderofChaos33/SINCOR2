@@ -1,0 +1,99 @@
+{
+  "name": "Compliance Automation Agent",
+  "description": "Supports SBOM generation, lease accounting schedules, and workflow automation for regulated operators.",
+  "version": "1.0.1",
+  "supportedInterfaces": [
+    {
+      "url": "https://compliance.example.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "Example Compliance Ops",
+    "url": "https://compliance.example.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": true,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "sbom-generation",
+      "name": "SBOM Generation",
+      "description": "Builds CycloneDX-style component inventories for release governance.",
+      "tags": [
+        "compliance",
+        "sbom",
+        "supply-chain"
+      ],
+      "examples": [
+        "Generate an SBOM from a dependency list."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "lease-accounting",
+      "name": "Lease Accounting Support",
+      "description": "Produces ASC 842 schedules and related operational evidence.",
+      "tags": [
+        "compliance",
+        "asc-842",
+        "finance"
+      ],
+      "examples": [
+        "Process a monthly lease schedule for a retail location."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "workflow-bridge",
+      "name": "Workflow Bridge",
+      "description": "Triggers and normalizes n8n or webhook-driven automations.",
+      "tags": [
+        "n8n",
+        "automation",
+        "webhooks"
+      ],
+      "examples": [
+        "Trigger a workflow and parse the webhook response."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "documentationUrl": "https://compliance.example.com/docs"
+}

@@ -1,0 +1,83 @@
+{
+  "name": "SINCOR2 Lead Generation Pack",
+  "description": "Lead enrichment, ICP matching, scoring, and outreach automation for revenue teams and operator-led growth workflows.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR2",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "lead-enrichment-outbound",
+      "name": "Lead Enrichment and Outbound",
+      "description": "Enriches leads, scores opportunities, drafts messaging, and tracks engagement.",
+      "tags": [
+        "lead-gen",
+        "outbound",
+        "sales",
+        "enrichment"
+      ],
+      "examples": [
+        "Enrich a SaaS lead and score fit.",
+        "Create a three-step outreach sequence."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "icp-matching",
+      "name": "Ideal Customer Profile Matching",
+      "description": "Defines ICP criteria and ranks leads by fit.",
+      "tags": [
+        "icp",
+        "lead-scoring",
+        "sales-ops"
+      ],
+      "examples": [
+        "Define an ICP for healthcare SaaS.",
+        "Rank a batch of leads by fit."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "documentationUrl": "https://getsincor.com/docs/api"
+}

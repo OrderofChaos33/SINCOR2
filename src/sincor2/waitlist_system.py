@@ -14,6 +14,8 @@ from email.mime.multipart import MIMEMultipart
 from flask import request, jsonify
 import re
 
+DEFAULT_PRODUCT_INTEREST = 'Growth Engine'
+
 class WaitlistManager:
     def __init__(self, db_path="data/waitlist.db"):
         self.db_path = db_path
@@ -130,10 +132,25 @@ class WaitlistManager:
             if not self.validate_email(email):
                 return {'success': False, 'error': 'Invalid email format'}
             
+            normalized_signup = dict(signup_data)
+            normalized_signup['product_interest'] = normalized_signup.get('product_interest') or DEFAULT_PRODUCT_INTEREST
+            normalized_signup['company_name'] = normalized_signup.get('company_name') or normalized_signup.get('company') or ''
+            normalized_signup['pain_points'] = normalized_signup.get('pain_points') or normalized_signup.get('message') or ''
+            for optional_field in (
+                'industry',
+                'team_size',
+                'monthly_revenue',
+                'referral_code',
+                'utm_source',
+                'utm_medium',
+                'utm_campaign',
+            ):
+                normalized_signup[optional_field] = normalized_signup.get(optional_field) or ''
+
             email_hash = self.hash_email(email)
             encrypted_email = self.encrypt_email(email)
             verification_token = secrets.token_urlsafe(32)
-            priority_score = self.calculate_priority_score(signup_data)
+            priority_score = self.calculate_priority_score(normalized_signup)
             
             # Get request metadata
             ip_address = request.remote_addr if request else 'unknown'
@@ -158,13 +175,13 @@ class WaitlistManager:
                         referral_code, utm_source, utm_medium, utm_campaign
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    email_hash, encrypted_email, signup_data.get('product_interest'),
-                    signup_data.get('company_name'), signup_data.get('industry'),
-                    signup_data.get('team_size'), signup_data.get('monthly_revenue'),
-                    signup_data.get('pain_points'), ip_address, user_agent,
-                    verification_token, priority_score, signup_data.get('referral_code'),
-                    signup_data.get('utm_source'), signup_data.get('utm_medium'),
-                    signup_data.get('utm_campaign')
+                    email_hash, encrypted_email, normalized_signup.get('product_interest'),
+                    normalized_signup.get('company_name'), normalized_signup.get('industry'),
+                    normalized_signup.get('team_size'), normalized_signup.get('monthly_revenue'),
+                    normalized_signup.get('pain_points'), ip_address, user_agent,
+                    verification_token, priority_score, normalized_signup.get('referral_code'),
+                    normalized_signup.get('utm_source'), normalized_signup.get('utm_medium'),
+                    normalized_signup.get('utm_campaign')
                 ))
                 
                 # Update product analytics
@@ -172,7 +189,7 @@ class WaitlistManager:
                     UPDATE product_analytics 
                     SET signups_count = signups_count + 1, last_updated = CURRENT_TIMESTAMP
                     WHERE product_name = ?
-                ''', (signup_data.get('product_interest'),))
+                ''', (normalized_signup.get('product_interest'),))
                 
                 conn.commit()
                 

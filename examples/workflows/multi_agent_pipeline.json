@@ -1,0 +1,132 @@
+{
+  "workflowId": "multi-agent-pipeline-v1",
+  "name": "Healthcare Intake to Settlement Pipeline",
+  "description": "Illustrates a multi-agent workflow that discovers agents, routes work, performs quality review, and records settlement.",
+  "version": "1.0.0",
+  "entrypoint": "discover-healthcare-agent",
+  "agents": [
+    {
+      "id": "registry",
+      "role": "discovery",
+      "interface": "internal:marketplace.registry"
+    },
+    {
+      "id": "router",
+      "role": "routing",
+      "interface": "internal:core.router"
+    },
+    {
+      "id": "healthcare-credentialing",
+      "role": "execution",
+      "card": "examples/agent_cards/healthcare_credentialing.json"
+    },
+    {
+      "id": "quality-audit",
+      "role": "review",
+      "interface": "https://getsincor.com/api/a2a"
+    },
+    {
+      "id": "settlement",
+      "role": "payment",
+      "interface": "internal:marketplace.settlement"
+    }
+  ],
+  "steps": [
+    {
+      "id": "discover-healthcare-agent",
+      "type": "discovery",
+      "input": {
+        "requiredSkills": [
+          "payer-enrollment"
+        ],
+        "preferredTags": [
+          "healthcare",
+          "credentialing"
+        ]
+      },
+      "output": {
+        "selectedAgent": "healthcare-credentialing"
+      }
+    },
+    {
+      "id": "route-task",
+      "type": "routing",
+      "dependsOn": [
+        "discover-healthcare-agent"
+      ],
+      "input": {
+        "taskId": "task-001",
+        "requiredSkills": [
+          "payer-enrollment"
+        ]
+      },
+      "output": {
+        "route": "healthcare-credentialing"
+      }
+    },
+    {
+      "id": "execute-credentialing",
+      "type": "task",
+      "dependsOn": [
+        "route-task"
+      ],
+      "agentId": "healthcare-credentialing",
+      "input": {
+        "providerId": "prov-123",
+        "payer": "Example Health Plan"
+      },
+      "output": {
+        "status": "submitted",
+        "enrollmentId": "ENR-12345"
+      }
+    },
+    {
+      "id": "quality-review",
+      "type": "review",
+      "dependsOn": [
+        "execute-credentialing"
+      ],
+      "agentId": "quality-audit",
+      "input": {
+        "artifactRef": "execute-credentialing"
+      },
+      "output": {
+        "status": "approved"
+      }
+    },
+    {
+      "id": "record-settlement",
+      "type": "settlement",
+      "dependsOn": [
+        "quality-review"
+      ],
+      "agentId": "settlement",
+      "input": {
+        "quoteToken": "AXIOM",
+        "amount": "1.2500"
+      },
+      "output": {
+        "status": "confirmed",
+        "treasury": "0xAf9B539D8043C634b7E611818518BA7E850F289e"
+      }
+    }
+  ],
+  "errorHandling": {
+    "retryPolicy": {
+      "maxRetries": 2,
+      "backoffSeconds": 2
+    },
+    "fallback": "route-task",
+    "manualReviewQueue": "ops-healthcare-review"
+  },
+  "observability": {
+    "emitMetrics": true,
+    "emitEvents": true,
+    "traceFields": [
+      "taskId",
+      "providerId",
+      "enrollmentId",
+      "settlementId"
+    ]
+  }
+}

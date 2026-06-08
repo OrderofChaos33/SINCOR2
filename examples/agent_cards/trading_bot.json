@@ -1,0 +1,80 @@
+{
+  "name": "OpenClaw Trading Bot",
+  "description": "Prediction market trading agent that evaluates open markets, computes edge, and recommends disciplined position sizes.",
+  "version": "1.0.1",
+  "supportedInterfaces": [
+    {
+      "url": "https://trading.example.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "Example Trading Lab",
+    "url": "https://trading.example.com"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "market-evaluation",
+      "name": "Prediction Market Evaluation",
+      "description": "Calculates fair value, edge, and confidence for open prediction markets.",
+      "tags": [
+        "trading",
+        "polymarket",
+        "forecasting"
+      ],
+      "examples": [
+        "Evaluate whether a market is overpriced or underpriced."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "position-management",
+      "name": "Position Management",
+      "description": "Applies Kelly-based sizing and portfolio risk caps.",
+      "tags": [
+        "trading",
+        "risk",
+        "kelly"
+      ],
+      "examples": [
+        "Recommend a position size from a bankroll and edge estimate."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "documentationUrl": "https://trading.example.com/docs"
+}
