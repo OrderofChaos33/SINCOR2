@@ -16,8 +16,8 @@ def sinc_gateway():
 
 
 @pages_bp.get("/mvp")
-def mvp_dashboard():
-    return render_template("index.html")
+def legacy_mvp_redirect():
+    return redirect("/", code=302)
 
 
 @pages_bp.get("/signup")
