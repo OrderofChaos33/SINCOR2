@@ -29,7 +29,7 @@ class WaitlistManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     email_hash TEXT UNIQUE NOT NULL,
                     encrypted_email TEXT NOT NULL,
-                    product_interest TEXT NOT NULL,
+                    product_interest TEXT,
                     company_name TEXT,
                     industry TEXT,
                     team_size TEXT,
