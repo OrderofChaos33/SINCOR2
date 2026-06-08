@@ -1,0 +1,18 @@
+{
+  "vertical": "ecosystem",
+  "description": "SINC token ecosystem expansion automation — use case discovery, holder analytics, liquidity monitoring, and competitive intelligence.",
+  "phases": [
+    "use_case_viability",
+    "holder_analytics",
+    "liquidity_monitoring",
+    "competitive_intelligence"
+  ],
+  "agents": [
+    {"id": "ecosystem-scout", "role": "use_case_discovery", "cadence": "weekly"},
+    {"id": "holder-analyst", "role": "holder_analytics", "cadence": "daily"},
+    {"id": "liquidity-sentinel", "role": "liquidity_monitoring", "cadence": "realtime"},
+    {"id": "competitive-intel", "role": "competitive_intelligence", "cadence": "weekly"}
+  ],
+  "treasury_routing": "0xAf9B539D8043C634b7E611818518BA7E850F289e",
+  "sinc_token": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+}
