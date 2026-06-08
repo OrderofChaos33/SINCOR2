@@ -55,13 +55,13 @@ class Settings:
         admin_password = os.getenv("ADMIN_PASSWORD", "")
 
         if env in {"production", "prod"}:
-            if len(secret_key) < 16:
+            if not secret_key or len(secret_key) < 16:
                 logger.error(
                     "SECRET_KEY missing/weak in production; using an ephemeral in-memory key. "
                     "Set a strong persistent SECRET_KEY immediately."
                 )
                 secret_key = secrets.token_urlsafe(48)
-            if len(jwt_secret_key) < 16:
+            if not jwt_secret_key or len(jwt_secret_key) < 16:
                 logger.error(
                     "JWT_SECRET_KEY missing/weak in production; using an ephemeral in-memory key. "
                     "Set a strong persistent JWT_SECRET_KEY immediately."
