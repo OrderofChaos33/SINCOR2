@@ -17,7 +17,7 @@ def sinc_gateway():
 
 @pages_bp.get("/mvp")
 def mvp_dashboard():
-    return render_template("index_mvp.html")
+    return render_template("index.html")
 
 
 @pages_bp.get("/signup")
@@ -28,3 +28,23 @@ def signup():
 @pages_bp.get("/wallet-connect")
 def wallet_connect():
     return redirect("/sinc", code=302)
+
+
+@pages_bp.get("/buy")
+def buy():
+    return render_template("buy.html")
+
+
+@pages_bp.get("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@pages_bp.get("/terms")
+def terms():
+    return render_template("terms.html")
+
+
+@pages_bp.get("/axiom")
+def axiom():
+    return render_template("axiom.html")
