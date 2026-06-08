@@ -1,0 +1,87 @@
+{
+  "name": "SINCOR2 Healthcare Operations Pack",
+  "description": "Healthcare revenue cycle and credentialing automation for prior authorization, eligibility, claims, remittance, and payer enrollment workflows.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR2",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "healthcare-rcm",
+      "name": "Healthcare Revenue Cycle Management",
+      "description": "Automates prior auth, claim follow-up, eligibility verification, and ERA normalization.",
+      "tags": [
+        "healthcare",
+        "rcm",
+        "prior-auth",
+        "edi",
+        "claims"
+      ],
+      "examples": [
+        "Submit prior auth for outpatient imaging.",
+        "Verify eligibility before claim creation."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "provider-credentialing",
+      "name": "Provider Credentialing",
+      "description": "Coordinates CAQH, payer enrollment, license tracking, and facility privileges.",
+      "tags": [
+        "credentialing",
+        "caqh",
+        "payer-enrollment",
+        "healthcare"
+      ],
+      "examples": [
+        "Initiate CAQH enrollment for a new surgeon.",
+        "Track license expirations by provider."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "documentationUrl": "https://getsincor.com/docs/api"
+}

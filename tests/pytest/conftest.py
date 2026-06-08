@@ -1,5 +1,6 @@
 
 import os
+import tempfile
 
 import pytest
 
@@ -22,6 +23,16 @@ def env_defaults(monkeypatch):
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "admin-password")
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123")
+
+
+@pytest.fixture(autouse=True)
+def isolated_waitlist_db(tmp_path, monkeypatch):
+    """Give every test its own fresh waitlist SQLite database."""
+    from sincor2 import waitlist_system
+
+    db_path = str(tmp_path / "waitlist_test.db")
+    fresh_manager = waitlist_system.WaitlistManager(db_path=db_path)
+    monkeypatch.setattr(waitlist_system, "waitlist_manager", fresh_manager)
 
 
 @pytest.fixture

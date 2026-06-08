@@ -1,0 +1,84 @@
+{
+  "name": "SINCOR2 Compliance Automation Pack",
+  "description": "Regulatory automation for SBOM generation, lease schedules, filing readiness, and n8n workflow bridging.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR2",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": true,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "regulatory-compliance",
+      "name": "Regulatory Compliance Automation",
+      "description": "Generates SBOM artifacts, lease schedules, and domain requirement checklists.",
+      "tags": [
+        "compliance",
+        "sbom",
+        "asc-842",
+        "sox"
+      ],
+      "examples": [
+        "Generate an SBOM for a service release.",
+        "Process a monthly lease schedule."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "n8n-workflow-bridge",
+      "name": "n8n Workflow Bridge",
+      "description": "Triggers and observes RPA automations through n8n-compatible execution flows.",
+      "tags": [
+        "n8n",
+        "automation",
+        "rpa",
+        "webhooks"
+      ],
+      "examples": [
+        "Trigger an accounts-payable automation.",
+        "Normalize a workflow webhook payload."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "documentationUrl": "https://getsincor.com/docs/api"
+}
