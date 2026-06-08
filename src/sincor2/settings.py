@@ -81,13 +81,6 @@ class Settings:
             if not self.admin_password or self.admin_password == "changeme123":
                 errors.append("ADMIN_PASSWORD must be set to a non-default value in production")
 
-            if not self.stripe_secret_key and not (
-                self.paypal_client_id and self.paypal_client_secret
-            ):
-                errors.append(
-                    "At least one payment provider must be configured in production "
-                    "(Stripe key or PayPal client id/secret)"
-                )
 
         if errors:
             raise SettingsError("; ".join(errors))
