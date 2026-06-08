@@ -25,7 +25,7 @@ jobs:
           pip install -e .[dev]
 
       - name: Dependency vulnerability scan
-        run: pip-audit --desc --strict
+        run: pip-audit --desc --strict -r requirements.txt
 
       - name: Secret scan
         uses: gitleaks/gitleaks-action@v2
