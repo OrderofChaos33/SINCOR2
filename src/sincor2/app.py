@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -24,6 +25,9 @@ from sincor2.waitlist_system import waitlist_manager
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))
+
 
 def _attach_request_context(app: Flask) -> None:
     @app.before_request
@@ -44,7 +48,7 @@ def _attach_request_context(app: Flask) -> None:
 
 def create_app() -> Flask:
     settings = Settings.from_env()
-    app = Flask(__name__, template_folder="../../templates", static_folder="../../static")
+    app = Flask(__name__, template_folder=os.path.join(_ROOT, "templates"), static_folder=os.path.join(_ROOT, "static"))
 
     app.config["SECRET_KEY"] = settings.secret_key or "dev-only-secret-key"
     app.config["JWT_SECRET_KEY"] = settings.jwt_secret_key or "dev-only-jwt-key"
