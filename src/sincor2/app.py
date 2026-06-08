@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -44,7 +45,12 @@ def _attach_request_context(app: Flask) -> None:
 
 def create_app() -> Flask:
     settings = Settings.from_env()
-    app = Flask(__name__, template_folder="../../templates", static_folder="../../static")
+    project_root = Path(__file__).resolve().parents[2]
+    app = Flask(
+        __name__,
+        template_folder=str(project_root / "templates"),
+        static_folder=str(project_root / "static"),
+    )
 
     app.config["SECRET_KEY"] = settings.secret_key or "dev-only-secret-key"
     app.config["JWT_SECRET_KEY"] = settings.jwt_secret_key or "dev-only-jwt-key"
