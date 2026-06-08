@@ -56,19 +56,19 @@ class Settings:
 
         if env in {"production", "prod"}:
             if not secret_key or len(secret_key) < 16:
-                logger.error(
+                logger.critical(
                     "SECRET_KEY missing/weak in production; using an ephemeral in-memory key. "
                     "Set a strong persistent SECRET_KEY immediately."
                 )
                 secret_key = secrets.token_urlsafe(48)
             if not jwt_secret_key or len(jwt_secret_key) < 16:
-                logger.error(
+                logger.critical(
                     "JWT_SECRET_KEY missing/weak in production; using an ephemeral in-memory key. "
                     "Set a strong persistent JWT_SECRET_KEY immediately."
                 )
                 jwt_secret_key = secrets.token_urlsafe(48)
             if not admin_password or admin_password == "changeme123":
-                logger.error(
+                logger.critical(
                     "ADMIN_PASSWORD missing/default in production; admin auth will remain blocked "
                     "until ADMIN_PASSWORD is set to a strong value."
                 )
