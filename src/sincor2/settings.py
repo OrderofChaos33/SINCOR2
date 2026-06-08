@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
+import secrets
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsError(RuntimeError):
@@ -49,6 +53,28 @@ class Settings:
         jwt_secret_key = os.getenv("JWT_SECRET_KEY", os.getenv("JWT_SECRET", ""))
         admin_username = os.getenv("ADMIN_USERNAME", "admin")
         admin_password = os.getenv("ADMIN_PASSWORD", "")
+
+        if env in {"production", "prod"}:
+            if len(secret_key) < 16:
+                logger.error(
+                    "SECRET_KEY missing/weak in production; using an ephemeral in-memory key. "
+                    "Set a strong persistent SECRET_KEY immediately."
+                )
+                secret_key = secrets.token_urlsafe(48)
+            if len(jwt_secret_key) < 16:
+                logger.error(
+                    "JWT_SECRET_KEY missing/weak in production; using an ephemeral in-memory key. "
+                    "Set a strong persistent JWT_SECRET_KEY immediately."
+                )
+                jwt_secret_key = secrets.token_urlsafe(48)
+            if not admin_password or admin_password == "changeme123":
+                logger.error(
+                    "ADMIN_PASSWORD missing/default in production; admin auth will remain blocked "
+                    "until ADMIN_PASSWORD is set to a strong value."
+                )
+                # Keep app booting while auth_system still blocks misconfigured
+                # admin logins in production.
+                admin_password = secrets.token_urlsafe(24)
 
         settings = cls(
             environment=env,

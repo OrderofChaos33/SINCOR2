@@ -32,7 +32,8 @@ class SINCORAuth:
         """Initialize JWT authentication with Flask app"""
 
         # JWT Configuration
-        app.config['JWT_SECRET_KEY'] = os.environ.get(
+        configured_jwt_secret = app.config.get('JWT_SECRET_KEY')
+        app.config['JWT_SECRET_KEY'] = configured_jwt_secret or os.environ.get(
             'JWT_SECRET_KEY',
             'dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars'
         )

@@ -27,6 +27,9 @@ class _RequestIdFilter(logging.Filter):
 def run_startup_initializers(app: Flask, settings: Settings) -> None:
     """Initialize logging and bind validated runtime settings to the Flask app."""
     configure_logging()
-    logging.getLogger().addFilter(_RequestIdFilter())
+    root_logger = logging.getLogger()
+    root_logger.addFilter(_RequestIdFilter())
+    for handler in root_logger.handlers:
+        handler.addFilter(_RequestIdFilter())
     app.logger.info("Startup complete", extra={"request_id": "startup"})
     app.config["SINCOR_SETTINGS"] = settings
