@@ -72,8 +72,6 @@ def create_app() -> Flask:
             app.extensions["stripe_checkout"] = StripeCheckout(api_key=settings.stripe_secret_key)
         except Exception as exc:  # pragma: no cover
             logger.warning("Stripe initialization failed: %s", exc)
-    else:
-        logger.info("Stripe checkout disabled: STRIPE_SECRET_KEY is not configured.")
 
     app.extensions["waitlist_manager"] = waitlist_manager
 

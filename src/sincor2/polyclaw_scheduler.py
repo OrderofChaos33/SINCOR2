@@ -84,8 +84,8 @@ def execute_trade(opportunity):
         return False
     
     try:
-        logger.info(f"[POLYCLAW] 🚀 Executing: {opportunity['strategy']}")
-        logger.info(f"[POLYCLAW]    Market: {opportunity['market_id']}")
+        logger.info("[POLYCLAW] 🚀 Executing: %s", opportunity['strategy'])
+        logger.info("[POLYCLAW]    Market: %s", opportunity['market_id'])
         logger.info(
             "[POLYCLAW]    Edge: %s%% | Net profit: %s%%",
             opportunity['edge_percent'],
