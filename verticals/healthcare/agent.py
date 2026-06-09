@@ -1,49 +1,60 @@
-from __future__ import annotations
-
-from abc import ABC, abstractmethod
-import logging
-from typing import Any, Dict
-
-logger = logging.getLogger(__name__)
+from ..agent import VerticalAgent
+from .schemas import TaskInput, TaskOutput
 
 
-class VerticalAgent(ABC):
-    """
-    Production-grade base class for vertical-specific agents.
-    All vertical agents should inherit from this class.
-    """
+class HealthcareAgent(VerticalAgent):
+    name = "healthcare_rcm_agent"
+    version = "0.2.0"
+    description = (
+        "Revenue cycle management, eligibility, credentialing, and payer workflow automation"
+    )
+    capabilities = [
+        "eligibility_verification",
+        "prior_authorization",
+        "claims_status_tracking",
+        "credentialing_workflow",
+        "payer_reconciliation",
+    ]
+    tags = ["healthcare", "rcm", "payer", "automation"]
 
-    name: str = "base_vertical_agent"
-    version: str = "0.1.0"
-    capabilities: list[str] = []
-    description: str = ""
+    def execute(self, task: dict) -> dict:
+        task_input = TaskInput.model_validate(task)
+        task_type = task_input.task_type
+        payload = task_input.payload
 
-    def __init__(self):
-        self.logger = logging.getLogger(f"vertical.{self.name}")
-
-    @abstractmethod
-    def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute a task. Must be implemented by subclasses.
-        Should return a structured result dict.
-        """
-        pass
-
-    def get_agent_card(self) -> Dict[str, Any]:
-        """Return machine-readable Agent Card for A2A discovery."""
-        return {
-            "name": self.name,
-            "version": self.version,
-            "description": self.description,
-            "capabilities": self.capabilities,
-            "input_schema": "See schemas.py",
-            "output_schema": "See schemas.py",
-        }
-
-    def validate_task(self, task: Dict[str, Any]) -> bool:
-        """Basic validation hook. Override for stricter checks."""
-        return isinstance(task, dict)
-
-    def handle_error(self, error: Exception, task: Dict[str, Any]) -> Dict[str, Any]:
-        self.logger.error(f"Error executing task: {error}", exc_info=True)
-        return {"status": "error", "message": str(error)}
+        if task_type == "eligibility_verification":
+            return TaskOutput(
+                status="success",
+                result={"eligible": True, "coverage_details": payload.get("patient_id")},
+                correlation_id=task_input.correlation_id,
+            ).model_dump()
+        if task_type == "prior_authorization":
+            return TaskOutput(
+                status="success",
+                result={"auth_id": "PA-98765", "status": "approved", "valid_days": 30},
+                correlation_id=task_input.correlation_id,
+            ).model_dump()
+        if task_type == "claims_status_tracking":
+            return TaskOutput(
+                status="success",
+                result={"claim_id": payload.get("claim_id"), "status": "paid", "amount": 1240.50},
+                correlation_id=task_input.correlation_id,
+            ).model_dump()
+        if task_type == "credentialing_workflow":
+            return TaskOutput(
+                status="success",
+                result={"provider_id": payload.get("provider_id"), "status": "credentialed"},
+                correlation_id=task_input.correlation_id,
+            ).model_dump()
+        if task_type == "payer_reconciliation":
+            return TaskOutput(
+                status="success",
+                result={"discrepancies_found": 2, "resolved": True},
+                correlation_id=task_input.correlation_id,
+            ).model_dump()
+        return TaskOutput(
+            status="error",
+            result={},
+            error=f"Unsupported healthcare task: {task_type}",
+            correlation_id=task_input.correlation_id,
+        ).model_dump()

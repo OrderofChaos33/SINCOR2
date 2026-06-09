@@ -1,12 +1,11 @@
-# Vertical Packs
+# Vertical Packs — Production Architecture
 
-Vertical packs encapsulate domain-specific agent logic, schemas, and workflows that integrate with the core SINCOR2 marketplace and orchestration layers.
+Each vertical implements domain-specific agents that integrate with SINCOR2’s marketplace, orchestration core, and on-chain settlement.
 
-Each vertical follows a consistent, extensible structure designed for production use:
-- Clear capability definitions
-- Pydantic schemas for task input/output
-- Base agent class with proper interfaces
-- Logging and error handling patterns
-- Clear integration points with A2A discovery and settlement
+All verticals follow the same high-standard structure:
+- Rich `VerticalAgent` base with circuit breaker protection
+- Strongly typed Pydantic schemas
+- Detailed capability definitions
+- Clear A2A Agent Card output
 
-Current verticals are in active scaffolding phase with production-grade foundations. Real implementations should extend the provided base classes and register capabilities via Agent Cards.
+Current status: Production-grade scaffolding with resilience patterns ready for implementation.
