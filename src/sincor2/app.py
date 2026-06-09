@@ -50,8 +50,12 @@ def create_app() -> Flask:
     settings = Settings.from_env()
     app = Flask(__name__, template_folder=os.path.join(_ROOT, "templates"), static_folder=os.path.join(_ROOT, "static"))
 
-    app.config["SECRET_KEY"] = settings.secret_key or "dev-only-secret-key"
-    app.config["JWT_SECRET_KEY"] = settings.jwt_secret_key or "dev-only-jwt-key"
+    app.config["SECRET_KEY"] = settings.secret_key
+    app.config["JWT_SECRET_KEY"] = settings.jwt_secret_key
+    app.config["ADMIN_USERNAME"] = settings.admin_username
+    app.config["ADMIN_PASSWORD"] = settings.admin_password
+    app.config["ENVIRONMENT"] = settings.environment
+    app.config["DEBUG"] = settings.debug
 
     run_startup_initializers(app, settings)
     _attach_request_context(app)
@@ -59,10 +63,13 @@ def create_app() -> Flask:
     sincor_auth = SINCORAuth(app)
     app.extensions["sincor_auth"] = sincor_auth
 
-    try:
-        app.extensions["stripe_checkout"] = StripeCheckout(api_key=settings.stripe_secret_key)
-    except Exception as exc:  # pragma: no cover
-        logger.warning("Stripe initialization failed: %s", exc)
+    if settings.stripe_secret_key:
+        try:
+            app.extensions["stripe_checkout"] = StripeCheckout(api_key=settings.stripe_secret_key)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Stripe initialization failed: %s", exc)
+    else:
+        logger.info("Stripe checkout disabled: STRIPE_SECRET_KEY is not configured.")
 
     app.extensions["waitlist_manager"] = waitlist_manager
 

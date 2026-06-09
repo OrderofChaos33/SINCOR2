@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import secrets
 from dataclasses import dataclass
 
 
@@ -9,12 +11,36 @@ class SettingsError(RuntimeError):
 
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
+_NON_PROD_ENVIRONMENTS = {"development", "dev", "local", "test", "testing"}
+_MIN_SECRET_LENGTH = 16
+logger = logging.getLogger(__name__)
 
 
 def _as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in _TRUE_VALUES
+
+
+def _normalize_environment(value: str | None) -> str:
+    normalized = (value or "development").strip().lower()
+    return normalized or "development"
+
+
+def _is_strong_enough(value: str | None, minimum_length: int = _MIN_SECRET_LENGTH) -> bool:
+    return bool(value and len(value) >= minimum_length)
+
+
+def _development_fallback(name: str, current_value: str, *, minimum_length: int = 32) -> str:
+    if _is_strong_enough(current_value, minimum_length):
+        return current_value
+
+    generated = secrets.token_urlsafe(max(minimum_length, 32))
+    logger.warning(
+        "%s is missing or weak outside production; generated an in-memory fallback for this process.",
+        name,
+    )
+    return generated
 
 
 @dataclass(frozen=True)
@@ -39,16 +65,23 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        env = os.getenv("FLASK_ENV", os.getenv("ENVIRONMENT", "development")).strip().lower()
+        env = _normalize_environment(os.getenv("FLASK_ENV", os.getenv("ENVIRONMENT", "development")))
         debug = _as_bool(
             os.getenv("DEBUG"),
-            default=env in {"development", "dev", "local", "test", "testing"},
+            default=env in _NON_PROD_ENVIRONMENTS,
         )
 
         secret_key = os.getenv("SECRET_KEY", "")
         jwt_secret_key = os.getenv("JWT_SECRET_KEY", os.getenv("JWT_SECRET", ""))
         admin_username = os.getenv("ADMIN_USERNAME", "admin")
         admin_password = os.getenv("ADMIN_PASSWORD", "")
+        is_production = env in {"production", "prod"}
+
+        if not is_production:
+            secret_key = _development_fallback("SECRET_KEY", secret_key)
+            jwt_secret_key = _development_fallback("JWT_SECRET_KEY", jwt_secret_key)
+            if not admin_password or admin_password == "changeme123":
+                admin_password = _development_fallback("ADMIN_PASSWORD", admin_password)
 
         settings = cls(
             environment=env,
@@ -74,13 +107,19 @@ class Settings:
         errors: list[str] = []
 
         if self.is_production:
-            if not self.secret_key or len(self.secret_key) < 16:
-                errors.append("SECRET_KEY must be set to a strong value in production")
-            if not self.jwt_secret_key or len(self.jwt_secret_key) < 16:
-                errors.append("JWT_SECRET_KEY must be set to a strong value in production")
+            if not _is_strong_enough(self.secret_key):
+                current_length = len(self.secret_key) if self.secret_key else 0
+                errors.append(
+                    f"SECRET_KEY must be set to a strong value in production (minimum {_MIN_SECRET_LENGTH} characters, got {current_length})"
+                )
+            if not _is_strong_enough(self.jwt_secret_key):
+                current_length = len(self.jwt_secret_key) if self.jwt_secret_key else 0
+                errors.append(
+                    f"JWT_SECRET_KEY must be set to a strong value in production (minimum {_MIN_SECRET_LENGTH} characters, got {current_length})"
+                )
             if not self.admin_password or self.admin_password == "changeme123":
                 errors.append("ADMIN_PASSWORD must be set to a non-default value in production")
 
 
         if errors:
-            raise SettingsError("; ".join(errors))
+            raise SettingsError(f"Invalid production configuration: {'; '.join(errors)}")

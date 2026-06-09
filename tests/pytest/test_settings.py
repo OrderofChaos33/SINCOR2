@@ -11,6 +11,9 @@ def test_settings_non_prod_allows_dev_defaults(monkeypatch):
     monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
     settings = Settings.from_env()
     assert settings.environment == "development"
+    assert len(settings.secret_key) >= 32
+    assert len(settings.jwt_secret_key) >= 32
+    assert settings.admin_password != "changeme123"
 
 
 def test_settings_prod_requires_secure_values(monkeypatch):

@@ -11,8 +11,15 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.interval import IntervalTrigger
+    APSCHEDULER_AVAILABLE = True
+except ImportError:
+    BackgroundScheduler = None
+    IntervalTrigger = None
+    APSCHEDULER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -124,14 +131,18 @@ def polyclaw_cycle():
 def start_polyclaw_scheduler(app):
     """Start Polyclaw autonomous trading scheduler"""
     global scheduler
-    
+
     if not POLYCLAW_ENABLED:
         logger.warning("[POLYCLAW] Scheduler disabled (POLYCLAW_ENABLED=false)")
         return None
-    
+
+    if not APSCHEDULER_AVAILABLE:
+        logger.warning("[POLYCLAW] APScheduler not installed; scheduler startup skipped")
+        return None
+
     try:
         scheduler = BackgroundScheduler()
-        
+
         # Add polyclaw scan job
         scheduler.add_job(
             polyclaw_cycle,

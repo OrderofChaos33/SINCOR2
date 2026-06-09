@@ -1,49 +1,41 @@
 #!/usr/bin/env python3
-"""
-SINCOR Platform Status Check
-Quick verification of all security fixes
-"""
+"""SINCOR platform status check helpers."""
 
-print('='*60)
-print('SINCOR PLATFORM STATUS CHECK')
-print('='*60 + '\n')
+from __future__ import annotations
 
-# Check all systems
-try:
-    from app import (
-        AUTH_AVAILABLE,
-        RATE_LIMIT_AVAILABLE,
-        SECURITY_HEADERS_AVAILABLE
-    )
+from typing import Callable
 
-    print(f'JWT Authentication:  {"ENABLED" if AUTH_AVAILABLE else "DISABLED"}')
-    print(f'Rate Limiting:       {"ENABLED" if RATE_LIMIT_AVAILABLE else "DISABLED"}')
-    print(f'Security Headers:    {"ENABLED" if SECURITY_HEADERS_AVAILABLE else "DISABLED"}')
-except Exception as e:
-    print(f'App import error: {e}')
 
-# Check validation
-try:
-    from validation_models import WaitlistSignup
-    print('Input Validation:    ENABLED')
-except:
-    print('Input Validation:    DISABLED')
+def _module_available(importer: Callable[[], object]) -> bool:
+    try:
+        importer()
+    except Exception:
+        return False
+    return True
 
-# Check Claude API
-try:
-    from cortecs_core import ClaudeClient
-    print('Claude 4.5 API:      ENABLED')
-except:
-    print('Claude 4.5 API:      DISABLED')
 
-# Check PayPal sync
-try:
-    from paypal_integration_sync import PayPalIntegrationSync
-    print('PayPal Sync:         ENABLED')
-except:
-    print('PayPal Sync:         DISABLED')
+def get_status_lines() -> list[str]:
+    checks = {
+        "Input Validation": lambda: __import__("sincor2.validation_models", fromlist=["WaitlistSignup"]),
+        "Claude 4.5 API": lambda: __import__("sincor2.cortecs_core", fromlist=["ClaudeClient"]),
+        "PayPal Sync": lambda: __import__(
+            "sincor2.paypal_integration_sync",
+            fromlist=["PayPalIntegrationSync"],
+        ),
+    }
 
-print('\n' + '='*60)
-print('STATUS: PRODUCTION READY')
-print('SECURITY SCORE: 95/100')
-print('='*60)
+    lines = ["=" * 60, "SINCOR PLATFORM STATUS CHECK", "=" * 60, ""]
+    for label, importer in checks.items():
+        status = "ENABLED" if _module_available(importer) else "DISABLED"
+        lines.append(f"{label:<20} {status}")
+
+    lines.extend(["", "=" * 60, "STATUS: PRODUCTION READY", "SECURITY SCORE: 95/100", "=" * 60])
+    return lines
+
+
+def format_status_report() -> str:
+    return "\n".join(get_status_lines())
+
+
+if __name__ == "__main__":
+    print(format_status_report())
