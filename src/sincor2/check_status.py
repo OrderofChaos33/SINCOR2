@@ -16,7 +16,10 @@ def _module_available(importer: Callable[[], object]) -> bool:
 
 def get_status_lines() -> list[str]:
     checks = {
-        "Input Validation": lambda: __import__("sincor2.validation_models", fromlist=["WaitlistSignup"]),
+        "Input Validation": lambda: __import__(
+            "sincor2.validation_models",
+            fromlist=["WaitlistSignup"],
+        ),
         "Claude 4.5 API": lambda: __import__("sincor2.cortecs_core", fromlist=["ClaudeClient"]),
         "PayPal Sync": lambda: __import__(
             "sincor2.paypal_integration_sync",

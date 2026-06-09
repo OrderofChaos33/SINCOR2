@@ -37,7 +37,10 @@ def _development_fallback(name: str, current_value: str, *, minimum_length: int 
 
     generated = secrets.token_urlsafe(max(minimum_length, 32))
     logger.warning(
-        "%s is missing or weak outside production; generated an in-memory fallback for this process.",
+        (
+            "%s is missing or weak outside production; "
+            "generated an in-memory fallback for this process."
+        ),
         name,
     )
     return generated
@@ -65,7 +68,9 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        env = _normalize_environment(os.getenv("FLASK_ENV", os.getenv("ENVIRONMENT", "development")))
+        env = _normalize_environment(
+            os.getenv("FLASK_ENV", os.getenv("ENVIRONMENT", "development"))
+        )
         debug = _as_bool(
             os.getenv("DEBUG"),
             default=env in _NON_PROD_ENVIRONMENTS,
@@ -110,12 +115,14 @@ class Settings:
             if not _is_strong_enough(self.secret_key):
                 current_length = len(self.secret_key) if self.secret_key else 0
                 errors.append(
-                    f"SECRET_KEY must be set to a strong value in production (minimum {_MIN_SECRET_LENGTH} characters, got {current_length})"
+                    "SECRET_KEY must be set to a strong value in production "
+                    f"(minimum {_MIN_SECRET_LENGTH} characters, got {current_length})"
                 )
             if not _is_strong_enough(self.jwt_secret_key):
                 current_length = len(self.jwt_secret_key) if self.jwt_secret_key else 0
                 errors.append(
-                    f"JWT_SECRET_KEY must be set to a strong value in production (minimum {_MIN_SECRET_LENGTH} characters, got {current_length})"
+                    "JWT_SECRET_KEY must be set to a strong value in production "
+                    f"(minimum {_MIN_SECRET_LENGTH} characters, got {current_length})"
                 )
             if not self.admin_password or self.admin_password == "changeme123":
                 errors.append("ADMIN_PASSWORD must be set to a non-default value in production")
