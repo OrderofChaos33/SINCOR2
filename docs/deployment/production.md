@@ -1,45 +1,56 @@
-# Production Deployment Checklist
+# Production Deployment & Operations Guide
 
-This checklist complements `DEPLOYMENT_GUIDE.md` and focuses on production readiness gates.
+## Overview
+This guide defines the standards and practices for running SINCOR2 reliably in production environments.
 
-## 1) Environment and Secrets
-- [ ] `SECRET_KEY`, `JWT_SECRET_KEY`, and admin credentials are set securely
-- [ ] API keys (Anthropic, Stripe/PayPal, other providers) are stored in environment variables
-- [ ] `.env` is excluded from source control and secret scanning is enabled in CI
-- [ ] Separate values exist for staging and production
+## Supported Deployment Targets
+- Railway (primary recommended path)
+- Docker / container platforms
+- Cloud VMs with systemd or supervisor
 
-## 2) Runtime Configuration
-- [ ] Application starts with `gunicorn sincor2.mvp_app:app`
-- [ ] `FLASK_ENV=production` and debug mode is disabled
-- [ ] Rate limit storage uses Redis for multi-worker safety
-- [ ] Health endpoint (`/health`) is reachable from orchestrator/load balancer
+## Environment & Configuration
+All configuration must be supplied via environment variables. Never commit secrets.
 
-## 3) Security Controls
-- [ ] HTTPS/TLS is enforced end-to-end
-- [ ] Security headers are enabled (CSP, HSTS, frame/content protections)
-- [ ] Authentication and authorization flows are validated
-- [ ] Dependency updates and vulnerability checks are current
+Required categories:
+- LLM provider credentials
+- Wallet / on-chain keys (Base)
+- Payment providers (Stripe, etc.)
+- Database / storage configuration (if used)
+- Monitoring and observability keys
 
-## 4) A2A and Marketplace Readiness
-- [ ] Agent Card endpoint (`/.well-known/agent-card.json`) is valid
-- [ ] Discovery and capability matching flows are verified
-- [ ] Reputation and policy enforcement paths are validated
-- [ ] Delegated execution and fallback behavior are tested
+## Railway Production Setup
+1. Connect repository and enable automatic deploys.
+2. Configure all environment variables in the Railway dashboard.
+3. Use `railway.json` for build and start commands.
+4. After code pushes, manually trigger redeploy if needed for immediate effect.
 
-## 5) Payments and On-Chain Settlement
-- [ ] SINC/AXIOM settlement settings are configured for Base
-- [ ] Treasury routing and payout controls are verified
-- [ ] Payment provider webhooks are configured and signed
-- [ ] Failure/retry logic is tested for off-chain and on-chain paths
+## Docker Production Standards
+- Use multi-stage builds for smaller images.
+- Run as non-root user.
+- Healthcheck on `/health`.
+- Proper signal handling for graceful shutdown.
 
-## 6) Observability and Operations
-- [ ] Structured logging is enabled and retained
-- [ ] Metrics and alerting are configured for latency, errors, and queue depth
-- [ ] Incident response contacts and escalation paths are documented
-- [ ] Backup and restore procedures are tested
+## Security Requirements
+- Enforce rate limiting and authentication on all public endpoints.
+- Rotate secrets regularly.
+- Enable secret scanning in CI.
+- Use HTTPS only.
+- Treat all agent-to-agent and payment data as sensitive.
 
-## 7) Release Validation
-- [ ] Automated test suite runs clean in CI for release branch
-- [ ] Smoke tests pass post-deploy (auth, A2A task flow, payments, health)
-- [ ] Rollback procedure is verified
-- [ ] Release notes/changelog updated
+## Observability & Monitoring
+- Expose `/health` and structured logging.
+- Integrate error tracking (e.g. Sentry).
+- Add metrics collection for task volume, latency, and error rates.
+- Log aggregation is required for production troubleshooting.
+
+## Scaling & Reliability
+- The orchestration layer supports horizontal scaling.
+- For high-throughput workloads, introduce async task processing.
+- Implement circuit breakers and retry policies on external calls.
+- Database connection pooling and query optimization recommended.
+
+## Operational Checklist
+- All dependencies scanned and up to date.
+- Tests passing in CI before deploy.
+- Monitoring and alerting configured.
+- Rollback plan defined (previous Railway deployment or Docker tag).

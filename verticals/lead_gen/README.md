@@ -1,16 +1,24 @@
-# Lead Generation Vertical
+# Lead Generation Vertical Pack
 
-The lead generation pack helps operators identify, enrich, prioritize, and engage prospects with repeatable outbound workflows.
+**Domain Focus:** Prospect discovery, ICP matching, outreach sequencing, and conversion workflow automation.
 
-## Modules
+**Integration Points**
+- Marketplace capability matching
+- Core task router
+- On-chain settlement for paid tasks
+- A2A Agent Card discovery
 
-- `outbound_agent.py` — enrichment, scoring, outreach sequence generation, and engagement tracking.
-- `icp_matcher.py` — ideal customer profile definition and fit-based ranking.
-- `agent_card.json` — A2A skill contract for lead generation services.
+**Current Status**
+Production-grade scaffolding in place. Base agent, schemas, and structure ready for implementation.
 
-## Typical workflows
+**Key Planned Capabilities**
+- Prospect enrichment and qualification agents
+- ICP scoring and segmentation automation
+- Outreach campaign and sequence orchestration
+- Conversion pipeline task execution support
 
-- enrichment before CRM insertion;
-- prioritization for SDR and founder-led sales queues;
-- multichannel cold outreach sequence generation;
-- lead scoring for marketplace-based sales automation.
+**Next Implementation Steps**
+1. Implement concrete agents inheriting from `VerticalAgent`
+2. Define detailed Pydantic schemas in `schemas.py`
+3. Register capabilities and expose via Agent Card
+4. Add integration tests with core marketplace

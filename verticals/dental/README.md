@@ -1,16 +1,24 @@
-# Dental Vertical
+# Dental Vertical Pack
 
-The dental pack focuses on day-to-day practice operations and compliance oversight for offices that need predictable chair utilization and documentation readiness.
+**Domain Focus:** Practice operations automation, patient engagement, treatment workflow support, and dental office compliance.
 
-## Modules
+**Integration Points**
+- Marketplace capability matching
+- Core task router
+- On-chain settlement for paid tasks
+- A2A Agent Card discovery
 
-- `practice_ops_agent.py` — schedule optimization, recall campaigns, and patient billing support.
-- `compliance_agent.py` — HIPAA, OSHA, and infection control documentation assistance.
-- `agent_card.json` — A2A discoverability contract for dental operations.
+**Current Status**
+Production-grade scaffolding in place. Base agent, schemas, and structure ready for implementation.
 
-## Ideal operators
+**Key Planned Capabilities**
+- Scheduling and recall optimization agents
+- Treatment plan and case follow-up automation
+- Billing and front-desk workflow orchestration
+- Compliance-aware operational task execution
 
-- DSOs and multi-location practices;
-- owner-operator clinics;
-- revenue and front-office automation teams;
-- compliance coordinators preparing for inspections and audits.
+**Next Implementation Steps**
+1. Implement concrete agents inheriting from `VerticalAgent`
+2. Define detailed Pydantic schemas in `schemas.py`
+3. Register capabilities and expose via Agent Card
+4. Add integration tests with core marketplace
