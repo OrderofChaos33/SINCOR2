@@ -26,25 +26,25 @@ class DentalAgent(VerticalAgent):
                 result={"appointment_id": "APT-4421", "time": payload.get("preferred_time")},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "recall_automation":
+        elif task_type == "recall_automation":
             return TaskOutput(
                 status="success",
                 result={"patients_contacted": 87, "booked": 34},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "billing_and_insurance":
+        elif task_type == "billing_and_insurance":
             return TaskOutput(
                 status="success",
                 result={"claim_submitted": True, "expected_reimbursement": 890},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "hipaa_compliance_check":
+        elif task_type == "hipaa_compliance_check":
             return TaskOutput(
                 status="success",
                 result={"compliance_score": 98, "issues": []},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "infection_control_support":
+        elif task_type == "infection_control_support":
             return TaskOutput(
                 status="success",
                 result={"protocols_verified": True},

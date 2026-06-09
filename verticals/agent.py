@@ -25,7 +25,9 @@ class CircuitBreaker:
 
     def call(self, func: Callable, *args, **kwargs):
         if self.state == CircuitState.OPEN:
-            if time.time() - self.last_failure_time > self.recovery_timeout:
+            if self.last_failure_time and (
+                time.time() - self.last_failure_time > self.recovery_timeout
+            ):
                 self.state = CircuitState.HALF_OPEN
             else:
                 raise Exception("Circuit breaker is OPEN - service degraded")

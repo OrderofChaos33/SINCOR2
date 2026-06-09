@@ -26,7 +26,7 @@ class TradingAgent(VerticalAgent):
                 result={"signal": "bullish", "confidence": 0.87, "asset": payload.get("asset")},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "polymarket_evaluation":
+        elif task_type == "polymarket_evaluation":
             return TaskOutput(
                 status="success",
                 result={
@@ -36,19 +36,19 @@ class TradingAgent(VerticalAgent):
                 },
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "position_management":
+        elif task_type == "position_management":
             return TaskOutput(
                 status="success",
                 result={"positions_updated": 3, "pnl": 1240},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "risk_assessment":
+        elif task_type == "risk_assessment":
             return TaskOutput(
                 status="success",
                 result={"risk_score": 42, "max_drawdown": "8.2%"},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "market_data_enrichment":
+        elif task_type == "market_data_enrichment":
             return TaskOutput(
                 status="success",
                 result={"enriched_fields": 7},

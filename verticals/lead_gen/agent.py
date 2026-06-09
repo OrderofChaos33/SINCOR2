@@ -25,25 +25,25 @@ class LeadGenAgent(VerticalAgent):
                 result={"enriched_leads": 142, "data_quality": 0.94},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "icp_matching":
+        elif task_type == "icp_matching":
             return TaskOutput(
                 status="success",
                 result={"matches": 67, "fit_score_avg": 0.81},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "outreach_sequencing":
+        elif task_type == "outreach_sequencing":
             return TaskOutput(
                 status="success",
                 result={"sequences_created": 89, "channels": ["email", "linkedin"]},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "engagement_tracking":
+        elif task_type == "engagement_tracking":
             return TaskOutput(
                 status="success",
                 result={"engaged": 214, "meetings_booked": 28},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "conversion_prediction":
+        elif task_type == "conversion_prediction":
             return TaskOutput(
                 status="success",
                 result={"predicted_conversion": 0.34, "priority_leads": 19},

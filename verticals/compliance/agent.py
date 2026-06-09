@@ -25,25 +25,25 @@ class ComplianceAgent(VerticalAgent):
                 result={"sbom_id": "SBOM-3921", "components": 124},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "lease_accounting":
+        elif task_type == "lease_accounting":
             return TaskOutput(
                 status="success",
                 result={"leases_processed": 17, "compliance": "IFRS16"},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "regulatory_filing":
+        elif task_type == "regulatory_filing":
             return TaskOutput(
                 status="success",
                 result={"filing_id": "REG-8812", "status": "submitted"},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "n8n_workflow_bridge":
+        elif task_type == "n8n_workflow_bridge":
             return TaskOutput(
                 status="success",
                 result={"workflow_triggered": True, "execution_id": "exec_9921"},
                 correlation_id=task_input.correlation_id,
             ).model_dump()
-        if task_type == "audit_trail_creation":
+        elif task_type == "audit_trail_creation":
             return TaskOutput(
                 status="success",
                 result={"audit_id": "AUD-5512", "entries": 342},
