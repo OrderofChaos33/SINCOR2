@@ -1,13 +1,19 @@
-# Trading Vertical
+# Trading Vertical Pack
 
-The trading pack focuses on market discovery, probabilistic edge estimation, and position sizing for operators running automated or semi-automated prediction strategies.
+**Domain:** Signal intelligence, position workflows, and risk-aware market automation.
 
-## Modules
+**Core Capabilities**
+- Signal generation
+- Polymarket evaluation
+- Position management
+- Risk assessment
+- Market data enrichment
 
-- `openclaw_agent.py` — signal generation, Kelly sizing, win-rate adaptation, and position management.
-- `polymarket_agent.py` — open market discovery, edge calculations, and mock order placement.
-- `agent_card.json` — A2A-compliant discoverability document for trading capabilities.
+**Integration Points**
+- Marketplace capability discovery
+- Core task router with policy enforcement
+- On-chain settlement for paid trading tasks
+- A2A-compliant Agent Cards
 
-## Notes
-
-These modules provide decision-support and orchestration primitives only. Operators should layer venue-specific compliance, execution controls, and human review where appropriate.
+**Resilience**
+Circuit breaker protection enabled on all agent executions.

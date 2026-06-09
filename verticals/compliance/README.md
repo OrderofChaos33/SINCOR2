@@ -1,16 +1,19 @@
-# Compliance Vertical
+# Compliance Vertical Pack
 
-The compliance pack addresses regulated documentation, reporting, and workflow automation needs that benefit from repeatable schemas and deterministic audit artifacts.
+**Domain:** Regulatory automation, audit evidence workflows, and compliance operations.
 
-## Modules
+**Core Capabilities**
+- SBOM generation
+- Lease accounting support
+- Regulatory filing workflows
+- n8n workflow bridge integration
+- Audit trail creation
 
-- `regulatory_agent.py` — SBOM generation, lease accounting schedules, and jurisdiction-specific requirement checks.
-- `n8n_bridge.py` — bridge logic for kicking off and observing n8n-based automation flows.
-- `agent_card.json` — A2A skill manifest for compliance workloads.
+**Integration Points**
+- Marketplace capability discovery
+- Core task router with policy enforcement
+- On-chain settlement for paid compliance tasks
+- A2A-compliant Agent Cards
 
-## Covered areas
-
-- software supply chain inventories;
-- ASC 842 lease operations;
-- cannabis and hemp filing support;
-- SOX control evidence orchestration.
+**Resilience**
+Circuit breaker protection enabled on all agent executions.

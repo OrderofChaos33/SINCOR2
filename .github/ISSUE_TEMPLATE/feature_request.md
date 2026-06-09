@@ -1,22 +1,23 @@
 ---
-name: Feature request
-about: Suggest an improvement or new capability for SINCOR2
-title: "[FEATURE] "
+name: Feature Request
+about: Propose a new capability or improvement
+title: '[FEATURE] '
 labels: enhancement
-assignees: ''
 ---
 
-## Summary
-Describe the feature request.
+### Problem Statement
+What user or system pain does this address?
 
-## Problem Statement
-What user or platform problem does this solve?
+### Proposed Solution
+High-level description of the desired behavior.
 
-## Proposed Solution
-Describe the desired behavior at a high level.
+### Integration Points
+How should this interact with existing components (marketplace, core router, verticals, on-chain, etc.)?
 
-## Alternatives Considered
-What alternatives did you evaluate?
+### Acceptance Criteria
+- [ ] 
+- [ ] 
 
-## Additional Context
-Include links, mockups, API ideas, or architecture notes.
+### Alternatives Considered
+
+### Additional Context

@@ -1,29 +1,30 @@
 ---
-name: Bug report
-about: Report a reproducible problem to help us improve SINCOR2
-title: "[BUG] "
+name: Bug Report
+about: Report a defect in SINCOR2
+title: '[BUG] '
 labels: bug
-assignees: ''
 ---
 
-## Summary
-Describe the issue clearly.
+### Summary
+One-sentence description of the issue.
 
-## Steps to Reproduce
+### Steps to Reproduce
 1. 
 2. 
 3. 
 
-## Expected Behavior
-What should have happened?
+### Expected Behavior
 
-## Actual Behavior
-What happened instead?
+### Actual Behavior
 
-## Environment
-- OS:
+### Environment
 - Python version:
-- Deployment target (local/Railway/Heroku/etc.):
+- Deployment: Railway / Docker / Local
+- Relevant commit or version:
 
-## Additional Context
-Logs, screenshots, request payloads, and any other relevant details.
+### Logs / Stack Trace
+```
+Paste relevant logs here
+```
+
+### Additional Context

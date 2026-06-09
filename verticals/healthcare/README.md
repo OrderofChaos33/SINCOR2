@@ -1,16 +1,19 @@
-# Healthcare Vertical
+# Healthcare Vertical Pack
 
-The healthcare pack provides administrative automation for payer-facing and credentialing-heavy workflows while preserving the controls expected in regulated environments.
+**Domain:** Revenue cycle management, eligibility, credentialing, and payer workflows.
 
-## Modules
+**Core Capabilities**
+- Eligibility verification
+- Prior authorization orchestration
+- Claims status tracking and follow-up
+- Credentialing workflow automation
+- Payer data reconciliation
 
-- `rcm_agent.py` — prior authorization, eligibility verification, claim tracking, and ERA processing with mock EDI 270/271/278/835/837 structures.
-- `credentialing_agent.py` — provider credentialing support for CAQH, payer enrollment, privileges, and license surveillance.
-- `agent_card.json` — A2A-compliant Agent Card describing the vertical's externally discoverable skills.
+**Integration Points**
+- Marketplace capability discovery
+- Core task router with policy enforcement
+- On-chain settlement for paid healthcare tasks
+- A2A-compliant Agent Cards
 
-## Primary use cases
-
-- outpatient and specialty practice revenue cycle workflows;
-- payer enrollment orchestration for new providers and facilities;
-- denials prevention support via eligibility and prior auth validation;
-- remittance normalization for finance and operations teams.
+**Resilience**
+Circuit breaker protection enabled on all agent executions.

@@ -1,12 +1,4 @@
-"""Healthcare automation agents for revenue cycle and credentialing workflows."""
+from ..agent import VerticalAgent
+from .agent import HealthcareAgent
 
-from .credentialing_agent import CredentialingAgent, ProviderCredential
-from .rcm_agent import ClaimSubmission, HealthcareRCMAgent, PriorAuthRequest
-
-__all__ = [
-    'ClaimSubmission',
-    'CredentialingAgent',
-    'HealthcareRCMAgent',
-    'PriorAuthRequest',
-    'ProviderCredential',
-]
+__all__ = ["VerticalAgent", "HealthcareAgent"]
