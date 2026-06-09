@@ -32,9 +32,12 @@ class SINCORAuth:
         """Initialize JWT authentication with Flask app"""
 
         # JWT Configuration
-        app.config['JWT_SECRET_KEY'] = os.environ.get(
-            'JWT_SECRET_KEY',
-            'dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars'
+        app.config['JWT_SECRET_KEY'] = (
+            app.config.get('JWT_SECRET_KEY')
+            or os.environ.get(
+                'JWT_SECRET_KEY',
+                'dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars'
+            )
         )
         app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
         app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
@@ -87,8 +90,14 @@ class SINCORAuth:
         """
 
         # Get admin credentials from environment
-        valid_username = os.environ.get('ADMIN_USERNAME', 'admin')
-        valid_password = os.environ.get('ADMIN_PASSWORD')
+        valid_username = (
+            (self.app.config.get('ADMIN_USERNAME') if self.app else None)
+            or os.environ.get('ADMIN_USERNAME', 'admin')
+        )
+        valid_password = (
+            (self.app.config.get('ADMIN_PASSWORD') if self.app else None)
+            or os.environ.get('ADMIN_PASSWORD')
+        )
 
         # SECURITY: In production, refuse all auth attempts if ADMIN_PASSWORD
         # is unset OR equals the well-known dev placeholder. Prevents the

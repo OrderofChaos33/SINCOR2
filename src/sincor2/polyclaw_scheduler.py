@@ -5,14 +5,20 @@ Integrated with SINCOR's APScheduler
 Scans Polymarket every minute for arbitrage, executes autonomously
 """
 
-import os
-import sys
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.interval import IntervalTrigger
+    APSCHEDULER_AVAILABLE = True
+except ImportError:
+    BackgroundScheduler = None
+    IntervalTrigger = None
+    APSCHEDULER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +39,11 @@ def log_trade(trade_data):
     TRADES_LOG.parent.mkdir(parents=True, exist_ok=True)
     with open(TRADES_LOG, "a") as f:
         f.write(json.dumps(trade_data) + "\n")
-    logger.info(f"[POLYCLAW] Trade logged: {trade_data['strategy']} | {trade_data['net_profit_percent']}% profit")
+    logger.info(
+        "[POLYCLAW] Trade logged: %s | %s%% profit",
+        trade_data['strategy'],
+        trade_data['net_profit_percent'],
+    )
 
 def scan_polymarket():
     """
@@ -66,13 +76,21 @@ def execute_trade(opportunity):
     
     net_profit = opportunity.get("net_profit_percent", 0)
     if net_profit < POLYCLAW_ALERT_THRESHOLD:
-        logger.debug(f"[POLYCLAW] Skipping: profit {net_profit}% < threshold {POLYCLAW_ALERT_THRESHOLD}%")
+        logger.debug(
+            "[POLYCLAW] Skipping: profit %s%% < threshold %s%%",
+            net_profit,
+            POLYCLAW_ALERT_THRESHOLD,
+        )
         return False
     
     try:
-        logger.info(f"[POLYCLAW] 🚀 Executing: {opportunity['strategy']}")
-        logger.info(f"[POLYCLAW]    Market: {opportunity['market_id']}")
-        logger.info(f"[POLYCLAW]    Edge: {opportunity['edge_percent']}% | Net profit: {net_profit}%")
+        logger.info("[POLYCLAW] 🚀 Executing: %s", opportunity['strategy'])
+        logger.info("[POLYCLAW]    Market: %s", opportunity['market_id'])
+        logger.info(
+            "[POLYCLAW]    Edge: %s%% | Net profit: %s%%",
+            opportunity['edge_percent'],
+            net_profit,
+        )
         
         # TODO: Actual execution via Polyclaw API
         # - Sign transaction with wallet private key
@@ -101,7 +119,11 @@ def polyclaw_cycle():
         return
     
     try:
-        logger.info(f"[POLYCLAW] Cycle | Risk: {POLYCLAW_RISK_LEVEL} | Auto-exec: {POLYCLAW_AUTO_EXECUTE}")
+        logger.info(
+            "[POLYCLAW] Cycle | Risk: %s | Auto-exec: %s",
+            POLYCLAW_RISK_LEVEL,
+            POLYCLAW_AUTO_EXECUTE,
+        )
         
         opportunities = scan_polymarket()
         
@@ -124,14 +146,18 @@ def polyclaw_cycle():
 def start_polyclaw_scheduler(app):
     """Start Polyclaw autonomous trading scheduler"""
     global scheduler
-    
+
     if not POLYCLAW_ENABLED:
         logger.warning("[POLYCLAW] Scheduler disabled (POLYCLAW_ENABLED=false)")
         return None
-    
+
+    if not APSCHEDULER_AVAILABLE:
+        logger.warning("[POLYCLAW] APScheduler not installed; scheduler startup skipped")
+        return None
+
     try:
         scheduler = BackgroundScheduler()
-        
+
         # Add polyclaw scan job
         scheduler.add_job(
             polyclaw_cycle,
