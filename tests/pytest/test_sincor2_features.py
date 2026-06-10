@@ -589,7 +589,8 @@ class TestReputationEngine:
         score_no_stake = engine.calculate_trust_score("manual")
         engine.stake_sinc("manual", 100.0)
         score_with_stake = engine.calculate_trust_score("manual")
-        expected_boost = 1.0 + math.log(100.0 + 1.0)
+        # Boost is capped at 3× base score; log(101) ≈ 5.6 which exceeds cap
+        expected_boost = min(1.0 + math.log(100.0 + 1.0), 3.0)
         assert abs(score_with_stake - score_no_stake * expected_boost) < 0.001
 
     def test_leaderboard_orders_by_trust_score(self):

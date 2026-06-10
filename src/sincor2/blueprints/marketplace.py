@@ -87,8 +87,8 @@ def register_agent():
 
     try:
         record = registry.register(card)
-    except Exception as exc:
-        return jsonify({"error": f"registration failed: {exc}"}), 500
+    except Exception:
+        return jsonify({"error": "registration failed"}), 500
 
     # Apply SINC stake to reputation engine if available
     reputation_engine = _platform_state().get("reputation_engine")

@@ -120,8 +120,9 @@ class ReputationEngine:
             + (min(profile.tasks_completed, 20) / 20.0 * 0.10)
         )
         base = round(base * latency_modifier, 4)
-        # SINC staking boost: log-scaled so large stakes have diminishing returns
-        sinc_boost = 1.0 + math.log(profile.sinc_staked + 1.0)
+        # SINC staking boost: log-scaled to give diminishing returns and prevent
+        # large stakes from dominating routing. Capped at 3× base score.
+        sinc_boost = min(1.0 + math.log(profile.sinc_staked + 1.0), 3.0)
         return round(base * sinc_boost, 4)
 
     def get_leaderboard(self, limit: int = 10) -> List[Dict[str, object]]:

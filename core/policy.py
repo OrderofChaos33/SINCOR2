@@ -297,6 +297,9 @@ class PolicyEnforcedExecutor:
             try:
                 result = handler(task)
                 elapsed = time.monotonic() - start
+                # NOTE: Timeout is checked cooperatively after handler returns.
+                # This detects slow handlers but does not interrupt long-running ones.
+                # For truly preemptive timeout, use a thread-based wrapper externally.
                 if elapsed > self.timeout_seconds:
                     raise PolicyTimeoutError(
                         f"Task exceeded timeout of {self.timeout_seconds}s "

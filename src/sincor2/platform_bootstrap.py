@@ -55,6 +55,8 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
         "router": router,
         "vertical_agents": vertical_agents,
         "reputation": reputation,
+        # reputation_engine key used by marketplace blueprint staking endpoints
+        "reputation_engine": reputation,
         "skill_vertical_map": dict(SKILL_VERTICAL_MAP),
         "registered_cards": registered,
     }
