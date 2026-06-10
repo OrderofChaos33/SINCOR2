@@ -173,7 +173,7 @@ flowchart TD
 | Vertical dispatch | `src/sincor2/vertical_dispatch.py` | Skill-id routing to vertical packs and kernel tasks |
 | Polyclaw scheduler | `src/sincor2/polyclaw_scheduler.py` | Autonomous Polymarket arbitrage scanning via APScheduler |
 | Outreach engine | `src/sincor2/outreach_engine.py` | Yelp/Google Places lead fetch + Resend cold outreach |
-| Content agent | `src/sincor2/content_agent.py` | Autonomous 2 000+ word blog posts via Claude, WordPress auto-publish, 12-week rolling calendar |
+| Content agent | `src/sincor2/content_agent.py` | Autonomous 2,000+ word blog posts via Claude, WordPress auto-publish, 12-week rolling calendar |
 | Infinite scaling | `src/sincor2/infinite_scaling_engine.py` | Agent ROI tracking and exponential spawning algorithms |
 | Partnership framework | `src/sincor2/partnership_framework.py` | Revenue-sharing, strategic alliance, and reseller network management |
 | SINAX | `src/sincor2/sinax/` | Geometric proof navigation augmentation layer |
@@ -560,7 +560,7 @@ The Revenue Orchestrator wires all three together: Stripe checkout triggers dyna
 JWT-based auth via `flask-jwt-extended`:
 
 - Access tokens (1-hour expiry) and refresh tokens (30-day expiry).
-- ****** authentication on all protected endpoints.
+- JWT token authentication via `Authorization` header on all protected endpoints.
 - Auto-generated strong in-memory fallbacks for non-production; explicit secrets required for production.
 - Admin panel protected by a separate `ADMIN_PASSWORD` env variable.
 
