@@ -10,9 +10,12 @@ from typing import Any, Dict
 
 from flask import Flask
 
+from core.policy import ExecutionPolicy
+from core.reliability import ReliabilityControls
 from core.router import TaskRouter
 from marketplace.registry import AgentCardRegistry
 from marketplace.reputation import ReputationEngine
+from marketplace.settlement import SettlementCoordinator
 from verticals.loader import (
     SKILL_VERTICAL_MAP,
     instantiate_vertical_agents,
@@ -46,17 +49,23 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Could not load platform agent card: %s", exc)
 
-    router = TaskRouter(registry=registry)
-    vertical_agents = instantiate_vertical_agents()
     reputation = ReputationEngine()
+    router = TaskRouter(registry=registry, reputation=reputation)
+    vertical_agents = instantiate_vertical_agents()
+    settlement = SettlementCoordinator()
+    policy = ExecutionPolicy()
+    reliability = ReliabilityControls()
 
     platform_state = {
         "registry": registry,
         "router": router,
         "vertical_agents": vertical_agents,
         "reputation": reputation,
-        # reputation_engine key used by marketplace blueprint staking endpoints
+        # reputation_engine alias used by marketplace blueprint staking endpoints
         "reputation_engine": reputation,
+        "settlement": settlement,
+        "policy": policy,
+        "reliability": reliability,
         "skill_vertical_map": dict(SKILL_VERTICAL_MAP),
         "registered_cards": registered,
     }
@@ -65,7 +74,8 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
     _extend_a2a_skills_from_registry(registry)
 
     logger.info(
-        "Platform bootstrap complete: %s agent cards, %s vertical agents",
+        "Platform bootstrap complete: %s agent cards, %s vertical agents, "
+        "settlement + policy + reliability initialized",
         registered,
         len(vertical_agents),
     )

@@ -10,6 +10,18 @@ from verticals.loader import resolve_vertical_agent
 
 logger = logging.getLogger(__name__)
 
+# Maps A2A skill ids for cross-cutting SINCOR skills to AgencyKernel task types.
+_KERNEL_SKILL_MAP: Dict[str, str] = {
+    "market-intelligence": "market_analysis",
+    "lead-enrichment": "lead_enrichment",
+    "contract-negotiation": "contract_review",
+    "content-creation": "content_generation",
+    "predictive-analytics": "predictive_analysis",
+    "quality-audit": "quality_audit",
+    "agent-lifecycle": "agent_management",
+    "axiom-payment": "payment_verification",
+}
+
 
 def _parse_task_payload(input_text: str, skill_id: str) -> Dict[str, Any]:
     """Build a vertical task payload from A2A input text."""
@@ -93,12 +105,18 @@ def dispatch_via_router(
     if vertical_result:
         return vertical_result
 
+    # Attempt agency kernel execution for non-vertical skills
+    kernel_result = _dispatch_via_agency_kernel(skill_id, input_text)
+    if kernel_result:
+        return kernel_result
+
     return (
         json.dumps(
             {
                 "status": "routed",
                 "agent_id": decision.agent_id,
                 "score": decision.score,
+                "trust_score": decision.trust_score,
                 "matched_skills": decision.matched_skills,
                 "message": "Task routed; awaiting agent execution hook.",
             },
@@ -106,3 +124,36 @@ def dispatch_via_router(
         ),
         None,
     )
+
+
+def _dispatch_via_agency_kernel(
+    skill_id: str,
+    input_text: str,
+) -> Optional[Tuple[str, None]]:
+    """Attempt execution through the AgencyKernel for cross-cutting SINCOR skills."""
+    task_type = _KERNEL_SKILL_MAP.get(skill_id)
+    if not task_type:
+        return None
+
+    try:
+        from sincor2.agency_kernel import AgencyKernel
+
+        kernel = AgencyKernel()
+        task_context = {
+            "task_type": task_type,
+            "skill_id": skill_id,
+            "input": input_text,
+        }
+        result = kernel.execute_task(task_context)
+        if isinstance(result, dict):
+            output = json.dumps(result, indent=2)
+        else:
+            output = str(result)
+        logger.info("Agency kernel dispatch skill=%s task_type=%s", skill_id, task_type)
+        return output, None
+    except (ImportError, AttributeError):
+        logger.debug("AgencyKernel not available for skill=%s", skill_id)
+        return None
+    except Exception as exc:
+        logger.warning("AgencyKernel dispatch error skill=%s: %s", skill_id, exc)
+        return None
