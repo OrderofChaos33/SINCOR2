@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import logging
 
-from flask import Flask
+from flask import Flask, g, has_request_context
 
 from .settings import Settings
 
-_LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s request_id=%(request_id)s %(message)s"
+_LOG_FORMAT = (
+    "%(asctime)s %(levelname)s %(name)s "
+    "request_id=%(request_id)s correlation_id=%(correlation_id)s %(message)s"
+)
 _REQUEST_ID_FACTORY_INSTALLED = False
 
 
@@ -29,6 +32,8 @@ def configure_logging() -> None:
             record = old_factory(*args, **kwargs)
             if not hasattr(record, "request_id"):
                 record.request_id = "-"
+            if not hasattr(record, "correlation_id"):
+                record.correlation_id = "-"
             return record
 
         logging.setLogRecordFactory(record_factory)
@@ -37,10 +42,16 @@ def configure_logging() -> None:
 
 class _RequestIdFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        # Our formatter requires request_id for every record; set a fallback for
-        # startup/background logs that are emitted outside request context.
+        if has_request_context():
+            record.request_id = getattr(g, "request_id", getattr(record, "request_id", "-"))
+            record.correlation_id = getattr(
+                g, "correlation_id", getattr(record, "correlation_id", record.request_id)
+            )
+
         if not hasattr(record, "request_id"):
             record.request_id = "-"
+        if not hasattr(record, "correlation_id"):
+            record.correlation_id = "-"
         return True
 
 

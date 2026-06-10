@@ -11,6 +11,7 @@ This directory contains reference Agent Cards and workflow payloads that show ho
 
 ### Workflows
 - `workflows/multi_agent_pipeline.json` — multi-agent pipeline showing discovery, routing, execution, settlement, and observability checkpoints.
+- `a2a_loop_demo.py` — minimal discovery → task submission → settlement demo against a local SINCOR2 instance.
 
 ## How to use
 
@@ -18,3 +19,13 @@ This directory contains reference Agent Cards and workflow payloads that show ho
 2. Register an Agent Card with the marketplace registry or publish it from an A2A endpoint.
 3. Adapt skills, authentication, and settlement metadata for your deployment environment.
 4. Use the workflow example as a template for chaining specialized agents with clear handoffs.
+
+## Local A2A loop demo
+
+Start the app locally, then run:
+
+```bash
+python examples/a2a_loop_demo.py
+```
+
+By default the script targets `http://127.0.0.1:8080` and submits a simulated paid task using the lead-generation vertical so you can verify discovery, execution, and settlement recording in one pass.
