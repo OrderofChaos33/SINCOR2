@@ -1,0 +1,846 @@
+{
+  "agents": [
+    {
+      "agent_id": "sincor2-compliance-automation-pack",
+      "name": "SINCOR2 Compliance Automation Pack",
+      "description": "Regulatory automation for SBOM generation, lease schedules, filing readiness, and n8n workflow bridging.",
+      "version": "1.0.0",
+      "endpoint": "https://getsincor.com/api/a2a",
+      "skills": [
+        {
+          "id": "regulatory-compliance",
+          "name": "Regulatory Compliance Automation",
+          "description": "Generates SBOM artifacts, lease schedules, and domain requirement checklists.",
+          "tags": [
+            "compliance",
+            "sbom",
+            "asc-842",
+            "sox"
+          ],
+          "examples": [
+            "Generate an SBOM for a service release.",
+            "Process a monthly lease schedule."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        },
+        {
+          "id": "n8n-workflow-bridge",
+          "name": "n8n Workflow Bridge",
+          "description": "Triggers and observes RPA automations through n8n-compatible execution flows.",
+          "tags": [
+            "n8n",
+            "automation",
+            "rpa",
+            "webhooks"
+          ],
+          "examples": [
+            "Trigger an accounts-payable automation.",
+            "Normalize a workflow webhook payload."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        }
+      ],
+      "tags": [
+        "asc-842",
+        "automation",
+        "compliance",
+        "n8n",
+        "rpa",
+        "sbom",
+        "sox",
+        "webhooks"
+      ],
+      "provider": {
+        "organization": "SINCOR2",
+        "url": "https://getsincor.com"
+      },
+      "capabilities": {
+        "streaming": false,
+        "pushNotifications": true,
+        "stateTransitionHistory": true
+      },
+      "metadata": {
+        "documentationUrl": "https://getsincor.com/docs/api",
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ]
+      },
+      "security": [
+        {
+          "apiKey": []
+        }
+      ],
+      "raw_card": {
+        "name": "SINCOR2 Compliance Automation Pack",
+        "description": "Regulatory automation for SBOM generation, lease schedules, filing readiness, and n8n workflow bridging.",
+        "version": "1.0.0",
+        "supportedInterfaces": [
+          {
+            "url": "https://getsincor.com/api/a2a",
+            "protocolBinding": "JSONRPC",
+            "protocolVersion": "1.0.1"
+          }
+        ],
+        "provider": {
+          "organization": "SINCOR2",
+          "url": "https://getsincor.com"
+        },
+        "capabilities": {
+          "streaming": false,
+          "pushNotifications": true,
+          "stateTransitionHistory": true
+        },
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ],
+        "skills": [
+          {
+            "id": "regulatory-compliance",
+            "name": "Regulatory Compliance Automation",
+            "description": "Generates SBOM artifacts, lease schedules, and domain requirement checklists.",
+            "tags": [
+              "compliance",
+              "sbom",
+              "asc-842",
+              "sox"
+            ],
+            "examples": [
+              "Generate an SBOM for a service release.",
+              "Process a monthly lease schedule."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          },
+          {
+            "id": "n8n-workflow-bridge",
+            "name": "n8n Workflow Bridge",
+            "description": "Triggers and observes RPA automations through n8n-compatible execution flows.",
+            "tags": [
+              "n8n",
+              "automation",
+              "rpa",
+              "webhooks"
+            ],
+            "examples": [
+              "Trigger an accounts-payable automation.",
+              "Normalize a workflow webhook payload."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          }
+        ],
+        "securitySchemes": {
+          "apiKey": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "documentationUrl": "https://getsincor.com/docs/api"
+      }
+    },
+    {
+      "agent_id": "sincor2-dental-practice-pack",
+      "name": "SINCOR2 Dental Practice Pack",
+      "description": "Dental practice operations and compliance automation for schedule optimization, patient recall, billing, HIPAA, OSHA, and infection control.",
+      "version": "1.0.0",
+      "endpoint": "https://getsincor.com/api/a2a",
+      "skills": [
+        {
+          "id": "dental-practice-ops",
+          "name": "Dental Practice Operations",
+          "description": "Optimizes schedule mix, recall campaigns, treatment reminders, and billing outputs.",
+          "tags": [
+            "dental",
+            "scheduling",
+            "billing",
+            "recall"
+          ],
+          "examples": [
+            "Optimize tomorrow's hygiene schedule.",
+            "Generate billing from a treatment plan."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        },
+        {
+          "id": "dental-compliance",
+          "name": "Dental Compliance",
+          "description": "Supports HIPAA, OSHA, and infection control readiness workflows.",
+          "tags": [
+            "dental",
+            "hipaa",
+            "osha",
+            "infection-control"
+          ],
+          "examples": [
+            "Generate an OSHA checklist.",
+            "Review infection control readiness."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        }
+      ],
+      "tags": [
+        "billing",
+        "dental",
+        "hipaa",
+        "infection-control",
+        "osha",
+        "recall",
+        "scheduling"
+      ],
+      "provider": {
+        "organization": "SINCOR2",
+        "url": "https://getsincor.com"
+      },
+      "capabilities": {
+        "streaming": false,
+        "pushNotifications": false,
+        "stateTransitionHistory": true
+      },
+      "metadata": {
+        "documentationUrl": "https://getsincor.com/docs/api",
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ]
+      },
+      "security": [
+        {
+          "apiKey": []
+        }
+      ],
+      "raw_card": {
+        "name": "SINCOR2 Dental Practice Pack",
+        "description": "Dental practice operations and compliance automation for schedule optimization, patient recall, billing, HIPAA, OSHA, and infection control.",
+        "version": "1.0.0",
+        "supportedInterfaces": [
+          {
+            "url": "https://getsincor.com/api/a2a",
+            "protocolBinding": "JSONRPC",
+            "protocolVersion": "1.0.1"
+          }
+        ],
+        "provider": {
+          "organization": "SINCOR2",
+          "url": "https://getsincor.com"
+        },
+        "capabilities": {
+          "streaming": false,
+          "pushNotifications": false,
+          "stateTransitionHistory": true
+        },
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ],
+        "skills": [
+          {
+            "id": "dental-practice-ops",
+            "name": "Dental Practice Operations",
+            "description": "Optimizes schedule mix, recall campaigns, treatment reminders, and billing outputs.",
+            "tags": [
+              "dental",
+              "scheduling",
+              "billing",
+              "recall"
+            ],
+            "examples": [
+              "Optimize tomorrow's hygiene schedule.",
+              "Generate billing from a treatment plan."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          },
+          {
+            "id": "dental-compliance",
+            "name": "Dental Compliance",
+            "description": "Supports HIPAA, OSHA, and infection control readiness workflows.",
+            "tags": [
+              "dental",
+              "hipaa",
+              "osha",
+              "infection-control"
+            ],
+            "examples": [
+              "Generate an OSHA checklist.",
+              "Review infection control readiness."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          }
+        ],
+        "securitySchemes": {
+          "apiKey": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "documentationUrl": "https://getsincor.com/docs/api"
+      }
+    },
+    {
+      "agent_id": "sincor2-healthcare-operations-pack",
+      "name": "SINCOR2 Healthcare Operations Pack",
+      "description": "Healthcare revenue cycle and credentialing automation for prior authorization, eligibility, claims, remittance, and payer enrollment workflows.",
+      "version": "1.0.0",
+      "endpoint": "https://getsincor.com/api/a2a",
+      "skills": [
+        {
+          "id": "healthcare-rcm",
+          "name": "Healthcare Revenue Cycle Management",
+          "description": "Automates prior auth, claim follow-up, eligibility verification, and ERA normalization.",
+          "tags": [
+            "healthcare",
+            "rcm",
+            "prior-auth",
+            "edi",
+            "claims"
+          ],
+          "examples": [
+            "Submit prior auth for outpatient imaging.",
+            "Verify eligibility before claim creation."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        },
+        {
+          "id": "provider-credentialing",
+          "name": "Provider Credentialing",
+          "description": "Coordinates CAQH, payer enrollment, license tracking, and facility privileges.",
+          "tags": [
+            "credentialing",
+            "caqh",
+            "payer-enrollment",
+            "healthcare"
+          ],
+          "examples": [
+            "Initiate CAQH enrollment for a new surgeon.",
+            "Track license expirations by provider."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        }
+      ],
+      "tags": [
+        "caqh",
+        "claims",
+        "credentialing",
+        "edi",
+        "healthcare",
+        "payer-enrollment",
+        "prior-auth",
+        "rcm"
+      ],
+      "provider": {
+        "organization": "SINCOR2",
+        "url": "https://getsincor.com"
+      },
+      "capabilities": {
+        "streaming": false,
+        "pushNotifications": false,
+        "stateTransitionHistory": true
+      },
+      "metadata": {
+        "documentationUrl": "https://getsincor.com/docs/api",
+        "defaultInputModes": [
+          "application/json",
+          "text/plain"
+        ],
+        "defaultOutputModes": [
+          "application/json",
+          "text/plain"
+        ]
+      },
+      "security": [
+        {
+          "apiKey": []
+        }
+      ],
+      "raw_card": {
+        "name": "SINCOR2 Healthcare Operations Pack",
+        "description": "Healthcare revenue cycle and credentialing automation for prior authorization, eligibility, claims, remittance, and payer enrollment workflows.",
+        "version": "1.0.0",
+        "supportedInterfaces": [
+          {
+            "url": "https://getsincor.com/api/a2a",
+            "protocolBinding": "JSONRPC",
+            "protocolVersion": "1.0.1"
+          }
+        ],
+        "provider": {
+          "organization": "SINCOR2",
+          "url": "https://getsincor.com"
+        },
+        "capabilities": {
+          "streaming": false,
+          "pushNotifications": false,
+          "stateTransitionHistory": true
+        },
+        "defaultInputModes": [
+          "application/json",
+          "text/plain"
+        ],
+        "defaultOutputModes": [
+          "application/json",
+          "text/plain"
+        ],
+        "skills": [
+          {
+            "id": "healthcare-rcm",
+            "name": "Healthcare Revenue Cycle Management",
+            "description": "Automates prior auth, claim follow-up, eligibility verification, and ERA normalization.",
+            "tags": [
+              "healthcare",
+              "rcm",
+              "prior-auth",
+              "edi",
+              "claims"
+            ],
+            "examples": [
+              "Submit prior auth for outpatient imaging.",
+              "Verify eligibility before claim creation."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          },
+          {
+            "id": "provider-credentialing",
+            "name": "Provider Credentialing",
+            "description": "Coordinates CAQH, payer enrollment, license tracking, and facility privileges.",
+            "tags": [
+              "credentialing",
+              "caqh",
+              "payer-enrollment",
+              "healthcare"
+            ],
+            "examples": [
+              "Initiate CAQH enrollment for a new surgeon.",
+              "Track license expirations by provider."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          }
+        ],
+        "securitySchemes": {
+          "apiKey": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "documentationUrl": "https://getsincor.com/docs/api"
+      }
+    },
+    {
+      "agent_id": "sincor2-lead-generation-pack",
+      "name": "SINCOR2 Lead Generation Pack",
+      "description": "Lead enrichment, ICP matching, scoring, and outreach automation for revenue teams and operator-led growth workflows.",
+      "version": "1.0.0",
+      "endpoint": "https://getsincor.com/api/a2a",
+      "skills": [
+        {
+          "id": "lead-enrichment-outbound",
+          "name": "Lead Enrichment and Outbound",
+          "description": "Enriches leads, scores opportunities, drafts messaging, and tracks engagement.",
+          "tags": [
+            "lead-gen",
+            "outbound",
+            "sales",
+            "enrichment"
+          ],
+          "examples": [
+            "Enrich a SaaS lead and score fit.",
+            "Create a three-step outreach sequence."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        },
+        {
+          "id": "icp-matching",
+          "name": "Ideal Customer Profile Matching",
+          "description": "Defines ICP criteria and ranks leads by fit.",
+          "tags": [
+            "icp",
+            "lead-scoring",
+            "sales-ops"
+          ],
+          "examples": [
+            "Define an ICP for healthcare SaaS.",
+            "Rank a batch of leads by fit."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        }
+      ],
+      "tags": [
+        "enrichment",
+        "icp",
+        "lead-gen",
+        "lead-scoring",
+        "outbound",
+        "sales",
+        "sales-ops"
+      ],
+      "provider": {
+        "organization": "SINCOR2",
+        "url": "https://getsincor.com"
+      },
+      "capabilities": {
+        "streaming": false,
+        "pushNotifications": false,
+        "stateTransitionHistory": true
+      },
+      "metadata": {
+        "documentationUrl": "https://getsincor.com/docs/api",
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ]
+      },
+      "security": [
+        {
+          "apiKey": []
+        }
+      ],
+      "raw_card": {
+        "name": "SINCOR2 Lead Generation Pack",
+        "description": "Lead enrichment, ICP matching, scoring, and outreach automation for revenue teams and operator-led growth workflows.",
+        "version": "1.0.0",
+        "supportedInterfaces": [
+          {
+            "url": "https://getsincor.com/api/a2a",
+            "protocolBinding": "JSONRPC",
+            "protocolVersion": "1.0.1"
+          }
+        ],
+        "provider": {
+          "organization": "SINCOR2",
+          "url": "https://getsincor.com"
+        },
+        "capabilities": {
+          "streaming": false,
+          "pushNotifications": false,
+          "stateTransitionHistory": true
+        },
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ],
+        "skills": [
+          {
+            "id": "lead-enrichment-outbound",
+            "name": "Lead Enrichment and Outbound",
+            "description": "Enriches leads, scores opportunities, drafts messaging, and tracks engagement.",
+            "tags": [
+              "lead-gen",
+              "outbound",
+              "sales",
+              "enrichment"
+            ],
+            "examples": [
+              "Enrich a SaaS lead and score fit.",
+              "Create a three-step outreach sequence."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          },
+          {
+            "id": "icp-matching",
+            "name": "Ideal Customer Profile Matching",
+            "description": "Defines ICP criteria and ranks leads by fit.",
+            "tags": [
+              "icp",
+              "lead-scoring",
+              "sales-ops"
+            ],
+            "examples": [
+              "Define an ICP for healthcare SaaS.",
+              "Rank a batch of leads by fit."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          }
+        ],
+        "securitySchemes": {
+          "apiKey": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "documentationUrl": "https://getsincor.com/docs/api"
+      }
+    },
+    {
+      "agent_id": "sincor2-trading-intelligence-pack",
+      "name": "SINCOR2 Trading Intelligence Pack",
+      "description": "Prediction market and trading support for signal generation, market evaluation, and disciplined position sizing.",
+      "version": "1.0.0",
+      "endpoint": "https://getsincor.com/api/a2a",
+      "skills": [
+        {
+          "id": "openclaw-trading",
+          "name": "OpenClaw Trading Intelligence",
+          "description": "Generates adaptive trade signals and position guidance using self-improving win-rate tracking.",
+          "tags": [
+            "trading",
+            "signals",
+            "kelly",
+            "prediction-markets"
+          ],
+          "examples": [
+            "Generate a market signal for a Polymarket question.",
+            "Recommend a position size from bankroll."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        },
+        {
+          "id": "polymarket-execution",
+          "name": "Polymarket Market Agent",
+          "description": "Surfaces open markets, calculates edge, and produces order tickets.",
+          "tags": [
+            "polymarket",
+            "markets",
+            "execution",
+            "forecasting"
+          ],
+          "examples": [
+            "List open crypto markets.",
+            "Place a mock order on a yes/no market."
+          ],
+          "inputModes": [
+            "application/json"
+          ],
+          "outputModes": [
+            "application/json"
+          ]
+        }
+      ],
+      "tags": [
+        "execution",
+        "forecasting",
+        "kelly",
+        "markets",
+        "polymarket",
+        "prediction-markets",
+        "signals",
+        "trading"
+      ],
+      "provider": {
+        "organization": "SINCOR2",
+        "url": "https://getsincor.com"
+      },
+      "capabilities": {
+        "streaming": true,
+        "pushNotifications": false,
+        "stateTransitionHistory": true
+      },
+      "metadata": {
+        "documentationUrl": "https://getsincor.com/docs/api",
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ]
+      },
+      "security": [
+        {
+          "apiKey": []
+        }
+      ],
+      "raw_card": {
+        "name": "SINCOR2 Trading Intelligence Pack",
+        "description": "Prediction market and trading support for signal generation, market evaluation, and disciplined position sizing.",
+        "version": "1.0.0",
+        "supportedInterfaces": [
+          {
+            "url": "https://getsincor.com/api/a2a",
+            "protocolBinding": "JSONRPC",
+            "protocolVersion": "1.0.1"
+          }
+        ],
+        "provider": {
+          "organization": "SINCOR2",
+          "url": "https://getsincor.com"
+        },
+        "capabilities": {
+          "streaming": true,
+          "pushNotifications": false,
+          "stateTransitionHistory": true
+        },
+        "defaultInputModes": [
+          "application/json"
+        ],
+        "defaultOutputModes": [
+          "application/json"
+        ],
+        "skills": [
+          {
+            "id": "openclaw-trading",
+            "name": "OpenClaw Trading Intelligence",
+            "description": "Generates adaptive trade signals and position guidance using self-improving win-rate tracking.",
+            "tags": [
+              "trading",
+              "signals",
+              "kelly",
+              "prediction-markets"
+            ],
+            "examples": [
+              "Generate a market signal for a Polymarket question.",
+              "Recommend a position size from bankroll."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          },
+          {
+            "id": "polymarket-execution",
+            "name": "Polymarket Market Agent",
+            "description": "Surfaces open markets, calculates edge, and produces order tickets.",
+            "tags": [
+              "polymarket",
+              "markets",
+              "execution",
+              "forecasting"
+            ],
+            "examples": [
+              "List open crypto markets.",
+              "Place a mock order on a yes/no market."
+            ],
+            "inputModes": [
+              "application/json"
+            ],
+            "outputModes": [
+              "application/json"
+            ]
+          }
+        ],
+        "securitySchemes": {
+          "apiKey": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "documentationUrl": "https://getsincor.com/docs/api"
+      }
+    }
+  ]
+}

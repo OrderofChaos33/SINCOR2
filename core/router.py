@@ -50,13 +50,12 @@ class TaskRouter:
         self.route_history.append(decision)
         return decision
 
-    def find_available_agents(self, required_skills: Sequence[str], max_load: float = 5.0) -> List[AgentCardRecord]:
+    def find_available_agents(self, required_skills: Sequence[str], max_load: Optional[float] = None) -> List[AgentCardRecord]:
         """Return agents whose current load does not exceed the threshold."""
-        threshold = self.DEFAULT_MAX_LOAD if max_load == 5.0 else max_load
-        """Return agents whose current load does not exceed the threshold."""
+        threshold = self.DEFAULT_MAX_LOAD if max_load is None else max_load
         candidates = []
         for record in self.registry.list_all():
-            if self.agent_loads.get(record.agent_id, 0.0) > max_load:
+            if self.agent_loads.get(record.agent_id, 0.0) >= threshold:
                 continue
             if self.matcher.find_best_match([record], required_skills=required_skills):
                 candidates.append(record)

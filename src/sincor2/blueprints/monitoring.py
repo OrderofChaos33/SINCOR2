@@ -11,12 +11,18 @@ monitoring_bp = Blueprint("monitoring", __name__)
 @monitoring_bp.get("/health")
 def health_check():
     settings = current_app.config["SINCOR_SETTINGS"]
+    platform = current_app.extensions.get("sincor_platform", {})
     return jsonify(
         {
             "status": "healthy",
             "service": "SINCOR2",
             "environment": settings.environment,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "platform": {
+                "agent_cards": platform.get("registered_cards", 0),
+                "vertical_agents": len(platform.get("vertical_agents", {})),
+                "marketplace": "available" if platform.get("registry") else "degraded",
+            },
         }
     )
 

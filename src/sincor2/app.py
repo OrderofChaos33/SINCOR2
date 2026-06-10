@@ -12,15 +12,17 @@ from flask import Flask, g, request
 from sincor2.a2a_integration import A2ARouter
 from sincor2.auth_system import SINCORAuth
 from sincor2.blueprints.auth import auth_bp
+from sincor2.blueprints.marketplace import marketplace_bp
 from sincor2.blueprints.monitoring import monitoring_bp
 from sincor2.blueprints.pages import pages_bp
 from sincor2.blueprints.payments import payments_bp
 from sincor2.blueprints.waitlist import waitlist_bp
+from sincor2.platform_bootstrap import bootstrap_platform
 from sincor2.error_handling import register_error_handlers
 from sincor2.settings import Settings
 from sincor2.startup import run_startup_initializers
 from sincor2.stripe_checkout import StripeCheckout
-from sincor2.waitlist_system import waitlist_manager
+from sincor2 import waitlist_system
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -73,13 +75,16 @@ def create_app() -> Flask:
         except Exception as exc:  # pragma: no cover
             logger.warning("Stripe initialization failed: %s", exc)
 
-    app.extensions["waitlist_manager"] = waitlist_manager
+    app.extensions["waitlist_manager"] = waitlist_system.waitlist_manager
+
+    bootstrap_platform(app)
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(payments_bp)
     app.register_blueprint(waitlist_bp)
     app.register_blueprint(monitoring_bp)
+    app.register_blueprint(marketplace_bp)
 
     app.register_blueprint(A2ARouter().blueprint)
 

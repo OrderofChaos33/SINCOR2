@@ -11,7 +11,8 @@ const https = require('https');
 const fs = require('fs');
 
 // Config
-const CURVE = '0xb627F53E08AD7d455e787d052C18D6877020E2BF';
+// Live SincBondingCurve — see CANONICAL_ADDRESSES.md
+const CURVE = process.env.SINC_BONDING_CURVE || '0x75dE341a2BC81806198364F125d4Cde36527619C';
 const RPC_WS = 'wss://base-mainnet.public.blastapi.io'; // Free WebSocket RPC
 const RPC_HTTP = 'https://mainnet.base.org';
 

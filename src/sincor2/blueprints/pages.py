@@ -94,3 +94,8 @@ def security():
 @pages_bp.get("/billing")
 def billing():
     return redirect("/dashboard", code=302)
+
+
+@pages_bp.get("/refer")
+def refer():
+    return render_template("refer.html")

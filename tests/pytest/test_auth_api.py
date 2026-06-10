@@ -3,7 +3,7 @@
 def test_login_success(client):
     response = client.post(
         "/api/auth/login",
-        json={"username": "admin", "password": "admin-password"},
+        json={"username": "admin", "password": "admin-password-32-char-minimum-ok"},
     )
     assert response.status_code == 200
     payload = response.get_json()

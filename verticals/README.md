@@ -8,4 +8,4 @@ All verticals follow the same high-standard structure:
 - Detailed capability definitions
 - Clear A2A Agent Card output
 
-Current status: Production-grade scaffolding with resilience patterns ready for implementation.
+Current status: Wired to the live runtime via `platform_bootstrap.py`. Vertical agents dispatch through A2A for registered skill ids. External API integrations remain the next implementation step per vertical.

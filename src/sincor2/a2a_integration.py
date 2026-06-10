@@ -1310,6 +1310,21 @@ def _dispatch_to_swarm(task: A2ATask):
     Returns (output: str | None, error: str | None).
     """
     try:
+        from flask import has_request_context, current_app
+        from sincor2.vertical_dispatch import dispatch_vertical_task, dispatch_via_router
+
+        platform_state = None
+        if has_request_context():
+            platform_state = current_app.extensions.get("sincor_platform")
+
+        vertical_result = dispatch_vertical_task(task.skill_id, task.input_text, platform_state)
+        if vertical_result:
+            return vertical_result
+
+        routed_result = dispatch_via_router(task.id, task.skill_id, task.input_text, platform_state)
+        if routed_result:
+            return routed_result
+
         # Try to import the swarm's IBI module for real responses
         try:
             from sincor2.instant_business_intelligence import BusinessIntelligenceEngine

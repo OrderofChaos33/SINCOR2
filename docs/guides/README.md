@@ -21,11 +21,12 @@ This guide is the starting point for engineers, platform operators, and external
 - `examples/` — example Agent Cards and workflow payloads.
 
 ### Adding a new vertical pack
+See [vertical-integration.md](vertical-integration.md) for the full wiring guide. Summary:
 1. Create a self-contained package under `verticals/<name>/`.
 2. Add `__init__.py`, one or more agent modules, `agent_card.json`, and `README.md`.
-3. Use dataclasses for data models and add clear docstrings plus type hints.
+3. Register the agent class in `verticals/loader.py` and map skill ids.
 4. Keep the Agent Card aligned with the skills actually implemented.
-5. Update examples or docs if the new pack changes discovery or operator workflows.
+5. Add tests in `tests/pytest/test_platform_integration.py`.
 
 ### Adding or updating Agent Cards
 - Publish accurate `supportedInterfaces`, `skills`, `securitySchemes`, and `documentationUrl` fields.
@@ -40,8 +41,9 @@ This guide is the starting point for engineers, platform operators, and external
 ## Operator guide
 
 ### Runtime operations
-- Use `/health` for health probes and uptime checks.
+- Use `/health` for health probes (includes marketplace bootstrap status).
 - Monitor `/api/monitoring/dashboard` for payment and waitlist subsystem readiness.
+- Use `/api/marketplace/agents` and `/api/marketplace/routing/stats` for discovery and routing telemetry.
 - Treat A2A task storage as process-local unless a persistent backend is configured.
 
 ### Deployment workflow

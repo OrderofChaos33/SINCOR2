@@ -107,10 +107,10 @@ use_parentheses = true
 ensure_newline_before_comments = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests/pytest"]
 python_files = ["test_*.py"]
-addopts = "-ra"
+addopts = "-ra -p no:pytest_ethereum"
 
 [tool.ruff]
 line-length = 100

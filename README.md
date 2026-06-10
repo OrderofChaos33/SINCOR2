@@ -114,6 +114,8 @@ SINCOR2 uses SINC for utility and governance-oriented platform mechanics while A
 
 - [API reference](docs/api/README.md)
 - [Contributor and operator guides](docs/guides/README.md)
+- [Vertical pack integration](docs/guides/vertical-integration.md)
+- [Canonical on-chain addresses](CANONICAL_ADDRESSES.md)
 - [Token overview](docs/token/README.md)
 - [Examples](examples/README.md)
 - [Deployment guide](DEPLOYMENT_GUIDE.md)
