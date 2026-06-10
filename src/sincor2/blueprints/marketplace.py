@@ -1,4 +1,4 @@
-"""Marketplace discovery and routing API."""
+"""Marketplace discovery, routing, and registration API."""
 
 from __future__ import annotations
 
@@ -50,6 +50,76 @@ def get_agent(agent_id: str):
             "provider": record.provider,
         }
     )
+
+
+@marketplace_bp.post("/register")
+def register_agent():
+    """Register an external A2A agent with the SINCOR marketplace.
+
+    Accepts an Agent Card payload and optionally a SINC stake amount.
+
+    Request body (JSON):
+    --------------------
+    ``agent_card``: dict — A2A v1.0.1 compliant Agent Card.
+    ``agent_url``: str  — Base URL where the agent is hosted.
+    ``sinc_stake``: int — Optional SINC token stake (default 0).
+
+    Returns a registration receipt with ``agent_id``, ``status``, and
+    routing metadata.
+    """
+    body = request.get_json(silent=True) or {}
+    card = body.get("agent_card")
+    sinc_stake = int(body.get("sinc_stake", 0))
+
+    if not card:
+        return jsonify({"error": "agent_card is required"}), 400
+
+    # Minimal A2A compliance check
+    for required_field in ("name", "description", "version"):
+        if not card.get(required_field):
+            return jsonify({"error": f"agent_card missing required field '{required_field}'"}), 400
+    if not card.get("skills"):
+        return jsonify({"error": "agent_card must include at least one skill"}), 400
+
+    registry = _platform_state().get("registry")
+    if registry is None:
+        return jsonify({"error": "marketplace not initialized"}), 503
+
+    try:
+        record = registry.register(card)
+    except Exception as exc:
+        return jsonify({"error": f"registration failed: {exc}"}), 500
+
+    # Apply SINC stake to reputation engine if available
+    reputation_engine = _platform_state().get("reputation_engine")
+    if reputation_engine and sinc_stake > 0:
+        try:
+            reputation_engine.stake_sinc(record.agent_id, float(sinc_stake))
+        except Exception:
+            pass  # Non-fatal — staking can be applied later
+
+    # Determine routing priority based on trust score
+    routing_priority = "standard"
+    if reputation_engine:
+        rep = reputation_engine.get_reputation(record.agent_id)
+        trust = float(rep.get("trust_score", 0.0))
+        if trust > 0.8:
+            routing_priority = "premium"
+        elif trust > 0.5:
+            routing_priority = "elevated"
+
+    return jsonify(
+        {
+            "agent_id": record.agent_id,
+            "status": "registered",
+            "name": record.name,
+            "version": record.version,
+            "sinc_staked": sinc_stake,
+            "routing_priority": routing_priority,
+            "skills_indexed": len(record.skills),
+            "marketplace_url": f"/api/marketplace/agents/{record.agent_id}",
+        }
+    ), 201
 
 
 @marketplace_bp.get("/skills")
@@ -117,3 +187,66 @@ def list_verticals():
         for agent in agents.values()
     ]
     return jsonify({"verticals": payload, "count": len(payload)})
+
+
+@marketplace_bp.get("/reputation/<agent_id>")
+def get_reputation(agent_id: str):
+    """Return the SINC-weighted reputation profile for an agent."""
+    reputation_engine = _platform_state().get("reputation_engine")
+    if reputation_engine is None:
+        return jsonify({"agent_id": agent_id, "trust_score": 0.0, "sinc_staked": 0.0})
+    return jsonify(reputation_engine.get_reputation(agent_id))
+
+
+@marketplace_bp.get("/reputation/leaderboard")
+def reputation_leaderboard():
+    """Return the top agents ranked by SINC-weighted trust score."""
+    reputation_engine = _platform_state().get("reputation_engine")
+    limit = min(int(request.args.get("limit", 10)), 100)
+    if reputation_engine is None:
+        return jsonify({"leaderboard": [], "count": 0})
+    board = reputation_engine.get_leaderboard(limit=limit)
+    return jsonify({"leaderboard": board, "count": len(board)})
+
+
+@marketplace_bp.post("/reputation/<agent_id>/stake")
+def stake_sinc(agent_id: str):
+    """Stake SINC tokens for an agent to boost routing priority.
+
+    Body: ``{"amount": <float>}``
+    """
+    reputation_engine = _platform_state().get("reputation_engine")
+    if reputation_engine is None:
+        return jsonify({"error": "reputation engine not initialized"}), 503
+    body = request.get_json(silent=True) or {}
+    amount = float(body.get("amount", 0))
+    if amount <= 0:
+        return jsonify({"error": "amount must be > 0"}), 400
+    profile = reputation_engine.stake_sinc(agent_id, amount)
+    return jsonify({
+        "agent_id": agent_id,
+        "sinc_staked": profile.sinc_staked,
+        "trust_score": profile.trust_score,
+        "message": f"Staked {amount} SINC. On-chain transaction required to finalise.",
+    })
+
+
+@marketplace_bp.post("/reputation/<agent_id>/unstake")
+def unstake_sinc(agent_id: str):
+    """Unstake SINC tokens for an agent.
+
+    Body: ``{"amount": <float>}`` — omit to unstake all.
+    """
+    reputation_engine = _platform_state().get("reputation_engine")
+    if reputation_engine is None:
+        return jsonify({"error": "reputation engine not initialized"}), 503
+    body = request.get_json(silent=True) or {}
+    amount = body.get("amount")
+    profile = reputation_engine.unstake_sinc(
+        agent_id, float(amount) if amount is not None else None
+    )
+    return jsonify({
+        "agent_id": agent_id,
+        "sinc_staked": profile.sinc_staked,
+        "trust_score": profile.trust_score,
+    })
