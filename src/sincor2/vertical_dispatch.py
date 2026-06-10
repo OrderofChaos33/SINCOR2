@@ -10,6 +10,18 @@ from verticals.loader import resolve_vertical_agent
 
 logger = logging.getLogger(__name__)
 
+# Maps A2A skill ids for cross-cutting SINCOR skills to AgencyKernel task types.
+_KERNEL_SKILL_MAP: Dict[str, str] = {
+    "market-intelligence": "market_analysis",
+    "lead-enrichment": "lead_enrichment",
+    "contract-negotiation": "contract_review",
+    "content-creation": "content_generation",
+    "predictive-analytics": "predictive_analysis",
+    "quality-audit": "quality_audit",
+    "agent-lifecycle": "agent_management",
+    "axiom-payment": "payment_verification",
+}
+
 
 def _parse_task_payload(input_text: str, skill_id: str) -> Dict[str, Any]:
     """Build a vertical task payload from A2A input text."""
@@ -99,18 +111,6 @@ def _dispatch_via_agency_kernel(
     input_text: str,
 ) -> Optional[Tuple[str, None]]:
     """Attempt execution through the AgencyKernel for cross-cutting SINCOR skills."""
-    # Skill → kernel task type map
-    _KERNEL_SKILL_MAP: Dict[str, str] = {
-        "market-intelligence": "market_analysis",
-        "lead-enrichment": "lead_enrichment",
-        "contract-negotiation": "contract_review",
-        "content-creation": "content_generation",
-        "predictive-analytics": "predictive_analysis",
-        "quality-audit": "quality_audit",
-        "agent-lifecycle": "agent_management",
-        "axiom-payment": "payment_verification",
-    }
-
     task_type = _KERNEL_SKILL_MAP.get(skill_id)
     if not task_type:
         return None

@@ -1016,13 +1016,15 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
             return
 
         amount_display = Decimal(axm_paid) / Decimal(10 ** 18)
+        # Use 15-minute expiry — enough time for on-chain confirmation + retries.
+        settlement_expiry = int(os.getenv("A2A_SETTLEMENT_EXPIRY_MINUTES", "15"))
         quote = settlement.create_quote(
             task_reference=task.id,
             payer=task.caller_id,
             payee=TREASURY_WALLET,
             amount=amount_display,
             token_symbol="AXIOM",
-            expires_in_minutes=1,
+            expires_in_minutes=settlement_expiry,
         )
         settlement.confirm_payment(
             quote_id=quote.quote_id,

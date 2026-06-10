@@ -254,9 +254,9 @@ def submit_task():
             result = reliability.call_with_breaker(f"vertical:{skill_id}", _execute)
         else:
             result = _execute()
-    except Exception as exc:
+    except Exception:
         logger.exception("marketplace task execution failed skill=%s", skill_id)
-        return jsonify({"error": str(exc), "skill_id": skill_id}), 500
+        return jsonify({"error": "task execution failed", "skill_id": skill_id}), 500
 
     output, error = result if result else (None, "no output produced")
 
@@ -339,9 +339,9 @@ def confirm_settlement():
             tx_hash=tx_hash,
             confirmed_amount=confirmed_amount,
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("settlement confirm failed quote=%s", quote_id)
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "settlement confirmation failed"}), 500
 
     from dataclasses import asdict
     return jsonify({"settlement": asdict(record)})

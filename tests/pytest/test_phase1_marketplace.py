@@ -75,9 +75,9 @@ class TestReputationEngine:
     def test_latency_modifier_applied(self, reputation):
         # Very high latency should reduce trust
         profile_fast = reputation.record_task_outcome("fast-agent", success=True, quality_rating=5.0, latency_ms=100)
-        # Reset
-        rep2 = ReputationEngine()
-        profile_slow = rep2.record_task_outcome("slow-agent", success=True, quality_rating=5.0, latency_ms=90_000)
+        # Reset with a fresh engine to isolate the slow-agent
+        slow_reputation_engine = ReputationEngine()
+        profile_slow = slow_reputation_engine.record_task_outcome("slow-agent", success=True, quality_rating=5.0, latency_ms=90_000)
         assert profile_fast.trust_score > profile_slow.trust_score
 
 
