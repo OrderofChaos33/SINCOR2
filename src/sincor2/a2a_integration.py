@@ -991,7 +991,54 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
             task.history.append(agent_msg)
         _update_task(task, state=TaskState.COMPLETED, output=output)
 
+        # Record settlement if payment was included
+        if axm_paid > 0 and tx_hash:
+            _record_a2a_settlement(task, axm_paid, tx_hash)
+
     return _rpc_ok(_task_to_rpc(task, history_length=history_length), rpc_id=rpc_id)
+
+
+def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:
+    """Create a settlement record in the platform coordinator for a paid A2A task."""
+    try:
+        from decimal import Decimal
+        from flask import has_request_context, current_app
+
+        if not has_request_context():
+            return
+
+        platform_state = current_app.extensions.get("sincor_platform")
+        if not platform_state:
+            return
+
+        settlement = platform_state.get("settlement")
+        if settlement is None:
+            return
+
+        amount_display = Decimal(axm_paid) / Decimal(10 ** 18)
+        # Use 15-minute expiry — enough time for on-chain confirmation + retries.
+        settlement_expiry = int(os.getenv("A2A_SETTLEMENT_EXPIRY_MINUTES", "15"))
+        quote = settlement.create_quote(
+            task_reference=task.id,
+            payer=task.caller_id,
+            payee=TREASURY_WALLET,
+            amount=amount_display,
+            token_symbol="AXIOM",
+            expires_in_minutes=settlement_expiry,
+        )
+        settlement.confirm_payment(
+            quote_id=quote.quote_id,
+            tx_hash=tx_hash,
+            confirmed_amount=amount_display,
+        )
+        logger.info(
+            "A2A settlement recorded task=%s axm=%.4f tx=%s",
+            task.id,
+            float(amount_display),
+            tx_hash,
+        )
+    except Exception as exc:
+        logger.warning("Settlement record failed for task %s: %s", task.id, exc)
 
 
 def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
