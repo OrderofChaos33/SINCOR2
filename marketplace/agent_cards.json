@@ -841,6 +841,44 @@
         ],
         "documentationUrl": "https://getsincor.com/docs/api"
       }
+    },
+    {
+      "agent_id": "external-agent",
+      "name": "External Agent",
+      "description": "An external agent.",
+      "version": "1.0.0",
+      "endpoint": "http://ext.example.com/api/a2a",
+      "skills": [
+        {
+          "id": "ext-skill",
+          "name": "External Skill"
+        }
+      ],
+      "tags": [],
+      "provider": {},
+      "capabilities": {},
+      "metadata": {
+        "documentationUrl": null,
+        "defaultInputModes": [],
+        "defaultOutputModes": []
+      },
+      "security": [],
+      "raw_card": {
+        "description": "An external agent.",
+        "name": "External Agent",
+        "skills": [
+          {
+            "id": "ext-skill",
+            "name": "External Skill"
+          }
+        ],
+        "supportedInterfaces": [
+          {
+            "url": "http://ext.example.com/api/a2a"
+          }
+        ],
+        "version": "1.0.0"
+      }
     }
   ]
 }

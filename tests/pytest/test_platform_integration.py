@@ -89,7 +89,15 @@ def test_vertical_dispatch_healthcare():
     platform_state = {"vertical_agents": agents}
     output, error = dispatch_vertical_task(
         "healthcare-rcm",
-        json.dumps({"task_type": "eligibility_verification", "payload": {"patient_id": "P-1"}}),
+        json.dumps({
+            "task_type": "eligibility_verification",
+            "payload": {
+                "member_id": "M-12345",
+                "payer_id": "BCBS01",
+                "service_date": "2026-06-10",
+                "provider_npi": "1234567890",
+            },
+        }),
         platform_state,
     )
     assert error is None

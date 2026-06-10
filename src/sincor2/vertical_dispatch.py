@@ -46,8 +46,15 @@ def dispatch_vertical_task(
     skill_id: str,
     input_text: str,
     platform_state: Optional[Dict[str, Any]],
+    task_id: Optional[str] = None,
+    caller_id: str = "",
 ) -> Optional[Tuple[str, None]]:
-    """Try to fulfill a task via a registered vertical agent."""
+    """Try to fulfill a task via a registered vertical agent.
+
+    Tasks are routed through the :class:`~core.policy.PolicyEnforcedExecutor`
+    for auth checks, policy rules, retry-with-backoff, and AXIOM settlement
+    triggering before and after execution.
+    """
     if not platform_state:
         return None
 
@@ -57,7 +64,18 @@ def dispatch_vertical_task(
         return None
 
     task_payload = _parse_task_payload(input_text, skill_id)
-    result = agent.run(task_payload)
+    task_payload.setdefault("task_id", task_id or "")
+    task_payload.setdefault("caller_id", caller_id)
+
+    # Route through policy-enforced executor for rule checks + retry
+    try:
+        from core.policy import get_default_executor
+        executor = get_default_executor()
+        result = executor.execute(agent.run, task_payload)
+    except Exception:
+        # Fallback: direct execution (preserves backward compat if policy import fails)
+        result = agent.run(task_payload)
+
     output = json.dumps(result, indent=2) if isinstance(result, dict) else str(result)
     logger.info("Vertical dispatch skill=%s agent=%s status=%s", skill_id, agent.name, result.get("status"))
     return output, None
@@ -68,6 +86,7 @@ def dispatch_via_router(
     skill_id: str,
     input_text: str,
     platform_state: Optional[Dict[str, Any]],
+    caller_id: str = "",
 ) -> Optional[Tuple[str, None]]:
     """Route through the orchestration core when a matching agent card exists."""
     if not platform_state:
@@ -81,7 +100,8 @@ def dispatch_via_router(
     if not decision:
         return None
 
-    vertical_result = dispatch_vertical_task(skill_id, input_text, platform_state)
+    vertical_result = dispatch_vertical_task(skill_id, input_text, platform_state,
+                                             task_id=task_id, caller_id=caller_id)
     if vertical_result:
         return vertical_result
 

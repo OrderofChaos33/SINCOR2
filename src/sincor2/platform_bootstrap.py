@@ -61,6 +61,8 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
         "router": router,
         "vertical_agents": vertical_agents,
         "reputation": reputation,
+        # reputation_engine alias used by marketplace blueprint staking endpoints
+        "reputation_engine": reputation,
         "settlement": settlement,
         "policy": policy,
         "reliability": reliability,
