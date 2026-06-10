@@ -27,10 +27,13 @@ Running this example
     # Run (starts a local orchestrator on port 8002):
     PYTHONPATH=src:src/sincor2 python examples/workflows/cross_framework_workflow.py
 
-    # Test via A2A:
+    # Test via A2A (bash/zsh — backslash continuations require bash or zsh):
     curl -s -X POST http://localhost:8002/api/a2a \\
       -H 'Content-Type: application/json' \\
       -d '{"jsonrpc":"2.0","id":1,"method":"message/send","params":{"message":{"parts":[{"text":"Verify eligibility for member M-12345 with BlueCross on 2026-06-10"}]}}}'
+
+    # One-liner for all shells:
+    curl -s -X POST http://localhost:8002/api/a2a -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"message/send","params":{"message":{"parts":[{"text":"Verify eligibility"}]}}}'
 """
 
 from __future__ import annotations
