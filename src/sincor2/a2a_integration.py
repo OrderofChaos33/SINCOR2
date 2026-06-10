@@ -44,15 +44,13 @@ Quick start
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
 import threading
-import time
 import urllib.request as _urllib_request
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional
@@ -527,6 +525,13 @@ def _new_task(skill_id: str, input_text: str, caller_id: str,
         history=[user_msg],
         axm_paid=axm_paid,
         tx_hash=tx_hash,
+        metadata={
+            "skill_id": skill_id,
+            "caller_id": caller_id,
+            "simulation_mode": bool(
+                axm_paid and tx_hash and str(tx_hash).startswith("0xSIMULATED")
+            ),
+        },
     )
     with _store_lock:
         _tasks[task_id] = task
@@ -707,7 +712,6 @@ class A2ARouter:
             body   = request.get_json(force=True, silent=True) or {}
             method = body.get("method", "")
             rpc_id = body.get("id")
-            params = body.get("params") or {}
 
             # Streaming methods → SSE response
             if method in ("message/stream", "tasks/resubscribe"):
@@ -1002,7 +1006,8 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
     """Create a settlement record in the platform coordinator for a paid A2A task."""
     try:
         from decimal import Decimal
-        from flask import has_request_context, current_app
+
+        from flask import current_app, has_request_context
 
         if not has_request_context():
             return
@@ -1357,14 +1362,21 @@ def _dispatch_to_swarm(task: A2ATask):
     Returns (output: str | None, error: str | None).
     """
     try:
-        from flask import has_request_context, current_app
+        from flask import current_app, has_request_context
+
         from sincor2.vertical_dispatch import dispatch_vertical_task, dispatch_via_router
 
         platform_state = None
         if has_request_context():
             platform_state = current_app.extensions.get("sincor_platform")
 
-        vertical_result = dispatch_vertical_task(task.skill_id, task.input_text, platform_state)
+        vertical_result = dispatch_vertical_task(
+            task.skill_id,
+            task.input_text,
+            platform_state,
+            task_id=task.id,
+            caller_id=task.caller_id,
+        )
         if vertical_result:
             return vertical_result
 
