@@ -8,8 +8,8 @@ Covers:
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 import pytest
 
@@ -18,16 +18,15 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from agents.toa import (
+from agents.toa import (  # noqa: E402
+    KernelForecaster,
+    MonteCarloSimulator,
+    RollingFeedbackAgent,
     TOAConfig,
     TOAOrchestrator,
     TOAStateStore,
-    KernelForecaster,
-    MonteCarloSimulator,
     WFCCollapser,
-    RollingFeedbackAgent,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -362,8 +361,8 @@ class TestTOAEndToEnd:
 
     def test_e2e_with_task_router(self, simple_context, tmp_path):
         """Full pipeline: forecast → simulate → collapse → route."""
-        from marketplace.registry import AgentCardRegistry
         from core.router import TaskRouter
+        from marketplace.registry import AgentCardRegistry
 
         registry = AgentCardRegistry(storage_path=tmp_path / "cards.json")
         registry.register({
@@ -373,8 +372,10 @@ class TestTOAEndToEnd:
             "version": "1.0.0",
             "supportedInterfaces": [{"url": "/exec/v1"}],
             "skills": [
-                {"id": "execution", "name": "Execution", "description": "Execute tasks", "tags": ["execution"]},
-                {"id": "revenue", "name": "Revenue", "description": "Revenue tasks", "tags": ["revenue"]},
+                {"id": "execution", "name": "Execution", "description": "Execute tasks",
+                 "tags": ["execution"]},
+                {"id": "revenue", "name": "Revenue", "description": "Revenue tasks",
+                 "tags": ["revenue"]},
             ],
         })
 

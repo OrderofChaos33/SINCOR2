@@ -9,6 +9,7 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from flask import Flask, g, request
 
+from sincor2 import waitlist_system
 from sincor2.a2a_integration import A2ARouter
 from sincor2.auth_system import SINCORAuth
 from sincor2.blueprints.auth import auth_bp
@@ -17,12 +18,11 @@ from sincor2.blueprints.monitoring import monitoring_bp
 from sincor2.blueprints.pages import pages_bp
 from sincor2.blueprints.payments import payments_bp
 from sincor2.blueprints.waitlist import waitlist_bp
-from sincor2.platform_bootstrap import bootstrap_platform
 from sincor2.error_handling import register_error_handlers
+from sincor2.platform_bootstrap import bootstrap_platform
 from sincor2.settings import Settings
 from sincor2.startup import run_startup_initializers
 from sincor2.stripe_checkout import StripeCheckout
-from sincor2 import waitlist_system
 
 load_dotenv()
 logger = logging.getLogger(__name__)
