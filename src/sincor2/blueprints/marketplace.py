@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from flask import Blueprint, current_app, jsonify, request
 
-from sincor2.vertical_dispatch import dispatch_via_router, dispatch_vertical_task
+from sincor2.vertical_dispatch import dispatch_vertical_task, dispatch_via_router
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def register_agent():
     if not card.get("skills"):
         return jsonify({"error": "agent_card must include at least one skill"}), 400
 
-    registry = _platform_state().get("registry")
+    registry = _platform().get("registry")
     if registry is None:
         return jsonify({"error": "marketplace not initialized"}), 503
 
@@ -104,7 +104,7 @@ def register_agent():
         return jsonify({"error": "registration failed"}), 500
 
     # Apply SINC stake to reputation engine if available
-    reputation_engine = _platform_state().get("reputation_engine")
+    reputation_engine = _platform().get("reputation_engine")
     if reputation_engine and sinc_stake > 0:
         try:
             reputation_engine.stake_sinc(record.agent_id, float(sinc_stake))
@@ -284,7 +284,6 @@ def submit_task():
     body = request.get_json(force=True, silent=True) or {}
     skill_id = body.get("skill_id", "").strip()
     input_data = body.get("input", "")
-    caller_id = body.get("caller_id", "anonymous")
     preferred_tags = body.get("preferred_tags", [])
 
     if not skill_id:
@@ -297,7 +296,9 @@ def submit_task():
     # Policy check
     policy = platform.get("policy")
     if policy is not None:
-        check = policy.check_policy({"budget": float(body.get("budget", 0.0)), "retries": 0, "request_rate": 0.0})
+        check = policy.check_policy(
+            {"budget": float(body.get("budget", 0.0)), "retries": 0, "request_rate": 0.0}
+        )
         if not check["allowed"]:
             return jsonify({"error": "policy violation", "violations": check["violations"]}), 422
 
@@ -306,7 +307,11 @@ def submit_task():
     if router is None:
         return jsonify({"error": "router not initialized"}), 503
 
-    decision = router.route(task_id="marketplace-task", required_skills=[skill_id], preferred_tags=preferred_tags or None)
+    decision = router.route(
+        task_id="marketplace-task",
+        required_skills=[skill_id],
+        preferred_tags=preferred_tags or None,
+    )
     if decision is None:
         return jsonify({"error": f"no agent available for skill '{skill_id}'"}), 404
 
@@ -434,6 +439,28 @@ def settlement_stats():
     )
 
 
+@marketplace_bp.get("/settlement/records")
+def settlement_records():
+    """Return recent settlement records and treasury routing events."""
+    platform = _platform()
+    settlement = platform.get("settlement")
+    if settlement is None:
+        return jsonify({"error": "settlement not initialized"}), 503
+
+    limit = min(int(request.args.get("limit", 25)), 100)
+    from dataclasses import asdict
+
+    records = [asdict(record) for record in list(settlement.settlements.values())[-limit:]]
+    treasury_events = settlement.treasury_journal[-limit:]
+    return jsonify(
+        {
+            "settlements": records,
+            "treasury_journal": treasury_events,
+            "count": len(records),
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
 # Routing & verticals info
 # ---------------------------------------------------------------------------
@@ -465,7 +492,7 @@ def list_verticals():
 @marketplace_bp.get("/reputation/<agent_id>")
 def get_reputation(agent_id: str):
     """Return the SINC-weighted reputation profile for an agent."""
-    reputation_engine = _platform_state().get("reputation_engine")
+    reputation_engine = _platform().get("reputation_engine")
     if reputation_engine is None:
         return jsonify({"agent_id": agent_id, "trust_score": 0.0, "sinc_staked": 0.0})
     return jsonify(reputation_engine.get_reputation(agent_id))
@@ -474,7 +501,7 @@ def get_reputation(agent_id: str):
 @marketplace_bp.get("/reputation/leaderboard")
 def reputation_leaderboard():
     """Return the top agents ranked by SINC-weighted trust score."""
-    reputation_engine = _platform_state().get("reputation_engine")
+    reputation_engine = _platform().get("reputation_engine")
     limit = min(int(request.args.get("limit", 10)), 100)
     if reputation_engine is None:
         return jsonify({"leaderboard": [], "count": 0})
@@ -488,7 +515,7 @@ def stake_sinc(agent_id: str):
 
     Body: ``{"amount": <float>}``
     """
-    reputation_engine = _platform_state().get("reputation_engine")
+    reputation_engine = _platform().get("reputation_engine")
     if reputation_engine is None:
         return jsonify({"error": "reputation engine not initialized"}), 503
     body = request.get_json(silent=True) or {}
@@ -510,7 +537,7 @@ def unstake_sinc(agent_id: str):
 
     Body: ``{"amount": <float>}`` — omit to unstake all.
     """
-    reputation_engine = _platform_state().get("reputation_engine")
+    reputation_engine = _platform().get("reputation_engine")
     if reputation_engine is None:
         return jsonify({"error": "reputation engine not initialized"}), 503
     body = request.get_json(silent=True) or {}

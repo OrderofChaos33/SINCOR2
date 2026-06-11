@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR2 Operator Console</title>
+  <style>
+    :root {
+      --bg: #08101f;
+      --panel: #111b2f;
+      --panel-soft: #16233d;
+      --text: #edf2ff;
+      --muted: #94a3b8;
+      --accent: #7c3aed;
+      --accent-2: #0ea5e9;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --border: rgba(148, 163, 184, 0.16);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #050b17 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+    }
+    header, main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    h1, h2, h3, p { margin-top: 0; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .hero-actions a {
+      color: var(--text);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-left: 8px;
+      background: rgba(124, 58, 237, 0.12);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .panel {
+      background: rgba(17, 27, 47, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    .metric {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 8px 0;
+    }
+    .muted { color: var(--muted); }
+    .status-ok { color: var(--success); }
+    .status-warn { color: var(--warning); }
+    form {
+      display: grid;
+      gap: 12px;
+    }
+    label {
+      font-size: 14px;
+      color: var(--muted);
+      display: grid;
+      gap: 6px;
+    }
+    input, textarea, select, button {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 12px;
+      font: inherit;
+    }
+    textarea { min-height: 140px; resize: vertical; }
+    button {
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none;
+      font-weight: 700;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    code, pre {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 10px;
+    }
+    pre {
+      padding: 14px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: rgba(14, 165, 233, 0.14);
+      color: #bfdbfe;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>SINCOR2 Operator Console</h1>
+      <p class="muted">Discover registered Agent Cards, submit A2A tasks, inspect task state, and review settlement activity.</p>
+    </div>
+    <div class="hero-actions">
+      <a href="/.well-known/agent-card.json">Platform Agent Card</a>
+      <a href="/health">Health</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid">
+      <div class="panel">
+        <h2>Runtime health</h2>
+        <div class="metric" id="health-status">Loading…</div>
+        <div class="muted" id="health-detail">Checking readiness.</div>
+      </div>
+      <div class="panel">
+        <h2>Registered agents</h2>
+        <div class="metric" id="agent-count">0</div>
+        <div class="muted">Agent Cards indexed in the marketplace registry.</div>
+      </div>
+      <div class="panel">
+        <h2>Settlement records</h2>
+        <div class="metric" id="settlement-count">0</div>
+        <div class="muted">Confirmed settlement events recorded by the platform.</div>
+      </div>
+      <div class="panel">
+        <h2>Treasury journal</h2>
+        <div class="metric" id="treasury-count">0</div>
+        <div class="muted">Treasury routing events emitted by settlement handling.</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Submit A2A task</h2>
+      <form id="task-form">
+        <label>
+          Skill
+          <select id="skill-select" required></select>
+        </label>
+        <label>
+          Caller ID
+          <input id="caller-id" value="operator-console" />
+        </label>
+        <label>
+          Task payload JSON
+          <textarea id="task-payload">{
+  "task_type": "lead_enrichment",
+  "payload": {
+    "company": "Acme Corp",
+    "segment": "B2B SaaS"
+  }
+}</textarea>
+        </label>
+        <label>
+          <input id="simulate-payment" type="checkbox" checked />
+          Include simulation settlement metadata
+        </label>
+        <button type="submit">Submit task</button>
+      </form>
+      <p class="muted">Simulation mode sends a demo tx hash plus AXM amount so the platform records a settlement event without requiring a live Base transfer in development.</p>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <h2>Latest response</h2>
+        <pre id="latest-response">No task submitted yet.</pre>
+      </div>
+      <div class="panel">
+        <h2>Registered skills</h2>
+        <div id="skills-list" class="chips"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Recent A2A tasks</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>State</th>
+            <th>Skill</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody id="tasks-body">
+          <tr><td colspan="4" class="muted">Loading task history.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Recent settlements</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Settlement</th>
+            <th>Task</th>
+            <th>Amount</th>
+            <th>Tx hash</th>
+          </tr>
+        </thead>
+        <tbody id="settlements-body">
+          <tr><td colspan="4" class="muted">Loading settlement history.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    async function fetchJson(url, options) {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!response.ok) throw new Error(JSON.stringify(data));
+      return data;
+    }
+
+    function renderTableRows(bodyId, rows, emptyMessage) {
+      const tbody = document.getElementById(bodyId);
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="4" class="muted">${emptyMessage}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.join("");
+    }
+
+    async function refreshHealth() {
+      const health = await fetchJson("/health");
+      const statusEl = document.getElementById("health-status");
+      const detailEl = document.getElementById("health-detail");
+      statusEl.textContent = health.status;
+      statusEl.className = health.status === "healthy" ? "metric status-ok" : "metric status-warn";
+      const failing = Object.entries(health.checks)
+        .filter(([, value]) => !value.ready)
+        .map(([key]) => key);
+      detailEl.textContent = failing.length ? `Attention: ${failing.join(", ")}` : "All critical subsystems ready.";
+    }
+
+    async function refreshAgents() {
+      const data = await fetchJson("/api/marketplace/agents");
+      document.getElementById("agent-count").textContent = data.count;
+      const skills = [];
+      const select = document.getElementById("skill-select");
+      select.innerHTML = "";
+      data.agents.forEach((agent) => {
+        (agent.skills || []).forEach((skill) => {
+          skills.push(skill);
+          const option = document.createElement("option");
+          option.value = skill;
+          option.textContent = `${skill} · ${agent.name}`;
+          select.appendChild(option);
+        });
+      });
+      document.getElementById("skills-list").innerHTML = skills
+        .map((skill) => `<span class="chip">${skill}</span>`)
+        .join("");
+    }
+
+    async function refreshTasks() {
+      const data = await fetchJson("/api/a2a", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "tasks-list",
+          method: "tasks/list",
+          params: { pageSize: 10 }
+        })
+      });
+      const tasks = data.result.tasks || [];
+      renderTableRows(
+        "tasks-body",
+        tasks.map((task) => `
+          <tr>
+            <td><code>${task.id}</code></td>
+            <td>${task.status.state}</td>
+            <td>${task.metadata.skill_id || "n/a"}</td>
+            <td>${task.status.timestamp}</td>
+          </tr>
+        `),
+        "No A2A tasks recorded yet."
+      );
+    }
+
+    async function refreshSettlements() {
+      const data = await fetchJson("/api/marketplace/settlement/records");
+      document.getElementById("settlement-count").textContent = data.settlements.length;
+      document.getElementById("treasury-count").textContent = data.treasury_journal.length;
+      renderTableRows(
+        "settlements-body",
+        data.settlements.map((record) => `
+          <tr>
+            <td><code>${record.settlement_id}</code></td>
+            <td><code>${record.task_reference}</code></td>
+            <td>${record.amount} ${record.token_symbol}</td>
+            <td><code>${record.tx_hash}</code></td>
+          </tr>
+        `),
+        "No settlement events recorded yet."
+      );
+    }
+
+    async function submitTask(event) {
+      event.preventDefault();
+      const skillId = document.getElementById("skill-select").value;
+      const callerId = document.getElementById("caller-id").value || "operator-console";
+      const payloadText = document.getElementById("task-payload").value;
+      const simulatePayment = document.getElementById("simulate-payment").checked;
+      const payload = JSON.parse(payloadText);
+      const metadata = { skillId, callerId };
+      if (simulatePayment) {
+        metadata.txHash = "0xSIMULATEDTASK";
+        metadata.axmPaidWei = "1000000000000000000";
+      }
+
+      const response = await fetchJson("/api/a2a", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: `op-${Date.now()}`,
+          method: "message/send",
+          params: {
+            message: {
+              role: "user",
+              parts: [{ kind: "text", text: JSON.stringify(payload) }],
+              metadata
+            }
+          }
+        })
+      });
+
+      document.getElementById("latest-response").textContent = JSON.stringify(response, null, 2);
+      await Promise.all([refreshTasks(), refreshSettlements()]);
+    }
+
+    document.getElementById("task-form").addEventListener("submit", submitTask);
+    Promise.all([refreshHealth(), refreshAgents(), refreshTasks(), refreshSettlements()]).catch((error) => {
+      document.getElementById("latest-response").textContent = error.message;
+    });
+  </script>
+</body>
+</html>
