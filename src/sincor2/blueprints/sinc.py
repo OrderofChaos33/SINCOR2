@@ -146,7 +146,6 @@ def get_quote():
         mgr = _manager()
         staked = mgr.get_staked(wallet)
         if staked >= TIER_PRIORITY_STAKE:
-            from sincor2.sinc_access import TIER_PRIORITY_STAKE as _TP
             discount_bps = 2000  # 20% staking discount
             effective_cost = base_cost - (base_cost * discount_bps) // 10_000
             discount_applied = True

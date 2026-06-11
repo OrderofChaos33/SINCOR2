@@ -816,7 +816,7 @@ class A2ARouter:
                 "chain_id":           CHAIN_ID,
                 "note": (
                     f"Pay {SINC_PRICE_PER_TASK} SINC (or {AXM_PRICE_PER_TASK / 10**18:.4f} AXM "
-                    f"for legacy) to `pay_to` on Base (chain 8453) then include the tx hash "
+                    f"for legacy) to the pay_to address on Base (chain 8453) then include the tx hash "
                     f"in your tasks/send request."
                 ),
             })

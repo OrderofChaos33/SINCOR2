@@ -39,19 +39,16 @@ class AgentCardRecord:
         agent_id = card.get('id') or card.get('name', 'agent').lower().replace(' ', '-')
 
         # Parse optional SINC pricing block from agent card
+        def _sinc_int(d: dict, key: str, default: int) -> int:
+            try:
+                return int(d.get(key, default))
+            except (TypeError, ValueError):
+                return default
+
         sinc_pricing = card.get('sincPricing', {})
-        try:
-            sinc_price_per_call = int(sinc_pricing.get('pricePerCall', 1))
-        except (TypeError, ValueError):
-            sinc_price_per_call = 1
-        try:
-            sinc_price_per_minute = int(sinc_pricing.get('pricePerMinute', 0))
-        except (TypeError, ValueError):
-            sinc_price_per_minute = 0
-        try:
-            sinc_stake_required = int(sinc_pricing.get('stakeRequired', 250))
-        except (TypeError, ValueError):
-            sinc_stake_required = 250
+        sinc_price_per_call = _sinc_int(sinc_pricing, 'pricePerCall', 1)
+        sinc_price_per_minute = _sinc_int(sinc_pricing, 'pricePerMinute', 0)
+        sinc_stake_required = _sinc_int(sinc_pricing, 'stakeRequired', 250)
 
         return cls(
             agent_id=agent_id,

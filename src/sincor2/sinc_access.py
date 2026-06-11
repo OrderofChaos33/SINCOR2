@@ -151,7 +151,10 @@ class SINCAccessManager:
     """
 
     def __init__(self, rpc_url: Optional[str] = None) -> None:
-        self._rpc_url = rpc_url or os.getenv("BASE_RPC_URL") or DEFAULT_BASE_RPC
+        rpc = rpc_url or os.getenv("BASE_RPC_URL") or DEFAULT_BASE_RPC
+        if rpc and not rpc.startswith("https://") and not rpc.startswith("http://localhost") and not rpc.startswith("http://127."):
+            logger.warning("BASE_RPC_URL does not use HTTPS — on-chain reads may be vulnerable to MITM attacks")
+        self._rpc_url = rpc
         self._cache = _TTLCache()
 
     # ------------------------------------------------------------------
