@@ -65,6 +65,11 @@ def dashboard():
     return render_template("dashboard.html")
 
 
+@pages_bp.get("/operator")
+def operator_dashboard():
+    return render_template("operator_dashboard.html")
+
+
 @pages_bp.get("/my-orders")
 def my_orders():
     return render_template("my_orders.html")

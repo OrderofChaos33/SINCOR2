@@ -372,10 +372,18 @@ class TestTOAEndToEnd:
             "version": "1.0.0",
             "supportedInterfaces": [{"url": "/exec/v1"}],
             "skills": [
-                {"id": "execution", "name": "Execution", "description": "Execute tasks",
-                 "tags": ["execution"]},
-                {"id": "revenue", "name": "Revenue", "description": "Revenue tasks",
-                 "tags": ["revenue"]},
+                {
+                    "id": "execution",
+                    "name": "Execution",
+                    "description": "Execute tasks",
+                    "tags": ["execution"],
+                },
+                {
+                    "id": "revenue",
+                    "name": "Revenue",
+                    "description": "Revenue tasks",
+                    "tags": ["revenue"],
+                },
             ],
         })
 

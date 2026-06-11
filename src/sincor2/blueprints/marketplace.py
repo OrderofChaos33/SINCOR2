@@ -296,11 +296,9 @@ def submit_task():
     # Policy check
     policy = platform.get("policy")
     if policy is not None:
-        check = policy.check_policy({
-            "budget": float(body.get("budget", 0.0)),
-            "retries": 0,
-            "request_rate": 0.0,
-        })
+        check = policy.check_policy(
+            {"budget": float(body.get("budget", 0.0)), "retries": 0, "request_rate": 0.0}
+        )
         if not check["allowed"]:
             return jsonify({"error": "policy violation", "violations": check["violations"]}), 422
 
@@ -437,6 +435,28 @@ def settlement_stats():
             "total_quotes": len(settlement.quotes),
             "total_settlements": len(settlement.settlements),
             "treasury_journal_entries": len(settlement.treasury_journal),
+        }
+    )
+
+
+@marketplace_bp.get("/settlement/records")
+def settlement_records():
+    """Return recent settlement records and treasury routing events."""
+    platform = _platform()
+    settlement = platform.get("settlement")
+    if settlement is None:
+        return jsonify({"error": "settlement not initialized"}), 503
+
+    limit = min(int(request.args.get("limit", 25)), 100)
+    from dataclasses import asdict
+
+    records = [asdict(record) for record in list(settlement.settlements.values())[-limit:]]
+    treasury_events = settlement.treasury_journal[-limit:]
+    return jsonify(
+        {
+            "settlements": records,
+            "treasury_journal": treasury_events,
+            "count": len(records),
         }
     )
 

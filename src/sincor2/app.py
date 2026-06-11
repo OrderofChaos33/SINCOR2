@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -35,16 +36,30 @@ def _attach_request_context(app: Flask) -> None:
     @app.before_request
     def set_request_id() -> None:
         request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        correlation_id = request.headers.get("X-Correlation-ID") or request_id
         g.request_id = request_id
+        g.correlation_id = correlation_id
+        g.request_started_at = time.perf_counter()
         request.request_id = request_id  # type: ignore[attr-defined]
+        request.correlation_id = correlation_id  # type: ignore[attr-defined]
 
     @app.after_request
     def add_operational_headers(response):
+        started_at = getattr(g, "request_started_at", time.perf_counter())
+        duration_ms = (time.perf_counter() - started_at) * 1000
         response.headers["X-Request-ID"] = getattr(g, "request_id", "")
+        response.headers["X-Correlation-ID"] = getattr(g, "correlation_id", "")
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+        app.logger.info(
+            "request_complete method=%s path=%s status=%s duration_ms=%.2f",
+            request.method,
+            request.path,
+            response.status_code,
+            duration_ms,
+        )
         return response
 
 

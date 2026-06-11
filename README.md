@@ -107,6 +107,22 @@ curl -X POST http://localhost:8080/api/a2a \
 
 See [docs/api/README.md](docs/api/README.md) for the full JSON-RPC reference.
 
+### 6. Use the operator console
+
+Open `http://localhost:8080/operator` to:
+
+- inspect runtime health and registered Agent Cards
+- submit A2A tasks from the browser
+- review recent task state and settlement events
+
+### 7. Run the end-to-end demo script
+
+```bash
+python examples/a2a_loop_demo.py
+```
+
+The demo fetches the Agent Card, submits a simulated paid A2A task, and prints the resulting settlement snapshot.
+
 ---
 
 ## Platform Architecture
