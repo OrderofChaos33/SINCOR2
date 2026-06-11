@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from decimal import Decimal
 
 import pytest
@@ -12,7 +11,6 @@ from core.router import TaskRouter
 from marketplace.registry import AgentCardRegistry
 from marketplace.reputation import ReputationEngine
 from marketplace.settlement import SettlementCoordinator
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -74,10 +72,14 @@ class TestReputationEngine:
 
     def test_latency_modifier_applied(self, reputation):
         # Very high latency should reduce trust
-        profile_fast = reputation.record_task_outcome("fast-agent", success=True, quality_rating=5.0, latency_ms=100)
+        profile_fast = reputation.record_task_outcome(
+            "fast-agent", success=True, quality_rating=5.0, latency_ms=100
+        )
         # Reset with a fresh engine to isolate the slow-agent
         slow_reputation_engine = ReputationEngine()
-        profile_slow = slow_reputation_engine.record_task_outcome("slow-agent", success=True, quality_rating=5.0, latency_ms=90_000)
+        profile_slow = slow_reputation_engine.record_task_outcome(
+            "slow-agent", success=True, quality_rating=5.0, latency_ms=90_000
+        )
         assert profile_fast.trust_score > profile_slow.trust_score
 
 
@@ -236,7 +238,10 @@ class TestMarketplaceTaskSubmission:
             "/api/marketplace/tasks",
             json={
                 "skill_id": "healthcare-rcm",
-                "input": {"task_type": "eligibility_verification", "payload": {"patient_id": "P-999"}},
+                "input": {
+                    "task_type": "eligibility_verification",
+                    "payload": {"patient_id": "P-999"},
+                },
             },
         )
         assert resp.status_code == 200
@@ -315,7 +320,10 @@ class TestMarketplaceSettlementEndpoints:
             "/api/marketplace/tasks",
             json={
                 "skill_id": "healthcare-rcm",
-                "input": {"task_type": "eligibility_verification", "payload": {"patient_id": "P-001"}},
+                "input": {
+                    "task_type": "eligibility_verification",
+                    "payload": {"patient_id": "P-001"},
+                },
                 "payer": "0xWALLET",
                 "amount": "2.0",
             },
@@ -387,7 +395,10 @@ class TestA2ASettlementIntegration:
                 "params": {
                     "skillId": "healthcare-rcm",
                     "message": {
-                        "parts": [{"text": json.dumps({"task_type": "eligibility_verification", "payload": {"patient_id": "P-A2A"}})}],
+                        "parts": [{"text": json.dumps({
+                            "task_type": "eligibility_verification",
+                            "payload": {"patient_id": "P-A2A"},
+                        })}],
                     },
                 },
             },
@@ -409,7 +420,10 @@ class TestA2ASettlementIntegration:
                     "axmPaidWei": str(1 * 10 ** 18),
                     "txHash": "0xDEADBEEF01",
                     "message": {
-                        "parts": [{"text": json.dumps({"task_type": "claims_status_tracking", "payload": {"claim_id": "C-99"}})}],
+                        "parts": [{"text": json.dumps({
+                            "task_type": "claims_status_tracking",
+                            "payload": {"claim_id": "C-99"},
+                        })}],
                     },
                 },
             },
@@ -463,12 +477,13 @@ class TestVerticalDispatchKernelFallback:
         assert data["status"] == "success"
 
     def test_dispatch_via_router_returns_result(self):
-        from sincor2.vertical_dispatch import dispatch_via_router
-        from verticals.loader import load_agent_cards, instantiate_vertical_agents
-        from marketplace.registry import AgentCardRegistry
-        from core.router import TaskRouter
+        import pathlib
+        import tempfile
 
-        import tempfile, pathlib
+        from core.router import TaskRouter
+        from marketplace.registry import AgentCardRegistry
+        from sincor2.vertical_dispatch import dispatch_via_router
+        from verticals.loader import instantiate_vertical_agents, load_agent_cards
         with tempfile.TemporaryDirectory() as tmp:
             reg = AgentCardRegistry(storage_path=pathlib.Path(tmp) / "cards.json")
             for card in load_agent_cards():

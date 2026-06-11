@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import json
 import math
-import sys
 import os
+import sys
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -392,7 +392,7 @@ class TestExtendedExecutionPolicy:
         assert any(v["rule"] == "max-budget" for v in result["violations"])
 
     def test_middleware_context_auth_middleware_rejects_missing_caller(self):
-        from core.policy import auth_middleware, MiddlewareContext
+        from core.policy import MiddlewareContext, auth_middleware
 
         ctx = MiddlewareContext({"caller_id": ""})
         auth_middleware(ctx)
@@ -400,14 +400,14 @@ class TestExtendedExecutionPolicy:
         assert "caller_id" in ctx.rejection_reason
 
     def test_middleware_context_auth_middleware_allows_valid_caller(self):
-        from core.policy import auth_middleware, MiddlewareContext
+        from core.policy import MiddlewareContext, auth_middleware
 
         ctx = MiddlewareContext({"caller_id": "wallet-0xABC"})
         auth_middleware(ctx)
         assert ctx.allowed is True
 
     def test_sinc_balance_middleware_factory(self):
-        from core.policy import sinc_balance_middleware, MiddlewareContext
+        from core.policy import MiddlewareContext, sinc_balance_middleware
 
         check = sinc_balance_middleware(min_sinc_balance=100.0)
 
@@ -420,8 +420,9 @@ class TestExtendedExecutionPolicy:
         assert ctx_fail.allowed is False
 
     def test_schema_validation_middleware_passes_valid(self):
-        from core.policy import schema_validation_middleware, MiddlewareContext
         from pydantic import BaseModel
+
+        from core.policy import MiddlewareContext, schema_validation_middleware
 
         class MySchema(BaseModel):
             status: str
@@ -433,8 +434,9 @@ class TestExtendedExecutionPolicy:
         assert ctx.allowed is True
 
     def test_schema_validation_middleware_fails_invalid(self):
-        from core.policy import schema_validation_middleware, MiddlewareContext
         from pydantic import BaseModel
+
+        from core.policy import MiddlewareContext, schema_validation_middleware
 
         class MySchema(BaseModel):
             required_field: str
@@ -504,7 +506,7 @@ class TestExtendedExecutionPolicy:
         assert "caller_id" in result["error"]
 
     def test_axiom_settlement_middleware_triggers_hook(self):
-        from core.policy import axiom_settlement_middleware, MiddlewareContext
+        from core.policy import MiddlewareContext, axiom_settlement_middleware
 
         triggered = []
 
@@ -699,8 +701,9 @@ class TestSINCWeightedDiscovery:
 
 class TestHealthcareSchemas:
     def test_eligibility_request_validates(self):
-        from verticals.healthcare.schemas import EligibilityRequest
         from datetime import date
+
+        from verticals.healthcare.schemas import EligibilityRequest
 
         req = EligibilityRequest(
             member_id="M-12345",
@@ -712,9 +715,11 @@ class TestHealthcareSchemas:
         assert req.provider_npi == "1234567890"
 
     def test_eligibility_request_rejects_bad_npi(self):
-        from verticals.healthcare.schemas import EligibilityRequest
         from datetime import date
+
         import pydantic
+
+        from verticals.healthcare.schemas import EligibilityRequest
 
         with pytest.raises(pydantic.ValidationError):
             EligibilityRequest(
@@ -725,8 +730,9 @@ class TestHealthcareSchemas:
             )
 
     def test_claim_submission_request_total_charge(self):
-        from verticals.healthcare.schemas import ClaimSubmissionRequest, ServiceLine, DiagnosisCode
         from datetime import date
+
+        from verticals.healthcare.schemas import ClaimSubmissionRequest, DiagnosisCode, ServiceLine
 
         req = ClaimSubmissionRequest(
             patient_id="P-001",
@@ -748,8 +754,9 @@ class TestHealthcareSchemas:
         assert req.total_charge == Decimal("300.00")
 
     def test_prior_auth_request_validates(self):
-        from verticals.healthcare.schemas import PriorAuthRequest
         from datetime import date
+
+        from verticals.healthcare.schemas import PriorAuthRequest
 
         req = PriorAuthRequest(
             patient_id="P-002",
@@ -861,7 +868,7 @@ class TestRegisterAgent:
         validate_agent_card(self._VALID_CARD)  # Should not raise
 
     def test_validate_agent_card_missing_name(self):
-        from scripts.register_agent import validate_agent_card, A2AValidationError
+        from scripts.register_agent import A2AValidationError, validate_agent_card
 
         bad = dict(self._VALID_CARD)
         del bad["name"]
@@ -869,29 +876,30 @@ class TestRegisterAgent:
             validate_agent_card(bad)
 
     def test_validate_agent_card_no_skills(self):
-        from scripts.register_agent import validate_agent_card, A2AValidationError
+        from scripts.register_agent import A2AValidationError, validate_agent_card
 
         bad = dict(self._VALID_CARD, skills=[])
         with pytest.raises(A2AValidationError, match="skill"):
             validate_agent_card(bad)
 
     def test_validate_agent_card_skill_missing_id(self):
-        from scripts.register_agent import validate_agent_card, A2AValidationError
+        from scripts.register_agent import A2AValidationError, validate_agent_card
 
         bad = dict(self._VALID_CARD, skills=[{"name": "No ID"}])
         with pytest.raises(A2AValidationError, match="id"):
             validate_agent_card(bad)
 
     def test_validate_agent_card_no_interfaces(self):
-        from scripts.register_agent import validate_agent_card, A2AValidationError
+        from scripts.register_agent import A2AValidationError, validate_agent_card
 
         bad = dict(self._VALID_CARD, supportedInterfaces=[])
         with pytest.raises(A2AValidationError, match="supportedInterfaces"):
             validate_agent_card(bad)
 
     def test_fetch_agent_card_uses_well_known(self):
-        from scripts.register_agent import fetch_agent_card
         import urllib.request as _req
+
+        from scripts.register_agent import fetch_agent_card
 
         card_json = json.dumps(self._VALID_CARD).encode()
 
@@ -911,8 +919,9 @@ class TestRegisterAgent:
         assert card["name"] == "My Test Agent"
 
     def test_fetch_agent_card_falls_back_to_legacy(self):
-        from scripts.register_agent import fetch_agent_card
         import urllib.request as _req
+
+        from scripts.register_agent import fetch_agent_card
 
         card_json = json.dumps(self._VALID_CARD).encode()
 
