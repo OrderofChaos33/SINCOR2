@@ -24,6 +24,10 @@ class AgentCardRecord:
     metadata: Dict[str, Any] = field(default_factory=dict)
     security: List[Dict[str, Any]] = field(default_factory=list)
     raw_card: Dict[str, Any] = field(default_factory=dict)
+    # SINC token pricing
+    sinc_price_per_call: int = 1       # SINC per individual agent invocation
+    sinc_price_per_minute: int = 0     # SINC per runtime minute (0 = not metered by time)
+    sinc_stake_required: int = 250     # Minimum SINC staked to list in marketplace
 
     @classmethod
     def from_agent_card(cls, card: Dict[str, Any]) -> 'AgentCardRecord':
@@ -33,6 +37,19 @@ class AgentCardRecord:
         skills = list(card.get('skills', []))
         tags = sorted({tag for skill in skills for tag in skill.get('tags', [])})
         agent_id = card.get('id') or card.get('name', 'agent').lower().replace(' ', '-')
+
+        # Parse optional SINC pricing block from agent card
+        def _sinc_int(d: dict, key: str, default: int) -> int:
+            try:
+                return int(d.get(key, default))
+            except (TypeError, ValueError):
+                return default
+
+        sinc_pricing = card.get('sincPricing', {})
+        sinc_price_per_call = _sinc_int(sinc_pricing, 'pricePerCall', 1)
+        sinc_price_per_minute = _sinc_int(sinc_pricing, 'pricePerMinute', 0)
+        sinc_stake_required = _sinc_int(sinc_pricing, 'stakeRequired', 250)
+
         return cls(
             agent_id=agent_id,
             name=card.get('name', agent_id),
@@ -50,6 +67,9 @@ class AgentCardRecord:
             },
             security=list(card.get('security', [])),
             raw_card=dict(card),
+            sinc_price_per_call=sinc_price_per_call,
+            sinc_price_per_minute=sinc_price_per_minute,
+            sinc_stake_required=sinc_stake_required,
         )
 
 

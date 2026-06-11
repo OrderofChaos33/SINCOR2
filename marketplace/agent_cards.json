@@ -166,7 +166,10 @@
           }
         ],
         "documentationUrl": "https://getsincor.com/docs/api"
-      }
+      },
+      "sinc_price_per_call": 1,
+      "sinc_price_per_minute": 0,
+      "sinc_stake_required": 250
     },
     {
       "agent_id": "sincor2-dental-practice-pack",
@@ -333,7 +336,10 @@
           }
         ],
         "documentationUrl": "https://getsincor.com/docs/api"
-      }
+      },
+      "sinc_price_per_call": 1,
+      "sinc_price_per_minute": 0,
+      "sinc_stake_required": 250
     },
     {
       "agent_id": "sincor2-healthcare-operations-pack",
@@ -507,7 +513,10 @@
           }
         ],
         "documentationUrl": "https://getsincor.com/docs/api"
-      }
+      },
+      "sinc_price_per_call": 1,
+      "sinc_price_per_minute": 0,
+      "sinc_stake_required": 250
     },
     {
       "agent_id": "sincor2-lead-generation-pack",
@@ -672,7 +681,10 @@
           }
         ],
         "documentationUrl": "https://getsincor.com/docs/api"
-      }
+      },
+      "sinc_price_per_call": 1,
+      "sinc_price_per_minute": 0,
+      "sinc_stake_required": 250
     },
     {
       "agent_id": "sincor2-trading-intelligence-pack",
@@ -840,7 +852,10 @@
           }
         ],
         "documentationUrl": "https://getsincor.com/docs/api"
-      }
+      },
+      "sinc_price_per_call": 1,
+      "sinc_price_per_minute": 0,
+      "sinc_stake_required": 250
     },
     {
       "agent_id": "external-agent",
@@ -878,7 +893,48 @@
           }
         ],
         "version": "1.0.0"
-      }
+      },
+      "sinc_price_per_call": 1,
+      "sinc_price_per_minute": 0,
+      "sinc_stake_required": 250
+    },
+    {
+      "agent_id": "testagent",
+      "name": "TestAgent",
+      "description": "test",
+      "version": "1.0.0",
+      "endpoint": "",
+      "skills": [
+        {
+          "id": "s1",
+          "name": "s1",
+          "tags": []
+        }
+      ],
+      "tags": [],
+      "provider": {},
+      "capabilities": {},
+      "metadata": {
+        "documentationUrl": null,
+        "defaultInputModes": [],
+        "defaultOutputModes": []
+      },
+      "security": [],
+      "raw_card": {
+        "description": "test",
+        "name": "TestAgent",
+        "skills": [
+          {
+            "id": "s1",
+            "name": "s1",
+            "tags": []
+          }
+        ],
+        "version": "1.0.0"
+      },
+      "sinc_price_per_call": 1,
+      "sinc_price_per_minute": 0,
+      "sinc_stake_required": 250
     }
   ]
 }

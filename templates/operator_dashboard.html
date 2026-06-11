@@ -130,6 +130,14 @@
     <div class="hero-actions">
       <a href="/.well-known/agent-card.json">Platform Agent Card</a>
       <a href="/health">Health</a>
+      <!-- SINC Wallet Widget -->
+      <span id="sinc-op-connect" onclick="sincOpWidget.connect()"
+            style="cursor:pointer;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:6px;padding:6px 14px;font-size:.82rem;font-weight:600">
+        Connect Wallet
+      </span>
+      <span id="sinc-op-pill" style="display:none;background:#0f1a2a;border:1px solid #1e3a5f;border-radius:999px;padding:4px 12px;font-size:.8rem;cursor:pointer" onclick="sincOpWidget.showDetails()">
+        🪙 <span id="sinc-op-balance" style="color:#60a5fa;font-weight:700">— SINC</span>
+      </span>
     </div>
   </header>
 
@@ -364,6 +372,33 @@
     Promise.all([refreshHealth(), refreshAgents(), refreshTasks(), refreshSettlements()]).catch((error) => {
       document.getElementById("latest-response").textContent = error.message;
     });
+
+    // SINC wallet widget
+    const sincOpWidget = (() => {
+      let wallet = localStorage.getItem('sinc_wallet') || null;
+      async function refreshBalance() {
+        if (!wallet) return;
+        try {
+          const res = await fetch(`/api/sinc/balance?wallet=${wallet}`);
+          if (!res.ok) return;
+          const { data } = await res.json();
+          document.getElementById('sinc-op-balance').textContent = `${data.sinc_balance} SINC`;
+          document.getElementById('sinc-op-balance').style.color = data.sinc_balance > 0 ? '#34d399' : '#f87171';
+          document.getElementById('sinc-op-pill').style.display = 'inline-flex';
+          document.getElementById('sinc-op-connect').style.display = 'none';
+        } catch {}
+      }
+      async function connect() {
+        if (!window.ethereum) { alert('Web3 wallet required.'); return; }
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        wallet = accounts[0];
+        localStorage.setItem('sinc_wallet', wallet);
+        await refreshBalance();
+      }
+      function showDetails() { window.open(`/api/sinc/balance?wallet=${wallet}`, '_blank'); }
+      if (wallet) refreshBalance();
+      return { connect, showDetails };
+    })();
   </script>
 </body>
 </html>

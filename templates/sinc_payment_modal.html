@@ -1,0 +1,313 @@
+<!--
+  SINC Payment Modal — reusable partial for all SINC-gated actions.
+
+  Usage: include this partial in any page that needs SINC payment flows,
+  then trigger it via:
+    SINCModal.open({ action: 'agent_call', quantity: 1, onSuccess: fn });
+
+  The modal handles three payment paths:
+    1. Use Credits (instant, if balance sufficient)
+    2. On-chain Transfer (MetaMask approve + purchaseCredits)
+    3. Buy SINC First (redirect to /sinc)
+-->
+
+<!-- Backdrop + modal -->
+<div id="sinc-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div id="sinc-modal" style="background:#111827;border:1px solid #334155;border-radius:1rem;padding:2rem;max-width:420px;width:90%;position:relative">
+
+    <!-- Close -->
+    <button onclick="SINCModal.close()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:#64748b;font-size:1.2rem;cursor:pointer">✕</button>
+
+    <!-- Header -->
+    <div style="margin-bottom:1.5rem">
+      <div style="font-size:1.5rem;margin-bottom:.4rem">🪙</div>
+      <h2 id="sinc-modal-title" style="color:#f1f5f9;font-size:1.1rem;font-weight:700;margin:0 0 .3rem">SINC Required</h2>
+      <p id="sinc-modal-description" style="color:#94a3b8;font-size:.85rem;margin:0"></p>
+    </div>
+
+    <!-- Cost summary -->
+    <div style="background:#0d1117;border:1px solid #1e293b;border-radius:.75rem;padding:1rem;margin-bottom:1.25rem">
+      <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
+        <span style="color:#64748b;font-size:.82rem">Action cost</span>
+        <span id="sinc-modal-cost" style="color:#f1f5f9;font-weight:700;font-size:.9rem">— SINC</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
+        <span style="color:#64748b;font-size:.82rem">Your credits</span>
+        <span id="sinc-modal-credits" style="color:#34d399;font-size:.85rem">Loading…</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:#64748b;font-size:.82rem">Wallet balance</span>
+        <span id="sinc-modal-balance" style="color:#94a3b8;font-size:.85rem">—</span>
+      </div>
+    </div>
+
+    <!-- Shortfall warning -->
+    <div id="sinc-modal-shortfall" style="display:none;background:#2d1515;border:1px solid #7f1d1d;border-radius:.5rem;padding:.75rem;margin-bottom:1rem;color:#fca5a5;font-size:.82rem"></div>
+
+    <!-- Payment path tabs -->
+    <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+      <button class="sinc-tab active" data-tab="credits" onclick="SINCModal.switchTab('credits')"
+              style="flex:1;padding:.5rem;border:1px solid #334155;border-radius:.5rem;background:#1e293b;color:#f1f5f9;font-size:.8rem;cursor:pointer">
+        ⚡ Use Credits
+      </button>
+      <button class="sinc-tab" data-tab="onchain" onclick="SINCModal.switchTab('onchain')"
+              style="flex:1;padding:.5rem;border:1px solid #1e293b;border-radius:.5rem;background:none;color:#64748b;font-size:.8rem;cursor:pointer">
+        🔗 On-chain
+      </button>
+      <button class="sinc-tab" data-tab="buy" onclick="SINCModal.switchTab('buy')"
+              style="flex:1;padding:.5rem;border:1px solid #1e293b;border-radius:.5rem;background:none;color:#64748b;font-size:.8rem;cursor:pointer">
+        🛒 Buy SINC
+      </button>
+    </div>
+
+    <!-- Tab: Credits -->
+    <div id="sinc-tab-credits" class="sinc-tab-panel">
+      <p style="color:#94a3b8;font-size:.82rem;margin-bottom:1rem">
+        Instantly deduct from your prepaid SINC credit balance. No gas required.
+      </p>
+      <button id="sinc-btn-credits" onclick="SINCModal.payWithCredits()"
+              style="width:100%;padding:.75rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:.75rem;color:#fff;font-weight:700;font-size:.9rem;cursor:pointer">
+        Pay with Credits
+      </button>
+    </div>
+
+    <!-- Tab: On-chain -->
+    <div id="sinc-tab-onchain" class="sinc-tab-panel" style="display:none">
+      <p style="color:#94a3b8;font-size:.82rem;margin-bottom:.75rem">
+        Approve and deposit SINC as prepaid credits, then use them instantly.
+        Requires MetaMask or a compatible wallet.
+      </p>
+      <div style="background:#0d1117;border:1px solid #1e293b;border-radius:.5rem;padding:.75rem;margin-bottom:1rem;font-size:.78rem;color:#94a3b8">
+        <div>Step 1: Approve SINC transfer</div>
+        <div style="margin-top:.25rem">Step 2: Deposit to platform credits</div>
+      </div>
+      <div style="margin-bottom:.75rem">
+        <label style="color:#64748b;font-size:.78rem;display:block;margin-bottom:.3rem">Amount to deposit (min 10)</label>
+        <input id="sinc-onchain-amount" type="number" min="10" value="100"
+               style="width:100%;padding:.5rem .75rem;background:#0d1117;border:1px solid #334155;border-radius:.5rem;color:#f1f5f9;font-size:.9rem">
+      </div>
+      <button onclick="SINCModal.purchaseOnChain()"
+              style="width:100%;padding:.75rem;background:#1e293b;border:1px solid #6366f1;border-radius:.75rem;color:#a5b4fc;font-weight:700;font-size:.9rem;cursor:pointer">
+        Connect & Deposit SINC
+      </button>
+    </div>
+
+    <!-- Tab: Buy SINC -->
+    <div id="sinc-tab-buy" class="sinc-tab-panel" style="display:none">
+      <p style="color:#94a3b8;font-size:.82rem;margin-bottom:1rem">
+        Get SINC via the bonding curve — instant, no middlemen.
+        Price starts ~$1.09/SINC and rises gently as supply sells out.
+      </p>
+      <a href="/sinc" target="_blank" rel="noopener"
+         style="display:block;width:100%;padding:.75rem;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:.75rem;color:#1c1917;font-weight:700;font-size:.9rem;cursor:pointer;text-align:center;text-decoration:none">
+        Buy SINC →
+      </a>
+      <p style="color:#475569;font-size:.75rem;margin-top:.75rem;text-align:center">
+        Contract: 0x75dE341a2BC81806198364F125d4Cde36527619C (Base)
+      </p>
+    </div>
+
+    <!-- Status message -->
+    <div id="sinc-modal-status" style="display:none;margin-top:1rem;padding:.6rem;border-radius:.5rem;font-size:.82rem;text-align:center"></div>
+
+  </div>
+</div>
+
+<style>
+  .sinc-tab.active {
+    background: #1e293b !important;
+    border-color: #6366f1 !important;
+    color: #a5b4fc !important;
+  }
+</style>
+
+<script>
+/* SINCModal — lightweight controller for the payment modal */
+const SINCModal = (() => {
+  let _context = {};   // { action, quantity, onSuccess, onCancel }
+  let _wallet = null;
+
+  function _el(id) { return document.getElementById(id); }
+
+  function _setStatus(msg, ok) {
+    const el = _el('sinc-modal-status');
+    el.style.display = 'block';
+    el.style.background = ok ? '#0f2a1a' : '#2d1515';
+    el.style.border = `1px solid ${ok ? '#166534' : '#7f1d1d'}`;
+    el.style.color = ok ? '#34d399' : '#fca5a5';
+    el.textContent = msg;
+  }
+
+  async function _fetchBalance(wallet) {
+    try {
+      const res = await fetch(`/api/sinc/balance?wallet=${wallet}`);
+      if (!res.ok) return null;
+      return (await res.json()).data;
+    } catch { return null; }
+  }
+
+  async function _fetchQuote(action, quantity) {
+    const res = await fetch('/api/sinc/quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action_type: action, quantity, wallet: _wallet }),
+    });
+    return res.ok ? (await res.json()).quote : null;
+  }
+
+  async function open(ctx) {
+    _context = ctx || {};
+    const action = _context.action || 'agent_call';
+    const quantity = _context.quantity || 1;
+    const title = _context.title || 'SINC Required';
+    const description = _context.description || `Pay to perform: ${action}`;
+
+    _el('sinc-modal-title').textContent = title;
+    _el('sinc-modal-description').textContent = description;
+    _el('sinc-modal-cost').textContent = 'Loading…';
+    _el('sinc-modal-credits').textContent = 'Loading…';
+    _el('sinc-modal-balance').textContent = '—';
+    _el('sinc-modal-status').style.display = 'none';
+    _el('sinc-modal-shortfall').style.display = 'none';
+
+    _el('sinc-modal-backdrop').style.display = 'flex';
+
+    // Try to get connected wallet
+    _wallet = localStorage.getItem('sinc_wallet') || null;
+
+    // Fetch quote
+    const quote = await _fetchQuote(action, quantity);
+    if (quote) {
+      const cost = quote.effective_cost_sinc;
+      _el('sinc-modal-cost').textContent = `${cost} SINC`;
+      _el('sinc-onchain-amount').value = Math.max(10, cost);
+
+      if (_wallet) {
+        const bal = await _fetchBalance(_wallet);
+        if (bal) {
+          const credits = bal.credits;
+          _el('sinc-modal-credits').textContent = `${credits} SINC`;
+          _el('sinc-modal-balance').textContent = `${bal.sinc_balance} SINC`;
+
+          if (credits < cost) {
+            const shortfall = cost - credits;
+            _el('sinc-modal-shortfall').style.display = 'block';
+            _el('sinc-modal-shortfall').textContent =
+              `⚠ You need ${shortfall} more SINC credits. Purchase credits or buy SINC below.`;
+            _el('sinc-btn-credits').disabled = true;
+            _el('sinc-btn-credits').style.opacity = '0.5';
+          } else {
+            _el('sinc-btn-credits').disabled = false;
+            _el('sinc-btn-credits').style.opacity = '1';
+          }
+        }
+      } else {
+        _el('sinc-modal-credits').textContent = 'Connect wallet to check';
+      }
+    }
+  }
+
+  function close() {
+    _el('sinc-modal-backdrop').style.display = 'none';
+    if (_context.onCancel) _context.onCancel();
+  }
+
+  function switchTab(tab) {
+    ['credits', 'onchain', 'buy'].forEach(t => {
+      const panel = _el(`sinc-tab-${t}`);
+      const btn = document.querySelector(`[data-tab="${t}"]`);
+      if (panel) panel.style.display = t === tab ? 'block' : 'none';
+      if (btn) btn.classList.toggle('active', t === tab);
+    });
+  }
+
+  async function payWithCredits() {
+    if (!_wallet) {
+      _setStatus('Connect your wallet first.', false);
+      return;
+    }
+    _setStatus('Processing…', true);
+    try {
+      const res = await fetch('/api/sinc/credits/spend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Wallet-Address': _wallet,
+        },
+        body: JSON.stringify({
+          wallet: _wallet,
+          action_type: _context.action || 'agent_call',
+          quantity: _context.quantity || 1,
+          task_id: _context.task_id || '',
+        }),
+      });
+      if (res.ok) {
+        _setStatus('✓ Credits deducted. Proceeding…', true);
+        setTimeout(() => {
+          close();
+          if (_context.onSuccess) _context.onSuccess();
+        }, 800);
+      } else {
+        const err = await res.json();
+        _setStatus(err.message || 'Payment failed.', false);
+      }
+    } catch (e) {
+      _setStatus('Network error. Please try again.', false);
+    }
+  }
+
+  async function purchaseOnChain() {
+    const amount = parseInt(_el('sinc-onchain-amount').value, 10);
+    if (!amount || amount < 10) {
+      _setStatus('Minimum purchase is 10 SINC.', false);
+      return;
+    }
+    if (!window.ethereum) {
+      _setStatus('MetaMask or a Web3 wallet is required.', false);
+      return;
+    }
+    _setStatus('Requesting wallet connection…', true);
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      _wallet = accounts[0];
+      localStorage.setItem('sinc_wallet', _wallet);
+
+      // Fetch calldata from backend
+      const res = await fetch('/api/sinc/credits/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet: _wallet, amount }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        _setStatus(err.message || 'Could not prepare transaction.', false);
+        return;
+      }
+      const { instructions } = await res.json();
+
+      _setStatus('Step 1/2: Approve SINC…', true);
+      await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: _wallet, to: instructions.step_1.to, data: instructions.step_1.data }],
+      });
+
+      _setStatus('Step 2/2: Depositing credits…', true);
+      await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{ from: _wallet, to: instructions.step_2.to, data: instructions.step_2.data }],
+      });
+
+      _setStatus('✓ Credits deposited! Balance updates in ~15 seconds.', true);
+    } catch (e) {
+      _setStatus(e.message || 'Transaction cancelled.', false);
+    }
+  }
+
+  return { open, close, switchTab, payWithCredits, purchaseOnChain };
+})();
+
+// Close modal on backdrop click
+document.getElementById('sinc-modal-backdrop').addEventListener('click', function(e) {
+  if (e.target === this) SINCModal.close();
+});
+</script>

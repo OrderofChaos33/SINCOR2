@@ -16,8 +16,19 @@
                     <h1 class="text-2xl font-bold text-gray-800">SINCOR Agent Control Center</h1>
                     <p class="text-gray-600">Select and configure your AI business automation agents</p>
                 </div>
-                <div class="text-right">
+                <div class="text-right flex items-center gap-3">
                     <p class="text-sm text-blue-600">🤖 42 Agents Available</p>
+                    <!-- SINC live cost badge -->
+                    <div id="sinc-cost-badge" style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 12px;font-size:.78rem;font-weight:600;color:#4338ca">
+                        🪙 Est. Cost: <span id="sinc-cost-value">1 SINC/call</span>
+                    </div>
+                    <button onclick="sincSelectorWidget.connect()" id="sinc-sel-connect"
+                            style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer">
+                        Connect Wallet
+                    </button>
+                    <span id="sinc-sel-pill" style="display:none;font-size:.78rem;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 10px;color:#4338ca;font-weight:700;cursor:pointer" onclick="sincSelectorWidget.showDetails()">
+                        🪙 <span id="sinc-sel-balance">—</span>
+                    </span>
                 </div>
             </div>
         </div>
@@ -458,6 +469,60 @@
             .catch(error => console.error('Error saving configuration:', error));
         }
     </script>
+
+<script>
+/* SINC selector widget — real-time cost estimation */
+const sincSelectorWidget = (() => {
+  let wallet = localStorage.getItem('sinc_wallet') || null;
+
+  async function updateCost(agentCount) {
+    const count = agentCount || 1;
+    try {
+      const res = await fetch('/api/sinc/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action_type: 'agent_call', quantity: count, wallet: wallet }),
+      });
+      if (!res.ok) return;
+      const { quote } = await res.json();
+      document.getElementById('sinc-cost-value').textContent =
+        `${quote.effective_cost_sinc} SINC${count > 1 ? ` (${count} calls)` : '/call'}`;
+    } catch {}
+  }
+
+  async function refreshBalance() {
+    if (!wallet) return;
+    try {
+      const res = await fetch(`/api/sinc/balance?wallet=${wallet}`);
+      if (!res.ok) return;
+      const { data } = await res.json();
+      document.getElementById('sinc-sel-balance').textContent = `${data.sinc_balance} SINC`;
+      document.getElementById('sinc-sel-pill').style.display = 'inline-flex';
+      document.getElementById('sinc-sel-connect').style.display = 'none';
+    } catch {}
+  }
+
+  async function connect() {
+    if (!window.ethereum) { alert('Web3 wallet required.'); return; }
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    wallet = accounts[0];
+    localStorage.setItem('sinc_wallet', wallet);
+    await refreshBalance();
+  }
+
+  function showDetails() { window.open(`/api/sinc/balance?wallet=${wallet}`, '_blank'); }
+
+  if (wallet) refreshBalance();
+  // Expose updateCost for agent selection events
+  return { connect, showDetails, updateCost };
+})();
+
+// Hook into agent selection to update live cost estimate
+document.addEventListener('change', () => {
+  const selected = document.querySelectorAll('input[type=checkbox]:checked');
+  sincSelectorWidget.updateCost(selected.length || 1);
+});
+</script>
 
 </body>
 </html>

@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from flask import Blueprint, current_app, jsonify, request
 
+from sincor2.sinc_access import sinc_required
 from sincor2.vertical_dispatch import dispatch_vertical_task, dispatch_via_router
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,11 @@ def list_agents():
             "version": record.version,
             "tags": record.tags,
             "skills": [skill.get("id") for skill in record.skills],
+            "sinc_pricing": {
+                "price_per_call": record.sinc_price_per_call,
+                "price_per_minute": record.sinc_price_per_minute,
+                "stake_required": record.sinc_stake_required,
+            },
         }
         for record in registry.list_all()
     ]
@@ -61,11 +67,17 @@ def get_agent(agent_id: str):
             "tags": record.tags,
             "skills": record.skills,
             "provider": record.provider,
+            "sinc_pricing": {
+                "price_per_call": record.sinc_price_per_call,
+                "price_per_minute": record.sinc_price_per_minute,
+                "stake_required": record.sinc_stake_required,
+            },
         }
     )
 
 
 @marketplace_bp.post("/register")
+@sinc_required(min_staked=250)
 def register_agent():
     """Register an external A2A agent with the SINCOR marketplace.
 
@@ -339,7 +351,7 @@ def submit_task():
     settlement_quote = None
     payer = body.get("payer", "").strip()
     raw_amount = body.get("amount", "1.0")
-    token_symbol = body.get("token_symbol", "AXIOM")
+    token_symbol = body.get("token_symbol", "SINC")
     settlement = platform.get("settlement")
     if payer and settlement is not None:
         try:
