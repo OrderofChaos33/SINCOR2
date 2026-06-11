@@ -67,8 +67,14 @@ TREASURY_WALLET  = os.getenv("TREASURY_ADDRESS",       "0xAf9B539D8043C634b7E611
 DEAD_ADDRESS     = "0x000000000000000000000000000000000000dEaD"
 CHAIN_ID         = int(os.getenv("BASE_CHAIN_ID", "8453"))  # Base mainnet
 
-# AXM amount (in wei, 18 decimals) required per A2A task call.
-# Configurable via env so it can be tuned post-launch.
+# Primary token for A2A task payments. Default is SINC; set A2A_PRIMARY_TOKEN=AXIOM
+# for legacy AXIOM-based settlements.
+A2A_PRIMARY_TOKEN = os.getenv("A2A_PRIMARY_TOKEN", "SINC").upper()
+
+# SINC price per A2A task call (whole tokens, decimals=0).
+SINC_PRICE_PER_TASK = int(os.getenv("SINC_PRICE_PER_TASK", "1"))  # 1 SINC default
+
+# Legacy AXIOM price per task (wei, 18 decimals) — kept for backward compatibility.
 AXM_PRICE_PER_TASK = int(os.getenv("AXM_PRICE_PER_TASK", str(1 * 10**18)))  # 1 AXM default
 
 PLATFORM_URL     = os.getenv("PLATFORM_URL", "https://getsincor.com")
@@ -772,20 +778,22 @@ class A2ARouter:
             return jsonify({
                 "agents": [
                     {
-                        "id":       s.id,
-                        "name":     s.name,
-                        "tags":     s.tags,
-                        "axm_price_per_task": str(AXM_PRICE_PER_TASK),
+                        "id":                 s.id,
+                        "name":               s.name,
+                        "tags":               s.tags,
+                        "sinc_price_per_task": SINC_PRICE_PER_TASK,
+                        "axm_price_per_task": str(AXM_PRICE_PER_TASK),  # legacy
                     }
                     for s in SINCOR_SKILLS
                 ],
-                "axiom_contract": AXIOM_CONTRACT,
-                "sinc_contract":  SINC_CONTRACT,
-                "treasury":       TREASURY_WALLET,
-                "chain_id":       CHAIN_ID,
+                "primary_token":   A2A_PRIMARY_TOKEN,
+                "sinc_contract":   SINC_CONTRACT,
+                "axiom_contract":  AXIOM_CONTRACT,
+                "treasury":        TREASURY_WALLET,
+                "chain_id":        CHAIN_ID,
             })
 
-        # ── Axiom payment quote ───────────────────────────────────────────────
+        # ── SINC/AXIOM payment quote ──────────────────────────────────────────
         @bp.route("/api/a2a/quote", methods=["POST"])
         def quote():
             from flask import jsonify, request
@@ -795,15 +803,21 @@ class A2ARouter:
             if not skill:
                 return jsonify(_err(f"Unknown skill: {skill_id}", code=-32602)), 400
             return jsonify({
-                "skill_id":          skill_id,
-                "axm_price_wei":     str(AXM_PRICE_PER_TASK),
-                "axm_price_display": f"{AXM_PRICE_PER_TASK / 10**18:.4f} AXM",
-                "pay_to":            TREASURY_WALLET,
-                "axiom_contract":    AXIOM_CONTRACT,
-                "chain_id":          CHAIN_ID,
+                "skill_id":           skill_id,
+                # SINC (primary)
+                "sinc_amount":        SINC_PRICE_PER_TASK,
+                "sinc_contract":      SINC_CONTRACT,
+                # AXIOM (legacy fallback)
+                "axm_price_wei":      str(AXM_PRICE_PER_TASK),
+                "axm_price_display":  f"{AXM_PRICE_PER_TASK / 10**18:.4f} AXM",
+                "axiom_contract":     AXIOM_CONTRACT,
+                "primary_token":      A2A_PRIMARY_TOKEN,
+                "pay_to":             TREASURY_WALLET,
+                "chain_id":           CHAIN_ID,
                 "note": (
-                    "Transfer the exact AXM amount to `pay_to` on Base (chain 8453) "
-                    "then include the tx hash in your tasks/send request."
+                    f"Pay {SINC_PRICE_PER_TASK} SINC (or {AXM_PRICE_PER_TASK / 10**18:.4f} AXM "
+                    f"for legacy) to `pay_to` on Base (chain 8453) then include the tx hash "
+                    f"in your tasks/send request."
                 ),
             })
 

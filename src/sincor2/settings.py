@@ -61,6 +61,10 @@ class Settings:
     paypal_client_secret: str | None
     anthropic_api_key: str | None
     base_rpc_url: str | None
+    # SINC token integration
+    sinc_contract_address: str
+    sinc_platform_access_address: str
+    platform_signer_key: str | None
 
     @property
     def is_production(self) -> bool:
@@ -104,6 +108,12 @@ class Settings:
             paypal_client_secret=os.getenv("PAYPAL_REST_API_SECRET"),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             base_rpc_url=os.getenv("BASE_RPC_URL"),
+            sinc_contract_address=os.getenv(
+                "SINC_CONTRACT_ADDRESS",
+                "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+            ),
+            sinc_platform_access_address=os.getenv("SINC_PLATFORM_ACCESS_ADDRESS", ""),
+            platform_signer_key=os.getenv("PLATFORM_SIGNER_KEY"),
         )
         settings.validate()
         return settings

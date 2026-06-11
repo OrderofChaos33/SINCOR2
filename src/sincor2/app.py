@@ -18,10 +18,12 @@ from sincor2.blueprints.marketplace import marketplace_bp
 from sincor2.blueprints.monitoring import monitoring_bp
 from sincor2.blueprints.pages import pages_bp
 from sincor2.blueprints.payments import payments_bp
+from sincor2.blueprints.sinc import sinc_bp
 from sincor2.blueprints.waitlist import waitlist_bp
 from sincor2.error_handling import register_error_handlers
 from sincor2.platform_bootstrap import bootstrap_platform
 from sincor2.settings import Settings
+from sincor2.sinc_access import SINCAccessManager, SINCMeter
 from sincor2.startup import run_startup_initializers
 from sincor2.stripe_checkout import StripeCheckout
 
@@ -84,6 +86,11 @@ def create_app() -> Flask:
     sincor_auth = SINCORAuth(app)
     app.extensions["sincor_auth"] = sincor_auth
 
+    # SINC token access management
+    sinc_manager = SINCAccessManager(rpc_url=settings.base_rpc_url)
+    app.extensions["sinc_access"] = sinc_manager
+    app.extensions["sinc_meter"] = SINCMeter()
+
     if settings.stripe_secret_key:
         try:
             app.extensions["stripe_checkout"] = StripeCheckout(api_key=settings.stripe_secret_key)
@@ -97,6 +104,7 @@ def create_app() -> Flask:
     app.register_blueprint(pages_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(payments_bp)
+    app.register_blueprint(sinc_bp)
     app.register_blueprint(waitlist_bp)
     app.register_blueprint(monitoring_bp)
     app.register_blueprint(marketplace_bp)

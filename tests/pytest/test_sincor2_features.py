@@ -955,6 +955,15 @@ class TestRegisterAgent:
 # ===========================================================================
 
 class TestMarketplaceRegistrationEndpoint:
+    """Tests for /api/marketplace/register.
+
+    These tests bypass the SINC stake gate (which is tested separately in
+    test_sinc_integration.py) by patching the SINCAccessManager instance so
+    that the full registration logic can be exercised in isolation.
+    """
+
+    _WALLET = "0x" + "a" * 40
+
     def _valid_card(self):
         return {
             "name": "External Agent",
@@ -964,37 +973,80 @@ class TestMarketplaceRegistrationEndpoint:
             "supportedInterfaces": [{"url": "http://ext.example.com/api/a2a"}],
         }
 
-    def test_register_endpoint_returns_201(self, client):
-        resp = client.post(
-            "/api/marketplace/register",
-            json={"agent_card": self._valid_card(), "agent_url": "http://ext.example.com"},
-        )
+    def _with_stake(self, app, amount=500):
+        """Context manager that mocks sufficient stake on the registered manager."""
+        import sincor2.sinc_access as sinc_access_mod
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _ctx():
+            mgr = app.extensions.get("sinc_access")
+            orig_call = mgr._eth_call if mgr else None
+            orig_addr = sinc_access_mod.SINC_PLATFORM_ACCESS
+            if mgr:
+                from unittest.mock import MagicMock
+                mgr._eth_call = MagicMock(return_value=amount)
+                sinc_access_mod.SINC_PLATFORM_ACCESS = "0x" + "1" * 40
+                mgr.invalidate_cache(self._WALLET)
+            try:
+                yield
+            finally:
+                if mgr:
+                    mgr._eth_call = orig_call
+                    sinc_access_mod.SINC_PLATFORM_ACCESS = orig_addr
+
+        return _ctx()
+
+    def test_register_endpoint_returns_201(self, client, app):
+        with self._with_stake(app):
+            resp = client.post(
+                "/api/marketplace/register",
+                headers={"X-Wallet-Address": self._WALLET},
+                json={"agent_card": self._valid_card(), "agent_url": "http://ext.example.com"},
+            )
         assert resp.status_code == 201
         data = resp.get_json()
         assert data["status"] == "registered"
         assert "agent_id" in data
         assert "skills_indexed" in data
 
-    def test_register_endpoint_missing_card_returns_400(self, client):
-        resp = client.post("/api/marketplace/register", json={})
+    def test_register_endpoint_missing_card_returns_400(self, client, app):
+        with self._with_stake(app):
+            resp = client.post(
+                "/api/marketplace/register",
+                headers={"X-Wallet-Address": self._WALLET},
+                json={},
+            )
         assert resp.status_code == 400
 
-    def test_register_endpoint_missing_name_returns_400(self, client):
+    def test_register_endpoint_missing_name_returns_400(self, client, app):
         bad_card = {"description": "d", "version": "1.0", "skills": [{"id": "x", "name": "X"}],
                     "supportedInterfaces": [{"url": "http://x.com"}]}
-        resp = client.post("/api/marketplace/register", json={"agent_card": bad_card})
+        with self._with_stake(app):
+            resp = client.post(
+                "/api/marketplace/register",
+                headers={"X-Wallet-Address": self._WALLET},
+                json={"agent_card": bad_card},
+            )
         assert resp.status_code == 400
 
-    def test_register_endpoint_no_skills_returns_400(self, client):
+    def test_register_endpoint_no_skills_returns_400(self, client, app):
         bad_card = dict(self._valid_card(), skills=[])
-        resp = client.post("/api/marketplace/register", json={"agent_card": bad_card})
+        with self._with_stake(app):
+            resp = client.post(
+                "/api/marketplace/register",
+                headers={"X-Wallet-Address": self._WALLET},
+                json={"agent_card": bad_card},
+            )
         assert resp.status_code == 400
 
-    def test_registered_agent_appears_in_list(self, client):
-        client.post(
-            "/api/marketplace/register",
-            json={"agent_card": self._valid_card()},
-        )
+    def test_registered_agent_appears_in_list(self, client, app):
+        with self._with_stake(app):
+            client.post(
+                "/api/marketplace/register",
+                headers={"X-Wallet-Address": self._WALLET},
+                json={"agent_card": self._valid_card()},
+            )
         resp = client.get("/api/marketplace/agents")
         assert resp.status_code == 200
         agents = resp.get_json()["agents"]

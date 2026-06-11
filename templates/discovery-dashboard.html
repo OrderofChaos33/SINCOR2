@@ -16,13 +16,70 @@
             <p class="text-xl text-gray-600 mb-8">
                 Our interactive demo platform is currently in development. Join the waitlist to be the first to experience SINCOR's 42-agent orchestration system.
             </p>
+
+            <!-- SINC Priority Gate -->
+            <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-5 mb-6 text-left">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                        <h3 class="font-bold text-indigo-800 text-sm mb-1">🪙 Priority Discovery Access</h3>
+                        <p class="text-indigo-600 text-xs">Stake 500+ SINC to unlock priority routing and early demo access.</p>
+                    </div>
+                    <div class="flex gap-2 flex-wrap">
+                        <span id="sinc-disc-badge" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full border border-indigo-300">500 SINC to unlock</span>
+                        <button onclick="sincDiscWidget.connect()"
+                                id="sinc-disc-connect"
+                                class="bg-indigo-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-indigo-700">
+                            Connect Wallet
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="space-y-4">
                 <button onclick="window.location.href='/'" class="w-full bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors">
                     Join Waitlist for Demo Access
                 </button>
                 <a href="/" class="block text-blue-600 hover:text-blue-700 font-medium">← Back to Home</a>
+                <a href="/sinc" class="block text-indigo-500 hover:text-indigo-600 font-medium text-sm">🪙 Get SINC for priority access</a>
             </div>
         </div>
     </div>
+
+<script>
+const sincDiscWidget = (() => {
+  let wallet = localStorage.getItem('sinc_wallet') || null;
+  const PRIORITY_THRESHOLD = 500;
+
+  async function refreshBalance() {
+    if (!wallet) return;
+    try {
+      const res = await fetch(`/api/sinc/balance?wallet=${wallet}`);
+      if (!res.ok) return;
+      const { data } = await res.json();
+      const bal = data.sinc_balance;
+      const staked = data.staked;
+      document.getElementById('sinc-disc-connect').style.display = 'none';
+      const badge = document.getElementById('sinc-disc-badge');
+      if (staked >= PRIORITY_THRESHOLD || bal >= PRIORITY_THRESHOLD) {
+        badge.textContent = '✓ Priority Access Unlocked';
+        badge.className = 'bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full border border-green-300';
+      } else {
+        badge.textContent = `${bal} / ${PRIORITY_THRESHOLD} SINC`;
+      }
+    } catch {}
+  }
+
+  async function connect() {
+    if (!window.ethereum) { alert('Web3 wallet required.'); return; }
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    wallet = accounts[0];
+    localStorage.setItem('sinc_wallet', wallet);
+    await refreshBalance();
+  }
+
+  if (wallet) refreshBalance();
+  return { connect };
+})();
+</script>
 </body>
 </html>
