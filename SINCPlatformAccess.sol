@@ -194,12 +194,9 @@ contract SINCPlatformAccess is ReentrancyGuard {
 
         uint256 fee = (amount * PLATFORM_FEE_BPS) / _BPS_DENOMINATOR;
 
-        // CEI: deduct credits before transferring fee
+        // CEI: deduct credits before accruing fee
         credits[user] -= amount;
         accruedTreasuryFees += fee;
-
-        // Transfer fee to treasury immediately
-        require(sinc.transfer(treasury, fee), "fee transfer failed");
 
         emit CreditsSpent(user, amount, taskId);
         emit FeePaid(user, fee);
@@ -285,7 +282,6 @@ contract SINCPlatformAccess is ReentrancyGuard {
 
         credits[msg.sender] -= LISTING_FEE;
         accruedTreasuryFees += LISTING_FEE;
-        require(sinc.transfer(treasury, LISTING_FEE), "fee transfer failed");
 
         emit ListingFeePaid(msg.sender, LISTING_FEE);
     }
@@ -331,12 +327,11 @@ contract SINCPlatformAccess is ReentrancyGuard {
         uint256 fee = (rec.amount * PLATFORM_FEE_BPS) / _BPS_DENOMINATOR;
         uint256 payeeAmount = rec.amount - fee;
 
-        // CEI: mark released before transfers
+        // CEI: mark released before transfer
         rec.released = true;
         accruedTreasuryFees += fee;
 
         require(sinc.transfer(rec.payee, payeeAmount), "payee transfer failed");
-        require(sinc.transfer(treasury, fee), "fee transfer failed");
 
         emit EscrowReleased(taskId, rec.payer, rec.payee, payeeAmount);
         emit FeePaid(rec.payer, fee);

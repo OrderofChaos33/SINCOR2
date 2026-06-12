@@ -141,8 +141,10 @@ class TestSINCAccessManager:
         assert status["can_use_advanced"] is False
 
     def test_rpc_failure_returns_zero(self):
+        from urllib.error import URLError
         mgr = SINCAccessManager(rpc_url="http://invalid-host-xyz.invalid")
-        result = mgr.get_balance("0x" + "a" * 40)
+        with patch("urllib.request.urlopen", side_effect=URLError("simulated network failure")):
+            result = mgr.get_balance("0x" + "a" * 40)
         assert result == 0
 
 

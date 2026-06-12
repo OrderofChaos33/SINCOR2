@@ -95,9 +95,9 @@ def advanced_feature():
 def register_agent():
     ...
 
-# Require 10 SINC credits and deduct 10
+# Require 10 SINC credits
 @bp.route("/run-agent", methods=["POST"])
-@sinc_required(use_credits=True, cost=10)
+@sinc_required(min_credits=10)
 def run_agent():
     ...
 ```
@@ -132,10 +132,7 @@ def run_agent():
 from sincor2.sinc_access import SINCAccessManager
 
 mgr = SINCAccessManager(
-    sinc_address="0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
-    platform_access_address="0x...",  # SINCPlatformAccess deployed address
     rpc_url="https://mainnet.base.org",
-    cache_ttl=15,
 )
 
 balance = mgr.get_balance("0xUserWallet")    # on-chain balanceOf
@@ -151,7 +148,7 @@ mgr.invalidate_cache("0xUserWallet")        # force fresh read
 ```python
 from sincor2.sinc_access import SINCMeter
 
-meter = SINCMeter(log_file="sinc_usage_log.json")
+meter = SINCMeter(log_path="sinc_usage_log.json")
 meter.record(
     wallet="0xUserWallet",
     action_type="agent_call",
@@ -160,7 +157,7 @@ meter.record(
 )
 ```
 
-Records are appended to `sinc_usage_log.json` (or a path set by `SINC_USAGE_LOG` env var).
+Records are appended to `sinc_usage_log.json` (or a path set by `SINC_USAGE_LOG_PATH` env var).
 Each record includes: `wallet`, `action_type`, `sinc_amount`, `task_id`, `timestamp` (ISO 8601).
 
 ---

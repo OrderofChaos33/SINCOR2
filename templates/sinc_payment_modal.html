@@ -233,6 +233,7 @@ const SINCModal = (() => {
         headers: {
           'Content-Type': 'application/json',
           'X-Wallet-Address': _wallet,
+          'Authorization': 'Bearer ' + (localStorage.getItem('sinc_access_token') || ''),
         },
         body: JSON.stringify({
           wallet: _wallet,

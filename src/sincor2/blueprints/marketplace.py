@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from flask import Blueprint, current_app, jsonify, request
 
-from sincor2.sinc_access import sinc_required
+from sincor2.sinc_access import COST_LISTING_FEE, sinc_required
 from sincor2.vertical_dispatch import dispatch_vertical_task, dispatch_via_router
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ def get_agent(agent_id: str):
 
 
 @marketplace_bp.post("/register")
-@sinc_required(min_staked=250)
+@sinc_required(min_staked=250, min_credits=COST_LISTING_FEE)
 def register_agent():
     """Register an external A2A agent with the SINCOR marketplace.
 
