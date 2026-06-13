@@ -1,0 +1,131 @@
+{
+  "last_updated": "2026-06-13T20:41:06Z",
+  "threshold": 75,
+  "opportunities": [
+    {
+      "id": "base-builder-grants",
+      "name": "Base Builder Grants",
+      "score": 93,
+      "status": "ready_for_nomination",
+      "fit": [
+        "Base-native shipped code",
+        "retroactive rewards for live work",
+        "strong public-goods and open-source overlap"
+      ],
+      "mechanics": "Rolling nomination-based retro grants for shipped Base work.",
+      "official_urls": [
+        "https://docs.base.org/get-started/get-funded",
+        "https://docs.google.com/forms/d/e/1FAIpQLScf2B0jT5CsCBMrcCOi5l5Gm-EwHAW0TGZe_2Tc9yp3-FXLNA/viewform",
+        "https://gitcoin.co/apps/base-builder-grants"
+      ],
+      "deadline": "rolling",
+      "immediate_next_action": "Submit self-nomination using prepared artifact after human approval.",
+      "blockers": []
+    },
+    {
+      "id": "uniswap-foundation-grants",
+      "name": "Uniswap Foundation Grants",
+      "score": 91,
+      "status": "brief_ready",
+      "fit": [
+        "live Uniswap v4 hook and related tooling",
+        "DeFi infrastructure and security alignment",
+        "open-source protocol contribution narrative"
+      ],
+      "mechanics": "Foundation grant application for v4 hooks, tooling, security, and integrations.",
+      "official_urls": [
+        "https://www.uniswapfoundation.org/grants",
+        "https://developers.uniswap.org/docs/ecosystem/builder-support/get-funded"
+      ],
+      "deadline": "open / rolling",
+      "immediate_next_action": "Convert brief into application draft with measured impact once onchain metrics are pulled.",
+      "blockers": [
+        "Need fresh verifiable usage and deployment metrics."
+      ]
+    },
+    {
+      "id": "uniswap-hook-incubator",
+      "name": "Uniswap Hook Incubator",
+      "score": 89,
+      "status": "cohort_monitoring",
+      "fit": [
+        "direct v4 hook relevance",
+        "mentorship and visibility value",
+        "team already shipping relevant contracts"
+      ],
+      "mechanics": "Cohort-based incubator for advanced v4 hook builders.",
+      "official_urls": [
+        "https://atrium.academy/uniswap",
+        "https://developers.uniswap.org/docs/ecosystem/builder-support/get-funded"
+      ],
+      "deadline": "next public cohort reported for July 2026",
+      "immediate_next_action": "Watch cohort timing and submit incubator-ready narrative if deadline opens.",
+      "blockers": []
+    },
+    {
+      "id": "gitcoin-builder-rounds",
+      "name": "Gitcoin Builder Profile + Grants Rounds",
+      "score": 84,
+      "status": "profile_missing",
+      "fit": [
+        "OSS-friendly public-goods mechanism",
+        "Ethereum/Base eligible if profile and impact evidence are strong",
+        "works well once community support exists"
+      ],
+      "mechanics": "Builder profile plus round-specific applications and Human Passport checks.",
+      "official_urls": [
+        "https://builder.gitcoin.co",
+        "https://grants.gitcoin.co"
+      ],
+      "deadline": "round-dependent",
+      "immediate_next_action": "Create Builder profile and gather GitHub, deployment, and impact evidence.",
+      "blockers": [
+        "No public SINCOR/OrderofChaos33 Builder profile found during discovery.",
+        "Round timing must be confirmed at application time."
+      ]
+    },
+    {
+      "id": "optimism-retro-funding",
+      "name": "Optimism Retro Funding",
+      "score": 82,
+      "status": "evidence_pack_needed",
+      "fit": [
+        "retroactive public-goods orientation",
+        "Base / OP Stack adjacency",
+        "best fit if impact evidence is strong and widely useful"
+      ],
+      "mechanics": "Retroactive reward process for measurable ecosystem impact.",
+      "official_urls": [
+        "https://retrofunding.optimism.io/",
+        "https://app.optimism.io/retroPGF"
+      ],
+      "deadline": "seasonal / round-based",
+      "immediate_next_action": "Prepare OP Stack public-goods framing and monitor next round status.",
+      "blockers": [
+        "Need tighter OP Stack impact framing than Base-only framing."
+      ]
+    },
+    {
+      "id": "fjord-lbp",
+      "name": "Fjord Foundry LBP",
+      "score": 79,
+      "status": "readiness_prepared",
+      "fit": [
+        "liquidity support rather than grant",
+        "relevant for SINC token distribution",
+        "permissionless path reduces dependency risk"
+      ],
+      "mechanics": "Permissionless or curated LBP launch workflow for token distribution and price discovery.",
+      "official_urls": [
+        "https://www.fjordfoundry.com/",
+        "https://help.fjordfoundry.com/fjord-foundry-docs/for-sale-creators/token-sale-types/liquidity-bootstrapping-pools-lbps"
+      ],
+      "deadline": "open",
+      "immediate_next_action": "Complete token sale readiness pack before any launch decision.",
+      "blockers": [
+        "Requires wallet signatures and liquidity decisions.",
+        "Should not proceed without human approval."
+      ]
+    }
+  ]
+}
