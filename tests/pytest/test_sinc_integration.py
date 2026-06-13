@@ -10,21 +10,18 @@ import pytest
 
 from marketplace.registry import AgentCardRecord, AgentCardRegistry
 from marketplace.settlement import (
-    PLATFORM_FEE_BPS,
+    AXIOM_TOKEN,
+    SINC_TOKEN,
     SettlementCoordinator,
     _compute_fee,
-    _resolve_token_address,
-    SINC_TOKEN,
-    AXIOM_TOKEN,
 )
 from sincor2.sinc_access import (
     SINCAccessManager,
     SINCMeter,
-    _TTLCache,
-    _encode_address,
     _decode_uint256,
+    _encode_address,
+    _TTLCache,
 )
-
 
 # ===========================================================================
 # Helpers
@@ -212,13 +209,17 @@ class TestSettlementSINCPrimary:
 
     def test_create_quote_axiom_legacy(self):
         coordinator = SettlementCoordinator()
-        quote = coordinator.create_quote("task-2", "0xpayer", "0xpayee", Decimal("1"), token_symbol="AXIOM")
+        quote = coordinator.create_quote(
+            "task-2", "0xpayer", "0xpayee", Decimal("1"), token_symbol="AXIOM"
+        )
         assert quote.token_symbol == "AXIOM"
         assert quote.token_address == AXIOM_TOKEN
 
     def test_sinc_amount_field_populated(self):
         coordinator = SettlementCoordinator()
-        quote = coordinator.create_quote("task-3", "0xpayer", "0xpayee", Decimal("5"), token_symbol="SINC")
+        quote = coordinator.create_quote(
+            "task-3", "0xpayer", "0xpayee", Decimal("5"), token_symbol="SINC"
+        )
         assert quote.sinc_amount == "5.0000"
 
     def test_platform_fee_5_percent(self):
@@ -372,11 +373,15 @@ class TestSINCBlueprint:
         assert res.status_code in (201, 503)
 
     def test_purchase_credits_no_contract(self, client):
-        res = client.post("/api/sinc/credits/purchase", json={"wallet": "0x" + "a" * 40, "amount": 50})
+        res = client.post(
+            "/api/sinc/credits/purchase", json={"wallet": "0x" + "a" * 40, "amount": 50}
+        )
         assert res.status_code in (201, 503)
 
     def test_purchase_credits_amount_too_low(self, client):
-        res = client.post("/api/sinc/credits/purchase", json={"wallet": "0x" + "a" * 40, "amount": 5})
+        res = client.post(
+            "/api/sinc/credits/purchase", json={"wallet": "0x" + "a" * 40, "amount": 5}
+        )
         assert res.status_code == 400
         assert res.get_json()["code"] == "amount_too_low"
 

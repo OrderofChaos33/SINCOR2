@@ -975,8 +975,9 @@ class TestMarketplaceRegistrationEndpoint:
 
     def _with_stake(self, app, amount=500):
         """Context manager that mocks sufficient stake on the registered manager."""
-        import sincor2.sinc_access as sinc_access_mod
         from contextlib import contextmanager
+
+        import sincor2.sinc_access as sinc_access_mod
 
         @contextmanager
         def _ctx():

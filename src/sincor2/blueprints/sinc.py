@@ -1,13 +1,13 @@
-from __future__ import annotations
-
 """SINC token API endpoints — balance, quotes, credits, staking, and history.
 
 All monetary amounts are in whole SINC tokens (decimals = 0).
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Dict
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
