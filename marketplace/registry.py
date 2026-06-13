@@ -45,7 +45,7 @@ class AgentCardRecord:
             except (TypeError, ValueError):
                 return default
 
-        sinc_pricing = card.get('sincPricing', {})
+        sinc_pricing = card.get('sincPricing') or {}
         sinc_price_per_call = _sinc_int(sinc_pricing, 'pricePerCall', 1)
         sinc_price_per_minute = _sinc_int(sinc_pricing, 'pricePerMinute', 0)
         sinc_stake_required = _sinc_int(sinc_pricing, 'stakeRequired', 250)

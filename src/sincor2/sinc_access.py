@@ -21,7 +21,6 @@ SINC_PLATFORM_ACCESS_ADDRESS  : Deployed SINCPlatformAccess contract address
 """
 
 import functools
-import hashlib
 import json
 import logging
 import os
