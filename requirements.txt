@@ -5,7 +5,7 @@ Flask>=3.0.0,<4.0.0
 # Essential dependencies
 requests>=2.33.0              # HTTP requests for API integrations (fixes CWE-670, CWE-201, CWE-377)
 httpx>=0.25.0                # Async HTTP client for concurrent operations
-PyJWT>=2.12.0                  # JWT authentication
+PyJWT>=2.13.0                  # JWT authentication
 Jinja2>=3.1.0                 # Template engine
 PyYAML>=6.0                   # Configuration files
 python-dotenv>=1.0.0          # Environment variable management
