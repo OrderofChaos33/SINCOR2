@@ -21,9 +21,9 @@ def _root() -> Path:
 
 
 def _log_path() -> Path:
-    p = _root() / "data" / "agent_burn_log.jsonl"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    return p
+    from sincor2.data_paths import agent_burn_log_path
+
+    return agent_burn_log_path()
 
 
 def record_platform_payment(
