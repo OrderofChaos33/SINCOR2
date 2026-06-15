@@ -1656,6 +1656,121 @@ def vertical_webbuilder():
     return render_template('vertical_webbuilder.html')
 
 
+@app.route('/verticals/webbuilder/studio')
+@app.route('/webbuilder/studio')
+def webbuilder_studio_page():
+    """Dedicated WebBuilder workspace — projects, preview, migration planner."""
+    return render_template('webbuilder_studio.html')
+
+
+@app.route('/preview/<slug>')
+def webbuilder_preview_page(slug):
+    """Staging preview for a WebBuilder project (preview-first migration)."""
+    from sincor2.webbuilder_studio import _load
+
+    for p in _load().get('projects', []):
+        if p.get('slug') == slug:
+            active = next(
+                (s for s in p.get('migration', []) if s.get('status') == 'active'),
+                None,
+            )
+            label = active['title'] if active else (p.get('status') or 'preview')
+            return render_template(
+                'webbuilder_preview.html',
+                project=p,
+                migration_label=label,
+            )
+    return render_template('error.html', code=404, title='Preview Not Found',
+                           message='This staging preview does not exist or was removed.'), 404
+
+
+@app.route('/api/webbuilder/studio')
+def api_webbuilder_studio_home():
+    from sincor2.webbuilder_studio import studio_home
+    return jsonify(studio_home())
+
+
+@app.route('/api/webbuilder/projects', methods=['GET', 'POST'])
+def api_webbuilder_projects():
+    from sincor2.webbuilder_studio import create_project, list_projects
+
+    if request.method == 'GET':
+        return jsonify({'ok': True, 'projects': list_projects()})
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'ok': False, 'error': 'name_required'}), 400
+    project = create_project(
+        name=name,
+        niche=data.get('niche', ''),
+        source_type=data.get('source_type', 'none'),
+        source_url=data.get('source_url', ''),
+        territory=data.get('territory', ''),
+        owner_email=data.get('owner_email', ''),
+        prompt=data.get('prompt', ''),
+    )
+    return jsonify({'ok': True, 'project': project}), 201
+
+
+@app.route('/api/webbuilder/projects/<project_id>')
+def api_webbuilder_project_get(project_id):
+    from sincor2.webbuilder_studio import get_project, migration_status
+
+    p = get_project(project_id)
+    if not p:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    return jsonify(p)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/migration')
+def api_webbuilder_migration(project_id):
+    from sincor2.webbuilder_studio import migration_status
+
+    status = migration_status(project_id)
+    if not status.get('ok'):
+        return jsonify(status), 404
+    return jsonify(status)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/run', methods=['POST'])
+def api_webbuilder_run(project_id):
+    from sincor2.webbuilder_studio import run_autonomous_phases
+
+    return jsonify(run_autonomous_phases(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/approve', methods=['POST'])
+def api_webbuilder_approve(project_id):
+    from sincor2.webbuilder_studio import approve_preview
+
+    p = approve_preview(project_id)
+    if not p:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    return jsonify(p)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/domain', methods=['POST'])
+def api_webbuilder_domain(project_id):
+    from sincor2.webbuilder_studio import connect_domain
+
+    data = request.get_json(silent=True) or {}
+    result = connect_domain(
+        project_id,
+        data.get('domain', ''),
+        include_www=bool(data.get('include_www', True)),
+    )
+    if not result.get('ok'):
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/verify-dns', methods=['POST'])
+def api_webbuilder_verify_dns(project_id):
+    from sincor2.webbuilder_studio import verify_dns
+
+    return jsonify(verify_dns(project_id))
+
+
 @app.route('/sinc')
 def sinc_token():
     """SINC token gateway page."""
