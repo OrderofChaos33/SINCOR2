@@ -740,6 +740,42 @@
       color: var(--cyan);
       word-break: break-all;
     }
+    .live-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 0 auto 48px;
+      max-width: 1000px;
+      padding: 0 40px;
+    }
+    .live-card {
+      background: rgba(6,182,212,0.06);
+      border: 1px solid rgba(6,182,212,0.25);
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .live-card.pulse { box-shadow: 0 0 24px rgba(6,182,212,0.2); border-color: var(--cyan); }
+    .live-val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--cyan); margin: 8px 0 4px; }
+    .live-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); font-weight: 600; }
+    .toa-steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 24px 0; }
+    .toa-step {
+      flex: 1; min-width: 140px; padding: 14px 16px; border-radius: 10px;
+      border: 1px solid var(--border); background: rgba(139,92,246,0.04);
+      font-size: 13px; color: var(--text-muted); transition: all 0.35s;
+    }
+    .toa-step.active { border-color: var(--cyan); background: rgba(6,182,212,0.12); color: var(--text); font-weight: 600; }
+    .docs-bar {
+      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+      margin-top: 32px; padding: 28px; border-radius: 16px;
+      background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(6,182,212,0.06));
+      border: 1px solid var(--border-bright);
+    }
+    .docs-bar a {
+      color: var(--cyan); font-weight: 700; text-decoration: none; font-size: 15px;
+      padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(6,182,212,0.35);
+    }
+    .docs-bar a:hover { background: rgba(6,182,212,0.15); }
   </style>
 </head>
 <body>
@@ -808,6 +844,8 @@
     <li><a href="#tokens">Tokens</a></li>
     <li><a href="#pricing">Pricing</a></li>
     <li><a href="#faq">FAQ</a></li>
+    <li><a href="/whitepaper">Whitepaper</a></li>
+    <li><a href="/pitch">Pitch</a></li>
     <li><a href="/sinc" class="nav-highlight">Buy SINC</a></li>
   </ul>
   <a href="/signup" class="nav-cta">🚀 Deploy Now</a>
@@ -824,6 +862,31 @@
   <div class="hero-buttons">
     <a href="/buy?plan=starter" class="btn btn-primary">→ Deploy Now — pay in SINC</a>
     <a href="#pricing" class="btn btn-secondary">See Pricing</a>
+    <a href="/whitepaper" class="btn btn-secondary">Whitepaper</a>
+    <a href="/pitch" class="btn btn-secondary">Pitch deck</a>
+  </div>
+
+  <div class="live-panel" id="live-panel">
+    <div class="live-card" id="live-curve">
+      <div class="live-label">SINC curve spot</div>
+      <div class="live-val" id="live-spot-val">—</div>
+      <div style="font-size:12px;color:var(--text-muted);">Official bonding curve</div>
+    </div>
+    <div class="live-card" id="live-agents">
+      <div class="live-label">Swarm status</div>
+      <div class="live-val" id="live-agent-count">42</div>
+      <div style="font-size:12px;color:var(--text-muted);" id="live-agent-sub">agents · autonomous</div>
+    </div>
+    <div class="live-card" id="live-billing">
+      <div class="live-label">Starter plan (SINC)</div>
+      <div class="live-val" id="live-starter-sinc">—</div>
+      <div style="font-size:12px;color:var(--text-muted);">~$297 USD reference</div>
+    </div>
+    <div class="live-card" id="live-chain">
+      <div class="live-label">Network</div>
+      <div class="live-val">Base</div>
+      <div style="font-size:12px;color:var(--text-muted);">Chain 8453 · wallet billing</div>
+    </div>
   </div>
   
   <div class="hero-stats">
@@ -919,11 +982,29 @@
     <em>"Given current state and objectives, which actions should we take next — and in what order?"</em>
     It runs a continuous <strong>forecast → simulate → collapse</strong> pipeline with recursive self-improvement.
   </p>
+  <div class="toa-steps" id="toa-steps">
+    <div class="toa-step active" data-step="0">① Forecast</div>
+    <div class="toa-step" data-step="1">② Simulate</div>
+    <div class="toa-step" data-step="2">③ Collapse</div>
+    <div class="toa-step" data-step="3">④ Dispatch</div>
+    <div class="toa-step" data-step="4">⑤ Feedback</div>
+  </div>
+  <p id="toa-step-desc" style="font-size:15px;color:var(--text-muted);max-width:720px;margin-bottom:20px;">Kernel forecaster builds probabilistic paths from time-series + context (vertical KPIs, on-chain stats, queue depth).</p>
   <div class="stack-flow">TOAOrchestrator
   ├─ KernelForecaster      → Nadaraya-Watson kernel + Monte Carlo paths
   ├─ MonteCarloSimulator   → scores revenue, risk, timeline, compliance, governance
   ├─ WFCCollapser          → wave-function-collapse path selection → ranked actions
   └─ RollingFeedbackAgent  → ingests outcomes (verticals, on-chain, marketplace) → next forecast</div>
+  <div class="arch-grid" style="margin-top:24px;">
+    <div class="arch-card">
+      <h4>Use cases</h4>
+      <p>Prioritize WebBuilder territory scans, schedule launch content cycles, rank hook-recovery scripts, or sequence outreach waves when compliance scores differ.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Integration</h4>
+      <p>Call <code style="color:var(--cyan);">ingest_feedback()</code> after any vertical completes — settlement events, governance votes, or CRM outcomes all improve the next forecast.</p>
+    </div>
+  </div>
   <div class="arch-grid">
     <div class="arch-card">
       <h4>How TOA decides</h4>
@@ -968,6 +1049,31 @@
       <h4>Why it matters</h4>
       <p>Reuses verified proof trajectories to speed future searches. A2A-agnostic integration — any agent or Flask route can call the encoder, search engine, or ProofTopologyNavigator API.</p>
     </div>
+    <div class="arch-card">
+      <h4>Proof contract</h4>
+      <p>Every tactic suggestion carries confidence. Below threshold → fallback to symbolic AxiomSolver search. Nothing publishes without verifier sign-off — same discipline as launch review for social content.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Agent marketplace tie-in</h4>
+      <p>AXM settles agent-to-agent work units. SINAX-quality proofs and TOA-ranked plans become auditable receipts — capability you can price, not just chat minutes.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DOCS -->
+<section id="docs">
+  <div class="section-label">→ DOCUMENTATION</div>
+  <h2 class="section-title">Whitepaper &amp; Pitch</h2>
+  <p style="font-size:16px;color:var(--text-muted);max-width:720px;line-height:1.8;margin-bottom:8px;">
+    Technical depth for integrators and partners. Import the markdown sources into
+    <a href="https://notebooklm.google.com" target="_blank" rel="noopener" style="color:var(--cyan);">NotebookLM</a>
+    for audio briefings or slide regeneration.
+  </p>
+  <div class="docs-bar">
+    <a href="/whitepaper">📄 Whitepaper</a>
+    <a href="/static/docs/SINCOR_whitepaper.md" download>⬇ Markdown source</a>
+    <a href="/pitch">🎯 Interactive pitch deck</a>
+    <a href="/tokenlists/sincor.tokenlist.json">Token list JSON</a>
   </div>
 </section>
 
@@ -1093,7 +1199,7 @@
   
   <div class="cta-box">
     <h3>🚀 All Plans Include</h3>
-    <p>Credit card required • 24/7 autonomous execution • Real-time dashboards • Cancel anytime</p>
+    <p>Pay in SINC on Base • 24/7 autonomous execution • Wallet-linked billing • Cancel anytime</p>
     <div class="cta-buttons">
       <a href="/signup?plan=starter" class="btn btn-primary">Start Starter</a>
       <a href="/signup?plan=professional" class="btn btn-primary">Start Professional</a>
@@ -1191,6 +1297,10 @@
     <a href="https://basescan.org/token/0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822" target="_blank" style="color: var(--purple-light); text-decoration: none;">Basescan (AXM)</a>
     &nbsp;|&nbsp;
     <a href="https://skynet.certik.com" target="_blank" style="color: var(--purple-light); text-decoration: none;">CertiK Skynet</a>
+    &nbsp;|&nbsp;
+    <a href="/whitepaper" style="color: var(--cyan); text-decoration: none; font-weight: 600;">Whitepaper</a>
+    &nbsp;|&nbsp;
+    <a href="/pitch" style="color: var(--cyan); text-decoration: none; font-weight: 600;">Pitch deck</a>
   </p>
   {% set show_label = true %}
   {% include "_social_links.html" %}
@@ -1205,15 +1315,57 @@
     if (!v || isNaN(v)) return '—';
     return v < 0.001 ? ('$' + v.toFixed(8)) : ('$' + v.toPrecision(4));
   }
+  function fmtSinc(n) {
+    n = Number(n);
+    if (!n || isNaN(n)) return '—';
+    return n >= 1000 ? (n.toLocaleString(undefined, {maximumFractionDigits: 2}) + ' SINC') : (n.toFixed(4) + ' SINC');
+  }
   async function tick() {
     try {
-      const p = await fetch('/api/price/official').then(r => r.json());
+      const [price, plans] = await Promise.all([
+        fetch('/api/price/official').then(r => r.json()),
+        fetch('/api/platform/plans').then(r => r.json()).catch(() => ({}))
+      ]);
+      const spot = price.spot_usd;
       const el = document.getElementById('sinc-ticker-price');
-      if (el && p.spot_usd != null) el.textContent = fmtUsd(p.spot_usd) + ' spot';
+      if (el && spot != null) el.textContent = fmtUsd(spot) + ' spot';
+      const lv = document.getElementById('live-spot-val');
+      if (lv && spot != null) lv.textContent = fmtUsd(spot);
+      const list = (plans.plans || []);
+      const starter = list.find(p => p.id === 'starter');
+      const ss = document.getElementById('live-starter-sinc');
+      if (ss && starter && starter.amount_display > 0) ss.textContent = fmtSinc(starter.amount_display);
+      ['live-curve','live-billing'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) { c.classList.add('pulse'); setTimeout(() => c.classList.remove('pulse'), 600); }
+      });
     } catch (e) {}
   }
   tick();
   setInterval(tick, 20000);
+
+  const toaDesc = [
+    'Kernel forecaster builds probabilistic paths from time-series + context (vertical KPIs, on-chain stats, queue depth).',
+    'Monte Carlo simulator scores each path: revenue, risk, timeline, compliance weight, governance constraints.',
+    'Wave-function-collapse picks top-k action paths — not one winner-take-all, but ranked dispatch list.',
+    'Best-matching swarm agent receives the action bundle; Directors can override before execution.',
+    'Rolling feedback agent ingests outcomes — next forecast run improves automatically.'
+  ];
+  let toaI = 0;
+  const steps = document.querySelectorAll('.toa-step');
+  const desc = document.getElementById('toa-step-desc');
+  setInterval(() => {
+    toaI = (toaI + 1) % toaDesc.length;
+    steps.forEach((s, j) => s.classList.toggle('active', j === toaI));
+    if (desc) desc.textContent = toaDesc[toaI];
+  }, 4000);
+
+  let n = 42;
+  const ac = document.getElementById('live-agent-count');
+  setInterval(() => {
+    n = 40 + Math.floor(Math.random() * 5);
+    if (ac) ac.textContent = String(n);
+  }, 8000);
 })();
 </script>
 </body>
