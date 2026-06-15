@@ -1,130 +1,195 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SINCOR2 Whitepaper</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, sans-serif; line-height: 1.8; color: #333; background: #f5f5f5; }
-        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; background: white; min-height: 100vh; }
-        h1 { color: #667eea; margin-bottom: 30px; border-bottom: 3px solid #667eea; padding-bottom: 15px; }
-        h2 { color: #764ba2; margin-top: 40px; margin-bottom: 20px; }
-        h3 { color: #666; margin-top: 25px; margin-bottom: 15px; }
-        p { margin-bottom: 15px; }
-        ul, ol { margin-left: 25px; margin-bottom: 15px; }
-        .section { margin-bottom: 40px; }
-        .header { text-align: center; margin-bottom: 50px; }
-        .download-btn { display: inline-block; margin-top: 30px; padding: 12px 24px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; border-radius: 8px; }
-        .download-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        tr { border: 1px solid #ddd; }
-        th, td { padding: 12px; text-align: left; }
-        tr:nth-child(even) { background: #f9f9f9; }
-        tr:first-child { background: #f0f0f0; }
-        a { color: #667eea; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Whitepaper — Autonomous Workforce on Base</title>
+  <meta name="description" content="SINCOR technical whitepaper: multi-agent OS, SINC + AXIOM tokenomics, TOA, SINAX, wallet billing.">
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --surface:#111827; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; --border:rgba(139,92,246,.2); }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; line-height:1.7; }
+    nav { display:flex; justify-content:space-between; align-items:center; padding:16px 32px; border-bottom:1px solid var(--border); position:sticky; top:0; background:rgba(10,14,39,.92); backdrop-filter:blur(16px); z-index:20; }
+    nav a { color:var(--cyan); text-decoration:none; font-weight:600; font-size:14px; margin-left:20px; }
+    .wrap { max-width:820px; margin:0 auto; padding:48px 24px 80px; }
+    .hero { text-align:center; margin-bottom:48px; }
+    .kicker { font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--cyan); font-weight:700; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(32px,5vw,48px); margin:12px 0; letter-spacing:-.03em; }
+    .sub { color:var(--muted); font-size:16px; }
+    .actions { margin-top:24px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+    .btn { padding:12px 22px; border-radius:10px; font-weight:700; text-decoration:none; font-size:14px; }
+    .btn-primary { background:linear-gradient(135deg,var(--purple),#6d28d9); color:#fff; }
+    .btn-secondary { border:1px solid var(--border); color:var(--text); }
+    h2 { font-family:'Sora',sans-serif; font-size:26px; margin:40px 0 16px; color:#e2e8f0; border-bottom:1px solid var(--border); padding-bottom:8px; }
+    h3 { font-size:18px; margin:24px 0 10px; color:var(--cyan); }
+    p { color:var(--muted); margin-bottom:14px; }
+    ul { margin:0 0 16px 22px; color:var(--muted); }
+    li { margin-bottom:8px; }
+    table { width:100%; border-collapse:collapse; margin:16px 0; font-size:14px; }
+    th, td { border:1px solid var(--border); padding:10px 12px; text-align:left; }
+    th { background:rgba(139,92,246,.12); color:#c4b5fd; }
+    .mono { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--cyan); word-break:break-all; }
+    .callout { background:rgba(6,182,212,.08); border:1px solid rgba(6,182,212,.3); border-radius:12px; padding:18px; margin:20px 0; }
+    .toc { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px 24px; margin-bottom:32px; }
+    .toc a { color:var(--cyan); text-decoration:none; display:block; padding:4px 0; font-size:14px; }
+    #live-spot { font-family:'JetBrains Mono',monospace; color:var(--cyan); }
+    footer { text-align:center; padding:32px; color:var(--muted); font-size:13px; border-top:1px solid var(--border); }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🚀 SINCOR2 Platform Whitepaper</h1>
-            <p>Advanced Agent-Driven Cryptocurrency Infrastructure</p>
-            <p style="color: #999; margin-top: 10px;">Version 1.0 | February 2026</p>
-            <a href="/docs/whitepaper.pdf" class="download-btn" style="display: inline-block;">📥 Download PDF</a>
-        </div>
+<nav>
+  <a href="/" style="margin:0;color:#f1f5f9;font-family:'Sora',sans-serif;">← SINCOR</a>
+  <div>
+    <a href="/pitch">Pitch deck</a>
+    <a href="/buy">Buy with SINC</a>
+    <a href="/sinc">Curve</a>
+  </div>
+</nav>
 
-        <div class="section">
-            <h2>Executive Summary</h2>
-            <p>SINCOR2 is a next-generation platform enabling autonomous AI agents to interact with crypto markets, DeFi protocols, and traditional finance. Built on Base L2 with multi-chain support, SINCOR2 democratizes access to sophisticated trading, MEV extraction, and liquidation hunting strategies.</p>
-        </div>
-
-        <div class="section">
-            <h2>1. Introduction</h2>
-            <h3>1.1 Problem Statement</h3>
-            <p>Current cryptocurrency infrastructure requires significant technical expertise for participation in advanced trading strategies. Retail users are limited to simple buy/hold or basic DEX trading.</p>
-            
-            <h3>1.2 Solution</h3>
-            <p>SINCOR2 provides agent-based automation, enabling users to deploy AI-powered strategies across multiple networks without deep technical knowledge.</p>
-        </div>
-
-        <div class="section">
-            <h2>2. Core Technology</h2>
-            <h3>2.1 Dutch Auction System</h3>
-            <p>SINC token distribution via 7-day declining price auction, creating price discovery while generating initial liquidity.</p>
-            
-            <h3>2.2 Bonding Curve AMM</h3>
-            <p>Logarithmic pricing model on Base L2 with 0.25% fee structure, enabling sustainable fee capture.</p>
-            
-            <h3>2.3 Autonomous Agents</h3>
-            <p>Claude AI-powered agents for trading, liquidation hunting, and MEV extraction across Ethereum ecosystem.</p>
-        </div>
-
-        <div class="section">
-            <h2>3. Tokenomics</h2>
-            <ul>
-                <li><strong>Total Supply:</strong> 999 Trillion SINC</li>
-                <li><strong>Initial Auction:</strong> 48 Million SINC (7-day declining price)</li>
-                <li><strong>Fee Model:</strong> 0.25% on bonding curve, 0.01%-1% dynamic on DAEAMM</li>
-                <li><strong>Treasury:</strong> Collected fees fund agent development and ecosystem growth</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>4. Payment Methods</h2>
-            <h3>Platform Access - Multiple Payment Options</h3>
-            <ul>
-                <li><strong>PayPal:</strong> USD payments via PayPal REST API (sandbox & production)</li>
-                <li><strong>Cryptocurrency:</strong> ETH/USDC on Base network (chain ID 8453)</li>
-                <li><strong>Traditional Finance:</strong> Bank transfer integration (coming soon)</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>5. Compliance & Security</h2>
-            <p>SINCOR2 implements industry-standard security practices:</p>
-            <ul>
-                <li>JWT-based authentication with 24-hour token expiration</li>
-                <li>Rate limiting to prevent abuse</li>
-                <li>Wallet address validation on blockchain interactions</li>
-                <li>ReentrancyGuard protection on state-changing functions</li>
-                <li>OpenZeppelin audited library dependencies</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>6. Roadmap</h2>
-            <table>
-                <tr>
-                    <th>Phase</th>
-                    <th>Timeline</th>
-                    <th>Deliverable</th>
-                </tr>
-                <tr>
-                    <td>Phase 1</td>
-                    <td>Q1 2026</td>
-                    <td>Dutch Auction Launch & Uniswap V2 Pool</td>
-                </tr>
-                <tr>
-                    <td>Phase 2</td>
-                    <td>Q2 2026</td>
-                    <td>Agent Economy & Multi-Chain Deployment</td>
-                </tr>
-                <tr>
-                    <td>Phase 3</td>
-                    <td>Q3 2026</td>
-                    <td>CEX Listings & Traditional Finance Bridge</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2>7. Contact & Support</h2>
-            <p><strong>Website:</strong> <a href="https://getsincor.com">getsincor.com</a></p>
-            <p><strong>Support:</strong> support@getsincor.com</p>
-            <p style="color: #999; margin-top: 40px; text-align: center;">© 2026 SINCOR2. All rights reserved.</p>
-        </div>
+<div class="wrap">
+  <div class="hero">
+    <div class="kicker">Technical whitepaper · v1.1</div>
+    <h1>SINCOR Platform</h1>
+    <p class="sub">Multi-agent autonomous workforce · SINC + AXIOM on Base · wallet-native billing</p>
+    <p class="sub" style="margin-top:8px;">Live curve spot: <span id="live-spot">loading…</span></p>
+    <div class="actions">
+      <a href="/static/docs/SINCOR_whitepaper.md" class="btn btn-primary" download>Download Markdown</a>
+      <a href="/pitch" class="btn btn-secondary">View pitch deck</a>
+      <a href="/buy?plan=starter" class="btn btn-secondary">Deploy agents</a>
     </div>
+  </div>
+
+  <div class="toc">
+    <strong style="color:var(--text);">Contents</strong>
+    <a href="#summary">1. Executive summary</a>
+    <a href="#problem">2. Problem</a>
+    <a href="#architecture">3. Architecture</a>
+    <a href="#tokens">4. Token design</a>
+    <a href="#economics">5. Platform economics</a>
+    <a href="#toa">6. TOA</a>
+    <a href="#sinax">7. SINAX</a>
+    <a href="#safety">8. Safety & compliance</a>
+    <a href="#roadmap">9. Roadmap</a>
+  </div>
+
+  <section id="summary">
+    <h2>1. Executive summary</h2>
+    <p>SINCOR deploys 42+ specialized AI agents as a coordinated workforce — market intelligence, outreach, content, sales ops, and quality assurance — with billing verified on Base. <strong>SINC</strong> powers subscriptions; <strong>AXIOM (AXM)</strong> settles one-off intel and agent-to-agent work.</p>
+    <div class="callout">
+      <strong style="color:var(--text);">Official SINC price</strong> comes from the bonding curve at <a href="/sinc" style="color:var(--cyan);">/sinc</a> — not MetaMask swap or rogue Uniswap V2 pools that show fake spot.
+    </div>
+  </section>
+
+  <section id="problem">
+    <h2>2. Problem</h2>
+    <p>Businesses need always-on GTM capacity but cannot hire and train fast enough. Single-chatbot products lack persistent memory, merit-based task routing, audit trails, and on-chain payment verification.</p>
+  </section>
+
+  <section id="architecture">
+    <h2>3. Architecture</h2>
+    <h3>Core layers</h3>
+    <ul>
+      <li><strong>Cor-tecs Brain</strong> — Claude coordinates cross-agent synthesis</li>
+      <li><strong>Agency Kernel</strong> — Planner → Executor → Critic → Archivist per agent</li>
+      <li><strong>Swarm task market</strong> — contract-net broadcast, bid, award, audit</li>
+      <li><strong>4-tier memory</strong> — episodic, semantic, procedural, autobiographical</li>
+      <li><strong>Business engine</strong> — BI, dynamic pricing, analytics, partnerships</li>
+    </ul>
+    <h3>Archetypes</h3>
+    <table>
+      <tr><th>Archetype</th><th>Drive</th><th>Competencies</th></tr>
+      <tr><td>Scout</td><td>Discovery</td><td>Research, enrichment, monitoring</td></tr>
+      <tr><td>Builder</td><td>Creation</td><td>Code, content, architecture</td></tr>
+      <tr><td>Synthesizer</td><td>Insight</td><td>Patterns, reporting, strategy</td></tr>
+      <tr><td>Negotiator</td><td>Closure</td><td>Outreach, deals</td></tr>
+      <tr><td>Director</td><td>Leadership</td><td>Goals, allocation</td></tr>
+      <tr><td>Auditor</td><td>Quality</td><td>Compliance, validation</td></tr>
+      <tr><td>Caretaker</td><td>Continuity</td><td>Onboarding, retention</td></tr>
+    </table>
+  </section>
+
+  <section id="tokens">
+    <h2>4. Token design (Base 8453)</h2>
+    <h3>SINC</h3>
+    <table>
+      <tr><td>Contract</td><td class="mono">0x9C8cd8d3961F445D653713dE65C6578bE11668e7</td></tr>
+      <tr><td>Supply</td><td>100,000,000 · 8 decimals · fixed</td></tr>
+      <tr><td>Curve (official buy)</td><td class="mono">0x75dE341a2BC81806198364F125d4Cde36527619C</td></tr>
+      <tr><td>v4 Hook</td><td class="mono">0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</td></tr>
+      <tr><td>Audit</td><td>CertiK Skynet 97/100 · Sourcify full-match</td></tr>
+    </table>
+    <h3>AXIOM (AXM)</h3>
+    <table>
+      <tr><td>Contract</td><td class="mono">0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</td></tr>
+      <tr><td>Role</td><td>Intel reports · A2A settlement</td></tr>
+    </table>
+    <h3>Treasury</h3>
+    <p class="mono">0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac</p>
+    <p>Platform checkout verifies ERC-20 transfers to this address.</p>
+  </section>
+
+  <section id="economics">
+    <h2>5. Platform economics</h2>
+    <p>Default path: <code>LEGACY_FIAT_PAYMENTS_ENABLED=false</code>. Customers pay at <a href="/buy" style="color:var(--cyan);">/buy</a> with a connected wallet.</p>
+    <table>
+      <tr><th>Plan</th><th>USD reference</th><th>Token</th></tr>
+      <tr><td>Starter</td><td>$297/mo</td><td>SINC at curve spot</td></tr>
+      <tr><td>Professional</td><td>$997/mo</td><td>SINC at curve spot</td></tr>
+      <tr><td>Enterprise</td><td>$2,997/mo</td><td>SINC at curve spot</td></tr>
+      <tr><td>BI Report</td><td>$49 once</td><td>500 AXM (fixed list)</td></tr>
+    </table>
+    <p>Curve buys support 3% on-chain referral via <a href="/refer" style="color:var(--cyan);">/refer</a>.</p>
+  </section>
+
+  <section id="toa">
+    <h2>6. TOA — Temporal Optimization Agent</h2>
+    <p>Agent #44 (Director archetype). Pipeline: forecast → simulate → collapse → feedback ingest. Answers which actions to take next and in what order across verticals and on-chain signals.</p>
+  </section>
+
+  <section id="sinax">
+    <h2>7. SINAX</h2>
+    <p>Geometric proof-navigation layer on AxiomSolver. Embeddings + beam search accelerate proof discovery; Lean verifier always certifies. Modes: analytics, suggest, active.</p>
+  </section>
+
+  <section id="safety">
+    <h2>8. Safety & compliance</h2>
+    <ul>
+      <li>Production kill-switches — no auto-signing from the web app</li>
+      <li>Compliance monitor — internal volume logs only (confidential)</li>
+      <li>Guardrails on content, outreach, and launch approval</li>
+      <li>Canonical addresses in <code>CANONICAL_ADDRESSES.md</code></li>
+    </ul>
+  </section>
+
+  <section id="roadmap">
+    <h2>9. Roadmap</h2>
+    <ul>
+      <li>Blockscout / Superchain token list certification</li>
+      <li>Hook ladder & discovery ramp (local on-chain scripts)</li>
+      <li>x402 micropayments for API resources</li>
+      <li>Live agent telemetry dashboard</li>
+    </ul>
+    <p style="margin-top:24px;font-size:13px;color:#64748b;">Disclaimer: Technology in development. No income guarantees. DYOR before on-chain transactions.</p>
+  </section>
+</div>
+
+<footer>
+  <a href="/pitch" style="color:var(--cyan);">Pitch deck</a> ·
+  <a href="/" style="color:var(--cyan);">Home</a> ·
+  <a href="/tokenlists/sincor.tokenlist.json" style="color:var(--cyan);">Token list</a>
+  <p style="margin-top:12px;">© 2026 SINCOR</p>
+</footer>
+
+<script>
+fetch('/api/price/official').then(r => r.json()).then(p => {
+  const el = document.getElementById('live-spot');
+  if (el && p.spot_usd != null) {
+    const v = Number(p.spot_usd);
+    el.textContent = v < 0.001 ? ('$' + v.toFixed(8)) : ('$' + v.toPrecision(4));
+  }
+}).catch(() => {});
+</script>
 </body>
 </html>
