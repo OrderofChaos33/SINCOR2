@@ -1663,25 +1663,42 @@ def webbuilder_studio_page():
     return render_template('webbuilder_studio.html')
 
 
+def _webbuilder_html_response(html: str):
+    resp = make_response(html)
+    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return resp
+
+
 @app.route('/preview/<slug>')
 def webbuilder_preview_page(slug):
-    """Staging preview for a WebBuilder project (preview-first migration)."""
-    from sincor2.webbuilder_studio import _load
+    """Staging preview lane — serves Orion HTML from disk."""
+    from sincor2.webbuilder_studio import get_site_html, project_by_slug
 
-    for p in _load().get('projects', []):
-        if p.get('slug') == slug:
-            active = next(
-                (s for s in p.get('migration', []) if s.get('status') == 'active'),
-                None,
-            )
-            label = active['title'] if active else (p.get('status') or 'preview')
-            return render_template(
-                'webbuilder_preview.html',
-                project=p,
-                migration_label=label,
-            )
+    html = get_site_html(slug, 'preview') or get_site_html(slug, 'draft')
+    if html:
+        return _webbuilder_html_response(html)
+    p = project_by_slug(slug)
+    if p:
+        active = next((s for s in p.get('migration', []) if s.get('status') == 'active'), None)
+        label = active['title'] if active else (p.get('status') or 'preview')
+        return render_template('webbuilder_preview.html', project=p, migration_label=label)
     return render_template('error.html', code=404, title='Preview Not Found',
                            message='This staging preview does not exist or was removed.'), 404
+
+
+@app.route('/site/<slug>')
+def webbuilder_live_page(slug):
+    """Live lane — published production HTML (draft-safe)."""
+    from sincor2.webbuilder_studio import get_site_html, project_by_slug
+
+    html = get_site_html(slug, 'live')
+    if html:
+        return _webbuilder_html_response(html)
+    p = project_by_slug(slug)
+    if p:
+        return redirect(p.get('preview_url') or '/verticals/webbuilder/studio', code=302)
+    return render_template('error.html', code=404, title='Site Not Found',
+                           message='This site has not been published to the live lane yet.'), 404
 
 
 @app.route('/api/webbuilder/studio')
@@ -1769,6 +1786,57 @@ def api_webbuilder_verify_dns(project_id):
     from sincor2.webbuilder_studio import verify_dns
 
     return jsonify(verify_dns(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/rebuild', methods=['POST'])
+def api_webbuilder_rebuild(project_id):
+    from sincor2.webbuilder_studio import rebuild_draft
+
+    data = request.get_json(silent=True) or {}
+    return jsonify(rebuild_draft(project_id, prompt=data.get('prompt')))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/republish-preview', methods=['POST'])
+def api_webbuilder_republish_preview(project_id):
+    from sincor2.webbuilder_studio import republish_preview
+
+    return jsonify(republish_preview(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/publish-live', methods=['POST'])
+def api_webbuilder_publish_live(project_id):
+    from sincor2.webbuilder_studio import publish_live
+
+    return jsonify(publish_live(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/contacts')
+def api_webbuilder_contacts(project_id):
+    from sincor2.webbuilder_crm import list_contacts
+    from sincor2.webbuilder_studio import data_dir, get_project
+
+    if not get_project(project_id):
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    return jsonify({'ok': True, 'contacts': list_contacts(data_dir(), project_id)})
+
+
+@app.route('/api/webbuilder/contact', methods=['POST'])
+def api_webbuilder_contact():
+    from sincor2.webbuilder_studio import submit_contact
+
+    data = request.get_json(silent=True) or {}
+    project_id = (data.get('project_id') or '').strip()
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip()
+    if not project_id or not name or not email:
+        return jsonify({'ok': False, 'error': 'missing_fields'}), 400
+    return jsonify(submit_contact(
+        project_id=project_id,
+        name=name,
+        email=email,
+        phone=data.get('phone', ''),
+        message=data.get('message', ''),
+    ))
 
 
 @app.route('/sinc')
