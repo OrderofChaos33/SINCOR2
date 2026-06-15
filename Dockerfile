@@ -23,6 +23,8 @@ RUN mkdir -p /data/webbuilder /data/logs/compliance /data/quarantine logs output
 ENV SINCOR_DATA_DIR=/data
 ENV WEBBUILDER_DATA_DIR=/data/webbuilder
 ENV COMPLIANCE_MONITOR_ENABLED=true
+ENV COMPLIANCE_CONFIDENTIAL=true
+ENV COMPLIANCE_LOG_TO_STDOUT=false
 
 # Expose default port (Railway overrides via $PORT)
 EXPOSE 8080
