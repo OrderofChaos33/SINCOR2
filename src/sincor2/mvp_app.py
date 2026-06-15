@@ -1764,6 +1764,20 @@ def token_list_assets(filename):
     return resp
 
 
+@app.route('/api/token/security')
+def sinc_token_security():
+    """GoPlus + Blockscout signals explaining wallet suspicious UI."""
+    try:
+        from sincor2.token_security import diagnose
+        resp = make_response(jsonify(diagnose()))
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Cache-Control'] = 'public, max-age=120'
+        return resp
+    except Exception as e:
+        logger.warning('[TOKEN] security error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/.well-known/sinc-token.json')
 @app.route('/api/token/metadata')
 def sinc_token_metadata():
