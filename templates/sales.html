@@ -120,12 +120,23 @@
     .footer-copy { font-size: 13px; color: var(--muted); }
 
     @media(max-width:768px) {
-      nav { padding: 14px 20px; }
-      .hero, .section, .final-cta { padding-left: 20px; padding-right: 20px; }
+      nav { padding: 12px 16px; }
+      .hero { padding: 48px 16px 40px; }
+      .section, .final-cta { padding: 40px 16px; }
+      .hero-sub { font-size: 17px; }
+      .hero-cta { flex-direction: column; width: 100%; max-width: 360px; margin-left: auto; margin-right: auto; }
+      .btn-primary, .btn-secondary { width: 100%; text-align: center; }
+      .trust-row { gap: 12px; }
       .vs-table { grid-template-columns: 1fr; }
       .vs-row-bad { border-right: none; border-bottom: 1px solid var(--border); }
-      .roi-box { grid-template-columns: 1fr; }
-      footer { padding: 24px 20px; flex-direction: column; }
+      .agent-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .agent-card { padding: 14px 10px; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .price-card { padding: 28px 20px; }
+      .roi-box { grid-template-columns: 1fr; padding: 28px 20px; }
+      .roi-number { font-size: 48px; }
+      footer { padding: 24px 16px; flex-direction: column; text-align: center; }
+      .footer-links { flex-wrap: wrap; justify-content: center; }
     }
   </style>
 </head>
@@ -150,7 +161,7 @@
   </div>
   <div class="trust-row">
     <div class="trust-item"><span>✓</span> No contracts, cancel anytime</div>
-    <div class="trust-item"><span>✓</span> Live in under 5 minutes</div>
+    <div class="trust-item"><span>✓</span> Self-serve onboarding</div>
     <div class="trust-item"><span>✓</span> Real agents, not templates</div>
     <div class="trust-item"><span>✓</span> 24/7 autonomous execution</div>
   </div>
@@ -310,7 +321,7 @@
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggle(this)">How long does setup take? <span class="faq-arrow">▼</span></div>
-      <div class="faq-a">Under 5 minutes. Sign up, enter your credit card and business details, and your agents activate immediately. No onboarding call required.</div>
+      <div class="faq-a">Sign up, enter your credit card and business details, and your agents activate immediately. Guided onboarding walks you through connecting your tools — no onboarding call required.</div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggle(this)">Why is there no free trial? <span class="faq-arrow">▼</span></div>
@@ -334,7 +345,7 @@
 <!-- FINAL CTA -->
 <div class="final-cta">
   <h2>Your Competitors Are Already Doing This.<br><span class="green">Don't Fall Behind.</span></h2>
-  <p>$297/month. 8 agents. Running 24/7. Deploy in 5 minutes.</p>
+  <p>$297/month. 8 agents. Running 24/7. Self-serve deployment.</p>
   <a href="/signup" class="btn-primary" style="font-size:20px; padding:20px 52px;">Deploy Your Agents Now →</a>
   <div class="trust-row" style="margin-top:24px;">
     <div class="trust-item"><span>✓</span> No contracts</div>
@@ -353,6 +364,8 @@
     <a href="/terms">Terms</a>
     <a href="/privacy">Privacy</a>
   </div>
+  {% set show_label = true %}
+  {% include "_social_links.html" %}
   <div class="footer-copy">© 2026 SINCOR Business Solutions</div>
 </footer>
 
