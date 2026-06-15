@@ -2492,7 +2492,8 @@ def sitemap_xml():
         ('/pricing', '0.9', 'weekly'),
         ('/affiliate-program', '0.7', 'monthly'),
         ('/enterprise-dashboard', '0.7', 'monthly'),
-        ('/whitepaper', '0.6', 'monthly'),
+        ('/whitepaper', '0.7', 'monthly'),
+        ('/pitch', '0.7', 'monthly'),
         ('/privacy', '0.4', 'monthly'),
         ('/terms', '0.4', 'monthly'),
         ('/security', '0.4', 'monthly'),
@@ -2533,13 +2534,16 @@ def whitepaper():
     return render_template('whitepaper.html')
 
 
+@app.route('/pitch')
+def pitch_deck():
+    """Interactive pitch deck (NotebookLM source in content/notebooklm/)."""
+    return render_template('pitch.html')
+
+
 @app.route('/docs/whitepaper.pdf')
 def whitepaper_pdf():
-    """Return whitepaper PDF stub."""
-    return jsonify({
-        'message': 'Whitepaper PDF available for download',
-        'url': '/static/docs/whitepaper.pdf'
-    }), 200
+    """Redirect to markdown whitepaper download."""
+    return redirect('/static/docs/SINCOR_whitepaper.md', code=302)
 
 
 # ============================================================================
