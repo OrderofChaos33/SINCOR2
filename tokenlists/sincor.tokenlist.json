@@ -1,0 +1,34 @@
+{
+  "name": "SINCOR Token List",
+  "logoURI": "https://raw.githubusercontent.com/OrderofChaos33/SINCOR2/main/static/tokenlists/assets/logo-256.png",
+  "keywords": [
+    "sincor",
+    "sinc",
+    "base",
+    "ai"
+  ],
+  "timestamp": "2026-06-15T07:32:01.905412Z",
+  "version": {
+    "major": 1,
+    "minor": 0,
+    "patch": 2
+  },
+  "tokens": [
+    {
+      "chainId": 8453,
+      "address": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+      "name": "SINC",
+      "symbol": "SINC",
+      "decimals": 8,
+      "logoURI": "https://raw.githubusercontent.com/OrderofChaos33/SINCOR2/main/static/tokenlists/assets/logo-256.png",
+      "tags": [
+        "defi",
+        "ai"
+      ],
+      "extensions": {
+        "logoURIMirror": "https://getsincor.com/static/tokenlists/assets/logo-256.png",
+        "website": "https://getsincor.com"
+      }
+    }
+  ]
+}
