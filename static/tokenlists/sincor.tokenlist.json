@@ -7,11 +7,11 @@
     "base",
     "ai"
   ],
-  "timestamp": "2026-06-14T20:13:12.209737Z",
+  "timestamp": "2026-06-15T07:32:01.905412Z",
   "version": {
     "major": 1,
     "minor": 0,
-    "patch": 1
+    "patch": 2
   },
   "tokens": [
     {
@@ -24,7 +24,11 @@
       "tags": [
         "defi",
         "ai"
-      ]
+      ],
+      "extensions": {
+        "logoURIMirror": "https://getsincor.com/static/tokenlists/assets/logo-256.png",
+        "website": "https://getsincor.com"
+      }
     }
   ]
 }
