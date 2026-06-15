@@ -27,6 +27,15 @@
     "limitOrderHook": "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0",
     "hookRouter": "0x11b86E85cC5170F4165c89ccb11332133B29E283",
     "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    "genesisNFT": "0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09"
+    "genesisNFT": "0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09",
+    "rogueV2PairDoNotUse": "0x85372932f9b151a076815d92cf71a97980ffd667"
+  },
+  "security": {
+    "officialBuyUrl": "https://getsincor.com/sinc",
+    "deployer": "0xC184EcEfFaf6392951e4C7b042d61774497B5dC5",
+    "doNotSwapVia": ["0x85372932f9b151a076815d92cf71a97980ffd667"],
+    "securityApi": "https://getsincor.com/api/token/security",
+    "certiK": "https://skynet.certik.com/projects/sincor",
+    "sourcify": "https://repo.sourcify.dev/contracts/full_match/8453/0x9C8cd8d3961F445D653713dE65C6578bE11668e7/"
   }
 }
