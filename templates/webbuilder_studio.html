@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebBuilder Studio — SINCOR</title>
+  <meta name="description" content="Dedicated workspace for WebBuilder projects. Preview-first migration, DNS cutover, autonomous agent pipeline.">
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#070b18;--surface:#0f1629;--surface2:#151d33;--border:rgba(139,92,246,.14);
+      --purple:#8b5cf6;--cyan:#06b6d4;--green:#10b981;--amber:#f59e0b;--pink:#ec4899;
+      --text:#f1f5f9;--muted:#94a3b8;
+    }
+    body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(7,11,24,.92);backdrop-filter:blur(16px);
+      position:sticky;top:0;z-index:50;
+    }
+    .brand{font-family:'Sora',sans-serif;font-weight:700;font-size:18px;background:linear-gradient(135deg,#c4b5fd,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none}
+    .topbar-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .topbar-actions a,.btn-sm{
+      font-size:12px;font-weight:600;text-decoration:none;padding:8px 14px;border-radius:8px;
+      border:1px solid var(--border);color:var(--muted);
+    }
+    .btn-sm.primary{background:linear-gradient(135deg,var(--purple),#6d28d9);border:none;color:#fff}
+    .layout{display:grid;grid-template-columns:280px 1fr 340px;flex:1;min-height:0}
+    .sidebar{border-right:1px solid var(--border);background:var(--surface);padding:16px;overflow-y:auto}
+    .sidebar h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+    .project-item{
+      display:block;padding:12px;border-radius:10px;border:1px solid transparent;margin-bottom:8px;
+      cursor:pointer;text-decoration:none;color:inherit;transition:border-color .2s,background .2s;
+    }
+    .project-item:hover,.project-item.active{background:var(--surface2);border-color:rgba(6,182,212,.3)}
+    .project-item strong{display:block;font-size:14px;margin-bottom:4px}
+    .project-item span{font-size:11px;color:var(--muted)}
+    .main{padding:20px;overflow-y:auto}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+    .panel h3{font-family:'Sora',sans-serif;font-size:18px;margin-bottom:8px}
+    .panel p{color:var(--muted);font-size:14px;line-height:1.6}
+    .create-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+    label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
+    input,select,textarea{
+      width:100%;background:#0a1020;border:1px solid var(--border);border-radius:8px;
+      padding:10px 12px;color:var(--text);font-size:14px;font-family:inherit;
+    }
+    textarea{min-height:80px;resize:vertical}
+    .full{grid-column:1/-1}
+    .btn{
+      display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:10px;border:none;
+      font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;
+    }
+    .btn-primary{background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff}
+    .btn-ghost{background:transparent;border:1px solid rgba(6,182,212,.4);color:var(--cyan)}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .preview-frame{
+      width:100%;height:420px;border:1px solid var(--border);border-radius:12px;background:#fff;margin-top:12px;
+    }
+    .rail{border-left:1px solid var(--border);background:var(--surface);padding:16px;overflow-y:auto}
+    .phase{
+      display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;
+    }
+    .phase-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex-shrink:0;background:#334155}
+    .phase.done .phase-dot{background:var(--green)}
+    .phase.active .phase-dot{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+    .phase.blocked .phase-dot{background:var(--amber)}
+    .phase-title{font-weight:600}
+    .phase-meta{font-size:11px;color:var(--muted);margin-top:2px}
+    .dns-box{
+      margin-top:12px;padding:12px;background:#0a1020;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:11px;
+    }
+    .patterns{list-style:none;margin-top:12px}
+    .patterns li{font-size:12px;color:var(--muted);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+    .patterns li::before{content:'✓ ';color:var(--green)}
+    .status-pill{
+      display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+      padding:4px 10px;border-radius:20px;background:rgba(6,182,212,.12);color:var(--cyan);margin-bottom:12px;
+    }
+    .row-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    @media(max-width:1100px){.layout{grid-template-columns:1fr}.sidebar,.rail{border:none;border-bottom:1px solid var(--border)}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a href="/verticals/webbuilder" class="brand">WebBuilder Studio</a>
+    <div class="topbar-actions">
+      <a href="/verticals/webbuilder">Vertical overview</a>
+      <a href="/">SINCOR</a>
+      <button class="btn-sm primary" id="btn-new">+ New project</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Projects</h2>
+      <div id="project-list"></div>
+    </aside>
+
+    <main class="main" id="main-panel">
+      <div class="panel" id="welcome-panel">
+        <span class="status-pill">Dedicated workspace</span>
+        <h3>Preview-first migration — like GHL AI Studio, built for SINCOR swarms</h3>
+        <p>Every business gets its own project lane: discover sources → build draft → publish preview URL → owner approves → DNS cutover → go live → marketing. Edits stay in draft until you republish.</p>
+        <ul class="patterns">
+          <li>Clone Facebook / Google / Yelp / legacy URL as structure inspiration</li>
+          <li>Preview on getsincor.com before custom domain</li>
+          <li>Version snapshots on each agent build</li>
+          <li>Autonomous DNS verify + primary URL + 301 redirects</li>
+        </ul>
+        <div class="row-actions">
+          <button class="btn btn-primary" id="btn-start-create">Start migration project →</button>
+          <a href="/verticals/webbuilder" class="btn btn-ghost" style="text-decoration:none">How the swarm works</a>
+        </div>
+      </div>
+
+      <div class="panel" id="create-panel" style="display:none">
+        <h3>New migration project</h3>
+        <p>Agents use your source URL for discovery — not a 1:1 copy. Follow-up questions auto-fill from public signals.</p>
+        <form id="create-form" class="create-grid">
+          <div><label>Business name *</label><input name="name" required placeholder="Green Valley Landscaping"></div>
+          <div><label>Niche</label><input name="niche" placeholder="Landscaping"></div>
+          <div><label>Territory</label><input name="territory" placeholder="Austin, TX"></div>
+          <div><label>Owner email</label><input name="owner_email" type="email" placeholder="owner@business.com"></div>
+          <div class="full"><label>Migration source</label>
+            <select name="source_type" id="source-type">
+              <option value="none">No source — prompt only</option>
+              <option value="facebook">Facebook page</option>
+              <option value="google">Google Business listing</option>
+              <option value="yelp">Yelp profile</option>
+              <option value="website">Legacy / competitor URL (inspiration)</option>
+            </select>
+          </div>
+          <div class="full"><label>Source URL</label><input name="source_url" placeholder="https://facebook.com/... or Google Maps link"></div>
+          <div class="full"><label>Build prompt</label><textarea name="prompt" placeholder="Create a 5-page site with booking CTA, service areas, and review section. Brand tone: professional, local, trustworthy."></textarea></div>
+          <div class="full row-actions">
+            <button type="submit" class="btn btn-primary">Create & run autonomous phases →</button>
+            <button type="button" class="btn btn-ghost" id="btn-cancel-create">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="project-panel" style="display:none">
+        <div class="panel">
+          <span class="status-pill" id="p-status">—</span>
+          <h3 id="p-name">—</h3>
+          <p id="p-meta">—</p>
+          <div class="row-actions">
+            <a class="btn btn-ghost" id="p-preview-link" href="#" target="_blank" rel="noopener">Open preview ↗</a>
+            <button class="btn btn-primary" id="btn-approve" disabled>Owner approved preview</button>
+            <button class="btn btn-ghost" id="btn-run">Run autonomous phases</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Live preview</h3>
+          <iframe class="preview-frame" id="preview-frame" title="Site preview"></iframe>
+        </div>
+        <div class="panel" id="domain-panel">
+          <h3>Connect custom domain</h3>
+          <p>Preview must be published first (autonomous). Then add DNS — same flow as GHL: preview → verify → primary URL.</p>
+          <div class="create-grid" style="margin-top:12px">
+            <div class="full"><label>Domain</label><input id="domain-input" placeholder="www.greenvalleylandscaping.com"></div>
+          </div>
+          <div class="row-actions">
+            <button class="btn btn-primary" id="btn-domain">Issue DNS instructions</button>
+            <button class="btn btn-ghost" id="btn-verify-dns">Verify DNS now</button>
+          </div>
+          <div class="dns-box" id="dns-box" style="display:none"></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="rail">
+      <h2 style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">Migration plan</h2>
+      <div id="migration-rail"><p style="color:var(--muted);font-size:13px">Select or create a project.</p></div>
+    </aside>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+let activeId = new URLSearchParams(location.search).get('project') || '';
+
+function showCreate(on) {
+  $('welcome-panel').style.display = on ? 'none' : (activeId ? 'none' : 'block');
+  $('create-panel').style.display = on ? 'block' : 'none';
+  $('project-panel').style.display = (!on && activeId) ? 'block' : 'none';
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, { headers: {'Content-Type':'application/json'}, ...opts });
+  return r.json();
+}
+
+function renderProjectList(projects) {
+  const el = $('project-list');
+  if (!projects.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px">No projects yet.</p>';
+    return;
+  }
+  el.innerHTML = projects.map(p => `
+    <a class="project-item ${p.id===activeId?'active':''}" href="?project=${p.id}" data-id="${p.id}">
+      <strong>${esc(p.name)}</strong>
+      <span>${esc(p.migration_progress)} · ${esc(p.status)}</span>
+    </a>`).join('');
+}
+
+function esc(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderMigration(phases) {
+  if (!phases || !phases.length) {
+    $('migration-rail').innerHTML = '<p style="color:var(--muted);font-size:13px">—</p>';
+    return;
+  }
+  $('migration-rail').innerHTML = phases.map(s => `
+    <div class="phase ${s.status}">
+      <div class="phase-dot"></div>
+      <div>
+        <div class="phase-title">${esc(s.title)} <span style="color:var(--muted);font-weight:400">· ${esc(s.agent)}</span></div>
+        <div class="phase-meta">${esc(s.detail || s.status)}</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderProject(p) {
+  if (!p) return;
+  activeId = p.id;
+  showCreate(false);
+  $('p-name').textContent = p.name;
+  $('p-status').textContent = p.status || 'draft';
+  $('p-meta').textContent = `${p.niche || 'Local business'} · ${p.migration_progress || ''} phases · Preview: ${p.preview_url || '—'}`;
+  const link = $('p-preview-link');
+  if (p.preview_url) {
+    link.href = p.preview_url;
+    link.style.display = 'inline-flex';
+    $('preview-frame').src = p.preview_url;
+  }
+  const ownerStep = (p.migration || []).find(s => s.id === 'owner_review');
+  $('btn-approve').disabled = !(ownerStep && ownerStep.status === 'active');
+  renderMigration(p.migration);
+  if (p.dns_records && p.dns_records.length) {
+    $('dns-box').style.display = 'block';
+    $('dns-box').innerHTML = p.dns_records.map(r =>
+      `${r.type}  ${r.host}  →  ${r.value}  (TTL ${r.ttl})`
+    ).join('<br>');
+  }
+  if (p.primary_url) {
+    $('p-meta').textContent += ` · Live: ${p.primary_url}`;
+  }
+}
+
+async function loadHome() {
+  const data = await api('/api/webbuilder/studio');
+  renderProjectList(data.projects || []);
+  if (activeId) {
+    const p = await api(`/api/webbuilder/projects/${activeId}`);
+    if (p && p.id) renderProject(p);
+    else { activeId = ''; showCreate(false); }
+  }
+}
+
+$('btn-new').onclick = () => { activeId = ''; history.replaceState({}, '', location.pathname); showCreate(true); };
+$('btn-start-create').onclick = () => showCreate(true);
+$('btn-cancel-create').onclick = () => showCreate(false);
+
+$('create-form').onsubmit = async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  const res = await api('/api/webbuilder/projects', { method:'POST', body: JSON.stringify(body) });
+  if (res.ok && res.project) {
+    activeId = res.project.id;
+    history.replaceState({}, '', `?project=${activeId}`);
+    await loadHome();
+    renderProject(res.project);
+  } else alert(res.error || 'Create failed');
+};
+
+$('btn-approve').onclick = async () => {
+  const res = await api(`/api/webbuilder/projects/${activeId}/approve`, { method:'POST' });
+  if (res.id) renderProject(res);
+};
+
+$('btn-run').onclick = async () => {
+  const res = await api(`/api/webbuilder/projects/${activeId}/run`, { method:'POST' });
+  if (res.project) renderProject(res.project);
+};
+
+$('btn-domain').onclick = async () => {
+  const domain = $('domain-input').value.trim();
+  if (!domain) return alert('Enter a domain');
+  const res = await api(`/api/webbuilder/projects/${activeId}/domain`, {
+    method:'POST', body: JSON.stringify({ domain, include_www: true })
+  });
+  if (res.project) renderProject(res.project);
+  else alert(res.error || 'Domain step failed');
+};
+
+$('btn-verify-dns').onclick = async () => {
+  const res = await api(`/api/webbuilder/projects/${activeId}/verify-dns`, { method:'POST' });
+  if (res.project) renderProject(res.project);
+  alert(res.ok ? 'DNS verified — cutover running' : (res.message || 'DNS not ready yet'));
+};
+
+loadHome();
+setInterval(() => { if (activeId) api(`/api/webbuilder/projects/${activeId}`).then(p => { if (p.id) renderProject(p); }); }, 12000);
+</script>
+{% set show_label = false %}{% include "_social_links.html" %}
+</body>
+</html>
