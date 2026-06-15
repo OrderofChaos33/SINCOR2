@@ -522,11 +522,19 @@ def ops_schedulers_status():
             'running': bool(outreach_scheduler and outreach_scheduler.running),
             'next_run': _job_next(outreach_scheduler, 'outreach_cycle'),
         },
-        'compliance': {
-            'enabled': os.environ.get('COMPLIANCE_MONITOR_ENABLED', 'false').lower() == 'true',
-            'running': bool(compliance_scheduler and compliance_scheduler.running),
-            'next_run': _job_next(compliance_scheduler, 'compliance_monitor'),
-        },
+        'compliance': (
+            {
+                'enabled': os.environ.get('COMPLIANCE_MONITOR_ENABLED', 'false').lower() == 'true',
+                'confidential': True,
+                'running': bool(compliance_scheduler and compliance_scheduler.running),
+                'next_run': _job_next(compliance_scheduler, 'compliance_monitor'),
+            }
+            if _check_admin_token(request) or _check_admin_key(request)
+            else {
+                'enabled': os.environ.get('COMPLIANCE_MONITOR_ENABLED', 'false').lower() == 'true',
+                'confidential': True,
+            }
+        ),
         'polyclaw': {
             'enabled': os.environ.get('POLYCLAW_ENABLED', 'false').lower() == 'true',
             'running': bool(polyclaw_scheduler and polyclaw_scheduler.running),
