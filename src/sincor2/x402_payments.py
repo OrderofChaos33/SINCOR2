@@ -25,7 +25,9 @@ _CONFIG = _ROOT / "config" / "x402_pricing.yaml"
 
 
 def _db_path() -> Path:
-    return _ROOT / "orders.db"
+    from sincor2.data_paths import orders_db_path
+
+    return orders_db_path()
 
 
 def init_x402_db() -> None:
