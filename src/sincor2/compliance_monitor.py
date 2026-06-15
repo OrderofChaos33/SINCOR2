@@ -5,7 +5,9 @@ SINCOR Compliance Monitor Agent
 Runs every 30 minutes to audit marketing claims, email content, API responses,
 environment variables, database activity, and payment configurations.
 
-On violation: Slack alert + email alert + detailed log + auto-quarantine.
+Confidential / internal-only: violations are written to the Railway volume
+at /data/logs/compliance — no Slack, email, webhooks, or other outbound reporting.
+Checks use local files and in-process Flask test requests only (no external HTTP).
 
 Usage:
     # Run once:
@@ -22,33 +24,17 @@ import json
 import time
 import logging
 import hashlib
-import smtplib
-import requests
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 # ---------------------------------------------------------------------------
 # Config — all values come from environment variables; never hardcoded
 # ---------------------------------------------------------------------------
 
-SLACK_WEBHOOK_URL = os.getenv("SLACK_COMPLIANCE_WEBHOOK_URL", "")
-ALERT_EMAIL_TO = os.getenv(
-    "COMPLIANCE_ALERT_EMAIL",
-    os.getenv("LAUNCH_REVIEW_ALERT_EMAIL", "court@getsincor.com"),
-)
-ALERT_EMAIL_FROM = os.getenv(
-    "ALERT_FROM_EMAIL",
-    os.getenv("SUPPORT_EMAIL", "support@getsincor.com"),
-)
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.sendgrid.net")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "apikey")
+# Outbound compliance reporting is disabled by design (confidential internal audit).
+COMPLIANCE_CONFIDENTIAL = os.getenv("COMPLIANCE_CONFIDENTIAL", "true").lower() != "false"
 SMTP_PASS = os.getenv("SMTP_PASS", "")
-APP_BASE_URL = os.getenv("APP_BASE_URL", "https://getsincor.com")
 
 
 def _resolve_log_dir() -> Path:
@@ -143,13 +129,13 @@ SUSPICIOUS_DB_PATTERNS = [
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 QUARANTINE_DIR.mkdir(parents=True, exist_ok=True)
 
+_log_handlers: list[logging.Handler] = [logging.FileHandler(LOG_DIR / "monitor.log")]
+if os.getenv("COMPLIANCE_LOG_TO_STDOUT", "false").lower() == "true":
+    _log_handlers.append(logging.StreamHandler())
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [COMPLIANCE] %(levelname)s %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_DIR / "monitor.log"),
-        logging.StreamHandler(),
-    ],
+    handlers=_log_handlers,
 )
 logger = logging.getLogger("sincor.compliance")
 
@@ -186,163 +172,6 @@ class ComplianceViolation:
     def to_dict(self) -> dict:
         return self.__dict__
 
-    def to_slack_blocks(self) -> list:
-        severity_emoji = {
-            "CRITICAL": "🚨",
-            "HIGH": "⚠️",
-            "MEDIUM": "🔶",
-            "LOW": "ℹ️",
-        }.get(self.severity, "⚠️")
-        return [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": f"{severity_emoji} SINCOR COMPLIANCE VIOLATION [{self.severity}]",
-                },
-            },
-            {
-                "type": "section",
-                "fields": [
-                    {"type": "mrkdwn", "text": f"*Check:*\n{self.check_name}"},
-                    {"type": "mrkdwn", "text": f"*Severity:*\n{self.severity}"},
-                    {"type": "mrkdwn", "text": f"*What:*\n{self.what}"},
-                    {"type": "mrkdwn", "text": f"*Where:*\n{self.where}"},
-                    {"type": "mrkdwn", "text": f"*Who/What Caused It:*\n{self.who}"},
-                    {"type": "mrkdwn", "text": f"*Time:*\n{self.timestamp}"},
-                ],
-            },
-            {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*Details:*\n{self.details}"},
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*✅ Remediation:*\n{self.remediation}",
-                },
-            },
-        ]
-
-
-# ---------------------------------------------------------------------------
-# Alerting
-# ---------------------------------------------------------------------------
-
-def send_slack_alert(violation: ComplianceViolation) -> bool:
-    if not SLACK_WEBHOOK_URL:
-        logger.warning("SLACK_COMPLIANCE_WEBHOOK_URL not set — skipping Slack alert")
-        return False
-    try:
-        payload = {"blocks": violation.to_slack_blocks()}
-        resp = requests.post(SLACK_WEBHOOK_URL, json=payload, timeout=10)
-        if resp.status_code == 200:
-            logger.info(f"Slack alert sent for violation {violation.id}")
-            return True
-        else:
-            logger.error(f"Slack alert failed: {resp.status_code} {resp.text}")
-            return False
-    except Exception as exc:
-        logger.error(f"Slack alert exception: {exc}")
-        return False
-
-
-def _violation_email_bodies(violation: ComplianceViolation) -> tuple[str, str, str]:
-    subject = (
-        f"[URGENT] SINCOR Compliance Violation [{violation.severity}] — {violation.check_name}"
-    )
-    text_body = f"""
-SINCOR COMPLIANCE VIOLATION DETECTED
-=====================================
-ID: {violation.id}
-Time: {violation.timestamp}
-Severity: {violation.severity}
-Check: {violation.check_name}
-
-WHAT:        {violation.what}
-WHERE:       {violation.where}
-WHO/CAUSE:   {violation.who}
-
-DETAILS:
-{violation.details}
-
-REMEDIATION:
-{violation.remediation}
-
---- This is an automated alert from the SINCOR Compliance Monitor ---
-    """.strip()
-
-    html_body = f"""
-<html><body style="font-family:sans-serif;max-width:600px;margin:auto">
-<div style="background:#dc2626;color:white;padding:16px;border-radius:8px 8px 0 0">
-  <h2 style="margin:0">🚨 SINCOR Compliance Violation [{violation.severity}]</h2>
-</div>
-<div style="border:2px solid #dc2626;padding:16px;border-radius:0 0 8px 8px">
-  <table style="width:100%;border-collapse:collapse">
-    <tr><td style="font-weight:bold;padding:4px 8px;width:130px">ID</td><td style="padding:4px 8px">{violation.id}</td></tr>
-    <tr style="background:#f9fafb"><td style="font-weight:bold;padding:4px 8px">Time</td><td style="padding:4px 8px">{violation.timestamp}</td></tr>
-    <tr><td style="font-weight:bold;padding:4px 8px">Check</td><td style="padding:4px 8px">{violation.check_name}</td></tr>
-    <tr style="background:#f9fafb"><td style="font-weight:bold;padding:4px 8px">What</td><td style="padding:4px 8px">{violation.what}</td></tr>
-    <tr><td style="font-weight:bold;padding:4px 8px">Where</td><td style="padding:4px 8px">{violation.where}</td></tr>
-    <tr style="background:#f9fafb"><td style="font-weight:bold;padding:4px 8px">Who/Cause</td><td style="padding:4px 8px">{violation.who}</td></tr>
-  </table>
-  <h3>Details</h3>
-  <p style="background:#fef2f2;padding:12px;border-radius:6px">{violation.details}</p>
-  <h3 style="color:#16a34a">✅ Remediation</h3>
-  <p style="background:#f0fdf4;padding:12px;border-radius:6px">{violation.remediation}</p>
-</div>
-<p style="color:#9ca3af;font-size:12px;text-align:center;margin-top:16px">
-  Automated alert — SINCOR Compliance Monitor
-</p>
-</body></html>
-    """.strip()
-    return subject, text_body, html_body
-
-
-def send_email_alert(violation: ComplianceViolation) -> bool:
-    subject, text_body, html_body = _violation_email_bodies(violation)
-    from_addr = ALERT_EMAIL_FROM
-
-    if RESEND_API_KEY:
-        try:
-            from resend import Resend
-
-            client = Resend(api_key=RESEND_API_KEY)
-            client.emails.send({
-                "from": f"SINCOR Compliance <{from_addr}>",
-                "to": ALERT_EMAIL_TO,
-                "subject": subject,
-                "html": html_body,
-                "text": text_body,
-            })
-            logger.info(f"Resend compliance alert sent for violation {violation.id}")
-            return True
-        except Exception as exc:
-            logger.error(f"Resend alert exception: {exc}")
-
-    if not SMTP_PASS:
-        logger.warning("No RESEND_API_KEY or SMTP_PASS — skipping email alert")
-        return False
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = from_addr
-        msg["To"] = ALERT_EMAIL_TO
-        msg.attach(MIMEText(text_body, "plain"))
-        msg.attach(MIMEText(html_body, "html"))
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(from_addr, ALERT_EMAIL_TO, msg.as_string())
-        logger.info(f"Email alert sent for violation {violation.id}")
-        return True
-    except Exception as exc:
-        logger.error(f"Email alert exception: {exc}")
-        return False
-
 
 def quarantine_content(target_path: str, violation: ComplianceViolation) -> str:
     """Move a file or mark a DB record as quarantined. Returns quarantine path."""
@@ -364,20 +193,21 @@ def quarantine_content(target_path: str, violation: ComplianceViolation) -> str:
 
 
 def log_violation(violation: ComplianceViolation):
-    """Append violation to the daily JSONL log."""
+    """Append violation to the daily JSONL log (volume only — no outbound reporting)."""
     log_file = LOG_DIR / f"violations_{datetime.utcnow().strftime('%Y-%m-%d')}.jsonl"
-    with open(log_file, "a") as f:
+    with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(violation.to_dict()) + "\n")
-    logger.warning(
-        f"VIOLATION [{violation.severity}] {violation.check_name}: {violation.what} @ {violation.where}"
+    logger.info(
+        "Violation recorded locally id=%s severity=%s check=%s",
+        violation.id,
+        violation.severity,
+        violation.check_name,
     )
 
 
 def handle_violation(violation: ComplianceViolation):
-    """Central handler: log + alert + optionally quarantine."""
+    """Internal handler: volume log + optional local quarantine only."""
     log_violation(violation)
-    send_slack_alert(violation)
-    send_email_alert(violation)
     if violation.quarantine_target:
         quarantine_content(violation.quarantine_target, violation)
 
@@ -504,47 +334,66 @@ def check_marketing_claims(html_content: str, source_url: str) -> list[Complianc
     return violations
 
 
-def check_homepage_claims() -> list[ComplianceViolation]:
-    """Fetch live homepage and check for unsubstantiated claims."""
+def check_local_templates() -> list[ComplianceViolation]:
+    """Scan local marketing templates — no external HTTP."""
     violations = []
     try:
-        resp = requests.get(APP_BASE_URL, timeout=15)
-        violations += check_marketing_claims(resp.text, APP_BASE_URL)
-        buy_url = APP_BASE_URL.rstrip("/") + "/buy"
-        resp2 = requests.get(buy_url, timeout=15)
-        violations += check_marketing_claims(resp2.text, buy_url)
+        from sincor2.data_paths import project_root
+
+        templates = project_root() / "templates"
+        for name in (
+            "home.html",
+            "pricing.html",
+            "buy_tokens.html",
+            "sales.html",
+            "earn.html",
+            "terms.html",
+            "privacy.html",
+        ):
+            path = templates / name
+            if path.is_file():
+                html = path.read_text(encoding="utf-8", errors="ignore")
+                violations += check_marketing_claims(html, f"local:templates/{name}")
     except Exception as exc:
-        logger.error(f"Homepage check failed: {exc}")
+        logger.error("Local template check failed: %s", exc)
     return violations
 
 
 def check_api_response_leaks() -> list[ComplianceViolation]:
-    """Hit public API endpoints and check for accidental data leaks."""
+    """In-process API leak scan via Flask test client — no network egress."""
     violations = []
     endpoints_to_check = [
         "/api/v1/products",
         "/api/agents",
         "/health",
         "/api/status",
+        "/api/platform/plans",
     ]
-    for endpoint in endpoints_to_check:
-        url = APP_BASE_URL.rstrip("/") + endpoint
-        try:
-            resp = requests.get(url, timeout=10)
-            if resp.status_code not in (200, 404, 401, 403):
-                continue
-            if resp.status_code == 200:
-                body = resp.text
+    try:
+        from sincor2.mvp_app import app
+
+        with app.test_client() as client:
+            for endpoint in endpoints_to_check:
+                try:
+                    resp = client.get(endpoint)
+                except Exception as exc:
+                    logger.debug("API check skipped for %s: %s", endpoint, exc)
+                    continue
+                if resp.status_code not in (200, 404, 401, 403):
+                    continue
+                if resp.status_code != 200:
+                    continue
+                body = resp.get_data(as_text=True)
                 for pattern, pii_type in PII_PATTERNS:
                     if re.search(pattern, body):
                         violations.append(ComplianceViolation(
                             check_name="API_PII_LEAK",
                             severity="CRITICAL",
                             what=f"Potential {pii_type} in public API response",
-                            where=url,
+                            where=f"internal:{endpoint}",
                             who="API route handler",
                             details=(
-                                f"PII pattern '{pattern}' matched in response from {url}. "
+                                f"PII pattern '{pattern}' matched in response from {endpoint}. "
                                 "This data should never appear in API responses."
                             ),
                             remediation=(
@@ -553,7 +402,6 @@ def check_api_response_leaks() -> list[ComplianceViolation]:
                                 "Rotate any exposed credentials immediately."
                             ),
                         ))
-                # Check for debug info leaks
                 debug_patterns = [
                     (r"traceback\s*\(most recent call last\)", "Python traceback exposed"),
                     (r"sqlalchemy\.exc\.", "SQLAlchemy exception exposed"),
@@ -566,17 +414,17 @@ def check_api_response_leaks() -> list[ComplianceViolation]:
                             check_name="API_DEBUG_LEAK",
                             severity="HIGH",
                             what=f"Debug/sensitive info in API response: {desc}",
-                            where=url,
+                            where=f"internal:{endpoint}",
                             who="Flask error handler / unhandled exception",
-                            details=f"Pattern '{pattern}' found in {url} response.",
+                            details=f"Pattern '{pattern}' found in {endpoint} response.",
                             remediation=(
                                 "Set FLASK_DEBUG=0 in production. "
                                 "Add a global error handler that returns generic error messages. "
                                 "Ensure PROPAGATE_EXCEPTIONS=False."
                             ),
                         ))
-        except Exception as exc:
-            logger.debug(f"API check skipped for {url}: {exc}")
+    except Exception as exc:
+        logger.error("Internal API check failed: %s", exc)
     return violations
 
 
@@ -642,48 +490,40 @@ def check_email_content(email_html: str, subject: str, sender: str) -> list[Comp
     return violations
 
 
-def check_blog_posts() -> list[ComplianceViolation]:
-    """Check published blog posts for defamation and IP risks."""
+def check_local_blog_posts() -> list[ComplianceViolation]:
+    """Scan local blog markdown — no external HTTP."""
     violations = []
-    blog_url = APP_BASE_URL.rstrip("/") + "/blog"
     try:
-        resp = requests.get(blog_url, timeout=10)
-        if resp.status_code != 200:
+        from sincor2.data_paths import project_root
+
+        blog_dir = project_root() / "content" / "blog"
+        if not blog_dir.is_dir():
             return violations
 
-        # Extract links to individual posts
-        post_links = re.findall(r'href=["\'](/blog/[^"\']+)["\']', resp.text)
-        for link in post_links[:20]:  # Limit to 20 most recent
-            post_url = APP_BASE_URL.rstrip("/") + link
-            try:
-                post_resp = requests.get(post_url, timeout=10)
-                text = re.sub(r"<[^>]+>", " ", post_resp.text).lower()
-
-                # Defamation red flags
-                defamation_patterns = [
-                    (r"\b(scam|fraud|criminal|liar|corrupt)\b.*\b(company|ceo|founder|team)\b", "Potential defamation"),
-                    (r"\bcopy(right|ed)\b.*\bwithout\s+permission\b", "Copyright concern"),
-                ]
-                for pattern, desc in defamation_patterns:
-                    if re.search(pattern, text, re.IGNORECASE):
-                        violations.append(ComplianceViolation(
-                            check_name="BLOG_DEFAMATION_RISK",
-                            severity="HIGH",
-                            what=f"Blog post defamation/IP risk: {desc}",
-                            where=post_url,
-                            who="Blog author / content agent",
-                            details=f"Pattern '{pattern}' matched in {post_url}.",
-                            remediation=(
-                                "Have legal review this post before it stays live. "
-                                "Remove or qualify statements about specific companies/individuals. "
-                                "Ensure all quotes are attributed and accurate."
-                            ),
-                            quarantine_target=post_url,
-                        ))
-            except Exception:
-                pass
+        defamation_patterns = [
+            (r"\b(scam|fraud|criminal|liar|corrupt)\b.*\b(company|ceo|founder|team)\b", "Potential defamation"),
+            (r"\bcopy(right|ed)\b.*\bwithout\s+permission\b", "Copyright concern"),
+        ]
+        for path in sorted(blog_dir.glob("*.md"), reverse=True)[:20]:
+            text = path.read_text(encoding="utf-8", errors="ignore").lower()
+            for pattern, desc in defamation_patterns:
+                if re.search(pattern, text, re.IGNORECASE):
+                    violations.append(ComplianceViolation(
+                        check_name="BLOG_DEFAMATION_RISK",
+                        severity="HIGH",
+                        what=f"Blog post defamation/IP risk: {desc}",
+                        where=f"local:content/blog/{path.name}",
+                        who="Blog author / content agent",
+                        details=f"Pattern '{pattern}' matched in {path.name}.",
+                        remediation=(
+                            "Have legal review this post before it stays live. "
+                            "Remove or qualify statements about specific companies/individuals. "
+                            "Ensure all quotes are attributed and accurate."
+                        ),
+                        quarantine_target=str(path),
+                    ))
     except Exception as exc:
-        logger.error(f"Blog check failed: {exc}")
+        logger.error("Local blog check failed: %s", exc)
     return violations
 
 
@@ -699,10 +539,10 @@ def run_all_checks() -> list[ComplianceViolation]:
 
     checks = [
         ("Environment Variables", check_env_variables),
-        ("Homepage Marketing Claims", check_homepage_claims),
-        ("API Response Leaks", check_api_response_leaks),
+        ("Local Template Claims", check_local_templates),
+        ("Internal API Leaks", check_api_response_leaks),
         ("Database Log Audit", check_database_logs),
-        ("Blog Posts", check_blog_posts),
+        ("Local Blog Posts", check_local_blog_posts),
     ]
 
     for name, check_fn in checks:
@@ -761,7 +601,9 @@ def start_compliance_scheduler():
             misfire_grace_time=300,
         )
         scheduler.start()
-        logger.info("Compliance monitor scheduler started — runs every 30 minutes")
+        logger.info(
+            "Compliance monitor scheduler started — internal-only, runs every 30 minutes"
+        )
         return scheduler
     except ImportError:
         logger.warning(
@@ -777,9 +619,4 @@ def start_compliance_scheduler():
 
 if __name__ == "__main__":
     violations = run_all_checks()
-    if violations:
-        print(f"\n⚠️  {len(violations)} violation(s) found. Check logs/compliance/ for details.")
-        for v in violations:
-            print(f"  [{v.severity}] {v.check_name}: {v.what}")
-    else:
-        print("\n✅ No compliance violations detected.")
+    print(f"\n{len(violations)} violation(s) recorded under {LOG_DIR} (confidential — not exported).")
