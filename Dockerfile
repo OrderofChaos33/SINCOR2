@@ -18,9 +18,11 @@ COPY . .
 # Add src to Python path so sincor2 package is importable
 ENV PYTHONPATH=/app/src
 
-# Create necessary directories (mount Railway volume at /data/webbuilder for persistence)
-RUN mkdir -p logs outputs data /data/webbuilder
+# Mount one Railway volume at /data (orders.db, agent_burn_log, compliance logs, webbuilder)
+RUN mkdir -p /data/webbuilder /data/logs/compliance /data/quarantine logs outputs data
+ENV SINCOR_DATA_DIR=/data
 ENV WEBBUILDER_DATA_DIR=/data/webbuilder
+ENV COMPLIANCE_MONITOR_ENABLED=true
 
 # Expose default port (Railway overrides via $PORT)
 EXPOSE 8080
