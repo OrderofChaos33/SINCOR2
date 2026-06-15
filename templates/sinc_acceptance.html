@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINC acceptance &amp; whitelisting — SINCOR</title>
+  <meta name="description" content="Import SINC in wallets, buy via hook router or bonding curve, track whitelist PR status on Base.">
+  <style>
+    :root { --bg:#0a0e27; --panel:#0f1629; --cyan:#06b6d4; --purple:#8b5cf6; --text:#f1f5f9; --muted:#94a3b8; --green:#34d399; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; line-height:1.55; }
+    .wrap { max-width:820px; margin:0 auto; padding:32px 16px 64px; }
+    h1 { font-size:30px; margin:0 0 8px; }
+    .sub { color:var(--muted); margin-bottom:28px; }
+    .card { background:var(--panel); border:1px solid rgba(139,92,246,.15); border-radius:14px; padding:20px; margin-bottom:16px; }
+    h2 { font-size:18px; margin:0 0 12px; color:var(--cyan); }
+    .mono { font-family:ui-monospace,monospace; font-size:12px; word-break:break-all; }
+    a { color:var(--cyan); }
+    button, .btn { cursor:pointer; border:none; border-radius:10px; padding:10px 14px; font-weight:700; text-decoration:none; display:inline-block; }
+    .primary { background:linear-gradient(90deg,var(--cyan),var(--purple)); color:#0a0e27; }
+    .ghost { background:transparent; border:1px solid rgba(255,255,255,.15); color:var(--text); }
+    ul { padding-left:1.2rem; }
+    li { margin:6px 0; }
+    .ok { color:var(--green); }
+    .pending { color:#fbbf24; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    td, th { text-align:left; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.06); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <p class="sub"><a href="/sinc">← SINC gateway</a></p>
+  <h1>Acceptance &amp; whitelisting</h1>
+  <p class="sub">Wallets, hooks, and listing status — verifiable on Base mainnet.</p>
+
+  <div class="card">
+    <h2>1 · Import SINC in your wallet</h2>
+    <p>Canonical token: <span class="mono" id="token-addr">—</span></p>
+    <div class="row">
+      <button class="primary" id="copy-addr">Copy contract</button>
+      <button class="ghost" id="copy-list">Copy token list URL</button>
+      <a class="btn ghost" id="list-link" href="#" target="_blank" rel="noopener">Open token list JSON</a>
+    </div>
+    <ul id="import-hints" style="margin-top:14px;font-size:14px;color:var(--muted)"></ul>
+  </div>
+
+  <div class="card">
+    <h2>2 · Buy paths (hook + curve)</h2>
+    <table>
+      <tr><th>Path</th><th>Contract</th><th>Use when</th></tr>
+      <tr><td>ETH bonding curve</td><td class="mono" id="curve-addr">—</td><td>Default; soulbound Genesis NFT on first buy</td></tr>
+      <tr><td>USDC hook router</td><td class="mono" id="router-addr">—</td><td>Lifts $0.10–$0.95 ramp + $1.50+ floor walls</td></tr>
+      <tr><td>Limit-order hook</td><td class="mono" id="hook-addr">—</td><td>~<span id="hook-m">—</span>M SINC on sell walls (read-only)</td></tr>
+    </table>
+    <div class="row">
+      <a class="btn primary" href="/sinc#buy-eth">Buy with ETH</a>
+      <a class="btn primary" href="/sinc#buy-usdc">Buy with USDC</a>
+      <a class="btn ghost" href="/refer">Referral (3%)</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Listing / whitelist status</h2>
+    <p><span id="list-summary">Loading…</span></p>
+    <table id="list-table"><tbody></tbody></table>
+    <p style="font-size:13px;color:var(--muted);margin-top:12px">PR packages: <span class="mono" id="pr-path">tokenlists/pr-packages/</span> · Run <span class="mono">python scripts/whitelist_token.py prepare</span> locally.</p>
+    <ul id="pending-links" style="margin-top:12px;font-size:14px;color:var(--muted)"></ul>
+  </div>
+
+  <div class="card">
+    <h2>4 · Hook ops (automated)</h2>
+    <ul style="font-size:14px;color:var(--muted)">
+      <li>Hook fill keeper — withdraws USDC when limit orders fill (Windows logon task)</li>
+      <li>Buy watcher — curve Buy/Sell SMS alerts</li>
+      <li>Daily ops — chain snapshot + wallet watch</li>
+    </ul>
+  </div>
+</div>
+<script>
+async function load() {
+  const [hook, acc] = await Promise.all([
+    fetch('/api/hook/status').then(r => r.json()),
+    fetch('/api/acceptance/status').then(r => r.json()),
+  ]);
+  document.getElementById('token-addr').textContent = hook.sinc_token;
+  document.getElementById('curve-addr').textContent = hook.curve;
+  document.getElementById('router-addr').textContent = hook.router_address;
+  document.getElementById('hook-addr').textContent = hook.hook_address;
+  document.getElementById('hook-m').textContent = hook.sinc_in_hook_pm_m;
+  const listUrl = acc.token_list_url;
+  document.getElementById('list-link').href = listUrl;
+  document.getElementById('pr-path').textContent = acc.pr_packages;
+  document.getElementById('list-summary').textContent =
+    acc.listed_count + ' / ' + acc.listing_total + ' listings live (checked ' + new Date(acc.checked_at).toLocaleString() + ')';
+  const tbody = document.querySelector('#list-table tbody');
+  tbody.innerHTML = acc.listings.map(l =>
+    `<tr><td>${l.listed ? '✅' : '⏳'} ${l.name}</td><td class="mono" style="color:var(--muted)">${l.ref}</td></tr>`
+  ).join('');
+  const hints = document.getElementById('import-hints');
+  hints.innerHTML = Object.entries(acc.wallet_import).map(([k,v]) => `<li><strong>${k}</strong>: ${v}</li>`).join('');
+  const pending = document.getElementById('pending-links');
+  if (acc.pending_submissions && pending) {
+    pending.innerHTML = acc.pending_submissions.map(s =>
+      `<li><a href="${s.url}" target="_blank" rel="noopener">${s.name}</a></li>`
+    ).join('');
+  }
+  document.getElementById('copy-addr').onclick = () => navigator.clipboard.writeText(hook.sinc_token);
+  document.getElementById('copy-list').onclick = () => navigator.clipboard.writeText(listUrl);
+}
+load();
+</script>
+</body>
+</html>
