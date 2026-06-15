@@ -19,6 +19,9 @@
     .status-dot{width:6px;height:6px;background:#34d399;border-radius:50%;animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
+    /* DEMO BANNER */
+    .demo-banner{background:#422006;border-bottom:1px solid #92400e;color:#fcd34d;text-align:center;padding:.55rem 1rem;font-size:.82rem;font-weight:600}
+
     /* LAYOUT */
     .container{max-width:1100px;margin:0 auto;padding:2rem 1.5rem}
 
@@ -68,6 +71,9 @@
   </style>
 </head>
 <body>
+{% if demo_mode %}
+<div class="demo-banner">Sample metrics — live agent telemetry ships with your SINC subscription.</div>
+{% endif %}
 
 <nav>
   <div class="nav-logo">
@@ -79,17 +85,6 @@
     <div class="status-pill">
       <div class="status-dot"></div>
       {{ num_agents }} Agents Active
-    </div>
-    <!-- SINC Wallet Widget -->
-    <div id="sinc-widget" style="display:flex;align-items:center;gap:.5rem">
-      <button id="sinc-connect-btn" onclick="sincWidget.connect()"
-              style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:.5rem;padding:.3rem .75rem;color:#fff;font-size:.78rem;font-weight:600;cursor:pointer">
-        Connect Wallet
-      </button>
-      <div id="sinc-balance-pill" style="display:none;align-items:center;gap:.4rem;background:#0f1a2a;border:1px solid #1e3a5f;border-radius:999px;padding:.25rem .7rem;font-size:.78rem;cursor:pointer" onclick="sincWidget.showDetails()">
-        <span>🪙</span>
-        <span id="sinc-balance-display" style="color:#60a5fa;font-weight:700">— SINC</span>
-      </div>
     </div>
   </div>
 </nav>
@@ -148,18 +143,6 @@
     {% endfor %}
   </div>
 
-  <!-- SINC Advanced Features Gate -->
-  <div id="sinc-advanced-gate" style="background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.08));border:1px solid rgba(99,102,241,.25);border-radius:1rem;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:2rem;flex-wrap:wrap">
-    <div>
-      <h3 style="font-size:.95rem;font-weight:700;color:#f1f5f9;margin:0 0 .25rem">🔒 Advanced Agent Features</h3>
-      <p id="sinc-gate-msg" style="color:#94a3b8;font-size:.82rem;margin:0">Hold 500 SINC in your wallet to unlock advanced agent configurations and extended output modes.</p>
-    </div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-      <span id="sinc-gate-badge" style="background:#0f1a2a;border:1px solid #1e3a5f;border-radius:999px;padding:.3rem .75rem;font-size:.78rem;color:#60a5fa;font-weight:600;white-space:nowrap">500 SINC required</span>
-      <a href="/sinc" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:.75rem;padding:.5rem 1.1rem;font-weight:700;font-size:.82rem;cursor:pointer;white-space:nowrap;text-decoration:none">Get SINC →</a>
-    </div>
-  </div>
-
   <!-- Quick Links -->
   <div class="section-title">Quick Access</div>
   <div class="quick-links">
@@ -191,71 +174,6 @@
   <a href="/privacy">Privacy</a> ·
   <a href="/security">Security</a>
 </footer>
-
-<script>
-/* SINC wallet widget for dashboard */
-const sincWidget = (() => {
-  const ADVANCED_THRESHOLD = 500;
-  let wallet = localStorage.getItem('sinc_wallet') || null;
-
-  function _el(id) { return document.getElementById(id); }
-
-  async function refreshBalance() {
-    if (!wallet) return;
-    try {
-      const res = await fetch(`/api/sinc/balance?wallet=${wallet}`);
-      if (!res.ok) return;
-      const { data } = await res.json();
-      const bal = data.sinc_balance;
-      const credits = data.credits;
-      const staked = data.staked;
-
-      // Update nav pill
-      const color = bal >= ADVANCED_THRESHOLD ? '#34d399' : (bal > 0 ? '#f59e0b' : '#f87171');
-      _el('sinc-balance-display').textContent = `${bal} SINC`;
-      _el('sinc-balance-display').style.color = color;
-      _el('sinc-balance-pill').style.display = 'flex';
-      _el('sinc-connect-btn').style.display = 'none';
-
-      // Advanced features gate
-      if (bal >= ADVANCED_THRESHOLD) {
-        _el('sinc-advanced-gate').style.background = 'linear-gradient(135deg,rgba(16,185,129,.12),rgba(6,78,59,.08))';
-        _el('sinc-advanced-gate').style.borderColor = 'rgba(16,185,129,.25)';
-        _el('sinc-gate-msg').textContent = `✓ Advanced features unlocked. You hold ${bal} SINC (need ${ADVANCED_THRESHOLD}).`;
-        _el('sinc-gate-badge').textContent = `✓ Unlocked`;
-        _el('sinc-gate-badge').style.color = '#34d399';
-        _el('sinc-gate-badge').style.borderColor = '#166534';
-        _el('sinc-gate-badge').style.background = '#0f2a1a';
-      }
-    } catch (e) { /* non-fatal */ }
-  }
-
-  async function connect() {
-    if (!window.ethereum) {
-      alert('Please install MetaMask or another Web3 wallet to use SINC features.');
-      return;
-    }
-    try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      wallet = accounts[0];
-      localStorage.setItem('sinc_wallet', wallet);
-      await refreshBalance();
-    } catch (e) { /* user rejected */ }
-  }
-
-  function showDetails() {
-    window.location.href = `/api/sinc/balance?wallet=${wallet}`;
-  }
-
-  // Auto-refresh on load if wallet already connected
-  if (wallet) {
-    refreshBalance();
-    setInterval(refreshBalance, 30000);
-  }
-
-  return { connect, refreshBalance, showDetails };
-})();
-</script>
 
 </body>
 </html>
