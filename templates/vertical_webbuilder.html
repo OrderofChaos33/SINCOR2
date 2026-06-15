@@ -343,7 +343,7 @@
       <div class="agent-card">
         <div class="agent-role">Negotiator</div>
         <div class="agent-name">Pulse · Outreach</div>
-        <div class="agent-desc">Personalized email + SMS sequences with staged preview links. Handles objections, books calls, pushes Stripe checkout links.</div>
+        <div class="agent-desc">Personalized email + SMS sequences with staged preview links. Handles objections, books calls, pushes SINC/AXM checkout links.</div>
         <div class="agent-out">→ 3-touch cadence + follow-ups</div>
       </div>
       <div class="agent-card">
@@ -411,7 +411,7 @@
       <div class="flow-step"><div class="flow-num">1</div><div class="flow-title">Discover</div><div class="flow-desc">Map territory, filter no-website leads, enrich owner contacts</div></div>
       <div class="flow-step"><div class="flow-num">2</div><div class="flow-title">Brief</div><div class="flow-desc">Brand + offer extraction from public signals</div></div>
       <div class="flow-step"><div class="flow-num">3</div><div class="flow-title">Build</div><div class="flow-desc">Custom site + QA + staging URL</div></div>
-      <div class="flow-step"><div class="flow-num">4</div><div class="flow-title">Close</div><div class="flow-desc">Outreach with preview link → Stripe → go live</div></div>
+      <div class="flow-step"><div class="flow-num">4</div><div class="flow-title">Close</div><div class="flow-desc">Outreach with preview link → SINC/AXM pay → go live</div></div>
       <div class="flow-step"><div class="flow-num">5</div><div class="flow-title">Grow</div><div class="flow-desc">SEO, social, ads — autonomous post-launch</div></div>
     </div>
   </section>
@@ -476,11 +476,11 @@
     <div class="label">FAQ</div>
     <h2>Common questions</h2>
     <div class="faq" style="margin-top:24px;">
-      <details><summary>Is this live or a concept page?</summary><div class="body">The vertical runs on the same production SINCOR stack as the rest of the platform — agent roster, task market, outreach engine, and Stripe billing. This page describes the WebBuilder playbook configuration.</div></details>
+      <details><summary>Is this live or a concept page?</summary><div class="body">The vertical runs on the same production SINCOR stack as the rest of the platform — agent roster, task market, outreach engine, and SINC/AXM billing on Base. This page describes the WebBuilder playbook configuration.</div></details>
       <details><summary>Do you use WordPress templates?</summary><div class="body">No. Orion generates custom static sites with local SEO, schema, and performance budgets. Auditors block template spam and duplicate content patterns.</div></details>
       <details><summary>Who owns the site and domain?</summary><div class="body">The business owner. You white-label or operate as agency-of-record. Swarm hands off deploy keys + DNS instructions after payment.</div></details>
       <details><summary>Can I limit territory?</summary><div class="body">Yes — geo fences, niches (HVAC, detail, legal, etc.), and daily discovery caps are configured at onboarding.</div></details>
-      <details><summary>How does this connect to SINC / agents?</summary><div class="body">Subscriptions are USD via Stripe. On-chain SINC is optional for ecosystem participation; agent-to-agent settlement can use AXIOM on the marketplace layer.</div></details>
+      <details><summary>How does this connect to SINC / agents?</summary><div class="body">Platform access is paid in SINC; one-off deliverables and agent tasks settle in AXM. Both route through <a href="/buy">/buy</a> on Base — no Stripe or PayPal.</div></details>
     </div>
   </section>
 
@@ -513,7 +513,7 @@
     ['hi',  '[06:20:40] Pulse · outreach · owner=maria.garcia@...'],
     ['ok',  '[06:20:41] Pulse · sent preview + 3-touch sequence armed'],
     ['hi',  '[06:41:12] Pulse · REPLY · "love it — how do we go live?"'],
-    ['ok',  '[06:41:15] Pulse · Stripe checkout $1,200 · deposit 50%'],
+    ['ok',  '[06:41:15] Pulse · SINC checkout · deposit 50%'],
     ['hi',  '[06:55:01] Echo · scheduling launch posts + GMB draft'],
     ['ok',  '[06:55:04] TOA · ingest_feedback(win) · replanning discovery bias→detailing'],
   ];
