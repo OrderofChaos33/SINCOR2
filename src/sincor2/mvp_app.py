@@ -364,7 +364,9 @@ def sanitize_string(value, max_length=200):
 # DATABASE SETUP (SQLite for orders)
 # ============================================================================
 
-DB_PATH = os.path.join(project_root, 'orders.db')
+from sincor2.data_paths import migrate_legacy_orders_db, orders_db_path
+
+DB_PATH = str(migrate_legacy_orders_db())
 
 
 def get_db():
