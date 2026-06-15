@@ -45,6 +45,13 @@ template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
+
+@app.context_processor
+def inject_social_links():
+    from sincor2.social_links import SOCIAL_LINKS
+    return {'social_links': SOCIAL_LINKS}
+
+
 # Configure JWT � MUST be set in Railway secrets for production
 jwt_secret = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET')
 if not jwt_secret:
@@ -1640,6 +1647,13 @@ def product_professional():
 def product_enterprise():
     """Enterprise plan landing page."""
     return render_template('product_enterprise.html')
+
+
+@app.route('/verticals/webbuilder')
+@app.route('/webbuilder')
+def vertical_webbuilder():
+    """WebBuilder swarm vertical — find SMBs, build sites, market autonomously."""
+    return render_template('vertical_webbuilder.html')
 
 
 @app.route('/sinc')
