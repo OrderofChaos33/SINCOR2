@@ -86,7 +86,9 @@ def _root() -> Path:
 
 
 def _db_path() -> Path:
-    return _root() / "orders.db"
+    from sincor2.data_paths import orders_db_path
+
+    return orders_db_path()
 
 
 def init_platform_payments_db() -> None:
