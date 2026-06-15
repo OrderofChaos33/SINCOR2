@@ -61,31 +61,47 @@ CONTENT_DIR.mkdir(parents=True, exist_ok=True)
 CALENDAR_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 SINCOR_BRAND = {
-    "name": "Sincor",
+    "name": "SINCOR",
     "url": "https://getsincor.com",
     "free_trial_url": "https://getsincor.com/buy",
-    "tagline": "43 AI agents. One unstoppable growth engine.",
+    "sinc_buy_url": "https://getsincor.com/sinc",
+    "sinc_refer_url": "https://getsincor.com/refer",
+    "tagline": "42 AI agents. Verified SINC on Base. Self-serve — no human sales.",
     "description": (
-        "Sincor is an AI-powered CRM automation and SalesOps platform. "
-        "43 specialized AI agents handle contact deduplication, CRM sync, "
-        "lead enrichment, outbound automation, and pipeline intelligence — "
-        "so your sales team can focus on closing."
+        "SINCOR is a 42-agent autonomous swarm on Base with verifiable on-chain inventory. "
+        "Canonical SINC (0x9C8cd8…68e7) sells via bonding curve and v4 hook limit orders — "
+        "agents draft proof-of-work content; contracts handle distribution. "
+        "CRM automation and SalesOps remain part of the platform; SINC participation is "
+        "wallet-native and referral-backed (3% on-chain per buy)."
     ),
     "features": [
-        "Automatic duplicate contact detection and merge",
-        "Real-time CRM sync across HubSpot, Salesforce, Pipedrive",
-        "AI-powered lead scoring and enrichment",
-        "Outbound sequence automation with personalization",
-        "SalesOps analytics and pipeline forecasting",
-        "No-code workflow builder (replace Zapier for CRM tasks)",
-        "43 specialized AI agents working 24/7",
+        "42 specialized AI agents — content, ops, on-chain stats, review queue",
+        "Self-serve SINC buy at /sinc (ETH curve + USDC router)",
+        "3% on-chain referral payouts at /refer",
+        "Verifiable Base contracts: bonding curve, v4 hook, Sourcify-matched source",
+        "Human-in-the-loop launch review (~5 min/day) — agents draft, you approve",
+        "CRM sync, deduplication, lead enrichment (platform layer)",
+        "A2A agent card at /.well-known/agent.json for discovery",
     ],
-    "pricing_note": "Starter plan from $49/month. Free trial available.",
+    "pricing_note": "Platform from $297/mo; SINC buy is on-chain and self-serve.",
+    "sinc_token": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+    "curve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
 }
 
 # ─── SEO Keyword Bank ─────────────────────────────────────────────────────────
 # (keyword, seo_difficulty 1-10, content_type, priority)
 KEYWORD_BANK = [
+    # SINC / agent-token launch (priority)
+    ("verified AI agent token Base", 4, "comparison", 1),
+    ("bonding curve token launch Base", 5, "how-to", 1),
+    ("SINCOR SINC token", 2, "comparison", 1),
+    ("on-chain referral crypto 3 percent", 3, "how-to", 1),
+    ("Uniswap v4 hook limit orders explained", 6, "how-to", 1),
+    ("agent token vs vaporware checklist", 3, "comparison", 1),
+    ("self-serve crypto launch no VC", 4, "industry-trend", 1),
+    ("AI agent swarm autonomous marketing", 5, "industry-trend", 1),
+    ("Base mainnet verified token contracts", 4, "how-to", 1),
+    ("Sourcify verified smart contract", 3, "how-to", 2),
     # Core product keywords
     ("CRM sync automation", 4, "how-to", 1),
     ("duplicate contacts CRM", 3, "how-to", 1),
@@ -374,6 +390,16 @@ Write the complete post now:"""
     wc = count_words(markdown)
 
     logger.info(f"[GENERATE] Post ready: '{title}' ({wc} words)")
+
+    try:
+        from sincor2.compliance_guardrails import guardrails
+        guardrails.check_content(
+            f"{title}\n{markdown}",
+            agent="content_agent",
+            content_type="blog_post",
+        )
+    except Exception as e:
+        logger.warning("[GENERATE] Guardrails check failed: %s", e)
 
     return {
         "id": str(uuid.uuid4()),
@@ -693,6 +719,17 @@ class WordPressPublisher:
         if not self.enabled:
             logger.warning("[WP] Skipping publish — WordPress not configured")
             return {"error": "WordPress not configured", "saved_locally": True}
+
+        try:
+            from sincor2.compliance_guardrails import guardrails
+            guardrails.check_content(
+                f"{post.get('title', '')}\n{post.get('markdown', '')}",
+                agent="content_agent",
+                content_type="blog_post",
+            )
+        except Exception as e:
+            logger.error("[WP] Guardrails blocked publish: %s", e)
+            return {"error": "guardrail_block", "detail": str(e)}
 
         html_content = self.markdown_to_html(post["markdown"])
         payload = {
