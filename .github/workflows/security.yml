@@ -1,9 +1,8 @@
 name: Security Checks
 
+# Paused while GitHub billing is locked — re-enable after payment method fixed.
 on:
-  pull_request:
-  push:
-    branches: [main, master]
+  workflow_dispatch:
 
 permissions:
   contents: read
