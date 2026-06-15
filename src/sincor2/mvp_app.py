@@ -100,6 +100,13 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+# Production kill-switches — no accidental on-chain writes or compliance egress
+try:
+    from sincor2.safety_locks import assert_production_safety
+    assert_production_safety()
+except Exception as e:
+    logger.warning("[SAFETY] Lock check failed: %s", e)
+
 # Platform payments (SINC + AXM) — default billing path
 try:
     from sincor2.platform_payments import (
