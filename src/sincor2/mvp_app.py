@@ -14,6 +14,7 @@ from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from werkzeug.middleware.proxy_fix import ProxyFix
 try:
     from authlib.integrations.flask_client import OAuth
     OAUTH_AVAILABLE = True
@@ -34,6 +35,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger('sincor2')
 
+
+def _env_first(*keys: str, default: str = '') -> str:
+    """Return the first non-empty environment variable from *keys."""
+    for key in keys:
+        val = (os.environ.get(key) or '').strip()
+        if val:
+            return val
+    return default
+
+
 # Load environment variables
 load_dotenv()
 
@@ -43,6 +54,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+
+# Railway / reverse-proxy: correct scheme + host for OAuth redirect URIs
+if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('TRUST_PROXY', '').lower() in ('1', 'true', 'yes'):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 
 @app.context_processor
@@ -67,30 +83,104 @@ jwt = JWTManager(app)
 
 # OAuth (Google + GitHub)
 oauth = None
+OAUTH_REDIRECT_BASE = _env_first('OAUTH_REDIRECT_BASE_URL', 'PUBLIC_BASE_URL', 'SITE_URL', default='').rstrip('/')
+OAUTH_ERROR_MESSAGES = {
+    'oauth_unavailable': 'Social login is temporarily unavailable. Please use email signup.',
+    'oauth_failed': 'Social login failed. Please try again or use email signup.',
+    'no_email': 'We could not get your email from that provider. Try another method.',
+}
+
+
+def _oauth_redirect_uri(endpoint: str) -> str:
+    """Build absolute OAuth callback URL (Railway-safe)."""
+    if OAUTH_REDIRECT_BASE:
+        return f'{OAUTH_REDIRECT_BASE}{url_for(endpoint)}'
+    return url_for(endpoint, _external=True)
+
+
+def _oauth_provider_ready(name: str) -> bool:
+    return bool(oauth and hasattr(oauth, name))
+
+
+def _oauth_finish_login(email: str, name: str, provider: str):
+    """Create session + JWT cookie after successful OAuth."""
+    session['user_email'] = email
+    session['user_name'] = name or email.split('@')[0]
+    access_token = create_access_token(identity=email)
+    logger.info('[OAUTH] %s login: %s', provider, email)
+    resp = make_response(redirect('/dashboard'))
+    resp.set_cookie(
+        'access_token', access_token, httponly=True,
+        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
+        samesite='Lax', max_age=28800,
+    )
+    return resp
+
+
+def _google_userinfo(token: dict):
+    """Extract Google profile from token or userinfo endpoint."""
+    user_info = token.get('userinfo')
+    if user_info:
+        return user_info
+    if token.get('id_token') and hasattr(oauth.google, 'parse_id_token'):
+        try:
+            return oauth.google.parse_id_token(token)
+        except Exception as exc:
+            logger.warning('[OAUTH] Google id_token parse failed: %s', exc)
+    resp = oauth.google.get('userinfo')
+    return resp.json()
+
+
+def _github_primary_email() -> str:
+    """Fetch verified primary email when /user omits it."""
+    resp = oauth.github.get('user/emails')
+    emails = resp.json() if resp.ok else []
+    if not isinstance(emails, list):
+        return ''
+    for entry in emails:
+        if entry.get('primary') and entry.get('verified'):
+            return entry.get('email', '')
+    for entry in emails:
+        if entry.get('primary'):
+            return entry.get('email', '')
+    for entry in emails:
+        if entry.get('verified'):
+            return entry.get('email', '')
+    return emails[0].get('email', '') if emails else ''
+
+
 if OAUTH_AVAILABLE:
     oauth = OAuth(app)
-    _gcid = os.environ.get('GOOGLE_CLIENT_ID', '')
-    _gcs  = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-    _ghid = os.environ.get('GITHUB_CLIENT_ID', '')
-    _ghs  = os.environ.get('GITHUB_CLIENT_SECRET', '')
+    _gcid = _env_first('GOOGLE_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_ID')
+    _gcs = _env_first('GOOGLE_CLIENT_SECRET', 'GOOGLE_OAUTH_CLIENT_SECRET')
+    _ghid = _env_first('GITHUB_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID')
+    _ghs = _env_first('GITHUB_CLIENT_SECRET', 'GITHUB_OAUTH_CLIENT_SECRET')
     if _gcid and _gcs:
-        oauth.register('google',
+        oauth.register(
+            'google',
             client_id=_gcid,
             client_secret=_gcs,
             server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
             client_kwargs={'scope': 'openid email profile'},
         )
         logger.info('[OAUTH] Google OAuth registered')
+    else:
+        logger.warning('[OAUTH] Google OAuth skipped — set GOOGLE_OAUTH_CLIENT_ID/SECRET')
     if _ghid and _ghs:
-        oauth.register('github',
+        oauth.register(
+            'github',
             client_id=_ghid,
             client_secret=_ghs,
             access_token_url='https://github.com/login/oauth/access_token',
             authorize_url='https://github.com/login/oauth/authorize',
             api_base_url='https://api.github.com/',
-            client_kwargs={'scope': 'user:email'},
+            client_kwargs={'scope': 'read:user user:email'},
         )
         logger.info('[OAUTH] GitHub OAuth registered')
+    else:
+        logger.warning('[OAUTH] GitHub OAuth skipped — set GITHUB_CLIENT_ID/SECRET')
+elif not OAUTH_AVAILABLE:
+    logger.warning('[OAUTH] authlib not installed — social login disabled')
 
 # Rate limiter
 limiter = Limiter(
@@ -786,16 +876,33 @@ PRODUCT_PRICES = {
 @app.route('/signup', methods=['GET'])
 def signup_page():
     """Render signup page."""
-    return render_template('signup.html')
+    err_key = request.args.get('error', '')
+    return render_template(
+        'signup.html',
+        oauth_error=OAUTH_ERROR_MESSAGES.get(err_key, ''),
+        oauth_google=_oauth_provider_ready('google'),
+        oauth_github=_oauth_provider_ready('github'),
+    )
 
 
 # ── OAuth Routes ────────────────────────────────────────────────────────────
+@app.route('/api/auth/oauth-status', methods=['GET'])
+def oauth_status():
+    """Report which OAuth providers are configured (no secrets)."""
+    return jsonify({
+        'available': OAUTH_AVAILABLE,
+        'google': _oauth_provider_ready('google'),
+        'github': _oauth_provider_ready('github'),
+        'redirect_base': OAUTH_REDIRECT_BASE or None,
+    }), 200
+
+
 @app.route('/auth/google')
 def auth_google():
     """Redirect to Google OAuth."""
-    if not oauth or not hasattr(oauth, 'google'):
-        return jsonify({'error': 'Google OAuth not configured'}), 503
-    redirect_uri = url_for('auth_google_callback', _external=True)
+    if not _oauth_provider_ready('google'):
+        return redirect('/signup?error=oauth_unavailable')
+    redirect_uri = _oauth_redirect_uri('auth_google_callback')
     return oauth.google.authorize_redirect(redirect_uri)
 
 
@@ -803,34 +910,26 @@ def auth_google():
 def auth_google_callback():
     """Handle Google OAuth callback."""
     try:
-        if not oauth or not hasattr(oauth, 'google'):
+        if not _oauth_provider_ready('google'):
             return redirect('/signup?error=oauth_unavailable')
         token = oauth.google.authorize_access_token()
-        user_info = token.get('userinfo') or oauth.google.userinfo()
-        email = user_info.get('email', '')
-        name  = user_info.get('name', email.split('@')[0])
+        user_info = _google_userinfo(token)
+        email = (user_info.get('email') or '').strip()
+        name = (user_info.get('name') or email.split('@')[0]).strip()
         if not email:
             return redirect('/signup?error=no_email')
-        session['user_email'] = email
-        session['user_name']  = name
-        access_token = create_access_token(identity=email)
-        logger.info(f'[OAUTH] Google login: {email}')
-        resp = make_response(redirect('/dashboard'))
-        resp.set_cookie('access_token', access_token, httponly=True,
-                        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-                        samesite='Lax', max_age=28800)
-        return resp
+        return _oauth_finish_login(email, name, 'Google')
     except Exception as e:
-        logger.error(f'[OAUTH] Google callback error: {e}')
+        logger.error('[OAUTH] Google callback error: %s', e, exc_info=True)
         return redirect('/signup?error=oauth_failed')
 
 
 @app.route('/auth/github')
 def auth_github():
     """Redirect to GitHub OAuth."""
-    if not oauth or not hasattr(oauth, 'github'):
-        return jsonify({'error': 'GitHub OAuth not configured'}), 503
-    redirect_uri = url_for('auth_github_callback', _external=True)
+    if not _oauth_provider_ready('github'):
+        return redirect('/signup?error=oauth_unavailable')
+    redirect_uri = _oauth_redirect_uri('auth_github_callback')
     return oauth.github.authorize_redirect(redirect_uri)
 
 
@@ -838,33 +937,23 @@ def auth_github():
 def auth_github_callback():
     """Handle GitHub OAuth callback."""
     try:
-        if not oauth or not hasattr(oauth, 'github'):
+        if not _oauth_provider_ready('github'):
             return redirect('/signup?error=oauth_unavailable')
         oauth.github.authorize_access_token()
-        resp  = oauth.github.get('user')
+        resp = oauth.github.get('user')
+        if not resp.ok:
+            logger.error('[OAUTH] GitHub /user failed: %s', resp.status_code)
+            return redirect('/signup?error=oauth_failed')
         user_info = resp.json()
-        email = user_info.get('email', '')
+        email = (user_info.get('email') or '').strip()
         if not email:
-            # Fetch primary email separately
-            emails_resp = oauth.github.get('user/emails')
-            for e in emails_resp.json():
-                if e.get('primary'):
-                    email = e.get('email', '')
-                    break
-        name = user_info.get('name') or user_info.get('login', '')
+            email = _github_primary_email()
+        name = (user_info.get('name') or user_info.get('login') or '').strip()
         if not email:
             return redirect('/signup?error=no_email')
-        session['user_email'] = email
-        session['user_name']  = name
-        access_token = create_access_token(identity=email)
-        logger.info(f'[OAUTH] GitHub login: {email}')
-        resp2 = make_response(redirect('/dashboard'))
-        resp2.set_cookie('access_token', access_token, httponly=True,
-                         secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-                         samesite='Lax', max_age=28800)
-        return resp2
+        return _oauth_finish_login(email, name, 'GitHub')
     except Exception as e:
-        logger.error(f'[OAUTH] GitHub callback error: {e}')
+        logger.error('[OAUTH] GitHub callback error: %s', e, exc_info=True)
         return redirect('/signup?error=oauth_failed')
 
 
@@ -2428,7 +2517,13 @@ def affiliate_program():
 @app.route('/login')
 def login_page():
     """Login page."""
-    return render_template('login.html')
+    err_key = request.args.get('error', '')
+    return render_template(
+        'login.html',
+        oauth_error=OAUTH_ERROR_MESSAGES.get(err_key, ''),
+        oauth_google=_oauth_provider_ready('google'),
+        oauth_github=_oauth_provider_ready('github'),
+    )
 
 
 @app.route('/billing')
