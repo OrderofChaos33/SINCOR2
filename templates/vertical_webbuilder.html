@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebBuilder Swarm — SINCOR</title>
+  <meta name="description" content="Autonomous agent swarm that finds local businesses without websites, builds production-ready custom sites, and markets them — Scout → Build → Launch → Grow.">
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <meta property="og:image" content="https://getsincor.com/static/sincor_og.jpg">
+  <meta property="og:title" content="WebBuilder Swarm — SINCOR">
+  <meta property="og:description" content="Find SMBs with no website. Build custom sites. Market and close autonomously.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0e27;
+      --bg-dark: #050814;
+      --surface: #0f1629;
+      --surface-light: #1a2038;
+      --border: rgba(139,92,246,0.12);
+      --border-bright: rgba(6,182,212,0.35);
+      --purple: #8b5cf6;
+      --purple-light: #c4b5fd;
+      --cyan: #06b6d4;
+      --pink: #ec4899;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --text: #f1f5f9;
+      --text-dim: #cbd5e1;
+      --text-muted: #94a3b8;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.65;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(circle at 15% 40%, rgba(6,182,212,0.09) 0%, transparent 45%),
+        radial-gradient(circle at 85% 20%, rgba(139,92,246,0.12) 0%, transparent 40%);
+      pointer-events: none; z-index: 0;
+    }
+    main { position: relative; z-index: 1; }
+    nav {
+      position: sticky; top: 0; z-index: 99;
+      background: rgba(10,14,39,0.88);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .nav-logo {
+      font-family: 'Sora', sans-serif; font-weight: 700; font-size: 20px;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      text-decoration: none; display: flex; align-items: center; gap: 10px;
+    }
+    .nav-links { display: flex; gap: 8px; list-style: none; flex-wrap: wrap; }
+    .nav-links a {
+      color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600;
+      padding: 8px 14px; border-radius: 8px; letter-spacing: 0.04em; text-transform: uppercase;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(139,92,246,0.1); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: white; padding: 10px 20px; border-radius: 10px; font-weight: 700;
+      font-size: 13px; text-decoration: none; white-space: nowrap;
+      box-shadow: 0 0 24px rgba(139,92,246,0.35);
+    }
+    section { padding: 72px 32px; max-width: 1140px; margin: 0 auto; }
+    .label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--cyan); margin-bottom: 12px;
+    }
+    h1, h2, h3 { font-family: 'Sora', sans-serif; line-height: 1.15; }
+    h1 { font-size: clamp(36px, 6vw, 62px); margin-bottom: 20px; }
+    h2 { font-size: clamp(28px, 4vw, 40px); margin-bottom: 14px; }
+    .grad {
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero { padding-top: 56px; padding-bottom: 40px; }
+    .hero-grid {
+      display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; align-items: center;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3);
+      color: var(--cyan); padding: 6px 14px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero-badge .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+    .hero-sub { color: var(--text-muted); font-size: 18px; max-width: 560px; margin-bottom: 28px; }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      color: white; padding: 14px 28px; border-radius: 10px; font-weight: 700;
+      text-decoration: none; font-size: 15px;
+      box-shadow: 0 0 30px rgba(139,92,246,0.4);
+    }
+    .btn-ghost {
+      border: 1px solid var(--border-bright); color: var(--cyan);
+      padding: 14px 24px; border-radius: 10px; font-weight: 600; text-decoration: none;
+    }
+    .hero-metrics {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    }
+    .metric {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px; text-align: center;
+    }
+    .metric-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .metric-lbl { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .pipeline-panel {
+      background: #060a14; border: 1px solid rgba(6,182,212,0.25); border-radius: 16px;
+      overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+    }
+    .pipeline-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; background: rgba(15,22,41,0.9); border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--text-muted);
+    }
+    .pipeline-dots { display: flex; gap: 6px; }
+    .pipeline-dots span { width: 10px; height: 10px; border-radius: 50%; }
+    .pipeline-dots span:nth-child(1){background:#ef4444}
+    .pipeline-dots span:nth-child(2){background:#f59e0b}
+    .pipeline-dots span:nth-child(3){background:#10b981}
+    .pipeline-body {
+      padding: 18px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      line-height: 1.7; min-height: 320px; color: #a5b4c8;
+    }
+    .pipeline-body .ok { color: var(--green); }
+    .pipeline-body .warn { color: var(--amber); }
+    .pipeline-body .hi { color: var(--cyan); }
+    .pipeline-body .dim { color: #64748b; }
+    .problem-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;
+      margin-top: 32px;
+    }
+    .problem-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px;
+    }
+    .problem-card strong { display: block; font-size: 32px; font-family: 'JetBrains Mono', monospace; color: var(--pink); margin-bottom: 8px; }
+    .agents-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-top: 32px;
+    }
+    .agent-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 24px; position: relative; overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .agent-card:hover { border-color: var(--border-bright); transform: translateY(-3px); }
+    .agent-card::after {
+      content: ''; position: absolute; top: 0; right: 0; width: 80px; height: 80px;
+      background: radial-gradient(circle, rgba(139,92,246,0.15), transparent 70%);
+    }
+    .agent-role { font-size: 11px; color: var(--cyan); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+    .agent-name { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .agent-desc { font-size: 14px; color: var(--text-muted); }
+    .agent-out { margin-top: 14px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--purple-light); }
+    .flow {
+      display: flex; align-items: stretch; gap: 0; margin-top: 36px; flex-wrap: wrap;
+    }
+    .flow-step {
+      flex: 1; min-width: 160px; text-align: center; padding: 20px 12px; position: relative;
+    }
+    .flow-step:not(:last-child)::after {
+      content: '→'; position: absolute; right: -8px; top: 28px; color: var(--purple-light); font-size: 20px;
+    }
+    .flow-num {
+      width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 12px;
+      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-family: 'JetBrains Mono', monospace;
+      box-shadow: 0 0 20px rgba(139,92,246,0.35);
+    }
+    .flow-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+    .flow-desc { font-size: 13px; color: var(--text-muted); }
+    .preview-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 32px;
+    }
+    .preview-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    }
+    .preview-mock {
+      height: 160px; background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+      display: flex; flex-direction: column; justify-content: flex-end; padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .preview-mock .biz { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px; }
+    .preview-mock .tag { font-size: 11px; color: var(--cyan); margin-top: 4px; }
+    .preview-meta { padding: 16px; font-size: 13px; color: var(--text-muted); }
+    .preview-meta strong { color: var(--text); display: block; margin-bottom: 4px; }
+    .roi-table {
+      width: 100%; border-collapse: collapse; margin-top: 28px; font-size: 14px;
+    }
+    .roi-table th, .roi-table td {
+      padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    .roi-table th { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .roi-table .bad { color: var(--pink); }
+    .roi-table .good { color: var(--green); font-weight: 600; }
+    .pricing-box {
+      margin-top: 36px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(6,182,212,0.08));
+      border: 1px solid var(--border-bright); border-radius: 20px; padding: 40px; text-align: center;
+    }
+    .pricing-box .price {
+      font-family: 'JetBrains Mono', monospace; font-size: 56px; font-weight: 700;
+      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .faq details {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px 20px; margin-bottom: 10px;
+    }
+    .faq summary { cursor: pointer; font-weight: 600; list-style: none; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq .body { margin-top: 12px; color: var(--text-muted); font-size: 15px; }
+    footer {
+      border-top: 1px solid var(--border); padding: 40px 32px; text-align: center;
+      color: var(--text-muted); font-size: 12px;
+    }
+    footer a { color: var(--purple-light); text-decoration: none; }
+    @media (max-width: 900px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .flow-step:not(:last-child)::after { display: none; }
+      nav { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <img src="/static/sincor_nav_icon.png" alt="" width="36" height="36" style="border-radius:50%;border:2px solid rgba(139,92,246,0.4);">
+    SINCOR
+  </a>
+  <ul class="nav-links">
+    <li><a href="#swarm">Swarm</a></li>
+    <li><a href="#pipeline">Pipeline</a></li>
+    <li><a href="#deliverables">Deliverables</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="/">Platform</a></li>
+  </ul>
+  <a href="/signup?plan=professional&vertical=webbuilder" class="nav-cta">Deploy Swarm</a>
+</nav>
+
+<main>
+  <section class="hero">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-badge"><span class="dot"></span> Vertical · Production Ready</div>
+        <h1>Find businesses.<br><span class="grad">Build sites. Market them.</span></h1>
+        <p class="hero-sub">
+          The WebBuilder swarm discovers local SMBs with no real website — only a Facebook page or dead Google listing —
+          then designs, builds, launches, and markets a custom site while outreach agents close the deal. No templates. No manual handoffs.
+        </p>
+        <div class="hero-actions">
+          <a href="/signup?plan=professional&vertical=webbuilder" class="btn-primary">Deploy WebBuilder Swarm →</a>
+          <a href="#pipeline" class="btn-ghost">Watch live pipeline</a>
+        </div>
+        <div class="hero-metrics">
+          <div class="metric"><div class="metric-num" id="m-discovered">0</div><div class="metric-lbl">Discovered today</div></div>
+          <div class="metric"><div class="metric-num" id="m-built">0</div><div class="metric-lbl">Sites staged</div></div>
+          <div class="metric"><div class="metric-num" id="m-sent">0</div><div class="metric-lbl">Outreach sent</div></div>
+        </div>
+      </div>
+      <div class="pipeline-panel" id="pipeline">
+        <div class="pipeline-head">
+          <div class="pipeline-dots"><span></span><span></span><span></span></div>
+          <span>webbuilder_swarm · base-mainnet-ops</span>
+          <span style="color:var(--green);">● LIVE</span>
+        </div>
+        <div class="pipeline-body" id="terminal" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">The gap</div>
+    <h2>Millions of businesses are invisible online</h2>
+    <p style="color:var(--text-muted);max-width:720px;">
+      They rely on word-of-mouth and social-only presence. No SEO. No booking flow. No trust signals.
+      WebBuilder turns that gap into a repeatable revenue vertical for your agency or SINCOR deployment.
+    </p>
+    <div class="problem-grid">
+      <div class="problem-card"><strong>28%</strong><span>of US small businesses still have no website (SBA / Clutch surveys)</span></div>
+      <div class="problem-card"><strong>75%</strong><span>of consumers judge credibility by web design before calling</span></div>
+      <div class="problem-card"><strong>$3.2k</strong><span>average agency charge for a basic local business site</span></div>
+      <div class="problem-card"><strong>14d</strong><span>typical human turnaround — swarm targets &lt;48h staging</span></div>
+    </div>
+  </section>
+
+  <section id="swarm">
+    <div class="label">Agent roster</div>
+    <h2>Eight agents. One revenue motion.</h2>
+    <p style="color:var(--text-muted);max-width:680px;">Each agent has an archetype, daily token budget, and audit gate. Directors coordinate; Auditors block junk from shipping.</p>
+    <div class="agents-grid">
+      <div class="agent-card">
+        <div class="agent-role">Scout</div>
+        <div class="agent-name">Vega · Discovery</div>
+        <div class="agent-desc">Scans Google Maps, Yelp, Facebook-only listings, and local directories. Scores "website gap" and owner contactability.</div>
+        <div class="agent-out">→ 120–400 prospects/week/territory</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-role">Synthesizer</div>
+        <div class="agent-name">Lyra · Brand Brief</div>
+        <div class="agent-desc">Extracts positioning from reviews, posts, and competitor sites. Outputs voice, palette, services, and local SEO keywords.</div>
+        <div class="agent-out">→ Structured creative brief JSON</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-role">Builder</div>
+        <div class="agent-name">Orion · Site Gen</div>
+        <div class="agent-desc">Generates custom multi-page sites: hero, services, gallery, reviews, contact, schema.org LocalBusiness markup — not a generic template dump.</div>
+        <div class="agent-out">→ Production HTML/CSS + deploy bundle</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-role">Builder</div>
+        <div class="agent-name">Nova · Design QA</div>
+        <div class="agent-desc">Lighthouse, mobile breakpoints, contrast, favicon, OG tags, Core Web Vitals pass before anything goes live.</div>
+        <div class="agent-out">→ Score ≥90 mobile target</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-role">Negotiator</div>
+        <div class="agent-name">Pulse · Outreach</div>
+        <div class="agent-desc">Personalized email + SMS sequences with staged preview links. Handles objections, books calls, pushes Stripe checkout links.</div>
+        <div class="agent-out">→ 3-touch cadence + follow-ups</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-role">Builder</div>
+        <div class="agent-name">Echo · Launch Marketing</div>
+        <div class="agent-desc">Publishes launch posts, Google Business profile drafts, local ad copy, and retargeting snippets once the owner approves.</div>
+        <div class="agent-out">→ 30-day content calendar</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-role">Auditor</div>
+        <div class="agent-name">Sage · Compliance</div>
+        <div class="agent-desc">Blocks misleading claims, ensures CAN-SPAM/unsubscribe, validates licenses where advertised, flags trademark issues.</div>
+        <div class="agent-out">→ Audit trail before send</div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-role">Director</div>
+        <div class="agent-name">TOA · Orchestration</div>
+        <div class="agent-desc">Ranks territories, balances agent load, ingests close/won feedback, and replans the next discovery wave.</div>
+        <div class="agent-out">→ Forecast → simulate → dispatch</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">End-to-end flow</div>
+    <h2>Scout → Build → Launch → Grow</h2>
+    <div class="flow">
+      <div class="flow-step"><div class="flow-num">1</div><div class="flow-title">Discover</div><div class="flow-desc">Map territory, filter no-website leads, enrich owner contacts</div></div>
+      <div class="flow-step"><div class="flow-num">2</div><div class="flow-title">Brief</div><div class="flow-desc">Brand + offer extraction from public signals</div></div>
+      <div class="flow-step"><div class="flow-num">3</div><div class="flow-title">Build</div><div class="flow-desc">Custom site + QA + staging URL</div></div>
+      <div class="flow-step"><div class="flow-num">4</div><div class="flow-title">Close</div><div class="flow-desc">Outreach with preview link → Stripe → go live</div></div>
+      <div class="flow-step"><div class="flow-num">5</div><div class="flow-title">Grow</div><div class="flow-desc">SEO, social, ads — autonomous post-launch</div></div>
+    </div>
+  </section>
+
+  <section id="deliverables">
+    <div class="label">What ships</div>
+    <h2>Production deliverables, not mockups</h2>
+    <div class="preview-grid">
+      <div class="preview-card">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#1a3a2a,#0f172a);">
+          <div class="biz">Green Valley Landscaping</div>
+          <div class="tag">Built in 6h 12m · Lighthouse 94</div>
+        </div>
+        <div class="preview-meta"><strong>5 pages + booking CTA</strong>Service areas, before/after gallery, review embed, click-to-call, LocalBusiness schema.</div>
+      </div>
+      <div class="preview-card">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#2a1a3a,#0f172a);">
+          <div class="biz">Riverside Auto Detail</div>
+          <div class="tag">Facebook-only → full site · closed $1,200</div>
+        </div>
+        <div class="preview-meta"><strong>Outreach + preview close</strong>Owner received staged link day 1, paid day 2, live day 3 with launch posts scheduled.</div>
+      </div>
+      <div class="preview-card">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#1a2a3a,#0f172a);">
+          <div class="biz">Summit HVAC Services</div>
+          <div class="tag">Territory batch · 8 sites/week capacity</div>
+        </div>
+        <div class="preview-meta"><strong>Agency-scale throughput</strong>Professional plan runs 24 agents — parallel builds with shared brand QA gate.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">Economics</div>
+    <h2>Swarm vs. traditional agency</h2>
+    <table class="roi-table">
+      <thead><tr><th></th><th>Freelancer</th><th>Local agency</th><th>WebBuilder swarm</th></tr></thead>
+      <tbody>
+        <tr><td>Cost per site</td><td class="bad">$800–$2,000</td><td class="bad">$3,000–$8,000</td><td class="good">Marginal @ scale</td></tr>
+        <tr><td>Turnaround</td><td>7–21 days</td><td>14–45 days</td><td class="good">&lt;48h staging</td></tr>
+        <tr><td>Discovery</td><td>Manual</td><td>Manual</td><td class="good">Autonomous</td></tr>
+        <tr><td>Marketing post-launch</td><td>Extra $</td><td>Retainer</td><td class="good">Included agents</td></tr>
+        <tr><td>Your margin @ $997/mo plan</td><td>—</td><td>—</td><td class="good">10 sites/mo → strong ROI</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="pricing">
+    <div class="label">Deploy</div>
+    <h2>Run it on Professional or Enterprise</h2>
+    <p style="color:var(--text-muted);">WebBuilder is a vertical config — same SINCOR infrastructure, pre-wired agent roster and playbooks.</p>
+    <div class="pricing-box">
+      <div style="font-size:14px;color:var(--cyan);font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Recommended</div>
+      <div class="price">$997</div>
+      <div style="color:var(--text-muted);margin:8px 0 24px;">/month · 24 agents · WebBuilder vertical included</div>
+      <a href="/signup?plan=professional&vertical=webbuilder" class="btn-primary" style="display:inline-block;">Start WebBuilder Swarm →</a>
+      <p style="margin-top:16px;font-size:13px;color:var(--text-muted);">Or <a href="/signup?plan=starter" style="color:var(--cyan);">Starter ($297)</a> for lighter discovery · <a href="/buy?plan=enterprise" style="color:var(--cyan);">Enterprise</a> for white-label</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">FAQ</div>
+    <h2>Common questions</h2>
+    <div class="faq" style="margin-top:24px;">
+      <details><summary>Is this live or a concept page?</summary><div class="body">The vertical runs on the same production SINCOR stack as the rest of the platform — agent roster, task market, outreach engine, and Stripe billing. This page describes the WebBuilder playbook configuration.</div></details>
+      <details><summary>Do you use WordPress templates?</summary><div class="body">No. Orion generates custom static sites with local SEO, schema, and performance budgets. Auditors block template spam and duplicate content patterns.</div></details>
+      <details><summary>Who owns the site and domain?</summary><div class="body">The business owner. You white-label or operate as agency-of-record. Swarm hands off deploy keys + DNS instructions after payment.</div></details>
+      <details><summary>Can I limit territory?</summary><div class="body">Yes — geo fences, niches (HVAC, detail, legal, etc.), and daily discovery caps are configured at onboarding.</div></details>
+      <details><summary>How does this connect to SINC / agents?</summary><div class="body">Subscriptions are USD via Stripe. On-chain SINC is optional for ecosystem participation; agent-to-agent settlement can use AXIOM on the marketplace layer.</div></details>
+    </div>
+  </section>
+
+  <section style="text-align:center;padding-bottom:100px;">
+    <h2>Ready to run the <span class="grad">WebBuilder vertical</span>?</h2>
+    <p style="color:var(--text-muted);margin:12px auto 28px;max-width:520px;">Deploy in minutes. Agents discover, build, and market while you sleep.</p>
+    <a href="/signup?plan=professional&vertical=webbuilder" class="btn-primary">Deploy Now →</a>
+  </section>
+</main>
+
+<footer>
+  <p><a href="/">← Back to SINCOR</a> · <a href="/verticals/webbuilder">WebBuilder</a> · <a href="/sinc">SINC Token</a></p>
+  {% set show_label = true %}
+  {% include "_social_links.html" %}
+  <p style="margin-top:16px;">© 2026 SINCOR · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+</footer>
+
+<script>
+(function () {
+  const lines = [
+    ['dim', '[06:14:02] TOA · planning wave #184 · territory=austin-metro'],
+    ['hi',  '[06:14:03] Vega · scanning Google Maps · niche=landscaping'],
+    ['ok',  '[06:14:08] Vega · 47 candidates · 31 no-website · 12 facebook-only'],
+    ['hi',  '[06:14:10] Lyra · brief · "Green Valley Landscaping"'],
+    ['ok',  '[06:14:18] Lyra · palette + 6 services + 14 keywords'],
+    ['hi',  '[06:14:20] Orion · generating site · 5 pages'],
+    ['ok',  '[06:20:31] Nova · lighthouse mobile=94 accessibility=96'],
+    ['warn','[06:20:33] Sage · flagged unverified license claim · auto-removed'],
+    ['ok',  '[06:20:35] Sage · audit PASS · staging https://gv-landscaping.staging.getsincor.com'],
+    ['hi',  '[06:20:40] Pulse · outreach · owner=maria.garcia@...'],
+    ['ok',  '[06:20:41] Pulse · sent preview + 3-touch sequence armed'],
+    ['hi',  '[06:41:12] Pulse · REPLY · "love it — how do we go live?"'],
+    ['ok',  '[06:41:15] Pulse · Stripe checkout $1,200 · deposit 50%'],
+    ['hi',  '[06:55:01] Echo · scheduling launch posts + GMB draft'],
+    ['ok',  '[06:55:04] TOA · ingest_feedback(win) · replanning discovery bias→detailing'],
+  ];
+  const term = document.getElementById('terminal');
+  let i = 0;
+  function append() {
+    if (i >= lines.length) { i = 0; term.innerHTML = ''; }
+    const [cls, text] = lines[i++];
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = text;
+    term.appendChild(div);
+    term.scrollTop = term.scrollHeight;
+    setTimeout(append, 700 + Math.random() * 500);
+  }
+  append();
+
+  function animCounter(id, target, dur) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let n = 0;
+    const step = target / (dur / 40);
+    const t = setInterval(function () {
+      n += step;
+      if (n >= target) { n = target; clearInterval(t); }
+      el.textContent = Math.floor(n);
+    }, 40);
+  }
+  animCounter('m-discovered', 31, 1200);
+  animCounter('m-built', 8, 1400);
+  animCounter('m-sent', 24, 1600);
+})();
+</script>
+{% include "_tf_badge.html" %}
+</body>
+</html>
