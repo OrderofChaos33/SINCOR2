@@ -35,16 +35,55 @@ from email.mime.multipart import MIMEMultipart
 # ---------------------------------------------------------------------------
 
 SLACK_WEBHOOK_URL = os.getenv("SLACK_COMPLIANCE_WEBHOOK_URL", "")
-ALERT_EMAIL_TO = os.getenv("COMPLIANCE_ALERT_EMAIL", "court@getsincor.com")
-ALERT_EMAIL_FROM = os.getenv("ALERT_FROM_EMAIL", "")
+ALERT_EMAIL_TO = os.getenv(
+    "COMPLIANCE_ALERT_EMAIL",
+    os.getenv("LAUNCH_REVIEW_ALERT_EMAIL", "court@getsincor.com"),
+)
+ALERT_EMAIL_FROM = os.getenv(
+    "ALERT_FROM_EMAIL",
+    os.getenv("SUPPORT_EMAIL", "support@getsincor.com"),
+)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.sendgrid.net")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "apikey")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "https://getsincor.com")
-QUARANTINE_DIR = Path(os.getenv("QUARANTINE_DIR", "/tmp/sincor_quarantine"))
-LOG_DIR = Path(os.getenv("COMPLIANCE_LOG_DIR", "logs/compliance"))
-DATABASE_LOG_PATH = Path(os.getenv("DB_AUDIT_LOG", "logs/db_audit.log"))
+
+
+def _resolve_log_dir() -> Path:
+    override = os.getenv("COMPLIANCE_LOG_DIR", "").strip()
+    if override:
+        p = Path(override)
+    else:
+        try:
+            from sincor2.data_paths import compliance_log_dir
+
+            p = compliance_log_dir()
+        except Exception:
+            p = Path("logs/compliance")
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _resolve_quarantine_dir() -> Path:
+    override = os.getenv("QUARANTINE_DIR", "").strip()
+    if override:
+        p = Path(override)
+    else:
+        try:
+            from sincor2.data_paths import quarantine_dir
+
+            p = quarantine_dir()
+        except Exception:
+            p = Path("/tmp/sincor_quarantine")
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+QUARANTINE_DIR = _resolve_quarantine_dir()
+LOG_DIR = _resolve_log_dir()
+DATABASE_LOG_PATH = LOG_DIR.parent / "db_audit.log"
 JWT_SECRET_ENV_KEY = "JWT_SECRET_KEY"
 STRIPE_ENV_KEYS = ["STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY", "STRIPE_WEBHOOK_SECRET"]
 PAYPAL_ENV_KEYS = ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"]
@@ -72,6 +111,12 @@ UNSUBSTANTIATED_CLAIM_PATTERNS = [
     (r"\bno\s+risk\b", "No-risk claim (use '30-day money back' instead)"),
     (r"\bget\s+rich\b", "Get-rich claim"),
     (r"\bpassive\s+income\s+(guaranteed|proven|automatic)\b", "Guaranteed passive income claim"),
+    (r"\b10x\b", "Unsubstantiated multiplier claim (10x)"),
+    (r"\b\d+x\s+(faster|output|capacity|better|more)\b", "Unsubstantiated multiplier claim"),
+    (r"\b(under|in)\s+5\s+minutes?\b", "Unverified setup-time claim"),
+    (r"\bsetup\s+(in|takes?)\s+(under\s+)?5\s+min", "Unverified setup-time claim"),
+    (r"\bdeploy\s+in\s+5\s+minutes?\b", "Unverified setup-time claim"),
+    (r"\blive\s+in\s+under\s+5\s+minutes?\b", "Unverified setup-time claim"),
 ]
 
 # PII patterns
@@ -203,19 +248,11 @@ def send_slack_alert(violation: ComplianceViolation) -> bool:
         return False
 
 
-def send_email_alert(violation: ComplianceViolation) -> bool:
-    if not SMTP_PASS or not ALERT_EMAIL_FROM:
-        logger.warning("SMTP not configured — skipping email alert")
-        return False
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = (
-            f"[URGENT] SINCOR Compliance Violation [{violation.severity}] — {violation.check_name}"
-        )
-        msg["From"] = ALERT_EMAIL_FROM
-        msg["To"] = ALERT_EMAIL_TO
-
-        text_body = f"""
+def _violation_email_bodies(violation: ComplianceViolation) -> tuple[str, str, str]:
+    subject = (
+        f"[URGENT] SINCOR Compliance Violation [{violation.severity}] — {violation.check_name}"
+    )
+    text_body = f"""
 SINCOR COMPLIANCE VIOLATION DETECTED
 =====================================
 ID: {violation.id}
@@ -234,9 +271,9 @@ REMEDIATION:
 {violation.remediation}
 
 --- This is an automated alert from the SINCOR Compliance Monitor ---
-        """.strip()
+    """.strip()
 
-        html_body = f"""
+    html_body = f"""
 <html><body style="font-family:sans-serif;max-width:600px;margin:auto">
 <div style="background:#dc2626;color:white;padding:16px;border-radius:8px 8px 0 0">
   <h2 style="margin:0">🚨 SINCOR Compliance Violation [{violation.severity}]</h2>
@@ -259,8 +296,39 @@ REMEDIATION:
   Automated alert — SINCOR Compliance Monitor
 </p>
 </body></html>
-        """.strip()
+    """.strip()
+    return subject, text_body, html_body
 
+
+def send_email_alert(violation: ComplianceViolation) -> bool:
+    subject, text_body, html_body = _violation_email_bodies(violation)
+    from_addr = ALERT_EMAIL_FROM
+
+    if RESEND_API_KEY:
+        try:
+            from resend import Resend
+
+            client = Resend(api_key=RESEND_API_KEY)
+            client.emails.send({
+                "from": f"SINCOR Compliance <{from_addr}>",
+                "to": ALERT_EMAIL_TO,
+                "subject": subject,
+                "html": html_body,
+                "text": text_body,
+            })
+            logger.info(f"Resend compliance alert sent for violation {violation.id}")
+            return True
+        except Exception as exc:
+            logger.error(f"Resend alert exception: {exc}")
+
+    if not SMTP_PASS:
+        logger.warning("No RESEND_API_KEY or SMTP_PASS — skipping email alert")
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = from_addr
+        msg["To"] = ALERT_EMAIL_TO
         msg.attach(MIMEText(text_body, "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
@@ -268,7 +336,7 @@ REMEDIATION:
             server.ehlo()
             server.starttls()
             server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(ALERT_EMAIL_FROM, ALERT_EMAIL_TO, msg.as_string())
+            server.sendmail(from_addr, ALERT_EMAIL_TO, msg.as_string())
         logger.info(f"Email alert sent for violation {violation.id}")
         return True
     except Exception as exc:
@@ -674,6 +742,11 @@ def run_all_checks() -> list[ComplianceViolation]:
 
 def start_compliance_scheduler():
     """Attach the compliance monitor to APScheduler (call from app.py startup)."""
+    if os.getenv("COMPLIANCE_MONITOR_ENABLED", "false").lower() != "true":
+        logger.info(
+            "Compliance monitor disabled (set COMPLIANCE_MONITOR_ENABLED=true to activate)"
+        )
+        return None
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.interval import IntervalTrigger
