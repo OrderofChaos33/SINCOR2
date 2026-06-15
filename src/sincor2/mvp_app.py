@@ -1,7 +1,6 @@
 """
 SINCOR2 MVP - Minimal Flask Application
-A lean, deployable MVP with health checks, home page, buy flow, and Stripe payments.
-Stripe checkout ? order DB ? asset delivery pipeline.
+Platform billing: SINC (subscriptions) + AXM (one-off intel). Legacy Stripe/PayPal gated off by default.
 """
 
 import os
@@ -101,24 +100,47 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
-# Stripe integration
+# Platform payments (SINC + AXM) — default billing path
 try:
-    from sincor2.stripe_checkout import get_stripe_checkout
-    from sincor2.stripe_routes import init_stripe_routes
-    STRIPE_AVAILABLE = True
-except (ImportError, ModuleNotFoundError) as e:
-    logger.warning(f"[STRIPE] Import error: {e}")
-    STRIPE_AVAILABLE = False
+    from sincor2.platform_payments import (
+        activate_subscription,
+        create_checkout as platform_create_checkout,
+        fiat_payments_enabled,
+        get_subscription,
+        init_platform_payments_db,
+        list_plans as platform_list_plans,
+        list_subscriptions,
+        verify_checkout as platform_verify_checkout,
+    )
+    init_platform_payments_db()
+    PLATFORM_PAYMENTS_AVAILABLE = True
+    logger.info("[PAYMENTS] SINC + AXM platform billing active (fiat=%s)", fiat_payments_enabled())
+except Exception as e:
+    logger.warning(f"[PAYMENTS] Platform payments init failed: {e}")
+    PLATFORM_PAYMENTS_AVAILABLE = False
+    fiat_payments_enabled = lambda: False  # type: ignore
 
+# Legacy Stripe — only when LEGACY_FIAT_PAYMENTS_ENABLED=true
+STRIPE_AVAILABLE = False
 stripe_processor = None
-if STRIPE_AVAILABLE:
-    stripe_processor = get_stripe_checkout()
-    if stripe_processor and stripe_processor.enabled:
-        init_stripe_routes(app, stripe_processor)
-        logger.info("[APP] Stripe integration initialized and routes registered")
-    else:
-        logger.warning("[APP] Stripe not properly configured � set STRIPE_API_KEY")
+if fiat_payments_enabled():
+    try:
+        from sincor2.stripe_checkout import get_stripe_checkout
+        from sincor2.stripe_routes import init_stripe_routes
+        STRIPE_AVAILABLE = True
+    except (ImportError, ModuleNotFoundError) as e:
+        logger.warning(f"[STRIPE] Import error: {e}")
+        STRIPE_AVAILABLE = False
 
+    if STRIPE_AVAILABLE:
+        stripe_processor = get_stripe_checkout()
+        if stripe_processor and stripe_processor.enabled:
+            init_stripe_routes(app, stripe_processor)
+            logger.info("[APP] Legacy Stripe routes registered")
+        else:
+            logger.warning("[APP] LEGACY_FIAT_PAYMENTS_ENABLED but Stripe not configured")
+else:
+    logger.info("[APP] Stripe/PayPal disabled — use /buy with SINC or AXM")
 # PDF Generator initialization
 pdf_guides_dir = os.path.join(project_root, 'files', 'guides')
 try:
@@ -213,6 +235,24 @@ try:
 except Exception as e:
     logger.warning(f"[COMPLIANCE] Scheduler init failed: {e}")
     compliance_scheduler = None
+
+try:
+    from sincor2.subscription_scheduler import start_subscription_scheduler, stop_subscription_scheduler
+    import atexit as _atexit_sub
+    subscription_scheduler = start_subscription_scheduler(app)
+    if subscription_scheduler:
+        _atexit_sub.register(stop_subscription_scheduler)
+except Exception as e:
+    logger.warning(f"[SUBSCRIPTION] Scheduler init failed: {e}")
+    subscription_scheduler = None
+
+try:
+    from sincor2.x402_payments import init_x402_db
+    init_x402_db()
+    X402_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"[X402] Init failed: {e}")
+    X402_AVAILABLE = False
 
 # Polyclaw Autonomous Trading Agent — scans Polymarket for arbitrage, executes 24/7
 try:
@@ -589,10 +629,9 @@ def api_signup():
 @app.route('/api/outreach/run', methods=['POST'])
 def outreach_run_now():
     """Manually trigger one outreach cycle (admin use)."""
-    # Basic auth guard using admin credentials
-    auth = request.get_json(silent=True) or {}
-    if auth.get('admin_key') != os.environ.get('ADMIN_PASSWORD', ''):
-        return jsonify({'error': 'Unauthorized'}), 401
+    denied = _require_admin(request)
+    if denied:
+        return denied
     try:
         from sincor2.outreach_engine import get_outreach_engine
         import threading
@@ -646,6 +685,25 @@ def _check_admin_token(req):
         return decoded.get('sub') == ADMIN_USERNAME
     except Exception:
         return False
+
+
+def _check_admin_key(req) -> bool:
+    """Return True if request carries ADMIN_PASSWORD via header or JSON body."""
+    import hmac
+    if not ADMIN_PASSWORD:
+        return False
+    key = req.headers.get('X-Admin-Key', '')
+    if not key:
+        data = req.get_json(silent=True) or {}
+        key = str(data.get('admin_key', ''))
+    return bool(key) and hmac.compare_digest(str(key), str(ADMIN_PASSWORD))
+
+
+def _require_admin(req):
+    """Return None if authorized, else (response, status_code)."""
+    if _check_admin_token(req) or _check_admin_key(req):
+        return None
+    return jsonify({'error': 'Unauthorized'}), 401
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -943,10 +1001,10 @@ def delete_profile():
 
 @app.route('/buy', methods=['GET'])
 def buy_page():
-    """Render buy page with Stripe checkout."""
-    if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
+    """Platform checkout — SINC + AXM on Base (default). Legacy Stripe if explicitly enabled."""
+    if fiat_payments_enabled() and STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         return render_template('buy_converting.html')
-    return render_template('buy_stripe.html')
+    return render_template('buy_tokens.html')
 
 
 @app.route('/buy-sinc', methods=['GET'])
@@ -960,6 +1018,240 @@ def buy_sinc_page():
 # This is the CORE endpoint that triggers asset delivery
 # ============================================================================
 
+@app.route('/api/platform/plans', methods=['GET'])
+def platform_plans():
+    """List SINC/AXM-priced platform plans with live spot quotes."""
+    if not PLATFORM_PAYMENTS_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'platform_payments_unavailable'}), 503
+    return jsonify({'ok': True, 'plans': platform_list_plans(), 'fiat_enabled': fiat_payments_enabled()})
+
+
+@app.route('/api/platform/checkout', methods=['POST'])
+@limiter.limit("60 per hour")
+def platform_checkout():
+    """Create a SINC or AXM checkout quote."""
+    if not PLATFORM_PAYMENTS_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'platform_payments_unavailable'}), 503
+    data = request.get_json(silent=True) or {}
+    plan_id = sanitize_string(data.get('plan_id', 'intel'), max_length=32)
+    email = validate_email(data.get('customer_email', '')) or ''
+    wallet = validate_wallet(data.get('payer_wallet', '')) or ''
+    result = platform_create_checkout(plan_id, payer_wallet=wallet or '', customer_email=email)
+    if not result.get('ok'):
+        code = 400 if result.get('error') != 'spot_price_unavailable' else 503
+        return jsonify(result), code
+    return jsonify(result), 201
+
+
+@app.route('/api/platform/verify', methods=['POST'])
+@limiter.limit("120 per hour")
+def platform_verify():
+    """Verify ERC-20 payment to treasury and trigger fulfillment."""
+    if not PLATFORM_PAYMENTS_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'platform_payments_unavailable'}), 503
+    data = request.get_json(silent=True) or {}
+    payment_id = sanitize_string(data.get('payment_id', ''), max_length=64)
+    tx_hash = sanitize_string(data.get('tx_hash', ''), max_length=66)
+    email = validate_email(data.get('customer_email', '')) or ''
+    wallet = validate_wallet(data.get('payer_wallet', '')) or ''
+    result = platform_verify_checkout(
+        payment_id, tx_hash, customer_email=email, payer_wallet=wallet or ''
+    )
+    if not result.get('ok'):
+        status = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
+        return jsonify(result), status
+
+    order_id = result['order_id']
+    product_name = result['product_name']
+    amount = result['usd_reference']
+    order_type = result.get('order_type', 'generic')
+    product_info = PRODUCT_CATALOG.get(product_name, {'type': order_type})
+    customer_email = result.get('customer_email') or ''
+
+    db = get_db()
+    try:
+        db.execute(
+            '''INSERT INTO orders
+               (order_id, paypal_order_id, customer_email, product_name, amount,
+                currency, payment_status, delivery_status, delivery_url, order_type,
+                created_at, updated_at, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (order_id, tx_hash, customer_email or result.get('payer_wallet', ''),
+             product_name, amount, result['token'], 'completed', 'processing',
+             f'/my-orders?email={customer_email}' if customer_email else '/dashboard',
+             order_type, datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
+             json.dumps({
+                 'tx_hash': tx_hash,
+                 'payment_id': payment_id,
+                 'token': result['token'],
+                 'payer_wallet': result.get('payer_wallet'),
+                 'billing': 'platform_tokens',
+             }))
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        pass
+
+    if customer_email:
+        trigger_fulfillment(order_id, customer_email, product_name, amount, order_type, product_info)
+
+    payer = result.get('payer_wallet', '')
+    if result.get('token') == 'SINC' and result.get('amount_atomic'):
+        try:
+            from sincor2.agent_billing import record_platform_payment
+            record_platform_payment(
+                tx_hash=tx_hash,
+                payer_wallet=payer,
+                token='SINC',
+                amount_atomic=int(result['amount_atomic']),
+                product_name=product_name,
+                plan_id=result.get('plan_id', ''),
+                payment_id=payment_id,
+            )
+        except Exception as e:
+            logger.warning('[BILLING] agent_billing log failed: %s', e)
+
+    if result.get('billing') == 'month' and payer:
+        sub = activate_subscription(
+            wallet=payer,
+            plan_id=result.get('plan_id', ''),
+            product_name=product_name,
+            token=result['token'],
+            tx_hash=tx_hash,
+            payment_id=payment_id,
+            email=customer_email,
+        )
+        result['subscription'] = sub
+
+    logger.info('[PAYMENTS] %s verified: %s %s tx=%s', result['token'], product_name, order_id, tx_hash)
+    return jsonify(result), 200
+
+
+@app.route('/api/platform/subscription', methods=['GET'])
+@limiter.limit("120 per hour")
+def platform_subscription_status():
+    """Wallet-linked SINC subscription status."""
+    wallet = validate_wallet(request.args.get('wallet', ''))
+    if not wallet:
+        return jsonify({'ok': False, 'error': 'wallet_required'}), 400
+    plan_id = sanitize_string(request.args.get('plan_id', ''), max_length=32) or None
+    if plan_id:
+        sub = get_subscription(wallet, plan_id)
+        subs = [sub] if sub else []
+    else:
+        subs = list_subscriptions(wallet)
+    return jsonify({'ok': True, 'wallet': wallet, 'subscriptions': subs})
+
+
+@app.route('/api/sinc/curve', methods=['GET'])
+@limiter.limit("120 per minute")
+def api_sinc_curve():
+    """Cached curve state proxy (spec §5.2)."""
+    try:
+        import sys
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        from launch_content_engine.onchain_stats import fetch_stats
+        return jsonify({'ok': True, 'curve': fetch_stats()}), 200
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 503
+
+
+@app.route('/api/sinc/burn-stats', methods=['GET'])
+@limiter.limit("60 per minute")
+def api_sinc_burn_stats():
+    """Platform SINC revenue + burn counter (spec §5.2 / §5.3)."""
+    try:
+        from sincor2.agent_billing import fetch_burn_stats
+        return jsonify({'ok': True, **fetch_burn_stats()}), 200
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/x402/resources', methods=['GET'])
+def x402_resources():
+    if not X402_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import list_resources
+    return jsonify({'ok': True, 'resources': list_resources()})
+
+
+@app.route('/x402/<resource_id>', methods=['GET'])
+@limiter.limit("200 per hour")
+def x402_challenge(resource_id):
+    """HTTP 402 Payment Required — SINC micropayment challenge."""
+    if not X402_AVAILABLE:
+        return jsonify({'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import access_granted, create_challenge
+    token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
+    if access_granted(token, resource_id):
+        return jsonify({'ok': True, 'resource_id': resource_id, 'access': 'granted'}), 200
+    wallet = validate_wallet(request.args.get('wallet', '')) or ''
+    challenge = create_challenge(resource_id, payer_wallet=wallet or '')
+    return jsonify(challenge), 402
+
+
+@app.route('/api/x402/verify', methods=['POST'])
+@limiter.limit("120 per hour")
+def x402_verify():
+    if not X402_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import verify_challenge
+    data = request.get_json(silent=True) or {}
+    result = verify_challenge(
+        sanitize_string(data.get('challenge_id', ''), max_length=64),
+        sanitize_string(data.get('tx_hash', ''), max_length=66),
+        payer_wallet=validate_wallet(data.get('payer_wallet', '')) or '',
+    )
+    if not result.get('ok'):
+        code = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
+        return jsonify(result), code
+    try:
+        from sincor2.agent_billing import record_platform_payment
+        from sincor2.x402_payments import get_resource
+        res = get_resource(result.get('resource_id', ''))
+        if res:
+            record_platform_payment(
+                tx_hash=data.get('tx_hash', ''),
+                payer_wallet=result.get('payer_wallet', ''),
+                token='SINC',
+                amount_atomic=int(res['amount_atomic']),
+                product_name=f"x402:{result.get('resource_id')}",
+                plan_id='x402',
+                payment_id=result.get('challenge_id', ''),
+            )
+    except Exception:
+        pass
+    return jsonify(result), 200
+
+
+@app.route('/api/paid/<resource_id>', methods=['GET'])
+@limiter.limit("120 per hour")
+def x402_paid_resource(resource_id):
+    """Serve paid API payloads after x402 access token presented."""
+    if not X402_AVAILABLE:
+        return jsonify({'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import access_granted
+    token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
+    if not access_granted(token, resource_id):
+        from sincor2.x402_payments import create_challenge
+        ch = create_challenge(resource_id)
+        return jsonify(ch), 402
+
+    if resource_id == 'hook_status':
+        try:
+            from sincor2.hook_stats import fetch_hook_status
+            return jsonify({'ok': True, 'resource': resource_id, 'data': fetch_hook_status()}), 200
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+
+    return jsonify({
+        'ok': True,
+        'resource': resource_id,
+        'message': 'Access granted. Resource handler may be extended per config/x402_pricing.yaml.',
+    }), 200
+
+
 @app.route('/api/payment/webhook', methods=['POST'])
 @limiter.limit("500 per minute")
 def payment_webhook():
@@ -968,6 +1260,8 @@ def payment_webhook():
     Verifies webhook signature before processing.
     Stores order in DB and triggers product fulfillment/delivery.
     """
+    if not fiat_payments_enabled():
+        return jsonify({'error': 'Legacy fiat payments disabled. Use SINC/AXM at /buy.'}), 410
     if not stripe_processor or not stripe_processor.enabled:
         logger.error('[WEBHOOK] Stripe not configured � cannot process webhook')
         return jsonify({'error': 'Payment processor not configured'}), 503
@@ -1610,7 +1904,7 @@ def dashboard():
         profile=profile, order=order, agents=agents, stats=stats,
         tier=tier, num_agents=num_agents, company=company,
         fname=fname, use_case=use_case, member_since=member_since,
-        email=email)
+        email=email, demo_mode=True)
 
 
 @app.route('/privacy')
@@ -1703,6 +1997,9 @@ def webbuilder_live_page(slug):
 
 @app.route('/api/webbuilder/studio')
 def api_webbuilder_studio_home():
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import studio_home
     return jsonify(studio_home())
 
@@ -1711,6 +2008,9 @@ def api_webbuilder_studio_home():
 def api_webbuilder_projects():
     from sincor2.webbuilder_studio import create_project, list_projects
 
+    denied = _require_admin(request)
+    if denied:
+        return denied
     if request.method == 'GET':
         return jsonify({'ok': True, 'projects': list_projects()})
     data = request.get_json(silent=True) or {}
@@ -1731,6 +2031,9 @@ def api_webbuilder_projects():
 
 @app.route('/api/webbuilder/projects/<project_id>')
 def api_webbuilder_project_get(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import get_project, migration_status
 
     p = get_project(project_id)
@@ -1741,6 +2044,9 @@ def api_webbuilder_project_get(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/migration')
 def api_webbuilder_migration(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import migration_status
 
     status = migration_status(project_id)
@@ -1751,6 +2057,9 @@ def api_webbuilder_migration(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/run', methods=['POST'])
 def api_webbuilder_run(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import run_autonomous_phases
 
     return jsonify(run_autonomous_phases(project_id))
@@ -1758,6 +2067,9 @@ def api_webbuilder_run(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/approve', methods=['POST'])
 def api_webbuilder_approve(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import approve_preview
 
     p = approve_preview(project_id)
@@ -1768,6 +2080,9 @@ def api_webbuilder_approve(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/domain', methods=['POST'])
 def api_webbuilder_domain(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import connect_domain
 
     data = request.get_json(silent=True) or {}
@@ -1783,6 +2098,9 @@ def api_webbuilder_domain(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/verify-dns', methods=['POST'])
 def api_webbuilder_verify_dns(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import verify_dns
 
     return jsonify(verify_dns(project_id))
@@ -1790,6 +2108,9 @@ def api_webbuilder_verify_dns(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/rebuild', methods=['POST'])
 def api_webbuilder_rebuild(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import rebuild_draft
 
     data = request.get_json(silent=True) or {}
@@ -1798,6 +2119,9 @@ def api_webbuilder_rebuild(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/republish-preview', methods=['POST'])
 def api_webbuilder_republish_preview(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import republish_preview
 
     return jsonify(republish_preview(project_id))
@@ -1805,6 +2129,9 @@ def api_webbuilder_republish_preview(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/publish-live', methods=['POST'])
 def api_webbuilder_publish_live(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_studio import publish_live
 
     return jsonify(publish_live(project_id))
@@ -1812,6 +2139,9 @@ def api_webbuilder_publish_live(project_id):
 
 @app.route('/api/webbuilder/projects/<project_id>/contacts')
 def api_webbuilder_contacts(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     from sincor2.webbuilder_crm import list_contacts
     from sincor2.webbuilder_studio import data_dir, get_project
 
@@ -2025,6 +2355,9 @@ def _launch_review_modules():
 
 @app.route('/api/launch/review')
 def launch_review_list():
+    denied = _require_admin(request)
+    if denied:
+        return denied
     status = request.args.get('status', 'pending')
     list_drafts, _, _ = _launch_review_modules()
     return jsonify(list_drafts(status=status or None))
@@ -2032,6 +2365,9 @@ def launch_review_list():
 
 @app.route('/api/launch/review/<draft_id>', methods=['POST'])
 def launch_review_action(draft_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
     data = request.get_json(silent=True) or {}
     action = data.get('action', '')
     list_drafts, set_status, approve_and_post = _launch_review_modules()
@@ -2082,6 +2418,8 @@ def login_page():
 def billing():
     """Stripe Customer Portal � lets subscribers manage their plan/billing."""
     customer_email = request.args.get('email', '')
+    if not fiat_payments_enabled():
+        return render_template('billing_tokens.html')
     if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         try:
             import stripe as stripe_lib
@@ -2534,24 +2872,37 @@ def content_analytics():
 @app.route('/api/cancel-subscription', methods=['POST'])
 @limiter.limit("20 per minute")
 def cancel_subscription():
-    """
-    Cancel a SINCOR subscription.
-    - For Stripe: creates a Stripe subscription cancellation via the API.
-    - For PayPal: logs the request and emails support to process manually
-      (PayPal subscription cancellation requires asynchronous IPN/webhook confirmation).
-    Customers can also self-cancel via /billing (Stripe portal).
-    """
+    """Cancel subscription — wallet/SINC by default; legacy Stripe if enabled."""
     data = request.get_json(silent=True) or {}
     email = validate_email(data.get('email', ''))
+    wallet = validate_wallet(data.get('wallet', ''))
     reason = sanitize_string(data.get('reason', 'No reason provided'), max_length=500)
     subscription_id = sanitize_string(data.get('subscription_id', ''), max_length=200)
 
-    if not email:
-        return jsonify({'error': 'Valid email address required'}), 400
+    if not email and not wallet:
+        return jsonify({'error': 'email or wallet required'}), 400
 
-    logger.info(f"[CANCEL] Cancellation request from {email} | sub_id={subscription_id} | reason={reason}")
+    logger.info(f"[CANCEL] Request email={email} wallet={wallet} sub={subscription_id} reason={reason}")
 
-    # Try Stripe cancellation first
+    if not fiat_payments_enabled() and wallet and PLATFORM_PAYMENTS_AVAILABLE:
+        try:
+            from sincor2.platform_payments import cancel_wallet_subscriptions
+            n = cancel_wallet_subscriptions(wallet)
+            return jsonify({
+                'ok': True,
+                'cancelled': n,
+                'message': 'SINC subscription marked cancelled. No further renewals required.',
+            }), 200
+        except Exception as e:
+            logger.error(f"[CANCEL] Wallet cancel error: {e}")
+
+    if not fiat_payments_enabled():
+        return jsonify({
+            'ok': True,
+            'message': 'SINC billing: simply do not renew at /buy. Email support@getsincor.com to confirm.',
+        }), 200
+
+    # Legacy Stripe cancellation
     if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         try:
             import stripe as stripe_lib
@@ -2663,6 +3014,8 @@ def paypal_webhook():
     PayPal sends form-encoded IPN or JSON webhook events depending on integration type.
     Verification: IPN verification via PayPal IPN verification endpoint.
     """
+    if not fiat_payments_enabled():
+        return jsonify({'error': 'Legacy PayPal disabled. Use SINC/AXM at /buy.'}), 410
     content_type = request.content_type or ''
 
     # Determine if this is a JSON webhook (newer API) or IPN (form-encoded)
