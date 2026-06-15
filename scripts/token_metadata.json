@@ -1,0 +1,32 @@
+{
+  "name": "SINC",
+  "symbol": "SINC",
+  "address": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+  "chainId": 8453,
+  "chainName": "Base",
+  "decimals": 8,
+  "totalSupply": "100000000",
+  "website": "https://getsincor.com",
+  "explorer": "https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+  "twitter": "https://twitter.com/getsincor",
+  "telegram": "https://t.me/getsincor",
+  "logoSource": "static/sinc_logo_planet.jpg",
+  "descriptionShort": "SINC is the utility token of SINCOR — a swarm of 43 autonomous AI agents operating on Base.",
+  "descriptionLong": "SINC is the utility token of SINCOR, a production AI agent swarm on Base mainnet. Contracts are Sourcify-verified with CertiK Skynet 97/100. Fixed 100M supply, 8 decimals, no mint, no admin keys. SINC powers access to the agent network, curated sales, and on-chain coordination via Uniswap v4 limit-order infrastructure.",
+  "tags": ["defi", "ai"],
+  "trustSignals": [
+    "Sourcify full-match verified",
+    "CertiK Skynet 97/100",
+    "SolidityScan Low Risk 98.5/100",
+    "No mint function",
+    "No admin pause/withdraw",
+    "Fixed 100M supply"
+  ],
+  "relatedContracts": {
+    "bondingCurve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
+    "limitOrderHook": "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0",
+    "hookRouter": "0x11b86E85cC5170F4165c89ccb11332133B29E283",
+    "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "genesisNFT": "0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09"
+  }
+}
