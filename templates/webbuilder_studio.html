@@ -150,9 +150,14 @@
           <p id="p-meta">—</p>
           <div class="row-actions">
             <a class="btn btn-ghost" id="p-preview-link" href="#" target="_blank" rel="noopener">Open preview ↗</a>
+            <a class="btn btn-ghost" id="p-live-link" href="#" target="_blank" rel="noopener" style="display:none">Open live ↗</a>
             <button class="btn btn-primary" id="btn-approve" disabled>Owner approved preview</button>
-            <button class="btn btn-ghost" id="btn-run">Run autonomous phases</button>
+            <button class="btn btn-ghost" id="btn-rebuild">Rebuild draft</button>
+            <button class="btn btn-ghost" id="btn-republish" disabled>Republish preview</button>
+            <button class="btn btn-ghost" id="btn-publish-live" disabled>Publish live</button>
+            <button class="btn btn-ghost" id="btn-run">Run phases</button>
           </div>
+          <p id="lane-status" style="margin-top:12px;font-size:13px;color:var(--muted);"></p>
         </div>
         <div class="panel">
           <h3>Live preview</h3>
@@ -241,6 +246,21 @@ function renderProject(p) {
   }
   const ownerStep = (p.migration || []).find(s => s.id === 'owner_review');
   $('btn-approve').disabled = !(ownerStep && ownerStep.status === 'active');
+  $('btn-republish').disabled = !p.preview_stale;
+  $('btn-publish-live').disabled = !(p.live_stale || !p.live_version_id);
+  const liveLink = $('p-live-link');
+  if (p.live_url) {
+    liveLink.href = p.live_url;
+    liveLink.style.display = 'inline-flex';
+  }
+  const lanes = [];
+  if (p.preview_stale) lanes.push('Draft ahead of preview — click Republish preview');
+  if (p.live_stale) lanes.push('Preview ahead of live — click Publish live');
+  if (!lanes.length) lanes.push('Lanes in sync · edit draft safely without breaking live');
+  $('lane-status').textContent = lanes.join(' · ');
+  if (p.discovery && p.discovery.name) {
+    $('p-meta').textContent += ` · Vega: ${p.discovery.source}`;
+  }
   renderMigration(p.migration);
   if (p.dns_records && p.dns_records.length) {
     $('dns-box').style.display = 'block';
@@ -304,6 +324,25 @@ $('btn-verify-dns').onclick = async () => {
   const res = await api(`/api/webbuilder/projects/${activeId}/verify-dns`, { method:'POST' });
   if (res.project) renderProject(res.project);
   alert(res.ok ? 'DNS verified — cutover running' : (res.message || 'DNS not ready yet'));
+};
+
+$('btn-rebuild').onclick = async () => {
+  const prompt = window.prompt('Optional: refine build prompt for Orion', '');
+  const res = await api(`/api/webbuilder/projects/${activeId}/rebuild`, {
+    method:'POST', body: JSON.stringify({ prompt: prompt || undefined })
+  });
+  if (res.project) renderProject(res.project);
+};
+
+$('btn-republish').onclick = async () => {
+  const res = await api(`/api/webbuilder/projects/${activeId}/republish-preview`, { method:'POST' });
+  if (res.project) { renderProject(res.project); $('preview-frame').src = res.project.preview_url + '?t=' + Date.now(); }
+};
+
+$('btn-publish-live').onclick = async () => {
+  if (!confirm('Publish preview to LIVE lane? Production URL updates.')) return;
+  const res = await api(`/api/webbuilder/projects/${activeId}/publish-live`, { method:'POST' });
+  if (res.project) renderProject(res.project);
 };
 
 loadHome();
