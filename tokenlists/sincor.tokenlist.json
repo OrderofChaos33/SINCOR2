@@ -11,7 +11,7 @@
   "version": {
     "major": 1,
     "minor": 0,
-    "patch": 2
+    "patch": 3
   },
   "tokens": [
     {
@@ -27,7 +27,10 @@
       ],
       "extensions": {
         "logoURIMirror": "https://getsincor.com/static/tokenlists/assets/logo-256.png",
-        "website": "https://getsincor.com"
+        "website": "https://getsincor.com",
+        "officialBuyUrl": "https://getsincor.com/sinc",
+        "bondingCurve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
+        "metadata": "https://getsincor.com/.well-known/sinc-token.json"
       }
     }
   ]
