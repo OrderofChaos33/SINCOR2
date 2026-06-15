@@ -6,31 +6,25 @@ WORKDIR /app
 
 # Install only essential dependencies
 # Strip any erroneous python-sendgrid line (not a real PyPI package) before installing
-# Cache bust: 2026-05-28-v4  <<-- FORCED FRESH BUILD
+# Cache bust: v3
 COPY requirements.txt .
 RUN sed '/^python-sendgrid/d' requirements.txt > /tmp/req_clean.txt \
     && pip install --upgrade pip \
     && pip install -r /tmp/req_clean.txt
 
-# Copy application code (templates, static, src/sincor2, A2A all included)
+# Copy application code
 COPY . .
-
-# Verify critical new UI files made it into the image
-RUN echo "=== BUILD VERIFICATION ===" && \
-    ls -la /app/templates/ | head -10 && \
-    ls -la /app/static/ | head -5 && \
-    echo "Dashboard template exists:" && ls /app/templates/dashboard.html && \
-    echo "=== END VERIFICATION ==="
 
 # Add src to Python path so sincor2 package is importable
 ENV PYTHONPATH=/app/src
 
-# Create necessary directories
-RUN mkdir -p logs outputs data
+# Create necessary directories (mount Railway volume at /data/webbuilder for persistence)
+RUN mkdir -p logs outputs data /data/webbuilder
+ENV WEBBUILDER_DATA_DIR=/data/webbuilder
 
 # Expose default port (Railway overrides via $PORT)
 EXPOSE 8080
 
 # Run with gunicorn for production stability
 # Use shell form so $PORT env var is expanded at runtime
-CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --preload sincor2.mvp_app:app
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --preload run:app
