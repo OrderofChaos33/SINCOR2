@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Pitch Deck</title>
+  <meta name="description" content="SINCOR investor and partner pitch — autonomous workforce on Base.">
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; overflow:hidden; }
+    .top { position:fixed; top:0; left:0; right:0; z-index:10; display:flex; justify-content:space-between; align-items:center; padding:14px 24px; background:rgba(10,14,39,.9); border-bottom:1px solid rgba(139,92,246,.2); backdrop-filter:blur(12px); }
+    .top a { color:var(--cyan); text-decoration:none; font-weight:600; font-size:14px; }
+    .progress { flex:1; max-width:320px; height:4px; background:rgba(255,255,255,.1); border-radius:4px; margin:0 20px; overflow:hidden; }
+    .progress > div { height:100%; background:linear-gradient(90deg,var(--purple),var(--cyan)); width:0%; transition:width .35s ease; }
+    .deck { height:100vh; display:flex; align-items:center; justify-content:center; padding:80px 24px 100px; }
+    .slide { display:none; max-width:920px; width:100%; animation:fade .4s ease; }
+    .slide.active { display:block; }
+    @keyframes fade { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+    .kicker { font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--cyan); font-weight:700; margin-bottom:12px; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(36px,6vw,56px); line-height:1.1; margin-bottom:20px; letter-spacing:-.03em; }
+    h2 { font-family:'Sora',sans-serif; font-size:clamp(28px,4vw,40px); margin-bottom:16px; }
+    p, li { font-size:18px; line-height:1.65; color:var(--muted); }
+    ul { margin:16px 0 0 24px; }
+    li { margin-bottom:10px; }
+    .gradient { background:linear-gradient(135deg,#c4b5fd,var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-top:24px; }
+    .card { background:rgba(139,92,246,.08); border:1px solid rgba(139,92,246,.25); border-radius:12px; padding:18px; }
+    .card strong { display:block; color:var(--text); margin-bottom:6px; }
+    .mono { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan); word-break:break-all; }
+    .nav-hint { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); color:var(--muted); font-size:13px; }
+    .btns { position:fixed; bottom:24px; right:24px; display:flex; gap:10px; }
+    .btns button { background:rgba(139,92,246,.2); border:1px solid var(--purple); color:var(--text); padding:10px 18px; border-radius:8px; cursor:pointer; font-weight:600; }
+    .btns button:hover { background:var(--purple); }
+    table { width:100%; border-collapse:collapse; margin-top:20px; font-size:15px; }
+    th, td { border:1px solid rgba(255,255,255,.1); padding:12px; text-align:left; }
+    th { color:var(--cyan); }
+  </style>
+</head>
+<body>
+<div class="top">
+  <a href="/">← SINCOR</a>
+  <div class="progress"><div id="bar"></div></div>
+  <span id="counter" style="font-size:13px;color:var(--muted);font-family:'JetBrains Mono',monospace;">1 / 12</span>
+</div>
+
+<div class="deck" id="deck">
+
+  <section class="slide active" data-i="0">
+    <div class="kicker">Pitch deck · June 2026</div>
+    <h1><span class="gradient">SINCOR</span></h1>
+    <p>Autonomous workforce platform on Base — 42 specialized agents, wallet-native billing, verifiable on-chain inventory.</p>
+    <p style="margin-top:16px;"><a href="/whitepaper" style="color:var(--cyan);">Whitepaper →</a> · <a href="/buy?plan=starter" style="color:var(--cyan);">Deploy →</a></p>
+  </section>
+
+  <section class="slide" data-i="1">
+    <div class="kicker">Problem</div>
+    <h2>Hiring doesn't scale. Chatbots don't specialize.</h2>
+    <ul>
+      <li>GTM teams (research, outreach, content) are expensive and slow to staff</li>
+      <li>Single LLM sessions lack memory, merit, and audit trails</li>
+      <li>Token projects struggle to tie utility to real product usage</li>
+    </ul>
+  </section>
+
+  <section class="slide" data-i="2">
+    <div class="kicker">Solution</div>
+    <h2>Multi-agent OS — not a wrapper</h2>
+    <div class="grid">
+      <div class="card"><strong>Task market</strong>Broadcast → bid → award → audit</div>
+      <div class="card"><strong>Agency Kernel</strong>Plan → execute → criticize → archive</div>
+      <div class="card"><strong>Cor-tecs Brain</strong>Claude coordinates cross-agent work</div>
+      <div class="card"><strong>Wallet billing</strong>SINC subscriptions · AXM execution</div>
+    </div>
+  </section>
+
+  <section class="slide" data-i="3">
+    <div class="kicker">Live product</div>
+    <h2>Production on Railway today</h2>
+    <ul>
+      <li><strong>/buy</strong> — SINC/AXM checkout to treasury on Base</li>
+      <li><strong>/sinc</strong> — official bonding curve (not rogue V2)</li>
+      <li><strong>/launch/review</strong> — human gate before social posts</li>
+      <li>Health checks, compliance guardrails, admin-gated ops APIs</li>
+    </ul>
+  </section>
+
+  <section class="slide" data-i="4">
+    <div class="kicker">Agents</div>
+    <h2>Seven archetypes · full lifecycle</h2>
+    <p>Scout · Builder · Synthesizer · Negotiator · Director · Auditor · Caretaker</p>
+    <p style="margin-top:16px;">Hatch → Onboard → Shift ⟷ Rest → Review → Promote. Hard caps per agent prevent runaway spend.</p>
+  </section>
+
+  <section class="slide" data-i="5">
+    <div class="kicker">TOA</div>
+    <h2>Temporal Optimization Agent (#44)</h2>
+    <p><strong>Forecast</strong> probabilistic paths → <strong>simulate</strong> against objectives → <strong>collapse</strong> to ranked actions → <strong>ingest feedback</strong> for the next cycle.</p>
+    <p style="margin-top:16px;">Sits above routing: answers <em>what next, in what order?</em></p>
+  </section>
+
+  <section class="slide" data-i="6">
+    <div class="kicker">SINAX</div>
+    <h2>Geometric proof navigation</h2>
+    <p>AxiomSolver executes formal proofs (Lean). SINAX searches proof space via embeddings — faster than pure symbolic trees.</p>
+    <p style="margin-top:12px;color:var(--text);font-weight:600;">SINAX proposes. Verifier certifies. Always.</p>
+  </section>
+
+  <section class="slide" data-i="7">
+    <div class="kicker">Tokens · Base 8453</div>
+    <h2>SINC + AXIOM</h2>
+    <div class="grid">
+      <div class="card"><strong>SINC</strong>100M · 8 dec · CertiK 97<span class="mono" style="margin-top:8px;">0x9C8cd8d3961F445D653713dE65C6578bE11668e7</span></div>
+      <div class="card"><strong>AXM</strong>A2A + intel<span class="mono" style="margin-top:8px;">0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</span></div>
+      <div class="card"><strong>Curve</strong>Official buy<span class="mono" style="margin-top:8px;">0x75dE341a2BC81806198364F125d4Cde36527619C</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-i="8">
+    <div class="kicker">Revenue</div>
+    <h2>Token-native billing</h2>
+    <table>
+      <tr><th>Plan</th><th>Reference</th><th>Token</th></tr>
+      <tr><td>Starter</td><td>$297/mo</td><td>SINC spot</td></tr>
+      <tr><td>Professional</td><td>$997/mo</td><td>SINC spot</td></tr>
+      <tr><td>Enterprise</td><td>$2,997/mo</td><td>SINC spot</td></tr>
+      <tr><td>BI Report</td><td>$49</td><td>500 AXM</td></tr>
+    </table>
+  </section>
+
+  <section class="slide" data-i="9">
+    <div class="kicker">Safety</div>
+    <h2>Built for no-oops production</h2>
+    <ul>
+      <li>Canonical address doc — single source of truth</li>
+      <li>Compliance monitor: internal volume only, no outbound alerts</li>
+      <li>Production kill-switches: no auto-sign from web app</li>
+      <li>Guardrails on content, outreach, launch approval</li>
+    </ul>
+  </section>
+
+  <section class="slide" data-i="10">
+    <div class="kicker">Proof</div>
+    <h2>Verifiable on-chain</h2>
+    <ul>
+      <li>~65M SINC in official bonding curve</li>
+      <li>v4 hook + limit-order infrastructure deployed</li>
+      <li>Sourcify full-match on core contracts</li>
+      <li>Token list + Blockscout submission packages</li>
+    </ul>
+  </section>
+
+  <section class="slide" data-i="11">
+    <div class="kicker">Next step</div>
+    <h2>Deploy your team</h2>
+    <p>Buy on curve · Subscribe in SINC · Read the whitepaper · Import sources into NotebookLM for audio briefings.</p>
+    <p style="margin-top:24px;">
+      <a href="/sinc" style="color:var(--cyan);font-weight:700;">Buy SINC →</a> &nbsp;
+      <a href="/buy?plan=starter" style="color:var(--cyan);font-weight:700;">Starter plan →</a> &nbsp;
+      <a href="/whitepaper" style="color:var(--cyan);font-weight:700;">Whitepaper →</a>
+    </p>
+    <p style="margin-top:16px;font-size:14px;">NotebookLM source: <code style="color:var(--cyan);">content/notebooklm/SINCOR_pitch_source.md</code></p>
+  </section>
+</div>
+
+<div class="nav-hint">← → arrow keys · swipe on mobile</div>
+<div class="btns">
+  <button type="button" id="prev">Prev</button>
+  <button type="button" id="next">Next</button>
+</div>
+
+<script>
+(function () {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let i = 0;
+  const bar = document.getElementById('bar');
+  const counter = document.getElementById('counter');
+  function show(n) {
+    i = (n + slides.length) % slides.length;
+    slides.forEach((s, j) => s.classList.toggle('active', j === i));
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    counter.textContent = (i + 1) + ' / ' + slides.length;
+  }
+  document.getElementById('prev').onclick = () => show(i - 1);
+  document.getElementById('next').onclick = () => show(i + 1);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(i + 1); }
+    if (e.key === 'ArrowLeft') show(i - 1);
+  });
+  let tx = 0;
+  document.getElementById('deck').addEventListener('touchstart', e => { tx = e.changedTouches[0].screenX; });
+  document.getElementById('deck').addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].screenX - tx;
+    if (Math.abs(dx) > 50) show(dx < 0 ? i + 1 : i - 1);
+  });
+  show(0);
+})();
+</script>
+</body>
+</html>
