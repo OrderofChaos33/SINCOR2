@@ -1,0 +1,1 @@
+"""SINCOR launch distribution — agent-driven content with human review queue."""
