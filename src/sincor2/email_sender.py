@@ -15,9 +15,10 @@ logger = logging.getLogger('sincor2.email')
 
 # Try to import Resend (or SendGrid as fallback)
 try:
-    from resend import Resend
+    import resend as resend_sdk
     RESEND_AVAILABLE = True
 except ImportError:
+    resend_sdk = None
     RESEND_AVAILABLE = False
 
 try:
@@ -52,11 +53,10 @@ class EmailSender:
         self.twilio_client = None
 
         self.client = None
-        self.resend_client = None
 
         # Priority: Resend > SendGrid > Twilio SMS > Stub
         if RESEND_AVAILABLE and self.resend_key:
-            self.resend_client = Resend(api_key=self.resend_key)
+            resend_sdk.api_key = self.resend_key
             self.mode = 'resend'
             logger.info("[EMAIL] Using Resend API for email delivery")
         elif SENDGRID_AVAILABLE and self.sendgrid_key:
@@ -220,17 +220,19 @@ https://getsincor.com
             # Send via Resend
             try:
                 from_addr = f"{self.from_name} <{self.from_email}>" if self.from_name else self.from_email
-                response = self.resend_client.emails.send({
+                response = resend_sdk.Emails.send({
                     "from": from_addr,
-                    "to": to_email,
+                    "to": [to_email],
                     "subject": subject,
                     "html": html_content,
                     "text": text_content,
                     "reply_to": self.from_email
                 })
 
-                if hasattr(response, 'id') or (isinstance(response, dict) and 'id' in response):
-                    msg_id = response.get('id') if isinstance(response, dict) else response.id
+                msg_id = getattr(response, "id", None) or (
+                    response.get("id") if isinstance(response, dict) else None
+                )
+                if msg_id:
                     logger.info(f"[EMAIL-RESEND] Sent to {to_email} | msg_id={msg_id}")
                     return {
                         'status': 'sent',
