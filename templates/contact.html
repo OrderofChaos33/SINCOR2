@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact SINCOR</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <style>
+    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; min-height:100vh; padding:40px 20px; }
+    .wrap { max-width:560px; margin:0 auto; }
+    a { color:var(--cyan); text-decoration:none; font-weight:600; }
+    h1 { font-size:28px; margin:16px 0 8px; }
+    p { color:var(--muted); line-height:1.6; margin-bottom:16px; }
+    .card { background:rgba(255,255,255,.04); border:1px solid rgba(139,92,246,.25); border-radius:14px; padding:28px; margin-top:24px; }
+    label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--muted); }
+    input, textarea { width:100%; padding:12px 14px; border-radius:8px; border:1px solid rgba(255,255,255,.15); background:rgba(0,0,0,.25); color:var(--text); margin-bottom:16px; font:inherit; }
+    textarea { min-height:120px; resize:vertical; }
+    button { width:100%; padding:14px; border:none; border-radius:10px; background:linear-gradient(135deg,var(--purple),var(--cyan)); color:#fff; font-weight:700; cursor:pointer; }
+    .msg { padding:12px 14px; border-radius:8px; margin-bottom:16px; font-size:14px; }
+    .msg.ok { background:rgba(16,185,129,.15); border:1px solid rgba(16,185,129,.4); color:#6ee7b7; }
+    .msg.err { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.35); color:#fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/">← Back to SINCOR</a>
+    <h1>Contact &amp; Sales</h1>
+    <p>Enterprise demos, partnerships, or support — we respond within one business day.</p>
+    <p>Email: <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+
+    <div class="card">
+      {% if success %}<div class="msg ok">{{ success }}</div>{% endif %}
+      {% if error %}<div class="msg err">{{ error }}</div>{% endif %}
+      <form method="POST" action="/contact">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" placeholder="Your name">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required placeholder="you@company.com">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" required placeholder="Tell us about your team, use case, or question…"></textarea>
+        <button type="submit">Send message</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
