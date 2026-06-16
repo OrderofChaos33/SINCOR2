@@ -14,7 +14,7 @@ from pathlib import Path
 logger = logging.getLogger("sincor2.partner_outreach_notify")
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_ALERT_EMAIL = "eenergy@protonmail.com"
+DEFAULT_ALERT_EMAIL = "court@getsincor.com"
 _scheduler = None
 
 
