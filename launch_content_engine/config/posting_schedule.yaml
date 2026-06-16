@@ -1,0 +1,5 @@
+# Drafts land in review queue; human approves before any adapter posts.
+agent_spotlight: { cadence_hours: 48, enabled: true }
+onchain_stats: { cadence_hours: 24, enabled: true }
+farcaster: { cadence_hours: 24, enabled: true }
+seo_compare: { cadence_hours: 168, enabled: true }
