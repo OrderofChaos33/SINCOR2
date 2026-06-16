@@ -1,0 +1,1 @@
+"""Channel adapters — post only after human approval."""
