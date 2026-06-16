@@ -381,6 +381,21 @@ except Exception as e:
     logger.warning(f"[REVIEW_REMINDER] Scheduler init failed: {e}")
     review_reminder_scheduler = None
 
+# Daily email — partner outreach due list for /launch/partners
+try:
+    from sincor2.partner_outreach_notify import (
+        start_partner_reminder_scheduler,
+        stop_partner_reminder_scheduler,
+    )
+    import atexit as _atexit_partner
+    partner_reminder_scheduler = start_partner_reminder_scheduler(app)
+    if partner_reminder_scheduler:
+        _atexit_partner.register(stop_partner_reminder_scheduler)
+        logger.info("[PARTNER_REMINDER] Daily partner outreach email scheduler started")
+except Exception as e:
+    logger.warning(f"[PARTNER_REMINDER] Scheduler init failed: {e}")
+    partner_reminder_scheduler = None
+
 # Daily ops — read-only chain/revenue/wallet monitoring
 try:
     from sincor2.daily_ops_scheduler import start_daily_ops_scheduler, stop_daily_ops_scheduler
@@ -677,6 +692,16 @@ def ops_schedulers_status():
             'alert_email': os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'eenergy@protonmail.com'),
             'running': bool(review_reminder_scheduler and review_reminder_scheduler.running),
             'next_run': _job_next(review_reminder_scheduler, 'launch_review_reminder'),
+        },
+        'partner_reminder': {
+            'enabled': os.environ.get('PARTNER_OUTREACH_ENABLED', 'false').lower() == 'true',
+            'alert_email': (
+                os.environ.get('PARTNER_OUTREACH_ALERT_EMAIL')
+                or os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'eenergy@protonmail.com')
+            ),
+            'running': bool(partner_reminder_scheduler and partner_reminder_scheduler.running),
+            'next_run': _job_next(partner_reminder_scheduler, 'partner_outreach_reminder'),
+            'partners_url': '/launch/partners',
         },
         'daily_ops': {
             'enabled': os.environ.get('DAILY_OPS_ENABLED', 'false').lower() == 'true',
