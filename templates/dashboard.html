@@ -146,7 +146,7 @@
   <!-- Quick Links -->
   <div class="section-title">Quick Access</div>
   <div class="quick-links">
-    <a href="/admin/training-vault{% if email %}?email={{ email }}{% endif %}" class="quick-link">
+    <a href="/admin/training-vault{% if email %}?email={{ email }}{% endif %}{% if order_id %}&order_id={{ order_id }}{% endif %}" class="quick-link">
       <span class="quick-link-icon">📚</span> Training Vault
     </a>
     <a href="/contact" class="quick-link">
@@ -161,7 +161,7 @@
     <a href="/sinc" class="quick-link">
       <span class="quick-link-icon">🪙</span> SINC Token
     </a>
-    <a href="/api/profile/delete" class="quick-link" style="color:#ef4444" onclick="return confirm('Permanently delete your data?')">
+    <a href="#" class="quick-link" style="color:#ef4444" id="deleteData">
       <span class="quick-link-icon">🗑</span> Delete My Data
     </a>
   </div>
@@ -175,5 +175,28 @@
   <a href="/security">Security</a>
 </footer>
 
+<script>
+(function () {
+  const btn = document.getElementById('deleteData');
+  if (!btn) return;
+  btn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (!confirm('Permanently delete your profile data?')) return;
+    const token = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('access_token='));
+    const jwt = token ? decodeURIComponent(token.split('=')[1]) : '';
+    if (!jwt) { alert('Sign in again to delete your data.'); return; }
+    const res = await fetch('/api/profile/delete', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + jwt },
+    });
+    if (res.ok) {
+      alert('Your data has been removed.');
+      window.location.href = '/';
+    } else {
+      alert('Could not delete data. Contact support@getsincor.com');
+    }
+  });
+})();
+</script>
 </body>
 </html>
