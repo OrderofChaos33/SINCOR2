@@ -689,7 +689,7 @@ def ops_schedulers_status():
         },
         'review_reminder': {
             'enabled': os.environ.get('LAUNCH_REVIEW_REMINDER_ENABLED', 'true').lower() != 'false',
-            'alert_email': os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'eenergy@protonmail.com'),
+            'alert_email': os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'court@getsincor.com'),
             'running': bool(review_reminder_scheduler and review_reminder_scheduler.running),
             'next_run': _job_next(review_reminder_scheduler, 'launch_review_reminder'),
         },
@@ -697,7 +697,7 @@ def ops_schedulers_status():
             'enabled': os.environ.get('PARTNER_OUTREACH_ENABLED', 'false').lower() == 'true',
             'alert_email': (
                 os.environ.get('PARTNER_OUTREACH_ALERT_EMAIL')
-                or os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'eenergy@protonmail.com')
+                or os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'court@getsincor.com')
             ),
             'running': bool(partner_reminder_scheduler and partner_reminder_scheduler.running),
             'next_run': _job_next(partner_reminder_scheduler, 'partner_outreach_reminder'),
