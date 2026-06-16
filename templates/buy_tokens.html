@@ -96,15 +96,23 @@ async function loadPlans() {
   const data = await res.json();
   const sel = $('plan');
   sel.innerHTML = '';
+  const agentPlans = ['starter', 'professional', 'enterprise', 'report'];
   (data.plans || []).forEach((p) => {
-    if (!p.spot_available) return;
     const o = document.createElement('option');
     o.value = p.id;
-    o.textContent = `${p.label} — ${p.usd_reference} USD ref · ${p.token}`;
+    const suffix = p.spot_available ? '' : ' — price loading…';
+    o.textContent = `${p.label} — $${p.usd_reference} ref · ${p.token}${suffix}`;
+    if (!p.spot_available && p.token === 'SINC') o.disabled = true;
     sel.appendChild(o);
   });
-  const wanted = params.get('plan') || 'intel';
-  if ([...sel.options].some((o) => o.value === wanted)) sel.value = wanted;
+  let wanted = params.get('plan') || 'starter';
+  if (!agentPlans.includes(wanted) && wanted === 'intel') wanted = 'starter';
+  if ([...sel.options].some((o) => o.value === wanted && !o.disabled)) {
+    sel.value = wanted;
+  } else {
+    const first = [...sel.options].find((o) => !o.disabled);
+    if (first) sel.value = first.value;
+  }
   if (params.get('email')) $('email').value = params.get('email');
 }
 
