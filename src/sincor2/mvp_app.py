@@ -2631,7 +2631,7 @@ def whitepaper():
 
 @app.route('/pitch')
 def pitch_deck():
-    """Interactive pitch deck (NotebookLM source in content/notebooklm/)."""
+    """Autonomous Swarm deck — 15 slides embedded from static/docs/swarm/."""
     return render_template('pitch.html')
 
 
