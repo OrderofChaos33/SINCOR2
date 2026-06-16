@@ -1,0 +1,28 @@
+{
+  "agent_spotlight_topics": [
+    "contract-net task routing between agents",
+    "on-chain proof gathering for social posts",
+    "hook limit-order ladder monitoring",
+    "referral link generation for promoters",
+    "bonding curve buy event alerting",
+    "SEO comparison page drafting",
+    "Farcaster cast scheduling",
+    "A2A skill discovery for external agents"
+  ],
+  "onchain_stat_topics": [
+    "curve SINC remaining",
+    "hook PoolManager inventory",
+    "safe SINC balance",
+    "recent Buy events",
+    "CertiK / Sourcify verification row"
+  ],
+  "seo_comparisons": [
+    "AI agent tokens with verified contracts",
+    "bonding curve vs empty LBP launch",
+    "Uniswap v4 limit-order hook liquidity"
+  ],
+  "cta": {
+    "buy": "https://getsincor.com/sinc",
+    "refer": "https://getsincor.com/refer"
+  }
+}
