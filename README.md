@@ -7,9 +7,8 @@
 | Resource | URL |
 |----------|-----|
 | **Whitepaper** | [getsincor.com/whitepaper](https://getsincor.com/whitepaper) |
-| **Pitch deck** (interactive) | [getsincor.com/pitch](https://getsincor.com/pitch) |
+| **Autonomous Swarm deck** (embedded + presenter) | [getsincor.com/pitch](https://getsincor.com/pitch) · slides in [`static/docs/swarm/`](static/docs/swarm/) |
 | **Markdown source** | [`static/docs/SINCOR_whitepaper.md`](static/docs/SINCOR_whitepaper.md) |
-| **NotebookLM bundle** | [`content/notebooklm/SINCOR_pitch_source.md`](content/notebooklm/SINCOR_pitch_source.md) — import with the whitepaper into [NotebookLM](https://notebooklm.google.com) for audio overviews |
 | **Canonical addresses** | [`CANONICAL_ADDRESSES.md`](CANONICAL_ADDRESSES.md) |
 
 Default billing: **SINC + AXM on Base** (`LEGACY_FIAT_PAYMENTS_ENABLED=false`). Stripe/PayPal are legacy-only.
