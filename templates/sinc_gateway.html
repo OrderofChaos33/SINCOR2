@@ -599,6 +599,15 @@
       <div id="grad-progress" style="margin-top:6px; font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">loading on-chain stats…</div>
     </div>
     <button id="buy-connect" style="width:100%; padding:12px; background:var(--purple); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Connect Wallet</button>
+    <div id="wallet-picker" style="display:none; margin-top:12px; padding:14px; background:var(--bg-dark); border:1px solid var(--border-bright); border-radius:10px;">
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px; line-height:1.45;">On mobile? Open this page <strong style="color:var(--text);">inside</strong> your wallet app, or connect below:</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button type="button" data-wallet="metamask" style="width:100%; padding:11px; background:#f6851b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in MetaMask</button>
+        <button type="button" data-wallet="coinbase" style="width:100%; padding:11px; background:#0052ff; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Coinbase Wallet</button>
+        <button type="button" data-wallet="rainbow" style="width:100%; padding:11px; background:linear-gradient(90deg,#174299,#9011fe); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Rainbow</button>
+        <button type="button" data-wallet="walletconnect" style="width:100%; padding:11px; background:var(--surface-light); color:var(--text); border:1px solid var(--border-bright); border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">WalletConnect</button>
+      </div>
+    </div>
     <div id="buy-form" style="display:none; margin-top:16px;">
       <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Connected: <span id="buy-account" class="mono"></span></div>
       <input id="buy-eth" type="number" step="0.0001" min="0.0001" placeholder="ETH amount (e.g. 0.01)" style="width:100%; padding:12px; background:var(--bg-dark); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:15px; margin-bottom:12px;">
@@ -931,6 +940,8 @@
 
 </div>
 
+<script>window.SINC_WC_PROJECT_ID = {{ walletconnect_project_id|tojson }};</script>
+<script src="/static/js/sinc_wallet.js"></script>
 <script>
   const SINC_CONTRACT = '0x9C8cd8d3961F445D653713dE65C6578bE11668e7';
   const SINC_LOGO = 'https://getsincor.com/static/tokenlists/assets/logo-256.png';
@@ -1045,14 +1056,13 @@
 
   // ============ BUY WIDGET ============
   const CURVE = '0x75dE341a2BC81806198364F125d4Cde36527619C';
-  const BASE_CHAIN_ID = '0x2105'; // 8453
-  const BASE_PARAMS = {
-    chainId: BASE_CHAIN_ID,
-    chainName: 'Base',
-    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-    rpcUrls: ['https://mainnet.base.org'],
-    blockExplorerUrls: ['https://basescan.org']
-  };
+  const BASE_CHAIN_ID = SincWallet.BASE_CHAIN_ID;
+
+  function walletProvider() {
+    const p = SincWallet.getProvider();
+    if (!p) throw new Error('Wallet not connected — tap Connect Wallet or open in MetaMask app.');
+    return p;
+  }
 
   function bs(msg, color) {
     const el = document.getElementById('buy-status');
@@ -1072,30 +1082,41 @@
   }
 
   async function ensureBase() {
-    if (!window.ethereum) throw new Error('No wallet detected — install MetaMask');
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== BASE_CHAIN_ID) {
-      try {
-        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_ID }] });
-      } catch (e) {
-        if (e.code === 4902) {
-          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [BASE_PARAMS] });
-        } else throw e;
-      }
-    }
+    await SincWallet.ensureBase();
   }
+
+  function showBuyConnected(acct) {
+    acctEl.textContent = acct.slice(0, 6) + '...' + acct.slice(-4);
+    connectBtn.style.display = 'none';
+    buyForm.style.display = 'block';
+    const picker = document.getElementById('wallet-picker');
+    if (picker) picker.style.display = 'none';
+    const refLink = `https://getsincor.com/sinc?ref=${acct}`;
+    if (!document.getElementById('buy-ref-link')) {
+      const refDiv = document.createElement('div');
+      refDiv.id = 'buy-ref-link';
+      refDiv.style.cssText = 'margin-top:14px; padding:12px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:8px; font-size:12px; color:var(--text-dim);';
+      refDiv.innerHTML = `<div style="font-weight:600; color:var(--purple-light); margin-bottom:4px;">Your referral link — earn 3% of every buy</div><div style="word-break:break-all; font-family:'JetBrains Mono',monospace; color:var(--cyan); cursor:pointer;" title="Click to copy" onclick="navigator.clipboard.writeText('${refLink}'); this.style.color='#10b981'; this.textContent='copied!'; setTimeout(()=>{this.style.color='var(--cyan)'; this.textContent='${refLink}';},1500);">${refLink}</div>`;
+      buyForm.appendChild(refDiv);
+    }
+    const status = validRef ? `Connected. Buying via referrer ${validRef.slice(0,6)}...${validRef.slice(-4)} (they get 3%).` : 'Connected on Base. Enter ETH amount.';
+    bs(status, '#10b981');
+  }
+
+  SincWallet.wirePicker('wallet-picker', showBuyConnected);
 
   const TOKEN_LIST_URL = 'https://getsincor.com/tokenlists/sincor.tokenlist.json';
 
   async function addSincToWallet() {
     const btn = document.getElementById('add-wallet-btn');
     try {
-      if (!window.ethereum) {
-        alert('No wallet detected — install MetaMask, Rainbow, or Coinbase Wallet.');
+      if (!SincWallet.hasInjected() && !SincWallet.getProvider()) {
+        alert('Connect a wallet first, or open getsincor.com/sinc in the MetaMask app browser.');
+        document.getElementById('wallet-picker').style.display = 'block';
         return;
       }
       await ensureBase();
-      await window.ethereum.request({
+      await walletProvider().request({
         method: 'wallet_watchAsset',
         params: {
           type: 'ERC20',
@@ -1138,23 +1159,12 @@
     connectBtn.addEventListener('click', async () => {
       try {
         bs('Connecting...');
-        if (!window.ethereum) throw new Error('No wallet detected — install MetaMask');
-        await ensureBase();
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const acct = accounts[0];
-        acctEl.textContent = acct.slice(0,6) + '...' + acct.slice(-4);
-        connectBtn.style.display = 'none';
-        buyForm.style.display = 'block';
-        // Show personal referral link (3% kickback on every buy through it)
-        const refLink = `https://getsincor.com/sinc?ref=${acct}`;
-        const refDiv = document.createElement('div');
-        refDiv.style.cssText = 'margin-top:14px; padding:12px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:8px; font-size:12px; color:var(--text-dim);';
-        refDiv.innerHTML = `<div style="font-weight:600; color:var(--purple-light); margin-bottom:4px;">💸 Your referral link — earn 3% of every buy</div><div style="word-break:break-all; font-family:'JetBrains Mono',monospace; color:var(--cyan); cursor:pointer;" title="Click to copy" onclick="navigator.clipboard.writeText('${refLink}'); this.style.color='#10b981'; this.textContent='✓ copied!'; setTimeout(()=>{this.style.color='var(--cyan)'; this.textContent='${refLink}';},1500);">${refLink}</div>`;
-        buyForm.appendChild(refDiv);
-        const status = validRef ? `Connected. Buying via referrer ${validRef.slice(0,6)}...${validRef.slice(-4)} (they get 3%).` : 'Connected on Base. Enter ETH amount.';
-        bs(status, '#10b981');
+        const { account } = await SincWallet.connect();
+        showBuyConnected(account);
       } catch (e) {
-        bs('Error: ' + (e.message || e), '#ef4444');
+        const picker = document.getElementById('wallet-picker');
+        if (picker) picker.style.display = 'block';
+        bs((e.message || e) + ' — try Open in MetaMask below.', '#ef4444');
       }
     });
   }
@@ -1167,11 +1177,11 @@
         const ethWei = BigInt(Math.floor(eth * 1e18));
         const ethWeiHex = '0x' + ethWei.toString(16);
         await ensureBase();
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        const from = accounts[0];
+        const from = await SincWallet.getAccount();
+        if (!from) throw new Error('Reconnect wallet');
         const data = encodeBuy(ethWeiHex);
         bs('Confirm in wallet...');
-        const txHash = await window.ethereum.request({
+        const txHash = await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from, to: CURVE, value: ethWeiHex, data }]
         });
@@ -1236,17 +1246,19 @@
   let swapUser = null;
 
   async function connectSwap() {
-    if (!window.ethereum) throw new Error('No wallet — install MetaMask');
-    await ensureBase();
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    swapUser = accounts[0];
+    const { account } = await SincWallet.connect();
+    swapUser = account;
     swapAcct.textContent = swapUser.slice(0, 6) + '...' + swapUser.slice(-4);
     swapConnect.style.display = 'none';
     swapForm.style.display = 'block';
     ss('Connected. Enter SINC amount for live quote.', '#10b981');
   }
 
-  if (swapConnect) swapConnect.addEventListener('click', () => connectSwap().catch(e => ss('Error: ' + e.message, '#ef4444')));
+  if (swapConnect) swapConnect.addEventListener('click', () => connectSwap().catch(e => {
+    const picker = document.getElementById('wallet-picker');
+    if (picker) picker.style.display = 'block';
+    ss((e.message || e) + ' — try Open in MetaMask below.', '#ef4444');
+  }));
 
   async function refreshSwapQuote() {
     if (!swapUser || !swapAmt || !swapAmt.value) return;
@@ -1282,11 +1294,11 @@
         ss('Approve + swap in wallet...');
         const approveData = '0x095ea7b3000000000000000000000000' + KYBER_ROUTER.slice(2).toLowerCase()
           + atoms.toString(16).padStart(64, '0');
-        await window.ethereum.request({
+        await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: SINC_CONTRACT, data: approveData }]
         });
-        const txHash = await window.ethereum.request({
+        const txHash = await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: built.routerAddress || KYBER_ROUTER, data: built.data, value: '0x0' }]
         });
@@ -1307,12 +1319,12 @@
         ss('Curve sell: approve then sell...');
         const approveData = '0x095ea7b3000000000000000000000000' + CURVE.slice(2).toLowerCase()
           + atoms.toString(16).padStart(64, '0');
-        await window.ethereum.request({
+        await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: SINC_CONTRACT, data: approveData }]
         });
         const sellData = '0xe4849b32' + atoms.toString(16).padStart(64, '0');
-        const txHash = await window.ethereum.request({
+        const txHash = await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: CURVE, data: sellData }]
         });
@@ -1365,17 +1377,19 @@
   let usdcUser = null;
 
   async function connectUsdc() {
-    if (!window.ethereum) throw new Error('No wallet — install MetaMask');
-    await ensureBase();
-    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    usdcUser = accounts[0];
+    const { account } = await SincWallet.connect();
+    usdcUser = account;
     usdcAcct.textContent = usdcUser.slice(0, 6) + '...' + usdcUser.slice(-4);
     usdcConnect.style.display = 'none';
     usdcForm.style.display = 'block';
     us('Connected. Enter USDC — fills hook walls best-available.', '#10b981');
   }
 
-  if (usdcConnect) usdcConnect.addEventListener('click', () => connectUsdc().catch(e => us('Error: ' + e.message, '#ef4444')));
+  if (usdcConnect) usdcConnect.addEventListener('click', () => connectUsdc().catch(e => {
+    const picker = document.getElementById('wallet-picker');
+    if (picker) picker.style.display = 'block';
+    us((e.message || e) + ' — try Open in MetaMask below.', '#ef4444');
+  }));
 
   function refreshUsdcEst() {
     if (!usdcAmt || !usdcAmt.value) return;
@@ -1397,12 +1411,12 @@
         us('Approve USDC, then buy through hook...');
         const maxApprove = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
         const approveData = '0x095ea7b3' + pad64(HOOK_ROUTER) + maxApprove.slice(2);
-        await window.ethereum.request({
+        await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: usdcUser, to: USDC_ADDR, data: approveData }]
         });
         const buyData = BUY_USDC_SEL + pad64(usdcAtoms) + pad64(minSinc) + '0'.repeat(64);
-        const txHash = await window.ethereum.request({
+        const txHash = await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: usdcUser, to: HOOK_ROUTER, data: buyData }]
         });
