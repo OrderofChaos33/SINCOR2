@@ -2582,6 +2582,52 @@ def launch_review_page():
     return render_template('launch_review.html')
 
 
+@app.route('/launch/partners')
+def launch_partners_page():
+    """KOL / curator partner outreach pipeline for July 7 launch."""
+    return render_template('launch_partners.html')
+
+
+@app.route('/api/launch/partners', methods=['GET'])
+def launch_partners_api():
+    """Partner CRM summary + today's due outreach."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    try:
+        from sincor2.partner_outreach import (
+            due_outreach,
+            list_partners,
+            pipeline_summary,
+        )
+        return jsonify({
+            'summary': pipeline_summary(),
+            'due': due_outreach(limit=15),
+            'partners': list_partners(),
+        })
+    except Exception as e:
+        logger.error('[PARTNERS] API error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/launch/partners/<partner_id>', methods=['POST'])
+def launch_partners_update(partner_id):
+    """Mark partner status after outreach."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    status = (data.get('status') or '').strip()
+    notes = (data.get('notes') or '').strip()
+    try:
+        from sincor2.partner_outreach import update_status
+        if not update_status(partner_id, status, notes=notes):
+            return jsonify({'ok': False, 'error': 'invalid_status_or_partner'}), 400
+        return jsonify({'ok': True, 'partner_id': partner_id, 'status': status})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
 def _launch_review_modules():
     import sys
     if project_root not in sys.path:
