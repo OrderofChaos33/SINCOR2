@@ -776,6 +776,12 @@
       padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(6,182,212,0.35);
     }
     .docs-bar a:hover { background: rgba(6,182,212,0.15); }
+    .swarm-gallery { margin-top: 36px; display: flex; flex-direction: column; gap: 20px; }
+    .swarm-gallery figure { margin: 0; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 16px 48px rgba(0,0,0,.35); background: #f4f4f5; }
+    .swarm-gallery img { width: 100%; height: auto; display: block; }
+    .swarm-gallery figcaption { padding: 10px 14px; font-size: 12px; color: var(--text-muted); background: rgba(15,22,41,.85); border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; }
+    .swarm-presenter { margin-top: 20px; text-align: center; }
+    .swarm-presenter a { color: var(--cyan); font-weight: 700; text-decoration: none; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -1063,17 +1069,33 @@
 <!-- DOCS -->
 <section id="docs">
   <div class="section-label">→ DOCUMENTATION</div>
-  <h2 class="section-title">Whitepaper &amp; Pitch</h2>
-  <p style="font-size:16px;color:var(--text-muted);max-width:720px;line-height:1.8;margin-bottom:8px;">
-    Technical depth for integrators and partners. Import the markdown sources into
-    <a href="https://notebooklm.google.com" target="_blank" rel="noopener" style="color:var(--cyan);">NotebookLM</a>
-    for audio briefings or slide regeneration.
+  <h2 class="section-title">Whitepaper &amp; Autonomous Swarm Deck</h2>
+  <p style="font-size:16px;color:var(--text-muted);max-width:820px;line-height:1.8;margin-bottom:8px;">
+    Technical depth for integrators and partners. The full 15-slide <strong style="color:var(--text);">SINCOR2 Autonomous Swarm</strong> deck is embedded below — original layout, diagrams, and copy preserved.
   </p>
   <div class="docs-bar">
     <a href="/whitepaper">📄 Whitepaper</a>
     <a href="/static/docs/SINCOR_whitepaper.md" download>⬇ Markdown source</a>
-    <a href="/pitch">🎯 Interactive pitch deck</a>
+    <a href="/pitch">🎯 Presenter mode</a>
     <a href="/tokenlists/sincor.tokenlist.json">Token list JSON</a>
+  </div>
+  <div class="swarm-presenter"><a href="/pitch">Open fullscreen presenter →</a></div>
+  <div class="swarm-gallery" aria-label="SINCOR2 Autonomous Swarm deck">
+    <figure><img src="/static/docs/swarm/slide-01.png" alt="The Future of Autonomous Work" loading="lazy"><figcaption>01 · The Future of Autonomous Work</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-02.png" alt="Beyond Chatbots: The Multi-Agent Operating System" loading="lazy"><figcaption>02 · Beyond Chatbots</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-03.png" alt="The Core Intelligence Trinity" loading="lazy"><figcaption>03 · Core Intelligence Trinity</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-04.png" alt="The Genetic Code of the Swarm" loading="lazy"><figcaption>04 · Genetic Code of the Swarm</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-05.png" alt="The Agency Kernel" loading="lazy"><figcaption>05 · Agency Kernel</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-06.png" alt="4-Tier Memory Architecture" loading="lazy"><figcaption>06 · 4-Tier Memory</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-07.png" alt="Decentralized Swarm Coordination" loading="lazy"><figcaption>07 · Contract-Net Task Market</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-08.png" alt="T.O.A. Temporal Optimization Agent" loading="lazy"><figcaption>08 · T.O.A. Agent 44</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-09.png" alt="SINAX Geometric Proof Navigation" loading="lazy"><figcaption>09 · SINAX Proof Navigation</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-10.png" alt="Purpose-Built Revenue Pipelines" loading="lazy"><figcaption>10 · WebBuilder Revenue Pipeline</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-11.png" alt="The Business Intelligence Engine" loading="lazy"><figcaption>11 · Business Intelligence Engine</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-12.png" alt="Dual-Token Base Chain Economy" loading="lazy"><figcaption>12 · SINC + AXM Economy</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-13.png" alt="Scale Your Autonomous Workforce" loading="lazy"><figcaption>13 · Pricing Tiers</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-14.png" alt="The Deployment Pipeline" loading="lazy"><figcaption>14 · Deployment Pipeline</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-15.png" alt="The Swarm is Ready" loading="lazy"><figcaption>15 · The Swarm is Ready</figcaption></figure>
   </div>
 </section>
 
