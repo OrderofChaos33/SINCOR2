@@ -1,0 +1,327 @@
+# SINCOR July 7 launch — KOL / curator / ecosystem partner targets
+# Status tracked in data/launch_partners.db via partner_outreach.py
+
+launch_date: "2026-07-07"
+site: https://getsincor.com
+pitch_deck: https://getsincor.com/pitch
+whitepaper: https://getsincor.com/whitepaper
+buy: https://getsincor.com/sinc
+refer: https://getsincor.com/refer
+
+proof:
+  sinc: "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+  curve: "0x75dE341a2BC81806198364F125d4Cde36527619C"
+  chain: Base 8453
+  certik: "97/100 Skynet"
+  sourcify: full-match verified
+
+offer_packages:
+  curator: "Exclusive first look + embeddable swarm deck + on-chain proof pack"
+  kol: "Coordinated launch-day post + 3% on-chain referral via bonding curve"
+  ecosystem: "Technical co-announcement — verified agent platform, not a memecoin"
+  media: "Founder demo + agent spotlight footage + verifiable contract links"
+
+partners:
+  # ── P0 Ecosystem (amplify to Base-native audience) ─────────────────────
+  - id: base-official
+    name: Base
+    role: ecosystem
+    tier: P0
+    channel: x
+    handle: base
+    contact_url: https://discord.com/invite/buildonbase
+    contact_method: discord
+    angle: "42-agent autonomous workforce live on Base — verified contracts, AgentKit-adjacent story"
+    ask: "Showcase / ecosystem spotlight for July 7 launch"
+    notes: "Build on Base Discord #showcase or builder intake form"
+
+  - id: coinbase-agentkit
+    name: Coinbase Developer Platform (AgentKit)
+    role: ecosystem
+    tier: P0
+    channel: web
+    handle: coinbasedev
+    contact_url: https://www.coinbase.com/developer-platform
+    contact_method: form
+    angle: "Real multi-agent OS on Base — complements AgentKit wallet narrative"
+    ask: "Ecosystem blog mention or launch calendar slot"
+
+  - id: balancer-ecosystem
+    name: Balancer Protocol
+    role: ecosystem
+    tier: P0
+    channel: discord
+    handle: balancer
+    contact_url: https://discord.com/invite/balancer-638460494168064021
+    contact_method: discord
+    angle: "Base-native launch with liquidity infrastructure story"
+    ask: "#launches channel announcement + retweet from @balancer"
+
+  - id: jesse-pollak
+    name: Jesse Pollak
+    role: kol
+    tier: P0
+    channel: x
+    handle: jessepollak
+    contact_url: https://x.com/jessepollak
+    contact_method: dm
+    angle: "Builder on Base shipping 42 autonomous agents with verified on-chain inventory"
+    ask: "Acknowledgment or quote-tweet launch day — long shot, high upside"
+
+  # ── P0 Curators / Media (AI × crypto audience) ─────────────────────────
+  - id: bankless-wmpeaster
+    name: William M. Peaster
+    role: curator
+    tier: P0
+    channel: x
+    handle: wmpeaster
+    contact_url: https://x.com/wmpeaster
+    contact_method: dm
+    angle: "Wrote Farcaster AI agents hub — SINCOR is 42-agent swarm with proof, not vapor"
+    ask: "Bankless read or Farcaster Friday feature"
+
+  - id: bankless-desk
+    name: Bankless (editorial)
+    role: media
+    tier: P0
+    channel: web
+    handle: bankless
+    contact_url: https://www.bankless.com/read
+    contact_method: form
+    angle: "AI agent token with shipped product + CertiK + Sourcify — contrarian to vaporware"
+    ask: "Analysis piece or launch mention"
+
+  - id: the-defiant
+    name: The Defiant
+    role: media
+    tier: P0
+    channel: x
+    handle: TheDefiant
+    contact_url: https://thedefiant.io/
+    contact_method: email
+    angle: "Base AI agent deployers narrative — we have the full stack live"
+    ask: "News brief or market piece on agent tokens with real utility"
+
+  - id: unchained-farcaster
+    name: Unchained Crypto
+    role: media
+    tier: P0
+    channel: web
+    handle: UnchainedCrypto
+    contact_url: https://unchainedcrypto.com/
+    contact_method: form
+    angle: "Farcaster + Base + autonomous agents — founder interview"
+    ask: "Podcast or Q&A segment"
+
+  - id: coindesk-ai
+    name: CoinDesk (AI / tech desk)
+    role: media
+    tier: P0
+    channel: web
+    handle: CoinDesk
+    contact_url: https://www.coindesk.com/
+    contact_method: email
+    angle: "Coinbase/Base AI agent thesis — live platform with wallet-native billing"
+    ask: "Tech coverage or newsletter blurb"
+
+  # ── P0 Farcaster natives ───────────────────────────────────────────────
+  - id: farcaster-dwr
+    name: Dan Romero (Farcaster)
+    role: curator
+    tier: P0
+    channel: x
+    handle: dwr
+    contact_url: https://warpcast.com/dwr
+    contact_method: warpcast
+    angle: "Multi-agent business running on Farcaster rails — agent-to-agent settlement"
+    ask: "Channel feature or intro to /base / ai curators"
+
+  - id: bountycaster
+    name: Bountycaster
+    role: ecosystem
+    tier: P0
+    channel: web
+    handle: bountycaster
+    contact_url: https://www.bountycaster.xyz/
+    contact_method: warpcast
+    angle: "Launch week bounties for agent spotlight content from community"
+    ask: "Co-run bounty pool for launch day UGC"
+
+  - id: supercast
+    name: Supercast
+    role: ecosystem
+    tier: P0
+    channel: web
+    handle: supercast
+    contact_url: https://www.supercast.xyz/
+    contact_method: email
+    angle: "Agent-native client story — SINCOR swarm demo"
+    ask: "Featured client or launch livestream slot"
+
+  - id: higher-community
+    name: Higher community (Base culture)
+    role: curator
+    tier: P0
+    channel: warpcast
+    handle: higher
+    contact_url: https://warpcast.com/~/channel/higher
+    contact_method: warpcast
+    angle: "Base builder culture — autonomous agents as digital citizens"
+    ask: "Cross-post launch to /higher channel"
+
+  # ── P1 KOLs (AI agent / Base traders) ──────────────────────────────────
+  - id: virtuals-ecosystem
+    name: Virtuals Protocol community leads
+    role: kol
+    tier: P1
+    channel: x
+    handle: virtuals_io
+    contact_url: https://www.virtuals.io/
+    contact_method: dm
+    angle: "Agent token with 42 shipped agents — complementary to agent launchpad narrative"
+    ask: "AMA or joint Space — position as infrastructure not competitor"
+
+  - id: zerion-base-ai
+    name: Zerion (Base AI tokens guide)
+    role: curator
+    tier: P1
+    channel: x
+    handle: zerion
+    contact_url: https://zerion.io/
+    contact_method: dm
+    angle: "Included in AI tokens on Base guide — verified + audited"
+    ask: "List SINC in ecosystem roundup"
+
+  - id: aixbt-agent
+    name: aixbt (AI agent KOL)
+    role: kol
+    tier: P1
+    channel: x
+    handle: aixbt_agent
+    contact_url: https://x.com/aixbt_agent
+    contact_method: dm
+    angle: "Agent-native platform with on-chain proof — meta fit for AI KOL audience"
+    ask: "Launch day mention or thread collaboration"
+
+  - id: base-ecosystem-fund
+    name: Base Ecosystem Fund / builder network
+    role: ecosystem
+    tier: P1
+    channel: web
+    handle: base
+    contact_url: https://base.org/
+    contact_method: form
+    angle: "Production agent platform on Railway + on-chain billing"
+    ask: "Builder grant or amplification intro"
+
+  - id: dexscreener
+    name: DexScreener
+    role: ecosystem
+    tier: P1
+    channel: web
+    handle: dexscreener
+    contact_url: https://dexscreener.com/
+    contact_method: form
+    angle: "Enhanced token info + optional boost for launch window"
+    ask: "ETI submission + launch day trending boost budget"
+
+  - id: geckoterminal
+    name: GeckoTerminal / CoinGecko
+    role: ecosystem
+    tier: P1
+    channel: web
+    handle: coingecko
+    contact_url: https://www.geckoterminal.com/
+    contact_method: form
+    angle: "Metadata + trust signals for discoverability"
+    ask: "Token info update pre-launch"
+
+  # ── P1 Podcasts / Spaces hosts ───────────────────────────────────────
+  - id: bankless-podcast
+    name: Bankless Podcast
+    role: media
+    tier: P1
+    channel: web
+    handle: bankless
+    contact_url: https://www.bankless.com/podcast
+    contact_method: form
+    angle: "AI agents on Base — live demo of 42-agent swarm"
+    ask: "Guest slot week of July 7"
+
+  - id: edge-pod-base
+    name: Base builder podcast circuit
+    role: media
+    tier: P1
+    channel: x
+    handle: buildonbase
+    contact_url: https://x.com/base
+    contact_method: dm
+    angle: "Founder story — built autonomous revenue agents on Base"
+    ask: "Co-hosted X Space T-3 days before launch"
+
+  # ── P2 Amplifiers (nice-to-have) ─────────────────────────────────────
+  - id: farcaster-ai-channel
+    name: Farcaster /ai channel mods
+    role: curator
+    tier: P2
+    channel: warpcast
+    handle: ai
+    contact_url: https://warpcast.com/~/channel/ai
+    contact_method: warpcast
+    angle: "Agent swarm launch with proof row"
+    ask: "Pinned cast or channel post July 7"
+
+  - id: farcaster-base-channel
+    name: Farcaster /base channel mods
+    role: curator
+    tier: P2
+    channel: warpcast
+    handle: base
+    contact_url: https://warpcast.com/~/channel/base
+    contact_method: warpcast
+    angle: "Base-native agent platform launch"
+    ask: "Launch day post"
+
+  - id: blockscout-base
+    name: Blockscout (Base explorer)
+    role: ecosystem
+    tier: P2
+    channel: x
+    handle: blockscout
+    contact_url: https://base.blockscout.com/
+    contact_method: dm
+    angle: "Verified contracts + token list submission"
+    ask: "Retweet launch + confirm token list visibility"
+
+  - id: sourcify
+    name: Sourcify (verification)
+    role: ecosystem
+    tier: P2
+    channel: x
+    handle: sourcifyeth
+    contact_url: https://sourcify.dev/
+    contact_method: dm
+    angle: "Full-match verified agent platform contracts"
+    ask: "Verification spotlight tweet"
+
+  - id: certik
+    name: CertiK Skynet
+    role: ecosystem
+    tier: P2
+    channel: web
+    handle: CertiK
+    contact_url: https://skynet.certik.com/
+    contact_method: form
+    angle: "97/100 score — co-marketing if allowed"
+    ask: "Skynet badge amplification on launch"
+
+  - id: crypto-marketing-ref
+    name: Crypto KOL agencies (vet only)
+    role: agency
+    tier: P2
+    channel: web
+    handle: null
+    contact_url: https://www.luvkaizen.com/
+    contact_method: form
+    angle: "Fallback paid KOL campaign if organic pipeline thin by T-7"
+    ask: "Scoped campaign proposal — vet engagement quality first"
