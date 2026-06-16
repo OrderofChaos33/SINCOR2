@@ -328,10 +328,11 @@
       
       try {
         // Send signup data to backend
+        const plan = new URLSearchParams(window.location.search).get('plan') || 'starter';
         const response = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, name })
+          body: JSON.stringify({ email, name, plan })
         });
         
         const data = await response.json();
@@ -341,7 +342,8 @@
         }
         
         // Redirect to buy page
-        window.location.href = `/buy?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`;
+        const buyPlan = data.plan || plan || 'starter';
+        window.location.href = `/buy?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&plan=${encodeURIComponent(buyPlan)}`;
       
       } catch (err) {
         errorMsg.textContent = err.message || 'Something went wrong. Please try again.';
