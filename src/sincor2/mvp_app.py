@@ -102,19 +102,94 @@ def _oauth_provider_ready(name: str) -> bool:
     return bool(oauth and hasattr(oauth, name))
 
 
-def _oauth_finish_login(email: str, name: str, provider: str):
-    """Create session + JWT cookie after successful OAuth."""
+def _auth_cookie_response(email: str, redirect_url: str = '/dashboard'):
+    """Set session + JWT cookie and redirect."""
     session['user_email'] = email
-    session['user_name'] = name or email.split('@')[0]
     access_token = create_access_token(identity=email)
-    logger.info('[OAUTH] %s login: %s', provider, email)
-    resp = make_response(redirect('/dashboard'))
+    sep = '&' if '?' in redirect_url else '?'
+    if 'email=' not in redirect_url:
+        redirect_url = f'{redirect_url}{sep}email={email}'
+    resp = make_response(redirect(redirect_url))
     resp.set_cookie(
         'access_token', access_token, httponly=True,
         secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
         samesite='Lax', max_age=28800,
     )
     return resp
+
+
+def _session_email() -> str:
+    """Resolve logged-in customer email from session, JWT cookie, or query."""
+    email = (session.get('user_email') or '').strip()
+    if email:
+        return email
+    token = request.cookies.get('access_token', '')
+    if token:
+        try:
+            from flask_jwt_extended import decode_token
+            email = (decode_token(token).get('sub') or '').strip()
+            if email:
+                return email
+        except Exception:
+            pass
+    return (request.args.get('email') or '').strip()
+
+
+def _customer_exists(email: str) -> bool:
+    """True if email has a profile, order, or platform subscription."""
+    if not email:
+        return False
+    db = get_db()
+    if db.execute('SELECT 1 FROM customer_profiles WHERE email=?', (email,)).fetchone():
+        return True
+    if db.execute(
+        "SELECT 1 FROM orders WHERE customer_email=? LIMIT 1", (email,)
+    ).fetchone():
+        return True
+    try:
+        if db.execute(
+            "SELECT 1 FROM platform_subscriptions WHERE email=? LIMIT 1", (email,)
+        ).fetchone():
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _upsert_lead(email: str, name: str) -> None:
+    """Persist signup lead into customer_profiles."""
+    import secrets
+    email = email.strip().lower()
+    parts = (name or '').strip().split(None, 1)
+    first = parts[0] if parts else email.split('@')[0]
+    last = parts[1] if len(parts) > 1 else ''
+    now = datetime.utcnow().isoformat()
+    db = get_db()
+    existing = db.execute(
+        'SELECT profile_id FROM customer_profiles WHERE email=?', (email,)
+    ).fetchone()
+    if existing:
+        db.execute(
+            'UPDATE customer_profiles SET first_name=?, last_name=?, updated_at=? WHERE email=?',
+            (first, last, now, email),
+        )
+    else:
+        profile_id = 'lead_' + secrets.token_urlsafe(12)
+        db.execute(
+            '''INSERT INTO customer_profiles
+               (profile_id, email, first_name, last_name, created_at, updated_at)
+               VALUES (?,?,?,?,?,?)''',
+            (profile_id, email, first, last, now, now),
+        )
+    db.commit()
+
+
+def _oauth_finish_login(email: str, name: str, provider: str):
+    """Create session + JWT cookie after successful OAuth."""
+    session['user_name'] = name or email.split('@')[0]
+    _upsert_lead(email, name or email.split('@')[0])
+    logger.info('[OAUTH] %s login: %s', provider, email)
+    return _auth_cookie_response(email)
 
 
 def _google_userinfo(token: dict):
@@ -703,33 +778,46 @@ def polyclaw_status():
 
 @app.route('/api/signup', methods=['POST'])
 def api_signup():
-    """Signup endpoint — collect email + name, return confirmation."""
+    """Signup endpoint — collect email + name, persist lead, return confirmation."""
     try:
         data = request.get_json() or {}
-        email = data.get('email', '').strip()
+        email = data.get('email', '').strip().lower()
         name = data.get('name', '').strip()
-        
+        plan = (data.get('plan') or '').strip().lower()
+
         if not email or not name:
             return jsonify({'error': 'Email and name required'}), 400
-        
+
         if '@' not in email:
             return jsonify({'error': 'Invalid email address'}), 400
-        
-        # Log signup (for future lead tracking)
-        logger.info(f"[SIGNUP] New signup: {name} ({email})")
-        
-        # TODO: Store in database for CRM integration
-        # TODO: Send welcome email
-        
+
+        _upsert_lead(email, name)
+        session['user_email'] = email
+        session['user_name'] = name
+        logger.info('[SIGNUP] New lead: %s (%s) plan=%s', name, email, plan or 'none')
+
+        if email_sender:
+            try:
+                email_sender.send_welcome_email(
+                    customer_email=email,
+                    customer_name=name,
+                    company_name='',
+                    use_case='signup',
+                    order_id='',
+                )
+            except Exception as exc:
+                logger.warning('[SIGNUP] Welcome email failed: %s', exc)
+
         return jsonify({
             'success': True,
             'message': 'Signup successful! Redirecting to checkout...',
             'email': email,
-            'name': name
+            'name': name,
+            'plan': plan,
         }), 200
-    
+
     except Exception as e:
-        logger.error(f"[SIGNUP] Error: {e}")
+        logger.error('[SIGNUP] Error: %s', e)
         return jsonify({'error': str(e)}), 500
 
 
@@ -1115,8 +1203,8 @@ def buy_page():
 
 @app.route('/buy-sinc', methods=['GET'])
 def buy_sinc_page():
-    """Render SINC token purchase page (bonding curve on Base chain)."""
-    return render_template('buy_sinc.html')
+    """Redirect legacy buy-sinc URL to official curve gateway."""
+    return redirect('/sinc', code=302)
 
 
 # ============================================================================
@@ -1934,10 +2022,43 @@ def register_airdrop():
 # STUB PAGES
 # ============================================================================
 
-@app.route('/contact')
+@app.route('/contact', methods=['GET', 'POST'])
 def contact():
-    """Contact page stub."""
-    return jsonify({'message': 'Contact page', 'email': 'support@getsincor.com'}), 200
+    """Contact / sales page."""
+    if request.method == 'POST':
+        data = request.form or {}
+        email = (data.get('email') or '').strip().lower()
+        message = (data.get('message') or '').strip()[:2000]
+        name = (data.get('name') or '').strip()[:120]
+        if not email or '@' not in email or not message:
+            return render_template(
+                'contact.html',
+                error='Email and message are required.',
+                support_email=os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com'),
+            )
+        logger.info('[CONTACT] %s <%s>: %s', name or 'anon', email, message[:200])
+        if email_sender:
+            try:
+                support = os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com')
+                body = f'From: {name} <{email}>\n\n{message}'
+                email_sender.send_email(
+                    to_email=support,
+                    to_name='SINCOR Support',
+                    subject=f'SINCOR contact from {email}',
+                    html_content=f'<pre>{body}</pre>',
+                    text_content=body,
+                )
+            except Exception as exc:
+                logger.warning('[CONTACT] Forward failed: %s', exc)
+        return render_template(
+            'contact.html',
+            success='Message received. We reply within one business day.',
+            support_email=os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com'),
+        )
+    return render_template(
+        'contact.html',
+        support_email=os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com'),
+    )
 
 
 @app.route('/pricing')
@@ -1948,14 +2069,14 @@ def pricing():
 
 @app.route('/docs')
 def docs():
-    """API documentation stub."""
-    return jsonify({'message': 'API Documentation', 'version': '1.0.0'}), 200
+    """Product documentation."""
+    return render_template('docs.html')
 
 
 @app.route('/dashboard')
 def dashboard():
     """Customer dashboard — shows agent activity, profile, and account status."""
-    email = request.args.get('email', '')
+    email = _session_email()
 
     # Load profile if email provided
     profile = {}
@@ -1974,8 +2095,19 @@ def dashboard():
     import random
     random.seed(42)  # Consistent demo data
     tier = order.get('product_name', 'Starter')
-    agent_counts = {'Starter': 8, 'Professional': 24, 'Enterprise': 42}
-    num_agents = agent_counts.get(tier, 8)
+    try:
+        from sincor2.platform_payments import PLATFORM_PLANS
+        agent_counts = {
+            p['product_name']: p.get('agents', 10)
+            for p in PLATFORM_PLANS.values()
+        }
+    except Exception:
+        agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 42}
+    num_agents = agent_counts.get(tier, 10)
+    demo_mode = not bool(
+        order.get('order_id')
+        and order.get('payment_status') in ('completed', 'paid', 'verified')
+    )
 
     use_case = profile.get('primary_use_case', 'Lead Generation & Outreach')
     company  = profile.get('company_name', 'Your Company')
@@ -2006,11 +2138,14 @@ def dashboard():
 
     member_since = order.get('created_at', '')[:10] if order.get('created_at') else ''
 
-    return render_template('dashboard.html',
+    return render_template(
+        'dashboard.html',
         profile=profile, order=order, agents=agents, stats=stats,
         tier=tier, num_agents=num_agents, company=company,
         fname=fname, use_case=use_case, member_since=member_since,
-        email=email, demo_mode=True)
+        email=email, demo_mode=demo_mode,
+        order_id=order.get('order_id', ''),
+    )
 
 
 @app.route('/privacy')
@@ -2514,16 +2649,50 @@ def affiliate_program():
     return render_template('affiliate-program.html')
 
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    """Login page."""
+    """Login page — email session, OAuth, or admin API."""
     err_key = request.args.get('error', '')
-    return render_template(
-        'login.html',
-        oauth_error=OAUTH_ERROR_MESSAGES.get(err_key, ''),
-        oauth_google=_oauth_provider_ready('google'),
-        oauth_github=_oauth_provider_ready('github'),
-    )
+    ctx = {
+        'oauth_error': OAUTH_ERROR_MESSAGES.get(err_key, ''),
+        'oauth_google': _oauth_provider_ready('google'),
+        'oauth_github': _oauth_provider_ready('github'),
+        'error': None,
+        'success': None,
+    }
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip().lower()
+        if not email or '@' not in email:
+            ctx['error'] = 'Enter a valid email address.'
+            return render_template('login.html', **ctx)
+        if _customer_exists(email):
+            logger.info('[AUTH] Email login: %s', email)
+            return _auth_cookie_response(email)
+        ctx['error'] = 'No account found for that email. Sign up first or use Google/GitHub.'
+        return render_template('login.html', **ctx)
+    return render_template('login.html', **ctx)
+
+
+@app.route('/forgot-password')
+def forgot_password():
+    """Passwordless product — direct users to email login or support."""
+    return redirect('/login')
+
+
+@app.route('/business-setup')
+def business_setup():
+    return redirect('/signup')
+
+
+@app.route('/free-trial/<path:_slug>')
+@app.route('/free-trial')
+def free_trial():
+    return redirect('/signup')
+
+
+@app.route('/admin/executive')
+def admin_executive():
+    return redirect('/dashboard')
 
 
 @app.route('/billing')
@@ -2583,12 +2752,17 @@ def sitemap_xml():
     base = 'https://getsincor.com'
     pages = [
         ('/', '1.0', 'weekly'),
+        ('/signup', '0.9', 'weekly'),
+        ('/login', '0.8', 'weekly'),
         ('/buy', '0.9', 'weekly'),
+        ('/sinc', '0.9', 'weekly'),
         ('/pricing', '0.9', 'weekly'),
-        ('/affiliate-program', '0.7', 'monthly'),
-        ('/enterprise-dashboard', '0.7', 'monthly'),
+        ('/pitch', '0.8', 'monthly'),
         ('/whitepaper', '0.7', 'monthly'),
-        ('/pitch', '0.7', 'monthly'),
+        ('/onboarding', '0.6', 'monthly'),
+        ('/verticals/webbuilder', '0.7', 'weekly'),
+        ('/products/starter', '0.8', 'weekly'),
+        ('/contact', '0.6', 'monthly'),
         ('/privacy', '0.4', 'monthly'),
         ('/terms', '0.4', 'monthly'),
         ('/security', '0.4', 'monthly'),
