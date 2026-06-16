@@ -2438,7 +2438,10 @@ def api_webbuilder_contact():
 @app.route('/sinc')
 def sinc_token():
     """SINC token gateway page."""
-    return render_template('sinc_gateway.html')
+    return render_template(
+        'sinc_gateway.html',
+        walletconnect_project_id=os.environ.get('WALLETCONNECT_PROJECT_ID', '').strip(),
+    )
 
 
 @app.route('/refer')
