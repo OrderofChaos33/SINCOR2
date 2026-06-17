@@ -35,11 +35,12 @@
     "rogueV2PairDoNotUse": "0x85372932f9b151a076815d92cf71a97980ffd667"
   },
   "pricing": {
-    "schema": "dual-path",
-    "bondingCurveSpotUsd": "live from /api/price/official — ETH buy path only, micro-cents early",
-    "hookUsdcDiscoveryUsd": "0.10 to 0.95",
-    "hookUsdcFloorWallUsd": 1.50,
-    "doNotConflate": "curve spot is NOT hook floor; aggregators must label which path",
+    "schema": "floor-only",
+    "officialPriceUsd": 1.50,
+    "minimumBuyUsdPerSinc": 1.50,
+    "buyPath": "USDC via hook router — https://getsincor.com/sinc#buy-usdc",
+    "bondingCurveBuyEnabled": false,
+    "discoveryRampEnabled": false,
     "priceApi": "https://getsincor.com/api/price/official"
   },
   "security": {
