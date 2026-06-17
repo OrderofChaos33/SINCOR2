@@ -550,22 +550,16 @@
     </div>
   </div>
 
-  <!-- OFFICIAL PRICING (two buy paths — do not conflate) -->
+  <!-- OFFICIAL FLOOR — $1.50 minimum, non-negotiable -->
   <div style="max-width:720px; margin:20px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(6,182,212,0.12), rgba(139,92,246,0.1)); border:2px solid rgba(6,182,212,0.45); border-radius:12px; font-size:14px;">
-    <div style="font-weight:700; color:var(--cyan); margin-bottom:10px;">Official SINC pricing (two paths)</div>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px;">
-      <div style="padding:12px; background:rgba(0,0,0,0.25); border-radius:10px; border:1px solid rgba(6,182,212,0.25);">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:6px;">ETH · bonding curve spot</div>
-        <span id="official-spot" style="font-size:26px; font-weight:800; font-family:'JetBrains Mono',monospace;">loading…</span>
-        <div style="font-size:12px; color:var(--text-dim); margin-top:6px;">Rises with each ETH buy. Google/wallets showing ~$0.00009 are reading <em>this</em> path.</div>
-      </div>
-      <div style="padding:12px; background:rgba(0,0,0,0.25); border-radius:10px; border:1px solid rgba(139,92,246,0.35);">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:6px;">USDC · hook sell walls</div>
-        <span id="official-hook-floor" style="font-size:26px; font-weight:800; font-family:'JetBrains Mono',monospace;">$1.50+</span>
-        <div style="font-size:12px; color:var(--text-dim); margin-top:6px;">Discovery <span id="official-hook-ramp">$0.10–$0.95</span> · Floor wall <strong>$1.50+</strong> (USDC buy widget below).</div>
-      </div>
+    <div style="font-weight:700; color:var(--cyan); margin-bottom:8px;">Official SINC price — $1.50 minimum (non-negotiable)</div>
+    <span id="official-spot" style="font-size:32px; font-weight:800; font-family:'JetBrains Mono',monospace;">$1.50</span>
+    <span style="font-size:14px; color:var(--text-dim); margin-left:8px;">per SINC · USDC via hook floor only</span>
+    <div style="margin-top:10px; font-size:13px; color:var(--text-dim); line-height:1.5;">
+      Bonding-curve micro-prices and sub-floor discovery walls are <strong style="color:#f87171;">closed</strong>.
+      Wallets/Google showing ~$0.000009 are reading deprecated curve math — ignore it.
     </div>
-    <div style="margin-top:10px; font-size:12px; color:var(--text-muted);">Machine-readable: <a href="/api/price/official" style="color:var(--cyan)">/api/price/official</a> · <a href="/.well-known/sinc-token.json" style="color:var(--cyan)">sinc-token.json</a> · token list: <a href="/tokenlists/sincor.tokenlist.json" style="color:var(--cyan)">sincor.tokenlist.json</a></div>
+    <div style="margin-top:10px; font-size:12px; color:var(--text-muted);"><a href="/api/price/official" style="color:var(--cyan)">/api/price/official</a> · <a href="/.well-known/sinc-token.json" style="color:var(--cyan)">sinc-token.json</a></div>
   </div>
 
   <!-- ROGUE V2 / AGGREGATOR WARNING -->
@@ -582,46 +576,36 @@
   <div style="max-width:720px; margin:16px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(245,158,11,0.08), rgba(245,158,11,0.04)); border:1px solid rgba(245,158,11,0.3); border-radius:12px; font-size:14px; color:var(--text);">
     <div style="font-weight:600; color:#fbbf24; margin-bottom:6px;">Where to trade SINC today</div>
     <div style="color:var(--text-dim); line-height:1.5;">
-      <strong style="color:var(--text);">Buy (spot):</strong> bonding curve below (~$0.0001, rises with demand).<br>
-      <strong style="color:var(--text);">Buy (USDC):</strong> hook router below — lifts $0.10–$0.95 discovery ramp + $1.50+ floor walls.<br>
-      <strong style="color:var(--text);">Buy (floor $1.50+):</strong> same USDC widget or <a href="https://app.uniswap.org/swap?chain=base" target="_blank" rel="noopener" style="color:var(--cyan);">Uniswap v4</a>.<br>
+      <strong style="color:var(--text);">Buy:</strong> USDC hook below — <strong>$1.50/SINC minimum</strong> (only official path).<br>
+      <strong style="color:var(--text);">ETH curve:</strong> closed on getsincor.com — do not use for pricing.<br>
       <strong style="color:var(--text);">Sell → ETH:</strong> curve sell widget (curve-bought SINC only).<br>
       <strong style="color:var(--text);">Sell → USDC/WETH:</strong> Kyber aggregator (depth limited until we seed more LP).
     </div>
   </div>
 
-  <!-- BUY WIDGET -->
-  <div id="buy-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid var(--purple); border-radius:14px; box-shadow:0 0 40px rgba(139,92,246,0.15);">
-    <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">🪙 Buy SINC from the curve</div>
-    <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Connect your wallet on Base, enter ETH amount, sign one tx. First buyer per wallet auto-mints a soulbound Genesis NFT.</div>
-
-    <!-- LIVE GRADUATION PROGRESS -->
-    <div style="margin-bottom:18px; padding:12px; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px;">
+  <!-- ETH CURVE CLOSED -->
+  <div id="buy-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid rgba(239,68,68,0.35); border-radius:14px;">
+    <div style="font-size:18px; font-weight:600; color:#f87171; margin-bottom:6px;">ETH bonding curve — closed</div>
+    <div style="font-size:13px; color:var(--text-dim); line-height:1.55; margin-bottom:14px;">
+      Sub-$1.50 buys are not permitted. The legacy ETH curve showed micro-cent quotes — that path is disabled here.
+      <strong style="color:var(--text);">Use USDC below ($1.50/SINC minimum).</strong>
+    </div>
+    <div style="margin-bottom:14px; padding:12px; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-size:12px; font-weight:600; color:var(--cyan); text-transform:uppercase; letter-spacing:0.05em;">Graduation Progress</span>
+        <span style="font-size:12px; font-weight:600; color:var(--cyan); text-transform:uppercase;">Graduation Progress (legacy)</span>
         <span id="grad-pct" style="font-size:13px; font-weight:700; color:var(--purple-light);">—</span>
       </div>
       <div style="height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;">
         <div id="grad-bar" style="height:100%; width:0%; background:linear-gradient(90deg, var(--purple), var(--cyan)); transition:width 0.6s ease;"></div>
       </div>
-      <div id="grad-progress" style="margin-top:6px; font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">loading on-chain stats…</div>
+      <div id="grad-progress" style="margin-top:6px; font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">loading…</div>
     </div>
-    <button id="buy-connect" style="width:100%; padding:12px; background:var(--purple); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Connect Wallet</button>
-    <div id="wallet-picker" style="display:none; margin-top:12px; padding:14px; background:var(--bg-dark); border:1px solid var(--border-bright); border-radius:10px;">
-      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px; line-height:1.45;">On mobile? Open this page <strong style="color:var(--text);">inside</strong> your wallet app, or connect below:</div>
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        <button type="button" data-wallet="metamask" style="width:100%; padding:11px; background:#f6851b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in MetaMask</button>
-        <button type="button" data-wallet="coinbase" style="width:100%; padding:11px; background:#0052ff; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Coinbase Wallet</button>
-        <button type="button" data-wallet="rainbow" style="width:100%; padding:11px; background:linear-gradient(90deg,#174299,#9011fe); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Rainbow</button>
-        <button type="button" data-wallet="walletconnect" style="width:100%; padding:11px; background:var(--surface-light); color:var(--text); border:1px solid var(--border-bright); border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">WalletConnect</button>
-      </div>
-    </div>
-    <div id="buy-form" style="display:none; margin-top:16px;">
-      <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Connected: <span id="buy-account" class="mono"></span></div>
-      <input id="buy-eth" type="number" step="0.0001" min="0.0001" placeholder="ETH amount (e.g. 0.01)" style="width:100%; padding:12px; background:var(--bg-dark); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:15px; margin-bottom:12px;">
-      <button id="buy-go" style="width:100%; padding:12px; background:linear-gradient(135deg, var(--purple), var(--cyan)); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Buy SINC</button>
-    </div>
-    <div id="buy-status" style="margin-top:12px; font-size:13px; color:var(--cyan); min-height:18px;"></div>
+    <a href="#buy-usdc" class="btn-primary" style="display:block; text-align:center; text-decoration:none; padding:12px;">Buy with USDC at $1.50 floor →</a>
+    <div id="wallet-picker" style="display:none;"></div>
+    <div id="buy-form" style="display:none;"></div>
+    <div id="buy-status" style="display:none;"></div>
+    <button id="buy-connect" type="button" style="display:none;" disabled></button>
+    <button id="buy-go" type="button" style="display:none;" disabled></button>
     <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
       <a href="https://twitter.com/intent/tweet?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20Sourcify-verified%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%20%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#1d9bf0; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">𝕏 Share on X</a>
       <a href="https://warpcast.com/~/compose?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C&embeds[]=https://getsincor.com/sinc" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#8a63d2; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">⌐◨-◨ Share on Farcaster</a>
@@ -629,22 +613,32 @@
     </div>
   </div>
 
-  <!-- BUY SINC WITH USDC (HOOK ROUTER) -->
+  <!-- BUY SINC WITH USDC (HOOK ROUTER) — ONLY OFFICIAL PATH -->
   <div id="buy-usdc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid var(--cyan); border-radius:14px; box-shadow:0 0 32px rgba(6,182,212,0.12);">
-    <div style="font-size:18px; font-weight:600; margin-bottom:6px;">💵 Buy SINC with USDC (hook)</div>
-    <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Direct route through our audited limit-order hook — discovery ramp $0.10–$0.95 live, $1.50+ floor above that. You bring USDC; hook fills at wall prices.</div>
+    <div style="font-size:18px; font-weight:600; margin-bottom:6px;">Buy SINC with USDC — $1.50 minimum</div>
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Only official buy path. Pays USDC, receives SINC from hook floor sell walls at <strong>$1.50/SINC or higher</strong>. No sub-floor fills.</div>
+    <div id="wallet-picker" style="display:none; margin-bottom:12px; padding:14px; background:var(--bg-dark); border:1px solid var(--border-bright); border-radius:10px;">
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">On mobile? Open in your wallet app:</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button type="button" data-wallet="metamask" style="width:100%; padding:11px; background:#f6851b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in MetaMask</button>
+        <button type="button" data-wallet="coinbase" style="width:100%; padding:11px; background:#0052ff; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Coinbase Wallet</button>
+        <button type="button" data-wallet="rainbow" style="width:100%; padding:11px; background:linear-gradient(90deg,#174299,#9011fe); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Rainbow</button>
+        <button type="button" data-wallet="walletconnect" style="width:100%; padding:11px; background:var(--surface-light); color:var(--text); border:1px solid var(--border-bright); border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">WalletConnect</button>
+      </div>
+    </div>
     <button id="usdc-connect" style="width:100%; padding:12px; background:var(--surface-light); color:var(--text); border:1px solid var(--border-bright); border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Connect Wallet</button>
     <div id="usdc-form" style="display:none; margin-top:16px;">
       <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Connected: <span id="usdc-account" class="mono"></span></div>
       <div class="swap-field">
         <div class="swap-label">You pay</div>
         <div class="swap-input-wrap">
-          <input id="usdc-amount" type="number" step="0.01" min="1" placeholder="USDC amount" style="flex:1; background:transparent; border:none; color:var(--text); font-size:15px;">
+          <input id="usdc-amount" type="number" step="0.01" min="1.5" placeholder="USDC (min 1.50)" style="flex:1; background:transparent; border:none; color:var(--text); font-size:15px;">
           <span class="swap-token-badge">USDC</span>
         </div>
       </div>
       <div class="swap-info">
-        <div class="swap-info-row"><span>Est. SINC (≥$0.10)</span><span id="usdc-est-sinc" class="cyan">—</span></div>
+        <div class="swap-info-row"><span>Est. SINC (@ $1.50 min)</span><span id="usdc-est-sinc" class="cyan">—</span></div>
+        <div class="swap-info-row"><span>Min price</span><span class="cyan">$1.50 / SINC</span></div>
         <div class="swap-info-row"><span>Route</span><span class="cyan">SincHookRouter → v4 hook</span></div>
         <div class="swap-info-row"><span>Router</span><span id="usdc-router-addr" class="mono" style="font-size:11px;">—</span></div>
       </div>
@@ -1044,24 +1038,14 @@
     } catch (e) { console.log('acceptance check:', e); }
   }
 
+  const SINC_FLOOR_USD = 1.50;
+
   async function refreshOfficialSpot() {
     try {
       const p = await fetch('/api/price/official').then(r => r.json());
       const el = document.getElementById('official-spot');
-      const hookEl = document.getElementById('official-hook-floor');
-      const rampEl = document.getElementById('official-hook-ramp');
-      const spot = p.spot_usd ?? p.bonding_curve?.spot_usd;
-      if (el && spot != null) {
-        const usd = Number(spot);
-        el.textContent = usd < 0.001 ? ('$' + usd.toFixed(8)) : ('$' + usd.toPrecision(4));
-      }
-      const floor = p.hook_floor_usd ?? p.hook_usdc?.floor_wall_usd;
-      if (hookEl && floor != null) hookEl.textContent = '$' + Number(floor).toFixed(2) + '+';
-      const hmin = p.hook_discovery_min_usd ?? p.hook_usdc?.discovery_min_usd;
-      const hmax = p.hook_discovery_max_usd ?? p.hook_usdc?.discovery_max_usd;
-      if (rampEl && hmin != null && hmax != null) {
-        rampEl.textContent = '$' + Number(hmin).toFixed(2) + '–$' + Number(hmax).toFixed(2);
-      }
+      const floor = p.official_floor_usd ?? p.spot_usd ?? p.minimum_buy_usd_per_sinc ?? SINC_FLOOR_USD;
+      if (el) el.textContent = '$' + Number(floor).toFixed(2);
     } catch (e) { console.log('official spot:', e); }
   }
 
@@ -1103,25 +1087,7 @@
     await SincWallet.ensureBase();
   }
 
-  function showBuyConnected(acct) {
-    acctEl.textContent = acct.slice(0, 6) + '...' + acct.slice(-4);
-    connectBtn.style.display = 'none';
-    buyForm.style.display = 'block';
-    const picker = document.getElementById('wallet-picker');
-    if (picker) picker.style.display = 'none';
-    const refLink = `https://getsincor.com/sinc?ref=${acct}`;
-    if (!document.getElementById('buy-ref-link')) {
-      const refDiv = document.createElement('div');
-      refDiv.id = 'buy-ref-link';
-      refDiv.style.cssText = 'margin-top:14px; padding:12px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:8px; font-size:12px; color:var(--text-dim);';
-      refDiv.innerHTML = `<div style="font-weight:600; color:var(--purple-light); margin-bottom:4px;">Your referral link — earn 3% of every buy</div><div style="word-break:break-all; font-family:'JetBrains Mono',monospace; color:var(--cyan); cursor:pointer;" title="Click to copy" onclick="navigator.clipboard.writeText('${refLink}'); this.style.color='#10b981'; this.textContent='copied!'; setTimeout(()=>{this.style.color='var(--cyan)'; this.textContent='${refLink}';},1500);">${refLink}</div>`;
-      buyForm.appendChild(refDiv);
-    }
-    const status = validRef ? `Connected. Buying via referrer ${validRef.slice(0,6)}...${validRef.slice(-4)} (they get 3%).` : 'Connected on Base. Enter ETH amount.';
-    bs(status, '#10b981');
-  }
-
-  SincWallet.wirePicker('wallet-picker', showBuyConnected);
+  SincWallet.wirePicker('wallet-picker');
 
   const TOKEN_LIST_URL = 'https://getsincor.com/tokenlists/sincor.tokenlist.json';
 
@@ -1167,49 +1133,7 @@
     }
   }
 
-  const connectBtn = document.getElementById('buy-connect');
-  const buyForm = document.getElementById('buy-form');
-  const acctEl = document.getElementById('buy-account');
-  const ethInput = document.getElementById('buy-eth');
-  const goBtn = document.getElementById('buy-go');
-
-  if (connectBtn) {
-    connectBtn.addEventListener('click', async () => {
-      try {
-        bs('Connecting...');
-        const { account } = await SincWallet.connect();
-        showBuyConnected(account);
-      } catch (e) {
-        const picker = document.getElementById('wallet-picker');
-        if (picker) picker.style.display = 'block';
-        bs((e.message || e) + ' — try Open in MetaMask below.', '#ef4444');
-      }
-    });
-  }
-
-  if (goBtn) {
-    goBtn.addEventListener('click', async () => {
-      try {
-        const eth = parseFloat(ethInput.value);
-        if (!eth || eth < 0.0001) throw new Error('Enter at least 0.0001 ETH');
-        const ethWei = BigInt(Math.floor(eth * 1e18));
-        const ethWeiHex = '0x' + ethWei.toString(16);
-        await ensureBase();
-        const from = await SincWallet.getAccount();
-        if (!from) throw new Error('Reconnect wallet');
-        const data = encodeBuy(ethWeiHex);
-        bs('Confirm in wallet...');
-        const txHash = await walletProvider().request({
-          method: 'eth_sendTransaction',
-          params: [{ from, to: CURVE, value: ethWeiHex, data }]
-        });
-        bs('Sent! Tx: ' + txHash.slice(0,10) + '... — opening Basescan');
-        setTimeout(() => window.open('https://basescan.org/tx/' + txHash, '_blank'), 800);
-      } catch (e) {
-        bs('Error: ' + (e.message || e), '#ef4444');
-      }
-    });
-  }
+  // ETH curve buy disabled — $1.50 floor enforced via USDC hook only
 
   // ============ SWAP WIDGET (Kyber + curve sell) ============
   const USDC_ADDR = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
@@ -1375,13 +1299,15 @@
   }
 
   function estMinSincOut(usdcAtoms) {
-    // Conservative floor: assume ≥$0.10/SINC with 15% slippage buffer
-    return (usdcAtoms * 100n * 85n) / (10n * 100n);
+    // $1.50/SINC floor with 5% slippage buffer — rejects sub-floor hook fills client-side
+    const floorCents = BigInt(Math.round(SINC_FLOOR_USD * 100));
+    return (usdcAtoms * 100n * 95n) / (floorCents * 100n);
   }
 
   function estSincHuman(usdcAtoms) {
-    const sincAtoms = (usdcAtoms * 100n);
-    return (Number(sincAtoms) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const floorCents = BigInt(Math.round(SINC_FLOOR_USD * 100));
+    const sincAtoms = (usdcAtoms * 100n) / floorCents;
+    return (Number(sincAtoms) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 });
   }
 
   const usdcRouterEl = document.getElementById('usdc-router-addr');
@@ -1424,7 +1350,7 @@
       try {
         if (!usdcUser) await connectUsdc();
         const usdcAtoms = usdcToAtoms(usdcAmt.value);
-        if (usdcAtoms <= 0n) throw new Error('Enter at least 1 USDC');
+        if (usdcAtoms < usdcToAtoms(SINC_FLOOR_USD)) throw new Error('Minimum ' + SINC_FLOOR_USD + ' USDC ($1.50/SINC floor)');
         const minSinc = estMinSincOut(usdcAtoms);
         us('Approve USDC, then buy through hook...');
         const maxApprove = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
