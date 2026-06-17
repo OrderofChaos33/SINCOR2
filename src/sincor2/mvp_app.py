@@ -2470,21 +2470,14 @@ def sinc_recover_hook():
 
 @app.route('/api/price/official')
 def api_price_official():
-    """Canonical curve spot for tickers and visitor messaging."""
+    """Canonical pricing — bonding curve spot + hook USDC walls (separate buy paths)."""
     try:
-        from launch_content_engine.onchain_stats import fetch_stats
-        s = fetch_stats()
-        return jsonify({
-            'source': 'bonding_curve',
-            'curve': s['curve'],
-            'spot_usd': s.get('curve_spot_usd'),
-            'spot_eth': s.get('curve_spot_eth'),
-            'hook_floor_usd': s.get('hook_floor_usd', 1.50),
-            'note': s.get('price_note'),
-            'sinc_sold_m': s.get('sinc_sold_m'),
-            'curve_eth_accumulated': s.get('curve_eth_accumulated'),
-            'buy_url': s.get('buy_url'),
-        }), 200
+        from launch_content_engine.onchain_stats import build_official_price_payload
+        payload = build_official_price_payload()
+        resp = make_response(jsonify(payload))
+        resp.headers['Cache-Control'] = 'public, max-age=60'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp, 200
     except Exception as e:
         logger.warning('[PRICE] official error: %s', e)
         return jsonify({'error': str(e)}), 500
@@ -2598,6 +2591,11 @@ def sinc_token_metadata():
                 payload.update(json.load(f))
         except (json.JSONDecodeError, OSError):
             pass
+    try:
+        from launch_content_engine.onchain_stats import build_official_price_payload
+        payload['pricing'] = build_official_price_payload()
+    except Exception as e:
+        logger.debug('[TOKEN] live pricing unavailable: %s', e)
     resp = make_response(jsonify(payload))
     resp.headers['Access-Control-Allow-Origin'] = '*'
     resp.headers['Cache-Control'] = 'public, max-age=300'
