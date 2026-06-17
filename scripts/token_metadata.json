@@ -34,6 +34,14 @@
     "genesisNFT": "0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09",
     "rogueV2PairDoNotUse": "0x85372932f9b151a076815d92cf71a97980ffd667"
   },
+  "pricing": {
+    "schema": "dual-path",
+    "bondingCurveSpotUsd": "live from /api/price/official — ETH buy path only, micro-cents early",
+    "hookUsdcDiscoveryUsd": "0.10 to 0.95",
+    "hookUsdcFloorWallUsd": 1.50,
+    "doNotConflate": "curve spot is NOT hook floor; aggregators must label which path",
+    "priceApi": "https://getsincor.com/api/price/official"
+  },
   "security": {
     "officialBuyUrl": "https://getsincor.com/sinc",
     "deployer": "0xC184EcEfFaf6392951e4C7b042d61774497B5dC5",
