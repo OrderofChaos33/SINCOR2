@@ -172,18 +172,20 @@ def _cached_spot(key: str, fetcher) -> float | None:
 
 
 def _fetch_sinc_spot_usd_uncached() -> float | None:
+    """Official SINC quote price — non-negotiable $1.50 floor (not bonding-curve micro-spot)."""
+    floor = float(os.environ.get("SINC_FLOOR_USD", "1.50"))
     try:
         import sys
 
         root = str(_root())
         if root not in sys.path:
             sys.path.insert(0, root)
-        from launch_content_engine.onchain_stats import fetch_stats
+        from launch_content_engine.onchain_stats import SINC_FLOOR_USD
 
-        spot = fetch_stats().get("curve_spot_usd")
-        return float(spot) if spot and float(spot) > 0 else None
+        floor = float(SINC_FLOOR_USD)
     except Exception:
-        return None
+        pass
+    return floor if floor > 0 else None
 
 
 def fetch_sinc_spot_usd() -> float | None:
