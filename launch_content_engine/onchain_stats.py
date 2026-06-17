@@ -93,6 +93,9 @@ def fetch_stats() -> dict:
     except Exception:
         graduated = False
     rpc_ok = sinc_curve > 0 or sinc_pm > 0
+    hook_discovery_min = 0.10
+    hook_discovery_max = 0.95
+    hook_floor_usd = 1.50
     return {
         "sinc_in_curve_m": round(sinc_curve / 1e6, 2),
         "sinc_in_hook_pm_m": round(sinc_pm / 1e6, 2),
@@ -102,15 +105,77 @@ def fetch_stats() -> dict:
         "curve_spot_eth": price_eth_per_sinc,
         "curve_spot_usd": round(spot_usd, 8),
         "graduated": graduated,
-        "hook_floor_usd": 1.50,
-        "price_note": "Official spot = bonding curve. Hook $0.10+ are sell walls, not spot.",
+        "hook_discovery_min_usd": hook_discovery_min,
+        "hook_discovery_max_usd": hook_discovery_max,
+        "hook_floor_usd": hook_floor_usd,
+        "eth_usd": eth_usd,
+        "price_note": (
+            "Two official buy paths: (1) ETH bonding curve spot ~curve_spot_usd — rises with buys. "
+            "(2) USDC hook walls — discovery $0.10–$0.95, floor $1.50+. "
+            "Do NOT report curve spot as hook floor."
+        ),
         "rpc_ok": rpc_ok,
         "sinc_token": SINC,
         "curve": CURVE,
         "hook": HOOK,
         "router": ROUTER,
+        "rogue_v2_pair": "0x85372932f9b151a076815d92cf71a97980ffd667",
         "buy_url": "https://getsincor.com/sinc",
         "refer_url": "https://getsincor.com/refer",
+    }
+
+
+def build_official_price_payload(stats: dict | None = None) -> dict:
+    """Canonical pricing for APIs, wallets, and aggregators (Google, MetaMask, Blockscout)."""
+    s = stats or fetch_stats()
+    curve_spot = s.get("curve_spot_usd")
+    hook_floor = float(s.get("hook_floor_usd", 1.50))
+    hook_min = float(s.get("hook_discovery_min_usd", 0.10))
+    hook_max = float(s.get("hook_discovery_max_usd", 0.95))
+    return {
+        "source": "sincor_official",
+        "updated": "live",
+        "bonding_curve": {
+            "address": s.get("curve"),
+            "spot_usd": curve_spot,
+            "spot_eth": s.get("curve_spot_eth"),
+            "eth_accumulated": s.get("curve_eth_accumulated"),
+            "sinc_sold_m": s.get("sinc_sold_m"),
+            "buy_with": "ETH",
+            "buy_url": "https://getsincor.com/sinc#buy-sinc",
+            "note": "Early curve spot is micro-cents until more ETH accumulates. This is NOT the $1.50 hook floor.",
+        },
+        "hook_usdc": {
+            "hook": s.get("hook"),
+            "router": s.get("router"),
+            "discovery_min_usd": hook_min,
+            "discovery_max_usd": hook_max,
+            "floor_wall_usd": hook_floor,
+            "buy_with": "USDC",
+            "buy_url": "https://getsincor.com/sinc#buy-usdc",
+            "note": "USDC buys fill limit-order sell walls. Floor tier starts at $1.50/SINC.",
+        },
+        "aggregator_guidance": {
+            "curve_spot_is_not_floor": True,
+            "ignore_rogue_v2_pair": s.get("rogue_v2_pair"),
+            "official_buy_url": s.get("buy_url"),
+            "price_api": "https://getsincor.com/api/price/official",
+            "message": (
+                "If you show one price, label it. Curve spot (~$0.00009) is ETH path only. "
+                "Hook floor ($1.50) is USDC wall tier — different liquidity."
+            ),
+        },
+        # Backwards-compatible flat fields
+        "curve": s.get("curve"),
+        "spot_usd": curve_spot,
+        "spot_eth": s.get("curve_spot_eth"),
+        "hook_floor_usd": hook_floor,
+        "hook_discovery_min_usd": hook_min,
+        "note": s.get("price_note"),
+        "sinc_sold_m": s.get("sinc_sold_m"),
+        "curve_eth_accumulated": s.get("curve_eth_accumulated"),
+        "buy_url": s.get("buy_url"),
+        "eth_usd": s.get("eth_usd"),
     }
 
 
