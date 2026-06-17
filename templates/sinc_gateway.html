@@ -550,14 +550,22 @@
     </div>
   </div>
 
-  <!-- OFFICIAL SPOT (launch week) -->
+  <!-- OFFICIAL PRICING (two buy paths — do not conflate) -->
   <div style="max-width:720px; margin:20px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(6,182,212,0.12), rgba(139,92,246,0.1)); border:2px solid rgba(6,182,212,0.45); border-radius:12px; font-size:14px;">
-    <div style="font-weight:700; color:var(--cyan); margin-bottom:8px;">Official SINC spot price (bonding curve)</div>
-    <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:baseline;">
-      <span id="official-spot" style="font-size:28px; font-weight:800; font-family:'JetBrains Mono',monospace;">loading…</span>
-      <span style="color:var(--text-dim); font-size:13px;">Hook <strong style="color:var(--text);">$1.50+</strong> = minimum USDC <em>buy</em> wall, not spot. Curve spot rises with each buy.</span>
+    <div style="font-weight:700; color:var(--cyan); margin-bottom:10px;">Official SINC pricing (two paths)</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px;">
+      <div style="padding:12px; background:rgba(0,0,0,0.25); border-radius:10px; border:1px solid rgba(6,182,212,0.25);">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:6px;">ETH · bonding curve spot</div>
+        <span id="official-spot" style="font-size:26px; font-weight:800; font-family:'JetBrains Mono',monospace;">loading…</span>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:6px;">Rises with each ETH buy. Google/wallets showing ~$0.00009 are reading <em>this</em> path.</div>
+      </div>
+      <div style="padding:12px; background:rgba(0,0,0,0.25); border-radius:10px; border:1px solid rgba(139,92,246,0.35);">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:6px;">USDC · hook sell walls</div>
+        <span id="official-hook-floor" style="font-size:26px; font-weight:800; font-family:'JetBrains Mono',monospace;">$1.50+</span>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:6px;">Discovery <span id="official-hook-ramp">$0.10–$0.95</span> · Floor wall <strong>$1.50+</strong> (USDC buy widget below).</div>
+      </div>
     </div>
-    <div style="margin-top:10px; font-size:12px; color:var(--text-muted);">Import token list: <a href="/tokenlists/sincor.tokenlist.json" style="color:var(--cyan)">sincor.tokenlist.json</a> · Earn 3% referring buyers: <a href="/refer" style="color:var(--cyan)">/refer</a></div>
+    <div style="margin-top:10px; font-size:12px; color:var(--text-muted);">Machine-readable: <a href="/api/price/official" style="color:var(--cyan)">/api/price/official</a> · <a href="/.well-known/sinc-token.json" style="color:var(--cyan)">sinc-token.json</a> · token list: <a href="/tokenlists/sincor.tokenlist.json" style="color:var(--cyan)">sincor.tokenlist.json</a></div>
   </div>
 
   <!-- ROGUE V2 / AGGREGATOR WARNING -->
@@ -1040,9 +1048,19 @@
     try {
       const p = await fetch('/api/price/official').then(r => r.json());
       const el = document.getElementById('official-spot');
-      if (el && p.spot_usd != null) {
-        const usd = Number(p.spot_usd);
+      const hookEl = document.getElementById('official-hook-floor');
+      const rampEl = document.getElementById('official-hook-ramp');
+      const spot = p.spot_usd ?? p.bonding_curve?.spot_usd;
+      if (el && spot != null) {
+        const usd = Number(spot);
         el.textContent = usd < 0.001 ? ('$' + usd.toFixed(8)) : ('$' + usd.toPrecision(4));
+      }
+      const floor = p.hook_floor_usd ?? p.hook_usdc?.floor_wall_usd;
+      if (hookEl && floor != null) hookEl.textContent = '$' + Number(floor).toFixed(2) + '+';
+      const hmin = p.hook_discovery_min_usd ?? p.hook_usdc?.discovery_min_usd;
+      const hmax = p.hook_discovery_max_usd ?? p.hook_usdc?.discovery_max_usd;
+      if (rampEl && hmin != null && hmax != null) {
+        rampEl.textContent = '$' + Number(hmin).toFixed(2) + '–$' + Number(hmax).toFixed(2);
       }
     } catch (e) { console.log('official spot:', e); }
   }
