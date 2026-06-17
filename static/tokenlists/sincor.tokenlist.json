@@ -30,6 +30,12 @@
         "website": "https://getsincor.com",
         "officialBuyUrl": "https://getsincor.com/sinc",
         "bondingCurve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
+        "hookRouter": "0x11b86E85cC5170F4165c89ccb11332133B29E283",
+        "priceApi": "https://getsincor.com/api/price/official",
+        "pricingNote": "bondingCurveSpotUsd (ETH path) != hookFloorWallUsd (USDC path, $1.50+)",
+        "hookFloorWallUsd": 1.5,
+        "hookDiscoveryUsd": "0.10-0.95",
+        "roguePoolDoNotUse": "0x85372932f9b151a076815d92cf71a97980ffd667",
         "metadata": "https://getsincor.com/.well-known/sinc-token.json"
       }
     }
