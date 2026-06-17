@@ -32,8 +32,9 @@ def fetch_hook_status() -> dict:
         "sinc_address": SINC,
         "graduation_eth_target": GRADUATION_ETH,
         "graduation_pct": grad_pct,
-        "discovery_ramp": {"min_usd": 0.10, "max_usd": 0.95, "note": "USDC buys via router lift sell walls"},
-        "floor_ladder_usd": 1.50,
+        "discovery_ramp": {"enabled": False, "note": "Sub-floor discovery ramp closed — cancel on-chain if still live"},
+        "floor_ladder_usd": base.get("official_floor_usd", 1.50),
+        "minimum_buy_usd": base.get("official_floor_usd", 1.50),
         "buy_paths": {
             "eth_curve": "https://getsincor.com/sinc#buy-eth",
             "usdc_hook": "https://getsincor.com/sinc#buy-usdc",
