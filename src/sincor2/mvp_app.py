@@ -866,18 +866,13 @@ def outreach_run_now():
 @app.route('/', methods=['GET'])
 def home():
     """Home page."""
-    price_ctx = {'sinc_spot_usd': None, 'sinc_spot_label': 'curve…'}
+    price_ctx = {'sinc_spot_usd': None, 'sinc_spot_label': '$1.50 floor'}
     try:
-        from launch_content_engine.onchain_stats import fetch_stats
-        s = fetch_stats()
-        spot = s.get('curve_spot_usd')
-        if spot is not None:
-            price_ctx['sinc_spot_usd'] = spot
-            price_ctx['sinc_spot_label'] = (
-                f'${spot:.8f} spot' if spot < 0.001 else f'${spot:.6f} spot'
-            )
+        from launch_content_engine.onchain_stats import SINC_FLOOR_USD
+        price_ctx['sinc_spot_usd'] = SINC_FLOOR_USD
+        price_ctx['sinc_spot_label'] = f'${SINC_FLOOR_USD:.2f} floor'
     except Exception as e:
-        logger.debug('[HOME] curve spot unavailable: %s', e)
+        logger.debug('[HOME] floor price unavailable: %s', e)
     return render_template('home.html', **price_ctx)
 
 
