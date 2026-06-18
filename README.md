@@ -416,7 +416,7 @@ Manages the full partner lifecycle across eight partnership types (technology in
 |---|---|---|
 | **SINC** | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Governance, utility, and marketplace staking |
 | **AXIOM (AXM)** | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | A2A task settlement and payment rail |
-| **Treasury** | `0xAf9B539D8043C634b7E611818518BA7E850F289e` | All proceeds, liquidity, and sales route here first |
+ | All proceeds, liquidity, and sales route here first |
 | **Base chain** | `8453` | Production network |
 
 ### Smart Contracts (`onchain/src/`)
