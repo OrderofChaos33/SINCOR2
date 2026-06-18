@@ -13,6 +13,7 @@ numpy>=1.24.0                 # Numerical computing for monetization engine
 
 # Security & Authentication (Fix #3)
 flask-jwt-extended>=4.7.0     # JWT authentication with refresh tokens
+Authlib>=1.3.0                # Google + GitHub OAuth (signup/login)
 
 # Input Validation (Fix #4)
 pydantic[email]>=2.0.0        # Data validation and settings management

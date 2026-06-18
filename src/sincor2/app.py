@@ -8,7 +8,8 @@ ADDED: Rate Limiting for DDoS protection
 
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+from pathlib import Path
+from flask import Flask, render_template, request, jsonify, send_file, make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Load environment variables from .env file
@@ -69,7 +70,6 @@ try:
         WaitlistSignup,
         PaymentCreateRequest,
         PaymentExecuteRequest,
-        LoginRequest,
         validate_request
     )
     VALIDATION_AVAILABLE = True
@@ -87,7 +87,7 @@ except ImportError as e:
 
 # Import PayPal integration with SYNC wrappers
 try:
-    from sincor2.paypal_integration_sync import PayPalIntegrationSync, SINCORPaymentProcessorSync
+    from sincor2.paypal_integration_sync import PayPalIntegrationSync
     from sincor2.paypal_integration import PaymentRequest
     paypal_processor = PayPalIntegrationSync()
     PAYPAL_AVAILABLE = True
@@ -688,6 +688,206 @@ def sinc_token():
     return render_template('sinc_gateway.html')
 
 
+@app.route('/refer')
+@limiter.exempt if limiter else lambda f: f
+def sinc_refer():
+    """SINC referral program — generate a ?ref= link that pays 3% on-chain."""
+    return render_template('refer.html')
+
+
+@app.route('/sinc/acceptance')
+@limiter.exempt if limiter else lambda f: f
+def sinc_acceptance():
+    return render_template('sinc_acceptance.html')
+
+
+@app.route('/sinc/recover-hook')
+@limiter.exempt if limiter else lambda f: f
+def sinc_recover_hook():
+    """MetaMask-signed hook floor cancel — Account 6, no private key export."""
+    return render_template('hook_recover.html')
+
+
+@app.route('/earn')
+@limiter.exempt if limiter else lambda f: f
+def earn_value():
+    """Live value-creation hub — referrals, curve, hook, SaaS, token list."""
+    return render_template('earn.html')
+
+
+@app.route('/api/value/summary')
+@limiter.exempt if limiter else lambda f: f
+def api_value_summary():
+    try:
+        from sincor2.revenue_snapshot import fetch_live_status
+        return jsonify(fetch_live_status())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/ops/swarm-status')
+@limiter.exempt if limiter else lambda f: f
+def api_ops_swarm_status_legacy():
+    try:
+        from sincor2.swarm_ops import SWARM_TASKS, load_activity
+        from sincor2.grant_targets import borrow_reality_check, list_grant_targets
+        from sincor2.monetization_catalog import catalog_summary
+
+        activity = load_activity()
+        last = activity.get("runs", [])[-1] if activity.get("runs") else None
+        return jsonify({
+            "agents_defined": len(SWARM_TASKS),
+            "last_run": activity.get("last_run"),
+            "last_cycle": last,
+            "monetization": catalog_summary(),
+            "grant_targets": list_grant_targets(),
+            "borrow": borrow_reality_check(),
+            "review_url": "/launch/review",
+            "partners_url": "/launch/partners",
+            "note": "Production app: run.py → mvp_app.py",
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/ops/schedulers')
+@limiter.exempt if limiter else lambda f: f
+def api_ops_schedulers_legacy():
+    return jsonify({
+        "note": "Use production entrypoint run.py → mvp_app for full scheduler status",
+        "swarm_status": "/api/ops/swarm-status",
+        "value": "/api/value/summary",
+    })
+
+
+@app.route('/api/value/social')
+@limiter.exempt if limiter else lambda f: f
+def api_value_social():
+    try:
+        from sincor2.value_engine import social_pack
+        wallet = request.args.get('wallet', '').strip() or None
+        if wallet and not wallet.startswith('0x'):
+            wallet = None
+        return jsonify(social_pack(wallet))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/hook/status')
+@limiter.exempt if limiter else lambda f: f
+def api_hook_status():
+    try:
+        from sincor2.hook_stats import fetch_hook_status
+        return jsonify(fetch_hook_status())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/price/official')
+@limiter.exempt if limiter else lambda f: f
+def api_price_official():
+    """Canonical curve spot — use for tickers, OG tags, visitor messaging."""
+    try:
+        from launch_content_engine.onchain_stats import fetch_stats
+        s = fetch_stats()
+        return jsonify({
+            'source': 'bonding_curve',
+            'curve': s['curve'],
+            'spot_usd': s.get('curve_spot_usd'),
+            'spot_eth': s.get('curve_spot_eth'),
+            'hook_floor_usd': s.get('hook_floor_usd', 1.50),
+            'note': s.get('price_note'),
+            'sinc_sold_m': s.get('sinc_sold_m'),
+            'curve_eth_accumulated': s.get('curve_eth_accumulated'),
+            'buy_url': s.get('buy_url'),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/acceptance/status')
+@limiter.exempt if limiter else lambda f: f
+def api_acceptance_status():
+    try:
+        from sincor2.acceptance_status import fetch_acceptance
+        return jsonify(fetch_acceptance())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/tokenlists/sincor.tokenlist.json')
+@app.route('/.well-known/tokenlist.json')
+@limiter.exempt if limiter else lambda f: f
+def token_list_json():
+    path = Path(__file__).resolve().parent.parent.parent / 'static' / 'tokenlists' / 'sincor.tokenlist.json'
+    if not path.is_file():
+        return jsonify({'error': 'not found'}), 404
+    resp = make_response(send_file(path, mimetype='application/json'))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
+@app.route('/sinc/vs-agent-tokens')
+@limiter.exempt if limiter else lambda f: f
+def sinc_vs_agent_tokens():
+    """SEO comparison: verified agent tokens vs vaporware launches."""
+    return render_template('sinc_vs_agent_tokens.html')
+
+
+@app.route('/launch/review')
+@limiter.exempt if limiter else lambda f: f
+def launch_review_page():
+    """Human review queue for agent-drafted launch content."""
+    return render_template('launch_review.html')
+
+
+def _launch_review_modules():
+    import sys
+    root = Path(__file__).resolve().parent.parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from launch_content_engine.review_queue import (
+        approve_and_post,
+        list_drafts,
+        set_status,
+    )
+    return list_drafts, set_status, approve_and_post
+
+
+@app.route('/api/launch/review')
+@limiter.exempt if limiter else lambda f: f
+def launch_review_list():
+    status = request.args.get('status', 'pending')
+    list_drafts, _, _ = _launch_review_modules()
+    return jsonify(list_drafts(status=status or None))
+
+
+@app.route('/api/launch/review/<draft_id>', methods=['POST'])
+@limiter.exempt if limiter else lambda f: f
+def launch_review_action(draft_id):
+    data = request.get_json(silent=True) or {}
+    action = data.get('action', '')
+    _, set_status, approve_and_post = _launch_review_modules()
+
+    if action == 'reject':
+        ok = set_status(draft_id, 'rejected')
+        return jsonify({'ok': ok, 'status': 'rejected'})
+    if action == 'approve':
+        result = approve_and_post(draft_id)
+        return jsonify(result)
+    return jsonify({'ok': False, 'error': 'invalid_action'}), 400
+
+
+@app.route('/.well-known/agent.json')
+@limiter.exempt if limiter else lambda f: f
+def agent_card():
+    """A2A-style agent card for SINCOR swarm discovery."""
+    path = Path(__file__).resolve().parent.parent.parent / 'static' / '.well-known' / 'agent.json'
+    if not path.is_file():
+        return jsonify({'error': 'agent card not found'}), 404
+    return send_file(path, mimetype='application/json')
+
+
 @app.route('/why-no-dex')
 @limiter.exempt if limiter else lambda f: f
 def why_no_dex():
@@ -996,7 +1196,7 @@ def create_payment():
                 from flask_jwt_extended import verify_jwt_in_request
                 verify_jwt_in_request(optional=True)
                 current_user = get_jwt_identity()
-            except:
+            except Exception:
                 pass
 
         payment_data = request.get_json()
@@ -1052,7 +1252,7 @@ def execute_payment():
                 from flask_jwt_extended import verify_jwt_in_request
                 verify_jwt_in_request(optional=True)
                 current_user = get_jwt_identity()
-            except:
+            except Exception:
                 pass
 
         payment_data = request.get_json()
@@ -1101,11 +1301,16 @@ def start_monetization():
         # Execute monetization strategy synchronously
         # Note: This should be moved to a background task queue (Celery) for production
 
+        from sincor2.swarm_ops import run_swarm_cycle
+
+        summary = run_swarm_cycle()
         return jsonify({
             'success': True,
-            'message': 'Monetization engine started successfully',
-            'note': 'Running synchronously - consider using Celery for background processing',
-            'started_by': current_user
+            'message': 'Operational swarm cycle completed',
+            'agents_run': summary.get('agents_run'),
+            'agents_ok': summary.get('agents_ok'),
+            'started_by': current_user,
+            'status_url': '/api/ops/swarm-status',
         })
 
     except Exception as e:
@@ -1116,6 +1321,13 @@ def start_monetization():
 @limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f
 def monetization_status():
     """Get monetization engine status (RATE LIMITED)"""
+    live = {}
+    try:
+        from sincor2.revenue_snapshot import fetch_live_status
+
+        live = fetch_live_status()
+    except Exception as exc:
+        live = {"ok": False, "error": str(exc)}
     return jsonify({
         'paypal_available': PAYPAL_AVAILABLE,
         'monetization_available': MONETIZATION_AVAILABLE,
@@ -1123,7 +1335,14 @@ def monetization_status():
         'auth_available': AUTH_AVAILABLE,
         'rate_limit_available': RATE_LIMIT_AVAILABLE,
         'environment_configured': bool(os.environ.get('PAYPAL_REST_API_ID')),
-        'production_mode': os.environ.get('PAYPAL_ENV', 'sandbox') == 'live'
+        'production_mode': os.environ.get('PAYPAL_ENV', 'sandbox') == 'live',
+        'live_metrics': live,
+        'simulated': False,
+        'ops_urls': {
+            'swarm': '/api/ops/swarm-status',
+            'schedulers': '/api/ops/schedulers',
+            'value': '/api/value/summary',
+        },
     })
 
 
@@ -1166,12 +1385,12 @@ if __name__ == '__main__':
         print("\nAdmin credentials:")
         print(f"  Username: {os.environ.get('ADMIN_USERNAME', 'admin')}")
         if admin_pw_set:
-            print(f"  Password: <configured via ADMIN_PASSWORD env var>")
+            print("  Password: <configured via ADMIN_PASSWORD env var>")
         elif is_prod:
-            print(f"  Password: NOT CONFIGURED — admin auth is REJECTED in production")
-            print(f"  ⚠️  Set ADMIN_PASSWORD env var to a strong value before launch.")
+            print("  Password: NOT CONFIGURED — admin auth is REJECTED in production")
+            print("  ⚠️  Set ADMIN_PASSWORD env var to a strong value before launch.")
         else:
-            print(f"  Password: changeme123  (dev default — DO NOT use in production)")
+            print("  Password: changeme123  (dev default — DO NOT use in production)")
 
     if RATE_LIMIT_AVAILABLE:
         print("\nRate Limiting Active:")

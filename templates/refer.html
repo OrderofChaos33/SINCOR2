@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Earn 3% — SINC Referral Program</title>
+<style>
+  :root{ --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --purple:#a855f7; --purple-light:#c4b5fd; --text:#e5e7eb; --muted:#9ca3af; --green:#34d399; }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#1b1b34 0%,var(--bg) 60%);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;min-height:100vh}
+  .wrap{max-width:680px;margin:0 auto;padding:48px 20px}
+  .badge{display:inline-block;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--cyan);border:1px solid rgba(34,211,238,.3);border-radius:999px;padding:6px 14px;margin-bottom:18px}
+  h1{font-size:34px;line-height:1.15;margin:0 0 12px;font-weight:800}
+  h1 .grad{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+  p.sub{color:var(--muted);font-size:16px;margin:0 0 28px}
+  .card{background:var(--panel);border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:24px;margin-bottom:18px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  button{cursor:pointer;border:none;border-radius:12px;font-weight:700;font-size:15px;padding:14px 18px;transition:.15s transform,.15s opacity}
+  button:active{transform:translateY(1px)}
+  .btn-primary{background:linear-gradient(90deg,var(--cyan),var(--purple));color:#0a0a14;width:100%}
+  .btn-ghost{background:rgba(255,255,255,.06);color:var(--text)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row > *{flex:1;min-width:120px}
+  .linkbox{display:flex;gap:10px;align-items:center;background:#0c0c18;border:1px solid rgba(34,211,238,.25);border-radius:12px;padding:12px 14px;margin:14px 0}
+  .linkbox input{flex:1;background:transparent;border:none;color:var(--cyan);font-family:ui-monospace,monospace;font-size:14px;outline:none}
+  .step{display:flex;gap:12px;align-items:flex-start;margin:14px 0}
+  .step .n{flex:0 0 28px;height:28px;width:28px;border-radius:50%;background:rgba(168,85,247,.18);color:var(--purple-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  .muted{color:var(--muted);font-size:14px}
+  .hl{color:var(--green);font-weight:700}
+  #qr{margin-top:14px;border-radius:12px;background:#fff;padding:10px;display:none}
+  .hidden{display:none!important}
+  .note{font-size:12px;color:var(--muted);margin-top:8px}
+  a{color:var(--cyan)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="badge">SINC Referral Program</span>
+  <h1>Bring a buyer. <span class="grad">Earn 3% — on-chain, instant.</span></h1>
+  <p class="sub">Every purchase made through your link pays you <b>3% of the buy, automatically, in the same transaction.</b> No sign-up, no payout delay, no middleman — it's enforced by the bonding-curve contract itself.</p>
+
+  <div class="card">
+    <div id="connect-state">
+      <button class="btn-primary" id="connectBtn">Connect wallet to get your link</button>
+      <p class="note">Your wallet address becomes your referral ID. You earn to that address.</p>
+    </div>
+
+    <div id="link-state" class="hidden">
+      <div class="muted">Your referral link</div>
+      <div class="linkbox">
+        <input id="refLink" readonly>
+        <button class="btn-ghost" id="copyBtn">Copy</button>
+      </div>
+      <div class="row">
+        <button class="btn-ghost" id="tweetBtn">Share on X</button>
+        <button class="btn-ghost" id="tgBtn">Share on Telegram</button>
+        <button class="btn-ghost" id="qrBtn">Show QR</button>
+      </div>
+      <img id="qr" alt="referral QR">
+      <p class="note">Connected as <span class="mono" id="addr"></span> · earnings arrive in this wallet automatically.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step"><div class="n">1</div><div>Connect your wallet above to mint your unique <span class="mono">?ref=</span> link.</div></div>
+    <div class="step"><div class="n">2</div><div>Share it anywhere — X, Telegram, Discord, your group chat.</div></div>
+    <div class="step"><div class="n">3</div><div>Anyone who buys SINC through your link triggers an instant <span class="hl">3% payout</span> to your wallet, paid by the contract in the same buy transaction.</div></div>
+  </div>
+
+  <p class="muted">SINC token <span class="mono">0x9C8c…68e7</span> · Base · Sourcify-verified, CertiK 97/100, ownership renounced. The 3% referral is hard-coded in the bonding curve <span class="mono">0x75dE…619C</span> — verify it yourself on Basescan. Referral rewards are not investment advice; buyers should do their own research.</p>
+</div>
+
+<script>
+  // Vanilla JS — matches the sinc_gateway.html pattern (window.ethereum + ethers-free).
+  const SALE_URL = location.origin + '/sinc';            // your live buy widget
+  const $ = id => document.getElementById(id);
+  let refUrl = '';
+
+  function setLink(addr){
+    refUrl = SALE_URL + '?ref=' + addr;
+    $('refLink').value = refUrl;
+    $('addr').textContent = addr;
+    $('connect-state').classList.add('hidden');
+    $('link-state').classList.remove('hidden');
+    // persist so a refresh keeps the link
+    try{ localStorage.setItem('sinc_ref_addr', addr); }catch(e){}
+  }
+
+  async function connect(){
+    if(!window.ethereum){ alert('No wallet detected — install MetaMask or a Base-compatible wallet.'); return; }
+    try{
+      const accts = await window.ethereum.request({ method:'eth_requestAccounts' });
+      if(accts && accts[0]) setLink(accts[0]);
+    }catch(e){ console.log('connect failed', e); }
+  }
+
+  $('connectBtn').onclick = connect;
+  $('copyBtn').onclick = ()=>{ navigator.clipboard.writeText(refUrl).then(()=>{ $('copyBtn').textContent='Copied ✓'; setTimeout(()=>$('copyBtn').textContent='Copy',1500); }); };
+  $('tweetBtn').onclick = ()=>{ const t = encodeURIComponent('I\'m earning 3% on every SINC buy through my link. Verified + audited token on @base. Grab some 👇'); window.open('https://twitter.com/intent/tweet?text='+t+'&url='+encodeURIComponent(refUrl),'_blank'); };
+  $('tgBtn').onclick = ()=>{ window.open('https://t.me/share/url?url='+encodeURIComponent(refUrl)+'&text='+encodeURIComponent('Earn 3% on every SINC buy via my link:'),'_blank'); };
+  $('qrBtn').onclick = ()=>{ const q=$('qr'); q.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(refUrl); q.style.display = q.style.display==='block'?'none':'block'; };
+
+  // restore prior link on load
+  try{ const saved = localStorage.getItem('sinc_ref_addr'); if(saved) setLink(saved); }catch(e){}
+</script>
+</body>
+</html>

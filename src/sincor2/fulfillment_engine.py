@@ -367,6 +367,106 @@ def trigger_autonomous_fulfillment(customer_email: str, plan_id: str,
     logger.info(f"[FULFILL] Background fulfillment thread started for {customer_email}")
 
 
+def trigger_content_fulfillment(
+    customer_email: str,
+    product_name: str,
+    order_id: str,
+    product_info: dict,
+) -> None:
+    """Generate paid content pieces via content_agent and email delivery links."""
+
+    def _run():
+        pieces_raw = product_info.get("pieces", "3")
+        try:
+            piece_count = int(str(pieces_raw).split("-")[0])
+        except (TypeError, ValueError):
+            piece_count = 3
+        piece_count = max(1, min(piece_count, 10))
+        topic = (
+            product_info.get("topic")
+            or product_info.get("keyword")
+            or product_name
+            or "CRM automation for sales teams"
+        )
+        logger.info(
+            f"[FULFILL] Content package started for {customer_email} | "
+            f"{piece_count} pieces | topic={topic}"
+        )
+        try:
+            from sincor2.content_agent import generate_blog_post
+
+            deliverables = []
+            for i in range(piece_count):
+                keyword = f"{topic} — part {i + 1}" if piece_count > 1 else topic
+                post = generate_blog_post(keyword=keyword, content_type="how-to")
+                if post.get("success"):
+                    deliverables.append(
+                        {
+                            "title": post.get("title", keyword),
+                            "slug": post.get("slug"),
+                            "word_count": post.get("word_count", 0),
+                        }
+                    )
+            if deliverables:
+                _send_content_delivery_email(
+                    customer_email, product_name, order_id, deliverables
+                )
+                logger.info(
+                    f"[FULFILL] Content package complete for {customer_email} | "
+                    f"{len(deliverables)} pieces"
+                )
+            else:
+                _send_fallback_welcome(
+                    customer_email, "content", product_name, order_id
+                )
+        except Exception as e:
+            logger.error(f"[FULFILL] Content package failed for {customer_email}: {e}")
+            _send_fallback_welcome(customer_email, "content", product_name, order_id)
+
+    threading.Thread(target=_run, daemon=True).start()
+    logger.info(f"[FULFILL] Background content thread started for {customer_email}")
+
+
+def _send_content_delivery_email(
+    customer_email: str,
+    product_name: str,
+    order_id: str,
+    deliverables: list,
+) -> bool:
+    try:
+        from sincor2.email_sender import get_email_sender
+
+        sender = get_email_sender()
+        if not sender:
+            return False
+        items_html = "".join(
+            f"<li><strong>{d.get('title')}</strong> "
+            f"({d.get('word_count', 0)} words)</li>"
+            for d in deliverables
+        )
+        sender.send_email(
+            to_email=customer_email,
+            to_name=customer_email.split("@")[0].title(),
+            subject=f"Your {product_name} is ready | SINCOR",
+            html_content=f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+<h2>Your content package is ready</h2>
+<p>We generated {len(deliverables)} SEO-ready pieces for order <code>{order_id}</code>.</p>
+<ul>{items_html}</ul>
+<p>View order status: <a href="https://getsincor.com/my-orders">getsincor.com/my-orders</a></p>
+<p>— SINCOR Content Engine</p>
+</body></html>""",
+            text_content=(
+                f"Your {product_name} ({len(deliverables)} pieces) is ready. "
+                f"Order: {order_id} — https://getsincor.com/my-orders"
+            ),
+        )
+        return True
+    except Exception as e:
+        logger.error(f"[FULFILL] Content delivery email failed: {e}")
+        return False
+
+
 def _send_fallback_welcome(customer_email: str, plan_id: str, plan_name: str, order_id: str):
     """Fallback email if report generation fails."""
     try:

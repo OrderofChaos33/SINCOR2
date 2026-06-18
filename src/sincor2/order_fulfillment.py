@@ -13,7 +13,7 @@ from enum import Enum
 
 # Import content and BI engines
 try:
-    from unified_content_engine import (
+    from sincor2.unified_content_engine import (
         UnifiedContentEngine,
         ContentRequest,
         ContentPackage,
@@ -25,7 +25,7 @@ except ImportError:
     print("Warning: Content engine not available for fulfillment")
 
 try:
-    from instant_business_intelligence import InstantBusinessIntelligence
+    from sincor2.instant_business_intelligence import InstantBusinessIntelligence
     BI_ENGINE_AVAILABLE = True
 except ImportError:
     BI_ENGINE_AVAILABLE = False
@@ -161,14 +161,26 @@ class OrderFulfillmentSystem:
         # 3. Generate login credentials
         # 4. Send welcome email
 
-        # For now, simulate fulfillment
         order.delivery_url = f"/dashboard?email={order.customer_email}&plan={order.product_name}"
+        plan_id = (order.product_name or "professional").lower()
+        try:
+            from sincor2.fulfillment_engine import trigger_autonomous_fulfillment
+
+            trigger_autonomous_fulfillment(
+                customer_email=order.customer_email,
+                plan_id=plan_id,
+                plan_name=order.product_name,
+                order_id=order.order_id,
+                amount=float(order.amount or 0),
+            )
+        except Exception as exc:
+            print(f"[FULFILL] Engine dispatch failed: {exc}")
 
         fulfillment_data = {
             'account_created': True,
             'dashboard_url': order.delivery_url,
             'agents_activated': self._get_agent_count(order.product_name),
-            'welcome_email_sent': True
+            'fulfillment_engine': True,
         }
 
         print(f"[OK] Subscription activated: {json.dumps(fulfillment_data, indent=2)}")
@@ -185,27 +197,22 @@ class OrderFulfillmentSystem:
         # Determine report type
         report_type = self._get_report_type(order.product_name)
 
-        # Generate report (simulated for now)
-        report_data = {
-            'report_type': report_type,
-            'generated_at': datetime.now().isoformat(),
-            'customer_email': order.customer_email,
-            'sections': [
-                'Executive Summary',
-                'Revenue Analysis',
-                'Growth Opportunities',
-                'Competitive Positioning',
-                'Recommendations'
-            ],
-            'pages': 20,
-            'charts': 15
-        }
+        plan_id = report_type if report_type in ("starter", "professional", "enterprise") else "starter"
+        try:
+            from sincor2.fulfillment_engine import trigger_autonomous_fulfillment
 
-        # Create download URL (in production, this would be S3 or similar)
-        order.delivery_url = f"/download/report/{order.order_id}.pdf"
+            trigger_autonomous_fulfillment(
+                customer_email=order.customer_email,
+                plan_id=plan_id,
+                plan_name=order.product_name,
+                order_id=order.order_id,
+                amount=float(order.amount or 0),
+            )
+        except Exception as exc:
+            print(f"[FULFILL] BI dispatch failed: {exc}")
 
-        print(f"[OK] BI Report generated: {order.delivery_url}")
-        print(f"   Report includes: {', '.join(report_data['sections'])}")
+        order.delivery_url = f"/my-orders?order_id={order.order_id}"
+        print(f"[OK] BI Report queued via fulfillment engine: {order.delivery_url}")
 
     async def _fulfill_content_package(self, order: Order):
         """
@@ -216,17 +223,32 @@ class OrderFulfillmentSystem:
         """
         print(f"Generating content package: {order.product_name} for {order.customer_email}")
 
+        try:
+            from sincor2.fulfillment_engine import trigger_content_fulfillment
+
+            trigger_content_fulfillment(
+                customer_email=order.customer_email,
+                product_name=order.product_name,
+                order_id=order.order_id,
+                product_info={
+                    "pieces": self._get_content_piece_count(order.product_name),
+                    "topic": order.product_name,
+                },
+            )
+            order.delivery_url = f"/my-orders?order_id={order.order_id}"
+            print(f"[OK] Content package queued via content_agent: {order.delivery_url}")
+            return
+        except Exception as exc:
+            print(f"[FULFILL] Content agent dispatch failed: {exc}")
+
         if not CONTENT_ENGINE_AVAILABLE:
             raise Exception("Content engine not available")
 
-        # Determine package type
         package_type = self._get_content_package_type(order.product_name)
-
-        # Create content request
         content_request = ContentRequest(
             package_type=package_type,
             content_types=['blog_post', 'landing_page', 'product_description', 'email_campaign'],
-            industry='saas',  # Would come from customer profile
+            industry='saas',
             target_audience='director',
             brand_context={
                 'customer_email': order.customer_email,
@@ -236,22 +258,9 @@ class OrderFulfillmentSystem:
             tone='professional',
             delivery_speed=DeliverySpeed.PRIORITY
         )
-
-        # Generate content
         deliverable = await self.content_engine.generate_content_package(content_request)
-
-        # Export in multiple formats
-        markdown_export = self.content_engine.export_deliverable(deliverable, 'markdown')
-        html_export = self.content_engine.export_deliverable(deliverable, 'html')
-
-        # Create download URLs
         order.delivery_url = f"/download/content/{order.order_id}/"
-
-        print(f"[OK] Content package generated:")
-        print(f"   - {len(deliverable.generated_content)} pieces created")
-        print(f"   - {deliverable.total_word_count:,} words total")
-        print(f"   - Quality score: {deliverable.quality_scores.get('overall', 0):.1f}/100")
-        print(f"   - Download: {order.delivery_url}")
+        print(f"[OK] Content package generated (legacy engine): {order.delivery_url}")
 
     async def _fulfill_generic(self, order: Order):
         """Fulfill generic one-time purchases"""
@@ -277,9 +286,16 @@ class OrderFulfillmentSystem:
             return 'growth_forecast'
         return 'general'
 
+    def _get_content_piece_count(self, product_name: str) -> int:
+        if "Micro" in product_name:
+            return 1
+        if "Professional" in product_name or "Enterprise" in product_name:
+            return 5
+        return 3
+
     def _get_content_package_type(self, product_name: str):
         """Determine content package type"""
-        from unified_content_engine import ContentPackage
+        from sincor2.unified_content_engine import ContentPackage
 
         if 'Micro' in product_name:
             return ContentPackage.MICRO

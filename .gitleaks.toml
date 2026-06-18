@@ -1,0 +1,10 @@
+title = "SINCOR2 gitleaks config"
+
+[allowlist]
+description = "Historical secret leaks remediated on main; keys rotated or files removed"
+paths = [
+  '''buy_watcher\.js''',
+  '''code_pkg/start_syndicator\.py''',
+  '''code_pkg/test_clinton_auto_detailing\.py''',
+  '''docs/CLINTON_AUTO_DETAILING_SETUP\.md''',
+]

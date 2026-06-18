@@ -1,0 +1,29 @@
+# x402 micropayment pricing — SINC on Base (8 decimals)
+# AXM agent tasks can use resource suffix _axm where noted in code.
+
+defaults:
+  token: SINC
+  treasury: "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+  chain_id: 8453
+  challenge_ttl_seconds: 900
+
+resources:
+  agent_task:
+    label: "Single agent task invocation"
+    amount_sinc: 1.0
+    description: "One billable agent call on the SINCOR platform"
+
+  bi_report_preview:
+    label: "BI report preview slice"
+    amount_sinc: 5.0
+    description: "Preview section of a competitive intelligence report"
+
+  hook_status:
+    label: "Hook ladder status API"
+    amount_sinc: 0.1
+    description: "Detailed hook order book snapshot"
+
+  content_draft:
+    label: "AI content draft (disclosed)"
+    amount_sinc: 2.0
+    description: "One SEO/agent content draft from the content engine"

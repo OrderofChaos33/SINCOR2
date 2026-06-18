@@ -7,8 +7,9 @@ Runs the Flask web application for production deployment.
 import os
 import sys
 
-# Add src directory to Python path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+_root = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _root)
+sys.path.insert(0, os.path.join(_root, 'src'))
 
 from sincor2.mvp_app import app
 

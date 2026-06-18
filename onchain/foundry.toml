@@ -9,7 +9,7 @@ optimizer = true
 optimizer_runs = 200
 via_ir = true
 evm_version = "cancun"
-gas_reports = ["SincBondingCurve", "SincLimitOrderHook", "SincGenesisNFT"]
+gas_reports = ["SincBondingCurve", "SincLimitOrderHook", "SincTreasuryLadderHook", "SincHookRouter", "SincGenesisNFT"]
 fs_permissions = [{ access = "read-write", path = "./deployments" }]
 
 [fuzz]
@@ -23,6 +23,8 @@ depth = 50
 base = "${BASE_RPC_URL}"
 sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
-[etherscan]
-base = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }
-sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+# [etherscan] section disabled — using sourcify verifier (no key needed)
+# Restore for forge script --verify once a real Etherscan API token is available:
+# [etherscan]
+# base = { key = "${BASESCAN_API_KEY}", chain = 8453, url = "https://api.etherscan.io/v2/api" }
+# sepolia = { key = "${BASESCAN_API_KEY}", chain = 84532, url = "https://api.etherscan.io/v2/api" }

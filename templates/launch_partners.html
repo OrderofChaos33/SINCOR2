@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launch partners — SINCOR</title>
+  <style>
+    :root { --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --muted:#9ca3af; --text:#e5e7eb; --green:#34d399; --amber:#fbbf24; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,sans-serif; }
+    .wrap { max-width:1000px; margin:0 auto; padding:32px 16px; }
+    h1 { font-size:28px; margin:0 0 8px; }
+    .sub { color:var(--muted); margin-bottom:20px; }
+    .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+    .stat { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:14px 18px; min-width:120px; }
+    .stat b { display:block; font-size:22px; color:var(--cyan); }
+    .stat span { font-size:12px; color:var(--muted); }
+    .card { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:18px; margin-bottom:14px; }
+    .meta { font-size:12px; color:var(--muted); margin-bottom:10px; }
+    .tier-P0 { border-left:3px solid var(--green); }
+    .tier-P1 { border-left:3px solid var(--cyan); }
+    .tier-P2 { border-left:3px solid var(--amber); }
+    pre { white-space:pre-wrap; font-size:13px; line-height:1.5; margin:10px 0; background:#0c0c18; padding:12px; border-radius:10px; }
+    button { cursor:pointer; border:none; border-radius:10px; padding:8px 12px; font-weight:700; margin-right:6px; font-size:12px; }
+    .ok { background:var(--green); color:#042f2e; }
+    .ghost { background:rgba(255,255,255,.08); color:var(--text); }
+    a { color:var(--cyan); }
+    .login { max-width:360px; }
+    .login input { width:100%; box-sizing:border-box; margin:8px 0 12px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#0d0d18; color:var(--text); }
+    .login button { width:100%; background:var(--cyan); color:#042f2e; }
+    .err { color:#f87171; font-size:13px; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Launch partner pipeline</h1>
+  <p class="sub">KOL / curator / ecosystem outreach for <b id="launchDate">July 7</b>. <a href="/launch/campaign">Campaign</a> · <a href="/launch/launchpads">Launchpads</a> · <a href="/launch/review">Content queue</a> · <a href="/pitch">Pitch deck</a></p>
+
+  <div id="login" class="card login hidden">
+    <strong>Admin sign-in</strong>
+    <input id="email" type="email" placeholder="Admin email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="doLogin()">Sign in</button>
+    <div id="loginErr" class="err"></div>
+  </div>
+
+  <div id="main" class="hidden">
+    <div class="stats" id="stats"></div>
+    <p class="sub">Today's due outreach — copy message, send via listed channel, then mark contacted.</p>
+    <div id="due"></div>
+    <h2 style="font-size:18px;margin:28px 0 12px;">All partners</h2>
+    <div id="all"></div>
+  </div>
+</div>
+<script>
+const TOKEN_KEY = 'sincor_admin_token';
+function authHeaders() {
+  const t = sessionStorage.getItem(TOKEN_KEY);
+  return t ? { 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/json' } : {};
+}
+async function doLogin() {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: document.getElementById('email').value.trim(),
+      password: document.getElementById('password').value
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    document.getElementById('loginErr').textContent = data.error || 'Login failed';
+    return;
+  }
+  sessionStorage.setItem(TOKEN_KEY, data.access_token);
+  load();
+}
+async function mark(id, status) {
+  await fetch('/api/launch/partners/' + id, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ status })
+  });
+  load();
+}
+function copyText(t) {
+  navigator.clipboard.writeText(t);
+}
+async function load() {
+  const res = await fetch('/api/launch/partners', { headers: authHeaders() });
+  if (res.status === 401) {
+    document.getElementById('login').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('main').classList.remove('hidden');
+  const data = await res.json();
+  document.getElementById('launchDate').textContent = data.summary.launch_date;
+  const s = data.summary;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><b>${s.days_to_launch}</b><span>days to launch</span></div>
+    <div class="stat"><b>${s.total}</b><span>targets</span></div>
+    <div class="stat"><b>${s.by_status.partnered || 0}</b><span>partnered</span></div>
+    <div class="stat"><b>${s.by_status.contacted || 0}</b><span>contacted</span></div>
+    <div class="stat"><b>${(data.due || []).length}</b><span>due today</span></div>`;
+  const dueEl = document.getElementById('due');
+  dueEl.innerHTML = '';
+  (data.due || []).forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'card tier-' + p.tier;
+    div.innerHTML = `
+      <strong>${p.name}</strong> · ${p.tier} · ${p.phase}
+      <div class="meta">${p.contact_method} → <a href="${p.contact_url}" target="_blank" rel="noopener">${p.contact_url}</a></div>
+      <pre>${p.message.replace(/</g,'&lt;')}</pre>
+      <button class="ghost" onclick="copyText(${JSON.stringify(p.message)})">Copy</button>
+      <button class="ok" onclick="mark('${p.id}','contacted')">Mark contacted</button>
+      <button class="ghost" onclick="mark('${p.id}','interested')">Interested</button>
+      <button class="ghost" onclick="mark('${p.id}','partnered')">Partnered ✓</button>`;
+    dueEl.appendChild(div);
+  });
+  const allEl = document.getElementById('all');
+  allEl.innerHTML = '';
+  (data.partners || []).forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'card tier-' + p.tier;
+    div.innerHTML = `<strong>${p.name}</strong> <span class="meta">@${p.handle || '—'} · ${p.status}</span>`;
+    allEl.appendChild(div);
+  });
+}
+load();
+</script>
+</body>
+</html>

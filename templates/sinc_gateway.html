@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SINC Token — Live on Base | SINCOR Autonomous Agent Platform</title>
-  <meta name="description" content="Buy SINC live on Base via the audited bonding curve. 0% tax, CertiK 97, OZ LimitOrderHook, soulbound Genesis NFT for first buyers. Contracts verified on Sourcify.">
+  <meta name="description" content="Buy SINC on Base at the official $1.50/SINC minimum via USDC hook floor. 0% tax, CertiK 97, OZ LimitOrderHook. Sub-floor paths closed. Contracts verified on Sourcify.">
   <meta name="keywords" content="SINC token, SINCOR, Base chain, Uniswap V4, bonding curve, AI agents, x402, autonomous AI">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://getsincor.com/sinc">
@@ -14,14 +14,15 @@
   <meta property="og:url" content="https://getsincor.com/sinc">
   <meta property="og:title" content="SINC Token — Live on Base | Buy from the Audited Bonding Curve">
   <meta property="og:description" content="Buy SINC directly from the curve. CertiK 97 token, Sourcify-verified contracts, LP burns at graduation. Powers the SINCOR autonomous AI agent economy.">
-  <meta property="og:image" content="https://getsincor.com/static/sincor_logo_new.jpg">
+  <meta property="og:image" content="https://getsincor.com/static/sincor_og.jpg">
+  <meta property="og:image:alt" content="SINC by SINCOR">
   <meta property="og:site_name" content="SINCOR">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="SINC Token — Live on Base">
-  <meta name="twitter:description" content="Buy SINC from the audited bonding curve. CertiK 97. Sourcify verified. SINCOR autonomous AI agent platform.">
-  <meta name="twitter:image" content="https://getsincor.com/static/sincor_logo_new.jpg">
+  <meta name="twitter:description" content="Buy SINC at $1.50/SINC minimum on Base via USDC hook floor. CertiK 97. Sourcify verified. SINCOR autonomous AI agent platform.">
+  <meta name="twitter:image" content="https://getsincor.com/static/sincor_og.jpg">
 
   <!-- JSON-LD Structured Data -->
   <script type="application/ld+json">
@@ -241,14 +242,80 @@
       gap: 32px;
     }
     @media (max-width: 768px) {
-      .main-grid { grid-template-columns: 1fr; }
-      nav { padding: 16px 20px; }
-      .nav-links { display: none; }
-      .hero { padding: 120px 20px 60px; }
-      .stats-strip { padding: 0 20px; }
-      .main-grid { padding: 0 20px; }
-      .contract-section { padding: 0 20px; }
-      .footer-links-grid { padding: 0 20px; }
+      nav {
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .nav-logo { font-size: 16px; }
+      .nav-links {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px 12px;
+      }
+      .nav-links a { font-size: 13px; }
+      .nav-cta { padding: 8px 14px; font-size: 13px !important; }
+      .hero {
+        padding: 100px 16px 48px;
+      }
+      .hero h1 { font-size: clamp(32px, 8vw, 48px); }
+      .hero p { font-size: 16px; padding: 0 4px; }
+      .hero-cta {
+        flex-direction: column;
+        width: 100%;
+        max-width: 360px;
+        margin: 0 auto;
+      }
+      .btn-primary, .btn-secondary {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 20px;
+        font-size: 15px;
+      }
+      .stats-strip {
+        padding: 0 16px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 48px;
+      }
+      .stat-card { padding: 20px 14px; }
+      .stat-value { font-size: 22px; }
+      .main-grid {
+        grid-template-columns: 1fr;
+        padding: 0 16px;
+        gap: 20px;
+        margin-bottom: 48px;
+      }
+      .card { padding: 24px 18px; border-radius: 16px; }
+      .card-title { font-size: 18px; }
+      .swap-input-wrap input { font-size: 16px; padding: 14px; }
+      .swap-input-wrap select,
+      .swap-token-badge { padding: 14px 12px; font-size: 12px; }
+      .contract-section { padding: 0 16px; margin-bottom: 48px; }
+      .contract-box {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 20px 16px;
+        gap: 16px;
+      }
+      .contract-actions {
+        width: 100%;
+        flex-direction: column;
+      }
+      .copy-btn, .wallet-btn { width: 100%; text-align: center; }
+      .footer-links-grid {
+        padding: 0 16px;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-bottom: 48px;
+      }
+      .disclaimer { padding: 0 16px; margin-bottom: 48px; }
+      footer {
+        padding: 24px 16px;
+        flex-direction: column;
+        text-align: center;
+      }
     }
 
     /* SWAP CARD */
@@ -376,6 +443,25 @@
       transition: all 0.2s;
     }
     .copy-btn:hover { background: rgba(139,92,246,0.25); }
+    .contract-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .wallet-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      border: none;
+      border-radius: 8px; color: white;
+      font-weight: 600; font-size: 13px;
+      cursor: pointer; white-space: nowrap;
+      font-family: 'Space Grotesk', sans-serif;
+      transition: opacity 0.2s;
+    }
+    .wallet-btn:hover { opacity: 0.9; }
+    .tokenlist-hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      word-break: break-all;
+    }
+    .tokenlist-hint a { color: var(--cyan); }
 
     /* FOOTER LINKS */
     .footer-links-grid {
@@ -438,6 +524,7 @@
       <a href="/">Home</a>
       <a href="/pricing">Pricing</a>
       <a href="/sinc">SINC Token</a>
+      <a href="/refer">Refer 3%</a>
       <a href="/signup" class="nav-cta">Get Started</a>
     </div>
   </nav>
@@ -463,23 +550,62 @@
     </div>
   </div>
 
-  <!-- "NO ROUTE ON DEX" EXPLAINER BANNER -->
-  <div style="max-width:720px; margin:24px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(245,158,11,0.08), rgba(245,158,11,0.04)); border:1px solid rgba(245,158,11,0.3); border-radius:12px; font-size:14px; color:var(--text);">
-    <div style="font-weight:600; color:#fbbf24; margin-bottom:6px;">⚠️ Trying to swap on Uniswap or Aerodrome and seeing "No route found"?</div>
-    <div style="color:var(--text-dim); line-height:1.5;">That's expected — SINC isn't on a DEX yet. The bonding curve below <strong style="color:var(--text);">IS</strong> the buy mechanism. Once the curve graduates, a Uniswap V4 pool auto-creates and LP is burned. Until then, buy directly from the curve here. <a href="#buy-sinc" style="color:var(--cyan);">Buy below ↓</a></div>
+  <!-- OFFICIAL FLOOR — $1.50 minimum, non-negotiable -->
+  <div style="max-width:720px; margin:20px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(6,182,212,0.12), rgba(139,92,246,0.1)); border:2px solid rgba(6,182,212,0.45); border-radius:12px; font-size:14px;">
+    <div style="font-weight:700; color:var(--cyan); margin-bottom:8px;">Official SINC price — $1.50 minimum (non-negotiable)</div>
+    <span id="official-spot" style="font-size:32px; font-weight:800; font-family:'JetBrains Mono',monospace;">$1.50</span>
+    <span style="font-size:14px; color:var(--text-dim); margin-left:8px;">per SINC · USDC via hook floor only</span>
+    <div style="margin-top:10px; font-size:13px; color:var(--text-dim); line-height:1.5;">
+      Bonding-curve micro-prices and sub-floor discovery walls are <strong style="color:#f87171;">closed</strong>.
+      Wallets/Google showing ~$0.000009 are reading deprecated curve math — ignore it.
+    </div>
+    <div style="margin-top:10px; font-size:12px; color:var(--text-muted);"><a href="/api/price/official" style="color:var(--cyan)">/api/price/official</a> · <a href="/.well-known/sinc-token.json" style="color:var(--cyan)">sinc-token.json</a></div>
   </div>
 
-  <!-- BUY WIDGET -->
-  <div id="buy-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid var(--purple); border-radius:14px; box-shadow:0 0 40px rgba(139,92,246,0.15);">
-    <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">🪙 Buy SINC from the curve</div>
-    <div style="font-size:13px; color:var(--text-muted); margin-bottom:18px;">Connect your wallet on Base, enter ETH amount, sign one tx. First buyer per wallet auto-mints a soulbound Genesis NFT.</div>
-    <button id="buy-connect" style="width:100%; padding:12px; background:var(--purple); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Connect Wallet</button>
-    <div id="buy-form" style="display:none; margin-top:16px;">
-      <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Connected: <span id="buy-account" class="mono"></span></div>
-      <input id="buy-eth" type="number" step="0.0001" min="0.0001" placeholder="ETH amount (e.g. 0.01)" style="width:100%; padding:12px; background:var(--bg-dark); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:15px; margin-bottom:12px;">
-      <button id="buy-go" style="width:100%; padding:12px; background:linear-gradient(135deg, var(--purple), var(--cyan)); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Buy SINC</button>
+  <!-- ROGUE V2 / AGGREGATOR WARNING -->
+  <div style="max-width:720px; margin:16px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(239,68,68,0.12), rgba(239,68,68,0.05)); border:2px solid rgba(239,68,68,0.45); border-radius:12px; font-size:14px; color:var(--text);">
+    <div style="font-weight:700; color:#f87171; margin-bottom:8px;">Wallets showing the wrong price?</div>
+    <div style="color:var(--text-dim); line-height:1.55;">
+      MetaMask / Blockscout / Li.Fi may route through a <strong style="color:var(--text);">rogue V2 pool</strong>
+      (<span class="mono" style="font-size:12px;">0x85372932…d667</span>) — fake quotes, not the curve.
+      <strong style="color:var(--text);"> Only trust the curve spot above</strong> or buy on this page.
     </div>
-    <div id="buy-status" style="margin-top:12px; font-size:13px; color:var(--cyan); min-height:18px;"></div>
+  </div>
+
+  <!-- "NO ROUTE ON DEX" EXPLAINER BANNER -->
+  <div style="max-width:720px; margin:16px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(245,158,11,0.08), rgba(245,158,11,0.04)); border:1px solid rgba(245,158,11,0.3); border-radius:12px; font-size:14px; color:var(--text);">
+    <div style="font-weight:600; color:#fbbf24; margin-bottom:6px;">Where to trade SINC today</div>
+    <div style="color:var(--text-dim); line-height:1.5;">
+      <strong style="color:var(--text);">Buy:</strong> USDC hook below — <strong>$1.50/SINC minimum</strong> (only official path).<br>
+      <strong style="color:var(--text);">ETH curve:</strong> closed on getsincor.com — do not use for pricing.<br>
+      <strong style="color:var(--text);">Sell → ETH:</strong> curve sell widget (curve-bought SINC only).<br>
+      <strong style="color:var(--text);">Sell → USDC/WETH:</strong> Kyber aggregator (depth limited until we seed more LP).
+    </div>
+  </div>
+
+  <!-- ETH CURVE CLOSED -->
+  <div id="buy-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid rgba(239,68,68,0.35); border-radius:14px;">
+    <div style="font-size:18px; font-weight:600; color:#f87171; margin-bottom:6px;">ETH bonding curve — closed</div>
+    <div style="font-size:13px; color:var(--text-dim); line-height:1.55; margin-bottom:14px;">
+      Sub-$1.50 buys are not permitted. The legacy ETH curve showed micro-cent quotes — that path is disabled here.
+      <strong style="color:var(--text);">Use USDC below ($1.50/SINC minimum).</strong>
+    </div>
+    <div style="margin-bottom:14px; padding:12px; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:12px; font-weight:600; color:var(--cyan); text-transform:uppercase;">Graduation Progress (legacy)</span>
+        <span id="grad-pct" style="font-size:13px; font-weight:700; color:var(--purple-light);">—</span>
+      </div>
+      <div style="height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;">
+        <div id="grad-bar" style="height:100%; width:0%; background:linear-gradient(90deg, var(--purple), var(--cyan)); transition:width 0.6s ease;"></div>
+      </div>
+      <div id="grad-progress" style="margin-top:6px; font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">loading…</div>
+    </div>
+    <a href="#buy-usdc" class="btn-primary" style="display:block; text-align:center; text-decoration:none; padding:12px;">Buy with USDC at $1.50 floor →</a>
+    <div id="wallet-picker" style="display:none;"></div>
+    <div id="buy-form" style="display:none;"></div>
+    <div id="buy-status" style="display:none;"></div>
+    <button id="buy-connect" type="button" style="display:none;" disabled></button>
+    <button id="buy-go" type="button" style="display:none;" disabled></button>
     <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
       <a href="https://twitter.com/intent/tweet?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20Sourcify-verified%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%20%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#1d9bf0; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">𝕏 Share on X</a>
       <a href="https://warpcast.com/~/compose?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C&embeds[]=https://getsincor.com/sinc" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#8a63d2; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">⌐◨-◨ Share on Farcaster</a>
@@ -487,11 +613,100 @@
     </div>
   </div>
 
+  <!-- BUY SINC WITH USDC (HOOK ROUTER) — ONLY OFFICIAL PATH -->
+  <div id="buy-usdc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid var(--cyan); border-radius:14px; box-shadow:0 0 32px rgba(6,182,212,0.12);">
+    <div style="margin-bottom:12px; padding:10px 14px; background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.35); border-radius:8px; font-size:13px; color:var(--text-dim);">
+      <strong style="color:var(--cyan);">Floor block open:</strong> ~2,667 SINC at <strong>$1.50/SINC</strong> (~$4,000 USDC) on hook sell walls — first-come via USDC below.
+    </div>
+    <div style="font-size:18px; font-weight:600; margin-bottom:6px;">Buy SINC with USDC — $1.50 minimum</div>
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Only official buy path. Pays USDC, receives SINC from hook floor sell walls at <strong>$1.50/SINC or higher</strong>. No sub-floor fills.</div>
+    <div id="wallet-picker" style="display:none; margin-bottom:12px; padding:14px; background:var(--bg-dark); border:1px solid var(--border-bright); border-radius:10px;">
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">On mobile? Open in your wallet app:</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button type="button" data-wallet="metamask" style="width:100%; padding:11px; background:#f6851b; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in MetaMask</button>
+        <button type="button" data-wallet="coinbase" style="width:100%; padding:11px; background:#0052ff; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Coinbase Wallet</button>
+        <button type="button" data-wallet="rainbow" style="width:100%; padding:11px; background:linear-gradient(90deg,#174299,#9011fe); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Open in Rainbow</button>
+        <button type="button" data-wallet="walletconnect" style="width:100%; padding:11px; background:var(--surface-light); color:var(--text); border:1px solid var(--border-bright); border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">WalletConnect</button>
+      </div>
+    </div>
+    <button id="usdc-connect" style="width:100%; padding:12px; background:var(--surface-light); color:var(--text); border:1px solid var(--border-bright); border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Connect Wallet</button>
+    <div id="usdc-form" style="display:none; margin-top:16px;">
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Connected: <span id="usdc-account" class="mono"></span></div>
+      <div class="swap-field">
+        <div class="swap-label">You pay</div>
+        <div class="swap-input-wrap">
+          <input id="usdc-amount" type="number" step="0.01" min="1.5" placeholder="USDC (min 1.50)" style="flex:1; background:transparent; border:none; color:var(--text); font-size:15px;">
+          <span class="swap-token-badge">USDC</span>
+        </div>
+      </div>
+      <div class="swap-info">
+        <div class="swap-info-row"><span>Est. SINC (@ $1.50 min)</span><span id="usdc-est-sinc" class="cyan">—</span></div>
+        <div class="swap-info-row"><span>Min price</span><span class="cyan">$1.50 / SINC</span></div>
+        <div class="swap-info-row"><span>Route</span><span class="cyan">SincHookRouter → v4 hook</span></div>
+        <div class="swap-info-row"><span>Router</span><span id="usdc-router-addr" class="mono" style="font-size:11px;">—</span></div>
+      </div>
+      <button id="usdc-buy-go" style="width:100%; margin-top:12px; padding:12px; background:linear-gradient(135deg, var(--cyan), var(--purple)); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Buy SINC with USDC</button>
+      <div id="usdc-status" style="margin-top:12px; font-size:13px; color:var(--cyan); min-height:18px;"></div>
+    </div>
+  </div>
+
+  <!-- SWAP / SELL -->
+  <div id="swap-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:1px solid var(--border-bright); border-radius:14px;">
+    <div style="font-size:18px; font-weight:600; margin-bottom:6px;">💱 Swap or sell SINC</div>
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Connect once — get live Kyber quotes for USDC/WETH, or sell curve-bought SINC back for ETH.</div>
+    <button id="swap-connect" style="width:100%; padding:12px; background:var(--surface-light); color:var(--text); border:1px solid var(--border-bright); border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Connect Wallet to Swap</button>
+    <div id="swap-form" style="display:none; margin-top:16px;">
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Connected: <span id="swap-account" class="mono"></span></div>
+      <div class="swap-field">
+        <div class="swap-label">You sell</div>
+        <div class="swap-input-wrap">
+          <input id="swap-amount" type="number" step="0.00000001" min="0" placeholder="SINC amount">
+          <span class="swap-token-badge">SINC</span>
+        </div>
+      </div>
+      <div class="swap-field">
+        <div class="swap-label">You receive</div>
+        <div class="swap-input-wrap">
+          <select id="swap-out" style="flex:1; background:transparent; border:none; color:var(--text); font-size:15px;">
+            <option value="USDC">USDC</option>
+            <option value="WETH">WETH</option>
+          </select>
+        </div>
+      </div>
+      <div class="swap-info" id="swap-quote-box">
+        <div class="swap-info-row"><span>Estimated out</span><span id="swap-quote-out" class="cyan">—</span></div>
+        <div class="swap-info-row"><span>Route</span><span id="swap-quote-route">Kyber</span></div>
+        <div class="swap-info-row"><span>Floor (hook)</span><span class="cyan">≥ $1.50 / SINC</span></div>
+      </div>
+      <button id="swap-go" style="width:100%; margin-top:12px; padding:12px; background:linear-gradient(135deg, var(--cyan), var(--purple)); color:white; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Swap via Kyber</button>
+      <button id="curve-sell-go" style="width:100%; margin-top:8px; padding:12px; background:var(--bg-dark); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Sell on curve → ETH (curve-bought only)</button>
+      <div id="swap-status" style="margin-top:12px; font-size:13px; color:var(--cyan); min-height:18px;"></div>
+    </div>
+  </div>
+
+  <!-- ADOPTION CHECKLIST -->
+  <div style="max-width:720px; margin:32px auto; padding:24px; background:var(--surface); border:1px solid var(--border); border-radius:14px;">
+    <div style="font-size:17px; font-weight:600; margin-bottom:4px;">📈 Adoption checklist (measurable)</div>
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Incremental wins toward $1.50+ acceptability. Updated from on-chain state.</div>
+    <ul style="list-style:none; font-size:14px; color:var(--text-dim); line-height:2;">
+      <li>✅ CertiK 97 · Sourcify verified contracts</li>
+      <li>✅ Bonding curve live · <span id="chk-curve-sold">—</span> SINC sold</li>
+      <li>✅ $1.50+ hook ladder · ~20M SINC on limit-order hook</li>
+      <li id="chk-ramp">✅ Sub-floor discovery ramp — closed (never below $1.50)</li>
+      <li id="chk-router">✅ USDC buy widget · SincHookRouter on Base</li>
+      <li id="chk-grad">⏳ Graduation · <span id="chk-grad-val">—</span> / 0.5 ETH</li>
+      <li id="chk-tokenlist">✅ Token list live — <a href="/tokenlists/sincor.tokenlist.json" style="color:var(--cyan)">import URL</a> · <a href="/sinc/acceptance" style="color:var(--cyan)">acceptance hub</a></li>
+      <li id="chk-swap">✅ Swap widget on this page (Kyber + curve sell)</li>
+      <li>⏳ Aerodrome SINC/USDC seed pool (needs USDC capital)</li>
+      <li id="chk-superchain">⏳ Superchain / Coinbase Wallet list — <a href="/sinc/acceptance" style="color:var(--cyan)">PR status</a></li>
+    </ul>
+  </div>
+
   <!-- STATS -->
   <div class="stats-strip">
     <div class="stat-card">
-      <div class="stat-value" id="sinc-price">$—</div>
-      <div class="stat-label">Live Price</div>
+      <div class="stat-value" id="sinc-price">$1.50</div>
+      <div class="stat-label">Official Floor</div>
     </div>
     <div class="stat-card">
       <div class="stat-value">100M</div>
@@ -647,7 +862,18 @@
         <div class="contract-label">Contract Address (Base)</div>
         <div class="contract-addr">0x9C8cd8d3961F445D653713dE65C6578bE11668e7</div>
       </div>
-      <button class="copy-btn" onclick="copyContract()">📋 Copy Address</button>
+      <div class="contract-actions">
+        <button class="copy-btn" id="copy-contract-btn" onclick="copyContract()">📋 Copy Address</button>
+        <button class="wallet-btn" id="add-wallet-btn" onclick="addSincToWallet()">🦊 Add SINC to Wallet</button>
+        <button class="wallet-btn" id="copy-list-btn" onclick="copyTokenListUrl()" style="background:linear-gradient(90deg,#06b6d4,#8b5cf6);color:#0a0e27;">📥 Copy Token List URL</button>
+      </div>
+    </div>
+    <div class="tokenlist-hint">
+      Wallet import:
+      <a href="/tokenlists/sincor.tokenlist.json" target="_blank" rel="noopener">getsincor.com/tokenlists/sincor.tokenlist.json</a>
+      · Metadata: <a href="/.well-known/sinc-token.json" target="_blank" rel="noopener">sinc-token.json</a>
+      · <a href="/sinc/acceptance" style="color:var(--cyan)">acceptance &amp; whitelisting →</a>
+      · Blockscout certify: <a href="https://base.blockscout.com/my-account/verified-addresses" target="_blank" rel="noopener">verified addresses</a>
     </div>
   </div>
 
@@ -658,6 +884,13 @@
       <div>
         <div class="footer-link-name">Basescan</div>
         <div class="footer-link-sub">Verified canonical contract</div>
+      </div>
+    </a>
+    <a href="https://base.blockscout.com/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7" target="_blank" class="footer-link-card">
+      <div class="footer-link-icon">🛡️</div>
+      <div>
+        <div class="footer-link-name">Blockscout</div>
+        <div class="footer-link-sub">Certify via verified-addresses → clears suspicious UI</div>
       </div>
     </a>
     <a href="https://skynet.certik.com" target="_blank" class="footer-link-card">
@@ -702,15 +935,21 @@
       <a href="/">Home</a>
       <a href="/pricing">Pricing</a>
       <a href="/sinc">SINC Token</a>
+      <a href="/sinc/acceptance">Acceptance</a>
       <a href="/signup">Get Started</a>
     </div>
+    {% set show_label = false %}
+    {% include "_social_links.html" %}
     <span style="font-size:13px; color:var(--text-muted);">© 2026 Sincor Business Solutions</span>
   </footer>
 
 </div>
 
+<script>window.SINC_WC_PROJECT_ID = {{ walletconnect_project_id|tojson }};</script>
+<script src="/static/js/sinc_wallet.js"></script>
 <script>
   const SINC_CONTRACT = '0x9C8cd8d3961F445D653713dE65C6578bE11668e7';
+  const SINC_LOGO = 'https://getsincor.com/static/tokenlists/assets/logo-256.png';
 
   // Pre-launch: no V4 pool exists yet. Stats stay as placeholders until
   // graduate() initializes the SINC/WETH pool on Uniswap V4 PoolManager.
@@ -720,29 +959,113 @@
 
   function copyContract() {
     navigator.clipboard.writeText(SINC_CONTRACT).then(() => {
-      const btn = document.querySelector('.copy-btn');
+      const btn = document.getElementById('copy-contract-btn');
       if (!btn) return;
       btn.textContent = '✅ Copied!';
       setTimeout(() => btn.textContent = '📋 Copy Address', 2000);
     });
   }
 
-  // Display "Pre-launch" placeholders until V4 pool is live.
-  const priceEl = document.getElementById('sinc-price');
-  const liqEl = document.getElementById('sinc-liq');
-  if (priceEl) priceEl.textContent = 'Live on V4';
-  if (liqEl) liqEl.textContent = 'In curve';
+  // ============ LIVE CURVE STATS ============
+  const RPC = 'https://mainnet.base.org';
+  const CURVE_ADDR = '0x75dE341a2BC81806198364F125d4Cde36527619C';
+  const GRADUATION_WEI = 500000000000000000n; // 0.5 ETH
+
+  async function rpcCall(to, data) {
+    const r = await fetch(RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{ to, data }, 'latest'] })
+    });
+    const j = await r.json();
+    return j.result;
+  }
+
+  async function refreshStats() {
+    try {
+      const [official, ethHex, soldHex, gradHex] = await Promise.all([
+        fetch('/api/price/official').then(r => r.json()).catch(() => ({})),
+        rpcCall(CURVE_ADDR, '0xa5cb6825'), // ethAccumulated()
+        rpcCall(CURVE_ADDR, '0x9899fccf'), // sincSold()
+        rpcCall(CURVE_ADDR, '0xe7c2b772')  // graduated()
+      ]);
+
+      const floorUsd = official.official_floor_usd ?? official.spot_usd ?? SINC_FLOOR_USD;
+      const ethAcc = BigInt(ethHex || '0x0');
+      const sincSold = BigInt(soldHex || '0x0');
+      const isGraduated = gradHex && gradHex !== '0x' && BigInt(gradHex) !== 0n;
+
+      const ethAccEth = Number(ethAcc) / 1e18;
+      const sincSoldM = Number(sincSold) / 1e8 / 1e6;
+      const gradPct = Math.min(100, Number(ethAcc * 10000n / GRADUATION_WEI) / 100);
+
+      const priceEl = document.getElementById('sinc-price');
+      const liqEl = document.getElementById('sinc-liq');
+      // Non-negotiable: never display bonding-curve micro-spot as the public price.
+      if (priceEl) priceEl.textContent = isGraduated ? 'on V4' : ('$' + Number(floorUsd).toFixed(2));
+      if (liqEl) liqEl.textContent = ethAccEth.toFixed(5) + ' ETH';
+
+      // Update graduation progress display
+      const gradEl = document.getElementById('grad-progress');
+      const gradPctEl = document.getElementById('grad-pct');
+      const gradBarEl = document.getElementById('grad-bar');
+      if (gradEl) gradEl.textContent = isGraduated
+        ? '🎉 GRADUATED — V4 pool live'
+        : `${ethAccEth.toFixed(5)} / 0.5 ETH to graduation (${sincSoldM.toFixed(2)}M SINC sold)`;
+      if (gradPctEl) gradPctEl.textContent = isGraduated ? '100%' : gradPct.toFixed(1) + '%';
+      if (gradBarEl) gradBarEl.style.width = (isGraduated ? 100 : gradPct) + '%';
+
+      const soldEl = document.getElementById('chk-curve-sold');
+      if (soldEl) soldEl.textContent = sincSoldM.toFixed(2) + 'M';
+      const gradValEl = document.getElementById('chk-grad-val');
+      if (gradValEl) gradValEl.textContent = ethAccEth.toFixed(5);
+      const gradChk = document.getElementById('chk-grad');
+      if (gradChk && isGraduated) gradChk.innerHTML = '✅ Graduated — V4 SINC/WETH pool live';
+    } catch (e) {
+      console.log('stats refresh failed:', e);
+    }
+  }
+
+  async function refreshAcceptanceChecklist() {
+    try {
+      const acc = await fetch('/api/acceptance/status').then(r => r.json());
+      const sc = acc.listings?.find(l => l.name.includes('Superchain'));
+      const el = document.getElementById('chk-superchain');
+      if (el && sc) {
+        el.innerHTML = sc.listed
+          ? '✅ Superchain / Coinbase Wallet list — live'
+          : '⏳ Superchain PR staged — <a href="/sinc/acceptance" style="color:var(--cyan)">submit PR</a>';
+      }
+    } catch (e) { console.log('acceptance check:', e); }
+  }
+
+  const SINC_FLOOR_USD = 1.50;
+
+  async function refreshOfficialSpot() {
+    try {
+      const p = await fetch('/api/price/official').then(r => r.json());
+      const el = document.getElementById('official-spot');
+      const floor = p.official_floor_usd ?? p.spot_usd ?? p.minimum_buy_usd_per_sinc ?? SINC_FLOOR_USD;
+      if (el) el.textContent = '$' + Number(floor).toFixed(2);
+    } catch (e) { console.log('official spot:', e); }
+  }
+
+  refreshStats();
+  refreshOfficialSpot();
+  refreshAcceptanceChecklist();
+  setInterval(refreshStats, 15000);
+  setInterval(refreshOfficialSpot, 15000);
+  setInterval(refreshAcceptanceChecklist, 300000);
 
   // ============ BUY WIDGET ============
   const CURVE = '0x75dE341a2BC81806198364F125d4Cde36527619C';
-  const BASE_CHAIN_ID = '0x2105'; // 8453
-  const BASE_PARAMS = {
-    chainId: BASE_CHAIN_ID,
-    chainName: 'Base',
-    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-    rpcUrls: ['https://mainnet.base.org'],
-    blockExplorerUrls: ['https://basescan.org']
-  };
+  const BASE_CHAIN_ID = SincWallet.BASE_CHAIN_ID;
+
+  function walletProvider() {
+    const p = SincWallet.getProvider();
+    if (!p) throw new Error('Wallet not connected — tap Connect Wallet or open in MetaMask app.');
+    return p;
+  }
 
   function bs(msg, color) {
     const el = document.getElementById('buy-status');
@@ -762,74 +1085,295 @@
   }
 
   async function ensureBase() {
-    if (!window.ethereum) throw new Error('No wallet detected — install MetaMask');
-    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== BASE_CHAIN_ID) {
-      try {
-        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CHAIN_ID }] });
-      } catch (e) {
-        if (e.code === 4902) {
-          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [BASE_PARAMS] });
-        } else throw e;
+    await SincWallet.ensureBase();
+  }
+
+  SincWallet.wirePicker('wallet-picker');
+
+  const TOKEN_LIST_URL = 'https://getsincor.com/tokenlists/sincor.tokenlist.json';
+
+  async function addSincToWallet() {
+    const btn = document.getElementById('add-wallet-btn');
+    try {
+      if (!SincWallet.hasInjected() && !SincWallet.getProvider()) {
+        alert('Connect a wallet first, or open getsincor.com/sinc in the MetaMask app browser.');
+        document.getElementById('wallet-picker').style.display = 'block';
+        return;
       }
+      await ensureBase();
+      await walletProvider().request({
+        method: 'wallet_watchAsset',
+        params: {
+          type: 'ERC20',
+          options: {
+            address: SINC_CONTRACT,
+            symbol: 'SINC',
+            decimals: 8,
+            image: SINC_LOGO
+          }
+        }
+      });
+      if (btn) { btn.textContent = '✅ Added!'; setTimeout(() => btn.textContent = '🦊 Add SINC to Wallet', 2500); }
+    } catch (e) {
+      console.log('wallet_watchAsset failed:', e);
+      if (btn) { btn.textContent = '⚠️ Try manually'; setTimeout(() => btn.textContent = '🦊 Add SINC to Wallet', 2500); }
     }
   }
 
-  const connectBtn = document.getElementById('buy-connect');
-  const buyForm = document.getElementById('buy-form');
-  const acctEl = document.getElementById('buy-account');
-  const ethInput = document.getElementById('buy-eth');
-  const goBtn = document.getElementById('buy-go');
+  async function copyTokenListUrl() {
+    const btn = document.getElementById('copy-list-btn');
+    try {
+      await navigator.clipboard.writeText(TOKEN_LIST_URL);
+      if (btn) {
+        const prev = btn.textContent;
+        btn.textContent = '✅ Copied — paste in MetaMask → Settings → Token lists';
+        setTimeout(() => { btn.textContent = prev; }, 3500);
+      }
+    } catch (e) {
+      prompt('Copy token list URL:', TOKEN_LIST_URL);
+    }
+  }
 
-  if (connectBtn) {
-    connectBtn.addEventListener('click', async () => {
+  // ETH curve buy disabled — $1.50 floor enforced via USDC hook only
+
+  // ============ SWAP WIDGET (Kyber + curve sell) ============
+  const USDC_ADDR = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+  const WETH_ADDR = '0x4200000000000000000000000000000000000006';
+  const KYBER_ROUTER = '0x6131B5fae19EA4f9D964eAc0408E4408b66337b5';
+  const SINC_DECIMALS = 8;
+
+  function ss(msg, color) {
+    const el = document.getElementById('swap-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = color || 'var(--cyan)';
+  }
+
+  function sincToAtoms(amount) {
+    return BigInt(Math.floor(Number(amount) * 10 ** SINC_DECIMALS));
+  }
+
+  async function fetchKyberQuote(amountInAtoms, tokenOut, user) {
+    const url = `https://aggregator-api.kyberswap.com/base/api/v1/routes?tokenIn=${SINC_CONTRACT}&tokenOut=${tokenOut}&amountIn=${amountInAtoms.toString()}&to=${user}&saveGas=0`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Kyber quote failed');
+    const j = await r.json();
+    if (!j.data || !j.data.routeSummary) throw new Error('No route — pool too shallow');
+    return j.data;
+  }
+
+  async function buildKyberTx(routeData, user) {
+    const r = await fetch('https://aggregator-api.kyberswap.com/base/api/v1/route/build', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        routeSummary: routeData.routeSummary,
+        sender: user,
+        recipient: user,
+        slippageTolerance: 300
+      })
+    });
+    if (!r.ok) throw new Error('Kyber build failed');
+    const j = await r.json();
+    if (!j.data || !j.data.data) throw new Error('No calldata');
+    return j.data;
+  }
+
+  const swapConnect = document.getElementById('swap-connect');
+  const swapForm = document.getElementById('swap-form');
+  const swapAcct = document.getElementById('swap-account');
+  const swapAmt = document.getElementById('swap-amount');
+  const swapOut = document.getElementById('swap-out');
+  const swapGo = document.getElementById('swap-go');
+  const curveSellGo = document.getElementById('curve-sell-go');
+  let swapUser = null;
+
+  async function connectSwap() {
+    const { account } = await SincWallet.connect();
+    swapUser = account;
+    swapAcct.textContent = swapUser.slice(0, 6) + '...' + swapUser.slice(-4);
+    swapConnect.style.display = 'none';
+    swapForm.style.display = 'block';
+    ss('Connected. Enter SINC amount for live quote.', '#10b981');
+  }
+
+  if (swapConnect) swapConnect.addEventListener('click', () => connectSwap().catch(e => {
+    const picker = document.getElementById('wallet-picker');
+    if (picker) picker.style.display = 'block';
+    ss((e.message || e) + ' — try Open in MetaMask below.', '#ef4444');
+  }));
+
+  async function refreshSwapQuote() {
+    if (!swapUser || !swapAmt || !swapAmt.value) return;
+    try {
+      const atoms = sincToAtoms(swapAmt.value);
+      if (atoms <= 0n) return;
+      const out = swapOut.value === 'WETH' ? WETH_ADDR : USDC_ADDR;
+      const data = await fetchKyberQuote(atoms, out, swapUser);
+      const usd = data.routeSummary.amountOutUsd || '0';
+      const outAmt = data.routeSummary.amountOut || '0';
+      const dec = swapOut.value === 'WETH' ? 18 : 6;
+      const human = Number(outAmt) / 10 ** dec;
+      document.getElementById('swap-quote-out').textContent =
+        human.toPrecision(4) + ' ' + swapOut.value + ' (~$' + Number(usd).toFixed(2) + ')';
+    } catch (e) {
+      document.getElementById('swap-quote-out').textContent = 'No route / shallow pool';
+    }
+  }
+
+  if (swapAmt) swapAmt.addEventListener('input', () => { refreshSwapQuote().catch(() => {}); });
+  if (swapOut) swapOut.addEventListener('change', () => { refreshSwapQuote().catch(() => {}); });
+
+  if (swapGo) {
+    swapGo.addEventListener('click', async () => {
       try {
-        bs('Connecting...');
-        if (!window.ethereum) throw new Error('No wallet detected — install MetaMask');
-        await ensureBase();
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const acct = accounts[0];
-        acctEl.textContent = acct.slice(0,6) + '...' + acct.slice(-4);
-        connectBtn.style.display = 'none';
-        buyForm.style.display = 'block';
-        // Show personal referral link (3% kickback on every buy through it)
-        const refLink = `https://getsincor.com/sinc?ref=${acct}`;
-        const refDiv = document.createElement('div');
-        refDiv.style.cssText = 'margin-top:14px; padding:12px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:8px; font-size:12px; color:var(--text-dim);';
-        refDiv.innerHTML = `<div style="font-weight:600; color:var(--purple-light); margin-bottom:4px;">💸 Your referral link — earn 3% of every buy</div><div style="word-break:break-all; font-family:'JetBrains Mono',monospace; color:var(--cyan); cursor:pointer;" title="Click to copy" onclick="navigator.clipboard.writeText('${refLink}'); this.style.color='#10b981'; this.textContent='✓ copied!'; setTimeout(()=>{this.style.color='var(--cyan)'; this.textContent='${refLink}';},1500);">${refLink}</div>`;
-        buyForm.appendChild(refDiv);
-        const status = validRef ? `Connected. Buying via referrer ${validRef.slice(0,6)}...${validRef.slice(-4)} (they get 3%).` : 'Connected on Base. Enter ETH amount.';
-        bs(status, '#10b981');
+        if (!swapUser) await connectSwap();
+        const atoms = sincToAtoms(swapAmt.value);
+        if (atoms <= 0n) throw new Error('Enter a SINC amount');
+        const out = swapOut.value === 'WETH' ? WETH_ADDR : USDC_ADDR;
+        ss('Fetching route...');
+        const routeData = await fetchKyberQuote(atoms, out, swapUser);
+        const built = await buildKyberTx(routeData, swapUser);
+        ss('Approve + swap in wallet...');
+        const approveData = '0x095ea7b3000000000000000000000000' + KYBER_ROUTER.slice(2).toLowerCase()
+          + atoms.toString(16).padStart(64, '0');
+        await walletProvider().request({
+          method: 'eth_sendTransaction',
+          params: [{ from: swapUser, to: SINC_CONTRACT, data: approveData }]
+        });
+        const txHash = await walletProvider().request({
+          method: 'eth_sendTransaction',
+          params: [{ from: swapUser, to: built.routerAddress || KYBER_ROUTER, data: built.data, value: '0x0' }]
+        });
+        ss('Swap sent: ' + txHash.slice(0, 10) + '...');
+        setTimeout(() => window.open('https://basescan.org/tx/' + txHash, '_blank'), 800);
       } catch (e) {
-        bs('Error: ' + (e.message || e), '#ef4444');
+        ss('Error: ' + (e.message || e), '#ef4444');
       }
     });
   }
 
-  if (goBtn) {
-    goBtn.addEventListener('click', async () => {
+  if (curveSellGo) {
+    curveSellGo.addEventListener('click', async () => {
       try {
-        const eth = parseFloat(ethInput.value);
-        if (!eth || eth < 0.0001) throw new Error('Enter at least 0.0001 ETH');
-        const ethWei = BigInt(Math.floor(eth * 1e18));
-        const ethWeiHex = '0x' + ethWei.toString(16);
-        await ensureBase();
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        const from = accounts[0];
-        const data = encodeBuy(ethWeiHex);
-        bs('Confirm in wallet...');
-        const txHash = await window.ethereum.request({
+        if (!swapUser) await connectSwap();
+        const atoms = sincToAtoms(swapAmt.value);
+        if (atoms <= 0n) throw new Error('Enter a SINC amount');
+        ss('Curve sell: approve then sell...');
+        const approveData = '0x095ea7b3000000000000000000000000' + CURVE.slice(2).toLowerCase()
+          + atoms.toString(16).padStart(64, '0');
+        await walletProvider().request({
           method: 'eth_sendTransaction',
-          params: [{ from, to: CURVE, value: ethWeiHex, data }]
+          params: [{ from: swapUser, to: SINC_CONTRACT, data: approveData }]
         });
-        bs('Sent! Tx: ' + txHash.slice(0,10) + '... — opening Basescan');
+        const sellData = '0xe4849b32' + atoms.toString(16).padStart(64, '0');
+        const txHash = await walletProvider().request({
+          method: 'eth_sendTransaction',
+          params: [{ from: swapUser, to: CURVE, data: sellData }]
+        });
+        ss('Sell sent: ' + txHash.slice(0, 10) + '...');
         setTimeout(() => window.open('https://basescan.org/tx/' + txHash, '_blank'), 800);
       } catch (e) {
-        bs('Error: ' + (e.message || e), '#ef4444');
+        ss('Error: ' + (e.message || e), '#ef4444');
+      }
+    });
+  }
+
+  // ============ USDC → SINC HOOK ROUTER ============
+  const HOOK_ROUTER = '0x11b86E85cC5170F4165c89ccb11332133B29E283';
+  const BUY_USDC_SEL = '0x0a7cc2db'; // buySincUsdcBase(uint256,uint256,address)
+  const USDC_DECIMALS = 6;
+
+  function us(msg, color) {
+    const el = document.getElementById('usdc-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = color || 'var(--cyan)';
+  }
+
+  function pad64(n) {
+    return BigInt(n).toString(16).padStart(64, '0');
+  }
+
+  function usdcToAtoms(amount) {
+    return BigInt(Math.floor(Number(amount) * 10 ** USDC_DECIMALS));
+  }
+
+  function estMinSincOut(usdcAtoms) {
+    // $1.50/SINC floor with 5% slippage buffer — rejects sub-floor hook fills client-side
+    const floorCents = BigInt(Math.round(SINC_FLOOR_USD * 100));
+    return (usdcAtoms * 100n * 95n) / (floorCents * 100n);
+  }
+
+  function estSincHuman(usdcAtoms) {
+    const floorCents = BigInt(Math.round(SINC_FLOOR_USD * 100));
+    const sincAtoms = (usdcAtoms * 100n) / floorCents;
+    return (Number(sincAtoms) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  }
+
+  const usdcRouterEl = document.getElementById('usdc-router-addr');
+  if (usdcRouterEl) usdcRouterEl.textContent = HOOK_ROUTER.slice(0, 10) + '…' + HOOK_ROUTER.slice(-6);
+
+  const usdcConnect = document.getElementById('usdc-connect');
+  const usdcForm = document.getElementById('usdc-form');
+  const usdcAcct = document.getElementById('usdc-account');
+  const usdcAmt = document.getElementById('usdc-amount');
+  const usdcBuyGo = document.getElementById('usdc-buy-go');
+  let usdcUser = null;
+
+  async function connectUsdc() {
+    const { account } = await SincWallet.connect();
+    usdcUser = account;
+    usdcAcct.textContent = usdcUser.slice(0, 6) + '...' + usdcUser.slice(-4);
+    usdcConnect.style.display = 'none';
+    usdcForm.style.display = 'block';
+    us('Connected. Enter USDC — fills hook walls best-available.', '#10b981');
+  }
+
+  if (usdcConnect) usdcConnect.addEventListener('click', () => connectUsdc().catch(e => {
+    const picker = document.getElementById('wallet-picker');
+    if (picker) picker.style.display = 'block';
+    us((e.message || e) + ' — try Open in MetaMask below.', '#ef4444');
+  }));
+
+  function refreshUsdcEst() {
+    if (!usdcAmt || !usdcAmt.value) return;
+    const atoms = usdcToAtoms(usdcAmt.value);
+    if (atoms <= 0n) return;
+    const el = document.getElementById('usdc-est-sinc');
+    if (el) el.textContent = '~' + estSincHuman(atoms) + ' SINC';
+  }
+
+  if (usdcAmt) usdcAmt.addEventListener('input', refreshUsdcEst);
+
+  if (usdcBuyGo) {
+    usdcBuyGo.addEventListener('click', async () => {
+      try {
+        if (!usdcUser) await connectUsdc();
+        const usdcAtoms = usdcToAtoms(usdcAmt.value);
+        if (usdcAtoms < usdcToAtoms(SINC_FLOOR_USD)) throw new Error('Minimum ' + SINC_FLOOR_USD + ' USDC ($1.50/SINC floor)');
+        const minSinc = estMinSincOut(usdcAtoms);
+        us('Approve USDC, then buy through hook...');
+        const maxApprove = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+        const approveData = '0x095ea7b3' + pad64(HOOK_ROUTER) + maxApprove.slice(2);
+        await walletProvider().request({
+          method: 'eth_sendTransaction',
+          params: [{ from: usdcUser, to: USDC_ADDR, data: approveData }]
+        });
+        const buyData = BUY_USDC_SEL + pad64(usdcAtoms) + pad64(minSinc) + '0'.repeat(64);
+        const txHash = await walletProvider().request({
+          method: 'eth_sendTransaction',
+          params: [{ from: usdcUser, to: HOOK_ROUTER, data: buyData }]
+        });
+        us('Buy sent: ' + txHash.slice(0, 10) + '...');
+        setTimeout(() => window.open('https://basescan.org/tx/' + txHash, '_blank'), 800);
+      } catch (e) {
+        us('Error: ' + (e.message || e), '#ef4444');
       }
     });
   }
 </script>
+{% include "_tf_badge.html" %}
 </body>
 </html>
 

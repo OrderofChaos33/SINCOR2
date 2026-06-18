@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Value with SINC — 5 Live Revenue Streams</title>
+<link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e27;--panel:#0f1629;--cyan:#06b6d4;--purple:#8b5cf6;--text:#f1f5f9;--muted:#94a3b8;--green:#34d399}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;line-height:1.55}
+.wrap{max-width:900px;margin:0 auto;padding:36px 20px 60px}
+h1{font-size:2rem;margin:0 0 8px} .sub{color:var(--muted);margin-bottom:24px}
+.card{background:var(--panel);border:1px solid rgba(139,92,246,.2);border-radius:14px;padding:20px;margin:14px 0}
+.card h2{font-size:1.05rem;margin:0 0 8px;color:var(--purple)}
+.stat{font-size:1.4rem;font-weight:700;color:var(--cyan)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:16px 0}
+.pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:rgba(52,211,153,.15);color:var(--green);border:1px solid rgba(52,211,153,.35)}
+button,a.btn{cursor:pointer;border:none;border-radius:10px;padding:12px 16px;font-weight:700;font-family:inherit;text-decoration:none;display:inline-block}
+.btn-primary{background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff}
+.btn-ghost{background:#1a202c;color:#c4b5fd;border:1px solid rgba(139,92,246,.3)}
+.mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all}
+textarea{width:100%;min-height:110px;background:#050814;color:var(--cyan);border:1px solid rgba(6,182,212,.3);border-radius:10px;padding:12px;font-family:ui-monospace,monospace;font-size:12px}
+.muted{color:var(--muted);font-size:13px}
+.bar{height:8px;background:#1a202c;border-radius:6px;overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--purple),var(--cyan));width:0%}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="pill">Value engine</span>
+  <h1>Create value without waiting on recovery</h1>
+  <p class="sub">Five revenue streams are live on-chain and in-product. Stolen inventory is one line item — these are the others.</p>
+
+  <div class="row" id="metrics">
+    <div class="card"><div class="muted">Curve ETH</div><div class="stat" id="m-eth">—</div><div class="muted" id="m-grad">graduation —</div><div class="bar"><i id="m-bar"></i></div></div>
+    <div class="card"><div class="muted">SINC sold</div><div class="stat" id="m-sold">—</div></div>
+    <div class="card"><div class="muted">Hook inventory</div><div class="stat" id="m-hook">—</div></div>
+    <div class="card"><div class="muted">Treasury SINC</div><div class="stat" id="m-treasury">—</div></div>
+  </div>
+
+  <div class="card">
+    <h2>1 — Referral (instant 3% ETH)</h2>
+    <p class="muted">Hardest zero-cost lever. Contract pays referrer on every curve buy through your link.</p>
+    <button class="btn-primary" id="btn-connect">Connect wallet → get your link</button>
+    <p class="mono" id="ref-link" style="margin-top:12px;color:var(--cyan)"></p>
+    <p class="muted" id="ref-example"></p>
+    <a class="btn-ghost" href="/refer" style="margin-top:10px">Full referral page →</a>
+  </div>
+
+  <div class="card">
+    <h2>2 — Drive curve buys (graduation event)</h2>
+    <p class="muted">At <strong>0.5 ETH</strong> in the curve, SINC graduates to Uniswap v4 and LP burns — a marketable milestone that attracts buyers.</p>
+    <a class="btn-primary" href="/sinc#buy-sinc">Open buy widget →</a>
+  </div>
+
+  <div class="card">
+    <h2>3 — Hook USDC sales (~20M SINC on walls)</h2>
+    <p class="muted">Discovery ramp $0.10–$0.95 + floor $1.50+. Every fill = USDC to order owner. Run <span class="mono">hook_fill_keeper.ps1</span> to withdraw proceeds.</p>
+    <a class="btn-ghost" href="/sinc#buy-usdc">USDC buy route →</a>
+  </div>
+
+  <div class="card">
+    <h2>4 — SINCOR platform (SINC subscriptions)</h2>
+    <p class="muted">Agent platform access bills in SINC on Base — not cards. <span id="m-saas">—</span></p>
+    <a class="btn-ghost" href="/buy">Pay with SINC →</a>
+  </div>
+
+  <div class="card">
+    <h2>5 — Fix routing (token list)</h2>
+    <p class="muted">Import canonical list so wallets stop routing buyers to the rogue V2 pool.</p>
+    <a class="btn-ghost" href="/tokenlists/sincor.tokenlist.json" target="_blank">Token list JSON</a>
+    <a class="btn-ghost" href="/sinc/acceptance" style="margin-left:8px">Whitelisting hub</a>
+  </div>
+
+  <div class="card">
+    <h2>Share pack (live stats)</h2>
+    <textarea id="share-text" readonly></textarea>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-ghost" id="btn-copy">Copy</button>
+      <a class="btn-ghost" id="btn-tweet" target="_blank" rel="noopener">Post on X</a>
+      <a class="btn-ghost" id="btn-tg" target="_blank" rel="noopener">Telegram</a>
+    </div>
+  </div>
+
+  <p class="muted"><a href="/sinc" style="color:var(--cyan)">← SINC gateway</a></p>
+</div>
+<script>
+const CHAIN='0x2105';
+let wallet=null;
+
+async function loadValue(){
+  const v=await fetch('/api/value/summary').then(r=>r.json());
+  document.getElementById('m-eth').textContent=v.curve_eth_accumulated+' ETH';
+  document.getElementById('m-grad').textContent='Graduation '+v.graduation_pct+'% / 0.5 ETH';
+  document.getElementById('m-bar').style.width=Math.min(100,v.graduation_pct)+'%';
+  document.getElementById('m-sold').textContent=(v.sinc_sold_m||0)+'M';
+  document.getElementById('m-hook').textContent=(v.sinc_in_hook_pm_m||0)+'M';
+  document.getElementById('m-treasury').textContent=(v.treasury_sinc||0).toLocaleString();
+  const plat=v.streams?.find(s=>s.id==='platform');
+  if(plat) document.getElementById('m-saas').textContent='Completed SaaS: $'+plat.completed_usd+' ('+plat.total_orders+' orders)';
+  const pack=await fetch('/api/value/social').then(r=>r.json());
+  document.getElementById('share-text').value=pack.twitter||'';
+  document.getElementById('btn-tweet').href=pack.twitter_intent||'#';
+  document.getElementById('btn-tg').href=pack.telegram_share||'#';
+}
+
+async function connect(){
+  if(!window.ethereum) throw new Error('Install MetaMask');
+  const chain=await window.ethereum.request({method:'eth_chainId'});
+  if(chain!==CHAIN) await window.ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:CHAIN}]});
+  const accs=await window.ethereum.request({method:'eth_requestAccounts'});
+  wallet=accs[0];
+  const link='https://getsincor.com/sinc?ref='+wallet;
+  document.getElementById('ref-link').textContent=link;
+  document.getElementById('ref-example').textContent='Example: 0.1 ETH buy → you receive 0.003 ETH (3%) instantly.';
+  const pack=await fetch('/api/value/social?wallet='+wallet).then(r=>r.json());
+  document.getElementById('share-text').value=pack.twitter||'';
+  document.getElementById('btn-tweet').href=pack.twitter_intent||'#';
+}
+
+document.getElementById('btn-connect').onclick=()=>connect().catch(e=>alert(e.message));
+document.getElementById('btn-copy').onclick=()=>navigator.clipboard.writeText(document.getElementById('share-text').value);
+loadValue().catch(console.error);
+setInterval(()=>loadValue().catch(()=>{}),30000);
+</script>
+</body>
+</html>

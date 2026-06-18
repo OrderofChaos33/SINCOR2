@@ -1,0 +1,84 @@
+{
+  "name": "SINCOR2 Trading Intelligence Pack",
+  "description": "Prediction market and trading support for signal generation, market evaluation, and disciplined position sizing.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR2",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "openclaw-trading",
+      "name": "OpenClaw Trading Intelligence",
+      "description": "Generates adaptive trade signals and position guidance using self-improving win-rate tracking.",
+      "tags": [
+        "trading",
+        "signals",
+        "kelly",
+        "prediction-markets"
+      ],
+      "examples": [
+        "Generate a market signal for a Polymarket question.",
+        "Recommend a position size from bankroll."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "polymarket-execution",
+      "name": "Polymarket Market Agent",
+      "description": "Surfaces open markets, calculates edge, and produces order tickets.",
+      "tags": [
+        "polymarket",
+        "markets",
+        "execution",
+        "forecasting"
+      ],
+      "examples": [
+        "List open crypto markets.",
+        "Place a mock order on a yes/no market."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "documentationUrl": "https://getsincor.com/docs/api"
+}

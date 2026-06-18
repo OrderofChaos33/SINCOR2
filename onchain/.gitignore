@@ -5,3 +5,4 @@ lib/
 .env
 deployments/*.json
 !deployments/.gitkeep
+.emergency_wallet.json

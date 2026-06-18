@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINC Genesis Campaign — KPI TGE</title>
+  <meta name="description" content="Pre-deposit opens July 1. Earn LBP priority and allocation multipliers through on-chain KPIs.">
+  <style>
+    :root { --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --green:#34d399; --amber:#fbbf24; --muted:#9ca3af; --text:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,sans-serif; }
+    .wrap { max-width:920px; margin:0 auto; padding:32px 16px 64px; }
+    h1 { font-size:32px; margin:0 0 8px; background:linear-gradient(135deg,var(--cyan),var(--green)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .sub { color:var(--muted); margin-bottom:24px; line-height:1.6; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:28px; }
+    .stat { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:16px; }
+    .stat b { display:block; font-size:24px; color:var(--cyan); }
+    .stat span { font-size:12px; color:var(--muted); }
+    .card { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:20px; margin-bottom:16px; }
+    h2 { font-size:18px; margin:0 0 12px; }
+    .bar { height:8px; background:#1a1a2e; border-radius:99px; overflow:hidden; margin:8px 0; }
+    .fill { height:100%; background:linear-gradient(90deg,var(--cyan),var(--green)); border-radius:99px; transition:width .4s; }
+    .ms-done .fill { background:var(--green); }
+    label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+    input { width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#0d0d18; color:var(--text); }
+    button { cursor:pointer; border:none; border-radius:10px; padding:12px 16px; font-weight:700; background:var(--cyan); color:#042f2e; margin-top:12px; }
+    button.ghost { background:rgba(255,255,255,.08); color:var(--text); margin-left:8px; }
+    .tier { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:14px; }
+    .ok { color:var(--green); }
+    .warn { color:var(--amber); }
+    a { color:var(--cyan); }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .pill { font-size:11px; padding:6px 10px; border-radius:99px; background:rgba(34,211,238,.12); color:var(--cyan); border:1px solid rgba(34,211,238,.25); }
+    #msg { font-size:13px; margin-top:10px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SINC Genesis Campaign</h1>
+  <p class="sub">KPI-driven TGE rollouts · Pre-deposit opens <b>July 1</b> · TGE <b>July 7</b>. Bridge stables, earn points, unlock LBP priority. Social whitelist required for max allocation.</p>
+  <p class="sub"><a href="/sinc">Buy SINC</a> · <a href="/pitch">Pitch</a> · <a href="/refer">Refer 3%</a></p>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card">
+    <h2>Live KPI milestones</h2>
+    <div id="milestones"></div>
+  </div>
+
+  <div class="card">
+    <h2>Join waitlist + earn points</h2>
+    <label>Wallet (Base)</label>
+    <input id="wallet" placeholder="0x..." autocomplete="off">
+    <label>X / Twitter (optional — social whitelist)</label>
+    <input id="twitter" placeholder="@handle">
+    <label>Farcaster (optional)</label>
+    <input id="farcaster" placeholder="@username">
+    <label>Bridge tx hash (required for bridge USDC points)</label>
+    <input id="bridgeTx" placeholder="0x... after bridging USDC to Base">
+    <div class="actions">
+      <button onclick="register()">Register wallet</button>
+      <button class="ghost" onclick="claim('bridge_usdc')">Claim bridge USDC</button>
+      <button class="ghost" onclick="claim('social_whitelist')">Claim social whitelist</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Pre-deposit (opens July 1)</h2>
+    <p class="sub" style="margin:0 0 12px">Send USDC on Base to treasury <span id="treasury" class="pill">—</span> for LBP priority. Early depositors (before Jul 3) earn 2× points. Tx verified on-chain.</p>
+    <label>Amount USDC</label>
+    <input id="amount" type="number" min="1" step="1" placeholder="50">
+    <label>Tx hash (after you send)</label>
+    <input id="txhash" placeholder="0x...">
+    <button onclick="predeposit()">Record pre-deposit</button>
+  </div>
+
+  <div class="card">
+    <h2>LBP priority tiers</h2>
+    <div id="tiers"></div>
+  </div>
+
+  <div class="card">
+    <h2>Leaderboard</h2>
+    <div id="board" style="font-size:13px;"></div>
+  </div>
+</div>
+<script>
+async function load() {
+  const res = await fetch('/api/launch/campaign/status');
+  const d = await res.json();
+  if (d.treasury) document.getElementById('treasury').textContent = d.treasury;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><b>${d.phase || '—'}</b><span>Phase</span></div>
+    <div class="stat"><b>${d.participants || 0}</b><span>Participants</span></div>
+    <div class="stat"><b>$${(d.predeposit_usdc_total||0).toLocaleString()}</b><span>Pre-deposit TVL</span></div>
+    <div class="stat"><b>${d.social_whitelist_qualified||0}</b><span>Social qualified</span></div>
+    <div class="stat"><b>${d.whale_count||0}</b><span>Whales</span></div>`;
+  document.getElementById('milestones').innerHTML = (d.milestones||[]).map(m => `
+    <div class="ms-${m.achieved?'done':'pending'}">
+      <div style="display:flex;justify-content:space-between;font-size:14px">
+        <span>${m.title}</span>
+        <span class="${m.achieved?'ok':'warn'}">${m.achieved?'✓':'$'+m.current+' / $'+m.target}</span>
+      </div>
+      <div class="bar"><div class="fill" style="width:${m.pct}%"></div></div>
+      <div style="font-size:12px;color:var(--muted)">${m.reward||''}</div>
+    </div>`).join('');
+  document.getElementById('tiers').innerHTML = (d.predeposit_tiers||[]).map(t => `
+    <div class="tier"><span>${t.label} — $${t.min_usdc}+</span><span>${t.lbp_priority}× LBP</span></div>`).join('');
+  const lb = await fetch('/api/launch/campaign/leaderboard?limit=10');
+  const leaders = await lb.json();
+  document.getElementById('board').innerHTML = (leaders.rows||[]).map((r,i) =>
+    `${i+1}. ${r.wallet.slice(0,8)}… — ${r.total_points} pts · ${r.lbp_priority}× LBP`).join('<br>') || 'Be first.';
+}
+function w() { return document.getElementById('wallet').value.trim(); }
+async function register() {
+  const res = await fetch('/api/launch/campaign/register', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ wallet: w(), twitter: document.getElementById('twitter').value, farcaster: document.getElementById('farcaster').value })
+  });
+  const d = await res.json();
+  document.getElementById('msg').textContent = d.ok ? 'Registered — '+d.phase : (d.error||'Error');
+  load();
+}
+async function claim(action) {
+  const proof = action === 'bridge_usdc' ? document.getElementById('bridgeTx').value.trim() : 'self_claim';
+  const res = await fetch('/api/launch/campaign/points', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ wallet: w(), action, proof, tx_hash: proof })
+  });
+  const d = await res.json();
+  document.getElementById('msg').textContent = d.ok ? `+${d.points_awarded} pts (${action})` : (d.error||'Error');
+  load();
+}
+async function predeposit() {
+  const res = await fetch('/api/launch/campaign/predeposit', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ wallet: w(), amount_usdc: parseFloat(document.getElementById('amount').value), tx_hash: document.getElementById('txhash').value })
+  });
+  const d = await res.json();
+  document.getElementById('msg').textContent = d.ok ? `Pre-deposit $${d.predeposit_usdc} recorded` : (d.error||'Error');
+  load();
+}
+load();
+</script>
+</body>
+</html>

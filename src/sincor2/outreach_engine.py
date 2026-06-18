@@ -56,6 +56,7 @@ class OutreachEngine:
         self.yelp_key = os.environ.get('YELP_API_KEY', '')
         self.places_key = (
             os.environ.get('GOOGLE_PLACES_API_KEY') or
+            os.environ.get('GOOGLE_PLACES_KEY') or
             os.environ.get('GOOGLE_API_KEY', '')
         )
         self.enabled = os.environ.get('OUTREACH_ENABLED', 'false').lower() == 'true'
@@ -191,7 +192,7 @@ class OutreachEngine:
 <p>I'm Court at <a href="https://getsincor.com">SINCOR</a>. We build competitive intelligence
 reports for local service businesses — so you can see exactly what your rivals are doing
 (pricing, marketing, reviews, everything) in one clear PDF.</p>
-<p>It's $49 as a one-time report, or $149/month if you want fresh intel every month.</p>
+<p>Pay in AXM for a one-time report, or SINC monthly for fresh intel — on Base, no cards.</p>
 <p>Most of our clients say the first report pays for itself the same week — usually by
 catching a pricing gap they didn't know existed.</p>
 <p>Interested? Just reply here and I'll get your report started. Takes 5 minutes on your end.</p>
@@ -223,12 +224,24 @@ Your business appeared in a local directory. Not interested? Reply STOP and I wo
                 "Quick question: do you know what your top 3 competitors are charging right now?\n\n"
                 "I'm Court at SINCOR. We build competitive intelligence reports for local service "
                 "businesses — pricing, reviews, marketing, everything in one PDF.\n\n"
-                "$49 one-time or $149/month for monthly intel.\n\n"
+                "AXM one-time or SINC monthly for intel — getsincor.com/buy\n\n"
                 "Most clients say it pays for itself the same week.\n\n"
                 "Interested? Just reply and I'll get your report started.\n\n"
                 "— Court\nSINCOR | getsincor.com\n"
                 "---\nReply STOP to opt out."
             )
+            try:
+                from sincor2.compliance_guardrails import guardrails
+                guardrails.check_email_send(
+                    [email],
+                    text + "\n" + html,
+                    subject=f"What are your competitors charging? (for {lead.get('name', 'your business')})",
+                    agent="outreach_agent",
+                )
+            except Exception as e:
+                logger.error(f'[OUTREACH] Guardrails blocked send to {email}: {e}')
+                return False
+
             response = resend_client.emails.send({
                 'from': from_addr,
                 'to': email,

@@ -1,6 +1,17 @@
 # SINCOR2
 
-**SINCOR2** ([getsincor.com](https://getsincor.com)) is a production AI business automation platform built around a constellation of 43 specialized agents — each named after a star — that operate as a coordinated workforce. Clients subscribe to access the swarm for tasks that would normally require entire departments: market intelligence, competitive analysis, outbound sales, contract negotiation, content creation, quality assurance, and more. The platform handles its own economics through Stripe subscriptions, manages agent lifecycles from first boot to promotion, and uses Claude (Anthropic) as the central reasoning brain that coordinates everything. It is live, deployed on Railway, and actively processing real payments.
+**SINCOR2** ([getsincor.com](https://getsincor.com)) is a production autonomous workforce platform: 42+ specialized AI agents coordinated through a decentralized task market, with wallet-native billing on Base (**SINC** subscriptions, **AXM** execution). Live on Railway with Gunicorn, health checks, and verifiable on-chain contracts.
+
+### Documentation (public)
+
+| Resource | URL |
+|----------|-----|
+| **Whitepaper** | [getsincor.com/whitepaper](https://getsincor.com/whitepaper) |
+| **Autonomous Swarm deck** (embedded + presenter) | [getsincor.com/pitch](https://getsincor.com/pitch) · slides in [`static/docs/swarm/`](static/docs/swarm/) |
+| **Markdown source** | [`static/docs/SINCOR_whitepaper.md`](static/docs/SINCOR_whitepaper.md) |
+| **Canonical addresses** | [`CANONICAL_ADDRESSES.md`](CANONICAL_ADDRESSES.md) |
+
+Default billing: **SINC + AXM on Base** (`LEGACY_FIAT_PAYMENTS_ENABLED=false`). Stripe/PayPal are legacy-only.
 
 ---
 
@@ -59,7 +70,7 @@ On the customer-facing side, it looks like a SaaS platform with tiered subscript
 - Dynamic pricing that adjusts based on complexity and urgency
 - Predictive analytics with confidence intervals
 - Self-improving quality scoring that learns from client feedback
-- Stripe subscriptions with Customer Portal for self-service billing
+- SINC/AXM wallet checkout with on-chain treasury verification
 
 ---
 
@@ -434,7 +445,8 @@ Jinja2 templates live in `templates/`. Key templates include:
 - `enterprise-dashboard.html` / `professional_dashboard.html` — Tier-specific dashboards
 - `login.html` — Authentication page
 - `security.html` / `privacy.html` / `terms.html` — Legal pages
-- `whitepaper.html` — Technical whitepaper
+- `whitepaper.html` — Technical whitepaper ([/whitepaper](https://getsincor.com/whitepaper))
+- `pitch.html` — Interactive pitch deck ([/pitch](https://getsincor.com/pitch))
 - `sin-airdrop.html` — SINC token airdrop page
 
 ---

@@ -1,0 +1,81 @@
+{
+  "copyPasteBlock": "Name: SINC\nSymbol: SINC\nContract: 0x9C8cd8d3961F445D653713dE65C6578bE11668e7\nChain: Base (8453)\nDecimals: 8\nTotal Supply: 100000000\nWebsite: https://getsincor.com\nTwitter: https://twitter.com/getsincor\nTelegram: https://t.me/getsincor\nExplorer: https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7\nDescription (short): SINC is the utility token of SINCOR \u2014 a swarm of 43 autonomous AI agents operating on Base.\nDescription (long): SINC is the utility token of SINCOR, a production AI agent swarm on Base mainnet. Contracts are Sourcify-verified with CertiK Skynet 97/100. Fixed 100M supply, 8 decimals, no mint, no admin keys. SINC powers access to the agent network, curated sales, and on-chain coordination via Uniswap v4 limit-order infrastructure.\nTrust: Sourcify full-match verified \u00b7 CertiK Skynet 97/100 \u00b7 SolidityScan Low Risk 98.5/100 \u00b7 No mint function \u00b7 No admin pause/withdraw \u00b7 Fixed 100M supply",
+  "logoPath": "C:\\Users\\cjay4\\.grok\\worktrees\\desktop-sincor-clean\\sincor\\tokenlists\\assets\\logo-256.png",
+  "targets": [
+    {
+      "id": "geckoterminal",
+      "name": "GeckoTerminal token info",
+      "type": "form",
+      "url": "https://www.geckoterminal.com",
+      "docs": "https://support.coingecko.com/hc/en-us/articles/7291312302617",
+      "fee": false,
+      "notes": "Search SINC on Base, then Update token info."
+    },
+    {
+      "id": "dexscreener",
+      "name": "DexScreener enhanced token info",
+      "type": "form",
+      "url": "https://dexscreener.com/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+      "docs": "https://docs.dexscreener.com/token-listing",
+      "fee": true,
+      "notes": "Enhanced Token Info is paid; basic indexing is free with liquidity+trades."
+    },
+    {
+      "id": "coingecko",
+      "name": "CoinGecko listing request",
+      "type": "form",
+      "url": "https://www.coingecko.com/en/coins/new",
+      "docs": "https://support.coingecko.com/hc/en-us/articles/7291312302617",
+      "fee": false,
+      "notes": "Unlocks Rainbow verification path on Base."
+    },
+    {
+      "id": "coinmarketcap",
+      "name": "CoinMarketCap listing request",
+      "type": "form",
+      "url": "https://coinmarketcap.com/request/",
+      "docs": "https://support.coinmarketcap.com/hc/en-us/articles/360043685031",
+      "fee": false
+    },
+    {
+      "id": "dextools",
+      "name": "DEXTools token info update",
+      "type": "form",
+      "url": "https://www.dextools.io/app/en/base/pair-explorer",
+      "fee": true
+    },
+    {
+      "id": "birdeye",
+      "name": "Birdeye token info",
+      "type": "form",
+      "url": "https://birdeye.so/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7?chain=base",
+      "fee": false
+    },
+    {
+      "id": "blockscout",
+      "name": "Blockscout verified address + public tag",
+      "type": "form",
+      "url": "https://base.blockscout.com/my-account/verified-addresses",
+      "docs": "https://docs.blockscout.com/using-blockscout/my-account/verified-addresses",
+      "fee": false,
+      "notes": "Deployer signs to verify ownership \u2192 update token icon/name. Also submit public tag."
+    },
+    {
+      "id": "blockscout_public_tag",
+      "name": "Blockscout public tag request",
+      "type": "form",
+      "url": "https://base.blockscout.com/public-tags/submit",
+      "fee": false,
+      "notes": "Marks official SINC contract; clears unverified/suspicious UI for explorers."
+    },
+    {
+      "id": "tkn",
+      "name": "Token Name Service (TKN) \u2014 Blockscout icon source",
+      "type": "form",
+      "url": "https://tkn.xyz/token/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+      "docs": "https://docs.tkn.xyz/usage/organizations",
+      "fee": false,
+      "notes": "Blockscout pulls token metadata from TKN. Submit logo, website, description."
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+# Five launchpads — one-tap email outreach (mirrors launch_partners CRM)
+launch_date: "2026-07-07"
+tge_campaign: https://getsincor.com/launch/campaign
+site: https://getsincor.com
+pitch: https://getsincor.com/pitch
+
+proof:
+  sinc: "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+  chain: Base 8453
+  certik: "97/100 Skynet"
+  sourcify: full-match verified
+  hook_floor_usd: 1.50
+  predeposit_opens: "2026-07-01"
+
+offer:
+  lbp: "KPI-driven TGE with $250k+ pre-deposit pipeline, social whitelist, on-chain milestones"
+  volume: "Live gateway + hook walls — not empty pool launch"
+  tech: "42-agent platform, A2A marketplace, verified contracts"
+
+launchpads:
+  - id: fjord-foundry
+    name: Fjord Foundry
+    tier: P0
+    type: lbp_specialist
+    contact_email: partnerships@fjordfoundry.com
+    contact_url: https://fjordfoundry.com
+    contact_method: email
+    channel: email
+    angle: "Base-native AI infra token with KPI pre-deposit + social whitelist — proven demand before LBP"
+    ask: "Co-hosted LBP or priority slot week of July 7 with milestone-linked marketing"
+    notes: "Reference MegaETH-style KPI rollouts; we have predeposit waitlist Jul 1"
+
+  - id: balancer-lbp
+    name: Balancer Protocol (LBP v3)
+    tier: P0
+    type: lbp_native
+    contact_email: ecosystem@balancer.fi
+    contact_url: https://balancer.fi
+    contact_method: discord
+    channel: discord
+    angle: "Verified SINC on Base — hook + curve live, KPI campaign driving LBP demand"
+    ask: "Balancer pools/launches channel feature + LBP pool co-marketing July 7"
+    notes: "Existing relationship in partner CRM — cross-link"
+
+  - id: aerodrome-base
+    name: Aerodrome Finance
+    tier: P0
+    type: base_dex
+    contact_email: bd@aerodrome.finance
+    contact_url: https://aerodrome.finance
+    contact_method: email
+    channel: email
+    angle: "Post-TGE liquidity partnership on Base — agent platform token with real revenue rails"
+    ask: "Launch week liquidity incentive or pool listing coordination"
+    notes: "Whale capture list shared after $50k predeposit milestone"
+
+  - id: doppler-base
+    name: Doppler
+    tier: P1
+    type: base_launch_infra
+    contact_email: hello@doppler.lol
+    contact_url: https://www.doppler.lol
+    contact_method: email
+    channel: email
+    angle: "Token launch with on-chain KPI milestones + pre-deposit bonding curve"
+    ask: "Base launch infrastructure slot aligned to July 7 TGE"
+    notes: "Alternative LBP path if Balancer/Fjord timing tight"
+
+  - id: base-batches
+    name: Base Batches (Coinbase)
+    tier: P1
+    type: ecosystem_launch
+    contact_email: ""
+    contact_url: https://www.basebatches.xyz
+    contact_method: form
+    channel: form
+    angle: "Autonomous AI agent swarm on Base — KPI TGE campaign with verified contracts"
+    ask: "Cohort spotlight or launch calendar inclusion for July TGE"
+    notes: "Complements Base Builder grant narrative"

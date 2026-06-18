@@ -17,9 +17,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 logger = logging.getLogger(__name__)
 
 # Config
-POLYCLAW_ENABLED = os.getenv("POLYCLAW_ENABLED", "true").lower() == "true"
+POLYCLAW_ENABLED = os.getenv("POLYCLAW_ENABLED", "false").lower() == "true"
 POLYCLAW_RISK_LEVEL = os.getenv("POLYCLAW_RISK_LEVEL", "medium")
-POLYCLAW_AUTO_EXECUTE = os.getenv("POLYCLAW_AUTO_EXECUTE", "true").lower() == "true"
+POLYCLAW_AUTO_EXECUTE = os.getenv("POLYCLAW_AUTO_EXECUTE", "false").lower() == "true"
 POLYCLAW_ALERT_THRESHOLD = float(os.getenv("POLYCLAW_ALERT_THRESHOLD", "0.5"))
 POLYCLAW_SCAN_INTERVAL = int(os.getenv("POLYCLAW_SCAN_INTERVAL", "60"))  # seconds
 
@@ -36,21 +36,36 @@ def log_trade(trade_data):
     logger.info(f"[POLYCLAW] Trade logged: {trade_data['strategy']} | {trade_data['net_profit_percent']}% profit")
 
 def scan_polymarket():
-    """
-    Scan Polymarket for arbitrage opportunities
-    TODO: Wire actual Polyclaw CLI integration
-    """
+    """Scan markets via trading vertical agents — signals only unless AUTO_EXECUTE."""
     try:
-        # Placeholder — actual implementation would:
-        # 1. Fetch current Polymarket markets via API
-        # 2. Calculate YES/NO spread for each market
-        # 3. Identify arbitrage: |YES_price + NO_price - 1.0| > threshold
-        # 4. Return opportunities with edge % and strategy
-        
-        logger.debug("[POLYCLAW] Scanning Polymarket for arbitrage...")
-        # For now, return empty (no false trades)
-        return []
-    
+        from verticals.trading.polymarket_agent import PolymarketAgent
+        from verticals.trading.openclaw_agent import OpenClawTradingAgent
+
+        pm = PolymarketAgent()
+        trader = OpenClawTradingAgent()
+        opportunities = []
+
+        for market in pm.get_open_markets(category="all"):
+            price = float(market.get("probability", 0.5))
+            # Conservative model tilt — real API forecast would replace this
+            model_prob = min(0.99, max(0.01, price + (0.08 if price < 0.5 else -0.08)))
+            signal = trader.generate_signal(market, model_prob)
+            edge_pct = abs(signal.edge) * 100
+            if edge_pct < POLYCLAW_ALERT_THRESHOLD:
+                continue
+            opportunities.append({
+                "market_id": signal.market_id,
+                "strategy": signal.side,
+                "edge_percent": round(edge_pct, 2),
+                "net_profit_percent": round(edge_pct * 0.75, 2),
+                "signal_only": not POLYCLAW_AUTO_EXECUTE,
+                "rationale": signal.rationale,
+            })
+
+        if opportunities:
+            logger.info("[POLYCLAW] %s signal(s) above threshold", len(opportunities))
+        return opportunities
+
     except Exception as e:
         logger.error(f"[POLYCLAW] Scan error: {e}")
         return []

@@ -37,6 +37,16 @@ env/
 secrets/
 secrets_local/
 secrets.txt
+naynarsecrets.txt
+**/naynarsecrets.txt
+desktop.ini
+**/desktop.ini
+
+# Local agent/session artifacts (never commit)
+terminals/
+agent-tools/
+Hermes-Setup.exe
+data/neynar_signer_state.json
 PAYPAL_VAR.txt
 *.pem
 *.key

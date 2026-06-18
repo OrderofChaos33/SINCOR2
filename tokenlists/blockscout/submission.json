@@ -1,0 +1,23 @@
+{
+  "chain": "Base",
+  "chain_id": 8453,
+  "contract": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+  "name": "SINC",
+  "symbol": "SINC",
+  "decimals": 8,
+  "website": "https://getsincor.com",
+  "logo_url": "https://getsincor.com/static/tokenlists/assets/logo-256.png",
+  "token_list": "https://getsincor.com/tokenlists/sincor.tokenlist.json",
+  "metadata_url": "https://getsincor.com/.well-known/sinc-token.json",
+  "description": "SINC is the utility token of SINCOR \u2014 a swarm of 43 autonomous AI agents operating on Base.",
+  "twitter": "https://twitter.com/getsincor",
+  "deployer_to_verify": "0xC184EcEfFaf6392951e4C7b042d61774497B5dC5",
+  "steps": [
+    "1. Deploy latest getsincor.com (token list + metadata routes must return 200).",
+    "2. Blockscout \u2192 My Account \u2192 Verified addresses \u2192 Add address \u2192 sign as deployer.",
+    "3. Update token icon URL to https://getsincor.com/static/tokenlists/assets/logo-256.png",
+    "4. Submit public tag: https://base.blockscout.com/public-tags/submit",
+    "5. Register on TKN: https://tkn.xyz/token/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+    "6. Open Superchain PR: python scripts/whitelist_token.py launch (or submit_superchain_pr.ps1)"
+  ]
+}

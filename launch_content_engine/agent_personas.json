@@ -1,0 +1,14 @@
+[
+  {"name": "Market Research Agent", "category": "Business Intelligence", "task": "Summarized Base ecosystem AI-token launches and flagged verified-contract outliers."},
+  {"name": "Data Analysis Agent", "category": "Business Intelligence", "task": "Pulled live RPC stats for SINC curve inventory and formatted a holder-safe chart."},
+  {"name": "Content Creation Agent", "category": "Marketing", "task": "Drafted a build-log post about the 42-agent swarm architecture without price promises."},
+  {"name": "SEO Optimization Agent", "category": "Marketing", "task": "Generated a comparison outline: verified agent tokens vs vaporware launches."},
+  {"name": "Social Media Agent", "category": "Marketing", "task": "Queued a Farcaster cast about one agent completing an on-chain verification task."},
+  {"name": "Customer Outreach Agent", "category": "Marketing", "task": "Prepared amplifier DM drafts for Base ecosystem newsletters (review queue)."},
+  {"name": "Task Orchestrator Agent", "category": "Operations", "task": "Scheduled hook fill keeper + buy watcher in the ops daemon."},
+  {"name": "Workflow Optimizer Agent", "category": "Operations", "task": "Mapped buyer paths: curve ETH buys vs gateway USDC buys."},
+  {"name": "Quality Assurance Agent", "category": "Operations", "task": "Rejected a draft post that contained price predictions; sent back for rewrite."},
+  {"name": "FAQ Responder Agent", "category": "Customer Success", "task": "Answered 'why no DEX route' with link to /why-no-dex explainer."},
+  {"name": "Strategic Advisor Agent", "category": "Strategy", "task": "Recommended 4:1 ratio of swarm-interest posts to token mentions."},
+  {"name": "Communication Hub Agent", "category": "Coordination", "task": "Published A2A agent card for protocol-based discovery by external agents."}
+]

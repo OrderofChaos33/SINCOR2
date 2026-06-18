@@ -1,0 +1,84 @@
+{
+  "name": "SINCOR2 Dental Practice Pack",
+  "description": "Dental practice operations and compliance automation for schedule optimization, patient recall, billing, HIPAA, OSHA, and infection control.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR2",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": [
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "dental-practice-ops",
+      "name": "Dental Practice Operations",
+      "description": "Optimizes schedule mix, recall campaigns, treatment reminders, and billing outputs.",
+      "tags": [
+        "dental",
+        "scheduling",
+        "billing",
+        "recall"
+      ],
+      "examples": [
+        "Optimize tomorrow's hygiene schedule.",
+        "Generate billing from a treatment plan."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    },
+    {
+      "id": "dental-compliance",
+      "name": "Dental Compliance",
+      "description": "Supports HIPAA, OSHA, and infection control readiness workflows.",
+      "tags": [
+        "dental",
+        "hipaa",
+        "osha",
+        "infection-control"
+      ],
+      "examples": [
+        "Generate an OSHA checklist.",
+        "Review infection control readiness."
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "documentationUrl": "https://getsincor.com/docs/api"
+}

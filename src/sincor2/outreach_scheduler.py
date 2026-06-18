@@ -21,6 +21,10 @@ def start_outreach_scheduler(app=None):
     """
     global _scheduler
 
+    if os.environ.get("OUTREACH_ENABLED", "true").lower() != "true":
+        logger.info("[OUTREACH] Disabled — OUTREACH_ENABLED=false")
+        return None
+
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.interval import IntervalTrigger

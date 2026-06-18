@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ project.name }} — Preview</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta property="og:title" content="{{ project.name }}">
+  <meta property="og:description" content="{{ project.niche or 'Local business website preview' }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #0f172a; background: #f8fafc; }
+    .preview-banner {
+      position: sticky; top: 0; z-index: 99;
+      background: linear-gradient(90deg, #4c1d95, #0891b2);
+      color: white; text-align: center; padding: 10px 16px; font-size: 13px; font-weight: 600;
+    }
+    .preview-banner a { color: #fde68a; margin-left: 8px; }
+    header {
+      background: white; border-bottom: 1px solid #e2e8f0;
+      padding: 20px 32px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .logo { font-weight: 800; font-size: 20px; color: #1e293b; }
+    nav a { margin-left: 20px; color: #64748b; text-decoration: none; font-size: 14px; font-weight: 600; }
+    .hero {
+      padding: 80px 32px; text-align: center;
+      background: linear-gradient(180deg, #fff 0%, #f1f5f9 100%);
+    }
+    .hero h1 { font-size: clamp(32px, 5vw, 52px); margin-bottom: 16px; }
+    .hero p { color: #64748b; max-width: 560px; margin: 0 auto 28px; font-size: 18px; }
+    .cta {
+      display: inline-block; background: #7c3aed; color: white; padding: 14px 32px;
+      border-radius: 10px; font-weight: 700; text-decoration: none;
+    }
+    .grid {
+      max-width: 1000px; margin: 0 auto; padding: 48px 32px 80px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;
+    }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 24px; }
+    .card h3 { margin-bottom: 8px; font-size: 17px; }
+    .card p { color: #64748b; font-size: 14px; line-height: 1.6; }
+    footer { text-align: center; padding: 32px; color: #94a3b8; font-size: 12px; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="preview-banner">
+    STAGING PREVIEW — not indexed · edits are draft until cutover
+    <a href="/verticals/webbuilder/studio?project={{ project.id }}">Open in WebBuilder Studio →</a>
+  </div>
+  <header>
+    <div class="logo">{{ project.name }}</div>
+    <nav>
+      <a href="#services">Services</a>
+      <a href="#reviews">Reviews</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+  <section class="hero">
+    <h1>{{ project.name }}</h1>
+    <p>{{ project.prompt or ('Professional ' ~ (project.niche or 'local business') ~ ' — built by SINCOR WebBuilder swarm.') }}</p>
+    <a class="cta" href="#contact">Book a consultation</a>
+  </section>
+  <div class="grid" id="services">
+    <div class="card"><h3>Services</h3><p>Custom service pages generated from discovery — pricing tiers, service areas, and CTAs.</p></div>
+    <div class="card" id="reviews"><h3>Reviews</h3><p>Social proof block pulled from Google, Yelp, or Facebook source signals.</p></div>
+    <div class="card"><h3>Gallery</h3><p>Before/after and portfolio grid — owner can swap images in Studio visual edits.</p></div>
+    <div class="card" id="contact"><h3>Contact</h3><p>Form + click-to-call + map embed. Connects to SINCOR CRM on cutover.</p></div>
+  </div>
+  <footer>Preview slug: {{ project.slug }} · Migration phase: {{ migration_label }}</footer>
+</body>
+</html>

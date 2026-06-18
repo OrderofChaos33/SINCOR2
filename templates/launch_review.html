@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launch review queue — SINCOR</title>
+  <style>
+    :root { --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --muted:#9ca3af; --text:#e5e7eb; --green:#34d399; --red:#f87171; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,sans-serif; }
+    .wrap { max-width:900px; margin:0 auto; padding:32px 16px; }
+    h1 { font-size:28px; margin:0 0 8px; }
+    .sub { color:var(--muted); margin-bottom:24px; }
+    .card { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:18px; margin-bottom:14px; }
+    .meta { font-size:12px; color:var(--muted); margin-bottom:10px; }
+    pre { white-space:pre-wrap; font-size:14px; line-height:1.5; margin:0 0 12px; }
+    button { cursor:pointer; border:none; border-radius:10px; padding:10px 14px; font-weight:700; margin-right:8px; }
+    .approve { background:var(--green); color:#042f2e; }
+    .reject { background:rgba(248,113,113,.2); color:var(--red); }
+    .empty { color:var(--muted); padding:40px; text-align:center; }
+    a { color:var(--cyan); }
+    .login { max-width:360px; }
+    .login input { width:100%; box-sizing:border-box; margin:8px 0 12px; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12); background:#0d0d18; color:var(--text); }
+    .login button { width:100%; background:var(--cyan); color:#042f2e; }
+    .err { color:var(--red); font-size:13px; margin-top:8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Launch review queue</h1>
+  <p class="sub">Agents draft · you approve · Farcaster posts when Neynar keys are set (else outbox file). <a href="/launch/campaign">Campaign</a> · <a href="/launch/launchpads">Launchpads</a> · <a href="/launch/partners">Partners</a> · <a href="/sinc">/sinc</a></p>
+  <div id="login" class="card login" style="display:none">
+    <strong>Admin sign-in</strong>
+    <p class="sub" style="margin:8px 0 12px">Required to view and approve launch drafts.</p>
+    <input id="email" type="email" placeholder="Admin email" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button onclick="doLogin()">Sign in</button>
+    <div id="loginErr" class="err"></div>
+  </div>
+  <div id="list" class="empty">Loading…</div>
+</div>
+<script>
+const TOKEN_KEY = 'sincor_admin_token';
+
+function authHeaders() {
+  const t = sessionStorage.getItem(TOKEN_KEY);
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+async function doLogin() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    err.textContent = data.error || 'Login failed';
+    return;
+  }
+  sessionStorage.setItem(TOKEN_KEY, data.access_token);
+  document.getElementById('login').style.display = 'none';
+  load();
+}
+
+function showLogin() {
+  document.getElementById('login').style.display = 'block';
+  document.getElementById('list').className = 'empty';
+  document.getElementById('list').textContent = '';
+}
+
+async function load() {
+  const res = await fetch('/api/launch/review?status=pending', { headers: authHeaders() });
+  if (res.status === 401) { showLogin(); return; }
+  const drafts = await res.json();
+  const el = document.getElementById('list');
+  if (!drafts.length) { el.className='empty'; el.textContent='No pending drafts — run scripts/run_launch_ops.ps1'; return; }
+  el.className='';
+  el.innerHTML = drafts.map(d => `
+    <div class="card" data-id="${d.id}">
+      <div class="meta">${d.pipeline} · ${d.channel} · ${d.created_at}</div>
+      <strong>${d.title || '(no title)'}</strong>
+      <pre>${d.body.replace(/</g,'&lt;')}</pre>
+      <button class="approve" onclick="act('${d.id}','approve')">Approve & post</button>
+      <button class="reject" onclick="act('${d.id}','reject')">Reject</button>
+    </div>`).join('');
+}
+async function act(id, action) {
+  await fetch('/api/launch/review/' + id, {
+    method:'POST',
+    headers:{...authHeaders(), 'Content-Type':'application/json'},
+    body: JSON.stringify({action})
+  });
+  load();
+}
+if (sessionStorage.getItem(TOKEN_KEY)) {
+  load();
+} else {
+  showLogin();
+}
+setInterval(() => { if (sessionStorage.getItem(TOKEN_KEY)) load(); }, 30000);
+</script>
+</body>
+</html>

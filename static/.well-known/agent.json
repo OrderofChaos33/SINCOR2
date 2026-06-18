@@ -1,0 +1,59 @@
+{
+  "name": "SINCOR",
+  "description": "42 autonomous AI agents on Base. Verifiable contracts, bonding curve + v4 hook. Self-serve SINC participation — no human sales required.",
+  "url": "https://getsincor.com",
+  "version": "1.0.1",
+  "protocolVersion": "1.0",
+  "preferredTransport": "JSONRPC",
+  "provider": {
+    "organization": "SINCOR",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "swarm-status",
+      "name": "Swarm status",
+      "description": "Returns agent swarm health and task categories.",
+      "tags": ["agents", "status"],
+      "examples": ["What is SINCOR running right now?"]
+    },
+    {
+      "id": "onchain-sinc-stats",
+      "name": "SINC on-chain stats",
+      "description": "Factual RPC snapshot: curve inventory, hook liquidity, safe balance.",
+      "tags": ["base", "sinc", "onchain"],
+      "examples": ["How much SINC is in the bonding curve?"]
+    },
+    {
+      "id": "buy-sinc",
+      "name": "Buy SINC (human wallet)",
+      "description": "Self-serve purchase via web gateway — ETH curve or USDC router. No API key required.",
+      "tags": ["sinc", "gateway"],
+      "examples": ["Where do I buy SINC?"],
+      "metadata": {
+        "buyUrl": "https://getsincor.com/sinc",
+        "curve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
+        "router": "0x11b86E85cC5170F4165c89ccb11332133B29E283",
+        "token": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+      }
+    },
+    {
+      "id": "refer-sinc",
+      "name": "SINC referral (3% on-chain)",
+      "description": "Generate a referral link; curve pays 3% to referrer wallet per buy.",
+      "tags": ["referral", "sinc"],
+      "examples": ["How do I earn from SINC buys?"],
+      "metadata": {
+        "referUrl": "https://getsincor.com/refer"
+      }
+    }
+  ],
+  "supportsAuthenticatedExtendedCard": false
+}

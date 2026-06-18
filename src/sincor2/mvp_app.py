@@ -1,21 +1,21 @@
 """
 SINCOR2 MVP - Minimal Flask Application
-A lean, deployable MVP with health checks, home page, buy flow, and Stripe payments.
-Stripe checkout ? order DB ? asset delivery pipeline.
+Platform billing: SINC (subscriptions) + AXM (one-off intel). Legacy Stripe/PayPal gated off by default.
 """
 
 import os
 import re
+import sys
 import json
 import time
 import logging
 import sqlite3
 from datetime import datetime, timedelta
-from functools import wraps
 from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from werkzeug.middleware.proxy_fix import ProxyFix
 try:
     from authlib.integrations.flask_client import OAuth
     OAUTH_AVAILABLE = True
@@ -36,6 +36,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger('sincor2')
 
+
+def _env_first(*keys: str, default: str = '') -> str:
+    """Return the first non-empty environment variable from *keys."""
+    for key in keys:
+        val = (os.environ.get(key) or '').strip()
+        if val:
+            return val
+    return default
+
+
 # Load environment variables
 load_dotenv()
 
@@ -45,6 +55,45 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+
+# Railway / reverse-proxy: correct scheme + host for OAuth redirect URIs
+if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('TRUST_PROXY', '').lower() in ('1', 'true', 'yes'):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+_platform_state = None
+A2A_AVAILABLE = False
+try:
+    from sincor2.platform_bootstrap import bootstrap_platform
+    from sincor2.a2a_integration import A2ARouter
+    from sincor2.blueprints.marketplace import marketplace_bp
+
+    _platform_state = bootstrap_platform(app)
+    app.register_blueprint(A2ARouter().blueprint)
+    app.register_blueprint(marketplace_bp)
+    A2A_AVAILABLE = True
+    logger.info(
+        "[PLATFORM] A2A + marketplace live — %s cards, %s vertical agents",
+        _platform_state.get("registered_cards", 0),
+        len(_platform_state.get("vertical_agents", {})),
+    )
+except Exception as e:
+    logger.warning(f"[PLATFORM] Bootstrap failed: {e}")
+
+
+def _sched_enabled(key: str) -> bool:
+    """Agent schedulers default ON; set KEY=false to disable."""
+    return os.environ.get(key, "true").lower() == "true"
+
+
+@app.context_processor
+def inject_social_links():
+    from sincor2.social_links import SOCIAL_LINKS
+    return {'social_links': SOCIAL_LINKS}
+
 
 # Configure JWT � MUST be set in Railway secrets for production
 jwt_secret = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET')
@@ -62,30 +111,179 @@ jwt = JWTManager(app)
 
 # OAuth (Google + GitHub)
 oauth = None
+OAUTH_REDIRECT_BASE = _env_first('OAUTH_REDIRECT_BASE_URL', 'PUBLIC_BASE_URL', 'SITE_URL', default='').rstrip('/')
+OAUTH_ERROR_MESSAGES = {
+    'oauth_unavailable': 'Social login is temporarily unavailable. Please use email signup.',
+    'oauth_failed': 'Social login failed. Please try again or use email signup.',
+    'no_email': 'We could not get your email from that provider. Try another method.',
+}
+
+
+def _oauth_redirect_uri(endpoint: str) -> str:
+    """Build absolute OAuth callback URL (Railway-safe)."""
+    if OAUTH_REDIRECT_BASE:
+        return f'{OAUTH_REDIRECT_BASE}{url_for(endpoint)}'
+    return url_for(endpoint, _external=True)
+
+
+def _oauth_provider_ready(name: str) -> bool:
+    return bool(oauth and hasattr(oauth, name))
+
+
+def _auth_cookie_response(email: str, redirect_url: str = '/dashboard'):
+    """Set session + JWT cookie and redirect."""
+    session['user_email'] = email
+    access_token = create_access_token(identity=email)
+    sep = '&' if '?' in redirect_url else '?'
+    if 'email=' not in redirect_url:
+        redirect_url = f'{redirect_url}{sep}email={email}'
+    resp = make_response(redirect(redirect_url))
+    resp.set_cookie(
+        'access_token', access_token, httponly=True,
+        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
+        samesite='Lax', max_age=28800,
+    )
+    return resp
+
+
+def _session_email() -> str:
+    """Resolve logged-in customer email from session, JWT cookie, or query."""
+    email = (session.get('user_email') or '').strip()
+    if email:
+        return email
+    token = request.cookies.get('access_token', '')
+    if token:
+        try:
+            from flask_jwt_extended import decode_token
+            email = (decode_token(token).get('sub') or '').strip()
+            if email:
+                return email
+        except Exception:
+            pass
+    return (request.args.get('email') or '').strip()
+
+
+def _customer_exists(email: str) -> bool:
+    """True if email has a profile, order, or platform subscription."""
+    if not email:
+        return False
+    db = get_db()
+    if db.execute('SELECT 1 FROM customer_profiles WHERE email=?', (email,)).fetchone():
+        return True
+    if db.execute(
+        "SELECT 1 FROM orders WHERE customer_email=? LIMIT 1", (email,)
+    ).fetchone():
+        return True
+    try:
+        if db.execute(
+            "SELECT 1 FROM platform_subscriptions WHERE email=? LIMIT 1", (email,)
+        ).fetchone():
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _upsert_lead(email: str, name: str) -> None:
+    """Persist signup lead into customer_profiles."""
+    import secrets
+    email = email.strip().lower()
+    parts = (name or '').strip().split(None, 1)
+    first = parts[0] if parts else email.split('@')[0]
+    last = parts[1] if len(parts) > 1 else ''
+    now = datetime.utcnow().isoformat()
+    db = get_db()
+    existing = db.execute(
+        'SELECT profile_id FROM customer_profiles WHERE email=?', (email,)
+    ).fetchone()
+    if existing:
+        db.execute(
+            'UPDATE customer_profiles SET first_name=?, last_name=?, updated_at=? WHERE email=?',
+            (first, last, now, email),
+        )
+    else:
+        profile_id = 'lead_' + secrets.token_urlsafe(12)
+        db.execute(
+            '''INSERT INTO customer_profiles
+               (profile_id, email, first_name, last_name, created_at, updated_at)
+               VALUES (?,?,?,?,?,?)''',
+            (profile_id, email, first, last, now, now),
+        )
+    db.commit()
+
+
+def _oauth_finish_login(email: str, name: str, provider: str):
+    """Create session + JWT cookie after successful OAuth."""
+    session['user_name'] = name or email.split('@')[0]
+    _upsert_lead(email, name or email.split('@')[0])
+    logger.info('[OAUTH] %s login: %s', provider, email)
+    return _auth_cookie_response(email)
+
+
+def _google_userinfo(token: dict):
+    """Extract Google profile from token or userinfo endpoint."""
+    user_info = token.get('userinfo')
+    if user_info:
+        return user_info
+    if token.get('id_token') and hasattr(oauth.google, 'parse_id_token'):
+        try:
+            return oauth.google.parse_id_token(token)
+        except Exception as exc:
+            logger.warning('[OAUTH] Google id_token parse failed: %s', exc)
+    resp = oauth.google.get('userinfo')
+    return resp.json()
+
+
+def _github_primary_email() -> str:
+    """Fetch verified primary email when /user omits it."""
+    resp = oauth.github.get('user/emails')
+    emails = resp.json() if resp.ok else []
+    if not isinstance(emails, list):
+        return ''
+    for entry in emails:
+        if entry.get('primary') and entry.get('verified'):
+            return entry.get('email', '')
+    for entry in emails:
+        if entry.get('primary'):
+            return entry.get('email', '')
+    for entry in emails:
+        if entry.get('verified'):
+            return entry.get('email', '')
+    return emails[0].get('email', '') if emails else ''
+
+
 if OAUTH_AVAILABLE:
     oauth = OAuth(app)
-    _gcid = os.environ.get('GOOGLE_CLIENT_ID', '')
-    _gcs  = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-    _ghid = os.environ.get('GITHUB_CLIENT_ID', '')
-    _ghs  = os.environ.get('GITHUB_CLIENT_SECRET', '')
+    _gcid = _env_first('GOOGLE_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_ID')
+    _gcs = _env_first('GOOGLE_CLIENT_SECRET', 'GOOGLE_OAUTH_CLIENT_SECRET')
+    _ghid = _env_first('GITHUB_CLIENT_ID', 'GITHUB_OAUTH_CLIENT_ID')
+    _ghs = _env_first('GITHUB_CLIENT_SECRET', 'GITHUB_OAUTH_CLIENT_SECRET')
     if _gcid and _gcs:
-        oauth.register('google',
+        oauth.register(
+            'google',
             client_id=_gcid,
             client_secret=_gcs,
             server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
             client_kwargs={'scope': 'openid email profile'},
         )
         logger.info('[OAUTH] Google OAuth registered')
+    else:
+        logger.warning('[OAUTH] Google OAuth skipped — set GOOGLE_OAUTH_CLIENT_ID/SECRET')
     if _ghid and _ghs:
-        oauth.register('github',
+        oauth.register(
+            'github',
             client_id=_ghid,
             client_secret=_ghs,
             access_token_url='https://github.com/login/oauth/access_token',
             authorize_url='https://github.com/login/oauth/authorize',
             api_base_url='https://api.github.com/',
-            client_kwargs={'scope': 'user:email'},
+            client_kwargs={'scope': 'read:user user:email'},
         )
         logger.info('[OAUTH] GitHub OAuth registered')
+    else:
+        logger.warning('[OAUTH] GitHub OAuth skipped — set GITHUB_CLIENT_ID/SECRET')
+elif not OAUTH_AVAILABLE:
+    logger.warning('[OAUTH] authlib not installed — social login disabled')
 
 # Rate limiter
 limiter = Limiter(
@@ -95,24 +293,54 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
-# Stripe integration
+# Production kill-switches — no accidental on-chain writes or compliance egress
 try:
-    from sincor2.stripe_checkout import get_stripe_checkout
-    from sincor2.stripe_routes import stripe_bp, init_stripe_routes
-    STRIPE_AVAILABLE = True
-except (ImportError, ModuleNotFoundError) as e:
-    logger.warning(f"[STRIPE] Import error: {e}")
-    STRIPE_AVAILABLE = False
+    from sincor2.safety_locks import assert_production_safety
+    assert_production_safety()
+except Exception as e:
+    logger.warning("[SAFETY] Lock check failed: %s", e)
 
+# Platform payments (SINC + AXM) — default billing path
+try:
+    from sincor2.platform_payments import (
+        activate_subscription,
+        create_checkout as platform_create_checkout,
+        fiat_payments_enabled,
+        get_subscription,
+        init_platform_payments_db,
+        list_plans as platform_list_plans,
+        list_subscriptions,
+        verify_checkout as platform_verify_checkout,
+    )
+    init_platform_payments_db()
+    PLATFORM_PAYMENTS_AVAILABLE = True
+    logger.info("[PAYMENTS] SINC + AXM platform billing active (fiat=%s)", fiat_payments_enabled())
+except Exception as e:
+    logger.warning(f"[PAYMENTS] Platform payments init failed: {e}")
+    PLATFORM_PAYMENTS_AVAILABLE = False
+    fiat_payments_enabled = lambda: False  # type: ignore
+
+# Legacy Stripe — only when LEGACY_FIAT_PAYMENTS_ENABLED=true
+STRIPE_AVAILABLE = False
 stripe_processor = None
-if STRIPE_AVAILABLE:
-    stripe_processor = get_stripe_checkout()
-    if stripe_processor and stripe_processor.enabled:
-        init_stripe_routes(app, stripe_processor)
-        logger.info("[APP] Stripe integration initialized and routes registered")
-    else:
-        logger.warning("[APP] Stripe not properly configured � set STRIPE_API_KEY")
+if fiat_payments_enabled():
+    try:
+        from sincor2.stripe_checkout import get_stripe_checkout
+        from sincor2.stripe_routes import init_stripe_routes
+        STRIPE_AVAILABLE = True
+    except (ImportError, ModuleNotFoundError) as e:
+        logger.warning(f"[STRIPE] Import error: {e}")
+        STRIPE_AVAILABLE = False
 
+    if STRIPE_AVAILABLE:
+        stripe_processor = get_stripe_checkout()
+        if stripe_processor and stripe_processor.enabled:
+            init_stripe_routes(app, stripe_processor)
+            logger.info("[APP] Legacy Stripe routes registered")
+        else:
+            logger.warning("[APP] LEGACY_FIAT_PAYMENTS_ENABLED but Stripe not configured")
+else:
+    logger.info("[APP] Stripe/PayPal disabled — use /buy with SINC or AXM")
 # PDF Generator initialization
 pdf_guides_dir = os.path.join(project_root, 'files', 'guides')
 try:
@@ -153,6 +381,119 @@ try:
 except Exception as e:
     logger.warning(f"[CONTENT] Content scheduler init failed: {e}")
     content_scheduler = None
+
+# Launch ops — content drafts → /launch/review (hook keeper is local Windows task)
+try:
+    from sincor2.launch_ops_scheduler import start_launch_ops_scheduler, stop_launch_ops_scheduler
+    import atexit as _atexit_launch
+    launch_ops_scheduler = start_launch_ops_scheduler(app)
+    if launch_ops_scheduler:
+        _atexit_launch.register(stop_launch_ops_scheduler)
+        logger.info("[LAUNCH_OPS] Launch content scheduler started")
+except Exception as e:
+    logger.warning(f"[LAUNCH_OPS] Scheduler init failed: {e}")
+    launch_ops_scheduler = None
+
+# Daily email — ~5 min approval reminder for /launch/review
+try:
+    from sincor2.launch_review_notify import (
+        start_review_reminder_scheduler,
+        stop_review_reminder_scheduler,
+    )
+    import atexit as _atexit_review
+    review_reminder_scheduler = start_review_reminder_scheduler(app)
+    if review_reminder_scheduler:
+        _atexit_review.register(stop_review_reminder_scheduler)
+        logger.info("[REVIEW_REMINDER] Daily approval email scheduler started")
+except Exception as e:
+    logger.warning(f"[REVIEW_REMINDER] Scheduler init failed: {e}")
+    review_reminder_scheduler = None
+
+# Daily email — partner outreach due list for /launch/partners
+try:
+    from sincor2.partner_outreach_notify import (
+        start_partner_reminder_scheduler,
+        stop_partner_reminder_scheduler,
+    )
+    import atexit as _atexit_partner
+    partner_reminder_scheduler = start_partner_reminder_scheduler(app)
+    if partner_reminder_scheduler:
+        _atexit_partner.register(stop_partner_reminder_scheduler)
+        logger.info("[PARTNER_REMINDER] Daily partner outreach email scheduler started")
+except Exception as e:
+    logger.warning(f"[PARTNER_REMINDER] Scheduler init failed: {e}")
+    partner_reminder_scheduler = None
+
+# Daily email — launchpad outreach due list for /launch/launchpads
+try:
+    from sincor2.launchpad_outreach_notify import (
+        start_launchpad_reminder_scheduler,
+        stop_launchpad_reminder_scheduler,
+    )
+    import atexit as _atexit_launchpad
+    launchpad_reminder_scheduler = start_launchpad_reminder_scheduler(app)
+    if launchpad_reminder_scheduler:
+        _atexit_launchpad.register(stop_launchpad_reminder_scheduler)
+        logger.info("[LAUNCHPAD_REMINDER] Daily launchpad outreach email scheduler started")
+except Exception as e:
+    logger.warning(f"[LAUNCHPAD_REMINDER] Scheduler init failed: {e}")
+    launchpad_reminder_scheduler = None
+
+# Daily ops — read-only chain/revenue/wallet monitoring
+try:
+    from sincor2.daily_ops_scheduler import start_daily_ops_scheduler, stop_daily_ops_scheduler
+    import atexit as _atexit_daily
+    daily_ops_scheduler = start_daily_ops_scheduler(app)
+    if daily_ops_scheduler:
+        _atexit_daily.register(stop_daily_ops_scheduler)
+        logger.info("[DAILY_OPS] Daily ops scheduler started")
+except Exception as e:
+    logger.warning(f"[DAILY_OPS] Scheduler init failed: {e}")
+    daily_ops_scheduler = None
+
+# Operational swarm — 5 agents run real tasks (chain, content, partners, revenue, grants)
+swarm_scheduler = None
+try:
+    from sincor2.swarm_scheduler import start_swarm_scheduler
+    swarm_scheduler = start_swarm_scheduler(app)
+    if swarm_scheduler:
+        logger.info("[SWARM] Operational swarm scheduler started")
+except Exception as e:
+    logger.warning(f"[SWARM] Scheduler init failed: {e}")
+    swarm_scheduler = None
+
+# Compliance monitor — marketing/env audit
+try:
+    from sincor2.compliance_monitor import start_compliance_scheduler
+    import atexit as _atexit_compliance
+    compliance_scheduler = start_compliance_scheduler()
+    if compliance_scheduler:
+        def _stop_compliance():
+            if compliance_scheduler.running:
+                compliance_scheduler.shutdown(wait=False)
+        _atexit_compliance.register(_stop_compliance)
+        logger.info("[COMPLIANCE] Compliance monitor scheduler started")
+except Exception as e:
+    logger.warning(f"[COMPLIANCE] Scheduler init failed: {e}")
+    compliance_scheduler = None
+
+try:
+    from sincor2.subscription_scheduler import start_subscription_scheduler, stop_subscription_scheduler
+    import atexit as _atexit_sub
+    subscription_scheduler = start_subscription_scheduler(app)
+    if subscription_scheduler:
+        _atexit_sub.register(stop_subscription_scheduler)
+except Exception as e:
+    logger.warning(f"[SUBSCRIPTION] Scheduler init failed: {e}")
+    subscription_scheduler = None
+
+try:
+    from sincor2.x402_payments import init_x402_db
+    init_x402_db()
+    X402_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"[X402] Init failed: {e}")
+    X402_AVAILABLE = False
 
 # Polyclaw Autonomous Trading Agent — scans Polymarket for arbitrage, executes 24/7
 try:
@@ -264,7 +605,9 @@ def sanitize_string(value, max_length=200):
 # DATABASE SETUP (SQLite for orders)
 # ============================================================================
 
-DB_PATH = os.path.join(project_root, 'orders.db')
+from sincor2.data_paths import migrate_legacy_orders_db, orders_db_path
+
+DB_PATH = str(migrate_legacy_orders_db())
 
 
 def get_db():
@@ -379,6 +722,173 @@ def health():
     }), 200
 
 
+@app.route('/api/ops/schedulers', methods=['GET'])
+def ops_schedulers_status():
+    """Overview of background schedulers and env gates."""
+    def _job_next(sched, job_id):
+        if not sched or not sched.running:
+            return None
+        try:
+            job = sched.get_job(job_id)
+            return str(job.next_run_time) if job else None
+        except Exception:
+            return None
+
+    return jsonify({
+        'platform': {
+            'a2a_available': A2A_AVAILABLE,
+            'registered_cards': (_platform_state or {}).get('registered_cards', 0),
+            'vertical_agents': len((_platform_state or {}).get('vertical_agents', {})),
+            'agent_card': '/.well-known/agent-card.json',
+            'marketplace': '/api/marketplace/agents',
+        },
+        'launch_ops': {
+            'enabled': _sched_enabled('LAUNCH_OPS_ENABLED'),
+            'running': bool(launch_ops_scheduler and launch_ops_scheduler.running),
+            'next_run': _job_next(launch_ops_scheduler, 'launch_ops_content'),
+            'review_url': '/launch/review',
+        },
+        'review_reminder': {
+            'enabled': os.environ.get('LAUNCH_REVIEW_REMINDER_ENABLED', 'true').lower() != 'false',
+            'alert_email': os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'court@getsincor.com'),
+            'running': bool(review_reminder_scheduler and review_reminder_scheduler.running),
+            'next_run': _job_next(review_reminder_scheduler, 'launch_review_reminder'),
+        },
+        'partner_reminder': {
+            'enabled': _sched_enabled('PARTNER_OUTREACH_ENABLED'),
+            'alert_email': (
+                os.environ.get('PARTNER_OUTREACH_ALERT_EMAIL')
+                or os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'court@getsincor.com')
+            ),
+            'running': bool(partner_reminder_scheduler and partner_reminder_scheduler.running),
+            'next_run': _job_next(partner_reminder_scheduler, 'partner_outreach_reminder'),
+            'partners_url': '/launch/partners',
+        },
+        'launchpad_reminder': {
+            'enabled': _sched_enabled('LAUNCHPAD_OUTREACH_ENABLED'),
+            'alert_email': (
+                os.environ.get('LAUNCHPAD_OUTREACH_ALERT_EMAIL')
+                or os.environ.get('PARTNER_OUTREACH_ALERT_EMAIL')
+                or os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'court@getsincor.com')
+            ),
+            'running': bool(launchpad_reminder_scheduler and launchpad_reminder_scheduler.running),
+            'next_run': _job_next(launchpad_reminder_scheduler, 'launchpad_outreach_reminder'),
+            'launchpads_url': '/launch/launchpads',
+            'campaign_url': '/launch/campaign',
+        },
+        'campaign_ops': {
+            'enabled': _sched_enabled('LAUNCH_OPS_ENABLED'),
+            'running': bool(launch_ops_scheduler and launch_ops_scheduler.running),
+            'next_run': _job_next(launch_ops_scheduler, 'launch_ops_campaign'),
+            'campaign_url': '/launch/campaign',
+        },
+        'daily_ops': {
+            'enabled': _sched_enabled('DAILY_OPS_ENABLED'),
+            'running': bool(daily_ops_scheduler and daily_ops_scheduler.running),
+            'next_run': _job_next(daily_ops_scheduler, 'daily_ops'),
+            'latest_report': '/logs/ops/daily_latest.json',
+        },
+        'content_agent': {
+            'enabled': _sched_enabled('CONTENT_AGENT_ENABLED'),
+            'running': bool(content_scheduler and content_scheduler.running),
+            'next_run': _job_next(content_scheduler, 'content_cycle'),
+        },
+        'outreach': {
+            'enabled': _sched_enabled('OUTREACH_ENABLED'),
+            'running': bool(outreach_scheduler and outreach_scheduler.running),
+            'next_run': _job_next(outreach_scheduler, 'outreach_cycle'),
+        },
+        'compliance': (
+            {
+                'enabled': _sched_enabled('COMPLIANCE_MONITOR_ENABLED'),
+                'confidential': True,
+                'running': bool(compliance_scheduler and compliance_scheduler.running),
+                'next_run': _job_next(compliance_scheduler, 'compliance_monitor'),
+            }
+            if _check_admin_token(request) or _check_admin_key(request)
+            else {
+                'enabled': _sched_enabled('COMPLIANCE_MONITOR_ENABLED'),
+                'confidential': True,
+            }
+        ),
+        'polyclaw': {
+            'enabled': os.environ.get('POLYCLAW_ENABLED', 'false').lower() == 'true',
+            'running': bool(polyclaw_scheduler and polyclaw_scheduler.running),
+            'next_run': _job_next(polyclaw_scheduler, 'polyclaw_scan'),
+        },
+        'swarm_ops': {
+            'enabled': _sched_enabled('SWARM_OPS_ENABLED'),
+            'running': bool(swarm_scheduler and swarm_scheduler.running),
+            'next_run': _job_next(swarm_scheduler, 'swarm_ops_cycle'),
+            'agents': 6,
+            'status_url': '/api/ops/swarm-status',
+        },
+        'windows_tasks': [
+            'SINCOR Launch Daemons (logon)',
+            'SINCOR Launch Content (daily)',
+            'SINCOR Daily Ops (daily)',
+            'SINCOR Weekly Buyers (weekly)',
+        ],
+        'timestamp': datetime.utcnow().isoformat(),
+    }), 200
+
+
+@app.route('/api/value/summary', methods=['GET'])
+def api_value_summary():
+    """Live value + revenue snapshot (orders DB + on-chain streams)."""
+    try:
+        from sincor2.revenue_snapshot import fetch_live_status
+
+        return jsonify(fetch_live_status()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/ops/swarm-status', methods=['GET'])
+def ops_swarm_status():
+    """Last swarm cycle — proof agents ran real tasks."""
+    try:
+        from sincor2.swarm_ops import SWARM_TASKS, load_activity
+        from sincor2.grant_targets import borrow_reality_check, list_grant_targets
+
+        activity = load_activity()
+        last = activity.get("runs", [])[-1] if activity.get("runs") else None
+        from sincor2.monetization_catalog import catalog_summary
+
+        return jsonify({
+            "agents_defined": len(SWARM_TASKS),
+            "last_run": activity.get("last_run"),
+            "last_cycle": last,
+            "platform": {
+                "a2a_available": A2A_AVAILABLE,
+                "registered_cards": (_platform_state or {}).get("registered_cards", 0),
+                "vertical_agents": len((_platform_state or {}).get("vertical_agents", {})),
+            },
+            "monetization": catalog_summary(),
+            "grant_targets": list_grant_targets(),
+            "borrow": borrow_reality_check(),
+            "review_url": "/launch/review",
+            "partners_url": "/launch/partners",
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/ops/run-cycle', methods=['POST'])
+def ops_run_swarm_cycle():
+    """Trigger one swarm cycle (admin token or local dev)."""
+    if not (_check_admin_token(request) or _check_admin_key(request)):
+        return jsonify({"error": "admin_required"}), 403
+    try:
+        from sincor2.swarm_ops import run_swarm_cycle
+
+        summary = run_swarm_cycle()
+        return jsonify(summary), 200
+    except Exception as e:
+        logger.error("[SWARM] Manual cycle failed: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/outreach/status', methods=['GET'])
 def outreach_status():
     """Show outreach engine status (admin use)."""
@@ -419,9 +929,12 @@ def polyclaw_status():
                     total_profit += trade.get('net_profit_percent', 0)
         
         return jsonify({
-            'enabled': os.getenv('POLYCLAW_ENABLED', 'true').lower() == 'true',
+            'enabled': os.getenv('POLYCLAW_ENABLED', 'false').lower() == 'true',
+            'implementation_status': 'signal_only',
+            'live_trading': False,
+            'note': 'Scan/execute stubs — not production auto-trader. See sincor2-clone/verticals/trading for signal math.',
             'scheduler_running': scheduler_running,
-            'auto_execute': os.getenv('POLYCLAW_AUTO_EXECUTE', 'true').lower() == 'true',
+            'auto_execute': os.getenv('POLYCLAW_AUTO_EXECUTE', 'false').lower() == 'true',
             'risk_level': os.getenv('POLYCLAW_RISK_LEVEL', 'medium'),
             'alert_threshold': float(os.getenv('POLYCLAW_ALERT_THRESHOLD', '0.5')),
             'scan_interval': int(os.getenv('POLYCLAW_SCAN_INTERVAL', '60')),
@@ -435,43 +948,55 @@ def polyclaw_status():
 
 @app.route('/api/signup', methods=['POST'])
 def api_signup():
-    """Signup endpoint — collect email + name, return confirmation."""
+    """Signup endpoint — collect email + name, persist lead, return confirmation."""
     try:
         data = request.get_json() or {}
-        email = data.get('email', '').strip()
+        email = data.get('email', '').strip().lower()
         name = data.get('name', '').strip()
-        
+        plan = (data.get('plan') or '').strip().lower()
+
         if not email or not name:
             return jsonify({'error': 'Email and name required'}), 400
-        
+
         if '@' not in email:
             return jsonify({'error': 'Invalid email address'}), 400
-        
-        # Log signup (for future lead tracking)
-        logger.info(f"[SIGNUP] New signup: {name} ({email})")
-        
-        # TODO: Store in database for CRM integration
-        # TODO: Send welcome email
-        
+
+        _upsert_lead(email, name)
+        session['user_email'] = email
+        session['user_name'] = name
+        logger.info('[SIGNUP] New lead: %s (%s) plan=%s', name, email, plan or 'none')
+
+        if email_sender:
+            try:
+                email_sender.send_welcome_email(
+                    customer_email=email,
+                    customer_name=name,
+                    company_name='',
+                    use_case='signup',
+                    order_id='',
+                )
+            except Exception as exc:
+                logger.warning('[SIGNUP] Welcome email failed: %s', exc)
+
         return jsonify({
             'success': True,
             'message': 'Signup successful! Redirecting to checkout...',
             'email': email,
-            'name': name
+            'name': name,
+            'plan': plan,
         }), 200
-    
+
     except Exception as e:
-        logger.error(f"[SIGNUP] Error: {e}")
+        logger.error('[SIGNUP] Error: %s', e)
         return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/outreach/run', methods=['POST'])
 def outreach_run_now():
     """Manually trigger one outreach cycle (admin use)."""
-    # Basic auth guard using admin credentials
-    auth = request.get_json(silent=True) or {}
-    if auth.get('admin_key') != os.environ.get('ADMIN_PASSWORD', ''):
-        return jsonify({'error': 'Unauthorized'}), 401
+    denied = _require_admin(request)
+    if denied:
+        return denied
     try:
         from sincor2.outreach_engine import get_outreach_engine
         import threading
@@ -486,7 +1011,14 @@ def outreach_run_now():
 @app.route('/', methods=['GET'])
 def home():
     """Home page."""
-    return render_template('home.html')
+    price_ctx = {'sinc_spot_usd': None, 'sinc_spot_label': '$1.50 floor'}
+    try:
+        from launch_content_engine.onchain_stats import SINC_FLOOR_USD
+        price_ctx['sinc_spot_usd'] = SINC_FLOOR_USD
+        price_ctx['sinc_spot_label'] = f'${SINC_FLOOR_USD:.2f} floor'
+    except Exception as e:
+        logger.debug('[HOME] floor price unavailable: %s', e)
+    return render_template('home.html', **price_ctx)
 
 
 # ============================================================================
@@ -513,6 +1045,25 @@ def _check_admin_token(req):
         return decoded.get('sub') == ADMIN_USERNAME
     except Exception:
         return False
+
+
+def _check_admin_key(req) -> bool:
+    """Return True if request carries ADMIN_PASSWORD via header or JSON body."""
+    import hmac
+    if not ADMIN_PASSWORD:
+        return False
+    key = req.headers.get('X-Admin-Key', '')
+    if not key:
+        data = req.get_json(silent=True) or {}
+        key = str(data.get('admin_key', ''))
+    return bool(key) and hmac.compare_digest(str(key), str(ADMIN_PASSWORD))
+
+
+def _require_admin(req):
+    """Return None if authorized, else (response, status_code)."""
+    if _check_admin_token(req) or _check_admin_key(req):
+        return None
+    return jsonify({'error': 'Unauthorized'}), 401
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -578,16 +1129,33 @@ PRODUCT_PRICES = {
 @app.route('/signup', methods=['GET'])
 def signup_page():
     """Render signup page."""
-    return render_template('signup.html')
+    err_key = request.args.get('error', '')
+    return render_template(
+        'signup.html',
+        oauth_error=OAUTH_ERROR_MESSAGES.get(err_key, ''),
+        oauth_google=_oauth_provider_ready('google'),
+        oauth_github=_oauth_provider_ready('github'),
+    )
 
 
 # ── OAuth Routes ────────────────────────────────────────────────────────────
+@app.route('/api/auth/oauth-status', methods=['GET'])
+def oauth_status():
+    """Report which OAuth providers are configured (no secrets)."""
+    return jsonify({
+        'available': OAUTH_AVAILABLE,
+        'google': _oauth_provider_ready('google'),
+        'github': _oauth_provider_ready('github'),
+        'redirect_base': OAUTH_REDIRECT_BASE or None,
+    }), 200
+
+
 @app.route('/auth/google')
 def auth_google():
     """Redirect to Google OAuth."""
-    if not oauth or not hasattr(oauth, 'google'):
-        return jsonify({'error': 'Google OAuth not configured'}), 503
-    redirect_uri = url_for('auth_google_callback', _external=True)
+    if not _oauth_provider_ready('google'):
+        return redirect('/signup?error=oauth_unavailable')
+    redirect_uri = _oauth_redirect_uri('auth_google_callback')
     return oauth.google.authorize_redirect(redirect_uri)
 
 
@@ -595,34 +1163,26 @@ def auth_google():
 def auth_google_callback():
     """Handle Google OAuth callback."""
     try:
-        if not oauth or not hasattr(oauth, 'google'):
+        if not _oauth_provider_ready('google'):
             return redirect('/signup?error=oauth_unavailable')
         token = oauth.google.authorize_access_token()
-        user_info = token.get('userinfo') or oauth.google.userinfo()
-        email = user_info.get('email', '')
-        name  = user_info.get('name', email.split('@')[0])
+        user_info = _google_userinfo(token)
+        email = (user_info.get('email') or '').strip()
+        name = (user_info.get('name') or email.split('@')[0]).strip()
         if not email:
             return redirect('/signup?error=no_email')
-        session['user_email'] = email
-        session['user_name']  = name
-        access_token = create_access_token(identity=email)
-        logger.info(f'[OAUTH] Google login: {email}')
-        resp = make_response(redirect('/dashboard'))
-        resp.set_cookie('access_token', access_token, httponly=True,
-                        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-                        samesite='Lax', max_age=28800)
-        return resp
+        return _oauth_finish_login(email, name, 'Google')
     except Exception as e:
-        logger.error(f'[OAUTH] Google callback error: {e}')
-        return redirect(f'/signup?error=oauth_failed')
+        logger.error('[OAUTH] Google callback error: %s', e, exc_info=True)
+        return redirect('/signup?error=oauth_failed')
 
 
 @app.route('/auth/github')
 def auth_github():
     """Redirect to GitHub OAuth."""
-    if not oauth or not hasattr(oauth, 'github'):
-        return jsonify({'error': 'GitHub OAuth not configured'}), 503
-    redirect_uri = url_for('auth_github_callback', _external=True)
+    if not _oauth_provider_ready('github'):
+        return redirect('/signup?error=oauth_unavailable')
+    redirect_uri = _oauth_redirect_uri('auth_github_callback')
     return oauth.github.authorize_redirect(redirect_uri)
 
 
@@ -630,34 +1190,24 @@ def auth_github():
 def auth_github_callback():
     """Handle GitHub OAuth callback."""
     try:
-        if not oauth or not hasattr(oauth, 'github'):
+        if not _oauth_provider_ready('github'):
             return redirect('/signup?error=oauth_unavailable')
-        token = oauth.github.authorize_access_token()
-        resp  = oauth.github.get('user')
+        oauth.github.authorize_access_token()
+        resp = oauth.github.get('user')
+        if not resp.ok:
+            logger.error('[OAUTH] GitHub /user failed: %s', resp.status_code)
+            return redirect('/signup?error=oauth_failed')
         user_info = resp.json()
-        email = user_info.get('email', '')
+        email = (user_info.get('email') or '').strip()
         if not email:
-            # Fetch primary email separately
-            emails_resp = oauth.github.get('user/emails')
-            for e in emails_resp.json():
-                if e.get('primary'):
-                    email = e.get('email', '')
-                    break
-        name = user_info.get('name') or user_info.get('login', '')
+            email = _github_primary_email()
+        name = (user_info.get('name') or user_info.get('login') or '').strip()
         if not email:
             return redirect('/signup?error=no_email')
-        session['user_email'] = email
-        session['user_name']  = name
-        access_token = create_access_token(identity=email)
-        logger.info(f'[OAUTH] GitHub login: {email}')
-        resp2 = make_response(redirect('/dashboard'))
-        resp2.set_cookie('access_token', access_token, httponly=True,
-                         secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-                         samesite='Lax', max_age=28800)
-        return resp2
+        return _oauth_finish_login(email, name, 'GitHub')
     except Exception as e:
-        logger.error(f'[OAUTH] GitHub callback error: {e}')
-        return redirect(f'/signup?error=oauth_failed')
+        logger.error('[OAUTH] GitHub callback error: %s', e, exc_info=True)
+        return redirect('/signup?error=oauth_failed')
 
 
 @app.route('/auth/logout')
@@ -686,7 +1236,8 @@ def onboarding_page():
 @limiter.limit('10 per hour')
 def submit_onboarding():
     """Securely save customer profile. GDPR/CCPA compliant."""
-    import hashlib, secrets
+    import hashlib
+    import secrets
     from flask import session
 
     data = request.get_json(silent=True) or {}
@@ -698,7 +1249,8 @@ def submit_onboarding():
 
     # Input sanitization
     def clean(v, maxlen=200):
-        if not isinstance(v, str): return ''
+        if not isinstance(v, str):
+            return ''
         return re.sub(r'[<>"\']', '', v.strip())[:maxlen]
 
     email = clean(data.get('email', ''), 254)
@@ -808,22 +1360,256 @@ def delete_profile():
 
 @app.route('/buy', methods=['GET'])
 def buy_page():
-    """Render buy page with Stripe checkout."""
-    if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
+    """Platform checkout — SINC + AXM on Base (default). Legacy Stripe if explicitly enabled."""
+    if fiat_payments_enabled() and STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         return render_template('buy_converting.html')
-    return render_template('buy_stripe.html')
+    return render_template('buy_tokens.html')
 
 
 @app.route('/buy-sinc', methods=['GET'])
 def buy_sinc_page():
-    """Render SINC token purchase page (bonding curve on Base chain)."""
-    return render_template('buy_sinc.html')
+    """Redirect legacy buy-sinc URL to official curve gateway."""
+    return redirect('/sinc', code=302)
 
 
 # ============================================================================
 # PAYMENT WEBHOOK - Called by Stripe after successful payment
 # This is the CORE endpoint that triggers asset delivery
 # ============================================================================
+
+@app.route('/api/platform/plans', methods=['GET'])
+def platform_plans():
+    """List SINC/AXM-priced platform plans with live spot quotes."""
+    if not PLATFORM_PAYMENTS_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'platform_payments_unavailable'}), 503
+    return jsonify({'ok': True, 'plans': platform_list_plans(), 'fiat_enabled': fiat_payments_enabled()})
+
+
+@app.route('/api/platform/checkout', methods=['POST'])
+@limiter.limit("60 per hour")
+def platform_checkout():
+    """Create a SINC or AXM checkout quote."""
+    if not PLATFORM_PAYMENTS_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'platform_payments_unavailable'}), 503
+    data = request.get_json(silent=True) or {}
+    plan_id = sanitize_string(data.get('plan_id', 'intel'), max_length=32)
+    email = validate_email(data.get('customer_email', '')) or ''
+    wallet = validate_wallet(data.get('payer_wallet', '')) or ''
+    result = platform_create_checkout(plan_id, payer_wallet=wallet or '', customer_email=email)
+    if not result.get('ok'):
+        code = 400 if result.get('error') != 'spot_price_unavailable' else 503
+        return jsonify(result), code
+    return jsonify(result), 201
+
+
+@app.route('/api/platform/verify', methods=['POST'])
+@limiter.limit("120 per hour")
+def platform_verify():
+    """Verify ERC-20 payment to treasury and trigger fulfillment."""
+    if not PLATFORM_PAYMENTS_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'platform_payments_unavailable'}), 503
+    data = request.get_json(silent=True) or {}
+    payment_id = sanitize_string(data.get('payment_id', ''), max_length=64)
+    tx_hash = sanitize_string(data.get('tx_hash', ''), max_length=66)
+    email = validate_email(data.get('customer_email', '')) or ''
+    wallet = validate_wallet(data.get('payer_wallet', '')) or ''
+    result = platform_verify_checkout(
+        payment_id, tx_hash, customer_email=email, payer_wallet=wallet or ''
+    )
+    if not result.get('ok'):
+        status = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
+        return jsonify(result), status
+
+    order_id = result['order_id']
+    product_name = result['product_name']
+    amount = result['usd_reference']
+    order_type = result.get('order_type', 'generic')
+    product_info = PRODUCT_CATALOG.get(product_name, {'type': order_type})
+    customer_email = result.get('customer_email') or ''
+
+    db = get_db()
+    try:
+        db.execute(
+            '''INSERT INTO orders
+               (order_id, paypal_order_id, customer_email, product_name, amount,
+                currency, payment_status, delivery_status, delivery_url, order_type,
+                created_at, updated_at, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (order_id, tx_hash, customer_email or result.get('payer_wallet', ''),
+             product_name, amount, result['token'], 'completed', 'processing',
+             f'/my-orders?email={customer_email}' if customer_email else '/dashboard',
+             order_type, datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
+             json.dumps({
+                 'tx_hash': tx_hash,
+                 'payment_id': payment_id,
+                 'token': result['token'],
+                 'payer_wallet': result.get('payer_wallet'),
+                 'billing': 'platform_tokens',
+             }))
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        pass
+
+    if customer_email:
+        trigger_fulfillment(order_id, customer_email, product_name, amount, order_type, product_info)
+
+    payer = result.get('payer_wallet', '')
+    if result.get('token') == 'SINC' and result.get('amount_atomic'):
+        try:
+            from sincor2.agent_billing import record_platform_payment
+            record_platform_payment(
+                tx_hash=tx_hash,
+                payer_wallet=payer,
+                token='SINC',
+                amount_atomic=int(result['amount_atomic']),
+                product_name=product_name,
+                plan_id=result.get('plan_id', ''),
+                payment_id=payment_id,
+            )
+        except Exception as e:
+            logger.warning('[BILLING] agent_billing log failed: %s', e)
+
+    if result.get('billing') == 'month' and payer:
+        sub = activate_subscription(
+            wallet=payer,
+            plan_id=result.get('plan_id', ''),
+            product_name=product_name,
+            token=result['token'],
+            tx_hash=tx_hash,
+            payment_id=payment_id,
+            email=customer_email,
+        )
+        result['subscription'] = sub
+
+    logger.info('[PAYMENTS] %s verified: %s %s tx=%s', result['token'], product_name, order_id, tx_hash)
+    return jsonify(result), 200
+
+
+@app.route('/api/platform/subscription', methods=['GET'])
+@limiter.limit("120 per hour")
+def platform_subscription_status():
+    """Wallet-linked SINC subscription status."""
+    wallet = validate_wallet(request.args.get('wallet', ''))
+    if not wallet:
+        return jsonify({'ok': False, 'error': 'wallet_required'}), 400
+    plan_id = sanitize_string(request.args.get('plan_id', ''), max_length=32) or None
+    if plan_id:
+        sub = get_subscription(wallet, plan_id)
+        subs = [sub] if sub else []
+    else:
+        subs = list_subscriptions(wallet)
+    return jsonify({'ok': True, 'wallet': wallet, 'subscriptions': subs})
+
+
+@app.route('/api/sinc/curve', methods=['GET'])
+@limiter.limit("120 per minute")
+def api_sinc_curve():
+    """Cached curve state proxy (spec §5.2)."""
+    try:
+        import sys
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        from launch_content_engine.onchain_stats import fetch_stats
+        return jsonify({'ok': True, 'curve': fetch_stats()}), 200
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 503
+
+
+@app.route('/api/sinc/burn-stats', methods=['GET'])
+@limiter.limit("60 per minute")
+def api_sinc_burn_stats():
+    """Platform SINC revenue + burn counter (spec §5.2 / §5.3)."""
+    try:
+        from sincor2.agent_billing import fetch_burn_stats
+        return jsonify({'ok': True, **fetch_burn_stats()}), 200
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/x402/resources', methods=['GET'])
+def x402_resources():
+    if not X402_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import list_resources
+    return jsonify({'ok': True, 'resources': list_resources()})
+
+
+@app.route('/x402/<resource_id>', methods=['GET'])
+@limiter.limit("200 per hour")
+def x402_challenge(resource_id):
+    """HTTP 402 Payment Required — SINC micropayment challenge."""
+    if not X402_AVAILABLE:
+        return jsonify({'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import access_granted, create_challenge
+    token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
+    if access_granted(token, resource_id):
+        return jsonify({'ok': True, 'resource_id': resource_id, 'access': 'granted'}), 200
+    wallet = validate_wallet(request.args.get('wallet', '')) or ''
+    challenge = create_challenge(resource_id, payer_wallet=wallet or '')
+    return jsonify(challenge), 402
+
+
+@app.route('/api/x402/verify', methods=['POST'])
+@limiter.limit("120 per hour")
+def x402_verify():
+    if not X402_AVAILABLE:
+        return jsonify({'ok': False, 'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import verify_challenge
+    data = request.get_json(silent=True) or {}
+    result = verify_challenge(
+        sanitize_string(data.get('challenge_id', ''), max_length=64),
+        sanitize_string(data.get('tx_hash', ''), max_length=66),
+        payer_wallet=validate_wallet(data.get('payer_wallet', '')) or '',
+    )
+    if not result.get('ok'):
+        code = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
+        return jsonify(result), code
+    try:
+        from sincor2.agent_billing import record_platform_payment
+        from sincor2.x402_payments import get_resource
+        res = get_resource(result.get('resource_id', ''))
+        if res:
+            record_platform_payment(
+                tx_hash=data.get('tx_hash', ''),
+                payer_wallet=result.get('payer_wallet', ''),
+                token='SINC',
+                amount_atomic=int(res['amount_atomic']),
+                product_name=f"x402:{result.get('resource_id')}",
+                plan_id='x402',
+                payment_id=result.get('challenge_id', ''),
+            )
+    except Exception:
+        pass
+    return jsonify(result), 200
+
+
+@app.route('/api/paid/<resource_id>', methods=['GET'])
+@limiter.limit("120 per hour")
+def x402_paid_resource(resource_id):
+    """Serve paid API payloads after x402 access token presented."""
+    if not X402_AVAILABLE:
+        return jsonify({'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import access_granted
+    token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
+    if not access_granted(token, resource_id):
+        from sincor2.x402_payments import create_challenge
+        ch = create_challenge(resource_id)
+        return jsonify(ch), 402
+
+    if resource_id == 'hook_status':
+        try:
+            from sincor2.hook_stats import fetch_hook_status
+            return jsonify({'ok': True, 'resource': resource_id, 'data': fetch_hook_status()}), 200
+        except Exception as e:
+            return jsonify({'ok': False, 'error': str(e)}), 500
+
+    return jsonify({
+        'ok': True,
+        'resource': resource_id,
+        'message': 'Access granted. Resource handler may be extended per config/x402_pricing.yaml.',
+    }), 200
+
 
 @app.route('/api/payment/webhook', methods=['POST'])
 @limiter.limit("500 per minute")
@@ -833,6 +1619,8 @@ def payment_webhook():
     Verifies webhook signature before processing.
     Stores order in DB and triggers product fulfillment/delivery.
     """
+    if not fiat_payments_enabled():
+        return jsonify({'error': 'Legacy fiat payments disabled. Use SINC/AXM at /buy.'}), 410
     if not stripe_processor or not stripe_processor.enabled:
         logger.error('[WEBHOOK] Stripe not configured � cannot process webhook')
         return jsonify({'error': 'Payment processor not configured'}), 503
@@ -919,7 +1707,6 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
 
     # First, determine all the delivery details
     agent_count = product_info.get('agents', 10)
-    features = product_info.get('features', [])
 
     if order_type == 'subscription':
         # Subscription: Activate account + agents immediately
@@ -968,20 +1755,48 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
                 logger.error(f"[EMAIL] Error sending thank-you email for {order_id}: {e}")
                 result['email_sent'] = False
 
+        plan_id = product_info.get('plan_id', 'professional')
+        if plan_id in ('starter', 'professional', 'enterprise'):
+            try:
+                from sincor2.fulfillment_engine import trigger_autonomous_fulfillment
+
+                trigger_autonomous_fulfillment(
+                    customer_email=email,
+                    plan_id=plan_id,
+                    plan_name=product_name,
+                    order_id=order_id,
+                    amount=float(amount or 0),
+                )
+                result['next_steps'].insert(0, 'Competitive intelligence agents dispatched')
+            except Exception as e:
+                logger.error(f"[FULFILL] Subscription agent dispatch failed: {e}")
+
     elif order_type == 'bi_report':
-        # BI Report: Queue for generation (delivered within 48h)
         sections = product_info.get('sections', [])
         pages = product_info.get('pages', 20)
+        plan_id = product_info.get('plan_id', 'starter')
         result['message'] = f'Your {product_name} is being generated! {pages}-page report with {len(sections)} sections.'
         result['next_steps'] = [
-            'Report generation started automatically',
-            f'You will receive a {pages}-page report within 48 hours',
-            'Download link will be emailed and available at /my-orders'
+            'Autonomous agents started report generation',
+            'You will receive the report by email when ready',
+            'Track status at /my-orders',
         ]
         logger.info(f"[FULFILL] BI Report queued: {product_name} ({pages} pages) for {email}")
+        try:
+            from sincor2.fulfillment_engine import trigger_autonomous_fulfillment
+
+            trigger_autonomous_fulfillment(
+                customer_email=email,
+                plan_id=plan_id,
+                plan_name=product_name,
+                order_id=order_id,
+                amount=float(amount or 0),
+            )
+            result['next_steps'].insert(0, 'CortecsBrain + swarm agents running now')
+        except Exception as e:
+            logger.error(f"[FULFILL] Autonomous BI trigger failed: {e}")
 
     elif order_type == 'content':
-        # Content Package: Queue for creation
         pieces = product_info.get('pieces', '1-5')
         days = product_info.get('delivery_days', 7)
         result['message'] = f'Your content package is in production! {pieces} pieces being created.'
@@ -991,6 +1806,18 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
             'Download link will be emailed and available at /my-orders'
         ]
         logger.info(f"[FULFILL] Content Package queued: {product_name} ({pieces} pieces) for {email}")
+        try:
+            from sincor2.fulfillment_engine import trigger_content_fulfillment
+
+            trigger_content_fulfillment(
+                customer_email=email,
+                product_name=product_name,
+                order_id=order_id,
+                product_info=product_info,
+            )
+            result['next_steps'].insert(0, 'Content agent generating SEO pieces now')
+        except Exception as e:
+            logger.error(f"[FULFILL] Content agent dispatch failed: {e}")
 
     else:
         result['message'] = 'Order received and being processed.'
@@ -1087,7 +1914,7 @@ def thank_you_email(order_id):
         'DASHBOARD_URL': f'/dashboard?email={order_data.get("customer_email", "")}&order={order_id}',
         'HELP_URL': 'https://help.sincor.com',
         'STATUS_URL': 'https://status.sincor.com',
-        'UNSUBSCRIBE': f'mailto:support@getsincor.com?subject=Unsubscribe',
+        'UNSUBSCRIBE': 'mailto:support@getsincor.com?subject=Unsubscribe',
         'COMPANY_ADDRESS': '123 Innovation Drive, Tech City, TC 12345',
         **tier_flags
     }
@@ -1157,7 +1984,6 @@ def admin_training_vault():
     # Get product info
     product_info = PRODUCT_CATALOG.get(product_name, {})
     agent_count = product_info.get('agents', 10)
-    features = product_info.get('features', [])
 
     # Determine onboarding progress (default all pending; update based on customer activity)
     onboarding_steps = {
@@ -1384,7 +2210,6 @@ def register_airdrop():
     """Register wallet for SIN token airdrop."""
     data = request.get_json(silent=True) or {}
     raw_wallet = data.get('wallet', '')
-    tasks = data.get('tasks', {})
 
     wallet = validate_wallet(raw_wallet)
     if not wallet:
@@ -1402,10 +2227,43 @@ def register_airdrop():
 # STUB PAGES
 # ============================================================================
 
-@app.route('/contact')
+@app.route('/contact', methods=['GET', 'POST'])
 def contact():
-    """Contact page stub."""
-    return jsonify({'message': 'Contact page', 'email': 'support@getsincor.com'}), 200
+    """Contact / sales page."""
+    if request.method == 'POST':
+        data = request.form or {}
+        email = (data.get('email') or '').strip().lower()
+        message = (data.get('message') or '').strip()[:2000]
+        name = (data.get('name') or '').strip()[:120]
+        if not email or '@' not in email or not message:
+            return render_template(
+                'contact.html',
+                error='Email and message are required.',
+                support_email=os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com'),
+            )
+        logger.info('[CONTACT] %s <%s>: %s', name or 'anon', email, message[:200])
+        if email_sender:
+            try:
+                support = os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com')
+                body = f'From: {name} <{email}>\n\n{message}'
+                email_sender.send_email(
+                    to_email=support,
+                    to_name='SINCOR Support',
+                    subject=f'SINCOR contact from {email}',
+                    html_content=f'<pre>{body}</pre>',
+                    text_content=body,
+                )
+            except Exception as exc:
+                logger.warning('[CONTACT] Forward failed: %s', exc)
+        return render_template(
+            'contact.html',
+            success='Message received. We reply within one business day.',
+            support_email=os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com'),
+        )
+    return render_template(
+        'contact.html',
+        support_email=os.environ.get('SUPPORT_EMAIL', 'support@getsincor.com'),
+    )
 
 
 @app.route('/pricing')
@@ -1416,15 +2274,14 @@ def pricing():
 
 @app.route('/docs')
 def docs():
-    """API documentation stub."""
-    return jsonify({'message': 'API Documentation', 'version': '1.0.0'}), 200
+    """Product documentation."""
+    return render_template('docs.html')
 
 
 @app.route('/dashboard')
 def dashboard():
     """Customer dashboard — shows agent activity, profile, and account status."""
-    email = request.args.get('email', '')
-    order_id = request.args.get('order', '')
+    email = _session_email()
 
     # Load profile if email provided
     profile = {}
@@ -1440,12 +2297,22 @@ def dashboard():
             order = dict(o)
 
     # Agent activity feed — what the 6 autonomous agents have been doing
-    from datetime import datetime, timedelta
     import random
     random.seed(42)  # Consistent demo data
     tier = order.get('product_name', 'Starter')
-    agent_counts = {'Starter': 8, 'Professional': 24, 'Enterprise': 42}
-    num_agents = agent_counts.get(tier, 8)
+    try:
+        from sincor2.platform_payments import PLATFORM_PLANS
+        agent_counts = {
+            p['product_name']: p.get('agents', 10)
+            for p in PLATFORM_PLANS.values()
+        }
+    except Exception:
+        agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 42}
+    num_agents = agent_counts.get(tier, 10)
+    demo_mode = not bool(
+        order.get('order_id')
+        and order.get('payment_status') in ('completed', 'paid', 'verified')
+    )
 
     use_case = profile.get('primary_use_case', 'Lead Generation & Outreach')
     company  = profile.get('company_name', 'Your Company')
@@ -1476,11 +2343,14 @@ def dashboard():
 
     member_since = order.get('created_at', '')[:10] if order.get('created_at') else ''
 
-    return render_template('dashboard.html',
+    return render_template(
+        'dashboard.html',
         profile=profile, order=order, agents=agents, stats=stats,
         tier=tier, num_agents=num_agents, company=company,
         fname=fname, use_case=use_case, member_since=member_since,
-        email=email)
+        email=email, demo_mode=demo_mode,
+        order_id=order.get('order_id', ''),
+    )
 
 
 @app.route('/privacy')
@@ -1519,10 +2389,618 @@ def product_enterprise():
     return render_template('product_enterprise.html')
 
 
+@app.route('/verticals/webbuilder')
+@app.route('/webbuilder')
+def vertical_webbuilder():
+    """WebBuilder swarm vertical — find SMBs, build sites, market autonomously."""
+    return render_template('vertical_webbuilder.html')
+
+
+@app.route('/verticals/webbuilder/studio')
+@app.route('/webbuilder/studio')
+def webbuilder_studio_page():
+    """Dedicated WebBuilder workspace — projects, preview, migration planner."""
+    return render_template('webbuilder_studio.html')
+
+
+def _webbuilder_html_response(html: str):
+    resp = make_response(html)
+    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return resp
+
+
+@app.route('/preview/<slug>')
+def webbuilder_preview_page(slug):
+    """Staging preview lane — serves Orion HTML from disk."""
+    from sincor2.webbuilder_studio import get_site_html, project_by_slug
+
+    html = get_site_html(slug, 'preview') or get_site_html(slug, 'draft')
+    if html:
+        return _webbuilder_html_response(html)
+    p = project_by_slug(slug)
+    if p:
+        active = next((s for s in p.get('migration', []) if s.get('status') == 'active'), None)
+        label = active['title'] if active else (p.get('status') or 'preview')
+        return render_template('webbuilder_preview.html', project=p, migration_label=label)
+    return render_template('error.html', code=404, title='Preview Not Found',
+                           message='This staging preview does not exist or was removed.'), 404
+
+
+@app.route('/site/<slug>')
+def webbuilder_live_page(slug):
+    """Live lane — published production HTML (draft-safe)."""
+    from sincor2.webbuilder_studio import get_site_html, project_by_slug
+
+    html = get_site_html(slug, 'live')
+    if html:
+        return _webbuilder_html_response(html)
+    p = project_by_slug(slug)
+    if p:
+        return redirect(p.get('preview_url') or '/verticals/webbuilder/studio', code=302)
+    return render_template('error.html', code=404, title='Site Not Found',
+                           message='This site has not been published to the live lane yet.'), 404
+
+
+@app.route('/api/webbuilder/studio')
+def api_webbuilder_studio_home():
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import studio_home
+    return jsonify(studio_home())
+
+
+@app.route('/api/webbuilder/projects', methods=['GET', 'POST'])
+def api_webbuilder_projects():
+    from sincor2.webbuilder_studio import create_project, list_projects
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    if request.method == 'GET':
+        return jsonify({'ok': True, 'projects': list_projects()})
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'ok': False, 'error': 'name_required'}), 400
+    project = create_project(
+        name=name,
+        niche=data.get('niche', ''),
+        source_type=data.get('source_type', 'none'),
+        source_url=data.get('source_url', ''),
+        territory=data.get('territory', ''),
+        owner_email=data.get('owner_email', ''),
+        prompt=data.get('prompt', ''),
+    )
+    return jsonify({'ok': True, 'project': project}), 201
+
+
+@app.route('/api/webbuilder/projects/<project_id>')
+def api_webbuilder_project_get(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import get_project, migration_status
+
+    p = get_project(project_id)
+    if not p:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    return jsonify(p)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/migration')
+def api_webbuilder_migration(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import migration_status
+
+    status = migration_status(project_id)
+    if not status.get('ok'):
+        return jsonify(status), 404
+    return jsonify(status)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/run', methods=['POST'])
+def api_webbuilder_run(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import run_autonomous_phases
+
+    return jsonify(run_autonomous_phases(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/approve', methods=['POST'])
+def api_webbuilder_approve(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import approve_preview
+
+    p = approve_preview(project_id)
+    if not p:
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    return jsonify(p)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/domain', methods=['POST'])
+def api_webbuilder_domain(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import connect_domain
+
+    data = request.get_json(silent=True) or {}
+    result = connect_domain(
+        project_id,
+        data.get('domain', ''),
+        include_www=bool(data.get('include_www', True)),
+    )
+    if not result.get('ok'):
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route('/api/webbuilder/projects/<project_id>/verify-dns', methods=['POST'])
+def api_webbuilder_verify_dns(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import verify_dns
+
+    return jsonify(verify_dns(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/rebuild', methods=['POST'])
+def api_webbuilder_rebuild(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import rebuild_draft
+
+    data = request.get_json(silent=True) or {}
+    return jsonify(rebuild_draft(project_id, prompt=data.get('prompt')))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/republish-preview', methods=['POST'])
+def api_webbuilder_republish_preview(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import republish_preview
+
+    return jsonify(republish_preview(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/publish-live', methods=['POST'])
+def api_webbuilder_publish_live(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_studio import publish_live
+
+    return jsonify(publish_live(project_id))
+
+
+@app.route('/api/webbuilder/projects/<project_id>/contacts')
+def api_webbuilder_contacts(project_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.webbuilder_crm import list_contacts
+    from sincor2.webbuilder_studio import data_dir, get_project
+
+    if not get_project(project_id):
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    return jsonify({'ok': True, 'contacts': list_contacts(data_dir(), project_id)})
+
+
+@app.route('/api/webbuilder/contact', methods=['POST'])
+def api_webbuilder_contact():
+    from sincor2.webbuilder_studio import submit_contact
+
+    data = request.get_json(silent=True) or {}
+    project_id = (data.get('project_id') or '').strip()
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip()
+    if not project_id or not name or not email:
+        return jsonify({'ok': False, 'error': 'missing_fields'}), 400
+    return jsonify(submit_contact(
+        project_id=project_id,
+        name=name,
+        email=email,
+        phone=data.get('phone', ''),
+        message=data.get('message', ''),
+    ))
+
+
 @app.route('/sinc')
 def sinc_token():
     """SINC token gateway page."""
-    return render_template('sinc_gateway.html')
+    return render_template(
+        'sinc_gateway.html',
+        walletconnect_project_id=os.environ.get('WALLETCONNECT_PROJECT_ID', '').strip(),
+    )
+
+
+@app.route('/refer')
+def sinc_refer():
+    """SINC referral program — generate a ?ref= link that pays 3% on-chain."""
+    return render_template('refer.html')
+
+
+@app.route('/sinc/vs-agent-tokens')
+def sinc_vs_agent_tokens():
+    """SEO comparison: verified agent tokens vs vaporware launches."""
+    return render_template('sinc_vs_agent_tokens.html')
+
+
+@app.route('/sinc/acceptance')
+def sinc_acceptance():
+    """Wallet import, hook buy paths, whitelist listing status."""
+    return render_template('sinc_acceptance.html')
+
+
+@app.route('/sinc/recover-hook')
+def sinc_recover_hook():
+    """MetaMask-signed hook floor cancel — Account 6, no private key export."""
+    return render_template('hook_recover.html')
+
+
+@app.route('/api/price/official')
+def api_price_official():
+    """Canonical pricing — $1.50/SINC floor only; curve micro-spot is deprecated."""
+    try:
+        from launch_content_engine.onchain_stats import build_official_price_payload
+        payload = build_official_price_payload()
+        resp = make_response(jsonify(payload))
+        resp.headers['Cache-Control'] = 'public, max-age=60'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp, 200
+    except Exception as e:
+        logger.warning('[PRICE] official error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/hook/status')
+def api_hook_status():
+    """Live curve + hook inventory for gateway widgets."""
+    try:
+        from sincor2.hook_stats import fetch_hook_status
+        return jsonify(fetch_hook_status()), 200
+    except Exception as e:
+        logger.warning('[HOOK] status error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/acceptance/status')
+def api_acceptance_status():
+    """Whitelist / wallet acceptance checklist."""
+    try:
+        from sincor2.acceptance_status import fetch_acceptance
+        return jsonify(fetch_acceptance()), 200
+    except Exception as e:
+        logger.warning('[ACCEPTANCE] status error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+SINC_TOKEN = '0x9C8cd8d3961F445D653713dE65C6578bE11668e7'
+SINC_LOGO_URL = 'https://raw.githubusercontent.com/OrderofChaos33/SINCOR2/main/static/tokenlists/assets/logo-256.png'
+SINC_LOGO_URL_MIRROR = 'https://getsincor.com/static/tokenlists/assets/logo-256.png'
+
+
+def _cors_static_response(path, mimetype='application/octet-stream'):
+    if not os.path.isfile(path):
+        return None
+    resp = make_response(send_file(path, mimetype=mimetype))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Cache-Control'] = 'public, max-age=3600'
+    return resp
+
+
+def _token_list_response():
+    path = os.path.join(static_dir, 'tokenlists', 'sincor.tokenlist.json')
+    resp = _cors_static_response(path, 'application/json')
+    if resp is None:
+        return jsonify({'error': 'token list not found'}), 404
+    return resp
+
+
+@app.route('/tokenlists/sincor.tokenlist.json')
+@app.route('/.well-known/tokenlist.json')
+@app.route('/static/tokenlists/sincor.tokenlist.json')
+def token_list_json():
+    """Uniswap-format token list — wallet import (MetaMask, Rabby, 1inch)."""
+    return _token_list_response()
+
+
+@app.route('/static/tokenlists/assets/<path:filename>')
+@app.route('/tokenlists/assets/<path:filename>')
+def token_list_assets(filename):
+    """Token logos for wallets and explorers (Blockscout, Trust Wallet, TKN)."""
+    safe = os.path.basename(filename)
+    path = os.path.join(static_dir, 'tokenlists', 'assets', safe)
+    if safe.endswith('.svg'):
+        mimetype = 'image/svg+xml'
+    elif safe.endswith('.png'):
+        mimetype = 'image/png'
+    else:
+        return jsonify({'error': 'unsupported asset'}), 404
+    resp = _cors_static_response(path, mimetype)
+    if resp is None:
+        return jsonify({'error': 'asset not found'}), 404
+    return resp
+
+
+@app.route('/api/token/security')
+def sinc_token_security():
+    """GoPlus + Blockscout signals explaining wallet suspicious UI."""
+    try:
+        from sincor2.token_security import diagnose
+        resp = make_response(jsonify(diagnose()))
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Cache-Control'] = 'public, max-age=120'
+        return resp
+    except Exception as e:
+        logger.warning('[TOKEN] security error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/.well-known/sinc-token.json')
+@app.route('/api/token/metadata')
+def sinc_token_metadata():
+    """Machine-readable token metadata for explorers and compliance tooling."""
+    meta_path = os.path.join(project_root, 'scripts', 'token_metadata.json')
+    payload = {
+        'chainId': 8453,
+        'address': SINC_TOKEN,
+        'name': 'SINC',
+        'symbol': 'SINC',
+        'decimals': 8,
+        'logoURI': SINC_LOGO_URL,
+        'logoURIMirror': SINC_LOGO_URL_MIRROR,
+        'website': 'https://getsincor.com',
+        'explorer': f'https://basescan.org/token/{SINC_TOKEN}',
+        'blockscout': f'https://base.blockscout.com/token/{SINC_TOKEN}',
+        'tokenList': 'https://getsincor.com/tokenlists/sincor.tokenlist.json',
+    }
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, encoding='utf-8') as f:
+                payload.update(json.load(f))
+        except (json.JSONDecodeError, OSError):
+            pass
+    try:
+        from launch_content_engine.onchain_stats import build_official_price_payload
+        payload['pricing'] = build_official_price_payload()
+    except Exception as e:
+        logger.debug('[TOKEN] live pricing unavailable: %s', e)
+    resp = make_response(jsonify(payload))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Cache-Control'] = 'public, max-age=300'
+    return resp
+
+
+@app.route('/launch/review')
+def launch_review_page():
+    """Human review queue for agent-drafted launch content."""
+    return render_template('launch_review.html')
+
+
+@app.route('/launch/partners')
+def launch_partners_page():
+    """KOL / curator partner outreach pipeline for July 7 launch."""
+    return render_template('launch_partners.html')
+
+
+@app.route('/launch/campaign')
+def launch_campaign_page():
+    """Public KPI TGE campaign hub — pre-deposit, points, milestones."""
+    return render_template('launch_campaign.html')
+
+
+@app.route('/launch/launchpads')
+def launch_launchpads_page():
+    """Admin launchpad outreach — 5 LBP venues, one-tap email."""
+    return render_template('launch_launchpads.html')
+
+
+@app.route('/api/launch/campaign/status', methods=['GET'])
+def launch_campaign_status_api():
+    try:
+        from sincor2.launch_campaign import campaign_status
+        return jsonify(campaign_status())
+    except Exception as e:
+        logger.error('[CAMPAIGN] status error: %s', e)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/launch/campaign/leaderboard', methods=['GET'])
+def launch_campaign_leaderboard_api():
+    try:
+        from sincor2.launch_campaign import leaderboard
+        limit = min(int(request.args.get('limit', 50)), 100)
+        return jsonify({'ok': True, 'rows': leaderboard(limit=limit)})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/launch/campaign/register', methods=['POST'])
+@limiter.limit('30 per hour')
+def launch_campaign_register():
+    data = request.get_json(silent=True) or {}
+    wallet = (data.get('wallet') or '').strip()
+    try:
+        from sincor2.launch_campaign import register_wallet
+        result = register_wallet(
+            wallet,
+            email=(data.get('email') or '').strip(),
+            twitter=(data.get('twitter') or '').strip(),
+            farcaster=(data.get('farcaster') or '').strip(),
+        )
+        code = 200 if result.get('ok') else 400
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/launch/campaign/points', methods=['POST'])
+@limiter.limit('40 per hour')
+def launch_campaign_points():
+    data = request.get_json(silent=True) or {}
+    wallet = (data.get('wallet') or '').strip()
+    action = (data.get('action') or '').strip()
+    proof = (data.get('proof') or data.get('tx_hash') or '').strip()
+    try:
+        from sincor2.launch_campaign import award_points
+        result = award_points(wallet, action, proof=proof)
+        code = 200 if result.get('ok') else 400
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/launch/campaign/predeposit', methods=['POST'])
+@limiter.limit('20 per hour')
+def launch_campaign_predeposit():
+    data = request.get_json(silent=True) or {}
+    wallet = (data.get('wallet') or '').strip()
+    tx_hash = (data.get('tx_hash') or '').strip()
+    try:
+        amount_usdc = float(data.get('amount_usdc') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'invalid_amount'}), 400
+    try:
+        from sincor2.launch_campaign import record_predeposit
+        result = record_predeposit(wallet, amount_usdc, tx_hash=tx_hash)
+        code = 200 if result.get('ok') else 400
+        return jsonify(result), code
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/launch/launchpads', methods=['GET'])
+def launch_launchpads_api():
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    try:
+        from sincor2.launchpad_outreach import due_outreach, list_launchpads, pipeline_summary
+        return jsonify({
+            'summary': pipeline_summary(),
+            'due': due_outreach(limit=5),
+            'launchpads': list_launchpads(),
+        })
+    except Exception as e:
+        logger.error('[LAUNCHPADS] API error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/launch/launchpads/<launchpad_id>', methods=['POST'])
+def launch_launchpads_update(launchpad_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    status = (data.get('status') or '').strip()
+    notes = (data.get('notes') or '').strip()
+    try:
+        from sincor2.launchpad_outreach import mark_contacted
+        if not mark_contacted(launchpad_id, status=status, notes=notes):
+            return jsonify({'ok': False, 'error': 'invalid_status_or_launchpad'}), 400
+        return jsonify({'ok': True, 'launchpad_id': launchpad_id, 'status': status})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/launch/partners', methods=['GET'])
+def launch_partners_api():
+    """Partner CRM summary + today's due outreach."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    try:
+        from sincor2.partner_outreach import (
+            due_outreach,
+            list_partners,
+            pipeline_summary,
+        )
+        return jsonify({
+            'summary': pipeline_summary(),
+            'due': due_outreach(limit=15),
+            'partners': list_partners(),
+        })
+    except Exception as e:
+        logger.error('[PARTNERS] API error: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/launch/partners/<partner_id>', methods=['POST'])
+def launch_partners_update(partner_id):
+    """Mark partner status after outreach."""
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    status = (data.get('status') or '').strip()
+    notes = (data.get('notes') or '').strip()
+    try:
+        from sincor2.partner_outreach import update_status
+        if not update_status(partner_id, status, notes=notes):
+            return jsonify({'ok': False, 'error': 'invalid_status_or_partner'}), 400
+        return jsonify({'ok': True, 'partner_id': partner_id, 'status': status})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+def _launch_review_modules():
+    import sys
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from launch_content_engine.review_queue import (
+        approve_and_post,
+        list_drafts,
+        set_status,
+    )
+    return list_drafts, set_status, approve_and_post
+
+
+@app.route('/api/launch/review')
+def launch_review_list():
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    status = request.args.get('status', 'pending')
+    list_drafts, _, _ = _launch_review_modules()
+    return jsonify(list_drafts(status=status or None))
+
+
+@app.route('/api/launch/review/<draft_id>', methods=['POST'])
+def launch_review_action(draft_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    data = request.get_json(silent=True) or {}
+    action = data.get('action', '')
+    list_drafts, set_status, approve_and_post = _launch_review_modules()
+
+    if action == 'reject':
+        ok = set_status(draft_id, 'rejected')
+        return jsonify({'ok': ok, 'status': 'rejected'})
+    if action == 'approve':
+        result = approve_and_post(draft_id)
+        return jsonify(result)
+    return jsonify({'ok': False, 'error': 'invalid_action'}), 400
+
+
+@app.route('/.well-known/agent.json')
+def agent_card():
+    """A2A-style agent card for SINCOR swarm discovery."""
+    path = os.path.join(static_dir, '.well-known', 'agent.json')
+    if not os.path.isfile(path):
+        return jsonify({'error': 'agent card not found'}), 404
+    return send_file(path, mimetype='application/json')
 
 
 @app.route('/media-packs')
@@ -1543,16 +3021,58 @@ def affiliate_program():
     return render_template('affiliate-program.html')
 
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    """Login page."""
-    return render_template('login.html')
+    """Login page — email session, OAuth, or admin API."""
+    err_key = request.args.get('error', '')
+    ctx = {
+        'oauth_error': OAUTH_ERROR_MESSAGES.get(err_key, ''),
+        'oauth_google': _oauth_provider_ready('google'),
+        'oauth_github': _oauth_provider_ready('github'),
+        'error': None,
+        'success': None,
+    }
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip().lower()
+        if not email or '@' not in email:
+            ctx['error'] = 'Enter a valid email address.'
+            return render_template('login.html', **ctx)
+        if _customer_exists(email):
+            logger.info('[AUTH] Email login: %s', email)
+            return _auth_cookie_response(email)
+        ctx['error'] = 'No account found for that email. Sign up first or use Google/GitHub.'
+        return render_template('login.html', **ctx)
+    return render_template('login.html', **ctx)
+
+
+@app.route('/forgot-password')
+def forgot_password():
+    """Passwordless product — direct users to email login or support."""
+    return redirect('/login')
+
+
+@app.route('/business-setup')
+def business_setup():
+    return redirect('/signup')
+
+
+@app.route('/free-trial/<path:_slug>')
+@app.route('/free-trial')
+def free_trial():
+    return redirect('/signup')
+
+
+@app.route('/admin/executive')
+def admin_executive():
+    return redirect('/dashboard')
 
 
 @app.route('/billing')
 def billing():
     """Stripe Customer Portal � lets subscribers manage their plan/billing."""
     customer_email = request.args.get('email', '')
+    if not fiat_payments_enabled():
+        return render_template('billing_tokens.html')
     if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         try:
             import stripe as stripe_lib
@@ -1604,11 +3124,17 @@ def sitemap_xml():
     base = 'https://getsincor.com'
     pages = [
         ('/', '1.0', 'weekly'),
+        ('/signup', '0.9', 'weekly'),
+        ('/login', '0.8', 'weekly'),
         ('/buy', '0.9', 'weekly'),
+        ('/sinc', '0.9', 'weekly'),
         ('/pricing', '0.9', 'weekly'),
-        ('/affiliate-program', '0.7', 'monthly'),
-        ('/enterprise-dashboard', '0.7', 'monthly'),
-        ('/whitepaper', '0.6', 'monthly'),
+        ('/pitch', '0.8', 'monthly'),
+        ('/whitepaper', '0.7', 'monthly'),
+        ('/onboarding', '0.6', 'monthly'),
+        ('/verticals/webbuilder', '0.7', 'weekly'),
+        ('/products/starter', '0.8', 'weekly'),
+        ('/contact', '0.6', 'monthly'),
         ('/privacy', '0.4', 'monthly'),
         ('/terms', '0.4', 'monthly'),
         ('/security', '0.4', 'monthly'),
@@ -1649,13 +3175,16 @@ def whitepaper():
     return render_template('whitepaper.html')
 
 
+@app.route('/pitch')
+def pitch_deck():
+    """Autonomous Swarm deck — 15 slides embedded from static/docs/swarm/."""
+    return render_template('pitch.html')
+
+
 @app.route('/docs/whitepaper.pdf')
 def whitepaper_pdf():
-    """Return whitepaper PDF stub."""
-    return jsonify({
-        'message': 'Whitepaper PDF available for download',
-        'url': '/static/docs/whitepaper.pdf'
-    }), 200
+    """Redirect to markdown whitepaper download."""
+    return redirect('/static/docs/SINCOR_whitepaper.md', code=302)
 
 
 # ============================================================================
@@ -2005,24 +3534,37 @@ def content_analytics():
 @app.route('/api/cancel-subscription', methods=['POST'])
 @limiter.limit("20 per minute")
 def cancel_subscription():
-    """
-    Cancel a SINCOR subscription.
-    - For Stripe: creates a Stripe subscription cancellation via the API.
-    - For PayPal: logs the request and emails support to process manually
-      (PayPal subscription cancellation requires asynchronous IPN/webhook confirmation).
-    Customers can also self-cancel via /billing (Stripe portal).
-    """
+    """Cancel subscription — wallet/SINC by default; legacy Stripe if enabled."""
     data = request.get_json(silent=True) or {}
     email = validate_email(data.get('email', ''))
+    wallet = validate_wallet(data.get('wallet', ''))
     reason = sanitize_string(data.get('reason', 'No reason provided'), max_length=500)
     subscription_id = sanitize_string(data.get('subscription_id', ''), max_length=200)
 
-    if not email:
-        return jsonify({'error': 'Valid email address required'}), 400
+    if not email and not wallet:
+        return jsonify({'error': 'email or wallet required'}), 400
 
-    logger.info(f"[CANCEL] Cancellation request from {email} | sub_id={subscription_id} | reason={reason}")
+    logger.info(f"[CANCEL] Request email={email} wallet={wallet} sub={subscription_id} reason={reason}")
 
-    # Try Stripe cancellation first
+    if not fiat_payments_enabled() and wallet and PLATFORM_PAYMENTS_AVAILABLE:
+        try:
+            from sincor2.platform_payments import cancel_wallet_subscriptions
+            n = cancel_wallet_subscriptions(wallet)
+            return jsonify({
+                'ok': True,
+                'cancelled': n,
+                'message': 'SINC subscription marked cancelled. No further renewals required.',
+            }), 200
+        except Exception as e:
+            logger.error(f"[CANCEL] Wallet cancel error: {e}")
+
+    if not fiat_payments_enabled():
+        return jsonify({
+            'ok': True,
+            'message': 'SINC billing: simply do not renew at /buy. Email support@getsincor.com to confirm.',
+        }), 200
+
+    # Legacy Stripe cancellation
     if STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         try:
             import stripe as stripe_lib
@@ -2134,6 +3676,8 @@ def paypal_webhook():
     PayPal sends form-encoded IPN or JSON webhook events depending on integration type.
     Verification: IPN verification via PayPal IPN verification endpoint.
     """
+    if not fiat_payments_enabled():
+        return jsonify({'error': 'Legacy PayPal disabled. Use SINC/AXM at /buy.'}), 410
     content_type = request.content_type or ''
 
     # Determine if this is a JSON webhook (newer API) or IPN (form-encoded)

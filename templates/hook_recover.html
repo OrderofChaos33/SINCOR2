@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recover Hook SINC — MetaMask Sign (no key export)</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Space Grotesk', sans-serif; background: #0a0e27; color: #f1f5f9; min-height: 100vh; padding: 32px 20px; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    p { color: #94a3b8; line-height: 1.6; margin-bottom: 14px; }
+    .card { background: #0f1629; border: 1px solid rgba(139,92,246,0.2); border-radius: 14px; padding: 20px; margin: 16px 0; }
+    .warn { border-color: rgba(248,113,113,0.4); background: rgba(127,29,29,0.2); }
+    .ok { border-color: rgba(34,197,94,0.35); }
+    button { cursor: pointer; border: none; border-radius: 10px; padding: 12px 18px; font-weight: 700; font-family: inherit; }
+    .btn-primary { background: linear-gradient(135deg,#8b5cf6,#6d28d9); color: white; width: 100%; margin-top: 8px; }
+    .btn-secondary { background: #1a202c; color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); width: 100%; margin-top: 8px; }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; word-break: break-all; }
+    .rung { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .rung:last-child { border-bottom: none; }
+    .status { font-size: 13px; color: #cbd5e1; min-height: 20px; margin-top: 10px; }
+    a { color: #06b6d4; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Recover ~20M SINC from hook floor</h1>
+  <p>Use the wallet that <strong>placed the hook sell orders</strong>. SINC goes to new treasury <span class="mono">0x09E289…12Ac</span>.</p>
+
+  <div class="card">
+    <h2 style="font-size:1.05rem;margin-bottom:8px;">Which MetaMask account?</h2>
+    <p style="margin-bottom:8px;">Ignore account numbers (Account 1, 2, 3…). Find the one with <strong>this exact address</strong>:</p>
+    <p class="mono" style="color:#e2e8f0;margin-bottom:10px;">0xAf9B539D8043C634b7E611818518BA7E850F289e</p>
+    <p style="margin-bottom:0;font-size:14px;">In MetaMask: click the account circle (top left) → scroll your accounts → each one shows an address. Pick the one starting with <strong>Af9B</strong> and ending with <strong>F289e</strong>. That is your old treasury wallet (sometimes called Account 6).</p>
+  </div>
+
+  <div class="card warn">
+    <strong>Think before you cancel.</strong> These 6 rungs are your $1.50+ sell walls — working inventory, not stolen tokens.
+    Cancel only if you want SINC back in treasury to re-place elsewhere. Gas paid from the Af9B wallet.
+  </div>
+
+  <div class="card" id="wallet-card">
+    <div id="wallet-line" class="mono">Wallet: not connected</div>
+    <div id="browser-hint" class="status" style="margin-top:0;margin-bottom:8px;"></div>
+    <button class="btn-primary" id="btn-connect">Connect MetaMask (Base)</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:1.1rem;margin-bottom:10px;">Floor rungs (6 txs)</h2>
+    <div id="rungs"></div>
+    <button class="btn-secondary" id="btn-all">Sign all 6 (one after another)</button>
+  </div>
+
+  <p><a href="/sinc">← Back to SINC gateway</a></p>
+</div>
+<script>
+const CHAIN_ID = '0x2105'; // Base 8453
+const HOOK = '0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0';
+const AF9B = '0xAf9B539D8043C634b7E611818518BA7E850F289e';
+const RUNGS = [
+  { tick: 41880, label: '$1.50', sinc: '5M', data: '0x75f0920f000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000009c8cd8d3961f445d653713de65c6578be11668e70000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000008e0ee51dca5249c9e84dbec539fdd46b375110c0000000000000000000000000000000000000000000000000000000000000a398000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e2891432827d8835d2e9b83b25e2a5ba9612ac' },
+  { tick: 34920, label: '$3.00', sinc: '4M', data: '0x75f0920f000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000009c8cd8d3961f445d653713de65c6578be11668e70000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000008e0ee51dca5249c9e84dbec539fdd46b375110c00000000000000000000000000000000000000000000000000000000000008868000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e2891432827d8835d2e9b83b25e2a5ba9612ac' },
+  { tick: 25620, label: '$7.50', sinc: '4M', data: '0x75f0920f000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000009c8cd8d3961f445d653713de65c6578be11668e70000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000008e0ee51dca5249c9e84dbec539fdd46b375110c00000000000000000000000000000000000000000000000000000000000006414000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e2891432827d8835d2e9b83b25e2a5ba9612ac' },
+  { tick: 17880, label: '$15', sinc: '3M', data: '0x75f0920f000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000009c8cd8d3961f445d653713de65c6578be11668e70000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000008e0ee51dca5249c9e84dbec539fdd46b375110c000000000000000000000000000000000000000000000000000000000000045d8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e2891432827d8835d2e9b83b25e2a5ba9612ac' },
+  { tick: 6900, label: '$40', sinc: '2M', data: '0x75f0920f000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000009c8cd8d3961f445d653713de65c6578be11668e70000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000008e0ee51dca5249c9e84dbec539fdd46b375110c00000000000000000000000000000000000000000000000000000000000001af4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e2891432827d8835d2e9b83b25e2a5ba9612ac' },
+  { tick: 0, label: '$100', sinc: '2M', data: '0x75f0920f000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda029130000000000000000000000009c8cd8d3961f445d653713de65c6578be11668e70000000000000000000000000000000000000000000000000000000000000bb8000000000000000000000000000000000000000000000000000000000000003c0000000000000000000000008e0ee51dca5249c9e84dbec539fdd46b375110c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009e2891432827d8835d2e9b83b25e2a5ba9612ac' }
+];
+
+let account = null;
+let provider = null;
+const statusEl = document.getElementById('status');
+const walletLine = document.getElementById('wallet-line');
+const walletCard = document.getElementById('wallet-card');
+const browserHint = document.getElementById('browser-hint');
+const rungsEl = document.getElementById('rungs');
+
+function setStatus(msg, ok) {
+  statusEl.textContent = msg;
+  walletCard.className = 'card' + (ok ? ' ok' : '');
+}
+
+function getProvider() {
+  const eth = window.ethereum;
+  if (!eth) return null;
+  if (eth.providers && eth.providers.length) {
+    const mm = eth.providers.find(p => p.isMetaMask);
+    if (mm) return mm;
+    return eth.providers[0];
+  }
+  return eth;
+}
+
+function bootHints() {
+  provider = getProvider();
+  if (!provider) {
+    browserHint.textContent = 'No wallet detected. Open this page in Chrome or Edge with the MetaMask extension installed, then refresh.';
+    return;
+  }
+  const name = provider.isMetaMask ? 'MetaMask' : (provider.isCoinbaseWallet ? 'Coinbase Wallet' : 'Browser wallet');
+  browserHint.textContent = name + ' detected. Unlock it, switch to the Af9B account, then click Connect.';
+}
+
+async function ensureBase() {
+  const chain = await provider.request({ method: 'eth_chainId' });
+  if (chain !== CHAIN_ID) {
+    try {
+      await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_ID }] });
+    } catch (e) {
+      throw new Error('In MetaMask, change network to Base mainnet, then click Connect again.');
+    }
+  }
+}
+
+async function connect() {
+  provider = getProvider();
+  if (!provider) {
+    throw new Error('MetaMask not found. Use Chrome/Edge, install MetaMask, open this page there (not in the Cursor browser).');
+  }
+  await ensureBase();
+  let accs;
+  try {
+    accs = await provider.request({ method: 'eth_requestAccounts' });
+  } catch (e) {
+    if (e && e.code === 4001) throw new Error('You clicked Reject in MetaMask. Click Connect again and choose Connect / Allow.');
+    throw new Error((e && e.message) || String(e));
+  }
+  if (!accs || !accs.length) throw new Error('No account returned. Unlock MetaMask and try again.');
+  account = accs[0];
+  walletLine.textContent = 'Connected: ' + account;
+  if (account.toLowerCase() !== AF9B.toLowerCase()) {
+    setStatus('Wrong wallet. In MetaMask switch to 0xAf9B…F289e (old treasury), then click Connect again. Connected address was ' + account.slice(0,6) + '…' + account.slice(-4) + '.', false);
+  } else {
+    setStatus('Correct wallet. Click Sign all 6 below.', true);
+  }
+}
+
+async function sendRung(i) {
+  if (!account) throw new Error('Connect wallet first');
+  if (account.toLowerCase() !== AF9B.toLowerCase()) throw new Error('Use Account 6 (Af9B)');
+  const r = RUNGS[i];
+  setStatus('Confirm rung ' + (i+1) + '/6 in MetaMask…', false);
+  const hash = await provider.request({
+    method: 'eth_sendTransaction',
+    params: [{ from: account, to: HOOK, data: r.data }]
+  });
+  setStatus('Rung ' + (i+1) + ' sent: ' + hash, true);
+  return hash;
+}
+
+function renderRungs() {
+  rungsEl.innerHTML = '';
+  RUNGS.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'rung';
+    row.innerHTML = '<span><strong>' + r.label + '</strong> · ' + r.sinc + ' SINC · tick ' + r.tick + '</span>';
+    const btn = document.createElement('button');
+    btn.className = 'btn-secondary';
+    btn.style.width = 'auto';
+    btn.style.marginTop = '0';
+    btn.textContent = 'Sign';
+    btn.onclick = () => sendRung(i).catch(e => setStatus(e.message || String(e), false));
+    row.appendChild(btn);
+    rungsEl.appendChild(row);
+  });
+}
+
+document.getElementById('btn-connect').onclick = () => connect().catch(e => setStatus(e.message, false));
+document.getElementById('btn-all').onclick = async () => {
+  try {
+    for (let i = 0; i < RUNGS.length; i++) await sendRung(i);
+    setStatus('All 6 cancel txs sent. Check treasury SINC balance.', true);
+  } catch (e) { setStatus(e.message || String(e), false); }
+};
+
+renderRungs();
+bootHints();
+</script>
+</body>
+</html>

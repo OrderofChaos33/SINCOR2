@@ -1,0 +1,186 @@
+{
+  "generatedAt": "2026-06-15T07:32:01.914397+00:00",
+  "token": {
+    "name": "SINC",
+    "symbol": "SINC",
+    "address": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+    "chainId": 8453,
+    "chainName": "Base",
+    "decimals": 8,
+    "totalSupply": "100000000",
+    "website": "https://getsincor.com",
+    "explorer": "https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+    "twitter": "https://twitter.com/getsincor",
+    "telegram": "https://t.me/getsincor",
+    "logoSource": "static/sinc_logo_planet.jpg",
+    "descriptionShort": "SINC is the utility token of SINCOR \u2014 a swarm of 43 autonomous AI agents operating on Base.",
+    "descriptionLong": "SINC is the utility token of SINCOR, a production AI agent swarm on Base mainnet. Contracts are Sourcify-verified with CertiK Skynet 97/100. Fixed 100M supply, 8 decimals, no mint, no admin keys. SINC powers access to the agent network, curated sales, and on-chain coordination via Uniswap v4 limit-order infrastructure.",
+    "tags": [
+      "defi",
+      "ai"
+    ],
+    "trustSignals": [
+      "Sourcify full-match verified",
+      "CertiK Skynet 97/100",
+      "SolidityScan Low Risk 98.5/100",
+      "No mint function",
+      "No admin pause/withdraw",
+      "Fixed 100M supply"
+    ],
+    "relatedContracts": {
+      "bondingCurve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
+      "limitOrderHook": "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0",
+      "hookRouter": "0x11b86E85cC5170F4165c89ccb11332133B29E283",
+      "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "genesisNFT": "0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09"
+    }
+  },
+  "targets": [
+    {
+      "id": "balancer",
+      "name": "Balancer token list",
+      "type": "pr",
+      "repo": "https://github.com/balancer/tokenlists.git",
+      "path_hint": "src/tokenlists/balancer/tokens/base.ts",
+      "docs": "https://github.com/balancer/tokenlists",
+      "fee": false,
+      "notes": "SINC may already be listed \u2014 script checks live file."
+    },
+    {
+      "id": "superchain",
+      "name": "Superchain / Coinbase Wallet token list",
+      "type": "pr",
+      "repo": "https://github.com/ethereum-optimism/ethereum-optimism.github.io.git",
+      "path_hint": "data/SINC/data.json + logo.svg",
+      "docs": "https://github.com/ethereum-optimism/ethereum-optimism.github.io",
+      "fee": false,
+      "notes": "High impact for Base + Coinbase Wallet. Use nobridge:true for native Base token."
+    },
+    {
+      "id": "trustwallet",
+      "name": "Trust Wallet assets",
+      "type": "pr",
+      "repo": "https://github.com/trustwallet/assets.git",
+      "path_hint": "blockchains/base/assets/0x9C8cd8d3961F445D653713dE65C6578bE11668e7/",
+      "docs": "https://developer.trustwallet.com/developer/new-asset",
+      "fee": true,
+      "notes": "Requires BNB/TWT processing fee. Needs 10k+ holders for approval."
+    },
+    {
+      "id": "cowswap",
+      "name": "CoW Swap token list",
+      "type": "issue",
+      "url": "https://github.com/cowprotocol/token-lists/issues/new?template=1-addTokenForm.yml",
+      "docs": "https://github.com/cowprotocol/token-lists",
+      "fee": false
+    },
+    {
+      "id": "cowswap_image",
+      "name": "CoW Swap token image only",
+      "type": "issue",
+      "url": "https://github.com/cowprotocol/token-lists/issues/new?template=2-addImageForm.yml",
+      "docs": "https://github.com/cowprotocol/token-lists",
+      "fee": false
+    },
+    {
+      "id": "geckoterminal",
+      "name": "GeckoTerminal token info",
+      "type": "form",
+      "url": "https://www.geckoterminal.com",
+      "docs": "https://support.coingecko.com/hc/en-us/articles/7291312302617",
+      "fee": false,
+      "notes": "Search SINC on Base, then Update token info."
+    },
+    {
+      "id": "dexscreener",
+      "name": "DexScreener enhanced token info",
+      "type": "form",
+      "url": "https://dexscreener.com/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+      "docs": "https://docs.dexscreener.com/token-listing",
+      "fee": true,
+      "notes": "Enhanced Token Info is paid; basic indexing is free with liquidity+trades."
+    },
+    {
+      "id": "coingecko",
+      "name": "CoinGecko listing request",
+      "type": "form",
+      "url": "https://www.coingecko.com/en/coins/new",
+      "docs": "https://support.coingecko.com/hc/en-us/articles/7291312302617",
+      "fee": false,
+      "notes": "Unlocks Rainbow verification path on Base."
+    },
+    {
+      "id": "coinmarketcap",
+      "name": "CoinMarketCap listing request",
+      "type": "form",
+      "url": "https://coinmarketcap.com/request/",
+      "docs": "https://support.coinmarketcap.com/hc/en-us/articles/360043685031",
+      "fee": false
+    },
+    {
+      "id": "dextools",
+      "name": "DEXTools token info update",
+      "type": "form",
+      "url": "https://www.dextools.io/app/en/base/pair-explorer",
+      "fee": true
+    },
+    {
+      "id": "birdeye",
+      "name": "Birdeye token info",
+      "type": "form",
+      "url": "https://birdeye.so/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7?chain=base",
+      "fee": false
+    },
+    {
+      "id": "defillama",
+      "name": "DefiLlama adapter / protocol listing",
+      "type": "pr",
+      "repo": "https://github.com/DefiLlama/DefiLlama-Adapters.git",
+      "docs": "https://docs.llama.fi/list-your-project/submit-a-project",
+      "fee": false,
+      "notes": "For TVL tracking once pools have measurable liquidity."
+    },
+    {
+      "id": "sincor_tokenlist",
+      "name": "Self-hosted Uniswap token list (MetaMask / Rabby / 1inch import)",
+      "type": "host",
+      "url": "https://getsincor.com/tokenlists/sincor.tokenlist.json",
+      "fee": false,
+      "notes": "Served by Flask at /tokenlists/ and /.well-known/tokenlist.json"
+    },
+    {
+      "id": "blockscout",
+      "name": "Blockscout verified address + public tag",
+      "type": "form",
+      "url": "https://base.blockscout.com/my-account/verified-addresses",
+      "docs": "https://docs.blockscout.com/using-blockscout/my-account/verified-addresses",
+      "fee": false,
+      "notes": "Deployer signs to verify ownership \u2192 update token icon/name. Also submit public tag."
+    },
+    {
+      "id": "blockscout_public_tag",
+      "name": "Blockscout public tag request",
+      "type": "form",
+      "url": "https://base.blockscout.com/public-tags/submit",
+      "fee": false,
+      "notes": "Marks official SINC contract; clears unverified/suspicious UI for explorers."
+    },
+    {
+      "id": "tkn",
+      "name": "Token Name Service (TKN) \u2014 Blockscout icon source",
+      "type": "form",
+      "url": "https://tkn.xyz/token/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+      "docs": "https://docs.tkn.xyz/usage/organizations",
+      "fee": false,
+      "notes": "Blockscout pulls token metadata from TKN. Submit logo, website, description."
+    }
+  ],
+  "quickStart": [
+    "1. python scripts/whitelist_token.py prepare   # already run if you see this",
+    "2. python scripts/whitelist_token.py check     # see what's already listed",
+    "3. python scripts/whitelist_token.py launch    # clone repos + stage PR files",
+    "4. Push branches / open PRs / submit forms using tokenlists/pr-packages/",
+    "5. Host static/tokenlists/ on getsincor.com for wallet import URL"
+  ],
+  "walletImportUrl": "https://getsincor.com/tokenlists/sincor.tokenlist.json"
+}

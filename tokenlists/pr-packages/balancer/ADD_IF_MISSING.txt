@@ -1,0 +1,6 @@
+File: src/tokenlists/balancer/tokens/base.ts
+Add this line if SINC is not already present:
+
+  '0x9C8cd8d3961F445D653713dE65C6578bE11668e7', // SINC
+
+Then open PR: https://github.com/balancer/tokenlists/compare

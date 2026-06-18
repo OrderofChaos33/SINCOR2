@@ -1,0 +1,135 @@
+================================================================================
+  SINC (SINCOR) × BALANCER — PROOF OF WORK & PARTNER BRIEF
+  Base mainnet (chain 8453) · Prepared June 17, 2026 · getsincor.com
+================================================================================
+
+CONTACT
+  Court @ SINCOR · court@getsincor.com
+  Site: https://getsincor.com  SINC  https://getsincor.com/SINC
+  Campaign hub: https://getsincor.com/launch/campaign
+
+CANONICAL ON-CHAIN (verified — see CANONICAL_ADDRESSES.md)
+  SINC token          0x9C8cd8d3961F445D653713dE65C6578bE11668e7
+  SincBondingCurve    0x75dE341a2BC81806198364F125d4Cde36527619C  (~65% supply in curve)
+  SincLimitOrderHook  0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0
+  SincGenesisNFT      0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09
+  Treasury (active)   0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac
+  USDC (Base)         0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+  AXIOM (AXM)         0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822
+
+  Security: CertiK Skynet 97/100 · Sourcify full-match on SINC, curve, hook, NFT
+  Supply: 8 decimals · 100M max (confirmed on-chain)
+  Official buy path: https://getsincor.com/sinc — $1.50 USDC floor (hook + gateway)
+
+--------------------------------------------------------------------------------
+█ PROOF OF WORK (~5/7) — SHIPPED, LIVE, OR VERIFIED TODAY
+--------------------------------------------------------------------------------
+
+TOKEN LISTINGS & DISCOVERY (checked live 2026-06-17)
+  ✓ Listed in Balancer tokenlists (balancer/tokenlists — base.ts)
+  ✓ Self-hosted token list: https://getsincor.com/tokenlists/sincor.tokenlist.json
+  ✓ Token metadata: https://getsincor.com/.well-known/sinc-token.json
+  ✓ Blockscout submission package + certify workflow prepared (tokenlists/blockscout/)
+  ○ Superchain / Trust / Rainbow / CoW / Li.Fi / CoinGecko / TKN — PRs open or queued
+
+PRODUCTION PLATFORM (getsincor.com — Flask app via run.py → mvp_app.py)
+  ✓ Public gateway, pricing, dashboard, buy flow, referral (3%), pitch deck, whitepaper
+  ✓ SINC + AXM platform billing — on-chain treasury payments replace Stripe/PayPal
+  ✓ Orders DB + fulfillment engine (BI reports, subscriptions, content orders)
+  ✓ Revenue snapshot API — honest metrics from orders DB (no simulated revenue)
+  ✓ Compliance monitor + safety locks (no auto on-chain writes from web app)
+  ✓ A2A agent card: /.well-known/agent-card.json · marketplace API live
+
+AGENT INFRASTRUCTURE (built & wired)
+  ✓ 5 marketplace agent cards (compliance, lead gen, healthcare, dental, trading packs)
+  ✓ 5 vertical agents instantiated (verticals/loader.py TO live registry)
+  ✓ A2A task router + file-backed task store (data/a2a_tasks.json)
+  ✓ 6-agent operational swarm — real scheduled tasks, evidence at /api/ops/swarm-status:
+      · Auriga      — on-chain inventory + official floor price snapshot
+      · Polaris     — launch content drafts TO human review queue
+      · Fomalhaut   — partner + launchpad outreach batches (mailto one-tap)
+      · Alkaid      — revenue digest + campaign KPI snapshot
+      · Canopus     — grant / funding target refresh
+      · Sirius      — A2A marketplace + vertical health + compliance pass
+  ✓ Monetization catalog: 28 paths mapped · 8 LIVE · 10 PARTIAL (src/sincor2/monetization_catalog.py)
+
+LAUNCH OPS STACK (human-in-the-loop — drafts, not auto-spam)
+  ✓ Launch content engine — agent_spotlight, onchain_stats, seo_compare, campaign_kpi
+  ✓ Human review queue: /launch/review (approve before any social post)
+  ✓ Partner outreach CRM: /launch/partners — KOL/curator pipeline, daily email reminder
+  ✓ Launchpad outreach CRM: /launch/launchpads — 5 LBP venues, one-tap email bodies
+  ✓ Daily schedulers on Railway/local: launch ops, partner reminder, launchpad reminder,
+    swarm cycle, daily ops (chain/revenue evidence)
+
+KPI TGE CAMPAIGN ENGINE (MegaETH-style milestone rollouts — code shipped)
+  ✓ Public hub: /launch/campaign
+  ✓ SQLite campaign DB — register, points ledger, pre-deposits, milestone log
+  ✓ On-chain USDC verification (Base RPC) for bridge claims + treasury pre-deposits
+  ✓ Points → allocation multipliers · LBP priority tiers ($50 / $500 / $5k USDC)
+  ✓ Social whitelist (X + Farcaster) with mercenary penalty (social-only, no bridge)
+  ✓ Whale capture ($5k+ pre-deposit) · DeFi farmer score ($10k+ bridge cap)
+  ✓ 6 live KPI milestones ($10k–$250k TVL, wallets, volume, social qualified)
+  ✓ Prereq cascade — 4 waves unlock airdrop / aggregator / whale / final allocation pools
+  ✓ Milestone unlock → auto announcement drafts → /launch/review (Farcaster, Reddit,
+    DexScreener, GeckoTerminal, DeFiLlama, Dune, Base ecosystem channels configured)
+
+ON-CHAIN TOOLING (Foundry — onchain/)
+  ✓ Verified contracts deployed on Base · deployment record: onchain/deployments/8453.json
+  ✓ Hook keeper, treasury ladder, floor math, router scripts (14+ operational scripts)
+  ✓ Hook fill monitoring · treasury sweep · liquidity recovery tooling
+  ✓ Balancer v3 LBP pool deployed 2026-05-30 (0x3b35E92c4f34B8468659612B9742248185F04B00)
+    — verified LBPool; primary live sale venue today is v4 curve + USDC hook wall
+
+CONTENT & SEO (shipping organic surface area)
+  ✓ SEO compare pipeline · topic rotation · agent spotlight personas
+  ✓ Static docs, token logos (SVG/PNG), OG images, favicon pack
+  ✓ Templates: buy, gateway, earn, hook recover, launch campaign, partners, launchpads
+
+--------------------------------------------------------------------------------
+█ SCHEDULE (~1/7) — DATED MILESTONES ONLY
+--------------------------------------------------------------------------------
+
+  2026-07-01   Pre-deposit waitlist opens (USDC on Base → treasury, on-chain verified)
+  2026-07-03   Early-bird pre-deposit multiplier ends (2× points window closes)
+  2026-07-07   Target TGE / LBP window — KPI campaign drives demand before pool open
+  Ongoing      Milestone-gated announcement waves (unlock at $10k / $50k / $250k TVL, etc.)
+  Ongoing      Whitelist PRs: Superchain, Trust Wallet, CoinGecko, Blockscout certify
+
+--------------------------------------------------------------------------------
+█ PARTNER REQUEST 
+--------------------------------------------------------------------------------
+
+We are not asking Balancer to endorse price or guarantee liquidity. Standard co-launch asks:
+
+  1. LBP SLOT / CO-MARKETING
+     Priority feature in Balancer #launches (Discord) or ecosystem channels for the
+     week of July 7, 2026 — KPI pre-deposit campaign provides measurable demand signal
+     before pool seeding (not an empty-pool launch).
+
+  2. LISTING COORDINATION (ALREADY LISTED — THANK YOU)
+     SINC is live in balancer/tokenlists base.ts. Request: confirm metadata/logo URL
+     points to https://getsincor.com/static/tokenlists/assets/logo-256.png and
+     token list URL stays synced with getsincor.com/tokenlists/sincor.tokenlist.json.
+
+  3. TECHNICAL REVIEW WINDOW
+     30-minute async or live review of verified contracts (SINC, hook, curve) + campaign
+     hub demo. We will share predeposit TVL + qualified-wallet metrics as KPIs hit.
+
+  4. CURATION / PARTNER PIPELINE
+     Inclusion in Balancer Base launch calendar or partner newsletter — one slot, factual
+     copy only (CertiK 97, Sourcify verified, live gateway, agent platform on Base).
+
+  5. POST-TGE LIQUIDITY PATH
+     After LBP, coordination on Balancer pool listing / routing visibility on Base —
+     Aerodrome + aggregator follow-ups already queued in our launchpad CRM.
+
+WHAT WE PROVIDE IN RETURN
+  · Verified contracts + public campaign metrics (no NDAs on on-chain data)
+  · Co-branded milestone announcements when KPIs unlock (Balancer credited in copy)
+  · Technical blog / build-log content for Balancer channels (human-reviewed)
+  · Direct line: court@getsincor.com · live demo: /launch/campaign · /sinc
+
+================================================================================
+  SINCOR — Autonomous AI agent platform on Base. Token is utility, not the product.
+  This document reflects shipped code and verified on-chain state as of 2026-06-17.
+================================================================================

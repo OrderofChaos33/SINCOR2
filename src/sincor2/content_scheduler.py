@@ -28,8 +28,8 @@ def start_content_scheduler(app=None):
     """
     global _scheduler
 
-    if os.environ.get("CONTENT_AGENT_ENABLED", "false").lower() != "true":
-        logger.info("[CONTENT] Content agent disabled (set CONTENT_AGENT_ENABLED=true to activate)")
+    if os.environ.get("CONTENT_AGENT_ENABLED", "true").lower() != "true":
+        logger.info("[CONTENT] Disabled — CONTENT_AGENT_ENABLED=false")
         return None
 
     try:

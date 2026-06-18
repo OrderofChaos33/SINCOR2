@@ -1,0 +1,50 @@
+# SINCOR ops schedule reference — Windows tasks + Railway env gates.
+# Install Windows: .\scripts\install_ops_schedule.ps1 -BuyWatcher
+
+windows:
+  launch_daemons:
+    task: SINCOR Launch Daemons
+    trigger: logon
+    script: scripts/start_launch_daemons.ps1
+    notes: Hook keeper -Watch; optional buy_watcher.js with -BuyWatcher
+  launch_content:
+    task: SINCOR Launch Content
+    trigger: daily_09:00
+    script: scripts/run_launch_ops.ps1 -ContentOnly
+    skip_if: Railway LAUNCH_OPS_ENABLED=true (use -SkipContentTask)
+  daily_ops:
+    task: SINCOR Daily Ops
+    trigger: daily_08:00
+    script: scripts/run_daily_ops.ps1 -ChainStatus
+    output: logs/ops/
+  weekly_buyers:
+    task: SINCOR Weekly Buyers
+    trigger: sunday_10:00
+    script: scripts/run_daily_ops.ps1 -Buyers -ChainStatus
+
+railway:
+  launch_ops:
+    env: LAUNCH_OPS_ENABLED=true
+    interval: LAUNCH_OPS_INTERVAL_HOURS=24
+  daily_ops:
+    env: DAILY_OPS_ENABLED=true
+    interval: DAILY_OPS_INTERVAL_HOURS=24
+  compliance:
+    env: COMPLIANCE_MONITOR_ENABLED=true
+    interval: 30 minutes
+  content_agent:
+    env: CONTENT_AGENT_ENABLED=true
+    interval: CONTENT_INTERVAL_HOURS=48
+  outreach:
+    env: OUTREACH_ENABLED=true
+    interval: OUTREACH_INTERVAL_HOURS=6
+  polyclaw:
+    env: POLYCLAW_ENABLED=false
+    default_off: true
+
+manual_only:
+  - onchain/recover_liquidity.ps1 (tx modes)
+  - onchain/script/* deploy/place/exit scripts
+  - scripts/preflight_check.ps1
+  - scripts/verify_mainnet_contracts.ps1
+  - payment fulfillment (Stripe/PayPal webhooks — event-driven)

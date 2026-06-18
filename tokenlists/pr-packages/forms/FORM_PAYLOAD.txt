@@ -1,0 +1,13 @@
+Name: SINC
+Symbol: SINC
+Contract: 0x9C8cd8d3961F445D653713dE65C6578bE11668e7
+Chain: Base (8453)
+Decimals: 8
+Total Supply: 100000000
+Website: https://getsincor.com
+Twitter: https://twitter.com/getsincor
+Telegram: https://t.me/getsincor
+Explorer: https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7
+Description (short): SINC is the utility token of SINCOR — a swarm of 43 autonomous AI agents operating on Base.
+Description (long): SINC is the utility token of SINCOR, a production AI agent swarm on Base mainnet. Contracts are Sourcify-verified with CertiK Skynet 97/100. Fixed 100M supply, 8 decimals, no mint, no admin keys. SINC powers access to the agent network, curated sales, and on-chain coordination via Uniswap v4 limit-order infrastructure.
+Trust: Sourcify full-match verified · CertiK Skynet 97/100 · SolidityScan Low Risk 98.5/100 · No mint function · No admin pause/withdraw · Fixed 100M supply

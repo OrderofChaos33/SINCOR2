@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pay with SINC or AXM — SINCOR</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0a0e27;--panel:#0f1629;--cyan:#06b6d4;--purple:#8b5cf6;--text:#f1f5f9;--muted:#94a3b8;--green:#34d399;--red:#f87171}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;line-height:1.55}
+    .wrap{max-width:720px;margin:0 auto;padding:32px 20px 60px}
+    h1{font-size:1.75rem;margin:0 0 8px}
+    .sub{color:var(--muted);margin-bottom:24px}
+    .card{background:var(--panel);border:1px solid rgba(139,92,246,.25);border-radius:14px;padding:22px;margin:16px 0}
+    label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+    select,input{width:100%;background:#050814;color:var(--text);border:1px solid rgba(139,92,246,.3);border-radius:10px;padding:12px;font-family:inherit;font-size:15px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:560px){.row{grid-template-columns:1fr}}
+    .stat{font-size:1.5rem;font-weight:700;color:var(--cyan)}
+    .pill{display:inline-block;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.35)}
+    button,a.btn{cursor:pointer;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:inherit;text-decoration:none;display:inline-block;text-align:center}
+    .btn-primary{background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff;width:100%}
+    .btn-ghost{background:#1a202c;color:#c4b5fd;border:1px solid rgba(139,92,246,.35)}
+    .btn-cyan{background:linear-gradient(135deg,var(--cyan),#0891b2);color:#051018;width:100%}
+    .muted{color:var(--muted);font-size:13px}
+    .mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--cyan)}
+    .err{color:var(--red);font-size:14px;margin-top:10px;display:none}
+    .ok{color:var(--green);font-size:14px;margin-top:10px;display:none}
+    .token-badge{font-weight:700;color:var(--purple)}
+    nav{margin-bottom:20px}
+    nav a{color:var(--muted);text-decoration:none;font-size:14px}
+    nav a:hover{color:var(--text)}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <nav><a href="/">← Back to SINCOR</a> · <a href="/pricing">Pricing</a> · <a href="/sinc">Buy SINC</a> · <a href="/axiom">AXIOM</a></nav>
+
+  <span class="pill">SINC + AXM checkout</span>
+  <h1>Pay with platform tokens</h1>
+  <p class="sub">SINCOR billing runs on <strong>SINC</strong> (platform access) and <strong>AXM</strong> (one-off intel &amp; agent tasks). No Stripe. No PayPal. Base mainnet only.</p>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="plan">Plan</label>
+        <select id="plan"></select>
+      </div>
+      <div>
+        <label for="email">Email (for delivery)</label>
+        <input id="email" type="email" placeholder="you@business.com" autocomplete="email">
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <div class="muted">Amount due</div>
+      <div class="stat" id="amount">—</div>
+      <div class="muted" id="usd-ref"></div>
+      <div class="muted" id="spot"></div>
+    </div>
+    <div class="actions">
+      <button class="btn-primary" id="btn-quote" type="button">Refresh quote</button>
+      <button class="btn-cyan" id="btn-connect" type="button">Connect wallet</button>
+    </div>
+    <p class="mono" id="wallet" style="margin-top:12px"></p>
+    <p class="muted">Treasury: <span class="mono" id="treasury">—</span></p>
+    <button class="btn-primary" id="btn-pay" type="button" style="margin-top:12px" disabled>Send payment on Base</button>
+    <button class="btn-ghost" id="btn-verify" type="button" style="margin-top:10px;width:100%" disabled>I've sent — verify on-chain</button>
+    <p class="err" id="err"></p>
+    <p class="ok" id="ok"></p>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:1rem;margin:0 0 8px">How it works</h2>
+    <ol class="muted" style="padding-left:18px;margin:0">
+      <li>Pick a plan — subscriptions bill in <span class="token-badge">SINC</span>, one-time reports in <span class="token-badge">AXM</span>.</li>
+      <li>We quote live spot from the bonding curve (SINC) or DEX (AXM).</li>
+      <li>Connect MetaMask/Rabby on <strong>Base</strong> and send the exact token amount to treasury.</li>
+      <li>Verify your tx — fulfillment starts immediately.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+let checkout = null;
+let account = null;
+
+const $ = (id) => document.getElementById(id);
+function showErr(msg) { $('err').style.display = 'block'; $('err').textContent = msg; $('ok').style.display = 'none'; }
+function showOk(msg) { $('ok').style.display = 'block'; $('ok').textContent = msg; $('err').style.display = 'none'; }
+
+async function loadPlans() {
+  const res = await fetch('/api/platform/plans');
+  const data = await res.json();
+  const sel = $('plan');
+  sel.innerHTML = '';
+  const agentPlans = ['starter', 'professional', 'enterprise', 'report'];
+  (data.plans || []).forEach((p) => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    const suffix = p.spot_available ? '' : ' — price loading…';
+    o.textContent = `${p.label} — $${p.usd_reference} ref · ${p.token}${suffix}`;
+    if (!p.spot_available && p.token === 'SINC') o.disabled = true;
+    sel.appendChild(o);
+  });
+  let wanted = params.get('plan') || 'starter';
+  if (!agentPlans.includes(wanted) && wanted === 'intel') wanted = 'starter';
+  if ([...sel.options].some((o) => o.value === wanted && !o.disabled)) {
+    sel.value = wanted;
+  } else {
+    const first = [...sel.options].find((o) => !o.disabled);
+    if (first) sel.value = first.value;
+  }
+  if (params.get('email')) $('email').value = params.get('email');
+}
+
+async function refreshQuote() {
+  const plan = $('plan').value;
+  const email = $('email').value.trim();
+  const wallet = account || '';
+  showErr('');
+  $('btn-pay').disabled = true;
+  $('btn-verify').disabled = true;
+  const res = await fetch('/api/platform/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan_id: plan, customer_email: email, payer_wallet: wallet }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    showErr(data.error || 'Could not create checkout');
+    return;
+  }
+  checkout = data;
+  $('amount').textContent = `${data.amount_display} ${data.token}`;
+  $('usd-ref').textContent = `$${data.usd_reference} reference · ${data.billing === 'month' ? 'monthly' : 'one-time'}`;
+  $('spot').textContent = data.pricing_mode === 'fixed'
+    ? `Fixed list price (${data.token})`
+    : (data.spot_usd ? `Spot ≈ $${Number(data.spot_usd).toPrecision(4)} / ${data.token}` : '');
+  $('treasury').textContent = data.treasury;
+  if (account) {
+    $('btn-pay').disabled = false;
+    $('btn-verify').disabled = false;
+  }
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    showErr('No wallet detected. Install MetaMask or Rabby.');
+    return;
+  }
+  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+  if (chainId !== '0x2105') {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x2105' }],
+      });
+    } catch (e) {
+      showErr('Switch to Base network (chain 8453) to pay.');
+      return;
+    }
+  }
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  account = accounts[0];
+  $('wallet').textContent = account;
+  await refreshQuote();
+}
+
+function encodeTransfer(to, amountAtomic) {
+  const selector = '0xa9059cbb';
+  const addr = to.toLowerCase().replace('0x', '').padStart(64, '0');
+  const amt = BigInt(amountAtomic).toString(16).padStart(64, '0');
+  return selector + addr + amt;
+}
+
+async function sendPayment() {
+  if (!checkout || !account) return;
+  showErr('');
+  $('btn-pay').disabled = true;
+  $('btn-pay').textContent = 'Confirm in wallet…';
+  try {
+    const tx = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: account,
+        to: checkout.token_address,
+        data: encodeTransfer(checkout.treasury, checkout.amount_atomic),
+      }],
+    });
+    showOk(`Tx submitted: ${tx.slice(0, 14)}… — click verify when confirmed.`);
+    checkout._tx = tx;
+    $('btn-verify').disabled = false;
+  } catch (e) {
+    showErr(e.message || 'Transaction rejected');
+  } finally {
+    $('btn-pay').disabled = false;
+    $('btn-pay').textContent = 'Send payment on Base';
+  }
+}
+
+async function verifyPayment() {
+  if (!checkout) return;
+  const tx = checkout._tx || prompt('Paste your transaction hash (0x…)');
+  if (!tx) return;
+  showErr('');
+  $('btn-verify').disabled = true;
+  const res = await fetch('/api/platform/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      payment_id: checkout.payment_id,
+      tx_hash: tx,
+      customer_email: $('email').value.trim(),
+      payer_wallet: account,
+    }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    showErr(data.error || 'Verification failed');
+    $('btn-verify').disabled = false;
+    return;
+  }
+  let msg = 'Payment verified!';
+  if (data.subscription) {
+    msg += ` Subscription active until ${data.subscription.period_end.slice(0, 10)}.`;
+  }
+  showOk(msg + ' Redirecting…');
+  const email = $('email').value.trim();
+  const q = email ? `?email=${encodeURIComponent(email)}&order_id=${encodeURIComponent(data.order_id)}` : '';
+  setTimeout(() => { window.location.href = `/onboarding${q}`; }, 1500);
+}
+
+$('btn-quote').addEventListener('click', refreshQuote);
+$('btn-connect').addEventListener('click', connectWallet);
+$('btn-pay').addEventListener('click', sendPayment);
+$('btn-verify').addEventListener('click', verifyPayment);
+$('plan').addEventListener('change', refreshQuote);
+
+loadPlans().then(refreshQuote);
+</script>
+</body>
+</html>

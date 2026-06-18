@@ -87,8 +87,10 @@ class MonetizationEngine:
         self.analytics_engine = PredictiveAnalyticsEngine()
         self.quality_engine = SelfImprovingQualityEngine()
         
-        # Initialize payment processor with your Railway PayPal config
-        self.payment_processor = SINCORPaymentProcessor()
+        # Initialize payment processor with your Railway PayPal config (optional)
+        self.payment_processor = (
+            SINCORPaymentProcessor() if _PAYPAL_AVAILABLE and SINCORPaymentProcessor else None
+        )
         
         # Monetization state
         self.active_opportunities: List[RevenueOpportunity] = []
@@ -527,6 +529,24 @@ class MonetizationEngine:
             return partnership_ops[:max_count//2] + other_ops[:max_count//2]
         
         return opportunities[:max_count]
+
+    def _dispatch_opportunity_work(self, opportunity: RevenueOpportunity) -> Dict[str, Any]:
+        """Queue real swarm work for an opportunity — no simulated revenue."""
+        from sincor2.swarm_ops import run_swarm_cycle
+
+        stream_tasks = {
+            RevenueStream.INSTANT_BI: ["revenue_digest", "launch_content_draft"],
+            RevenueStream.AGENT_SERVICES: ["platform_health", "chain_snapshot"],
+            RevenueStream.PARTNERSHIPS: ["partner_outreach_batch"],
+            RevenueStream.SUBSCRIPTIONS: ["revenue_digest", "platform_health"],
+            RevenueStream.PREDICTIVE_ANALYTICS: ["revenue_digest"],
+            RevenueStream.CONSULTING: ["partner_outreach_batch", "grant_opportunities"],
+        }
+        tasks = stream_tasks.get(opportunity.revenue_stream)
+        try:
+            return run_swarm_cycle(tasks=tasks)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "agents_ok": 0}
     
     async def _execute_opportunity(self, opportunity: RevenueOpportunity) -> Dict[str, Any]:
         """Execute a specific revenue opportunity with real PayPal payment processing"""
@@ -534,51 +554,59 @@ class MonetizationEngine:
         # Simulate opportunity execution based on confidence score
         success_probability = opportunity.confidence_score
         
-        # Apply quality scoring to improve success rate
-        quality_assessment = await self.quality_engine.assess_deliverable_quality({
-            'complexity': opportunity.revenue_potential / 10000,
-            'timeline': opportunity.time_to_close,
-            'resource_availability': 0.8
-        })
-        
-        adjusted_success_probability = success_probability * quality_assessment.overall_score
-        
-        # Execute (simulated business logic, real payment processing)
-        execution_success = np.random.random() < adjusted_success_probability
-        
-        if execution_success:
-            # Calculate actual revenue (may vary from potential)
-            revenue_variance = np.random.uniform(0.8, 1.2)  # ±20% variance
-            actual_revenue = opportunity.revenue_potential * revenue_variance
-            
-            # Process real payment based on revenue stream type
+        quality_score = 0.85
+        try:
+            quality_assessment = await self.quality_engine.assess_deliverable_quality(
+                opportunity.opportunity_id,
+                {
+                    'complexity': opportunity.revenue_potential / 10000,
+                    'timeline': opportunity.time_to_close,
+                    'resource_availability': 0.8,
+                },
+                'revenue_opportunity',
+                'monetization_engine',
+            )
+            quality_score = getattr(quality_assessment, 'overall_score', quality_score) or quality_score
+        except Exception:
+            pass
+
+        adjusted_success_probability = success_probability * quality_score
+
+        from sincor2.revenue_snapshot import fetch_orders_revenue
+
+        orders_before = fetch_orders_revenue()
+        dispatch = self._dispatch_opportunity_work(opportunity)
+        orders_after = fetch_orders_revenue()
+        revenue_delta = max(
+            0.0,
+            float(orders_after.get("completed_revenue_usd", 0))
+            - float(orders_before.get("completed_revenue_usd", 0)),
+        )
+
+        execution_success = bool(dispatch.get("ok")) and dispatch.get("agents_ok", 1) > 0
+        actual_revenue = revenue_delta
+        payment_result = None
+        if execution_success and actual_revenue > 0 and self.payment_processor:
             payment_result = await self._process_real_payment(opportunity, actual_revenue)
-            
-            execution_result = {
-                'opportunity_id': opportunity.opportunity_id,
-                'success': True,
-                'actual_revenue': actual_revenue,
-                'payment_processed': payment_result.success if payment_result else False,
-                'payment_id': payment_result.payment_id if payment_result else None,
-                'net_revenue': payment_result.net_amount if payment_result else actual_revenue,
-                'execution_time': opportunity.time_to_close,
-                'client_segment': opportunity.client_segment,
-                'revenue_stream': opportunity.revenue_stream.value,
-                'competitive_advantage_utilized': opportunity.competitive_advantage,
-                'resource_cost': sum(opportunity.resource_requirement.values())
-            }
-        else:
-            execution_result = {
-                'opportunity_id': opportunity.opportunity_id,
-                'success': False,
-                'actual_revenue': 0.0,
-                'payment_processed': False,
-                'execution_time': opportunity.time_to_close,
-                'client_segment': opportunity.client_segment,
-                'revenue_stream': opportunity.revenue_stream.value,
-                'failure_reason': 'execution_failed',
-                'resource_cost': sum(opportunity.resource_requirement.values()) * 0.3  # Partial cost
-            }
+
+        execution_result = {
+            'opportunity_id': opportunity.opportunity_id,
+            'success': execution_success,
+            'actual_revenue': actual_revenue,
+            'simulated_revenue': 0.0,
+            'dispatch': dispatch,
+            'confidence': round(adjusted_success_probability, 4),
+            'payment_processed': payment_result.success if payment_result else False,
+            'payment_id': payment_result.payment_id if payment_result else None,
+            'net_revenue': payment_result.net_amount if payment_result else actual_revenue,
+            'execution_time': opportunity.time_to_close,
+            'client_segment': opportunity.client_segment,
+            'revenue_stream': opportunity.revenue_stream.value,
+            'competitive_advantage_utilized': opportunity.competitive_advantage,
+            'resource_cost': sum(opportunity.resource_requirement.values()),
+        }
+        if not execution_success:
+            execution_result['failure_reason'] = dispatch.get('error', 'dispatch_failed')
         
         # Log the deal
         deal_record = {
@@ -594,6 +622,9 @@ class MonetizationEngine:
     async def _process_real_payment(self, opportunity: RevenueOpportunity, amount: float) -> Optional[PaymentResult]:
         """Process real PayPal payment for revenue opportunity"""
         
+        if not self.payment_processor:
+            return None
+
         try:
             # Generate client email (in real system, this would come from CRM)
             client_email = f"client-{opportunity.client_segment}@example.com"
@@ -805,6 +836,12 @@ class MonetizationEngine:
         actions.append("Continue monitoring and optimizing based on real-time performance data")
         
         return actions
+
+    def get_live_metrics(self) -> Dict[str, Any]:
+        """Real orders + on-chain metrics — never simulated."""
+        from sincor2.revenue_snapshot import fetch_live_status
+        return fetch_live_status()
+
 
 # Monetization acceleration tactics
 ACCELERATION_TACTICS = {

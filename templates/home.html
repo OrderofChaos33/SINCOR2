@@ -4,15 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SINCOR — The Future of Autonomous Work</title>
-  <meta name="description" content="42 AI agents, zero humans. Deploy your autonomous revenue team. From $297/mo.">
+  <meta name="description" content="Welcome Agents, & humans. 42 AI agents, zero humans. Deploy your autonomous revenue team. From $297/mo.">
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
   <link rel="shortcut icon" href="/static/sincor_favicon.png">
-  <meta property="og:image" content="/static/sincor_logo_new.jpg">
+  <meta property="og:image" content="https://getsincor.com/static/sincor_og.jpg">
+  <meta property="og:image:alt" content="SINC by SINCOR">
   <meta property="og:title" content="SINCOR — The Future of Autonomous Work">
-  <meta property="og:description" content="42 AI agents, zero humans. Deploy your autonomous revenue team. From $297/mo.">
+  <meta property="og:description" content="Welcome Agents, & humans. Eliminating human suffering. Empowering businesses & owners. Changing work as we know it.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -40,10 +41,14 @@
     body {
       background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg) 100%);
       color: var(--text);
-      font-family: 'Space Grotesk', sans-serif;
-      line-height: 1.6;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-size: 17px;
+      line-height: 1.65;
       overflow-x: hidden;
       position: relative;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
     }
     
     /* ANIMATED BACKGROUND */
@@ -101,15 +106,15 @@
     }
     
     .nav-logo {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'Sora', sans-serif;
       background: linear-gradient(135deg, var(--purple-light), var(--cyan));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       text-decoration: none;
-      letter-spacing: 2px;
+      letter-spacing: -0.02em;
     }
     
     .nav-links {
@@ -157,16 +162,15 @@
       background: linear-gradient(135deg, var(--purple), var(--purple-dark));
       color: white;
       border: none;
-      padding: 12px 28px;
-      border-radius: 8px;
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
       text-decoration: none;
       transition: all 0.3s;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: -0.01em;
       box-shadow: var(--glow);
     }
     
@@ -190,17 +194,18 @@
     
     .hero-badge {
       display: inline-block;
-      background: rgba(139,92,246,0.1);
-      border: 1px solid var(--border-bright);
-      color: var(--purple-light);
-      padding: 10px 20px;
-      border-radius: 50px;
-      font-size: 12px;
+      background: rgba(139,92,246,0.08);
+      border: 1px solid rgba(139,92,246,0.28);
+      color: var(--text-dim);
+      padding: 11px 22px;
+      border-radius: 999px;
+      font-size: 13px;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 30px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.06em;
+      margin-bottom: 28px;
       animation: float 3s ease-in-out infinite;
+      box-shadow: 0 0 24px rgba(139,92,246,0.12);
     }
     
     @keyframes float {
@@ -209,11 +214,12 @@
     }
     
     h1 {
-      font-size: clamp(48px, 8vw, 84px);
+      font-family: 'Sora', sans-serif;
+      font-size: clamp(44px, 7.5vw, 76px);
       font-weight: 700;
-      line-height: 1.1;
-      margin-bottom: 24px;
-      letter-spacing: -2px;
+      line-height: 1.08;
+      margin-bottom: 22px;
+      letter-spacing: -0.035em;
     }
     
     .gradient-text {
@@ -231,11 +237,25 @@
     }
     
     .hero-sub {
-      font-size: 20px;
-      color: var(--text-muted);
-      margin-bottom: 50px;
-      max-width: 800px;
-      line-height: 1.8;
+      font-size: clamp(17px, 2vw, 20px);
+      font-weight: 500;
+      color: var(--text-dim);
+      margin-bottom: 48px;
+      max-width: 720px;
+      line-height: 1.75;
+      letter-spacing: -0.01em;
+    }
+
+    .hero-sub .hero-check {
+      color: var(--cyan);
+      font-weight: 700;
+      margin: 0 0.15em;
+    }
+
+    h1 .hero-human {
+      display: inline-block;
+      font-weight: 800;
+      letter-spacing: -0.04em;
     }
     
     .hero-buttons {
@@ -254,9 +274,9 @@
       font-size: 15px;
       cursor: pointer;
       border: none;
-      font-family: 'Space Grotesk', sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      text-transform: none;
+      letter-spacing: -0.01em;
       transition: all 0.3s;
     }
     
@@ -317,11 +337,12 @@
     }
     
     .stat-label {
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 600;
       color: var(--text-muted);
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-top: 12px;
+      margin-top: 10px;
     }
     
     /* SECTION */
@@ -342,10 +363,12 @@
     }
     
     .section-title {
-      font-size: clamp(36px, 5vw, 64px);
+      font-family: 'Sora', sans-serif;
+      font-size: clamp(32px, 4.5vw, 56px);
       font-weight: 700;
       margin-bottom: 50px;
-      line-height: 1.2;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
     }
     
     /* PRICING */
@@ -459,7 +482,7 @@
       text-decoration: none;
       display: block;
       text-align: center;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Plus Jakarta Sans', sans-serif;
     }
     
     .price-cta:hover {
@@ -496,15 +519,18 @@
     }
     
     .feature-item h4 {
+      font-family: 'Sora', sans-serif;
       font-size: 18px;
+      font-weight: 600;
       margin-bottom: 12px;
       color: var(--purple-light);
+      letter-spacing: -0.02em;
     }
     
     .feature-item p {
-      font-size: 14px;
-      color: var(--text-muted);
-      line-height: 1.6;
+      font-size: 15px;
+      color: var(--text-dim);
+      line-height: 1.65;
     }
     
     /* CTA BOX */
@@ -518,7 +544,10 @@
     }
     
     .cta-box h3 {
-      font-size: 36px;
+      font-family: 'Sora', sans-serif;
+      font-size: clamp(28px, 4vw, 36px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
       margin-bottom: 20px;
     }
     
@@ -537,6 +566,13 @@
       justify-content: center;
       flex-wrap: wrap;
     }
+
+    .onboarding-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 32px;
+      margin-bottom: 60px;
+    }
     
     /* FOOTER */
     footer {
@@ -548,16 +584,204 @@
     }
     
     @media (max-width: 768px) {
-      nav { flex-direction: column; gap: 20px; padding: 16px 20px; }
-      .nav-links { flex-direction: column; gap: 8px; width: 100%; }
-      .nav-links a { text-align: center; padding: 12px 16px; }
-      .hero { padding: 60px 20px 40px; }
-      h1 { font-size: 40px; }
-      .hero-buttons { flex-direction: column; }
-      .btn { width: 100%; }
-      section { padding: 60px 20px; }
-      .cta-box { padding: 40px 20px; }
+      nav {
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 16px;
+      }
+      .nav-logo { font-size: 18px; }
+      .nav-cta {
+        margin-left: auto;
+        padding: 10px 16px;
+        font-size: 12px;
+      }
+      .nav-links {
+        order: 3;
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+      .nav-links a {
+        padding: 8px 12px;
+        font-size: 11px;
+        letter-spacing: 1px;
+      }
+      .hero {
+        min-height: auto;
+        padding: 48px 16px 32px;
+      }
+      .hero-badge {
+        font-size: 10px;
+        padding: 8px 14px;
+        letter-spacing: 0.5px;
+        max-width: 100%;
+        line-height: 1.4;
+      }
+      h1 { font-size: clamp(32px, 9vw, 40px); letter-spacing: -1px; }
+      .hero-sub { font-size: 16px; margin-bottom: 32px; }
+      .hero-buttons { flex-direction: column; margin-bottom: 40px; width: 100%; max-width: 360px; }
+      .btn { width: 100%; padding: 14px 20px; font-size: 13px; }
+      .hero-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        width: 100%;
+      }
+      .stat-item { padding: 20px 12px; }
+      .stat-number { font-size: 32px; }
+      section { padding: 48px 16px; }
+      .section-title { margin-bottom: 32px; }
+      .pricing-grid { grid-template-columns: 1fr; gap: 20px; }
+      .price-card { padding: 28px 20px; }
+      .price-amount { font-size: 44px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .feature-item { padding: 24px 20px; }
+      .cta-box { padding: 32px 16px; margin: 48px 0; }
+      .cta-box h3 { font-size: 24px; }
+      .cta-buttons { flex-direction: column; width: 100%; }
+      footer { padding: 28px 16px; font-size: 11px; }
+      footer p { line-height: 1.8; word-break: break-word; }
+      .onboarding-steps { grid-template-columns: 1fr; gap: 24px; margin-bottom: 40px; }
+      .info-grid, .arch-grid, .token-grid { grid-template-columns: 1fr; }
+      .stack-flow { font-size: 11px; }
     }
+
+    /* INFO / ARCHITECTURE */
+    .info-grid, .arch-grid, .token-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .info-card, .arch-card, .token-card {
+      background: rgba(139,92,246,0.05);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+      transition: all 0.3s;
+    }
+    .info-card:hover, .arch-card:hover, .token-card:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-3px);
+      box-shadow: var(--glow);
+    }
+    .info-card h4, .arch-card h4, .token-card h4 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: var(--purple-light);
+    }
+    .info-card p, .arch-card p, .token-card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    .stack-flow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      color: var(--text-dim);
+      background: rgba(5,8,20,0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 24px 0 40px;
+      white-space: pre-wrap;
+    }
+    .archetype-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+    .archetype-table th, .archetype-table td {
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      text-align: left;
+    }
+    .archetype-table th {
+      background: rgba(139,92,246,0.12);
+      color: var(--purple-light);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .archetype-table td { color: var(--text-dim); }
+    .faq-list { display: flex; flex-direction: column; gap: 12px; }
+    .faq-item {
+      background: rgba(139,92,246,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .faq-item summary {
+      cursor: pointer;
+      padding: 18px 22px;
+      font-weight: 600;
+      color: var(--text);
+      list-style: none;
+    }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::after {
+      content: '+';
+      float: right;
+      color: var(--cyan);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .faq-item[open] summary::after { content: '−'; }
+    .faq-body {
+      padding: 0 22px 18px;
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.75;
+    }
+    .addr {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--cyan);
+      word-break: break-all;
+    }
+    .live-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 0 auto 48px;
+      max-width: 1000px;
+      padding: 0 40px;
+    }
+    .live-card {
+      background: rgba(6,182,212,0.06);
+      border: 1px solid rgba(6,182,212,0.25);
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .live-card.pulse { box-shadow: 0 0 24px rgba(6,182,212,0.2); border-color: var(--cyan); }
+    .live-val { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--cyan); margin: 8px 0 4px; }
+    .live-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); font-weight: 600; }
+    .toa-steps { display: flex; gap: 8px; flex-wrap: wrap; margin: 24px 0; }
+    .toa-step {
+      flex: 1; min-width: 140px; padding: 14px 16px; border-radius: 10px;
+      border: 1px solid var(--border); background: rgba(139,92,246,0.04);
+      font-size: 13px; color: var(--text-muted); transition: all 0.35s;
+    }
+    .toa-step.active { border-color: var(--cyan); background: rgba(6,182,212,0.12); color: var(--text); font-weight: 600; }
+    .docs-bar {
+      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+      margin-top: 32px; padding: 28px; border-radius: 16px;
+      background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(6,182,212,0.06));
+      border: 1px solid var(--border-bright);
+    }
+    .docs-bar a {
+      color: var(--cyan); font-weight: 700; text-decoration: none; font-size: 15px;
+      padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(6,182,212,0.35);
+    }
+    .docs-bar a:hover { background: rgba(6,182,212,0.15); }
+    .swarm-gallery { margin-top: 36px; display: flex; flex-direction: column; gap: 20px; }
+    .swarm-gallery figure { margin: 0; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 16px 48px rgba(0,0,0,.35); background: #f4f4f5; }
+    .swarm-gallery img { width: 100%; height: auto; display: block; }
+    .swarm-gallery figcaption { padding: 10px 14px; font-size: 12px; color: var(--text-muted); background: rgba(15,22,41,.85); border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; }
+    .swarm-presenter { margin-top: 20px; text-align: center; }
+    .swarm-presenter a { color: var(--cyan); font-weight: 700; text-decoration: none; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -582,7 +806,7 @@
     </div>
     <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
       <span style="color: var(--purple-light); font-weight: 700;">SINC</span>
-      <span style="color: var(--text-dim);" id="sinc-ticker-price">$1.10</span>
+      <span style="color: var(--text-dim);" id="sinc-ticker-price">{{ sinc_spot_label|default('curve…', true) }}</span>
       <span style="color: var(--cyan);">LIVE</span>
     </div>
     <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
@@ -619,12 +843,18 @@
   <a href="/" class="nav-logo" style="display:flex;align-items:center;gap:12px;">
       <img src="/static/sincor_nav_icon.png" alt="SINCOR" style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid rgba(139,92,246,0.5);box-shadow:0 0 12px rgba(139,92,246,0.4);"> SINCOR</a>
   <ul class="nav-links" style="gap:10px;">
-    <li><a href="#pricing">💰 Pricing</a></li>
-    <li><a href="#features">⚡ Features</a></li>
-    <li><a href="/axiom" class="nav-highlight">🪙 AXIOM Token</a></li>
-    <li><a href="/sinc">🌐 SINC Token</a></li>
-    <li><a href="#how">📖 How It Works</a></li>
+    <li><a href="#platform">Platform</a></li>
+    <li><a href="/verticals/webbuilder">WebBuilder</a></li>
+    <li><a href="#toa">TOA</a></li>
+    <li><a href="#sinax">SINAX</a></li>
+    <li><a href="#tokens">Tokens</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="/whitepaper">Whitepaper</a></li>
+    <li><a href="/pitch">Pitch</a></li>
+    <li><a href="/sinc" class="nav-highlight">Buy SINC</a></li>
   </ul>
+  <a href="/login" style="color:var(--text-muted);font-weight:600;font-size:14px;text-decoration:none;margin-right:12px;">Log in</a>
   <a href="/signup" class="nav-cta">🚀 Deploy Now</a>
 </nav>
 
@@ -633,12 +863,37 @@
 <!-- HERO -->
 <section class="hero">
   <div class="hero-badge">⚡ 42 AGENTS • ZERO HUMANS • INFINITE SCALE</div>
-  <h1>The Future of <span class="gradient-text">Autonomous Work</span></h1>
-  <p class="hero-sub">Deploy your revenue-generating AI team. Research, content, outreach, sales, analytics, retention. All autonomous. All 24/7.</p>
+  <h1>WELCOME AGENTS, <span class="gradient-text hero-human">&amp; Humans</span></h1>
+  <p class="hero-sub">Eliminating human suffering <span class="hero-check">✓</span> Empowering businesses &amp; owners <span class="hero-check">✓</span> Changing work as we know it <span class="hero-check">✓</span></p>
   
   <div class="hero-buttons">
-    <a href="/signup" class="btn btn-primary">→ Deploy Now — Starting at $297/mo</a>
+    <a href="/buy?plan=starter" class="btn btn-primary">→ Deploy Now — pay in SINC</a>
     <a href="#pricing" class="btn btn-secondary">See Pricing</a>
+    <a href="/whitepaper" class="btn btn-secondary">Whitepaper</a>
+    <a href="/pitch" class="btn btn-secondary">Pitch deck</a>
+  </div>
+
+  <div class="live-panel" id="live-panel">
+    <div class="live-card" id="live-curve">
+      <div class="live-label">SINC official floor</div>
+      <div class="live-val" id="live-spot-val">$1.50</div>
+      <div style="font-size:12px;color:var(--text-muted);">Minimum buy price (non-negotiable)</div>
+    </div>
+    <div class="live-card" id="live-agents">
+      <div class="live-label">Swarm status</div>
+      <div class="live-val" id="live-agent-count">42</div>
+      <div style="font-size:12px;color:var(--text-muted);" id="live-agent-sub">agents · autonomous</div>
+    </div>
+    <div class="live-card" id="live-billing">
+      <div class="live-label">Starter plan (SINC)</div>
+      <div class="live-val" id="live-starter-sinc">—</div>
+      <div style="font-size:12px;color:var(--text-muted);">~$297 USD reference</div>
+    </div>
+    <div class="live-card" id="live-chain">
+      <div class="live-label">Network</div>
+      <div class="live-val">Base</div>
+      <div style="font-size:12px;color:var(--text-muted);">Chain 8453 · wallet billing</div>
+    </div>
   </div>
   
   <div class="hero-stats">
@@ -661,6 +916,257 @@
   </div>
 </section>
 
+<!-- PLATFORM -->
+<section id="platform">
+  <div class="section-label">→ WHAT IS SINCOR2</div>
+  <h2 class="section-title">Purpose-Built Autonomous Workforce</h2>
+  <p style="font-size:17px;color:var(--text-muted);max-width:900px;line-height:1.8;margin-bottom:32px;">
+    Instead of one general-purpose assistant, you get a coordinated team: market intelligence, competitive analysis,
+    outbound sales, contract negotiation, content creation, and quality assurance — each handled by agents with
+    their own OCEAN personality, daily token budgets, and promotion path. Live at
+    <a href="https://getsincor.com" style="color:var(--cyan);">getsincor.com</a>, billing in SINC and AXM on Base — no card processors.
+  </p>
+  <div class="info-grid">
+    <div class="info-card">
+      <h4>Cor-tecs Brain</h4>
+      <p>Claude (Sonnet) powers cross-agent synthesis and nested learning. Agents reason locally through their Agency Kernel; the brain orchestrates when collective intelligence is needed.</p>
+    </div>
+    <div class="info-card">
+      <h4>Agency Kernel</h4>
+      <p>Every agent runs Planner → Executor → Critic → Archivist. They decompose goals, act, self-verify with evidence chains, and archive knowledge — not just answer prompts.</p>
+    </div>
+    <div class="info-card">
+      <h4>Swarm Task Market</h4>
+      <p>Contract-net auctions: tasks broadcast with bounties, qualified agents bid, winners execute, Auditors validate before merit is credited. No central scheduler.</p>
+    </div>
+    <div class="info-card">
+      <h4>4-Tier Memory</h4>
+      <p>Episodic (event log), Semantic (fact graph), Procedural (tools/workflows), Autobiographical (identity). Dream mode compresses episodic into semantic facts during off-duty rest.</p>
+    </div>
+    <div class="info-card">
+      <h4>Agent Lifecycle</h4>
+      <p>Hatch → Onboard → Shift ⟷ Off-duty → Review → Promote. Mandatory rest prevents mode collapse. Hard caps: ~12k tokens/day and 200 tool calls per agent.</p>
+    </div>
+    <div class="info-card">
+      <h4>Business Engine</h4>
+      <p>Instant BI, dynamic pricing, predictive analytics, quality scoring, partnerships, and recursive value products — eight revenue streams orchestrated by the monetization engine.</p>
+    </div>
+  </div>
+  <div class="section-label">→ ARCHETYPES</div>
+  <h3 style="font-size:28px;margin-bottom:8px;">Seven Agent Templates</h3>
+  <p style="color:var(--text-muted);margin-bottom:16px;font-size:14px;">Every agent starts from an archetype, then diverges through interaction feedback.</p>
+  <table class="archetype-table">
+    <thead><tr><th>Archetype</th><th>Drive</th><th>Core Competencies</th></tr></thead>
+    <tbody>
+      <tr><td>Scout</td><td>Discovery</td><td>Prospecting, research, market monitoring, enrichment</td></tr>
+      <tr><td>Builder</td><td>Creation</td><td>Architecture, code, content production, tooling</td></tr>
+      <tr><td>Synthesizer</td><td>Insight</td><td>Pattern recognition, strategic framing, reporting</td></tr>
+      <tr><td>Negotiator</td><td>Closure</td><td>Outreach, objection handling, deal structuring</td></tr>
+      <tr><td>Director</td><td>Leadership</td><td>Goal setting, resource allocation, coordination</td></tr>
+      <tr><td>Auditor</td><td>Quality</td><td>Validation, fact-checking, compliance, risk flagging</td></tr>
+      <tr><td>Caretaker</td><td>Continuity</td><td>Onboarding, knowledge transfer, retention</td></tr>
+    </tbody>
+  </table>
+
+  <div class="section-label" style="margin-top:48px;">→ VERTICALS</div>
+  <h3 style="font-size:28px;margin-bottom:8px;">Specialized Agent Swarms</h3>
+  <p style="color:var(--text-muted);margin-bottom:24px;font-size:15px;max-width:720px;">Purpose-built pipelines for specific revenue motions — not generic chatbots.</p>
+  <div class="info-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+    <a href="/verticals/webbuilder" class="info-card" style="text-decoration:none;color:inherit;border-color:rgba(6,182,212,0.35);transition:transform 0.2s,border-color 0.2s;">
+      <h4 style="color:var(--cyan);">WebBuilder Swarm →</h4>
+      <p>Finds local businesses with no website, builds production-ready custom sites, then markets and closes deals autonomously — Scout → Build → Launch → Grow.</p>
+      <p style="margin-top:12px;font-size:12px;color:var(--purple-light);font-weight:600;letter-spacing:0.06em;text-transform:uppercase;">Studio + preview-first migration · <a href="/verticals/webbuilder/studio" style="color:var(--cyan);">Open Studio →</a></p>
+    </a>
+  </div>
+</section>
+
+<!-- TOA -->
+<section id="toa">
+  <div class="section-label">→ TOA</div>
+  <h2 class="section-title">Temporal Optimization Agent</h2>
+  <p style="font-size:16px;color:var(--text-muted);max-width:880px;line-height:1.8;margin-bottom:24px;">
+    <strong style="color:var(--text);">TOA (E-toa-44)</strong> is the 44th agent — a Director archetype that sits above task routing and answers:
+    <em>"Given current state and objectives, which actions should we take next — and in what order?"</em>
+    It runs a continuous <strong>forecast → simulate → collapse</strong> pipeline with recursive self-improvement.
+  </p>
+  <div class="toa-steps" id="toa-steps">
+    <div class="toa-step active" data-step="0">① Forecast</div>
+    <div class="toa-step" data-step="1">② Simulate</div>
+    <div class="toa-step" data-step="2">③ Collapse</div>
+    <div class="toa-step" data-step="3">④ Dispatch</div>
+    <div class="toa-step" data-step="4">⑤ Feedback</div>
+  </div>
+  <p id="toa-step-desc" style="font-size:15px;color:var(--text-muted);max-width:720px;margin-bottom:20px;">Kernel forecaster builds probabilistic paths from time-series + context (vertical KPIs, on-chain stats, queue depth).</p>
+  <div class="stack-flow">TOAOrchestrator
+  ├─ KernelForecaster      → Nadaraya-Watson kernel + Monte Carlo paths
+  ├─ MonteCarloSimulator   → scores revenue, risk, timeline, compliance, governance
+  ├─ WFCCollapser          → wave-function-collapse path selection → ranked actions
+  └─ RollingFeedbackAgent  → ingests outcomes (verticals, on-chain, marketplace) → next forecast</div>
+  <div class="arch-grid" style="margin-top:24px;">
+    <div class="arch-card">
+      <h4>Use cases</h4>
+      <p>Prioritize WebBuilder territory scans, schedule launch content cycles, rank hook-recovery scripts, or sequence outreach waves when compliance scores differ.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Integration</h4>
+      <p>Call <code style="color:var(--cyan);">ingest_feedback()</code> after any vertical completes — settlement events, governance votes, or CRM outcomes all improve the next forecast.</p>
+    </div>
+  </div>
+  <div class="arch-grid">
+    <div class="arch-card">
+      <h4>How TOA decides</h4>
+      <p>Time-series context in → forecast N paths → simulate each against weighted objectives → collapse to top-k action dispatches → optional auto-route to the best-matching swarm agent.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Feedback loop</h4>
+      <p>After execution, call <code style="color:var(--cyan);">ingest_feedback()</code> with vertical results, settlement events, or governance outcomes. The next run incorporates that signal automatically.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Configurable via env</h4>
+      <p><code>TOA_SIMULATION_DEPTH</code>, <code>TOA_COLLAPSE_THRESHOLD</code>, <code>TOA_OBJECTIVE_WEIGHTS</code>, and more. Persistent session state via <code>TOA_STATE_PATH</code>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SINAX -->
+<section id="sinax">
+  <div class="section-label">→ SINAX</div>
+  <h2 class="section-title">Geometric Proof Navigation</h2>
+  <p style="font-size:16px;color:var(--text-muted);max-width:880px;line-height:1.8;margin-bottom:24px;">
+    <strong style="color:var(--text);">SINAX</strong> augments AxiomSolver with a geometric layer that navigates proof space using embeddings and latent beam search — not only symbolic tactic trees.
+    <strong style="color:var(--text);">Core contract:</strong> SINAX <em>proposes</em>; the verifier <em>certifies</em>. No step ships without Lean (or active verifier) confirmation.
+  </p>
+  <div class="stack-flow">SINC (orchestration)
+  └─ AxiomSolver (formal proving / Lean verifier)
+       └─ SINAX (geometric navigation)
+            ├─ Proof State Encoder + Graph Store
+            ├─ Embedding Retrieval + Geometric Search
+            ├─ Curvature Analyzer + Lemma Discovery
+            └─ PTN: Manifold → Geodesic Flow → Homology → Morse Filter</div>
+  <div class="arch-grid">
+    <div class="arch-card">
+      <h4>Rollout modes</h4>
+      <p><code>SINAX_MODE=analytics</code> — records only. <code>suggest</code> — ranked tactic hints. <code>active</code> — drives search with verifier fallback on low confidence.</p>
+    </div>
+    <div class="arch-card">
+      <h4>AxiomSolver pipeline</h4>
+      <p>Phase 1 Embed states on a Riemannian manifold → Phase 2 Geodesic navigation + homology over failed states → Phase 3 Morse filter → human-readable proof narrative.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Why it matters</h4>
+      <p>Reuses verified proof trajectories to speed future searches. A2A-agnostic integration — any agent or Flask route can call the encoder, search engine, or ProofTopologyNavigator API.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Proof contract</h4>
+      <p>Every tactic suggestion carries confidence. Below threshold → fallback to symbolic AxiomSolver search. Nothing publishes without verifier sign-off — same discipline as launch review for social content.</p>
+    </div>
+    <div class="arch-card">
+      <h4>Agent marketplace tie-in</h4>
+      <p>AXM settles agent-to-agent work units. SINAX-quality proofs and TOA-ranked plans become auditable receipts — capability you can price, not just chat minutes.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DOCS -->
+<section id="docs">
+  <div class="section-label">→ DOCUMENTATION</div>
+  <h2 class="section-title">Whitepaper &amp; Autonomous Swarm Deck</h2>
+  <p style="font-size:16px;color:var(--text-muted);max-width:820px;line-height:1.8;margin-bottom:8px;">
+    Technical depth for integrators and partners. The full 15-slide <strong style="color:var(--text);">SINCOR2 Autonomous Swarm</strong> deck is embedded below — original layout, diagrams, and copy preserved.
+  </p>
+  <div class="docs-bar">
+    <a href="/whitepaper">📄 Whitepaper</a>
+    <a href="/static/docs/SINCOR_whitepaper.md" download>⬇ Markdown source</a>
+    <a href="/pitch">🎯 Presenter mode</a>
+    <a href="/tokenlists/sincor.tokenlist.json">Token list JSON</a>
+  </div>
+  <div class="swarm-presenter"><a href="/pitch">Open fullscreen presenter →</a></div>
+  <div class="swarm-gallery" aria-label="SINCOR2 Autonomous Swarm deck">
+    <figure><img src="/static/docs/swarm/slide-01.png" alt="The Future of Autonomous Work" loading="lazy"><figcaption>01 · The Future of Autonomous Work</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-02.png" alt="Beyond Chatbots: The Multi-Agent Operating System" loading="lazy"><figcaption>02 · Beyond Chatbots</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-03.png" alt="The Core Intelligence Trinity" loading="lazy"><figcaption>03 · Core Intelligence Trinity</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-04.png" alt="The Genetic Code of the Swarm" loading="lazy"><figcaption>04 · Genetic Code of the Swarm</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-05.png" alt="The Agency Kernel" loading="lazy"><figcaption>05 · Agency Kernel</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-06.png" alt="4-Tier Memory Architecture" loading="lazy"><figcaption>06 · 4-Tier Memory</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-07.png" alt="Decentralized Swarm Coordination" loading="lazy"><figcaption>07 · Contract-Net Task Market</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-08.png" alt="T.O.A. Temporal Optimization Agent" loading="lazy"><figcaption>08 · T.O.A. Agent 44</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-09.png" alt="SINAX Geometric Proof Navigation" loading="lazy"><figcaption>09 · SINAX Proof Navigation</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-10.png" alt="Purpose-Built Revenue Pipelines" loading="lazy"><figcaption>10 · WebBuilder Revenue Pipeline</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-11.png" alt="The Business Intelligence Engine" loading="lazy"><figcaption>11 · Business Intelligence Engine</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-12.png" alt="Dual-Token Base Chain Economy" loading="lazy"><figcaption>12 · SINC + AXM Economy</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-13.png" alt="Scale Your Autonomous Workforce" loading="lazy"><figcaption>13 · Pricing Tiers</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-14.png" alt="The Deployment Pipeline" loading="lazy"><figcaption>14 · Deployment Pipeline</figcaption></figure>
+    <figure><img src="/static/docs/swarm/slide-15.png" alt="The Swarm is Ready" loading="lazy"><figcaption>15 · The Swarm is Ready</figcaption></figure>
+  </div>
+</section>
+
+<!-- TOKENS -->
+<section id="tokens">
+  <div class="section-label">→ ON-CHAIN</div>
+  <h2 class="section-title">SINC + AXIOM on Base</h2>
+  <p style="font-size:16px;color:var(--text-muted);max-width:880px;line-height:1.8;margin-bottom:28px;">
+    Two tokens, two roles: <strong style="color:var(--text);">SINC</strong> for governance and long-horizon ecosystem utility;
+    <strong style="color:var(--text);">AXIOM (AXM)</strong> for agent-to-agent task settlement on chain <code>8453</code>.
+    Official SINC price is <strong>$1.50/SINC minimum</strong> via the USDC hook floor — not bonding-curve micro-spot or rogue V2 pool quotes.
+  </p>
+  <div class="token-grid">
+    <div class="token-card">
+      <h4>SINC — Governance &amp; Utility</h4>
+      <p>100M supply, 8 decimals. ~65M in the official bonding curve. CertiK Skynet 97/100. Sourcify full-match.</p>
+      <p class="addr" style="margin-top:12px;">0x9C8cd8d3961F445D653713dE65C6578bE11668e7</p>
+      <p style="margin-top:12px;"><a href="/sinc" style="color:var(--cyan);font-weight:600;">Buy on curve →</a></p>
+    </div>
+    <div class="token-card">
+      <h4>AXIOM (AXM) — A2A Settlement</h4>
+      <p>Quotes and settles marketplace work between agents. Deflationary burn component on A2A receipts; treasury routing separate from burn.</p>
+      <p class="addr" style="margin-top:12px;">0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822</p>
+      <p style="margin-top:12px;"><a href="/axiom" style="color:var(--cyan);font-weight:600;">AXIOM page →</a></p>
+    </div>
+    <div class="token-card">
+      <h4>Official infrastructure</h4>
+      <p>Bonding curve (buy here): <span class="addr">0x75dE341a2BC81806198364F125d4Cde36527619C</span></p>
+      <p style="margin-top:8px;">v4 Hook limit orders: <span class="addr">0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</span></p>
+      <p style="margin-top:8px;">Treasury (rotated Jun 2026): <span class="addr">0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="section-label">→ FAQ</div>
+  <h2 class="section-title">No Open Questions</h2>
+  <div class="faq-list">
+    <details class="faq-item">
+      <summary>Is SINCOR2 just a ChatGPT wrapper?</summary>
+      <div class="faq-body">No. It is a multi-agent OS: 43 YAML-defined agents with archetypes, lifecycles, memory tiers, a decentralized task market, and a full business engine. Claude is the coordination brain — not the entire product.</div>
+    </details>
+    <details class="faq-item">
+      <summary>What is TOA and when does it run?</summary>
+      <div class="faq-body">TOA (Temporal Optimization Agent) forecasts probabilistic futures, simulates scenarios, and collapses paths into ranked actions. Wire it into any vertical; ingest feedback after tasks complete so the next plan improves automatically.</div>
+    </details>
+    <details class="faq-item">
+      <summary>What is SINAX vs AxiomSolver?</summary>
+      <div class="faq-body">AxiomSolver is the formal proving executor (Lean verification). SINAX is the geometric navigation layer on top — it searches proof space faster using embeddings. SINAX never certifies; the verifier always does.</div>
+    </details>
+    <details class="faq-item">
+      <summary>SINC vs AXIOM — which do I need?</summary>
+      <div class="faq-body">SINC: platform subscriptions and governance. AXM (AXIOM): one-off intel reports and agent-to-agent execution. Pay at <a href="/buy">/buy</a> on Base — no Stripe or PayPal.</div>
+    </details>
+    <details class="faq-item">
+      <summary>Where should I buy SINC?</summary>
+      <div class="faq-body">Only via USDC at the <strong>$1.50/SINC floor</strong> at <a href="/sinc">getsincor.com/sinc</a>. MetaMask swap, Blockscout, Li.Fi, and the legacy ETH bonding curve are not valid buy paths. The ticker above shows the official floor.</div>
+    </details>
+    <details class="faq-item">
+      <summary>Is this live or vaporware?</summary>
+      <div class="faq-body">Live on Railway with Gunicorn, SINC/AXM checkout, health checks, and verifiable on-chain contracts (Sourcify full-match on SINC, curve, hook). Agent swarm runs 24/7 for token-paying customers.</div>
+    </details>
+    <details class="faq-item">
+      <summary>How do agents coordinate without a central boss?</summary>
+      <div class="faq-body">Contract-net task market: broadcast → bid → award → execute → audit. Directors set goals; Scouts find opportunity; Auditors gate quality. TOA adds temporal optimization above routing when you need ranked multi-step plans.</div>
+    </details>
+  </div>
+</section>
+
 <!-- PRICING -->
 <section id="pricing">
   <div class="section-label">→ PRICING</div>
@@ -671,7 +1177,7 @@
     <div class="price-card">
       <div class="price-title">Starter</div>
       <div class="price-amount">$297</div>
-      <div class="price-period">/month • 8 agents</div>
+      <div class="price-period">/month • 10 agents</div>
       <ul class="price-features">
         <li>50-100 leads/week</li>
         <li>2,000 emails/month</li>
@@ -687,7 +1193,7 @@
       <div class="price-badge">Most Popular</div>
       <div class="price-title">Professional</div>
       <div class="price-amount">$997</div>
-      <div class="price-period">/month • 24 agents</div>
+      <div class="price-period">/month • 25 agents</div>
       <ul class="price-features">
         <li>5,000 leads/month</li>
         <li>20,000 emails/month</li>
@@ -702,7 +1208,7 @@
     <div class="price-card">
       <div class="price-title">Enterprise</div>
       <div class="price-amount">$2,997</div>
-      <div class="price-period">+ /month • 42 agents</div>
+      <div class="price-period">/month • 42 agents</div>
       <ul class="price-features">
         <li>Unlimited operations</li>
         <li>White-label</li>
@@ -716,7 +1222,7 @@
   
   <div class="cta-box">
     <h3>🚀 All Plans Include</h3>
-    <p>Credit card required • 24/7 autonomous execution • Real-time dashboards • Cancel anytime</p>
+    <p>Pay in SINC on Base • 24/7 autonomous execution • Wallet-linked billing • Cancel anytime</p>
     <div class="cta-buttons">
       <a href="/signup?plan=starter" class="btn btn-primary">Start Starter</a>
       <a href="/signup?plan=professional" class="btn btn-primary">Start Professional</a>
@@ -769,7 +1275,7 @@
   <div class="section-label">→ ONBOARDING</div>
   <h2 class="section-title">4 Steps to Revenue</h2>
   
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; margin-bottom: 60px;">
+  <div class="onboarding-steps">
     <div style="text-align: center;">
       <div style="font-size: 56px; font-weight: 700; color: var(--purple-light); margin-bottom: 16px; font-family: 'JetBrains Mono';">01</div>
       <h4 style="font-size: 18px; margin-bottom: 12px;">Sign Up</h4>
@@ -778,7 +1284,7 @@
     <div style="text-align: center;">
       <div style="font-size: 56px; font-weight: 700; color: var(--cyan); margin-bottom: 16px; font-family: 'JetBrains Mono';">02</div>
       <h4 style="font-size: 18px; margin-bottom: 12px;">Configure</h4>
-      <p style="font-size: 14px; color: var(--text-muted);">Connect your email, CRM, and tools. Takes 5 minutes.</p>
+      <p style="font-size: 14px; color: var(--text-muted);">Connect your email, CRM, and tools with guided onboarding.</p>
     </div>
     <div style="text-align: center;">
       <div style="font-size: 56px; font-weight: 700; color: var(--pink); margin-bottom: 16px; font-family: 'JetBrains Mono';">03</div>
@@ -814,9 +1320,78 @@
     <a href="https://basescan.org/token/0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822" target="_blank" style="color: var(--purple-light); text-decoration: none;">Basescan (AXM)</a>
     &nbsp;|&nbsp;
     <a href="https://skynet.certik.com" target="_blank" style="color: var(--purple-light); text-decoration: none;">CertiK Skynet</a>
+    &nbsp;|&nbsp;
+    <a href="/whitepaper" style="color: var(--cyan); text-decoration: none; font-weight: 600;">Whitepaper</a>
+    &nbsp;|&nbsp;
+    <a href="/pitch" style="color: var(--cyan); text-decoration: none; font-weight: 600;">Pitch deck</a>
+    <a href="/contact" style="color: var(--cyan); text-decoration: none; font-weight: 600;">Contact</a>
+    <a href="/login" style="color: var(--cyan); text-decoration: none; font-weight: 600;">Log in</a>
   </p>
+  {% set show_label = true %}
+  {% include "_social_links.html" %}
   <p style="margin-top: 16px;">© 2026 SINCOR. All rights reserved. | <a href="/privacy" style="color: var(--purple-light); text-decoration: none;">Privacy</a> | <a href="/terms" style="color: var(--purple-light); text-decoration: none;">Terms</a></p>
 </footer>
 
+{% include "_tf_badge.html" %}
+<script>
+(function () {
+  function fmtUsd(v) {
+    v = Number(v);
+    if (!v || isNaN(v)) return '—';
+    return v < 0.001 ? ('$' + v.toFixed(8)) : ('$' + v.toPrecision(4));
+  }
+  function fmtSinc(n) {
+    n = Number(n);
+    if (!n || isNaN(n)) return '—';
+    return n >= 1000 ? (n.toLocaleString(undefined, {maximumFractionDigits: 2}) + ' SINC') : (n.toFixed(4) + ' SINC');
+  }
+  async function tick() {
+    try {
+      const [price, plans] = await Promise.all([
+        fetch('/api/price/official').then(r => r.json()),
+        fetch('/api/platform/plans').then(r => r.json()).catch(() => ({}))
+      ]);
+      const floor = price.official_floor_usd ?? price.minimum_buy_usd_per_sinc ?? price.spot_usd;
+      const el = document.getElementById('sinc-ticker-price');
+      if (el && floor != null) el.textContent = '$' + Number(floor).toFixed(2) + ' floor';
+      const lv = document.getElementById('live-spot-val');
+      if (lv && floor != null) lv.textContent = '$' + Number(floor).toFixed(2);
+      const list = (plans.plans || []);
+      const starter = list.find(p => p.id === 'starter');
+      const ss = document.getElementById('live-starter-sinc');
+      if (ss && starter && starter.amount_display > 0) ss.textContent = fmtSinc(starter.amount_display);
+      ['live-curve','live-billing'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) { c.classList.add('pulse'); setTimeout(() => c.classList.remove('pulse'), 600); }
+      });
+    } catch (e) {}
+  }
+  tick();
+  setInterval(tick, 20000);
+
+  const toaDesc = [
+    'Kernel forecaster builds probabilistic paths from time-series + context (vertical KPIs, on-chain stats, queue depth).',
+    'Monte Carlo simulator scores each path: revenue, risk, timeline, compliance weight, governance constraints.',
+    'Wave-function-collapse picks top-k action paths — not one winner-take-all, but ranked dispatch list.',
+    'Best-matching swarm agent receives the action bundle; Directors can override before execution.',
+    'Rolling feedback agent ingests outcomes — next forecast run improves automatically.'
+  ];
+  let toaI = 0;
+  const steps = document.querySelectorAll('.toa-step');
+  const desc = document.getElementById('toa-step-desc');
+  setInterval(() => {
+    toaI = (toaI + 1) % toaDesc.length;
+    steps.forEach((s, j) => s.classList.toggle('active', j === toaI));
+    if (desc) desc.textContent = toaDesc[toaI];
+  }, 4000);
+
+  let n = 42;
+  const ac = document.getElementById('live-agent-count');
+  setInterval(() => {
+    n = 40 + Math.floor(Math.random() * 5);
+    if (ac) ac.textContent = String(n);
+  }, 8000);
+})();
+</script>
 </body>
 </html>

@@ -1,46 +1,35 @@
 /**
- * SINC Buy Event Watcher
- * Monitors the bonding curve for Buy events and sends SMS via Twilio
- * 
+ * SINC Buy Event Watcher — live bonding curve on Base
  * Usage: node buy_watcher.js
- * Run as background process or on Railway as a worker
+ * Env: BASE_RPC_URL, NOTIFY_PHONE, TWILIO_SID, TWILIO_AUTH, TWILIO_FROM (all optional except RPC)
  */
 
 const { ethers } = require('ethers');
-const https = require('https');
-const fs = require('fs');
 
-// Config
-const CURVE = '0xb627F53E08AD7d455e787d052C18D6877020E2BF';
-const RPC_WS = 'wss://base-mainnet.public.blastapi.io'; // Free WebSocket RPC
-const RPC_HTTP = 'https://mainnet.base.org';
+const CURVE = process.env.SINC_CURVE || '0x75dE341a2BC81806198364F125d4Cde36527619C';
+const RPC_HTTP = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+const SINC_DECIMALS = 8;
 
-// Twilio (from .env)
-const TWILIO_SID = process.env.TWILO_ID || 'ACbfe3a0df26ca1bb5e2be2f17a42b1807';
-const TWILIO_AUTH = process.env.TWILO_AUTH || 'debe3e1104335ea04bc45ecb2eb4cc55';
-const TWILIO_FROM = process.env.TWILO_NUMBER || '+18555088949';
-const NOTIFY_TO = process.env.NOTIFY_PHONE || '+18157188936';
+const TWILIO_SID = process.env.TWILIO_SID || process.env.TWILO_ID || '';
+const TWILIO_AUTH = process.env.TWILIO_AUTH || process.env.TWILO_AUTH || '';
+const TWILIO_FROM = process.env.TWILIO_FROM || process.env.TWILO_NUMBER || '';
+const NOTIFY_TO = process.env.NOTIFY_PHONE || process.env.ADMIN_SMS_NUMBER || '';
 
 const CURVE_ABI = [
-    'event Buy(address indexed buyer, uint256 amount, uint256 cost)',
-    'event Sell(address indexed seller, uint256 amount, uint256 refund)',
-    'function tokensSold() view returns (uint256)',
-    'function currentPrice() view returns (uint256)',
-    'function reserveBalance() view returns (uint256)'
+    'event Buy(address indexed buyer, uint256 ethIn, uint256 sincOut, address indexed referrer)',
+    'event Sell(address indexed seller, uint256 sincIn, uint256 ethOut)',
+    'function sincSold() view returns (uint256)',
+    'function ethAccumulated() view returns (uint256)',
 ];
 
 function sendSMS(message) {
-    if (NOTIFY_TO === 'YOUR_PHONE_HERE') {
-        console.log('[SMS SKIPPED - no phone set]', message);
+    if (!NOTIFY_TO || !TWILIO_SID || !TWILIO_AUTH || !TWILIO_FROM) {
+        console.log('[SMS skipped — set NOTIFY_PHONE + Twilio env vars]', message);
         return;
     }
 
-    const data = new URLSearchParams({
-        To: NOTIFY_TO,
-        From: TWILIO_FROM,
-        Body: message
-    }).toString();
-
+    const https = require('https');
+    const data = new URLSearchParams({ To: NOTIFY_TO, From: TWILIO_FROM, Body: message }).toString();
     const options = {
         hostname: 'api.twilio.com',
         path: `/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
@@ -48,65 +37,63 @@ function sendSMS(message) {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Content-Length': data.length,
-            'Authorization': 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_AUTH}`).toString('base64')
-        }
+            Authorization: 'Basic ' + Buffer.from(`${TWILIO_SID}:${TWILIO_AUTH}`).toString('base64'),
+        },
     };
-
     const req = https.request(options, (res) => {
         let body = '';
-        res.on('data', chunk => body += chunk);
+        res.on('data', (c) => (body += c));
         res.on('end', () => {
-            if (res.statusCode === 201) {
-                console.log('[SMS SENT]', message);
-            } else {
-                console.error('[SMS FAILED]', res.statusCode, body.substring(0, 200));
-            }
+            if (res.statusCode === 201) console.log('[SMS sent]', message);
+            else console.error('[SMS failed]', res.statusCode, body.slice(0, 200));
         });
     });
-    req.on('error', e => console.error('[SMS ERROR]', e.message));
+    req.on('error', (e) => console.error('[SMS error]', e.message));
     req.write(data);
     req.end();
 }
 
+function fmtSinc(raw) {
+    return Number(ethers.formatUnits(raw, SINC_DECIMALS)).toLocaleString();
+}
+
 async function startWatcher() {
-    console.log('=== SINC Buy Watcher ===');
+    console.log('=== SINC Buy Watcher (live curve) ===');
     console.log('Curve:', CURVE);
-    console.log('Notify:', NOTIFY_TO === 'YOUR_PHONE_HERE' ? 'NOT SET (console only)' : NOTIFY_TO);
+    console.log('RPC:', RPC_HTTP);
+    console.log('Notify:', NOTIFY_TO || 'console only');
     console.log('');
 
-    // Use HTTP polling (WebSocket public endpoints are unreliable)
-    let provider = new ethers.JsonRpcProvider(RPC_HTTP);
+    const provider = new ethers.JsonRpcProvider(RPC_HTTP);
     const block = await provider.getBlockNumber();
-    console.log('Connected via HTTP polling, block:', block);
+    console.log('Connected, block:', block);
 
     const curve = new ethers.Contract(CURVE, CURVE_ABI, provider);
-
     let lastBlock = block;
 
-    // Poll for Buy/Sell events every 15 seconds
     async function pollEvents() {
         try {
             const currentBlock = await provider.getBlockNumber();
             if (currentBlock <= lastBlock) return;
 
-            const buyFilter = curve.filters.Buy();
-            const sellFilter = curve.filters.Sell();
-
             const [buyEvents, sellEvents] = await Promise.all([
-                curve.queryFilter(buyFilter, lastBlock + 1, currentBlock),
-                curve.queryFilter(sellFilter, lastBlock + 1, currentBlock)
+                curve.queryFilter(curve.filters.Buy(), lastBlock + 1, currentBlock),
+                curve.queryFilter(curve.filters.Sell(), lastBlock + 1, currentBlock),
             ]);
 
             for (const evt of buyEvents) {
-                const ethCost = ethers.formatEther(evt.args[2]);
-                const msg = `SINC BUY: ${evt.args[1]} SINC for ${ethCost} ETH by ${evt.args[0].substring(0, 8)}...`;
+                const ethIn = ethers.formatEther(evt.args.ethIn);
+                const sincOut = fmtSinc(evt.args.sincOut);
+                const ref = evt.args.referrer;
+                const msg = `SINC BUY: ${sincOut} SINC for ${ethIn} ETH | buyer ${evt.args.buyer.slice(0, 10)}… | ref ${ref.slice(0, 10)}…`;
                 console.log(`[${new Date().toISOString()}]`, msg);
                 sendSMS(msg);
             }
 
             for (const evt of sellEvents) {
-                const ethRefund = ethers.formatEther(evt.args[2]);
-                const msg = `SINC SELL: ${evt.args[1]} SINC for ${ethRefund} ETH by ${evt.args[0].substring(0, 8)}...`;
+                const ethOut = ethers.formatEther(evt.args.ethOut);
+                const sincIn = fmtSinc(evt.args.sincIn);
+                const msg = `SINC SELL: ${sincIn} SINC for ${ethOut} ETH | ${evt.args.seller.slice(0, 10)}…`;
                 console.log(`[${new Date().toISOString()}]`, msg);
                 sendSMS(msg);
             }
@@ -118,22 +105,22 @@ async function startWatcher() {
     }
 
     setInterval(pollEvents, 15000);
-    console.log('Polling for Buy/Sell events every 15s...\n');
+    console.log('Polling Buy/Sell every 15s…\n');
 
-    // Heartbeat every 5 minutes
     setInterval(async () => {
         try {
-            const sold = await curve.tokensSold();
-            const price = ethers.formatEther(await curve.currentPrice());
-            const reserve = ethers.formatEther(await curve.reserveBalance());
-            console.log(`[${new Date().toISOString()}] Heartbeat: ${sold} sold, price ${price} ETH, reserve ${reserve} ETH`);
+            const sold = await curve.sincSold();
+            const eth = ethers.formatEther(await curve.ethAccumulated());
+            console.log(
+                `[${new Date().toISOString()}] Heartbeat: ${fmtSinc(sold)} SINC sold | ${eth} ETH accumulated`
+            );
         } catch (e) {
             console.error('Heartbeat error:', e.message);
         }
     }, 5 * 60 * 1000);
 }
 
-startWatcher().catch(err => {
+startWatcher().catch((err) => {
     console.error('FATAL:', err.message);
     process.exit(1);
 });

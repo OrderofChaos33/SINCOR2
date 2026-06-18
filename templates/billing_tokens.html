@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Billing — SINCOR</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0a0e27;--panel:#0f1629;--cyan:#06b6d4;--purple:#8b5cf6;--text:#f1f5f9;--muted:#94a3b8;--green:#34d399}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif}
+    .wrap{max-width:720px;margin:0 auto;padding:32px 20px 60px}
+    .card{background:var(--panel);border:1px solid rgba(139,92,246,.25);border-radius:14px;padding:22px;margin:16px 0}
+    button,a.btn{cursor:pointer;border:none;border-radius:10px;padding:12px 16px;font-weight:700;font-family:inherit;text-decoration:none;display:inline-block}
+    .btn-primary{background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff}
+    .btn-ghost{background:#1a202c;color:#c4b5fd;border:1px solid rgba(139,92,246,.35)}
+    .mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--cyan)}
+    .muted{color:var(--muted);font-size:14px}
+    .active{color:var(--green);font-weight:700}
+    .lapsed{color:#f87171;font-weight:700}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    td,th{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <a href="/" class="muted">← Home</a>
+  <h1>Wallet billing</h1>
+  <p class="muted">Subscriptions are paid in <strong>SINC</strong> on Base. Connect the wallet you paid from.</p>
+
+  <div class="card">
+    <button class="btn-primary" id="btn-connect" type="button">Connect wallet</button>
+    <p class="mono" id="wallet" style="margin-top:12px"></p>
+    <div id="subs" style="margin-top:16px"></div>
+  </div>
+
+  <div class="card">
+    <p class="muted">Need a new plan or renewal?</p>
+    <a class="btn-ghost" href="/buy">Pay with SINC / AXM →</a>
+  </div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function loadSubs(wallet) {
+  const res = await fetch('/api/platform/subscription?wallet=' + encodeURIComponent(wallet));
+  const data = await res.json();
+  const el = $('subs');
+  if (!data.ok || !data.subscriptions.length) {
+    el.innerHTML = '<p class="muted">No subscriptions found for this wallet. <a href="/buy">Subscribe at /buy</a></p>';
+    return;
+  }
+  const now = new Date();
+  let html = '<table><tr><th>Plan</th><th>Status</th><th>Renews / ends</th><th></th></tr>';
+  data.subscriptions.forEach((s) => {
+    const end = new Date(s.period_end);
+    const active = end > now && s.status === 'active';
+    html += `<tr>
+      <td>${s.product_name}</td>
+      <td class="${active ? 'active' : 'lapsed'}">${active ? 'Active' : 'Expired'}</td>
+      <td>${s.period_end.slice(0, 10)}</td>
+      <td><a class="btn-ghost" href="/buy?plan=${s.plan_id}">Renew</a></td>
+    </tr>`;
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+async function connect() {
+  if (!window.ethereum) { alert('Install MetaMask or Rabby'); return; }
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const w = accounts[0];
+  $('wallet').textContent = w;
+  await loadSubs(w);
+}
+
+$('btn-connect').addEventListener('click', connect);
+const q = new URLSearchParams(location.search).get('wallet');
+if (q) { $('wallet').textContent = q; loadSubs(q); }
+</script>
+</body>
+</html>
