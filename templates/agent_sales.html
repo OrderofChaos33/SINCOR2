@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Sales Pipeline — SINCOR</title>
+  <style>
+    :root { --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --green:#34d399; --amber:#fbbf24; --muted:#9ca3af; --text:#e5e7eb; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,sans-serif; }
+    .wrap { max-width:1000px; margin:0 auto; padding:28px 16px 48px; }
+    h1 { font-size:26px; margin:0 0 6px; }
+    .sub { color:var(--muted); margin-bottom:20px; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:20px; }
+    .stat { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:14px; }
+    .stat b { display:block; font-size:22px; color:var(--cyan); }
+    .card { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:16px; margin-bottom:14px; }
+    button { cursor:pointer; border:none; border-radius:8px; padding:10px 14px; font-weight:700; background:var(--cyan); color:#042f2e; margin-right:8px; }
+    pre { white-space:pre-wrap; font-size:12px; background:#0c0c18; padding:12px; border-radius:8px; max-height:240px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    td, th { text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,.06); }
+    a { color:var(--cyan); }
+    .ok { color:var(--green); }
+    .warn { color:var(--amber); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <p><a href="/launch/campaign">← Campaign</a> · <a href="/launch/outreach">Outreach emails</a></p>
+  <h1>Agent Sales Pipeline</h1>
+  <p class="sub">Outbound scouts → synthesizers → negotiators. Target: <b id="goal">10</b> pre-orders before LBP.</p>
+  <div class="stats" id="stats"></div>
+  <div class="card">
+    <button onclick="runBatch()">Run prospecting batch (draft 25)</button>
+    <button onclick="seed()">Seed 200-prospect queue</button>
+    <span id="action-msg"></span>
+  </div>
+  <div class="card">
+    <h2 style="margin:0 0 10px;font-size:16px;">Due outreach</h2>
+    <div id="due"></div>
+  </div>
+  <div class="card">
+    <h2 style="margin:0 0 10px;font-size:16px;">Draft preview</h2>
+    <pre id="draft">Select a prospect or run batch.</pre>
+  </div>
+</div>
+<script>
+const headers = () => ({ 'X-Admin-Key': localStorage.getItem('adminKey') || prompt('Admin key:') || '' });
+async function load() {
+  const res = await fetch('/api/launch/agent-sales', { headers: headers() });
+  const d = await res.json();
+  if (!d.ok) { document.getElementById('stats').innerHTML = '<p>Unauthorized</p>'; return; }
+  const s = d.summary;
+  document.getElementById('goal').textContent = s.goal_preorders;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><b>${s.preorders}/${s.goal_preorders}</b><span>Pre-orders</span></div>
+    <div class="stat"><b>${s.prospects_total}</b><span>Prospects</span></div>
+    <div class="stat"><b>${s.by_status.drafted||0}</b><span>Drafted</span></div>
+    <div class="stat"><b class="${s.goal_met?'ok':'warn'}">${s.goal_met?'GOAL MET':'In progress'}</b><span>Status</span></div>`;
+  document.getElementById('due').innerHTML = (s.due_outreach||[]).map(p =>
+    `<div><a href="#" onclick="preview(${p.id});return false;">#${p.id}</a> ${p.name} · ${p.segment_id} · ${p.status} · score ${p.score}</div>`
+  ).join('') || 'Run batch to draft outreach.';
+}
+async function preview(id) {
+  const res = await fetch('/api/launch/agent-sales/' + id + '/draft', { method:'POST', headers: headers() });
+  const d = await res.json();
+  if (d.body) document.getElementById('draft').textContent = d.body + (d.dm ? '\n\n--- DM ---\n' + d.dm : '');
+}
+async function runBatch() {
+  const res = await fetch('/api/launch/agent-sales/run', { method:'POST', headers: headers() });
+  const d = await res.json();
+  document.getElementById('action-msg').textContent = 'Drafted ' + (d.drafted||0);
+  load();
+}
+async function seed() {
+  await fetch('/api/launch/agent-sales/seed', { method:'POST', headers: headers() });
+  load();
+}
+load();
+</script>
+</body>
+</html>

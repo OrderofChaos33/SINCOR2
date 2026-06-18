@@ -2806,6 +2806,116 @@ def launch_launchpads_page():
     return render_template('launch_launchpads.html')
 
 
+@app.route('/launch/lbp')
+def launch_lbp_page():
+    """LBP founding round landing — countdown, price, Why SINC narrative."""
+    return render_template('launch_lbp.html')
+
+
+@app.route('/launch/agent-sales')
+def launch_agent_sales_page():
+    """Admin agent sales pipeline — 200 prospects, pre-order goal."""
+    return render_template('agent_sales.html')
+
+
+@app.route('/launch/outreach')
+def launch_outreach_page():
+    """Prepared outreach emails for approval (influencers, grants, co-founder)."""
+    from sincor2.outreach_emails import load_outreach_emails
+    return render_template('launch_outreach.html', emails=load_outreach_emails())
+
+
+@app.route('/reports')
+def sample_reports_hub():
+    """Sample BI reports — email gate for full access."""
+    from sincor2.sample_reports import list_reports_preview
+    return render_template('sample_reports.html', reports=list_reports_preview())
+
+
+@app.route('/reports/<slug>')
+def sample_report_view(slug):
+    from sincor2.sample_reports import load_report, validate_access_token
+    report = load_report(slug)
+    if not report:
+        return render_template('404.html'), 404
+    token = (request.args.get('token') or '').strip()
+    if not validate_access_token(token):
+        from flask import redirect
+        return redirect('/reports')
+    return render_template('sample_report.html', report=report)
+
+
+@app.route('/api/reports/sample-request', methods=['POST'])
+@limiter.limit('20 per hour')
+def api_sample_report_request():
+    data = request.get_json(silent=True) or {}
+    from sincor2.sample_reports import request_sample_access
+    result = request_sample_access(
+        email=(data.get('email') or '').strip(),
+        name=(data.get('name') or '').strip(),
+        company=(data.get('company') or '').strip(),
+    )
+    code = 200 if result.get('ok') else 400
+    return jsonify(result), code
+
+
+@app.route('/api/reports/preorder', methods=['POST'])
+@limiter.limit('30 per hour')
+def api_report_preorder():
+    data = request.get_json(silent=True) or {}
+    from sincor2.agent_sales import record_preorder
+    try:
+        amount = float(data.get('amount_usd') or 100)
+    except (TypeError, ValueError):
+        amount = 100.0
+    pid = data.get('prospect_id')
+    result = record_preorder(
+        email=(data.get('email') or '').strip(),
+        wallet=(data.get('wallet') or '').strip(),
+        amount_usd=amount,
+        prospect_id=int(pid) if pid else None,
+    )
+    return jsonify(result), 200 if result.get('ok') else 400
+
+
+@app.route('/api/launch/agent-sales', methods=['GET'])
+def api_agent_sales_summary():
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.agent_sales import pipeline_summary
+    return jsonify({'ok': True, 'summary': pipeline_summary()})
+
+
+@app.route('/api/launch/agent-sales/seed', methods=['POST'])
+def api_agent_sales_seed():
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.agent_sales import seed_prospect_queue
+    return jsonify({'ok': True, 'added': seed_prospect_queue()})
+
+
+@app.route('/api/launch/agent-sales/run', methods=['POST'])
+def api_agent_sales_run():
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.agent_sales import run_prospecting_batch
+    return jsonify(run_prospecting_batch(limit=25))
+
+
+@app.route('/api/launch/agent-sales/<int:prospect_id>/draft', methods=['POST'])
+def api_agent_sales_draft(prospect_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    from sincor2.agent_sales import draft_outreach
+    result = draft_outreach(prospect_id)
+    code = 200 if result.get('ok') else 404
+    return jsonify(result), code
+
+
 @app.route('/api/launch/campaign/status', methods=['GET'])
 def launch_campaign_status_api():
     try:

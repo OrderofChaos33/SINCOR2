@@ -1,0 +1,46 @@
+# Agent sales team — 200 prospect targets for LBP pre-orders
+# Goal: 10 pre-orders before LBP starts (July 7)
+
+goal_preorders: 10
+prospect_target: 200
+lbp_start: "2026-07-07T00:00:00Z"
+predeposit_opens: "2026-07-01T00:00:00Z"
+site: https://getsincor.com
+sample_reports: https://getsincor.com/reports
+lbp_url: https://getsincor.com/launch/lbp
+campaign_url: https://getsincor.com/launch/campaign
+
+segments:
+  - id: smb_owners
+    label: Small business owners
+    quota: 80
+    sources: [linkedin, local_chamber, google_maps, industry_directories]
+    agents: [outbound_scout, synthesizer, negotiator]
+    offer: "Custom BI report + 50% off first report when you buy $100 SINC during LBP"
+
+  - id: startup_founders
+    label: Startup founders
+    quota: 70
+    sources: [yc_alumni, indie_hackers, product_hunt, twitter_bio]
+    agents: [outbound_scout, synthesizer, negotiator]
+    offer: "Agent swarm for lead gen + LBP priority via pre-deposit"
+
+  - id: crypto_leads
+    label: Crypto project leads
+    quota: 50
+    sources: [base_builders, farcaster, dexscreener_new, lbp_discord]
+    agents: [outbound_scout, synthesizer, negotiator]
+    offer: "LBP playbook + 10% partner rev share for promotion"
+
+agent_roles:
+  outbound_scout:
+    count: 4
+    task: "Identify prospects matching segment ICP; score 1-100; queue for outreach"
+  synthesizer:
+    count: 3
+    task: "Draft personalized email/DM from prospect context + segment offer"
+  negotiator:
+    count: 3
+    task: "Handle replies; route to pre-order or pre-deposit; log objections"
+
+statuses: [queued, researched, drafted, contacted, replied, preordered, declined, no_response]

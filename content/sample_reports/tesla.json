@@ -1,0 +1,34 @@
+{
+  "slug": "tesla",
+  "company": "Tesla, Inc.",
+  "ticker": "TSLA",
+  "sector": "EV / Energy / Autonomy",
+  "generated_at": "2026-06-18",
+  "agent_team": ["Research Lead", "Market Analyst", "Regulatory Scout", "Writer"],
+  "executive_summary": "Tesla is transitioning from pure EV manufacturer to AI + energy platform. FSD v13 robotaxi pilots in Austin and Bay Area are the valuation hinge — success unlocks $500B+ mobility TAM; delay compresses multiple back to auto OEM peers. Energy storage growing 60%+ YoY, now material to gross profit.",
+  "sections": [
+    {
+      "title": "Auto Business",
+      "body": "Q1 2026 deliveries: 422K vehicles (-9% YoY). Model Y refresh driving mixed demand. China BYD price war forcing margin compression in APAC. Cybertruck production ramping but contribution still <5% of volume. ASP declining $3,200 YoY — volume-over-margin strategy intact."
+    },
+    {
+      "title": "FSD & Robotaxi",
+      "body": "Unsupervised FSD licensed in TX and CA (limited geofence). 2.1M vehicles on FSD subscription ($99/mo) or $12K buy. Robotaxi network pilot: 340 vehicles, 18K rides/week in Austin. Regulatory path in EU 18+ months behind US. Waymo still leads measured autonomous miles but Tesla scales faster on fleet size."
+    },
+    {
+      "title": "Energy & AI Compute",
+      "body": "Megapack backlog $28B+. 40 GWh deployed in 2025. Dojo successor chips powering internal training; external AI compute sales rumored for H2 2026. xAI partnership potential — Musk entity overlap creates governance questions for institutional holders."
+    },
+    {
+      "title": "Agent-Sourced Lead Opportunities",
+      "body": "Commercial fleet electrification: 890 SMB fleets in TX/CA/AZ with 10+ vehicle counts and no charging infra vendor locked. Solar + storage installers without Tesla Certified status: 120 high-intent prospects. Recommended play: bundled FSD fleet pricing for 20+ vehicle operators."
+    }
+  ],
+  "metrics": [
+    {"label": "Market Cap", "value": "$780B"},
+    {"label": "Energy Growth", "value": "+62% YoY"},
+    {"label": "FSD Subscribers", "value": "2.1M"},
+    {"label": "Gross Margin (auto)", "value": "17.8%"}
+  ],
+  "recommendation": "SPECULATIVE BUY on robotaxi milestone confirmation. Trim if Q2 deliveries miss 450K or FSD incident rate spikes above 0.8 per million miles."
+}

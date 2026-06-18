@@ -1,0 +1,34 @@
+{
+  "slug": "apple",
+  "company": "Apple Inc.",
+  "ticker": "AAPL",
+  "sector": "Consumer Technology",
+  "generated_at": "2026-06-18",
+  "agent_team": ["Research Lead", "Financial Analyst", "Competitive Intel", "Writer"],
+  "executive_summary": "Apple maintains premium pricing power through ecosystem lock-in while Services revenue (now 24% of total) offsets iPhone cyclicality. Vision Pro remains niche; Apple Intelligence rollout is the critical 2026 catalyst for upgrade cycles. Key risk: EU DMA compliance eroding App Store take rates in Europe.",
+  "sections": [
+    {
+      "title": "Revenue Architecture",
+      "body": "FY2025 revenue estimated at $408B (+4% YoY). iPhone contributes ~52%, Services $98B run-rate with 73% gross margin. Wearables/Home/Accessories flat at $40B. Greater China down 8% YoY — India offset insufficient to fully replace. Installed base exceeds 2.2B active devices, the primary monetization flywheel."
+    },
+    {
+      "title": "Competitive Position",
+      "body": "Samsung leads global unit share but Apple captures 85%+ of smartphone industry profits. Google Pixel AI features closing gap in on-device intelligence. Meta Quest competes on price vs Vision Pro ($3,499). Microsoft enterprise AI (Copilot) threatens Mac enterprise penetration in knowledge-worker segments."
+    },
+    {
+      "title": "Strategic Signals (90-day)",
+      "body": "• Apple Intelligence expanding to EU after regulatory clearance\n• M4 chip cadence accelerating Mac refresh cycle\n• App Store fee litigation settlements creating margin uncertainty\n• $110B buyback program supporting EPS despite modest top-line growth"
+    },
+    {
+      "title": "Agent-Sourced Lead Opportunities",
+      "body": "SMB agencies serving Apple reseller channels: 340 qualified prospects identified in our outbound scan. Top segments: MDM deployers, Apple-certified repair networks, creative agencies on Final Cut ecosystem. Recommended outreach: Services attach rate consulting for multi-device fleets."
+    }
+  ],
+  "metrics": [
+    {"label": "Market Cap", "value": "$3.1T"},
+    {"label": "Services Margin", "value": "73%"},
+    {"label": "Active Devices", "value": "2.2B+"},
+    {"label": "P/E (fwd)", "value": "28.4x"}
+  ],
+  "recommendation": "HOLD / Accumulate on Services beat. Watch Apple Intelligence adoption metrics in Q3 earnings for upgrade-cycle confirmation."
+}

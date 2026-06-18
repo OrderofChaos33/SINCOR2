@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINC LBP — July 7–10 Founding Round</title>
+  <meta name="description" content="The founding round of an autonomous agency. Liquidity Bootstrapping Pool July 7–10 on Base. Every dollar funds agent operations for 6 months.">
+  <style>
+    :root { --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --green:#34d399; --amber:#fbbf24; --muted:#9ca3af; --text:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:radial-gradient(900px 500px at 50% -5%,#1a1a34 0%,var(--bg) 55%); color:var(--text); font-family:Inter,system-ui,sans-serif; }
+    .wrap { max-width:920px; margin:0 auto; padding:36px 16px 64px; }
+    h1 { font-size:34px; margin:0 0 8px; background:linear-gradient(135deg,var(--cyan),var(--green)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .sub { color:var(--muted); line-height:1.65; margin-bottom:24px; }
+    .countdown { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:24px 0; }
+    .cd { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:18px; text-align:center; }
+    .cd b { display:block; font-size:32px; color:var(--cyan); }
+    .cd span { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+    .card { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:22px; margin-bottom:16px; }
+    h2 { font-size:18px; margin:0 0 12px; }
+    .price-row { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+    .price { font-size:36px; font-weight:800; color:var(--green); }
+    .chart { height:120px; background:#0d0d18; border-radius:10px; margin-top:12px; position:relative; overflow:hidden; }
+    .chart-fill { position:absolute; bottom:0; left:0; right:0; height:60%; background:linear-gradient(180deg,transparent,rgba(34,211,238,.25)); }
+    .chart-line { position:absolute; bottom:20%; left:0; right:0; height:2px; background:var(--cyan); }
+    .why li { margin:8px 0; color:var(--muted); }
+    .why strong { color:var(--text); }
+    .cta { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; }
+    a.btn { display:inline-block; padding:12px 18px; border-radius:10px; font-weight:700; text-decoration:none; }
+    .primary { background:var(--cyan); color:#042f2e; }
+    .ghost { background:rgba(255,255,255,.08); color:var(--text); border:1px solid rgba(255,255,255,.12); }
+    a { color:var(--cyan); }
+    .partner { border-color:rgba(251,191,36,.35); background:rgba(251,191,36,.06); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <p><a href="/">← SINCOR</a> · <a href="/launch/campaign">Campaign hub</a></p>
+  <h1>SINC Founding LBP</h1>
+  <p class="sub"><strong>This LBP is the founding round of an autonomous agency.</strong> Every dollar raised funds agent operations for the next 6 months — research, outreach, analysis, and delivery at scale. Price discovery starts high and mechanically drops. Pre-deposit opens July 1 for priority access.</p>
+
+  <div class="countdown" id="cd">
+    <div class="cd"><b id="d">—</b><span>Days</span></div>
+    <div class="cd"><b id="h">—</b><span>Hours</span></div>
+    <div class="cd"><b id="m">—</b><span>Min</span></div>
+    <div class="cd"><b id="s">—</b><span>Sec</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Live price floor</h2>
+    <div class="price-row">
+      <div class="price" id="price">$1.50</div>
+      <div class="sub" style="margin:0">Official SINC floor · Base 8453 · Balancer LBP week of Jul 7</div>
+    </div>
+    <div class="chart"><div class="chart-fill"></div><div class="chart-line"></div></div>
+    <p class="sub" style="margin:12px 0 0;font-size:13px;">LBP mechanics: starting weight shifts over 72h — early buyers pay premium for certainty; patient buyers capture lower average entry. Narrative momentum drives participation.</p>
+  </div>
+
+  <div class="card why">
+    <h2>Why SINC?</h2>
+    <ul>
+      <li><strong>42-agent platform already shipping</strong> — not a whitepaper token. Live gateway, CertiK 97/100, Sourcify-verified on Base.</li>
+      <li><strong>Revenue rails exist today</strong> — BI reports, lead gen, outbound sales agents. <a href="/reports">See sample reports</a>.</li>
+      <li><strong>Agent teams sell the product</strong> — our outbound agents prospect founders and SMBs 24/7. The meta-play is the demo.</li>
+      <li><strong>SINC is gas for agent ops</strong> — API calls, per-task billing, swarm orchestration. Token demand tied to usage.</li>
+      <li><strong>KPI campaign unlocks waves</strong> — pre-deposit milestones trigger launchpad co-marketing and allocation boosts.</li>
+    </ul>
+  </div>
+
+  <div class="card partner">
+    <h2>LBP partner program — 10% rev share</h2>
+    <p class="sub" style="margin:0">Influencers and micro-accounts (5K–20K): promote our LBP with your referral code and earn <strong>10% of raise volume</strong> during the LBP window (standard on-chain referral remains 3%; partner bonus paid separately). <a href="/refer">Get your link</a> · terms via <a href="mailto:partners@getsincor.com">partners@getsincor.com</a></p>
+  </div>
+
+  <div class="cta">
+    <a class="btn primary" href="/launch/campaign">Pre-deposit · earn LBP priority</a>
+    <a class="btn ghost" href="/sinc">Buy SINC now</a>
+    <a class="btn ghost" href="/reports">Sample BI reports</a>
+    <a class="btn ghost" href="/pitch">Presenter mode</a>
+  </div>
+
+  <p class="sub" style="margin-top:28px;font-size:12px;">LBP Jul 7–10, 2026 · Not financial advice · <a href="/whitepaper">Whitepaper</a></p>
+</div>
+<script>
+const LBP_START = Date.parse('2026-07-07T00:00:00Z');
+function tick() {
+  const diff = Math.max(0, LBP_START - Date.now());
+  const sec = Math.floor(diff / 1000);
+  document.getElementById('d').textContent = Math.floor(sec / 86400);
+  document.getElementById('h').textContent = Math.floor((sec % 86400) / 3600);
+  document.getElementById('m').textContent = Math.floor((sec % 3600) / 60);
+  document.getElementById('s').textContent = sec % 60;
+}
+tick(); setInterval(tick, 1000);
+fetch('/api/price/official').then(r=>r.json()).then(d=>{
+  const p = d.floor_usd || d.price_usd || d.spot_usd;
+  if (p) document.getElementById('price').textContent = '$' + Number(p).toFixed(2);
+}).catch(()=>{});
+</script>
+</body>
+</html>

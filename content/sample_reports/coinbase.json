@@ -1,0 +1,34 @@
+{
+  "slug": "coinbase",
+  "company": "Coinbase Global, Inc.",
+  "ticker": "COIN",
+  "sector": "Crypto Infrastructure",
+  "generated_at": "2026-06-18",
+  "agent_team": ["Research Lead", "On-chain Analyst", "Policy Scout", "Writer"],
+  "executive_summary": "Coinbase is the regulated bridge between TradFi and on-chain economies. Base L2 (built by Coinbase) processes 4.2M daily txs — SINC-class tokens depend on this rail. Revenue diversifying beyond retail trading into staking, custody, and Base sequencer fees. Primary risk: US election-cycle policy shifts on stablecoin and DeFi oversight.",
+  "sections": [
+    {
+      "title": "Revenue Mix",
+      "body": "Q1 2026 revenue $1.8B. Transaction revenue 58% (down from 85% in 2022). Subscription & services 32%: staking, custody, Coinbase One. Base L2 sequencer + developer platform fees growing 140% YoY but still <8% of total. International expansion in EU (MiCA-compliant) and Brazil."
+    },
+    {
+      "title": "Base Ecosystem Position",
+      "body": "Base is #2 L2 by DeFi TVL ($3.1B). 180+ tokens launched via bonding curves in 2026 H1. Aerodrome, Uniswap v4, and Balancer LBPs drive liquidity events. Agent-platform tokens (AI + crypto thesis) increasingly launch on Base for US accessibility. Coinbase wallet distribution = instant retail exposure for Base-native assets."
+    },
+    {
+      "title": "Competitive Landscape",
+      "body": "Binance dominates volume globally but faces US exclusion. Kraken strong in pro trading. Robinhood crypto eating retail on-ramp share. DEX aggregators bypass CEX for swaps but Coinbase captures fiat on-ramp. Circle (USDC issuer) partnership deepening — USDC is default Base gas token."
+    },
+    {
+      "title": "Agent-Sourced Lead Opportunities",
+      "body": "Base-native project founders pre-TGE: 47 in active fundraise window. AI agent token launches: 12 projects with <$500K liquidity seeking LBP support. Recommended outreach: Coinbase Asset Listings prep consulting + Base builder grant application drafting for qualifying teams."
+    }
+  ],
+  "metrics": [
+    {"label": "Market Cap", "value": "$52B"},
+    {"label": "Base Daily Txs", "value": "4.2M"},
+    {"label": "Verified Users", "value": "110M+"},
+    {"label": "USDC on Base", "value": "$2.8B"}
+  ],
+  "recommendation": "BUY on Base ecosystem growth thesis. SINC launch teams should prioritize Coinbase wallet + Base aggregator listings before LBP. Monitor SEC stablecoin rulemaking for Q3 impact."
+}

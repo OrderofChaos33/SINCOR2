@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ report.company }} — Intelligence Report | SINCOR</title>
+  <meta property="og:title" content="{{ report.company }} Intelligence Report — SINCOR">
+  <meta property="og:description" content="{{ report.executive_summary[:160] }}">
+  <style>
+    :root { --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --green:#34d399; --amber:#fbbf24; --muted:#9ca3af; --text:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,sans-serif; line-height:1.65; }
+    .wrap { max-width:820px; margin:0 auto; padding:32px 16px 64px; }
+    h1 { font-size:28px; margin:8px 0; }
+    h2 { font-size:18px; margin:24px 0 8px; color:var(--cyan); }
+    .meta { color:var(--muted); font-size:14px; }
+    .badge { display:inline-block; font-size:11px; padding:4px 10px; border-radius:99px; background:rgba(34,211,238,.12); color:var(--cyan); margin-right:6px; }
+    .exec { background:var(--panel); border-left:3px solid var(--green); padding:16px 18px; border-radius:0 12px 12px 0; margin:20px 0; }
+    .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin:20px 0; }
+    .metric { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:14px; text-align:center; }
+    .metric b { display:block; font-size:20px; color:var(--cyan); }
+    .metric span { font-size:11px; color:var(--muted); }
+    .rec { background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.25); border-radius:12px; padding:16px; margin-top:24px; }
+    .share { margin-top:28px; display:flex; gap:10px; flex-wrap:wrap; }
+    a { color:var(--cyan); }
+    button { cursor:pointer; border:none; border-radius:10px; padding:10px 14px; background:rgba(255,255,255,.08); color:var(--text); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <p><a href="/reports">← All sample reports</a> · <a href="/">SINCOR</a></p>
+  <div class="meta">{{ report.sector }} · {{ report.ticker }} · Generated {{ report.generated_at }}</div>
+  <h1>{{ report.company }}</h1>
+  <div>{% for agent in report.agent_team %}<span class="badge">{{ agent }}</span>{% endfor %}</div>
+
+  <div class="exec"><strong>Executive summary</strong><br>{{ report.executive_summary }}</div>
+
+  <div class="metrics">
+    {% for m in report.metrics %}
+    <div class="metric"><b>{{ m.value }}</b><span>{{ m.label }}</span></div>
+    {% endfor %}
+  </div>
+
+  {% for section in report.sections %}
+  <h2>{{ section.title }}</h2>
+  <p>{{ section.body }}</p>
+  {% endfor %}
+
+  <div class="rec"><strong>Recommendation</strong><br>{{ report.recommendation }}</div>
+
+  <div class="share">
+    <button onclick="navigator.clipboard.writeText(location.href);this.textContent='Copied!'">Copy share link</button>
+    <a href="#" id="share-x" target="_blank" rel="noopener">Share on X</a>
+    <a href="/buy?plan=starter">Order your custom report →</a>
+  </div>
+
+  <p class="meta" style="margin-top:32px;">Sample report for demonstration. Not investment advice. Custom reports available via SINCOR agent teams from $297/mo.</p>
+</div>
+<script>
+document.getElementById('share-x').href =
+  'https://twitter.com/intent/tweet?text=' + encodeURIComponent('SINCOR agent-generated BI report: {{ report.company }}') + '&url=' + encodeURIComponent(location.href);
+</script>
+</body>
+</html>

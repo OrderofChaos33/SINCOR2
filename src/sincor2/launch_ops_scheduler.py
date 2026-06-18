@@ -55,6 +55,17 @@ def _run_content_cycle() -> None:
         logger.error("[LAUNCH_OPS] Content cycle error: %s", e, exc_info=True)
 
 
+def _run_agent_sales_ops() -> None:
+    try:
+        from sincor2.agent_sales import run_prospecting_batch, seed_prospect_queue
+
+        seed_prospect_queue()
+        result = run_prospecting_batch(limit=10)
+        logger.info("[LAUNCH_OPS] Agent sales batch — drafted=%s", result.get("drafted"))
+    except Exception as e:
+        logger.error("[LAUNCH_OPS] Agent sales error: %s", e, exc_info=True)
+
+
 def _run_campaign_ops() -> None:
     try:
         from sincor2.launch_campaign import draft_campaign_kpi_post, run_campaign_ops
@@ -120,6 +131,16 @@ def start_launch_ops_scheduler(app=None):
         replace_existing=True,
         max_instances=1,
     )
+    if os.environ.get("AGENT_SALES_OPS_ENABLED", "true").lower() == "true":
+        sales_hours = float(os.environ.get("AGENT_SALES_OPS_INTERVAL_HOURS", "12"))
+        _scheduler.add_job(
+            _run_agent_sales_ops,
+            trigger=IntervalTrigger(hours=sales_hours),
+            id="launch_ops_agent_sales",
+            name="SINCOR Agent Sales Prospecting",
+            replace_existing=True,
+            max_instances=1,
+        )
     _scheduler.add_job(
         _run_content_cycle,
         trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=90)),

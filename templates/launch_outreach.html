@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Outreach Emails — Approval Queue</title>
+  <style>
+    :root { --bg:#0a0a14; --panel:#12121f; --cyan:#22d3ee; --muted:#9ca3af; --text:#e5e7eb; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,system-ui,sans-serif; }
+    .wrap { max-width:900px; margin:0 auto; padding:28px 16px 48px; }
+    h1 { font-size:26px; }
+    .card { background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:18px; margin-bottom:14px; }
+    h2 { font-size:16px; margin:0 0 8px; color:var(--cyan); }
+    pre { white-space:pre-wrap; font-size:13px; background:#0c0c18; padding:14px; border-radius:8px; }
+    button { cursor:pointer; border:none; border-radius:8px; padding:8px 12px; background:rgba(255,255,255,.1); color:var(--text); margin-top:8px; }
+    a { color:var(--cyan); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <p><a href="/launch/agent-sales">← Agent sales</a> · <a href="/launch/lbp">LBP page</a></p>
+  <h1>Outreach emails — approve before send</h1>
+  <p style="color:var(--muted)">From <code>config/outreach_emails.yaml</code>. Replace {{name}} manually per recipient.</p>
+  {% for key, item in emails.items() %}
+  <div class="card">
+    <h2>{{ key.replace('_', ' ') }}</h2>
+    {% if item.subject %}<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Subject: {{ item.subject }}</div>{% endif %}
+    {% if item.title %}<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">{{ item.title }}</div>{% endif %}
+    <pre id="body-{{ key }}">{{ item.body }}</pre>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('body-{{ key }}').textContent);this.textContent='Copied'">Copy</button>
+  </div>
+  {% endfor %}
+</div>
+</body>
+</html>
