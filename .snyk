@@ -1,0 +1,14 @@
+# Snyk policy — scan production app only, not backup Hardhat trees.
+version: v1.25.0
+ignore: {}
+exclude:
+  global:
+    - sincor-clean.BAK.20251015-103920/**
+    - "**/node_modules/**"
+    - "**/.audit-venv/**"
+    - agent-tools/**
+    - terminals/**
+    - sincor2-backup/**
+    - sincor-deploy-fresh/**
+    - "**/*.BAK.*/**"
+patch: {}

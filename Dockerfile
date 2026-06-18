@@ -9,7 +9,7 @@ WORKDIR /app
 # Cache bust: v3
 COPY requirements.txt .
 RUN sed '/^python-sendgrid/d' requirements.txt > /tmp/req_clean.txt \
-    && pip install --upgrade pip \
+    && pip install --upgrade "pip>=26.1.2" \
     && pip install -r /tmp/req_clean.txt
 
 # Copy application code

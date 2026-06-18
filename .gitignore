@@ -152,6 +152,10 @@ docs/reality_bending_market_models.pdf
 *.old
 *_backup.py
 *.py.bak
+sincor-clean.BAK.*/
+**/*.BAK.*/
+**/node_modules/
+.audit-venv/
 
 # Archives & Links (Windows)
 *.lnk
