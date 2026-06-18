@@ -47,6 +47,7 @@ terminals/
 agent-tools/
 Hermes-Setup.exe
 data/neynar_signer_state.json
+tokenlists/_staging/
 PAYPAL_VAR.txt
 *.pem
 *.key
