@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Status • SINCOR2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>body { font-family: 'Inter', system_ui, sans-serif; }</style>
+</head>
+<body class="bg-zinc-950 text-zinc-200">
+    <nav class="border-b border-zinc-800 bg-zinc-950/95 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-x-3">
+                <div class="w-8 h-8 bg-cyan-400 flex items-center justify-center rounded"><span class="text-zinc-950 font-bold text-xl tracking-tighter">S2</span></div>
+                <span class="font-semibold text-xl tracking-tighter">SINCOR2</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto px-6 pt-10 pb-16">
+        <h1 class="text-4xl font-semibold tracking-tighter">Audit &amp; Verification Status</h1>
+        <p class="text-zinc-400 mt-2">Transparency on third-party reviews and internal verification processes.</p>
+
+        <div class="mt-10">
+            <div class="minimal-card border border-zinc-800 rounded-2xl p-8">
+                <div class="flex items-center gap-x-3 mb-4">
+                    <i class="fas fa-clock text-amber-400 text-xl"></i>
+                    <div>
+                        <div class="font-semibold">SOC 2 Type II • In Preparation</div>
+                        <div class="text-xs text-amber-400">Target: Q4 2026</div>
+                    </div>
+                </div>
+                <div class="text-sm text-zinc-400">Gap analysis complete. Core security controls (authentication, logging, access management, change control) documented and implemented. Formal audit engagement with qualified assessor scheduled for late 2026.</div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="minimal-card border border-zinc-800 rounded-2xl p-6 text-sm">
+                    <div class="font-medium">On-Chain Contract Verification</div>
+                    <div class="text-emerald-400 text-xs mt-1">Sourcify Full Match (previous versions)</div>
+                    <div class="text-zinc-400 mt-2 text-xs">SINC and related contracts have undergone prior Sourcify verification. Current v3 contracts are open source in the repository for independent review and re-verification.</div>
+                </div>
+                <div class="minimal-card border border-zinc-800 rounded-2xl p-6 text-sm">
+                    <div class="font-medium">Internal Code Review</div>
+                    <div class="text-emerald-400 text-xs mt-1">Continuous via public GitHub</div>
+                    <div class="text-zinc-400 mt-2 text-xs">All changes are public. Security-sensitive modules (auth, payments, on-chain interaction) receive focused review before merge.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-10 text-xs text-zinc-500">This page will be updated with specific auditor names, report dates, and remediation status as formal audits are completed. Until then, the open-source nature of the platform provides the highest level of transparency.</div>
+    </div>
+</body>
+</html>
