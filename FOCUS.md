@@ -10,6 +10,42 @@
 - **Core A2A Marketplace + Swarm Coordination + High-Margin Verticals** (healthcare RCM, compliance, trading signals)
 - **Treasury Discipline**: AXM/SINC always converted to USDC/WETH before treasury deposit (except designated trading wallets)
 
+## Treasury Policy Usage Examples
+
+The treasury policy is enforced via `src/sincor2/treasury_policy.py`.
+
+### Convert before Treasury Deposit (Normal Path)
+```python
+from src.sincor2.treasury_policy import convert_before_treasury_if_needed
+
+amount, target_asset, converted = convert_before_treasury_if_needed(
+    amount=1250.0,
+    from_token="AXM",
+    receiving_wallet="TREASURY"
+)
+# Result: (1250.0, 'USDC', True)
+```
+
+### Trading Wallet Exception (Keep Native Tokens)
+```python
+# For Polyclaw, TOA-44 execution wallets, etc.
+amount, target_asset, converted = convert_before_treasury_if_needed(
+    amount=980.0,
+    from_token="SINC",
+    receiving_wallet="0xYourTradingWalletAddress"
+)
+# Result: (980.0, 'SINC', False)  → No conversion
+```
+
+### Check if Trading Wallet Should Syphon Profits
+```python
+should_syphon = treasury_policy.should_syphon_native_profit(
+    wallet_address="0xYourTradingWalletAddress",
+    current_profit_usd=2700
+)
+# Returns True if interval or threshold is met
+```
+
 ## Paused (Lower Immediate ROI / Higher Maintenance)
 - WebBuilder vertical and similar items (re-enable only when fully autonomous)
 
