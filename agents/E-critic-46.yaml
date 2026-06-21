@@ -49,13 +49,13 @@ memory_limits:
 status: Active
 created_date: '2026-06-21'
 constitution_sha256: hash_E-critic-46_auditor
-version: "1.0.0"
-description: >
+version: "1.1.0"  # Bumped for novelty enforcer integration
+ description: >
   The Content Critic (E-46) is the always-on quality gate. It scores every variant
   from Copywriters across multiple dimensions (brand, novelty, predicted performance,
-  platform fit, risk, compliance). Enforces forced novelty using memory similarity.
-  Ranks variants, provides actionable edit feedback, and only passes high-scoring
-  output downstream. Critical for production reliability and FinTech-grade standards.
+  platform fit, risk, compliance). Enforces forced novelty using the NoveltyEnforcer
+  module against episodic memory. Ranks variants, provides actionable edit feedback,
+  and only passes high-scoring output downstream.
 tags:
 - critic
 - scoring
@@ -75,7 +75,8 @@ skills:
   tags: [scoring, multi_criteria, quality]
 - id: enforce_novelty
   name: Forced Novelty Enforcement
-  description: Compare variants against recent approved posts and high-performers in memory. Reject or heavily penalize outputs with high semantic or structural similarity. Force fresh angles/hooks/metaphors.
+  description: Use NoveltyEnforcer (core/novelty_enforcer.py) to compare variants against recent approved posts in memory. Reject or force revision when similarity exceeds threshold. Provide actionable suggestions for fresh angles.
+  implementation: core.novelty_enforcer.enforce_novelty
   tags: [novelty, anti_repetition, memory]
 - id: apply_standards
   name: Apply Quality Standards
@@ -92,7 +93,7 @@ skills:
 supportedInterfaces:
 - type: a2a
   url: /a2a/critic/v1
-  version: "1.0.0"
+  version: "1.1.0"
 provider:
   name: SINCOR2 Platform
   url: https://sincor2.io
