@@ -1,0 +1,81 @@
+# Content Domain Memory Allocation & Config
+# Dedicated structures for the content/copy orchestration system
+# Version 1.0.0 | 2026-06-21
+
+memory_domain: content_copy_orchestration
+
+# Episodic Memory (recent approved posts, performance, decisions)
+episodic:
+  retention_days: 30
+  max_items: 500
+  fields:
+    - post_id
+    - platform
+    - vertical
+    - pillar_used
+    - hook_type
+    - full_text
+    - image_prompt (if FB)
+    - critic_scores
+    - novelty_score
+    - approval_status
+    - published_date
+    - performance_metrics (engagement, clicks, conversions where available)
+    - agent_ids_involved
+  indexes:
+    - by_platform
+    - by_vertical
+    - by_pillar
+    - by_approval_date
+
+# Semantic Memory (brand voice, high-performers, vertical knowledge, pillars)
+semantic:
+  max_items: 15000
+  categories:
+    brand_voice: "Current persistent brand voice, tone rules, key phrases, visual language from getsincor.com + evolution log"
+    high_performers: "Top approved copy examples with why they worked (scores, metrics)"
+    vertical_knowledge: "Loaded from VERTICAL_CONTENT_CATALOGS.md + customer customizations"
+    persistent_pillars: "Versioned, dynamic content pillars. Updated by Strategist. Used for rotation and novelty at campaign level."
+    standards: "Reference to CONTENT_STANDARDS.md rubric and thresholds"
+    metaphor_bank: "Evolving collection of fresh metaphors (geodesic, wave collapse, swarm intelligence, etc.) with usage history"
+
+# Procedural Memory (how to run the pipeline)
+procedural:
+  workflows:
+    full_pipeline: "Strategist brief → Copywriter variants → Critic scoring + novelty gate → Archivist log → optional human approval → publish + feedback ingestion"
+    novelty_enforcement: "Step-by-step similarity check + forced revision protocol"
+    pillar_rotation: "How Strategist selects and evolves persistent pillars to maintain freshness at macro level"
+    vertical_adaptation: "Loading catalog rules + compliance overlay before generation"
+
+# Performance & Feedback Vectors
+performance:
+  metrics_tracked:
+    - approval_rate (by agent, by vertical, by platform)
+    - critic_average_score
+    - novelty_average
+    - downstream_engagement_lift
+    - deploy/conversion_attribution (where measurable)
+  feedback_loop:
+    ingestion: "Post metrics → episodic memory → TOA forecasting update → pillar/angle optimization"
+    agent_promotion: "High win-rate Copywriters and accurate Strategists/Critics promoted per existing SBT rules"
+    pruning: "Low-performing patterns deprioritized or evolved in semantic memory"
+
+# Config for Persistence & Novelty
+config:
+  pillars_version: "1.0.0"
+  pillars_last_updated: "2026-06-21"
+  novelty_enforcement_threshold: 0.75  # Similarity score above which revision is forced
+  min_variants_per_brief: 3
+  critic_min_aggregate_score: 82
+  forced_pillar_rotation_days: 7  # Prevent macro-level repetition
+
+# Integration
+integration:
+  loaded_by: ["E-strategist-45", "E-critic-46", "Copywriter instances"]
+  updated_by: "Archivist + TOA feedback loop"
+  queryable_via: "A2A interfaces and internal memory APIs"
+
+# Notes for Production
+# - Start with file-based + simple vector similarity for novelty (future: full embedding store).
+# - All changes to this config are versioned and auditable.
+# - Customer deployments can inherit + override with their own memory allocation.
