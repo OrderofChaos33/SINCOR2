@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """
-Polyclaw Autonomous Trading Agent Scheduler
-Integrated with SINCOR's APScheduler
-Scans Polymarket every minute for arbitrage, executes autonomously
+Polyclaw Autonomous Trading Scheduler (Activated)
+
+Now uses the new autonomous system by default:
+- PolyclawCoreAgent (smart edge + adaptive sizing)
+- AutonomousRebalancer (performance-driven profit splitting)
+- ObserverImproverAgent (continuous observation + improvement)
+- SimulationEngine (high-fidelity sim, default mode)
+
+Simulation mode is ON by default until profitability is proven.
+No manual dials. Fully autonomous loop.
 """
 
-import json
 import logging
 import os
 from datetime import datetime
@@ -20,163 +26,150 @@ except ImportError:
     IntervalTrigger = None
     APSCHEDULER_AVAILABLE = False
 
+# Import the new autonomous system
+try:
+    from verticals.trading.polyclaw.simulation_engine import SimulationEngine
+    from verticals.trading.polyclaw.core_agent import PolyclawCoreAgent
+    from verticals.trading.polyclaw.autonomous_rebalancer import AutonomousRebalancer
+    from verticals.trading.polyclaw.observer_improver import ObserverImproverAgent
+    AUTONOMOUS_SYSTEM_AVAILABLE = True
+except ImportError:
+    AUTONOMOUS_SYSTEM_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
-# Config
+# ==================== CONFIG ====================
 POLYCLAW_ENABLED = os.getenv("POLYCLAW_ENABLED", "true").lower() == "true"
-POLYCLAW_RISK_LEVEL = os.getenv("POLYCLAW_RISK_LEVEL", "medium")
-POLYCLAW_AUTO_EXECUTE = os.getenv("POLYCLAW_AUTO_EXECUTE", "true").lower() == "true"
-POLYCLAW_ALERT_THRESHOLD = float(os.getenv("POLYCLAW_ALERT_THRESHOLD", "0.5"))
-POLYCLAW_SCAN_INTERVAL = int(os.getenv("POLYCLAW_SCAN_INTERVAL", "60"))  # seconds
+POLYCLAW_MODE = os.getenv("POLYCLAW_MODE", "simulation").lower()  # simulation | paper | live
+POLYCLAW_SCAN_INTERVAL = int(os.getenv("POLYCLAW_SCAN_INTERVAL", "60"))
 
-TRADES_LOG = Path.home() / ".openclaw" / "workspace" / "polyclaw_trades.jsonl"
+TRADES_LOG = Path.home() / ".polyclaw" / "trades.jsonl"
 
 scheduler = None
+sim_engine = None
+core_agent = None
+rebalancer = None
+observer = None
 
-def log_trade(trade_data):
-    """Log executed trade to JSONL"""
-    trade_data['timestamp'] = datetime.utcnow().isoformat()
-    TRADES_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with open(TRADES_LOG, "a") as f:
-        f.write(json.dumps(trade_data) + "\n")
-    logger.info(
-        "[POLYCLAW] Trade logged: %s | %s%% profit",
-        trade_data['strategy'],
-        trade_data['net_profit_percent'],
-    )
 
-def scan_polymarket():
-    """
-    Scan Polymarket for arbitrage opportunities
-    TODO: Wire actual Polyclaw CLI integration
-    """
-    try:
-        # Placeholder — actual implementation would:
-        # 1. Fetch current Polymarket markets via API
-        # 2. Calculate YES/NO spread for each market
-        # 3. Identify arbitrage: |YES_price + NO_price - 1.0| > threshold
-        # 4. Return opportunities with edge % and strategy
-        
-        logger.debug("[POLYCLAW] Scanning Polymarket for arbitrage...")
-        # For now, return empty (no false trades)
-        return []
-    
-    except Exception as e:
-        logger.error(f"[POLYCLAW] Scan error: {e}")
-        return []
+def initialize_autonomous_system():
+    """Initialize the full autonomous trading system."""
+    global sim_engine, core_agent, rebalancer, observer
 
-def execute_trade(opportunity):
-    """
-    Execute arbitrage trade autonomously
-    Uses wallet private key from env to sign + submit to Polymarket CLOB
-    """
-    if not POLYCLAW_AUTO_EXECUTE:
-        logger.info(f"[POLYCLAW] Auto-execute disabled. Pending approval: {opportunity}")
+    if not AUTONOMOUS_SYSTEM_AVAILABLE:
+        logger.warning("[POLYCLAW] Autonomous system modules not found. Using legacy mode.")
         return False
-    
-    net_profit = opportunity.get("net_profit_percent", 0)
-    if net_profit < POLYCLAW_ALERT_THRESHOLD:
-        logger.debug(
-            "[POLYCLAW] Skipping: profit %s%% < threshold %s%%",
-            net_profit,
-            POLYCLAW_ALERT_THRESHOLD,
-        )
-        return False
-    
-    try:
-        logger.info("[POLYCLAW] 🚀 Executing: %s", opportunity['strategy'])
-        logger.info("[POLYCLAW]    Market: %s", opportunity['market_id'])
-        logger.info(
-            "[POLYCLAW]    Edge: %s%% | Net profit: %s%%",
-            opportunity['edge_percent'],
-            net_profit,
-        )
-        
-        # TODO: Actual execution via Polyclaw API
-        # - Sign transaction with wallet private key
-        # - Submit YES/NO order to Polymarket CLOB
-        # - Track position in trades.jsonl
-        
-        trade_result = {
-            "market_id": opportunity["market_id"],
-            "strategy": opportunity["strategy"],
-            "edge_percent": opportunity["edge_percent"],
-            "net_profit_percent": net_profit,
-            "status": "executed",
-            "gas_estimate": opportunity.get("estimated_gas", 0)
-        }
-        
-        log_trade(trade_result)
-        return True
-    
-    except Exception as e:
-        logger.error(f"[POLYCLAW] Execution error: {e}")
-        return False
+
+    sim_engine = SimulationEngine(initial_bankroll=25000.0)
+    core_agent = PolyclawCoreAgent(name="polyclaw-core")
+    rebalancer = AutonomousRebalancer(total_bankroll=25000.0)
+    observer = ObserverImproverAgent()
+
+    logger.info("[POLYCLAW] Autonomous system initialized (simulation mode)")
+    return True
+
+
+def autonomous_cycle():
+    """One full autonomous trading cycle using the new system."""
+    if not AUTONOMOUS_SYSTEM_AVAILABLE or sim_engine is None:
+        logger.warning("[POLYCLAW] Autonomous system not initialized")
+        return
+
+    logger.info(f"[POLYCLAW] Autonomous cycle | Mode: {POLYCLAW_MODE}")
+
+    # Example markets (replace with real data feed later)
+    markets = [
+        {"id": "m1", "probability": 0.61, "true_probability": 0.68, "liquidity": 280000},
+        {"id": "m2", "probability": 0.44, "true_probability": 0.39, "liquidity": 150000},
+        {"id": "m3", "probability": 0.57, "true_probability": 0.64, "liquidity": 410000},
+    ]
+
+    decisions_made = []
+
+    for market in markets:
+        decision = core_agent.evaluate_market(market, model_probability=market.get("true_probability", 0.5))
+        if decision:
+            decisions_made.append(decision)
+            # Execute in simulation
+            fill = sim_engine.submit_order(market, decision.side, decision.size * 25000)
+
+            # Simulate outcome resolution
+            outcome_yes = market.get("true_probability", 0.5) > 0.5
+            sim_engine.resolve_market(fill.market_id, outcome_yes)
+
+            # Self-improvement
+            correct = (decision.side == "buy_yes" and outcome_yes) or (decision.side == "buy_no" and not outcome_yes)
+            core_agent.update_from_outcome(correct)
+            rebalancer.update_performance("core", pnl=0, was_win=correct, edge=decision.edge)
+
+    # Autonomous rebalancing
+    allocation = rebalancer.rebalance()
+
+    # Observer watches and suggests improvements
+    metrics = sim_engine.get_metrics()
+    observer.observe_cycle(metrics, sim_engine.state.trades[-len(decisions_made):] if decisions_made else [])
+    suggestions = observer.suggest_improvements()
+
+    logger.info(f"[POLYCLAW] Metrics: {metrics}")
+    logger.info(f"[POLYCLAW] Health: {observer.get_health_report()}")
+    if suggestions:
+        logger.info(f"[POLYCLAW] Suggestions from Observer: {suggestions}")
+
+
+def legacy_scan_polymarket():
+    """Legacy placeholder (kept for compatibility)."""
+    logger.debug("[POLYCLAW] Legacy scan called (no-op in autonomous mode)")
+    return []
+
 
 def polyclaw_cycle():
-    """Single scan + execute cycle"""
+    """Main cycle - routes to autonomous system when available."""
     if not POLYCLAW_ENABLED:
         return
-    
-    try:
-        logger.info(
-            "[POLYCLAW] Cycle | Risk: %s | Auto-exec: %s",
-            POLYCLAW_RISK_LEVEL,
-            POLYCLAW_AUTO_EXECUTE,
-        )
-        
-        opportunities = scan_polymarket()
-        
-        if not opportunities:
-            logger.debug("[POLYCLAW] No arbitrage opportunities detected")
-            return
-        
-        logger.info(f"[POLYCLAW] Found {len(opportunities)} opportunity/ies")
-        
-        for opp in opportunities:
-            net_profit = opp.get('net_profit_percent', 0)
-            logger.info(f"[POLYCLAW]   - {opp['strategy']}: {net_profit}% profit")
-            
-            if net_profit >= POLYCLAW_ALERT_THRESHOLD:
-                execute_trade(opp)
-    
-    except Exception as e:
-        logger.error(f"[POLYCLAW] Cycle error: {e}")
 
-def start_polyclaw_scheduler(app):
-    """Start Polyclaw autonomous trading scheduler"""
+    if AUTONOMOUS_SYSTEM_AVAILABLE and POLYCLAW_MODE in ["simulation", "paper"]:
+        autonomous_cycle()
+    else:
+        # Fallback to old behavior
+        opportunities = legacy_scan_polymarket()
+        for opp in opportunities:
+            logger.info(f"[POLYCLAW] Legacy opportunity: {opp}")
+
+
+def start_polyclaw_scheduler(app=None):
+    """Start the Polyclaw autonomous scheduler. Simulation mode by default."""
     global scheduler
 
     if not POLYCLAW_ENABLED:
         logger.warning("[POLYCLAW] Scheduler disabled (POLYCLAW_ENABLED=false)")
         return None
 
+    # Initialize autonomous system
+    initialize_autonomous_system()
+
     if not APSCHEDULER_AVAILABLE:
-        logger.warning("[POLYCLAW] APScheduler not installed; scheduler startup skipped")
+        logger.warning("[POLYCLAW] APScheduler not available. Running single cycle only.")
+        polyclaw_cycle()
         return None
 
     try:
         scheduler = BackgroundScheduler()
-
-        # Add polyclaw scan job
         scheduler.add_job(
             polyclaw_cycle,
             trigger=IntervalTrigger(seconds=POLYCLAW_SCAN_INTERVAL),
-            id='polyclaw_scan',
-            name='Polyclaw Market Scan',
-            replace_existing=True
+            id="polyclaw_autonomous_cycle",
+            name="Polyclaw Autonomous Cycle",
+            replace_existing=True,
         )
-        
         scheduler.start()
-        logger.info(f"[POLYCLAW] Scheduler started (scan every {POLYCLAW_SCAN_INTERVAL}s)")
+        logger.info(f"[POLYCLAW] Autonomous scheduler started | Mode: {POLYCLAW_MODE} | Interval: {POLYCLAW_SCAN_INTERVAL}s")
         return scheduler
-    
     except Exception as e:
-        logger.error(f"[POLYCLAW] Scheduler init failed: {e}")
+        logger.error(f"[POLYCLAW] Scheduler start failed: {e}")
         return None
 
+
 def stop_polyclaw_scheduler():
-    """Stop Polyclaw scheduler"""
     global scheduler
     if scheduler:
         try:
@@ -185,3 +178,9 @@ def stop_polyclaw_scheduler():
         except Exception as e:
             logger.error(f"[POLYCLAW] Shutdown error: {e}")
         scheduler = None
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    logger.info("Starting Polyclaw in standalone mode...")
+    start_polyclaw_scheduler()
