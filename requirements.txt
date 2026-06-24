@@ -46,5 +46,8 @@ stripe>=7.0.0                 # Stripe payment processor API
 # Outreach Scheduler
 APScheduler>=3.10.0           # Background job scheduler for autonomous outreach
 
+# Memory System (safe, lightweight - pure Python, required for GraphStore)
+networkx>=3.0
+
 # Optional: Redis for production rate limiting
 # redis>=5.0.0
