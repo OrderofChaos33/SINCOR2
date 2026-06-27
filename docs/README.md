@@ -8,6 +8,7 @@ This directory organizes architecture, transition planning, API references, and 
 - [`transition/`](./transition/) — transition strategy, gap analysis, and execution planning.
 - [`guides/`](./guides/) — contributor and operator guides.
 - [`api/`](./api/) — protocol and interface documentation.
+- [`funding/`](./funding/) — funding operations tracker, cycle logs, and submission artifacts.
 - [`superpowers/`](./superpowers/) — existing launch runbooks/plans/specs.
 
 ## Recommended reading order

@@ -600,6 +600,7 @@ See [SECURITY.md](SECURITY.md) for the full security policy.
 | [Architecture overview](docs/architecture/overview.md) | Detailed system diagrams |
 | [Runtime & configuration](docs/runtime-and-configuration.md) | Environment variables and settings reference |
 | [Contributor and operator guides](docs/guides/README.md) | Onboarding, conventions, and operational runbooks |
+| [Funding operations hub](docs/funding/README.md) | Opportunity tracker, cycle reports, and reusable funding artifacts |
 | [Vertical pack integration](docs/guides/vertical-integration.md) | How to add or extend a vertical pack |
 | [SINAX reference](docs/sinax/README.md) | Geometric proof navigation layer API and ops notes |
 | [Token overview](docs/token/README.md) | SINC and AXIOM roles, mechanics, and treasury routing |
