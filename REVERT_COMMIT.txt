@@ -1,0 +1,5 @@
+Revert "Merge pull request #69 from OrderofChaos33/grok-solutions-june2026
+
+feat: Grok-delivered OpenClaw recovery, Telegram agent interface, safe Polyclaw live trading, LangGraph multi-agent system with trading safety, and E2E tests"
+
+This reverts commit bc2de6762f20667941717b2b0dc82d3164764596.
