@@ -1,7 +1,10 @@
 name: CI
 
-# Paused while GitHub billing is locked — re-enable after payment method fixed.
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -25,17 +28,10 @@ jobs:
 
       - name: Lint
         run: |
-          ruff check \
-            src/sincor2/app.py \
-            src/sincor2/mvp_app.py \
-            src/sincor2/settings.py \
-            src/sincor2/startup.py \
-            src/sincor2/error_handling.py \
-            src/sincor2/blueprints \
-            tests/pytest
+          ruff check src/ tests/
 
       - name: Test
-        run: pytest --cov=src/sincor2 --cov-report=xml --cov-report=term
+        run: pytest --cov=src --cov-report=xml --cov-report=term
 
       - name: Upload coverage artifact
         if: always()
