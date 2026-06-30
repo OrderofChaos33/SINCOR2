@@ -11,6 +11,8 @@ import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAccountingHub} from "../../onchain/src/interfaces/IAccountingHub.sol"; // placeholder for future Hub
 
@@ -24,16 +26,21 @@ import {IAccountingHub} from "../../onchain/src/interfaces/IAccountingHub.sol"; 
  *         - hookData treated as untrusted (strict validation or controlled registry)
  *         - Prepared for AccountingHub separation (lean hook principle)
  *         - Protocol fee capture with proper math + events for Hub reconciliation
+ *         - NEW: Safe minimal MEV donation/redirect acceptance (anyone/searchers can call)
  *
  * Migration: Deploy alongside existing IntentHook. Wire new pools or upgrade
  *            when audit + tests pass. Existing SincLimitOrderHook remains untouched.
  *
  * @dev This is the recommended path for adding rehypothecation, dual yield,
  *      dynamic fees, and MEV redirect safely.
+ *      MEV capture here is the simple safe pattern: accept donations/redirects.
+ *      No complex on-hook arb detection. Leverages your existing intent/dark-pool
+ *      infrastructure for SINC self-funding where possible.
  */
 contract IntentHookV2 is BaseHook, ReentrancyGuard {
     using SafeCast for uint256;
     using SafeCast for int256;
+    using SafeERC20 for IERC20;
 
     address public treasury;
     address public owner;
@@ -48,12 +55,14 @@ contract IntentHookV2 is BaseHook, ReentrancyGuard {
     event PreHookExecuted(address indexed target, bool success);
     event PostHookExecuted(address indexed target, bool success);
     event HubUpdated(address newHub);
+    event MEVDonationAccepted(address indexed token, uint256 amount, address indexed from);
 
     error Unauthorized();
     error InvalidTreasury();
     error FeeTooHigh();
     error InvalidHookData();
     error HookDataExecutionFailed();
+    error MEVDonationFailed();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
@@ -184,6 +193,52 @@ contract IntentHookV2 is BaseHook, ReentrancyGuard {
 
             // Future: accountingHub.recordProtocolFee(key.currency1, feeAmount);
         }
+    }
+
+    // ==================== MEV CAPTURE / REDIRECT (Safe minimal pattern - START CATCHING MEV NOW) ====================
+
+    /// @notice Accept MEV donation or redirect from searchers, bots, or intent executors.
+    ///         This is the simple, safe, spec-compliant starting point for catching MEV.
+    ///         - Anyone can call (e.g. your MEV bot after profitable swap).
+    ///         - Value goes to protocolFees ledger via AccountingHub (or fallback to treasury).
+    ///         - Does NOT touch swap deltas, does NOT create mispricing, does NOT run complex arb logic on-hook.
+    ///         - Reentrancy guarded. Integrates cleanly with existing Hub.recordMEVRedirect.
+    ///         - Leverages your existing intent/dark-pool infrastructure for SINC self-funding where possible.
+    ///
+    /// @dev Per Phase 1 & Phase 3 of Security Hardening Spec: Prefer donation/redirect over complex on-hook detection.
+    ///      Call this function from your searcher/intent bot to redirect extracted MEV value back to LPs/protocol.
+    ///      Example: After a profitable sandwich or arb that touches your pool, searcher calls this with the profit share.
+    function acceptMEVDonation(address token, uint256 amount) external payable nonReentrant {
+        if (amount == 0) return;
+
+        if (token == address(0)) {
+            // Native token path
+            if (msg.value != amount) revert MEVDonationFailed();
+        } else {
+            // ERC20 path - caller must have approved this contract first
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        }
+
+        bool recorded = false;
+        if (address(accountingHub) != address(0)) {
+            try accountingHub.recordMEVRedirect(amount) {
+                recorded = true;
+            } catch {
+                // Hub call failed (e.g. not keeper role yet) - fallback to treasury
+            }
+        }
+
+        if (!recorded) {
+            // Fallback: direct to treasury (safe, no silent loss)
+            if (token == address(0)) {
+                (bool sent, ) = treasury.call{value: amount}("");
+                if (!sent) revert MEVDonationFailed();
+            } else {
+                IERC20(token).safeTransfer(treasury, amount);
+            }
+        }
+
+        emit MEVDonationAccepted(token, amount, msg.sender);
     }
 
     // ==================== SAFE PROPORTIONAL REDUCTION PATTERN (for future rehypo/claims) ====================
