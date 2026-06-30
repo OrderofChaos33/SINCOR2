@@ -13,6 +13,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 ///         Conservative math (mulDivUp on all reductions). Strict reconciliation.
 ///         Bounded automation entrypoints. Emergency controls with roles.
 /// @dev Deploy behind timelock + multisig for upgrades. Use with IntentHookV2 and RehypothecationAdapter.
+///      After deployment: grant KEEPER_ROLE to your Adapter and Hook contract addresses.
 contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
     using SafeCast for uint256;
 
@@ -25,7 +26,9 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
 
     uint256 public protocolFees;
 
-    mapping(address => uint256) public userRehypoYieldOwed;
+    mapping(address => uint256) public userRehypoPrincipalOwed; // Principal locked in external yield
+    mapping(address => uint256) public userRehypoYieldOwed;     // Accrued yield only
+    uint256 public totalRehypoPrincipalOwed;
     uint256 public totalRehypoYieldOwed;
 
     uint256 public actualPoolBalances;
@@ -40,6 +43,7 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
     event MEVRedirectRecorded(uint256 amount);
     event ExternalReconciled(uint256 reported, uint256 actual);
     event InvariantBreached(uint256 tracked, uint256 actual);
+    event KeeperRoleGranted(address indexed account);
 
     error InvariantViolation(uint256 tracked, uint256 actual);
     error ReconciliationDrift(uint256 tracked, uint256 actual);
@@ -47,11 +51,11 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
 
     // ==================== INVARIANT (Core Safety Property) ====================
     /// @notice MUST hold after every state mutation (including external calls):
-    /// tracked = totalUserPoolClaims + protocolFees + totalRehypoYieldOwed
+    /// tracked = totalUserPoolClaims + protocolFees + totalRehypoPrincipalOwed + totalRehypoYieldOwed
     /// actual  = actualPoolBalances + actualExternalClaimsValue
     /// Within DUST_TOLERANCE. Breach > dust reverts loudly.
     function checkInvariant() public view returns (bool) {
-        uint256 tracked = totalUserPoolClaims + protocolFees + totalRehypoYieldOwed;
+        uint256 tracked = totalUserPoolClaims + protocolFees + totalRehypoPrincipalOwed + totalRehypoYieldOwed;
         uint256 actual = actualPoolBalances + actualExternalClaimsValue;
         return tracked <= actual + DUST_TOLERANCE && actual <= tracked + DUST_TOLERANCE;
     }
@@ -59,7 +63,7 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
     modifier invariantProtected() {
         _;
         if (!checkInvariant()) {
-            uint256 tracked = totalUserPoolClaims + protocolFees + totalRehypoYieldOwed;
+            uint256 tracked = totalUserPoolClaims + protocolFees + totalRehypoPrincipalOwed + totalRehypoYieldOwed;
             uint256 actual = actualPoolBalances + actualExternalClaimsValue;
             emit InvariantBreached(tracked, actual);
             revert InvariantViolation(tracked, actual);
@@ -69,6 +73,13 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(EMERGENCY_ROLE, msg.sender);
+        _grantRole(KEEPER_ROLE, msg.sender); // Admin can grant to Adapters/Hooks later
+    }
+
+    /// @notice Grant KEEPER_ROLE to trusted contracts (Adapter, Hook, keepers). Call after deployment.
+    function grantKeeperRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(KEEPER_ROLE, account);
+        emit KeeperRoleGranted(account);
     }
 
     // ==================== RECORD FUNCTIONS (Called by Hook / Adapter) ====================
@@ -80,10 +91,12 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
         uint256 sharesReceived,
         uint256 depositId
     ) external onlyRole(KEEPER_ROLE) invariantProtected whenNotPaused {
-        // Conservative: do not overstate claims
-        userRehypoYieldOwed[user] += 0; // Extend with expected yield tracking if needed
-        totalRehypoYieldOwed += 0;
-        actualExternalClaimsValue += amount; // Will be reconciled to actual later
+        // Record principal as owed claim (user is owed this back + any yield)
+        userRehypoPrincipalOwed[user] += amount;
+        totalRehypoPrincipalOwed += amount;
+
+        actualExternalClaimsValue += amount; // Track value locked externally
+
         emit RehypoDepositRecorded(user, asset, amount, sharesReceived, depositId);
     }
 
@@ -94,11 +107,11 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
         uint256 actualDelta,
         uint256 remainingShares
     ) external onlyRole(KEEPER_ROLE) invariantProtected whenNotPaused {
-        // Use conservative reduction (mulDivUp direction)
-        uint256 currentOwed = userRehypoYieldOwed[user];
-        uint256 reduction = FullMath.mulDivUp(amountWithdrawn, currentOwed, currentOwed + 1); // safe guard
-        userRehypoYieldOwed[user] = currentOwed > reduction ? currentOwed - reduction : 0;
-        totalRehypoYieldOwed = totalRehypoYieldOwed > reduction ? totalRehypoYieldOwed - reduction : 0;
+        // Conservative reduction on principal (mulDivUp direction for safety)
+        uint256 currentPrincipal = userRehypoPrincipalOwed[user];
+        uint256 reduction = FullMath.mulDivUp(amountWithdrawn, currentPrincipal, currentPrincipal + 1); // safe guard against zero
+        userRehypoPrincipalOwed[user] = currentPrincipal > reduction ? currentPrincipal - reduction : 0;
+        totalRehypoPrincipalOwed = totalRehypoPrincipalOwed > reduction ? totalRehypoPrincipalOwed - reduction : 0;
 
         actualExternalClaimsValue = actualExternalClaimsValue > actualDelta ? actualExternalClaimsValue - actualDelta : 0;
 
@@ -123,7 +136,7 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
 
         if (!checkInvariant()) {
             actualExternalClaimsValue = oldActual; // revert state
-            uint256 tracked = totalUserPoolClaims + protocolFees + totalRehypoYieldOwed;
+            uint256 tracked = totalUserPoolClaims + protocolFees + totalRehypoPrincipalOwed + totalRehypoYieldOwed;
             emit ReconciliationDrift(tracked, reportedExternalValue);
             revert ReconciliationDrift(tracked, reportedExternalValue);
         }
@@ -162,7 +175,7 @@ contract AccountingHub is ReentrancyGuard, Pausable, AccessControl {
     // ==================== VIEW HELPERS ====================
 
     function getTrackedValue() external view returns (uint256) {
-        return totalUserPoolClaims + protocolFees + totalRehypoYieldOwed;
+        return totalUserPoolClaims + protocolFees + totalRehypoPrincipalOwed + totalRehypoYieldOwed;
     }
 
     function getActualValue() external view returns (uint256) {
