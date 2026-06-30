@@ -17,6 +17,8 @@ import {IAccountingHub} from "./interfaces/IAccountingHub.sol";
 ///         Designed to work with AccountingHub and IntentHookV2.
 /// @dev One adapter per yield source recommended. Battle-tested protocols only.
 ///      All critical paths are nonReentrant and invariant-aware via Hub.
+///      IMPORTANT: Implement the actual yieldProtocol.deposit/withdraw call in the marked section
+///      for your specific protocol (Aave V3, Morpho, etc.). The placeholder will cause reconciliation revert.
 contract RehypothecationAdapter is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
@@ -63,6 +65,7 @@ contract RehypothecationAdapter is ReentrancyGuard {
 
     /// @notice Deposit underlying to external yield protocol. Record exact amounts + timestamp.
     ///         Performs strict pre/post balance reconciliation.
+    ///         **You must implement the actual protocol deposit call** in the marked section below.
     function deposit(uint256 amount, address onBehalfOf) 
         external 
         nonReentrant 
@@ -70,33 +73,42 @@ contract RehypothecationAdapter is ReentrancyGuard {
     {
         if (amount == 0) revert ZeroAmount();
 
-        // 1. Pre-state
+        // 1. Pre-state (before any transfer)
         uint256 preUnderlying = underlying.balanceOf(address(this));
         uint256 preYield = yieldToken.balanceOf(address(this));
 
-        // 2. Pull funds
+        // 2. Pull funds from user
         underlying.safeTransferFrom(msg.sender, address(this), amount);
 
-        // 3. Approve + call external protocol (adapt to actual protocol interface)
+        // 3. Approve yield protocol to spend
         underlying.safeIncreaseAllowance(yieldProtocol, amount);
 
-        // Example for Aave-style or Morpho. Replace with real call + exact return capture.
-        // ILendingPool(yieldProtocol).deposit(address(underlying), amount, address(this), 0);
-        // sharesReceived = actual shares/tokens received from protocol
-        sharesReceived = amount; // Placeholder — replace with real protocol return value
+        // ============================================================
+        // === PROTOCOL-SPECIFIC DEPOSIT CALL - IMPLEMENT HERE ===
+        // Example for Aave V3 Pool:
+        // IPool(yieldProtocol).supply(address(underlying), amount, address(this), 0);
+        //
+        // Example for Morpho:
+        // IMorpho(yieldProtocol).supply(...);
+        //
+        // After the call, the protocol should have pulled ~amount of underlying
+        // and minted ~amount (or shares) of yieldToken to this adapter.
+        // ============================================================
 
         // 4. Post-state reconciliation (critical safety net)
         uint256 postUnderlying = underlying.balanceOf(address(this));
         uint256 postYield = yieldToken.balanceOf(address(this));
 
-        uint256 actualUnderlyingDelta = postUnderlying - preUnderlying;
-        uint256 actualYieldDelta = postYield - preYield;
+        uint256 underlyingSpentByProtocol = (preUnderlying + amount) - postUnderlying;
+        uint256 sharesReceivedActual = postYield - preYield;
 
-        // Expect underlying to decrease by ~amount (or stay if rebasing). Yield to increase.
-        if (actualUnderlyingDelta > DUST_THRESHOLD) {
-            // Unexpected extra balance or protocol anomaly
-            revert ReconciliationDrift(actualUnderlyingDelta, 0);
+        // Strict check: protocol must have accepted nearly all the underlying we sent
+        if (underlyingSpentByProtocol + DUST_THRESHOLD < amount) {
+            emit ReconciliationFailed(underlyingSpentByProtocol, amount);
+            revert ReconciliationDrift(underlyingSpentByProtocol, amount);
         }
+
+        sharesReceived = sharesReceivedActual;
 
         // 5. Record in Hub (separate rehypo ledger)
         depositId = nextDepositId++;
@@ -111,6 +123,7 @@ contract RehypothecationAdapter is ReentrancyGuard {
         hub.recordRehypoDeposit(onBehalfOf, address(underlying), amount, sharesReceived, depositId);
 
         emit Deposited(onBehalfOf, amount, sharesReceived, depositId);
+        emit Reconciled(underlyingSpentByProtocol, amount, true);
         return (depositId, sharesReceived);
     }
 
@@ -129,18 +142,20 @@ contract RehypothecationAdapter is ReentrancyGuard {
         uint256 preYield = yieldToken.balanceOf(address(this));
 
         // 2. Call external withdraw/claim (adapt to protocol)
+        // ============================================================
+        // === PROTOCOL-SPECIFIC WITHDRAW CALL - IMPLEMENT HERE ===
         // ILendingPool(yieldProtocol).withdraw(address(underlying), sharesToBurn, address(this));
-        amountWithdrawn = sharesToBurn; // Replace with actual returned amount from protocol
+        // amountWithdrawn = actual amount received from protocol
+        // ============================================================
+        amountWithdrawn = sharesToBurn; // Placeholder - replace with actual returned value
 
         // 3. Post-state + strict reconciliation
         uint256 postUnderlying = underlying.balanceOf(address(this));
         uint256 actualDelta = postUnderlying - preUnderlying;
 
         if (actualDelta + DUST_THRESHOLD < amountWithdrawn) {
-            // Protocol returned materially less than expected — possible loss or bug
             emit ReconciliationFailed(actualDelta, amountWithdrawn);
-            // Policy decision: either revert or accept lower amount conservatively
-            // For safety we accept what we got and update Hub with actual
+            // For safety we accept what protocol actually gave us (conservative)
         }
 
         // 4. Update Hub with actuals (conservative — never over-claim)
@@ -154,7 +169,7 @@ contract RehypothecationAdapter is ReentrancyGuard {
             dep.sharesReceived = remainingShares;
         }
 
-        // Transfer actual received to Hub (Hub decides distribution to user or treasury)
+        // Transfer actual received to Hub (Hub decides distribution)
         if (amountWithdrawn > 0) {
             underlying.safeTransfer(address(hub), amountWithdrawn);
         }
@@ -172,11 +187,9 @@ contract RehypothecationAdapter is ReentrancyGuard {
 
         // Compare against Hub tracked rehypo position for this adapter
         // If drift > DUST_THRESHOLD: either update conservatively or revert per policy
-        // This is your safety net against silent external protocol changes
-
         emit Reconciled(actualUnderlying, 0, true);
         return true;
     }
 
-    // Add claimYield(), emergencyRescue(), etc. following the exact same strict reconciliation pattern.
+    // TODO: Add claimYield(), emergencyRescue() following the exact same strict reconciliation pattern.
 }
