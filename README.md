@@ -546,13 +546,11 @@ Pythonfrom agents.toa import TOAOrchestrator
 
 toa = TOAOrchestrator(task_router=platform.task_router)  # optional integration
 
-result = toa.run(
+result = toa. run(
     context={"values": [100, 102, 105, 108, 110], "horizon": 12},
     objectives={"revenue": 0.4, "risk": 0.3, "timeline": 0.3},
     top_k=5
-)
-
-# result contains: run_id, action_plan (ranked list), route_decision, feedback_summary, etc.
+    result contains: run_id, action_plan (ranked list), route_decision, feedback_summary, etc.
 Key methods:
 
 run(context, objectives=None, top_k=None) — full pipeline
