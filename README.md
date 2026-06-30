@@ -487,7 +487,131 @@ Production-grade, compliance-ready audit trail supporting SOX, HIPAA, PCI-DSS, a
 ### Container Orchestration
 
 Flexible deployment targets across Kubernetes, Docker Swarm, Nomad, AWS ECS, Azure Container Instances, and Google Cloud Run, plus a native consciousness-aware orchestrator. Supports rolling updates, blue/green, canary, and zero-downtime migration deployment strategies.
+TOA — Temporal Optimization Agent (Wave Function Collapse Pipeline)
+TOA is SINCOR2’s native strategic foresight and decision-collapse engine. It implements a closed-loop Forecast → Simulate → Collapse + Feedback architecture that treats possible futures as a probabilistic superposition and actively collapses them into ranked, executable action plans.
+It is the platform’s “temporal navigator” layer — the component that turns reactive agent swarms and vertical packs into proactively self-optimizing, timeline-steering autonomous systems. TOA is directly inspired by (and named after) the Wave Function Collapse (WFC) paradigm from constraint-based procedural generation, adapted here to multi-objective decision making under uncertainty.
+Core Metaphor & Design Philosophy
+Just as classic WFC algorithms maintain a superposition of possible tile assignments and iteratively collapse them into a globally coherent output while respecting local constraints, TOA maintains a superposition of probable future trajectories (forecast paths) and collapses them into the highest-utility, highest-probability executable plans while respecting multi-objective constraints, feedback history, and platform policy.
+This gives SINCOR2 agents (and external A2A callers) the ability to:
 
+Project multiple futures from current observations
+Score them against revenue, risk, timeline, compliance, governance, and custom objectives
+Select and dispatch only the paths worth executing
+Learn continuously from real outcomes to improve the next cycle
+
+TOA
+TOA is our super forecaster simulator collapser . It is a full decisioning stack that produces action_dispatch payloads ready for the TaskRouter, Swarm Coordinator, Agency Kernel, or external A2A systems.
+The TOA Pipeline (Forecast → Simulate → Collapse)
+1. Forecaster (KernelForecaster + pluggable)
+Produces a set of probability-weighted future-state paths.
+The reference implementation (agents/toa/forecaster.py) is a pure-Python, zero-dependency Nadaraya-Watson kernel smoother:
+
+Takes a time-series of observations (context["values"])
+Fits a smoothed trend + estimates residual standard deviation
+Generates Monte Carlo paths by adding scaled Gaussian noise around the trend
+Assigns normalized probabilities biased toward paths with stronger terminal growth
+Configurable: forecast_horizon, simulation_depth (number of paths), bandwidth, noise_scale
+
+It is intentionally lightweight and swappable. Production deployments can replace it with Nixtla, NeuralForecast, Darts, Lag-Llama, or any custom ForecasterAgent implementation.
+2. Simulator (MonteCarloSimulator)
+Scores every forecast path against a weighted set of objective functions and produces a composite utility_score plus per-objective breakdown.
+Built-in objectives (all return normalized [0,1] scores):
+
+revenue — terminal growth relative to start (sigmoid-mapped)
+risk — inverse of coefficient of variation (lower volatility wins)
+timeline — how quickly the path reaches its peak value
+compliance — explicit or default score
+governance — explicit or default score
+
+Fully extensible via register_objective(name, fn). Weights are normalized internally and can be overridden per-run or via TOA_OBJECTIVE_WEIGHTS env. Priority ordering (objective_priority) influences collapse boosting.
+3. Collapser (WFCCollapser)
+Performs the actual “collapse”:
+
+Filters paths below collapse_threshold probability
+Ranks remaining paths by composite score:
+utility_score × probability × (1 + priority_boost)
+Returns top-k paths (default 5), each enriched with:
+rank, scenario_id, composite_score, utility_score, probability
+objective_breakdown
+action_dispatch (ready-to-route dict with task_type, priority, dominant_objective, required_skills, metadata)
+Human-readable rationale
+
+
+This is the step that converts probabilistic futures into concrete, prioritized work the rest of SINCOR2 can execute.
+4. Feedback Loop (RollingFeedbackAgent)
+Closes the loop. Ingests execution results, vertical outcomes, on-chain events, reputation deltas, or any external signals. Maintains a rolling buffer and emits an aggregated summary that gets injected into the next forecast context. Enables continuous self-improvement and adaptation across runs.
+TOAOrchestrator — The Public API
+agents/toa/orchestrator.py is the single entry point most consumers use:
+Pythonfrom agents.toa import TOAOrchestrator
+
+toa = TOAOrchestrator(task_router=platform.task_router)  # optional integration
+
+result = toa.run(
+    context={"values": [100, 102, 105, 108, 110], "horizon": 12},
+    objectives={"revenue": 0.4, "risk": 0.3, "timeline": 0.3},
+    top_k=5
+)
+
+# result contains: run_id, action_plan (ranked list), route_decision, feedback_summary, etc.
+Key methods:
+
+run(context, objectives=None, top_k=None) — full pipeline
+ingest_feedback(event) — push outcomes back in
+register_objective(name, fn) — extend the simulator at runtime
+get_stats() — diagnostics
+
+The orchestrator automatically:
+
+Merges feedback into context
+Persists state (TOAStateStore — SQLite by default)
+Dispatches the top action via the injected SINCOR2 TaskRouter when present
+Tracks run count and last action plan
+
+Configuration (TOAConfig)
+All settings are environment-driven with safe defaults (TOA_* prefix):
+
+TOA_SIMULATION_DEPTH (default 50)
+TOA_COLLAPSE_THRESHOLD (default 0.05)
+TOA_TOP_K_PATHS (default 5)
+TOA_FORECAST_HORIZON (default 12)
+TOA_MONTE_CARLO_ITERATIONS
+TOA_OBJECTIVE_WEIGHTS (comma-separated key:value)
+TOA_STATE_PATH (persistence file)
+TOA_STRUCTURED_LOGGING, TOA_FEEDBACK_BUFFER_SIZE, TOA_RUN_TIMEOUT_SECONDS
+
+Objective weights and priority order are first-class and directly influence both simulation scoring and collapse boosting.
+Integration with SINCOR2 Stack
+TOA is designed as a first-class citizen:
+
+Action dispatches flow directly into core.router.TaskRouter, swarm_coordination, Agency Kernel, or any vertical pack.
+Works with the full A2A protocol — external agents can submit contexts and receive collapsed plans.
+Integrates with real-time intelligence feeds and predictive analytics already present in the platform.
+State is persistent across restarts and can be shared or inspected.
+Can be instantiated per-agent, per-swarm, or as a platform-wide strategic layer.
+Pairs naturally with SINAX (geometric proof navigation) for high-stakes or formal-verification-heavy decisions.
+
+Primary Use Cases
+
+Autonomous trading & prediction markets — OpenClaw / Polyclaw signal generation, position sizing, and arbitrage scanning with self-improving win-rate feedback.
+Revenue & opportunity optimization — Detect windows, score impact, and dispatch the highest-utility actions across verticals (healthcare RCM, dental ops, compliance, lead gen).
+Risk & compliance steering — Balance revenue objectives against explicit risk and compliance scores.
+Personal / enterprise timeline optimization — The original “Temporal Optimization Agent – Wave Function Collapse Protocol” use case: actively pruning negative branches and amplifying high-utility timelines.
+Self-improving swarms — Every execution outcome improves the next forecast/simulation cycle.
+Cross-agent synthesis — Feed TOA output into Cortecs Core or multi-agent workflows for deeper reasoning.
+
+Extensibility & Production Readiness
+
+Full abstract base classes (ForecasterAgent, SimulatorAgent, CollapserAgent, FeedbackAgent) — inject your own implementations.
+Zero hard dependencies in the reference forecaster (pure stdlib + math).
+Structured logging, timeout protection, and graceful degradation on component failures.
+Designed for both embedded use inside agents and standalone strategic orchestration.
+State store enables long-running, stateful optimization sessions (exactly as used in persistent Temporal Optimization protocols).
+
+Summary
+TOA is SINCOR2’s native implementation of proactive, multi-objective, feedback-driven temporal optimization. It turns the platform’s powerful execution, marketplace, and swarm layers into a system that doesn’t just react to the present — it actively selects and steers toward the best available futures.
+It is the component that makes “Decentralized Autonomous Economies” (DAE) not just automated, but intelligently self-steering.
+Location in repo: agents/toa/ (orchestrator.py is the main entry point; full pipeline in base.py + collapser.py + forecaster.py + simulator.py + feedback.py + state.py + config.py).
+This module is production-grade, fully integrated, and ready for both internal platform use and external A2A consumption. It is one of the most advanced and strategically important pieces of SINCOR2’s cognitive architecture.
 ---
 
 ## DAE — Decentralized Autonomous Ecosystem
