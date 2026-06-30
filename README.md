@@ -499,7 +499,7 @@ Score them against revenue, risk, timeline, compliance, governance, and custom o
 Select and dispatch only the paths worth executing
 Learn continuously from real outcomes to improve the next cycle
 
-TOA
+## TOA TEMPORAL OPTIMIZATION AGENT
 TOA is our super forecaster simulator collapser . It is a full decisioning stack that produces action_dispatch payloads ready for the TaskRouter, Swarm Coordinator, Agency Kernel, or external A2A systems.
 The TOA Pipeline (Forecast → Simulate → Collapse)
 1. Forecaster (KernelForecaster + pluggable)
