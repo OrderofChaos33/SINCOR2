@@ -1,34 +1,62 @@
-# SINCOR2 MVP Platform - Railway Deployment
-FROM python:3.12-slim AS base
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
+# Multi-stage build for production
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# Install only essential dependencies
-# Strip any erroneous python-sendgrid line (not a real PyPI package) before installing
-# Cache bust: v3
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install to user directory
 COPY requirements.txt .
-RUN sed '/^python-sendgrid/d' requirements.txt > /tmp/req_clean.txt \
-    && pip install --upgrade pip \
-    && pip install -r /tmp/req_clean.txt
+RUN pip install --user --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Production stage
+FROM python:3.11-slim
 
-# sincor2 lives in src/; launch_content_engine lives at repo root
-ENV PYTHONPATH=/app/src:/app
+WORKDIR /app
 
-# Mount one Railway volume at /data (orders.db, agent_burn_log, compliance logs, webbuilder)
-RUN mkdir -p /data/webbuilder /data/logs/compliance /data/quarantine logs outputs data
-ENV SINCOR_DATA_DIR=/data
-ENV WEBBUILDER_DATA_DIR=/data/webbuilder
-ENV COMPLIANCE_MONITOR_ENABLED=true
-ENV COMPLIANCE_CONFIDENTIAL=true
-ENV COMPLIANCE_LOG_TO_STDOUT=false
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Expose default port (Railway overrides via $PORT)
-EXPOSE 8080
+# Create app user
+RUN useradd -m -u 1000 appuser
 
-# Run with gunicorn for production stability
-# Use shell form so $PORT env var is expanded at runtime
-CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 120 --preload run:app
+# Copy Python dependencies from builder
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+
+# Set environment
+ENV PATH=/home/appuser/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8080 \
+    PIP_NO_CACHE_DIR=1
+
+# Copy application
+COPY --chown=appuser:appuser . .
+
+# Create data directory
+RUN mkdir -p /data && chown -R appuser:appuser /data
+
+# Switch to non-root user
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+
+# Run application
+CMD ["gunicorn", \
+     "sincor2.mvp_app:app", \
+     "--bind", "0.0.0.0:8080", \
+     "--workers", "2", \
+     "--worker-class", "sync", \
+     "--timeout", "180", \
+     "--preload-app", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info"]

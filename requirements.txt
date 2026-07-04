@@ -1,57 +1,81 @@
-# SINCOR Master Platform Requirements - Production Ready
-# Core Flask framework
-Flask>=3.0.0,<4.0.0
+# ============================================================================
+# SINCOR2 Production Requirements
+# ============================================================================
+# Core Framework
+Flask==3.0.0
+Flask-JWT-Extended==4.5.2
+Flask-Limiter==3.5.0
+Flask-Cors==4.0.0
+Werkzeug==3.0.0
+gunicorn==21.2.0
 
-# Essential dependencies
-requests>=2.33.0              # HTTP requests for API integrations (fixes CWE-670, CWE-201, CWE-377)
-httpx>=0.25.0                # Async HTTP client for concurrent operations
-PyJWT>=2.12.0                  # JWT authentication
-Jinja2>=3.1.0                 # Template engine
-PyYAML>=6.0                   # Configuration files
-python-dotenv>=1.0.0          # Environment variable management
-numpy>=1.24.0                 # Numerical computing for monetization engine
+# Web & HTTP
+requests==2.31.0
+urllib3==2.0.7
+httpx==0.25.1
 
-# Security & Authentication (Fix #3)
-flask-jwt-extended>=4.7.0     # JWT authentication with refresh tokens
-Authlib>=1.3.0                # Google + GitHub OAuth (signup/login)
+# Data & Serialization
+Pydantic==2.4.2
+pydantic-core==2.10.1
+pydantic[email]==2.4.2
+python-dateutil==2.8.2
+pytz==2023.3
 
-# Input Validation (Fix #4)
-pydantic[email]>=2.0.0        # Data validation and settings management
-email-validator>=2.0.0        # Email validation for Pydantic
+# Database
+SQLAlchemy==2.0.23
+alembic==1.12.1
+sqlite3-backup==1.0
+psycopg2-binary==2.9.9
 
-# Rate Limiting (Fix #5)
-flask-limiter>=3.8.0          # Rate limiting for DDoS protection
+# Cryptography & Security
+cryptography==41.0.7
+PyJWT==2.8.1
+bcrypt==4.1.1
+python-dotenv==1.0.0
 
-# AI Integration (Fix #2)
-anthropic>=0.69.0             # Claude 4.5 Sonnet API
+# API Integrations
+stripe==6.7.0
+resend==0.4.0
+anthropic==0.7.1
+aiohttp==3.9.1
 
-# Production Server
-gunicorn>=21.0.0              # Production WSGI server
+# Scheduling & Async
+APScheduler==3.10.4
+aiofiles==23.2.1
+asyncio-contextmanager==1.0.0
 
-# Monitoring
-psutil>=5.9.0                 # System and process monitoring
+# Logging & Observability
+watchtower==3.0.1
+python-json-logger==2.0.7
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-exporter-otlp==1.21.0
 
-# PDF Generation (for training guide delivery)
-# weasyprint removed - requires system C libs not available in slim Docker image
-reportlab>=4.0.0              # PDF generation library
+# PDF Generation
+Reportlab==4.0.7
+WeasyPrint==59.1
+Pillow==10.1.0
 
-# Email Delivery
-resend>=0.4.0                 # Resend email API (primary)
-sendgrid>=6.10.0              # SendGrid email API (fallback)
-twilio>=8.0.0                 # Twilio SMS (purchase notification fallback)
+# Web Scraping & Parsing
+BeautifulSoup4==4.12.2
+html5lib==1.1
+lxml==4.9.3
 
-# Payment Processing
-stripe>=7.0.0                 # Stripe payment processor API
+# Machine Learning / Data Science
+numpy==1.24.3
+pandas==2.1.3
+scikit-learn==1.3.2
 
-# Outreach Scheduler
-APScheduler>=3.10.0           # Background job scheduler for autonomous outreach
+# Utilities
+click==8.1.7
+pyyaml==6.0.1
+pyaml==23.12.0
+python-slugify==8.0.1
+tenacity==8.2.3
 
-# Optional: Redis for production rate limiting
-# redis>=5.0.0
-
-#langchain and langgraph
-langgraph>=0.2.0
-langchain-core>=0.3
-python-telegram-bot[job-queue]>=21.0
-pydantic>=2.7
-httpx
+# Development (optional, see requirements-dev.txt)
+# pytest
+# pytest-cov
+# black
+# flake8
+# mypy

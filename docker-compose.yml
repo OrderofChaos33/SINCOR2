@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  sincor2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sincor2-dev
+    ports:
+      - "8080:8080"
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: "true"
+      SECRET_KEY: dev-secret-key-change-in-production
+      JWT_SECRET_KEY: dev-jwt-secret-key-change-in-production
+      DATABASE_URL: sqlite:////data/orders.db
+      SINCOR_DATA_DIR: /data
+    volumes:
+      - ./src:/app/src
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - sincor_data:/data
+    networks:
+      - sincor-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: sincor2-postgres
+    environment:
+      POSTGRES_USER: sincor
+      POSTGRES_PASSWORD: dev-password-change-in-production
+      POSTGRES_DB: sincor2
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sincor-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sincor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sincor_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  sincor-network:
+    driver: bridge

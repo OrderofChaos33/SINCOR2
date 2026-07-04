@@ -1,0 +1,45 @@
+# ============================================================================
+# SINCOR2 Development Requirements
+# ============================================================================
+-r requirements.txt
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1
+pytest-mock==3.12.0
+faker==20.1.0
+factory-boy==3.3.0
+
+# Code Quality
+black==23.12.0
+flake8==6.1.0
+isort==5.13.2
+bandit==1.7.5
+ruff==0.1.8
+mypy==1.7.1
+pylint==3.0.3
+
+# Security Scanning
+safety==2.3.5
+semgrep==1.45.3
+
+# Documentation
+Sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+mkdocs==1.5.3
+mkdocs-material==9.4.14
+
+# Debugging & Development
+ipython==8.18.1
+ipdb==0.13.13
+werkzeug-debug-toolbar==0.14.1
+
+# Performance Profiling
+py-spy==0.3.14
+memory-profiler==0.61.0
+line-profiler==4.1.1
+
+# CLI Tools
+python-dotenv[cli]==1.0.0
+click-shell==2.1

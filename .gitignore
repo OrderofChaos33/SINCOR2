@@ -1,9 +1,14 @@
+# ============================================================================
 # Python
+# ============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -16,221 +21,117 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
+PIPFILE.lock
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
-# Virtual Environment
-.venv/
-venv/
-ENV/
-env/
-.virtualenv
-
-# Environment Variables & Secrets
-.env
-.env.*
-*.env
-!.env.example
-secrets/
-secrets_local/
-secrets.txt
-PAYPAL_VAR.txt
-*.pem
-*.key
-*.cert
-
-# Databases
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs
-*.log
-logs/
-*.log.*
-
+# ============================================================================
 # IDE & Editor
+# ============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.project
-.pydevproject
-.settings/
-*.sublime-project
-*.sublime-workspace
-
-# OS Files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
+.sublime-project
+.sublime-workspace
+*.iml
 
-# Flask
-instance/
-.webassets-cache
+# ============================================================================
+# Environment
+# ============================================================================
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.test
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
+# ============================================================================
+# Secrets
+# ============================================================================
+*.key
+*.pem
+*.crt
+private_keys/
+secrets/
+.secrets
 
-# Local Development
-*.local.json
-.claude/settings.local.json
+# ============================================================================
+# Database
+# ============================================================================
+*.db
+*.sqlite
+*.sqlite3
+/data/
+/logs/
 
-# Data & Output Directories
-data/
-output/
+# ============================================================================
+# Logs
+# ============================================================================
+*.log
 logs/
-enrich/
-ingest/
-util/
+*.log.*
 
-# Temporary & Cache
+# ============================================================================
+# OS
+# ============================================================================
+.DS_Store
+Thumbs.db
+.directory
+
+# ============================================================================
+# Project Specific
+# ============================================================================
+/node_modules/
+/dist/
+/build/
+.next/
+out/
+
+# ============================================================================
+# Temporary Files
+# ============================================================================
 *.tmp
 *.temp
-tmp/
-temp/
-cache/
+*.bak
+*.swp
+*.swo
+*~
+.#*
+#*#
+
+# ============================================================================
+# IDE Cache
+# ============================================================================
 .cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
-# Build & Deploy
-*.zip
-*.tar.gz
-*.rar
-sincor_railway_build.zip*
-*.lnk
+# ============================================================================
+# Docker
+# ============================================================================
+.dockerignore
 
-# Assets (images for detailing business - not needed in version control)
-assets/*.jpg
-assets/*.jpeg
-assets/*.png
-assets/*.gif
-assets/*.bmp
-!assets/logo.png
-!assets/sincor-logo.jpg
+# ============================================================================
+# Railway
+# ============================================================================
+.railway/
 
-# Prevent nested copies
-sincor/sincor/
-sincor-deploy-fresh/
-
-# Conflict Files
-_incoming_conflicts/
-*.orig
-*.rej
-
-# Large/Generated Documentation
-docs/detailing_training.pdf
-docs/flyer.pdf
-docs/reality_bending_market_models.pdf
-
-# Backup Files
+# ============================================================================
+# Backup
+# ============================================================================
 *.bak
 *.backup
 *.old
-*_backup.py
-*.py.bak
-
-# Archives & Links (Windows)
-*.lnk
-*.zip
-*.tar
-*.gz
-
-# Specific Directories
-CLINTON-MONETIZATION-ENGINE_PRO/
-code/
-unknown/
-
-# Keep Important Files (override above patterns)
-!README*.md
-!LICENSE
-!requirements.txt
-!Dockerfile
-!Procfile
-!railway.json
-!.gitignore
-sincor/
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-.env
-.DS_Store
-logs/
-outputs/
-data/
-*.db
-sincor/
-sincor2-backup/
-tatus
-
-# Windows system files
-desktop.ini
-Desktop.ini
-Thumbs.db
-
-# Security System
-security_checksums.json
-
-# Sensitive credential / API-key files
-paypalpal.txt
-fenv.txt
-*.secret.txt
-
-# Deployment & session scratch files
-tmpclaude-*
-templates/tmpclaude-*
-
-# Deployment scripts (contain private keys or sensitive params)
-deploy_*.js
-verify_*.js
-load_*_sinc.js
-*_metadata.json
-*_abi.json
-*_bytecode.txt
-push_now.ps1/
-tmpclaude*/
-deploy\ logs.txt
-
-# Backup & working copies of source files
-app.py.backup*
-app.py.pre-*
-app.py.no-*
-app.py.original
-app.py.backup-*
-app_part*.txt
-cortecs_core.py.backup*
-cortecs_core.py.mocked
-paypal_integration.py.backup*
-quick_edit.bat
-New\ Text\ Document*.txt
-
-# Generated guide PDFs (delivered to customers, not for version control)
-files/guides/*.pdf
-files/
-
-# PayPal setup documentation (may contain credential references)
-paypal-setup/
-PAYPAL_SDK_DIAGNOSIS.md
-PAYPAL_PRODUCT_CATALOG.md
-
-# Plaintext key / secret files (fixed 2026-05-18 — replaces UTF-16 corrupted block)
-pk*.txt
-*pk.txt
-Axiom*.txt
-TWILO_AUTH*.txt
-*credentials*.txt
-load_*m_sinc.js
-tmpclaude-*
