@@ -53,7 +53,7 @@ opentelemetry-exporter-otlp==1.21.0
 
 # PDF Generation
 Reportlab==4.0.7
-WeasyPrint==59.1
+WeasyPrint==59.0
 Pillow==10.1.0
 
 # Web Scraping & Parsing
