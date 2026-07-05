@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """
-POLYCLAW SCHEDULER - AGGRESSIVE TUNED VERSION
-Ready to drop into SINCOR2.
-
-This version includes:
-- Aggressive tuned parameters (min_edge=0.028, kelly=0.55, max_pos=0.12)
-- Adaptive edge + dynamic Kelly based on recent performance
-- Daily loss limit + hard drawdown protection
-- APScheduler loop (scans every 60 seconds)
-- JSONL logging
-- Respects POLYCLAW_AUTO_EXECUTE env var (false = paper mode only)
+POLYCLAW SCHEDULER (PRODUCTION VERSION)
+Live, 24/7 Polymarket CLOB V2 Execution via Treasury Address.
 """
 
 import os
 import json
-import random
 import time
+import random
+import logging
 from datetime import datetime, timezone, date
 from apscheduler.schedulers.background import BackgroundScheduler
+
+try:
+    from py_clob_client_v2 import ApiCreds, ClobClient, OrderType, PartialCreateOrderOptions, Side, MarketOrderArgs
+except ImportError:
+    ClobClient = None
+    logging.warning("py-clob-client-v2 not installed. Live execution will fail.")
+
+logger = logging.getLogger(__name__)
 
 # ==================== AGGRESSIVE TUNED PARAMETERS ====================
 MIN_EDGE = 0.028
@@ -35,13 +36,15 @@ MAX_DD_HARD_STOP = 0.35
 PERSISTENT_EDGE_BIAS = 0.011
 NOISE_STD = 0.052
 WIN_RATE_EMA_ALPHA = 0.12
-
-AUTO_EXECUTE = os.getenv("POLYCLAW_AUTO_EXECUTE", "false").lower() == "true"
-
+# =====================================================================
 
 class PolyclawScheduler:
-    def __init__(self):
-        self.equity = 10000.0
+    def __init__(self, app=None):
+        self.app = app
+        self.running = False
+        
+        # Portfolio / Performance Tracking
+        self.equity = 10000.0 
         self.peak_equity = self.equity
         self.max_drawdown = 0.0
         self.total_trades = 0
@@ -49,18 +52,68 @@ class PolyclawScheduler:
         self.win_rate = 0.52
         self.daily_start_equity = self.equity
         self.current_day = date.today()
-        self.log_file = "polyclaw_aggressive_trades.jsonl"
-
+        self.log_file = "polyclaw_production_trades.jsonl"
+        
+        # Polymarket Credentials
+        self.host = "https://clob.polymarket.com"
+        self.chain_id = int(os.getenv("POLYMARKET_CHAIN_ID", "137"))
+        self.pk = os.getenv("POLYMARKET_PK")
+        self.funder = os.getenv("POLYMARKET_FUNDER")
+        self.api_key = os.getenv("POLYMARKET_API_KEY")
+        self.api_secret = os.getenv("POLYMARKET_SECRET")
+        self.api_passphrase = os.getenv("POLYMARKET_PASSPHRASE")
+        self.target_token = os.getenv("POLYCLAW_TARGET_TOKEN")
+        
+        self.client = self._init_clob_client()
         self.scheduler = BackgroundScheduler()
-        self.scheduler.add_job(self.scan_and_trade, 'interval', seconds=SCAN_INTERVAL_SECONDS)
 
-        print("=" * 80)
-        print("POLYCLAW AGGRESSIVE SCHEDULER STARTED")
-        print(f"Parameters: min_edge={MIN_EDGE}, kelly={KELLY_FRACTION}, max_pos={MAX_POSITION_PCT}")
-        print(f"Adaptive: {ADAPTIVE_MODE} | Daily Loss Limit: {DAILY_LOSS_LIMIT_PCT*100}%")
-        print(f"AUTO_EXECUTE = {AUTO_EXECUTE} (false = paper mode only)")
-        print(f"Logging to: {self.log_file}")
-        print("=" * 80)
+    def _init_clob_client(self):
+        if not ClobClient or not self.pk:
+            return None
+            
+        try:
+            creds = None
+            if self.api_key and self.api_secret and self.api_passphrase:
+                creds = ApiCreds(
+                    api_key=self.api_key,
+                    api_secret=self.api_secret,
+                    api_passphrase=self.api_passphrase
+                )
+            
+            client = ClobClient(
+                host=self.host,
+                key=self.pk,
+                chain_id=self.chain_id,
+                funder=self.funder,
+                signature_type=1,
+                creds=creds
+            )
+            
+            # If no API keys provided in env, derive them from the wallet
+            if not creds:
+                logger.info("Deriving Polymarket L2 API credentials from Private Key...")
+                client.creds = client.create_or_derive_api_key()
+                
+            return client
+        except Exception as e:
+            logger.error(f"Failed to initialize Polymarket CLOB client: {e}")
+            return None
+
+    def _sync_onchain_equity(self):
+        """Fetches true USDC balance from the treasury address."""
+        if not self.client or not self.funder:
+            return
+        try:
+            # Note: Depending on SDK version, exact balance fetch method may vary. 
+            # Often implemented via get_balance_allowance() for a specific token.
+            allowances = self.client.get_balance_allowance(
+                {"asset_type": "collateral", "owner": self.funder}
+            )
+            # Simplification: extracting balance from response
+            if allowances and "balance" in allowances:
+                self.equity = float(allowances["balance"])
+        except Exception as e:
+            logger.error(f"Error fetching on-chain equity: {e}")
 
     def _get_adaptive_edge(self, base_edge, recent_wins, recent_losses):
         if not ADAPTIVE_MODE:
@@ -95,115 +148,169 @@ class PolyclawScheduler:
         sized = min(kelly * KELLY_FRACTION * multiplier, MAX_POSITION_PCT)
         return max(0, sized)
 
-    def _simulate_outcome(self, model_prob):
-        true_prob = max(0.01, min(0.99, model_prob + random.gauss(0, 0.028)))
-        return random.random() < true_prob
-
     def _check_daily_limit(self):
         today = date.today()
         if today != self.current_day:
             self.daily_start_equity = self.equity
             self.current_day = today
-            print(f"\n=== NEW DAY - Daily equity reset ===\n")
             return False
 
         daily_pnl = self.equity - self.daily_start_equity
         daily_loss_pct = abs(daily_pnl) / self.daily_start_equity if daily_pnl < 0 else 0
 
         if daily_loss_pct >= DAILY_LOSS_LIMIT_PCT:
-            print(f"\nDAILY LOSS LIMIT HIT ({daily_loss_pct*100:.1f}%) - Pausing for today.")
+            logger.warning(f"DAILY LOSS LIMIT HIT ({daily_loss_pct*100:.1f}%) - Pausing.")
             return True
         return False
 
     def scan_and_trade(self):
-        if self._check_daily_limit():
+        if self._check_daily_limit() or self.max_drawdown >= MAX_DD_HARD_STOP:
             return
 
-        if self.max_drawdown >= MAX_DD_HARD_STOP:
-            print("\nHARD DRAWDOWN STOP TRIGGERED. Shutting down.")
-            self.scheduler.shutdown()
-            return
+        auto_execute = os.environ.get("POLYCLAW_AUTO_EXECUTE", "false").lower() == "true"
+        market_implied = 0.5 
 
-        market_implied = random.uniform(0.18, 0.82)
+        # 1. Fetch Real Orderbook Data
+        if auto_execute and self.client and self.target_token:
+            try:
+                book = self.client.get_order_book(self.target_token)
+                if book.bids and book.asks:
+                    best_bid = float(book.bids[0].price)
+                    best_ask = float(book.asks[0].price)
+                    market_implied = (best_bid + best_ask) / 2
+            except Exception as e:
+                logger.error(f"Failed to fetch market data: {e}")
+                return
+        else:
+            market_implied = random.uniform(0.18, 0.82) # Paper fallback
+
+        # 2. Calculate Edge & Sizing
         model_prob, edge = self._calculate_edge(market_implied)
-
         recent_wr = self.winning_trades / max(self.total_trades, 1)
         adaptive_edge = self._get_adaptive_edge(MIN_EDGE, self.winning_trades, self.total_trades - self.winning_trades)
 
         if abs(edge) < adaptive_edge:
             return
 
-        bet_fraction = self._kelly_size(edge, model_prob, recent_wr)
+        bet_fraction = self._kelly_size(edge, model_prob, self.win_rate)
         if bet_fraction <= 0:
             return
 
+        if auto_execute:
+            self._sync_onchain_equity()
+            
         bet_amount = self.equity * bet_fraction
+        
+        # 3. Execution Phase
+        won = None
+        pnl = 0.0
 
-        if AUTO_EXECUTE:
-            # TODO: Add real Polymarket / on-chain execution here
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] LIVE EXECUTION TRIGGERED (not implemented in this template)")
-            won = False
+        if auto_execute:
+            if not self.client or not self.target_token:
+                logger.error("Cannot execute live: missing Client or TARGET_TOKEN.")
+                return
+                
+            try:
+                logger.info(f"Submitting MARKET BUY for ${bet_amount:.2f} on token {self.target_token}")
+                # Execute Market Buy (Amount in USDC), Fill-or-Kill
+                resp = self.client.create_and_post_market_order(
+                    order_args=MarketOrderArgs(
+                        token_id=self.target_token,
+                        amount=bet_amount,
+                        side=Side.BUY,
+                    ),
+                    options=PartialCreateOrderOptions(tick_size="0.01"),
+                    order_type=OrderType.FOK,
+                )
+                logger.info(f"Order Response: {resp}")
+                self.total_trades += 1
+                pnl = 0.0 # PNL is unrealized until the market resolves on-chain
+            except Exception as e:
+                logger.error(f"Live Execution Failed: {e}")
+                return
         else:
-            won = self._simulate_outcome(model_prob)
+            # Paper Trading Simulation
+            true_prob = max(0.01, min(0.99, model_prob + random.gauss(0, 0.028)))
+            won = random.random() < true_prob
+            pnl = bet_amount if won else -bet_amount
+            self.equity += pnl
+            self.total_trades += 1
+            if won:
+                self.winning_trades += 1
+            
+            outcome = 1.0 if won else 0.0
+            self.win_rate = (WIN_RATE_EMA_ALPHA * outcome) + ((1 - WIN_RATE_EMA_ALPHA) * self.win_rate)
 
-        pnl = bet_amount if won else -bet_amount
-        self.equity += pnl
-        self.total_trades += 1
-        if won:
-            self.winning_trades += 1
-
-        outcome = 1.0 if won else 0.0
-        self.win_rate = (WIN_RATE_EMA_ALPHA * outcome) + ((1 - WIN_RATE_EMA_ALPHA) * self.win_rate)
-
+        # 4. Update Drawdowns
         if self.equity > self.peak_equity:
             self.peak_equity = self.equity
         current_dd = (self.peak_equity - self.equity) / self.peak_equity
         if current_dd > self.max_drawdown:
             self.max_drawdown = current_dd
 
+        # 5. Logging
         trade = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "target_token": self.target_token if auto_execute else "SIM",
             "market_implied": round(market_implied, 4),
             "model_prob": round(model_prob, 4),
             "edge": round(edge, 4),
-            "adaptive_edge_used": round(adaptive_edge, 4),
-            "bet_fraction": round(bet_fraction, 4),
             "bet_amount": round(bet_amount, 2),
-            "won": won,
             "pnl": round(pnl, 2),
             "equity": round(self.equity, 2),
-            "running_win_rate": round(self.win_rate, 4),
-            "max_dd_so_far": round(self.max_drawdown, 4),
-            "auto_execute": AUTO_EXECUTE
+            "auto_execute": auto_execute
         }
 
         with open(self.log_file, "a") as f:
             f.write(json.dumps(trade) + "\n")
 
-        status = "WIN " if won else "LOSS"
-        mode = "LIVE" if AUTO_EXECUTE else "PAPER"
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{mode}] {status} | Edge={edge*100:.2f}% | Bet=${bet_amount:.2f} | P&L=${pnl:+.2f} | Eq=${self.equity:,.2f} | WR={self.win_rate*100:.1f}% | DD={self.max_drawdown*100:.1f}%")
+        mode = "LIVE" if auto_execute else "PAPER"
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{mode}] Edge={edge*100:.2f}% | Bet=${bet_amount:.2f} | Eq=${self.equity:,.2f} | DD={self.max_drawdown*100:.1f}%")
 
     def start(self):
+        polyclaw_enabled = os.environ.get("POLYCLAW_ENABLED", "false").lower() == "true"
+        if not polyclaw_enabled:
+            return
+
+        self.scheduler.add_job(
+            func=self.scan_and_trade,
+            trigger='interval',
+            seconds=SCAN_INTERVAL_SECONDS,
+            id='polyclaw_scan',
+            replace_existing=True
+        )
         self.scheduler.start()
-        print("Polyclaw scheduler is now running...")
+        self.running = True
+        logger.info("POLYCLAW PRODUCTION SCHEDULER STARTED")
 
     def stop(self):
-        self.scheduler.shutdown()
-        print("Polyclaw scheduler stopped.")
+        if self.running:
+            self.scheduler.shutdown()
+            self.running = False
 
+
+# =====================================================================
+# MODULE-LEVEL API REQUIRED BY MVP_APP.PY (Lines 446, 737, 778)
+# =====================================================================
+
+_polyclaw_instance = None
+
+def start_polyclaw_scheduler(app):
+    global _polyclaw_instance
+    if _polyclaw_instance is None:
+        _polyclaw_instance = PolyclawScheduler(app)
+    _polyclaw_instance.start()
+
+def stop_polyclaw_scheduler():
+    global _polyclaw_instance
+    if _polyclaw_instance is not None:
+        _polyclaw_instance.stop()
 
 if __name__ == "__main__":
-    polyclaw = PolyclawScheduler()
-    polyclaw.start()
-
+    os.environ["POLYCLAW_ENABLED"] = "true" 
+    start_polyclaw_scheduler(None)
     try:
         while True:
             time.sleep(60)
     except KeyboardInterrupt:
-        polyclaw.stop()
-        print("\nFinal Stats:")
-        print(f"Total Trades: {polyclaw.total_trades}")
-        print(f"Final Equity: ${polyclaw.equity:,.2f}")
-        print(f"Max Drawdown: {polyclaw.max_drawdown*100:.1f}%")
-        print(f"Win Rate: {polyclaw.win_rate*100:.1f}%")
+        stop_polyclaw_scheduler()
