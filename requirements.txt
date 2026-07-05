@@ -24,7 +24,7 @@ pytz==2023.3
 # Database
 SQLAlchemy==2.0.23
 alembic==1.12.1
-sqlite3-backup==1.0
+sqlite3-backup==0.3.2
 psycopg2-binary==2.9.9
 
 # Cryptography & Security
