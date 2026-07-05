@@ -42,7 +42,7 @@ aiohttp==3.9.1
 # Scheduling & Async
 APScheduler==3.10.4
 aiofiles==23.2.1
-asyncio-contextmanager==1.0.0
+asyncio-contextmanager==1.0.1
 
 # Logging & Observability
 watchtower==3.0.1
