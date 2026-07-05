@@ -11,6 +11,36 @@
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
 <body class="bg-gradient-to-br from-purple-900 via-purple-800 to-red-900">
+    <!-- Balancer LBP Campaign Banner - July 7-10 - Auto removes on July 11 -->
+    <div id="lbp-campaign-banner" class="w-full bg-[#0a0a0f] overflow-hidden border-b border-white/10 relative z-[60]">
+        <a href="/sinc" class="block w-full" aria-label="Balancer LBP Liquidity Bootstrapping Pool Campaign Kicks Off July 7th - 10th on Base. Click to go to SINC page.">
+            <img 
+                src="/static/lbp-banner.png" 
+                alt="CAMPAIGN KICKS-OFF • BALANCER LBP LIQUIDITY BOOTSTRAPPING POOL • JULY 7TH - 10TH • SINCOR on Base with SINAX and AXIOM" 
+                class="w-full h-auto block"
+                style="image-rendering: crisp-edges; max-height: 180px; object-fit: cover;"
+            >
+        </a>
+        <button 
+            onclick="document.getElementById('lbp-campaign-banner').style.display='none'" 
+            class="absolute top-2 right-2 z-[70] w-8 h-8 flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white text-2xl leading-none border-none cursor-pointer transition-colors"
+            aria-label="Close campaign banner"
+        >
+            ×
+        </button>
+    </div>
+
+    <script>
+        // Auto-hide LBP banner after July 10, 2026
+        (function() {
+            const endDate = new Date('2026-07-11T00:00:00-05:00');
+            if (new Date() >= endDate) {
+                const banner = document.getElementById('lbp-campaign-banner');
+                if (banner) banner.style.display = 'none';
+            }
+        })();
+    </script>
+
     <!-- Navigation -->
     <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
