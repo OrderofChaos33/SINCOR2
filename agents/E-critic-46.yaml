@@ -50,7 +50,7 @@ status: Active
 created_date: '2026-06-21'
 constitution_sha256: hash_E-critic-46_auditor
 version: "1.1.0"  # Bumped for novelty enforcer integration
- description: >
+description: >
   The Content Critic (E-46) is the always-on quality gate. It scores every variant
   from Copywriters across multiple dimensions (brand, novelty, predicted performance,
   platform fit, risk, compliance). Enforces forced novelty using the NoveltyEnforcer
@@ -101,4 +101,4 @@ documentationUrl: /docs/architecture/content-orchestration.md
 defaultInputModes:
 - application/json
 defaultOutputModes:
-- application/json
+- application/json

@@ -1,200 +1,503 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SINCOR Dashboard — Your Agent Team</title>
+  <title>SINCOR · Agent Operations Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#070710;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
-    :root{--purple:#6366f1;--purple2:#8b5cf6;--green:#10b981;--amber:#f59e0b;--red:#f87171;--surface:#111827;--border:#1e293b}
-
-    /* NAV */
-    nav{background:#0d0d1a;border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
-    .nav-logo{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1rem;color:#f1f5f9}
-    .nav-logo-dot{width:30px;height:30px;background:linear-gradient(135deg,var(--purple),var(--purple2));border-radius:.4rem;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem}
-    .nav-right{display:flex;align-items:center;gap:1rem}
-    .nav-email{color:#64748b;font-size:.82rem}
-    .status-pill{display:flex;align-items:center;gap:.4rem;background:#0f2a1a;border:1px solid #166534;border-radius:999px;padding:.25rem .75rem;font-size:.78rem;color:#34d399;font-weight:600}
-    .status-dot{width:6px;height:6px;background:#34d399;border-radius:50%;animation:pulse 2s infinite}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-
-    /* DEMO BANNER */
-    .demo-banner{background:#422006;border-bottom:1px solid #92400e;color:#fcd34d;text-align:center;padding:.55rem 1rem;font-size:.82rem;font-weight:600}
-
-    /* LAYOUT */
-    .container{max-width:1100px;margin:0 auto;padding:2rem 1.5rem}
-
-    /* WELCOME */
-    .welcome{margin-bottom:2rem}
-    .welcome h1{font-size:1.6rem;font-weight:700;color:#f1f5f9;margin-bottom:.35rem}
-    .welcome p{color:#94a3b8;font-size:.95rem}
-
-    /* STATS GRID */
-    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
-    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.25rem 1.5rem}
-    .stat-icon{font-size:1.4rem;margin-bottom:.5rem}
-    .stat-value{font-size:1.75rem;font-weight:800;color:#f1f5f9;line-height:1}
-    .stat-label{font-size:.8rem;color:#64748b;margin:.25rem 0}
-    .stat-delta{font-size:.75rem;color:#34d399;font-weight:600}
-
-    /* AGENT GRID */
-    .section-title{font-size:1rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:1rem}
-    .agents{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:2rem}
-    .agent-card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1.25rem;display:flex;gap:1rem;align-items:flex-start;transition:border-color .2s}
-    .agent-card:hover{border-color:var(--purple)}
-    .agent-icon{font-size:1.5rem;width:40px;text-align:center;flex-shrink:0}
-    .agent-name{font-weight:700;color:#f1f5f9;font-size:.9rem;margin-bottom:.25rem;display:flex;align-items:center;gap:.5rem}
-    .active-badge{background:#0f2a1a;border:1px solid #166534;color:#34d399;font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:999px}
-    .agent-task{color:#94a3b8;font-size:.82rem;line-height:1.5}
-
-    /* UPGRADE BANNER */
-    .upgrade{background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.1));border:1px solid rgba(99,102,241,.3);border-radius:1rem;padding:1.5rem 2rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
-    .upgrade h3{font-size:1rem;font-weight:700;color:#f1f5f9;margin-bottom:.25rem}
-    .upgrade p{color:#94a3b8;font-size:.85rem}
-    .upgrade-btn{background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;border:none;border-radius:.75rem;padding:.75rem 1.5rem;font-weight:700;font-size:.9rem;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
-
-    /* QUICK LINKS */
-    .quick-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-bottom:2rem}
-    .quick-link{background:var(--surface);border:1px solid var(--border);border-radius:.75rem;padding:1rem 1.25rem;text-decoration:none;color:#e2e8f0;display:flex;align-items:center;gap:.75rem;font-size:.875rem;font-weight:500;transition:all .2s}
-    .quick-link:hover{border-color:var(--purple);color:#a78bfa}
-    .quick-link-icon{font-size:1.2rem}
-
-    /* FOOTER */
-    footer{text-align:center;padding:2rem;color:#334155;font-size:.8rem;border-top:1px solid var(--border);margin-top:2rem}
-    footer a{color:#475569;text-decoration:none}
-
-    @media(max-width:600px){
-      .upgrade{flex-direction:column}
-      .welcome h1{font-size:1.3rem}
+    :root{
+      --bg:#0a0b0f; --bg-grid:rgba(255,255,255,.022);
+      --panel:#12141c; --panel-2:#161923; --raise:#1b1f2b;
+      --line:#232838; --line-soft:#1a1e29;
+      --ink:#eef2f8; --ink-2:#aeb7c7; --ink-3:#6b7385; --ink-4:#464e60;
+      --sig:#3ddc84;            /* live / signal green */
+      --sig-dim:rgba(61,220,132,.12);
+      --acc:#4c8bf5;            /* Base blue — actions */
+      --acc-dim:rgba(76,139,245,.14);
+      --amber:#f5a623; --amber-dim:rgba(245,166,35,.12);
+      --red:#ff6b6b; --red-dim:rgba(255,107,107,.12);
+      --violet:#9d8cff;
+      --r:14px; --r-sm:10px;
+      --mono:'IBM Plex Mono',ui-monospace,monospace;
+      --sans:'IBM Plex Sans',system-ui,sans-serif;
+      --sidebar:248px;
     }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      background:var(--bg); color:var(--ink); font-family:var(--sans);
+      min-height:100vh; -webkit-font-smoothing:antialiased;
+      background-image:
+        linear-gradient(var(--bg-grid) 1px,transparent 1px),
+        linear-gradient(90deg,var(--bg-grid) 1px,transparent 1px),
+        radial-gradient(900px 500px at 78% -10%, rgba(76,139,245,.10), transparent 60%),
+        radial-gradient(700px 420px at 5% 0%, rgba(61,220,132,.06), transparent 55%);
+      background-size:44px 44px,44px 44px,100% 100%,100% 100%;
+    }
+    a{color:inherit;text-decoration:none}
+    ::selection{background:var(--acc-dim)}
+
+    /* ============ SHELL ============ */
+    .shell{display:grid;grid-template-columns:var(--sidebar) 1fr;min-height:100vh}
+
+    /* ============ SIDEBAR ============ */
+    .side{
+      position:sticky;top:0;height:100vh;border-right:1px solid var(--line);
+      background:linear-gradient(180deg,#0c0e14,#0a0b0f);
+      display:flex;flex-direction:column;padding:1.15rem 1rem;gap:.35rem;
+    }
+    .brand{display:flex;align-items:center;gap:.65rem;padding:.25rem .35rem .9rem;margin-bottom:.35rem;border-bottom:1px solid var(--line-soft)}
+    .brand-mark{
+      width:34px;height:34px;border-radius:9px;flex-shrink:0;
+      background:conic-gradient(from 210deg,var(--acc),var(--sig),var(--violet),var(--acc));
+      display:grid;place-items:center;font-weight:700;color:#04131f;font-size:1rem;
+      box-shadow:0 0 0 1px rgba(255,255,255,.06),0 6px 18px rgba(76,139,245,.25);
+    }
+    .brand-txt b{display:block;font-size:.98rem;letter-spacing:.02em;line-height:1}
+    .brand-txt span{font-family:var(--mono);font-size:.62rem;color:var(--ink-3);letter-spacing:.18em;text-transform:uppercase}
+    .nav-group{font-family:var(--mono);font-size:.6rem;letter-spacing:.2em;color:var(--ink-4);text-transform:uppercase;padding:.9rem .55rem .35rem}
+    .nav-item{
+      display:flex;align-items:center;gap:.7rem;padding:.55rem .6rem;border-radius:var(--r-sm);
+      color:var(--ink-2);font-size:.875rem;font-weight:500;position:relative;transition:.15s;
+    }
+    .nav-item svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;flex-shrink:0}
+    .nav-item:hover{background:var(--panel);color:var(--ink)}
+    .nav-item.on{background:var(--acc-dim);color:#cfe0ff}
+    .nav-item.on::before{content:"";position:absolute;left:-1rem;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--acc)}
+    .nav-item .tag{margin-left:auto;font-family:var(--mono);font-size:.6rem;background:var(--sig-dim);color:var(--sig);padding:.08rem .38rem;border-radius:999px}
+    .side-foot{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:.8rem}
+    .acct{display:flex;align-items:center;gap:.6rem;padding:.5rem .55rem;border-radius:var(--r-sm);background:var(--panel)}
+    .acct-av{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--violet),var(--acc));display:grid;place-items:center;font-weight:700;font-size:.8rem;color:#0a0b0f}
+    .acct-meta{min-width:0}
+    .acct-meta b{display:block;font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+    .acct-meta span{font-family:var(--mono);font-size:.62rem;color:var(--ink-3)}
+
+    /* ============ MAIN ============ */
+    .main{min-width:0;padding:0 0 3rem}
+    .topbar{
+      position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:1rem;
+      padding:1rem 1.9rem;border-bottom:1px solid var(--line);
+      background:rgba(10,11,15,.72);backdrop-filter:blur(14px);
+    }
+    .topbar h1{font-size:1.12rem;font-weight:700;letter-spacing:-.01em}
+    .topbar .sub{font-size:.8rem;color:var(--ink-3);margin-top:.1rem}
+    .top-actions{margin-left:auto;display:flex;align-items:center;gap:.7rem}
+    .live{display:flex;align-items:center;gap:.45rem;font-family:var(--mono);font-size:.72rem;color:var(--sig);background:var(--sig-dim);border:1px solid rgba(61,220,132,.25);padding:.35rem .7rem;border-radius:999px}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--sig);box-shadow:0 0 0 0 rgba(61,220,132,.6);animation:pulse 2.2s infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,132,.5)}70%{box-shadow:0 0 0 7px rgba(61,220,132,0)}100%{box-shadow:0 0 0 0 rgba(61,220,132,0)}}
+    .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:2px}
+    .seg button{background:none;border:none;color:var(--ink-3);font-family:var(--mono);font-size:.72rem;padding:.32rem .62rem;border-radius:7px;cursor:pointer;transition:.15s}
+    .seg button.on{background:var(--raise);color:var(--ink)}
+    .btn{
+      display:inline-flex;align-items:center;gap:.45rem;border:none;cursor:pointer;
+      font-family:var(--sans);font-weight:600;font-size:.83rem;padding:.55rem 1rem;border-radius:9px;transition:.15s;
+    }
+    .btn-primary{background:var(--acc);color:#04121f;box-shadow:0 6px 18px rgba(76,139,245,.28)}
+    .btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+    .btn-ghost{background:var(--panel);color:var(--ink-2);border:1px solid var(--line)}
+    .btn-ghost:hover{border-color:var(--acc);color:var(--ink)}
+
+    .demo{display:flex;align-items:center;gap:.6rem;margin:1.2rem 1.9rem 0;padding:.6rem .9rem;border-radius:var(--r-sm);background:var(--amber-dim);border:1px solid rgba(245,166,35,.3);color:#f7cf8f;font-size:.8rem}
+    .demo b{color:#ffd591}
+
+    .wrap{padding:1.4rem 1.9rem 0;display:flex;flex-direction:column;gap:1.4rem}
+    .eyebrow{font-family:var(--mono);font-size:.66rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-4);margin-bottom:.85rem;display:flex;align-items:center;gap:.6rem}
+    .eyebrow::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+
+    /* KPI ROW */
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+    .kpi{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:var(--r);padding:1.1rem 1.15rem;position:relative;overflow:hidden;transition:.2s}
+    .kpi:hover{border-color:#2c3346;transform:translateY(-2px)}
+    .kpi-top{display:flex;align-items:center;justify-content:space-between}
+    .kpi-ic{font-size:1.05rem;filter:saturate(1.1)}
+    .kpi-delta{font-family:var(--mono);font-size:.7rem;font-weight:600;display:flex;align-items:center;gap:.2rem;padding:.15rem .4rem;border-radius:999px}
+    .kpi-delta.up{color:var(--sig);background:var(--sig-dim)}
+    .kpi-delta.down{color:var(--red);background:var(--red-dim)}
+    .kpi-val{font-size:1.9rem;font-weight:700;letter-spacing:-.02em;margin-top:.55rem;line-height:1;font-variant-numeric:tabular-nums}
+    .kpi-lab{font-size:.76rem;color:var(--ink-3);margin-top:.3rem}
+    .kpi-unit{font-family:var(--mono);color:var(--ink-4)}
+    .spark{margin-top:.75rem;width:100%;height:34px;display:block;overflow:visible}
+
+    /* MAIN GRID */
+    .grid{display:grid;grid-template-columns:1fr 340px;gap:1.4rem;align-items:start}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+    .card-h{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.15rem;border-bottom:1px solid var(--line-soft)}
+    .card-h h3{font-size:.92rem;font-weight:600}
+    .card-h .meta{font-family:var(--mono);font-size:.7rem;color:var(--ink-3)}
+
+    /* AGENTS */
+    .agent-list{display:flex;flex-direction:column}
+    .agent{display:grid;grid-template-columns:38px 1fr auto;gap:.85rem;padding:.95rem 1.15rem;border-bottom:1px solid var(--line-soft);align-items:center;transition:.15s}
+    .agent:last-child{border-bottom:none}
+    .agent:hover{background:var(--panel-2)}
+    .agent-ic{width:38px;height:38px;border-radius:9px;background:var(--raise);display:grid;place-items:center;font-size:1.05rem;border:1px solid var(--line)}
+    .agent-main{min-width:0}
+    .agent-top{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+    .agent-name{font-weight:600;font-size:.88rem}
+    .role{font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--violet);background:rgba(157,140,255,.1);border:1px solid rgba(157,140,255,.2);padding:.08rem .4rem;border-radius:6px}
+    .st{display:inline-flex;align-items:center;gap:.32rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.05em}
+    .st.active{color:var(--sig)} .st.idle{color:var(--amber)}
+    .st i{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+    .st.active i{animation:pulse 2.2s infinite}
+    .agent-task{font-size:.79rem;color:var(--ink-3);margin-top:.28rem;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+    .agent-right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;min-width:104px}
+    .util{width:96px}
+    .util-bar{height:5px;border-radius:999px;background:var(--raise);overflow:hidden}
+    .util-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--sig))}
+    .util-txt{font-family:var(--mono);font-size:.62rem;color:var(--ink-3);margin-top:.25rem}
+    .last{font-family:var(--mono);font-size:.62rem;color:var(--ink-4)}
+
+    /* TIMELINE */
+    .tl{padding:.4rem 1.15rem 1rem}
+    .tl-row{display:grid;grid-template-columns:14px 1fr;gap:.8rem;padding:.7rem 0;position:relative}
+    .tl-row:not(:last-child)::before{content:"";position:absolute;left:6px;top:1.4rem;bottom:-.7rem;width:1px;background:var(--line)}
+    .tl-dot{width:12px;height:12px;border-radius:50%;margin-top:.15rem;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--line)}
+    .tl-lead{background:var(--sig)} .tl-outreach{background:var(--acc)} .tl-content{background:var(--violet)}
+    .tl-analytics{background:var(--amber)} .tl-partner{background:#ff9ecb} .tl-system{background:var(--ink-3)}
+    .tl-txt{font-size:.8rem;color:var(--ink-2);line-height:1.4}
+    .tl-t{font-family:var(--mono);font-size:.64rem;color:var(--ink-4);margin-top:.15rem}
+
+    /* RIGHT RAIL */
+    .rail{display:flex;flex-direction:column;gap:1.4rem;position:sticky;top:88px}
+    .use{padding:1.1rem 1.15rem;display:flex;flex-direction:column;gap:1.05rem}
+    .use-item .use-top{display:flex;justify-content:space-between;align-items:baseline;font-size:.8rem;margin-bottom:.42rem}
+    .use-item .use-top b{font-weight:600}
+    .use-num{font-family:var(--mono);font-size:.72rem;color:var(--ink-3)}
+    .bar{height:7px;border-radius:999px;background:var(--raise);overflow:hidden}
+    .bar>i{display:block;height:100%;border-radius:999px}
+    .fill-sinc{background:linear-gradient(90deg,var(--sig),#8ff0bd)}
+    .fill-axm{background:linear-gradient(90deg,var(--acc),#8fb8ff)}
+    .fill-task{background:linear-gradient(90deg,var(--violet),#c4b8ff)}
+
+    .plan{padding:1.1rem 1.15rem}
+    .plan-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;font-size:.82rem;border-bottom:1px solid var(--line-soft)}
+    .plan-row:last-child{border-bottom:none}
+    .plan-row span{color:var(--ink-3)} .plan-row b{font-weight:600}
+    .plan-badge{font-family:var(--mono);font-size:.66rem;color:var(--acc);background:var(--acc-dim);padding:.15rem .5rem;border-radius:6px}
+
+    .upsell{background:linear-gradient(150deg,rgba(76,139,245,.16),rgba(61,220,132,.08));border:1px solid rgba(76,139,245,.28);border-radius:var(--r);padding:1.2rem}
+    .upsell h4{font-size:.95rem;margin-bottom:.35rem}
+    .upsell p{font-size:.79rem;color:var(--ink-2);line-height:1.5;margin-bottom:.9rem}
+
+    .qa{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;padding:1rem 1.15rem}
+    .qa a{display:flex;align-items:center;gap:.55rem;padding:.7rem .75rem;border-radius:var(--r-sm);background:var(--panel-2);border:1px solid var(--line-soft);font-size:.8rem;font-weight:500;color:var(--ink-2);transition:.15s}
+    .qa a:hover{border-color:var(--acc);color:var(--ink);transform:translateY(-1px)}
+    .qa a.danger:hover{border-color:var(--red);color:var(--red)}
+    .qa svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7}
+
+    footer{text-align:center;padding:2.2rem 1.9rem;color:var(--ink-4);font-size:.76rem;margin-top:1.4rem;border-top:1px solid var(--line-soft)}
+    footer a{color:var(--ink-3)}footer a:hover{color:var(--acc)}
+
+    /* reveal */
+    .rv{opacity:0;transform:translateY(10px);animation:rise .55s cubic-bezier(.2,.7,.2,1) forwards}
+    @keyframes rise{to{opacity:1;transform:none}}
+
+    /* MOBILE */
+    .menu-btn{display:none}
+    @media(max-width:1080px){.grid{grid-template-columns:1fr}.rail{position:static}}
+    @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:820px){
+      .shell{grid-template-columns:1fr}
+      .side{position:fixed;left:0;top:0;z-index:90;width:260px;transform:translateX(-102%);transition:transform .25s;box-shadow:0 0 40px rgba(0,0,0,.5)}
+      .side.open{transform:none}
+      .menu-btn{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:9px;background:var(--panel);border:1px solid var(--line);cursor:pointer}
+      .menu-btn svg{width:18px;height:18px;stroke:var(--ink);fill:none;stroke-width:1.8}
+      .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;opacity:0;pointer-events:none;transition:.25s}
+      .scrim.on{opacity:1;pointer-events:auto}
+    }
+    @media(max-width:540px){.kpis{grid-template-columns:1fr}.topbar .sub{display:none}.qa{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-{% if demo_mode %}
-<div class="demo-banner">Sample metrics — live agent telemetry ships with your SINC subscription.</div>
-{% endif %}
+<div class="shell">
 
-<nav>
-  <div class="nav-logo">
-    <div class="nav-logo-dot">S</div>
-    SINCOR
-  </div>
-  <div class="nav-right">
-    {% if email %}<span class="nav-email">{{ email }}</span>{% endif %}
-    <div class="status-pill">
-      <div class="status-dot"></div>
-      {{ num_agents }} Agents Active
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side" id="side">
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div class="brand-txt"><b>SINCOR</b><span>Ops Console</span></div>
     </div>
-  </div>
-</nav>
 
-<div class="container">
+    <div class="nav-group">Operate</div>
+    <a class="nav-item on" href="#overview">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </a>
+    <a class="nav-item" href="#agents">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+      Agents <span class="tag">{{ active_agents }}</span>
+    </a>
+    <a class="nav-item" href="#activity">
+      <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+      Activity
+    </a>
+    <a class="nav-item" href="#usage">
+      <svg viewBox="0 0 24 24"><path d="M12 20V10M6 20v-6M18 20V6"/></svg>
+      Usage
+    </a>
 
-  <!-- Welcome -->
-  <div class="welcome">
-    <h1>{% if fname %}Welcome back, {{ fname }} 👋{% else %}Your Agent Dashboard 👋{% endif %}</h1>
-    <p>
-      {% if company and company != 'Your Company' %}
-        <strong style="color:#a78bfa">{{ company }}</strong> · 
-      {% endif %}
-      {{ tier }} Plan · {{ num_agents }} autonomous agents working 24/7
-      {% if member_since %} · Member since {{ member_since }}{% endif %}
-    </p>
-  </div>
+    <div class="nav-group">Account</div>
+    <a class="nav-item" href="/billing">
+      <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+      Billing
+    </a>
+    <a class="nav-item" href="/sinc">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9.5c0-1.4 1.3-2 3-2s3 .8 3 2-1.3 1.9-3 2.2-3 .9-3 2.3 1.3 2 3 2 3-.6 3-2"/></svg>
+      Tokens
+    </a>
+    <a class="nav-item" href="/docs">
+      <svg viewBox="0 0 24 24"><path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v6h6"/></svg>
+      Documentation
+    </a>
+    <a class="nav-item" href="/contact">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>
+      Support
+    </a>
 
-  <!-- Stats -->
-  <div class="stats">
-    {% for s in stats %}
-    <div class="stat-card">
-      <div class="stat-icon">{{ s.icon }}</div>
-      <div class="stat-value">{{ s.value }}</div>
-      <div class="stat-label">{{ s.label }}</div>
-      <div class="stat-delta">{{ s.delta }}</div>
-    </div>
-    {% endfor %}
-  </div>
-
-  <!-- Upgrade banner (only for Starter) -->
-  {% if tier == 'Starter' %}
-  <div class="upgrade">
-    <div>
-      <h3>🚀 Unlock 24 agents with Professional</h3>
-      <p>Double your output — sales pipeline, advanced research, and priority support included.</p>
-    </div>
-    <a href="/products/professional" class="upgrade-btn">Upgrade to Professional →</a>
-  </div>
-  {% endif %}
-
-  <!-- Agent Activity -->
-  <div class="section-title">Your Agent Team — Live Activity</div>
-  <div class="agents">
-    {% for agent in agents %}
-    <div class="agent-card">
-      <div class="agent-icon">{{ agent.icon }}</div>
-      <div>
-        <div class="agent-name">
-          {{ agent.name }}
-          <span class="active-badge">● ACTIVE</span>
+    <div class="side-foot">
+      <a class="acct" href="/billing" title="Manage account">
+        <div class="acct-av">{{ (fname[0] if fname else (email[0] if email else 'S'))|upper }}</div>
+        <div class="acct-meta">
+          <b>{{ fname or 'Your account' }}</b>
+          <span>{{ email or 'Not signed in' }}</span>
         </div>
-        <div class="agent-task">{{ agent.task }}</div>
+      </a>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <div class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div id="overview">
+        <h1>{% if fname %}Welcome back, {{ fname }}{% else %}Agent Operations{% endif %}</h1>
+        <div class="sub">
+          {% if company and company != 'Your Company' %}{{ company }} · {% endif %}{{ tier }} Plan · {{ use_case }}
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="live"><span class="dot"></span>{{ active_agents }}/{{ agents|length }} LIVE</span>
+        <div class="seg" id="range">
+          <button data-r="24h">24H</button>
+          <button data-r="7d" class="on">7D</button>
+          <button data-r="30d">30D</button>
+        </div>
+        <a class="btn btn-primary" href="/products/{{ tier|lower }}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Deploy Agent
+        </a>
       </div>
     </div>
-    {% endfor %}
-  </div>
 
-  <!-- Quick Links -->
-  <div class="section-title">Quick Access</div>
-  <div class="quick-links">
-    <a href="/admin/training-vault{% if email %}?email={{ email }}{% endif %}{% if order_id %}&order_id={{ order_id }}{% endif %}" class="quick-link">
-      <span class="quick-link-icon">📚</span> Training Vault
-    </a>
-    <a href="/contact" class="quick-link">
-      <span class="quick-link-icon">💬</span> Support
-    </a>
-    <a href="/billing" class="quick-link">
-      <span class="quick-link-icon">💳</span> Billing
-    </a>
-    <a href="/docs" class="quick-link">
-      <span class="quick-link-icon">📖</span> Documentation
-    </a>
-    <a href="/sinc" class="quick-link">
-      <span class="quick-link-icon">🪙</span> SINC Token
-    </a>
-    <a href="#" class="quick-link" style="color:#ef4444" id="deleteData">
-      <span class="quick-link-icon">🗑</span> Delete My Data
-    </a>
-  </div>
+    {% if demo_mode %}
+    <div class="demo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+      <span><b>Sample telemetry.</b> Live per-agent metrics stream in once your SINC subscription is active.</span>
+    </div>
+    {% endif %}
 
+    <div class="wrap">
+
+      <!-- KPI ROW -->
+      <section>
+        <div class="eyebrow">Performance · last 7 days</div>
+        <div class="kpis">
+          {% for s in stats %}
+          <div class="kpi rv" style="animation-delay:{{ loop.index0 * 60 }}ms">
+            <div class="kpi-top">
+              <span class="kpi-ic">{{ s.icon }}</span>
+              <span class="kpi-delta {{ s.trend }}">
+                {% if s.trend == 'up' %}▲{% else %}▼{% endif %} {{ s.delta }}
+              </span>
+            </div>
+            <div class="kpi-val">{{ s.value }}</div>
+            <div class="kpi-lab">{{ s.label }} <span class="kpi-unit">/ {{ s.unit }}</span></div>
+            <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none" data-spark="{{ s.spark|join(',') }}"></svg>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- MAIN GRID -->
+      <div class="grid">
+        <div style="display:flex;flex-direction:column;gap:1.4rem">
+
+          <!-- AGENTS -->
+          <section id="agents">
+            <div class="eyebrow">Agent roster</div>
+            <div class="card">
+              <div class="card-h">
+                <h3>Your Agent Team</h3>
+                <span class="meta">avg utilisation {{ avg_util }}%</span>
+              </div>
+              <div class="agent-list">
+                {% for a in agents %}
+                <div class="agent">
+                  <div class="agent-ic">{{ a.icon }}</div>
+                  <div class="agent-main">
+                    <div class="agent-top">
+                      <span class="agent-name">{{ a.name }}</span>
+                      <span class="role">{{ a.role }}</span>
+                      <span class="st {{ a.status }}"><i></i>{{ a.status|upper }}</span>
+                    </div>
+                    <div class="agent-task">{{ a.task }}</div>
+                  </div>
+                  <div class="agent-right">
+                    <div class="util">
+                      <div class="util-bar"><div class="util-fill" style="width:{{ a.util }}%"></div></div>
+                      <div class="util-txt">{{ a.util }}% load</div>
+                    </div>
+                    <span class="last">↻ {{ a.last }}</span>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </section>
+
+          <!-- TIMELINE -->
+          <section id="activity">
+            <div class="eyebrow">Live activity</div>
+            <div class="card">
+              <div class="card-h"><h3>Recent Agent Actions</h3><span class="meta">auto-refresh 30s</span></div>
+              <div class="tl">
+                {% for e in timeline %}
+                <div class="tl-row">
+                  <span class="tl-dot tl-{{ e.kind }}"></span>
+                  <div><div class="tl-txt">{{ e.text }}</div><div class="tl-t">{{ e.t }}</div></div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT RAIL -->
+        <aside class="rail" id="usage">
+          <div class="card">
+            <div class="card-h"><h3>Resource Budget</h3><span class="meta">resets daily</span></div>
+            <div class="use">
+              <div class="use-item">
+                <div class="use-top"><b>SINC compute</b><span class="use-num">{{ '{:,}'.format(usage.sinc_used) }} / {{ '{:,}'.format(usage.sinc_cap) }}</span></div>
+                <div class="bar"><i class="fill-sinc" style="width:{{ (usage.sinc_used / usage.sinc_cap * 100)|round }}%"></i></div>
+              </div>
+              <div class="use-item">
+                <div class="use-top"><b>AXIOM intel</b><span class="use-num">{{ usage.axiom_used }} / {{ usage.axiom_cap }}</span></div>
+                <div class="bar"><i class="fill-axm" style="width:{{ (usage.axiom_used / usage.axiom_cap * 100)|round }}%"></i></div>
+              </div>
+              <div class="use-item">
+                <div class="use-top"><b>Tasks today</b><span class="use-num">{{ usage.tasks_today }} / {{ usage.tasks_cap }}</span></div>
+                <div class="bar"><i class="fill-task" style="width:{{ (usage.tasks_today / usage.tasks_cap * 100)|round }}%"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>Your Plan</h3><span class="plan-badge">{{ tier|upper }}</span></div>
+            <div class="plan">
+              <div class="plan-row"><span>Agents provisioned</span><b>{{ num_agents }}</b></div>
+              <div class="plan-row"><span>Active now</span><b style="color:var(--sig)">{{ active_agents }}</b></div>
+              {% if member_since %}<div class="plan-row"><span>Member since</span><b>{{ member_since }}</b></div>{% endif %}
+              <div class="plan-row"><span>Renews</span><b>{{ renewal }}</b></div>
+            </div>
+          </div>
+
+          {% if tier == 'Starter' %}
+          <div class="upsell">
+            <h4>Scale to 25 agents</h4>
+            <p>Professional adds a sales pipeline, deep research, and priority support — roughly double the output.</p>
+            <a class="btn btn-primary" href="/products/professional" style="width:100%;justify-content:center">Upgrade to Professional →</a>
+          </div>
+          {% endif %}
+
+          <div class="card">
+            <div class="card-h"><h3>Quick Actions</h3></div>
+            <div class="qa">
+              <a href="/admin/training-vault{% if email %}?email={{ email }}{% endif %}{% if order_id %}&order_id={{ order_id }}{% endif %}">
+                <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Training Vault
+              </a>
+              <a href="/buy"><svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.5 13h11l2-8H6"/></svg>Buy Credits</a>
+              <a href="/docs"><svg viewBox="0 0 24 24"><path d="M4 4h11l5 5v11H4z"/><path d="M14 4v6h6"/></svg>Docs & API</a>
+              <a href="/contact"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>Support</a>
+              <a href="/sinc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg>SINC Token</a>
+              <a href="#" class="danger" id="deleteData"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Delete Data</a>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <footer>
+      © 2026 SINCOR Business Solutions ·
+      <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/security">Security</a>
+    </footer>
+  </div>
 </div>
-
-<footer>
-  © 2026 SINCOR Business Solutions ·
-  <a href="/terms">Terms</a> ·
-  <a href="/privacy">Privacy</a> ·
-  <a href="/security">Security</a>
-</footer>
 
 <script>
 (function () {
-  const btn = document.getElementById('deleteData');
-  if (!btn) return;
-  btn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    if (!confirm('Permanently delete your profile data?')) return;
-    const token = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('access_token='));
-    const jwt = token ? decodeURIComponent(token.split('=')[1]) : '';
-    if (!jwt) { alert('Sign in again to delete your data.'); return; }
-    const res = await fetch('/api/profile/delete', {
-      method: 'DELETE',
-      headers: { Authorization: 'Bearer ' + jwt },
+  /* ---- sparkline renderer (pure SVG, no deps) ---- */
+  function draw(svg, pts, range) {
+    var d = pts.slice();
+    if (range === '24h') d = d.slice(-5);
+    else if (range === '30d') d = d.concat(d.map(function(v,i){return Math.round(v*(1+(i%3)*.04));}));
+    var w = 120, h = 34, min = Math.min.apply(null,d), max = Math.max.apply(null,d);
+    var span = (max - min) || 1, n = d.length;
+    var pathD = '', areaD = '';
+    d.forEach(function(v,i){
+      var x = n===1 ? w : (i/(n-1))*w;
+      var y = h - 3 - ((v-min)/span)*(h-8);
+      pathD += (i? 'L':'M') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+      areaD += (i? 'L':'M') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
     });
-    if (res.ok) {
-      alert('Your data has been removed.');
-      window.location.href = '/';
-    } else {
-      alert('Could not delete data. Contact support@getsincor.com');
-    }
+    areaD += 'L'+w+' '+h+' L0 '+h+' Z';
+    var id = 'g'+Math.random().toString(36).slice(2,7);
+    svg.innerHTML =
+      '<defs><linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="#3ddc84" stop-opacity=".28"/>'+
+      '<stop offset="1" stop-color="#3ddc84" stop-opacity="0"/></linearGradient></defs>'+
+      '<path d="'+areaD+'" fill="url(#'+id+')"/>'+
+      '<path d="'+pathD+'" fill="none" stroke="#3ddc84" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  var sparks = [].slice.call(document.querySelectorAll('[data-spark]'));
+  function renderAll(range){
+    sparks.forEach(function(svg){
+      var pts = svg.getAttribute('data-spark').split(',').map(Number);
+      draw(svg, pts, range);
+    });
+  }
+  renderAll('7d');
+
+  /* ---- range segmented control ---- */
+  document.getElementById('range').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    this.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    renderAll(b.dataset.r);
+  });
+
+  /* ---- mobile sidebar ---- */
+  var side = document.getElementById('side'), scrim = document.getElementById('scrim'),
+      mb = document.getElementById('menuBtn');
+  function toggle(open){ side.classList.toggle('open',open); scrim.classList.toggle('on',open); }
+  if(mb) mb.addEventListener('click', function(){ toggle(!side.classList.contains('open')); });
+  scrim.addEventListener('click', function(){ toggle(false); });
+
+  /* ---- GDPR delete ---- */
+  var btn = document.getElementById('deleteData');
+  if (btn) btn.addEventListener('click', async function (e) {
+    e.preventDefault();
+    if (!confirm('Permanently delete your profile data? This cannot be undone.')) return;
+    var token = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.indexOf('access_token=')===0;});
+    var jwt = token ? decodeURIComponent(token.split('=')[1]) : '';
+    if (!jwt) { alert('Please sign in again to delete your data.'); return; }
+    var res = await fetch('/api/profile/delete', { method:'DELETE', headers:{ Authorization:'Bearer '+jwt } });
+    if (res.ok) { alert('Your data has been removed.'); location.href='/'; }
+    else { alert('Could not delete data. Contact support@getsincor.com'); }
   });
 })();
 </script>
