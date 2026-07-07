@@ -1,5 +1,5 @@
-# Cancel sub-floor discovery ramp ($0.10-$0.95) on the live hook.
-# Keeps $1.50+ floor ladder. Recovered SINC returns to RECIPIENT (default: treasury safe).
+
+#$1.50+ floor ladder. Recovered SINC returns to RECIPIENT (default: treasury safe).
 #
 # Prereq: signer wallet that PLACED the discovery orders (often treasury safe).
 #   cd C:\Users\cjay4\.grok\worktrees\desktop-sincor-clean\sincor\onchain
