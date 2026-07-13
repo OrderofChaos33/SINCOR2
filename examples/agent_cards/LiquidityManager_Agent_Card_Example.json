@@ -1,0 +1,96 @@
+{
+  "agent_card": {
+    "version": "1.0.1",
+    "agent_id": "liquidity_manager_v1_sincor",
+    "name": "SINCOR LiquidityManager Agent",
+    "description": "Autonomous agent for additive V4 liquidity amplification in SINCOR ecosystem. Manages ranges, pulls/returns capital from yield vaults (Morpho/Aerodrome style), optimizes for fees + idle yield, hedges IL. Interacts via existing SINCOR2 A2A (Agent Cards, JSON-RPC). Payments/settlement in AXM with deflationary burns. Complements existing limit-order hook and A2A tasks without any changes to core.",
+    "provider": {
+      "name": "SINCOR2",
+      "url": "https://getsincor.com",
+      "contact": "via SINCOR2 marketplace or A2A endpoint"
+    },
+    "capabilities": {
+      "skills": [
+        {
+          "skill_id": "optimize_liquidity_range",
+          "name": "Optimize V4 Liquidity Range",
+          "description": "Adjust concentrated liquidity ranges for target pools (e.g., SINC/USDC or SINC/WETH additive pools) based on volatility, volume, and agent signals. Uses on-chain data + predictive models. Triggers via A2A task paid in AXM.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "pool_id": {"type": "string", "description": "V4 PoolId or key (e.g., SINC/USDC)"},
+              "target_range": {"type": "object", "description": "Tick lower/upper or price bounds"},
+              "reason": {"type": "string", "description": "Volatility spike, volume forecast, IL hedge, etc."},
+              "axm_payment_intent": {"type": "string", "description": "Signed AXM payment commitment for this task (existing SINCOR2 validation)"}
+            },
+            "required": ["pool_id", "target_range", "axm_payment_intent"]
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "tx_hash": {"type": "string"},
+              "new_range": {"type": "object"},
+              "expected_yield_improvement": {"type": "number"},
+              "proof": {"type": "string", "description": "On-chain execution proof or event log"}
+            }
+          }
+        },
+        {
+          "skill_id": "manage_idle_yield",
+          "name": "Manage Idle Capital in Yield Vault",
+          "description": "Monitor and rebalance idle LP capital between V4 pool and ERC-4626 yield vault (Morpho/Aerodrome). Pull exact amounts for swaps (DualPool-style), return + fees same block. Maximizes LP yield (swap fees + continuous vault APY). A2A task paid in AXM.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "pool_id": {"type": "string"},
+              "action": {"type": "string", "enum": ["pull_for_swap", "return_to_vault", "rebalance"]},
+              "amount": {"type": "string", "description": "Exact amount or 'auto'"},
+              "axm_payment_intent": {"type": "string"}
+            },
+            "required": ["pool_id", "action", "axm_payment_intent"]
+          }
+        },
+        {
+          "skill_id": "provide_jit_liquidity",
+          "name": "Just-In-Time Liquidity Provision",
+          "description": "Provide temporary concentrated liquidity for high-volume periods or specific swaps. Agent-funded or treasury-backed. Earns fees + AXM rewards. Integrates with existing anti-sandwich protections.",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "pool_id": {"type": "string"},
+              "range": {"type": "object"},
+              "duration_blocks": {"type": "integer"},
+              "axm_payment_intent": {"type": "string"}
+            }
+          }
+        }
+      ],
+      "supported_protocols": ["Uniswap V4", "SINCOR2 A2A", "AXM settlement", "ERC-4626 vaults (Morpho/Aerodrome)"],
+      "authentication": {
+        "type": "A2A + AXM payment intent signature (existing SINCOR2 validation)"
+      }
+    },
+    "endpoints": {
+      "a2a_jsonrpc": "https://your-sincor2-deployment.com/a2a (or your deployed endpoint)",
+      "discovery": "Agent Card served at /.well-known/agent-card or via SINCOR2 marketplace registry"
+    },
+    "pricing": {
+      "model": "AXM per task (deflationary: 50% burned, 50% treasury). Variable based on complexity/gas. SINC staking boosts priority/routing.",
+      "settlement": "On-chain AXM via existing SINCOR2 A2A payment flow (Axiom.sol burns apply)"
+    },
+    "reputation": {
+      "scoring": "Composite: On-chain execution success rate, yield improvement delivered, AXM task volume, SINC staking weight. Routed preferentially in SINCOR2 marketplace.",
+      "transparency": "On-chain events + public dashboards"
+    },
+    "limitations": {
+      "scope": "Additive only - operates on new/parallel V4 pools alongside (does not modify) existing SincLimitOrderHook or core contracts. User/guardian approval for vault config. Agent actions pre-simulated where possible.",
+      "risks": "Standard DeFi (IL, volatility) mitigated by ranges + agent hedging. No custody. Fully decentralized."
+    },
+    "metadata": {
+      "created": "2026-07-12",
+      "updated": "2026-07-12",
+      "tags": ["liquidity", "defi", "v4-hook", "a2a", "axm", "sincor", "yield-optimization", "additive"],
+      "compatibility": "Fully compatible with SINCOR2 v3+ A2A, existing audited hook, AXM A2A settlement, SINC token. Improves liquidity without breaking anything."
+    }
+  }
+}
