@@ -8,6 +8,11 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
+/// @notice Strict interface searchers must implement for typed, contained execution
+interface IMoebiusSearcher {
+    function moebiusExecute(bytes calldata payload) external;
+}
+
 interface IPhantomCreditToken {
     function mintEphemeral(address to, uint256 amount) external;
     function burnEphemeral(address from, uint256 amount) external;
@@ -25,7 +30,8 @@ contract MoebiusMEVHook is BaseHook, ReentrancyGuardTransient {
     event MEVLoopExecuted(
         address indexed searcher,
         uint256 flashAmount,
-        uint256 declaredProfit,
+        uint256 expectedProfit,
+        uint256 actualTaxPaid,
         uint256 lpShare,
         uint256 protocolShare
     );
@@ -58,6 +64,7 @@ contract MoebiusMEVHook is BaseHook, ReentrancyGuardTransient {
         });
     }
 
+    /// @notice Entry point. Searcher declares expected profit upfront. Full validation.
     function executeMEV(
         PoolKey calldata key,
         uint256 flashAmount,
@@ -65,12 +72,19 @@ contract MoebiusMEVHook is BaseHook, ReentrancyGuardTransient {
         bytes calldata searcherPayload
     ) external nonReentrant {
         if (key.hooks != address(this)) revert InvalidPoolKey();
+        
+        address c0 = Currency.unwrap(key.currency0);
+        address c1 = Currency.unwrap(key.currency1);
+        if (c0 != address(pToken) && c1 != address(pToken)) revert InvalidPoolKey();
+        if (c0 == c1) revert InvalidPoolKey(); // Sanity against malformed keys
+        
         if (expectedProfit == 0) revert ZeroProfitDeclared();
 
         bytes memory data = abi.encode(msg.sender, key, flashAmount, expectedProfit, searcherPayload);
         poolManager.unlock(data);
     }
 
+    /// @notice The V4 callback - perfected with defense-in-depth, typed execution, V4 compliant settlement, safe tax math
     function unlockCallback(bytes calldata data) external override returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert UnauthorizedCallback();
 
@@ -82,60 +96,57 @@ contract MoebiusMEVHook is BaseHook, ReentrancyGuardTransient {
             bytes memory payload
         ) = abi.decode(data, (address, PoolKey, uint256, uint256, bytes));
 
-        // === DYNAMIC REAL ASSET DETECTION ===
-        bool isPTokenZero = Currency.unwrap(key.currency0) == address(pToken);
-        Currency realAsset = isPTokenZero ? key.currency1 : key.currency0;
+        // Defense in depth: ensure we don't process garbage data from a rogue nested unlock
+        if (key.hooks != address(this)) revert InvalidPoolKey();
+
+        // 1. Dynamic Sorting for real asset
+        bool isZeroPToken = Currency.unwrap(key.currency0) == address(pToken);
+        Currency realAsset = isZeroPToken ? key.currency1 : key.currency0;
 
         uint256 requiredTax = (expectedProfit * BASE_TAX_BIPS) / 10000;
-
-        // Record hook balance on the REAL asset before execution
         uint256 balanceBefore = realAsset.balanceOfSelf();
 
-        // Issue flash credit
+        // 2. Flash Issue & Typed Execution (searcher responsible for any nested V4 frames)
         pToken.mintEphemeral(searcher, flashAmount);
-
-        // Execute searcher logic
-        (bool success, ) = searcher.call(payload);
-        if (!success) revert ExecutionFailed();
-
-        // Enforce repayment
+        IMoebiusSearcher(searcher).moebiusExecute(payload);
         pToken.burnEphemeral(searcher, flashAmount);
 
-        // Enforce tax via hook balance delta on REAL asset
+        // 3. Tax Enforcement with safe math (prevents underflow if balance decreased)
         uint256 balanceAfter = realAsset.balanceOfSelf();
-        if (balanceAfter < balanceBefore + requiredTax) revert TaxEvasionDetected();
+        if (balanceAfter <= balanceBefore) revert TaxEvasionDetected();
+        uint256 actualTaxPaid = balanceAfter - balanceBefore;
+        if (actualTaxPaid < requiredTax) revert TaxEvasionDetected();
 
-        if (requiredTax > 0) {
-            uint256 protocolShare = (requiredTax * TREASURY_SHARE_BIPS) / 10000;
-            uint256 lpShare = requiredTax - protocolShare;
+        uint256 protocolShare = 0;
+        uint256 lpShare = 0;
 
-            // === CORRECT V4 FLASH ACCOUNTING ===
-            if (realAsset.isNative()) {
-                // Native ETH path
-                if (protocolShare > 0) {
-                    realAsset.transfer(protocolTreasury, protocolShare);
-                }
-                if (lpShare > 0) {
-                    realAsset.transfer(address(poolManager), lpShare);
-                    poolManager.donate(key, 0, lpShare, ""); // amount1 since real asset is currency1
-                    poolManager.settle{value: lpShare}(realAsset);
-                }
-            } else {
-                // ERC20 path
-                poolManager.sync(realAsset);
+        if (actualTaxPaid > 0) {
+            protocolShare = (actualTaxPaid * TREASURY_SHARE_BIPS) / 10000;
+            lpShare = actualTaxPaid - protocolShare;
 
-                if (protocolShare > 0) {
-                    realAsset.transfer(protocolTreasury, protocolShare);
-                }
-                if (lpShare > 0) {
-                    realAsset.transfer(address(poolManager), lpShare);
-                    poolManager.donate(key, lpShare, 0, ""); // amount0 since real asset is currency0
-                    poolManager.settle(realAsset);
-                }
+            if (protocolShare > 0) {
+                realAsset.transfer(protocolTreasury, protocolShare);
             }
 
-            emit MEVLoopExecuted(searcher, flashAmount, expectedProfit, lpShare, protocolShare);
+            if (lpShare > 0) {
+                uint256 amount0 = isZeroPToken ? 0 : lpShare;
+                uint256 amount1 = isZeroPToken ? lpShare : 0;
+                
+                poolManager.donate(key, amount0, amount1, "");
+
+                // 4. V4 Core compliant settlement (no-arg settle after sync/transfer for ERC20; payable no-arg for native)
+                if (realAsset.isNative()) {
+                    poolManager.settle{value: lpShare}();
+                } else {
+                    poolManager.sync(realAsset);
+                    realAsset.transfer(address(poolManager), lpShare);
+                    poolManager.settle();
+                }
+            }
         }
+
+        // 5. Always emit for verifiable auction mechanics (includes actualTaxPaid for overbids)
+        emit MEVLoopExecuted(searcher, flashAmount, expectedProfit, actualTaxPaid, lpShare, protocolShare);
 
         return "";
     }
