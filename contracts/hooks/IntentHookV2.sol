@@ -21,6 +21,10 @@ import {IAccountingHub} from "../../onchain/src/interfaces/IAccountingHub.sol";
  * @notice Production-hardened per Security Hardening Spec v1.0.
  *         MEV donation capture is NOW LIVE and bulletproof.
  *
+ * PRE/POST HOOK NOTE: Pre and post hook execution via hookData is intentionally disabled in this version for security (avoids arbitrary external calls and reentrancy risks inside V4 hook callbacks). hookData is accepted and decoded for event logging only; full execution can be added in future controlled extensions if needed.
+ *
+ * FEE CAPTURE NOTE: Protocol fee is calculated and emitted on positive delta. Actual on-chain value capture for swaps is supplemented by the robust MEV donation path (acceptMEVDonation / receive). Swap fee is primarily for tracking; full automated transfer would require additional V4 delta adjustment or separate collection mechanism.
+ *
  * BUNNI ADVERSARIAL TEST STATUS (executed 2026-06-30):
  *   - Exact mandatory dust + 60 tiny reductions sequence simulated with FullMath.mulDivUp logic.
  *   - SAFE mulDivUp pattern: PASSED - remaining tracked balance NEVER understated.
@@ -136,7 +140,11 @@ contract IntentHookV2 is BaseHook, ReentrancyGuard {
         bytes calldata hookData
     ) external override onlyPoolManager nonReentrant returns (bytes4, BeforeSwapDelta, uint24) {
         if (hookData.length > 0) {
-            emit PreHookExecuted(address(0), false);
+            address target = address(0);
+            try abi.decode(hookData, (address, bytes)) returns (address t, bytes memory) {
+                target = t;
+            } catch {}
+            emit PreHookExecuted(target, false); // false = execution disabled for security (avoids arbitrary call risk in hook context)
         }
         return (this.beforeSwap.selector, toBeforeSwapDelta(0, 0), 0);
     }
@@ -151,28 +159,38 @@ contract IntentHookV2 is BaseHook, ReentrancyGuard {
         _captureProtocolFeeSafe(key, delta);
 
         if (hookData.length > 0) {
-            emit PostHookExecuted(address(0), false);
+            address target = address(0);
+            try abi.decode(hookData, (address, bytes)) returns (address t, bytes memory) {
+                target = t;
+            } catch {}
+            emit PostHookExecuted(target, false); // false = execution disabled for security
         }
 
         return (this.afterSwap.selector, 0);
     }
 
-    // ==================== SAFE FEE CAPTURE ====================
+    // ==================== SAFE FEE CAPTURE (calculation + event; actual value via MEV path or future extension) ====================
 
     function _captureProtocolFeeSafe(PoolKey calldata key, BalanceDelta delta) internal {
         if (protocolFeeBps == 0) return;
 
         uint256 feeAmount = 0;
+        Currency feeCurrency = key.currency1;
         if (delta.amount1() > 0) {
             uint256 positive = uint256(uint128(delta.amount1()));
             feeAmount = FullMath.mulDiv(positive, protocolFeeBps, 10000);
+            feeCurrency = key.currency1;
         } else if (delta.amount0() > 0) {
             uint256 positive = uint256(uint128(delta.amount0()));
             feeAmount = FullMath.mulDiv(positive, protocolFeeBps, 10000);
+            feeCurrency = key.currency0;
         }
 
         if (feeAmount > 0) {
-            emit FeeCaptured(key.currency1, feeAmount, treasury);
+            emit FeeCaptured(feeCurrency, feeAmount, treasury);
+            // Note: Actual token transfer not performed here as this hook does not take from swap delta.
+            // Value capture for protocol is primarily through the robust MEV donation mechanisms below.
+            // Future: could integrate hub.recordProtocolFee or adjust swap delta for automatic collection.
         }
     }
 
