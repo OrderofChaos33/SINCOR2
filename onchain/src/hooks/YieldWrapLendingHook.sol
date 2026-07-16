@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 // YieldWrapLendingHook.sol
 // Production example: Idle LP capital earns lending yield (ERC4626/Morpho) on top of swap fees.
-// Builds directly on your existing LiquidityAmplifierHook pattern - additive, no breakage.
+// Builds directly on BaseLendingLoopHookContainer pattern - additive, no breakage to existing hooks.
 // Full NatSpec, events, safe patterns. Ready for SINCOR2 agent swarms (A2A task settlement in AXM).
 
  import {BaseLendingLoopHookContainer} from "./BaseLendingLoopHookContainer.sol";
@@ -26,7 +26,7 @@ contract YieldWrapLendingHook is BaseLendingLoopHookContainer {
     function setYieldVault(PoolId poolId, address vault) external {
         require(msg.sender == guardian, "Only guardian");
         yieldVaults[poolId] = vault;
-        emit YieldVaultUpdated(poolId, vault); // From base or add event
+        emit YieldVaultUpdated(poolId, vault);
     }
 
     function _beforeAddLiquidity(
@@ -39,19 +39,30 @@ contract YieldWrapLendingHook is BaseLendingLoopHookContainer {
         return BaseLendingLoopHookContainer._beforeAddLiquidity(sender, key, params, hookData);
     }
 
-    function _beforeSwap(...) internal override returns (bytes4, BeforeSwapDelta, uint24) {
+    function _beforeSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        bytes calldata hookData
+    ) internal override returns (bytes4, BeforeSwapDelta, uint24) {
         PoolId poolId = key.toId();
         address vault = yieldVaults[poolId];
-        if (vault != address(0) && whitelistedAgents[sender] || sender == address(0)) { // Allow or agent-gated
+        if (vault != address(0) && (whitelistedAgents[sender] || sender == address(0))) {
             // Production: Calculate needed liquidity, withdraw from ERC4626 (preview + redeem)
             // IERC4626(vault).withdraw(needed, address(this), address(this));
             // Then add to pool for swap execution (flash style)
-            emit LiquidityPulled(poolId, 0, 0); // Fill amounts
+            emit LiquidityPulled(poolId, 0, 0); // Fill amounts in full impl
         }
         return BaseLendingLoopHookContainer._beforeSwap(sender, key, params, hookData);
     }
 
-    function _afterSwap(...) internal override returns (bytes4, int128) {
+    function _afterSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) internal override returns (bytes4, int128) {
         // Return unused + fees to vault immediately
         // IERC4626(vault).deposit(returned, address(this));
         emit LiquidityReturned(poolId, 0, 0, 0);
