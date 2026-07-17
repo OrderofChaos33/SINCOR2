@@ -1,17 +1,19 @@
 """Bankroll and risk accounting for Polyclaw trading.
 
-Enforces the risk limits that previously existed only as unread env vars
-(``TRADING_MAX_DRAWDOWN``, ``TRADING_MAX_LEVERAGE``) and adds the incremental
-capital policy: start small (default $20), compound only realized profit.
+Everything is PROPORTIONAL to current equity — there is no fixed dollar
+ceiling. The account starts at ``POLYCLAW_CAPITAL_USD`` (default $20) and
+every limit scales as realized profit compounds:
 
-Policy defaults (all overridable via env)
------------------------------------------
-POLYCLAW_CAPITAL_USD             20     starting bankroll
-POLYCLAW_MAX_POSITION_USD        5      max notional per position
-POLYCLAW_MAX_EXPOSURE_USD        = capital + realized profit (total open notional)
-POLYCLAW_DAILY_LOSS_LIMIT_USD    5      trip kill switch beyond this/day
-TRADING_MAX_DRAWDOWN             0.15   equity drawdown fraction → kill switch
-TRADING_MAX_LEVERAGE             2.0    exposure / equity ceiling
+    equity = starting capital + realized PnL   (open positions at cost)
+
+- Position size:   up to POLYCLAW_MAX_POSITION_PCT (15%) of equity
+                   → $20 bankroll ≈ $0.30–$3 wagers, $3,000 ≈ $30–$300
+- Total exposure:  up to TRADING_MAX_LEVERAGE (2x) of equity
+- Daily loss stop: POLYCLAW_DAILY_LOSS_PCT (25%) of equity → kill switch
+- Drawdown stop:   TRADING_MAX_DRAWDOWN (15%) off peak equity → kill switch
+
+So the system is always growing: bigger equity → bigger wagers → bigger
+absolute limits, with the same relative discipline at every level.
 
 Kill switch persists in the DB; ``execution_adapter`` also mirrors it to a
 halt file so a crashed process cannot keep trading.
@@ -36,7 +38,6 @@ def _db_path() -> Path:
     path = Path(_DEFAULT_DB)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Probe writability; fall back to local file if /data isn't mounted.
         probe = path.parent / ".write_probe"
         probe.touch()
         probe.unlink()
@@ -48,14 +49,16 @@ def _db_path() -> Path:
 
 
 class Bankroll:
-    """Thread-safe SQLite-backed bankroll and risk gate."""
+    """Thread-safe SQLite-backed bankroll and risk gate. Equity-proportional."""
 
     def __init__(self, db_path: Optional[Path] = None) -> None:
         self.db_path = db_path or _db_path()
         self._lock = threading.Lock()
+        # Starting bankroll — a floor, not a cap. Equity grows from here.
         self.start_capital = float(os.getenv("POLYCLAW_CAPITAL_USD", "20"))
-        self.max_position = float(os.getenv("POLYCLAW_MAX_POSITION_USD", "5"))
-        self.daily_loss_limit = float(os.getenv("POLYCLAW_DAILY_LOSS_LIMIT_USD", "5"))
+        # Proportional limits (fractions of current equity)
+        self.max_position_pct = float(os.getenv("POLYCLAW_MAX_POSITION_PCT", "0.15"))
+        self.daily_loss_pct = float(os.getenv("POLYCLAW_DAILY_LOSS_PCT", "0.25"))
         self.max_drawdown = float(os.getenv("TRADING_MAX_DRAWDOWN", "0.15"))
         self.max_leverage = float(os.getenv("TRADING_MAX_LEVERAGE", "2.0"))
         self._init_db()
@@ -175,12 +178,22 @@ class Bankroll:
         return float(row["exp"])
 
     def equity(self) -> float:
-        """Starting capital + realized PnL (open positions valued at cost)."""
+        """Starting capital + realized PnL. Grows as we win."""
         return self.start_capital + self.realized_pnl_total()
 
+    # -- Dynamic (equity-proportional) limits ---------------------------
+
+    def max_position_size(self) -> float:
+        """Max notional for ONE position right now (15% of equity default)."""
+        return self.equity() * self.max_position_pct
+
+    def daily_loss_limit_usd(self) -> float:
+        """Daily realized-loss stop in USD (25% of equity default)."""
+        return max(1.0, self.equity() * self.daily_loss_pct)
+
     def max_exposure(self) -> float:
-        return min(self.equity() * self.max_leverage,
-                   self.start_capital + max(0.0, self.realized_pnl_total()))
+        """Total open notional ceiling (leverage × equity)."""
+        return self.equity() * self.max_leverage
 
     def available_capital(self) -> float:
         return max(0.0, self.max_exposure() - self.open_exposure())
@@ -196,6 +209,8 @@ class Bankroll:
             )
         return {"equity": round(eq, 2), "exposure": round(exp, 2),
                 "available": round(self.available_capital(), 2),
+                "max_position": round(self.max_position_size(), 2),
+                "daily_loss_limit": round(self.daily_loss_limit_usd(), 2),
                 "peak_equity": round(peak, 2),
                 "realized_today": round(self.realized_pnl_today(), 2),
                 "kill_switch": self.kill_switch_active()}
@@ -205,17 +220,20 @@ class Bankroll:
     # ------------------------------------------------------------------
 
     def can_open(self, size_usd: float) -> bool:
-        """True only if the position fits every risk limit."""
+        """True only if the position fits every (equity-scaled) risk limit."""
         with self._lock:
             if self.kill_switch_active():
                 return False
-            if size_usd <= 0 or size_usd > self.max_position:
+            if size_usd <= 0 or size_usd > self.max_position_size():
                 return False
             if size_usd > self.available_capital():
                 return False
-            # Daily loss limit
-            if self.realized_pnl_today() <= -abs(self.daily_loss_limit):
-                self.trip_kill_switch("daily loss limit reached")
+            # Daily loss limit (proportional)
+            if self.realized_pnl_today() <= -abs(self.daily_loss_limit_usd()):
+                self.trip_kill_switch(
+                    f"daily loss limit reached "
+                    f"(-${self.daily_loss_limit_usd():.2f} of ${self.equity():.2f} equity)"
+                )
                 return False
             # Drawdown limit vs peak equity
             peak = float(self._get_state("peak_equity", str(self.start_capital)) or self.start_capital)
