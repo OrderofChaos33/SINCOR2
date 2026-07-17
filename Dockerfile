@@ -1,5 +1,5 @@
-# Multi-stage build for production
-FROM python:3.11-slim as builder
+# Multi-stage build for production (small, secure, fast)
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install to user directory
+# Copy requirements and install to user directory (cached layer)
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
-# Production stage
-FROM python:3.11-slim
+# Production runtime stage
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app user
+# Create non-root user
 RUN useradd -m -u 1000 appuser
 
 # Copy Python dependencies from builder
@@ -36,23 +36,23 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
     PORT=8080 \
     PIP_NO_CACHE_DIR=1
 
-# Copy application
+# Copy application code
 COPY --chown=appuser:appuser . .
 
-# Create data directory
+# Create persistent data directory
 RUN mkdir -p /data && chown -R appuser:appuser /data
 
 # Switch to non-root user
 USER appuser
 
-# Health check
+# Healthcheck (assumes /health endpoint returns 200 OK)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health', timeout=5)" || exit 1
 
-# Run application
+# Run with Gunicorn (production WSGI server)
 CMD ["gunicorn", \
      "sincor2.mvp_app:app", \
-     "--bind", "0.0.0.0:8080", \
+     "--bind", "0.0.0.0:${PORT}", \
      "--workers", "2", \
      "--worker-class", "sync", \
      "--timeout", "180", \
