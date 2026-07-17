@@ -31,7 +31,7 @@ pragma solidity ^0.8.20;
  * ----------
  * Chain  : Base (chainId 8453)
  * Token  : 0x9C8cd8d3961F445D653713dE65C6578bE11668e7  (SINC v3, decimals=0)
- * Treasury: 0xAf9B539D8043C634b7E611818518BA7E850F289e
+ * Treasury: 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac
  */
 
 interface IERC20 {
