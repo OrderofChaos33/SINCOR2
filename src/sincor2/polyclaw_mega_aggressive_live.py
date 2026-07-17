@@ -6,7 +6,7 @@ path rolled ``random.random()`` and booked imaginary profit. That code is
 gone. Everything here flows through the real stack:
 
     forecasting_engine.scan_opportunities()   real Polymarket data → model probs
-    bankroll.can_open()                       $20 cap, drawdown/leverage gates
+    bankroll.can_open()                       equity-proportional risk gates
     execution_adapter.place_market_buy()      CLOB FOK orders (dry-run default)
     bankroll.record_trade()                   durable SQLite ledger
 
@@ -18,10 +18,12 @@ Live mode requires ALL of:
 Without them the runner still does the full scan/sizing loop but every order
 is a clearly-logged dry run. There is no silent "looks live" mode anymore.
 
-Incremental capital policy (defaults): $20 bankroll, max $5 per position,
-$5/day loss limit, 15% max drawdown, 2x leverage ceiling. All configurable
-via env — see bankroll.py. Treasury for fee routing:
-0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac (TREASURY_ADDRESS).
+Sizing policy — ALWAYS GROWING, no fixed dollar ceiling:
+  wager = half-Kelly × confidence, clamped to
+          [POLYCLAW_MIN_WAGER_USD, POLYCLAW_MAX_POSITION_PCT × equity]
+  $20 equity   → ~$0.30–$3 wagers
+  $3,000 equity → ~$30–$300 wagers (same discipline, bigger numbers)
+  Stronger TOA/forecast confidence → larger fraction of the range.
 
 Run one cycle:    python -m sincor2.polyclaw_mega_aggressive_live
 Run forever:      POLYCLAW_LOOP=1 python -m sincor2.polyclaw_mega_aggressive_live
@@ -58,12 +60,20 @@ TREASURY_ADDRESS = os.getenv(
 MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.04"))          # 4% min |edge|
 MIN_CONFIDENCE = float(os.getenv("POLYCLAW_MIN_CONFIDENCE", "0.4"))
 KELLY_FRACTION = float(os.getenv("POLYCLAW_KELLY_FRACTION", "0.5"))  # half-Kelly
+# Wager floor. NOTE: Polymarket's exchange minimum is ≈$1 per order — sizes
+# below that will be rejected by the CLOB. Set 0.30 only if your markets
+# accept sub-dollar orders; otherwise leave at 1.0.
+MIN_WAGER_USD = float(os.getenv("POLYCLAW_MIN_WAGER_USD", "1.0"))
 MAX_TRADES_PER_CYCLE = int(os.getenv("POLYCLAW_MAX_TRADES_PER_CYCLE", "3"))
 CYCLE_INTERVAL_SEC = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "900"))  # 15 min
 
 
 def _kelly_size(fc: Forecast, side: str, equity: float, cap: float) -> float:
-    """Half-Kelly position size in USD, bounded by the per-position cap."""
+    """Half-Kelly position size in USD, confidence-scaled, capped at ``cap``.
+
+    The cap is equity-proportional (bankroll.max_position_size()), so the
+    ceiling rises automatically as the bankroll compounds.
+    """
     p = fc.model_probability if side == "BUY_YES" else 1.0 - fc.model_probability
     price = fc.market_price if side == "BUY_YES" else 1.0 - fc.market_price
     if price <= 0.01 or price >= 0.99:
@@ -72,7 +82,7 @@ def _kelly_size(fc: Forecast, side: str, equity: float, cap: float) -> float:
     kelly = (p * (b + 1.0) - 1.0) / b
     if kelly <= 0:
         return 0.0
-    # Scale Kelly down by data-quality confidence; cap at bankroll limit.
+    # Scale Kelly down by data-quality confidence; cap at equity-proportional limit.
     size = equity * kelly * KELLY_FRACTION * fc.confidence
     return round(min(size, cap), 2)
 
@@ -95,9 +105,10 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
 
     snapshot = bankroll.snapshot()
     logger.info(
-        "cycle start | equity=$%.2f exposure=$%.2f available=$%.2f today=$%.2f%s",
+        "cycle start | equity=$%.2f exposure=$%.2f available=$%.2f "
+        "max_pos=$%.2f today=$%.2f%s",
         snapshot["equity"], snapshot["exposure"], snapshot["available"],
-        snapshot["realized_today"],
+        snapshot["max_position"], snapshot["realized_today"],
         "" if adapter.is_live() else " [DRY RUN]",
     )
 
@@ -116,10 +127,11 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         side_label, token_id = _pick_side(fc)
         if not token_id:
             continue
-        size = _kelly_size(fc, side_label, snapshot["equity"], bankroll.max_position)
-        if size < 1.0:  # Polymarket min order ≈ $1
-            logger.info("skip %s — Kelly size $%.2f below $1 minimum",
-                        fc.question[:60], size)
+        size = _kelly_size(fc, side_label, snapshot["equity"],
+                           bankroll.max_position_size())
+        if size < MIN_WAGER_USD:
+            logger.info("skip '%s' — Kelly size $%.2f below $%.2f wager floor",
+                        fc.question[:60], size, MIN_WAGER_USD)
             continue
 
         result = adapter.place_market_buy(token_id, size)
