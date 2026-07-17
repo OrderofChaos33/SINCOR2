@@ -1,4 +1,4 @@
-# Multi-stage build for production (small, secure, fast)
+# Multi-stage build for production (small, secure, fast, Railway-ready)
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -45,18 +45,17 @@ RUN mkdir -p /data && chown -R appuser:appuser /data
 # Switch to non-root user
 USER appuser
 
-# Healthcheck (assumes /health endpoint returns 200 OK)
+# Healthcheck (assumes /health endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health', timeout=5)" || exit 1
 
-# Run with Gunicorn (production WSGI server)
+# Run with Gunicorn (compatible, production settings)
 CMD ["gunicorn", \
      "sincor2.mvp_app:app", \
      "--bind", "0.0.0.0:${PORT}", \
      "--workers", "2", \
      "--worker-class", "sync", \
      "--timeout", "180", \
-     "--preload-app", \
      "--access-logfile", "-", \
      "--error-logfile", "-", \
      "--log-level", "info"]
