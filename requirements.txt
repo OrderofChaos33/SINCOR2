@@ -39,6 +39,9 @@ resend==2.7.0
 anthropic==0.7.1
 aiohttp==3.9.1
 
+# Polyclaw live trading (Polymarket CLOB) — required for POLYCLAW_LIVE=true
+py-clob-client>=0.17.0
+
 # Scheduling & Async
 APScheduler==3.10.4
 aiofiles==23.2.1
@@ -88,4 +91,3 @@ tenacity==8.2.3
 # black
 # flake8
 # mypy
-
