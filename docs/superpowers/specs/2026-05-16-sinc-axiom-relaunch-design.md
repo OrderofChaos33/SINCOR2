@@ -21,7 +21,7 @@ Relaunch the SINC token in a way that:
 
 - Treasury budget: very limited (~$50–200 in ETH for gas + minimal initial seed).
 - Signing authority: user only, via their own wallet software (MetaMask or hardware). No automated signing, no plaintext-key file reads.
-- Treasury wallet: `0xAf9B539D8043C634b7E611818518BA7E850F289e` (clean, no plaintext exposure).
+- Treasury wallet: `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` (clean, no plaintext exposure).
 - Legacy / compromised wallets that hold supply but must NOT be used for treasury operations:
   - `0x35cb3bf1b29F81d325EB9A7225a3E87fE7B37D6f` — original creator. Key has been in `pk.txt` on user's Desktop. Will be emptied and abandoned.
   - `0x6E36dfD8773A5Ad2336418a5135f4b6119f5cBC9` — top v2 holder. Key was pasted in a chat session (this conversation). Currently holds 40M SINC v2 tokens. Considered permanently compromised; v2 will be sunsetted so its 40M becomes worthless.
@@ -38,7 +38,7 @@ Relaunch the SINC token in a way that:
 - Owner role: per GoPlus, `owner_balance: 0` — likely already renounced or no privileged owner role. Spec assumes no `renounceOwnership()` step needed; verification step in runbook confirms.
 - Not mintable, not pausable, not blacklist-capable, no honeypot, no tax, no hidden owner, no proxy, no self-destruct.
 - **CertiK Skynet score: 97/100** (1 attention flag = "single-wallet concentration," resolved as supply distributes).
-- Initial supply allocation: 100M held by `0x35cb…7D6f` at time of audit. Allocation must be moved to `0xAf9B…289e` before any launch activity.
+- Initial supply allocation: 100M held by `0x35cb…7D6f` at time of audit. Allocation must be moved to `0x09E2…12Ac` before any launch activity.
 
 ## 4. On-chain architecture
 
@@ -89,7 +89,7 @@ Existing `SINCBondingCurve.sol` at the repo root is **not used** — it has rug-
   2. Initialize Uniswap V4 SINC/WETH pool on PoolManager `0x498581ff718922c3f8e6a244956af099b2652b2b` with `SincLimitOrderHook` attached, at the curve's final price.
   3. Add LP using **80% of accumulated ETH** paired with **all remaining SINC held by the curve** (typically ~15M but variable based on how Phase 1 went).
   4. Transfer the resulting LP NFT to `0x000000000000000000000000000000000000dEaD` (burn).
-  5. Transfer **20% of accumulated ETH** to treasury `0xAf9B…289e`.
+  5. Transfer **20% of accumulated ETH** to treasury `0x09E2…12Ac`.
   6. Self-disable: `buy()` and `sell()` revert thereafter; `graduated` boolean flips to `true`.
   7. Emit `Graduated(uint256 ethToLP, uint256 ethToTreasury, address poolId, uint256 burnedLPTokenId, uint256 sincToLP)` for indexers.
 
@@ -214,7 +214,7 @@ After graduation, the user (via wallet signature) places:
 ### 4.5 Sablier vesting stream
 
 - **Asset:** 10M SINC.
-- **Source wallet:** `0xAf9B…289e` (treasury).
+- **Source wallet:** `0x09E2…12Ac` (treasury).
 - **Recipient:** A new wallet derived from a hardware wallet (recommended). User to specify in runbook.
 - **Duration:** 24 months, linear, **non-cancellable, non-transferable**.
 - **Start:** Graduation day + 0 (vests from launch).
@@ -234,7 +234,7 @@ The curve receives a single 65M deposit at funding time. Phase 1 buyers consume 
 | Sablier 24mo linear vest | 10M | Sablier stream NFT | Step 14 |
 | **Total** | **100M** | ✓ | |
 
-**Treasury working balance over time** (starts at 100M in `0xAf9B…289e`):
+**Treasury working balance over time** (starts at 100M in `0x09E2…12Ac`):
 - After step 7 (fund curve): 35M in treasury, 65M in curve.
 - After step 12 (place ceiling LP): 30M in treasury.
 - After step 13 (place ladder): 10M in treasury.
@@ -267,7 +267,7 @@ The curve receives a single 65M deposit at funding time. Phase 1 buyers consume 
 - **Module:** `sincor-clean/agent_billing.py` (new).
 - **Flow:**
   1. A SINCOR agent receives a billable task (existing platform mechanism).
-  2. The customer pays via SINC ERC-20 transfer to `0xAf9B…289e`'s billing sub-address.
+  2. The customer pays via SINC ERC-20 transfer to `0x09E2…12Ac`'s billing sub-address.
   3. `agent_billing.py` detects the payment (via web3 event listener on the SINC contract), and immediately initiates two on-chain txs:
      - 50% of received SINC → `transfer(0x...dEaD, amount/2)` — burn
      - 50% remains in treasury for ops
@@ -323,7 +323,7 @@ launch_content_engine/
 Dashboard at `dune.com/sincor/sinc` showing live:
 - Total holders + 24h/7d/30d growth
 - Burn counter (lifetime + this week) sourced from `Transfer(_, 0x...dEaD, _)` events on SINC contract
-- Treasury balance + tx history for `0xAf9B…289e`
+- Treasury balance + tx history for `0x09E2…12Ac`
 - Vesting stream progress (Sablier NFT state)
 - 24h volume + tx count
 - Top 10 holders (with vesting/lock annotations)
@@ -410,9 +410,9 @@ Steps marked **🔐 SIGN** require user signature from their wallet. Steps marke
 
 | # | Step | Type | Notes |
 |---|---|---|---|
-| 0 | Set up new clean treasury wallet `0xAf9B…289e` (already done) | manual | If not on hardware wallet yet, strongly recommend setup now |
-| 1 | **Move 100M SINC from `0x35cb…7D6f` → `0xAf9B…289e`** | 🔐 SIGN | One ERC-20 transfer. Critical because `0x35cb` key is in `pk.txt` |
-| 2 | Sweep ETH dust from `0x35cb` to `0xAf9B` | 🔐 SIGN | Abandon `0x35cb` after |
+| 0 | Set up new clean treasury wallet `0x09E2…12Ac` (already done) | manual | If not on hardware wallet yet, strongly recommend setup now |
+| 1 | **Move 100M SINC from `0x35cb…7D6f` → `0x09E2…12Ac`** | 🔐 SIGN | One ERC-20 transfer. Critical because `0x35cb` key is in `pk.txt` |
+| 2 | Sweep ETH dust from `0x35cb` to `0x09E2` | 🔐 SIGN | Abandon `0x35cb` after |
 | 3 | Deploy Genesis NFT to Base Sepolia | 🤖 AUTO | `forge script 01_DeployGenesisNFT.s.sol --rpc-url $SEPOLIA_RPC` |
 | 4 | Deploy `SincBondingCurve` to Base Sepolia (curve constructor receives NFT addr) | 🤖 AUTO | `forge script 02_DeployBondingCurve.s.sol --rpc-url $SEPOLIA_RPC` |
 | 5 | Deploy `SincLimitOrderHook` to Base Sepolia (CREATE2-mined) | 🤖 AUTO | Scripts 04 + 05 |
@@ -420,7 +420,7 @@ Steps marked **🔐 SIGN** require user signature from their wallet. Steps marke
 | 7 | Submit free CertiK Skynet scan on Sepolia: curve, hook, NFT | manual | Wait for scan results (hours each). Expect ≥90 score on each. |
 | 8 | If all scans pass: deploy NFT + curve + hook to Base mainnet | 🔐 SIGN | Run scripts 01, 02, 04, 05 with `--broadcast` |
 | 9 | Verify mainnet deploys on Basescan (source upload, link contracts) | manual | Anchors all three contracts as audit-eligible |
-| 10 | Transfer 65M SINC from `0xAf9B` to curve contract | 🔐 SIGN | Funds Phase 1 distribution + Phase 2 LP seed (consumed at graduation) |
+| 10 | Transfer 65M SINC from `0x09E2` to curve contract | 🔐 SIGN | Funds Phase 1 distribution + Phase 2 LP seed (consumed at graduation) |
 | 11 | Submit CertiK Skynet scans on mainnet contracts | manual | For public credibility before launch |
 | 12 | Subscribe to CertiK Skynet continuous monitoring | manual | Live badge on `/sinc` |
 | 13 | Set up Dune Analytics dashboard (queries from `dune/*.sql`) | manual | Public at `dune.com/sincor/sinc` |
@@ -471,7 +471,7 @@ Steps marked **🔐 SIGN** require user signature from their wallet. Steps marke
 
 | Failure | Mitigation |
 |---|---|
-| `pk.txt` on user's Desktop leaks | Already-leaked wallets (`0x35cb`, `0x6E36`) abandoned. New treasury `0xAf9B` key never typed into any chat or plaintext file. Hardware wallet strongly recommended. |
+| `pk.txt` on user's Desktop leaks | Already-leaked wallets (`0x35cb`, `0x6E36`) abandoned. New treasury `0x09E2` key never typed into any chat or plaintext file. Hardware wallet strongly recommended. |
 | Billing-forwarder wallet key leaks | Limited blast radius: only ever holds in-flight SINC briefly. Key stored in `secrets_local/` (not OneDrive-synced). Can be rotated by deploying a new forwarder and switching the SINCOR billing endpoint. |
 | Treasury wallet runs out of gas mid-runbook | Pre-flight balance check at start of every script. User funds with $50–100 worth of ETH (covers entire runbook with headroom). |
 | User accidentally runs scripts out of order | Each script reads a `runbook_state.json` file and refuses to run if prerequisites haven't recorded a success marker. |
@@ -547,7 +547,7 @@ The spec accepts the principle that **bonding curves with no rug functions canno
 | Graduation logic bug discovered | If `graduate()` reverts, curve sits with accumulated ETH. Users can still `sell()` to exit. We'd communicate the issue and recommend everyone sell back, then redeploy. |
 | Hook bug discovered | OZ contract has no upgrade path. Worst case: limit-order feature broken, swap still works. Users with active orders can call `cancelOrder` to recover funds. |
 | Frontend bug | Hot-deploy fix; no on-chain implication. |
-| Treasury wallet drained | If `0xAf9B` private key leaked: irrecoverable. User MUST use hardware wallet for treasury. |
+| Treasury wallet drained | If `0x09E2` private key leaked: irrecoverable. User MUST use hardware wallet for treasury. |
 
 ## 11. Out of scope / Phase 3 roadmap
 
@@ -562,7 +562,7 @@ Explicitly NOT in this spec; documented for future planning:
 7. **DAO / governance** — only if community organically requests it. SINC was never sold as a governance token.
 8. **CEX listings** — Coinbase / Binance / Kraken listings require depth, age, and legal review. Phase 4+.
 9. **Migration claim contract for v2 holders** — explicitly NOT needed because user owns all 37 v2 wallets. If this changes (e.g., new v2 holders discovered), reopen this decision.
-10. **Renouncement of canonical SINC ownership** — appears already renounced per GoPlus; verification in runbook step 6.5. If not renounced, add step 6.5b: user signs `renounceOwnership()` from `0xAf9B`.
+10. **Renouncement of canonical SINC ownership** — appears already renounced per GoPlus; verification in runbook step 6.5. If not renounced, add step 6.5b: user signs `renounceOwnership()` from `0x09E2`.
 
 ## 12. Decisions made during brainstorming (for traceability)
 
@@ -580,7 +580,7 @@ Explicitly NOT in this spec; documented for future planning:
 | Target ceiling price | $1.50 (concentrated LP + limit-order ladder) | 2026-05-16 |
 | Wash trading | Refused. Out of scope. | 2026-05-16 |
 | Agent integration scope | Server-side utility-burn loop + x402 endpoint (no smart contract changes) | 2026-05-16 |
-| Treasury wallet | `0xAf9B539D8043C634b7E611818518BA7E850F289e` | 2026-05-16 |
+| Treasury wallet | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | 2026-07-17 |
 | Plaintext-key wallets | Empty and abandon (`0x35cb`, `0x6E36`) | 2026-05-16 |
 | Referral system | 3% of buy routed to referrer (or treasury if none); self-referral blocked | 2026-05-16 |
 | Genesis NFT | Soulbound ERC-721 auto-minted on first Phase 1 buy | 2026-05-16 |
@@ -602,7 +602,7 @@ These need user decisions before plan execution begins, but do not block writing
    - Existing 200×200 nav icon → deprecated, replaced by the new primary mark at 128×128
    - **Sub-decision pending:** adopt "SINCOR AI" as the company brand (replacing "SINCOR Business Solutions") or use it only on AI-product surfaces. Spec defaults to full adoption pending user confirmation.
 2. **Hardware wallet.** Will the user obtain Ledger/Trezor before launch, or proceed with hot wallet only? Strongly recommend hardware; spec assumes hardware unless user states otherwise.
-3. **Sablier recipient wallet address.** Confirmed treasury wallet (`0xAf9B…289e`) is the default; user can specify a separate vesting recipient if desired.
+3. **Sablier recipient wallet address.** Confirmed treasury wallet (`0x09E2…12Ac`) is the default; user can specify a separate vesting recipient if desired.
 4. **x402 pricing.** Initial SINC-per-call rates for paid SINCOR endpoints. Suggestion: 1 SINC per call as a round number; adjustable via config file.
 5. **Mvp_app.py status.** Is this file still in production routing, or is `app.py` canonical? Affects whether template + route changes need to be duplicated.
 6. **Whether the new SINC contract owner is truly renounced.** Spec assumes yes per GoPlus; runbook step 6.5 verifies via direct call to `owner()` view. If not renounced, add transfer-then-renounce sub-steps.
