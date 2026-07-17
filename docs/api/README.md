@@ -142,7 +142,7 @@ Returns the advertised SINCOR skill catalogue plus chain metadata.
   ],
   "axiom_contract": "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822",
   "sinc_contract": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
-  "treasury": "0xAf9B539D8043C634b7E611818518BA7E850F289e",
+  "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
   "chain_id": 8453
 }
 ```
@@ -165,7 +165,7 @@ Request a pricing quote for a skill.
   "skill_id": "lead-enrichment",
   "axm_price_wei": "1000000000000000000",
   "axm_price_display": "1.0000 AXM",
-  "pay_to": "0xAf9B539D8043C634b7E611818518BA7E850F289e",
+  "pay_to": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
   "axiom_contract": "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822",
   "chain_id": 8453,
   "note": "Transfer the exact AXM amount ..."
