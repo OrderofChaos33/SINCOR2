@@ -30,7 +30,10 @@ RUN useradd -m -u 1000 appuser
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
 # Set environment
+# NOTE: the sincor2 package lives in src/ (src layout), so /app/src must be
+# on PYTHONPATH or gunicorn cannot import sincor2.mvp_app.
 ENV PATH=/home/appuser/.local/bin:$PATH \
+    PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080 \
@@ -47,7 +50,7 @@ USER appuser
 
 # Healthcheck (assumes /health endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health', timeout=5)" || exit 1
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ.get('PORT', '8080'), timeout=5)" || exit 1
 
 # Run with Gunicorn (compatible, production settings)
 CMD ["gunicorn", \

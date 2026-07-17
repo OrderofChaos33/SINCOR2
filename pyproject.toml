@@ -54,8 +54,11 @@ Repository = "https://github.com/OrderofChaos33/SINCOR2"
 Issues = "https://github.com/OrderofChaos33/SINCOR2/issues"
 
 [tool.setuptools]
-packages = ["sincor2"]
+package-dir = {"" = "src"}
 include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.black]
 line-length = 100
