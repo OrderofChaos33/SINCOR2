@@ -9,6 +9,7 @@ gone. Everything here flows through the real stack:
     bankroll.can_open()                       equity-proportional risk gates
     execution_adapter.place_market_buy()      CLOB FOK orders (dry-run default)
     bankroll.record_trade()                   durable SQLite ledger
+    shadow_portfolio                          silent 25% TOA-blend A/B twin
 
 Live mode requires ALL of:
   POLYCLAW_LIVE=true
@@ -23,7 +24,11 @@ Sizing policy — ALWAYS GROWING, no fixed dollar ceiling:
           [POLYCLAW_MIN_WAGER_USD, POLYCLAW_MAX_POSITION_PCT × equity]
   $20 equity   → ~$1–$3 wagers
   $3,000 equity → ~$30–$300 wagers (same discipline, bigger numbers)
-  Stronger TOA/forecast confidence → larger fraction of the range.
+
+A/B experiment: every cycle the shadow portfolio paper-trades the SAME
+markets at a 0.75 book / 0.25 TOA blend. Resolved markets score both
+portfolios with real settlement math. Run `compare_performance()` any time
+for the live-vs-shadow scoreboard; promotion decisions come from that data.
 
 Run one cycle:    python -m sincor2.polyclaw_mega_aggressive_live
 Run forever:      POLYCLAW_LOOP=1 python -m sincor2.polyclaw_mega_aggressive_live
@@ -46,6 +51,7 @@ from sincor2.forecasting_engine import (
     resolve_predictions,
     scan_opportunities,
 )
+from sincor2 import shadow_portfolio
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -93,7 +99,7 @@ def _pick_side(fc: Forecast) -> tuple[str, str]:
 
 
 def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
-    """One full scan → size → execute → record cycle."""
+    """One full scan → size → execute → record → shadow-score cycle."""
     bankroll = get_bankroll()
     adapter = adapter or PolymarketAdapter(bankroll)
 
@@ -116,8 +122,25 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
     except Exception as exc:
         logger.debug("resolve_predictions failed: %s", exc)
 
+    # Resolve closed markets for BOTH portfolios (real settlement math).
+    try:
+        resolved = shadow_portfolio.resolve_all(bankroll)
+        if resolved["live"] or resolved["shadow"]:
+            logger.info("resolved: %d live, %d shadow trades",
+                        resolved["live"], resolved["shadow"])
+    except Exception as exc:
+        logger.debug("shadow resolve_all failed: %s", exc)
+
     opportunities = scan_opportunities(min_edge=MIN_EDGE)
     trades_taken: List[Dict[str, Any]] = []
+
+    # Shadow portfolio silently paper-trades the same scan at 25% TOA blend.
+    try:
+        shadow_opened = shadow_portfolio.record_shadow_cycle(opportunities)
+        if shadow_opened:
+            logger.info("[SHADOW] opened %d paper trades", shadow_opened)
+    except Exception as exc:
+        logger.debug("shadow record failed: %s", exc)
 
     for fc in opportunities[:MAX_TRADES_PER_CYCLE]:
         if fc.confidence < MIN_CONFIDENCE:
@@ -167,6 +190,7 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         "opportunities": len(opportunities),
         "trades_taken": trades_taken,
         "bankroll": final,
+        "ab_test": shadow_portfolio.compare_performance(),
         "treasury": TREASURY_ADDRESS,
     }
 
