@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List
 
-TREASURY_ADDRESS = os.getenv('TREASURY_ADDRESS', '0xAf9B539D8043C634b7E611818518BA7E850F289e')
+TREASURY_ADDRESS = os.getenv('TREASURY_ADDRESS', '0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac')
 
 # Health thresholds — operators can tune these via environment variables.
 _HEALTHY_AXIOM_FLOOR = Decimal(os.getenv('LIQUIDITY_HEALTHY_AXIOM', '10000'))
