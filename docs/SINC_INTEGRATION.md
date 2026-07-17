@@ -12,7 +12,7 @@ is integrated as the exclusive access and utility token across the SINCOR2 platf
 | SINC v3 | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Base |
 | SinCurve (bonding curve) | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Base |
 | SINCPlatformAccess | Set via `SINC_PLATFORM_ACCESS_ADDRESS` env var | Base |
-| Treasury | `0xAf9B539D8043C634b7E611818518BA7E850F289e` | Base |
+| Treasury | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Base |
 
 SINC uses `decimals = 0` — all amounts are whole integers (no wei conversion needed).
 
@@ -65,7 +65,7 @@ User Wallet (Base) ──► SINC Balance Check ──► Platform Access Grant
   settlement.py ──► SINC-only quotes + 5% fee → Treasury
   registry.py  ──► SINC pricing metadata on AgentCards
         │
-  Treasury: 0xAf9B539D8043C634b7E611818518BA7E850F289e
+  Treasury: 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac
 ```
 
 All on-chain actions (credit purchase, staking, escrow) are signed client-side via
