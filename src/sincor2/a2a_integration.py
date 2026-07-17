@@ -63,7 +63,7 @@ logger = logging.getLogger("sincor.a2a")
 
 AXIOM_CONTRACT   = os.getenv("AXIOM_CONTRACT_ADDRESS", "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822")
 SINC_CONTRACT    = os.getenv("SINC_CONTRACT_ADDRESS",  "0x9C8cd8d3961F445D653713dE65C6578bE11668e7")
-TREASURY_WALLET  = os.getenv("TREASURY_ADDRESS",       "0xAf9B539D8043C634b7E611818518BA7E850F289e")
+TREASURY_WALLET  = os.getenv("TREASURY_ADDRESS",       "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac")
 DEAD_ADDRESS     = "0x000000000000000000000000000000000000dEaD"
 CHAIN_ID         = int(os.getenv("BASE_CHAIN_ID", "8453"))  # Base mainnet
 
@@ -1215,7 +1215,7 @@ def _handle_cancel(body: Dict[str, Any]) -> Dict[str, Any]:
     task_id = params.get("id") or params.get("taskId")
     task    = _get_task(task_id or "")
     if not task:
-        return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
+        return _err("Task {task_id} not found".format(task_id=task_id), code=-32602, rpc_id=rpc_id)
     if task.state in TaskState.terminal_states():
         return _err("Task already in terminal state, cannot cancel",
                     code=-32003, rpc_id=rpc_id)
