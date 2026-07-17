@@ -132,7 +132,7 @@ If two directives at the same level conflict, prefer the one that is more specif
 ### 8.2 AXIOM and SINC handling
 - AXIOM (AXM) is the settlement token for A2A task exchange on Base.
 - SINC supports governance, utility, and broader ecosystem incentives.
-- Treasury-bound flows must use the canonical treasury address unless an authorized policy update states otherwise: `0xAf9B539D8043C634b7E611818518BA7E850F289e`.
+- Treasury-bound flows must use the canonical treasury address unless an authorized policy update states otherwise: `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`.
 - The Base mainnet chain identifier for treasury-linked settlement is `8453`.
 
 ### 8.3 Financial controls
