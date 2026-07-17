@@ -6,6 +6,7 @@ $ErrorActionPreference = "Continue"
 $root = "C:\Users\cjay4\OneDrive\Desktop\sincor-clean"
 $cast = "$env:USERPROFILE\.foundry\bin\cast.exe"
 $forge = "$env:USERPROFILE\.foundry\bin\forge.exe"
+$deployer = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 
 $pass = 0
 $warn = 0
@@ -50,24 +51,24 @@ if (-not $env) {
 }
 
 # 2. Deployer funded?
-$bal = & $cast balance 0x7B4082f78CdAc2cB5fa8572b2CA54BeDaaa8f956 --rpc-url "$root\onchain\base" 2>$null
+$bal = & $cast balance $deployer --rpc-url "$root\onchain\base" 2>$null
 if (-not $bal -or $LASTEXITCODE -ne 0) {
     # Try with full RPC URL
     $rpcLine = ($env | Where-Object { $_ -match "^BASE_RPC_URL=" }) -replace "^BASE_RPC_URL=", ""
     if ($rpcLine) {
-        $bal = & $cast balance 0x7B4082f78CdAc2cB5fa8572b2CA54BeDaaa8f956 --rpc-url $rpcLine 2>$null
+        $bal = & $cast balance $deployer --rpc-url $rpcLine 2>$null
     }
 }
 if ($bal) {
     $balInt = [decimal]$bal
     $ethBal = $balInt / 1000000000000000000
     if ($balInt -ge 2000000000000000) {
-        Check "Deployer 0x7B40 funded on Base mainnet" "OK" "$ethBal ETH"
+        Check "Deployer 0x09E2 funded on Base mainnet" "OK" "$ethBal ETH"
     } else {
-        Check "Deployer 0x7B40 funded on Base mainnet" "FAIL" "Has $ethBal ETH, need ≥ 0.002 ETH"
+        Check "Deployer 0x09E2 funded on Base mainnet" "FAIL" "Has $ethBal ETH, need ≥ 0.002 ETH"
     }
 } else {
-    Check "Deployer 0x7B40 balance check" "WARN" "Could not query balance — check RPC"
+    Check "Deployer 0x09E2 balance check" "WARN" "Could not query balance — check RPC"
 }
 
 # 3. Unit tests still green?
