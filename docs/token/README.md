@@ -16,7 +16,7 @@ SINCOR2 uses two distinct token roles on Base to separate platform utility from 
 
 ## Canonical on-chain references
 
-- **Treasury**: `0xAf9B539D8043C634b7E611818518BA7E850F289e`
+- **Treasury**: `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`
 - **SINC**: `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`
 - **AXIOM / AXM**: `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822`
 - **Base chain ID**: `8453`
