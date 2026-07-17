@@ -21,7 +21,7 @@ is a clearly-logged dry run. There is no silent "looks live" mode anymore.
 Sizing policy — ALWAYS GROWING, no fixed dollar ceiling:
   wager = half-Kelly × confidence, clamped to
           [POLYCLAW_MIN_WAGER_USD, POLYCLAW_MAX_POSITION_PCT × equity]
-  $20 equity   → ~$0.30–$3 wagers
+  $20 equity   → ~$1–$3 wagers
   $3,000 equity → ~$30–$300 wagers (same discipline, bigger numbers)
   Stronger TOA/forecast confidence → larger fraction of the range.
 
@@ -60,12 +60,10 @@ TREASURY_ADDRESS = os.getenv(
 MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.04"))          # 4% min |edge|
 MIN_CONFIDENCE = float(os.getenv("POLYCLAW_MIN_CONFIDENCE", "0.4"))
 KELLY_FRACTION = float(os.getenv("POLYCLAW_KELLY_FRACTION", "0.5"))  # half-Kelly
-# Wager floor. NOTE: Polymarket's exchange minimum is ≈$1 per order — sizes
-# below that will be rejected by the CLOB. Set 0.30 only if your markets
-# accept sub-dollar orders; otherwise leave at 1.0.
+# Wager floor = Polymarket's ≈$1 exchange minimum.
 MIN_WAGER_USD = float(os.getenv("POLYCLAW_MIN_WAGER_USD", "1.0"))
 MAX_TRADES_PER_CYCLE = int(os.getenv("POLYCLAW_MAX_TRADES_PER_CYCLE", "3"))
-CYCLE_INTERVAL_SEC = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "900"))  # 15 min
+CYCLE_INTERVAL_SEC = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "90"))  # 90s loop
 
 
 def _kelly_size(fc: Forecast, side: str, equity: float, cap: float) -> float:
