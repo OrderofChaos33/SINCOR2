@@ -1,193 +1,189 @@
 #!/usr/bin/env python3
-"""
-POLYCLAW MEGA AGGRESSIVE - FULL LIVE VERSION
-Fully optimized with real Polymarket execution.
+"""Polyclaw Live Runner — the consolidated, REAL trading loop.
+
+This file replaces the old "mega aggressive" module, whose ``AUTO_EXECUTE``
+path rolled ``random.random()`` and booked imaginary profit. That code is
+gone. Everything here flows through the real stack:
+
+    forecasting_engine.scan_opportunities()   real Polymarket data → model probs
+    bankroll.can_open()                       $20 cap, drawdown/leverage gates
+    execution_adapter.place_market_buy()      CLOB FOK orders (dry-run default)
+    bankroll.record_trade()                   durable SQLite ledger
+
+Live mode requires ALL of:
+  POLYCLAW_LIVE=true
+  POLYMARKET_PRIVATE_KEY=0x...        (Polygon EOA, funded with USDC + MATIC)
+  pip install py-clob-client
+
+Without them the runner still does the full scan/sizing loop but every order
+is a clearly-logged dry run. There is no silent "looks live" mode anymore.
+
+Incremental capital policy (defaults): $20 bankroll, max $5 per position,
+$5/day loss limit, 15% max drawdown, 2x leverage ceiling. All configurable
+via env — see bankroll.py. Treasury for fee routing:
+0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac (TREASURY_ADDRESS).
+
+Run one cycle:    python -m sincor2.polyclaw_mega_aggressive_live
+Run forever:      POLYCLAW_LOOP=1 python -m sincor2.polyclaw_mega_aggressive_live
 """
 
+from __future__ import annotations
+
+import logging
 import os
-import json
+import sys
 import time
-import random
-from datetime import datetime, timezone, date
-from dotenv import load_dotenv
+from typing import Any, Dict, List, Optional
 
-load_dotenv()
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-POLYMARKET_PRIVATE_KEY = os.getenv("POLYMARKET_PRIVATE_KEY")
-if not POLYMARKET_PRIVATE_KEY:
-    raise ValueError("Missing POLYMARKET_PRIVATE_KEY in .env file")
+from sincor2.bankroll import get_bankroll
+from sincor2.execution_adapter import PolymarketAdapter, kill_switch_tripped
+from sincor2.forecasting_engine import (
+    Forecast,
+    resolve_predictions,
+    scan_opportunities,
+)
 
-# ==================== AGGRESSIVE PARAMETERS ====================
-MIN_EDGE = 0.028
-KELLY_FRACTION = 0.55
-MAX_POSITION_PCT = 0.12
-SCAN_INTERVAL_SECONDS = 45
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger("sincor.polyclaw.live")
 
-ADAPTIVE_MODE = True
-WIN_STREAK_BOOST = 0.008
-LOSS_STREAK_PENALTY = 0.012
+TREASURY_ADDRESS = os.getenv(
+    "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+)
 
-DAILY_LOSS_LIMIT_PCT = 0.08
-MAX_DD_HARD_STOP = 0.30
+MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.04"))          # 4% min |edge|
+MIN_CONFIDENCE = float(os.getenv("POLYCLAW_MIN_CONFIDENCE", "0.4"))
+KELLY_FRACTION = float(os.getenv("POLYCLAW_KELLY_FRACTION", "0.5"))  # half-Kelly
+MAX_TRADES_PER_CYCLE = int(os.getenv("POLYCLAW_MAX_TRADES_PER_CYCLE", "3"))
+CYCLE_INTERVAL_SEC = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "900"))  # 15 min
 
-PERSISTENT_EDGE_BIAS = 0.011
-NOISE_STD = 0.052
-WIN_RATE_EMA_ALPHA = 0.12
 
-AUTO_EXECUTE = os.getenv("POLYCLAW_AUTO_EXECUTE", "false").lower() == "true"
+def _kelly_size(fc: Forecast, side: str, equity: float, cap: float) -> float:
+    """Half-Kelly position size in USD, bounded by the per-position cap."""
+    p = fc.model_probability if side == "BUY_YES" else 1.0 - fc.model_probability
+    price = fc.market_price if side == "BUY_YES" else 1.0 - fc.market_price
+    if price <= 0.01 or price >= 0.99:
+        return 0.0
+    b = (1.0 / price) - 1.0
+    kelly = (p * (b + 1.0) - 1.0) / b
+    if kelly <= 0:
+        return 0.0
+    # Scale Kelly down by data-quality confidence; cap at bankroll limit.
+    size = equity * kelly * KELLY_FRACTION * fc.confidence
+    return round(min(size, cap), 2)
 
-# ==================== POLYMARKET CLIENT ====================
-try:
-    from py_clob_client_v2 import ClobClient
-except ImportError:
-    print("ERROR: Run `pip install py_clob_client_v2 python-dotenv`")
-    exit(1)
 
-client = ClobClient(host="https://clob.polymarket.com", chain_id=137, key=POLYMARKET_PRIVATE_KEY)
-try:
-    creds = client.create_or_derive_api_key()
-    client.set_api_creds(creds)
-except Exception as e:
-    print(f"Client init error: {e}")
-    if AUTO_EXECUTE:
-        raise
+def _pick_side(fc: Forecast) -> tuple[str, str]:
+    """Return (side_label, token_id) for the larger-edge direction."""
+    if fc.edge > 0:
+        return "BUY_YES", fc.token_id_yes
+    return "BUY_NO", (fc.token_id_no or "")
 
-class MegaPolyclaw:
-    def __init__(self):
-        self.equity = 10000.0
-        self.peak_equity = self.equity
-        self.max_drawdown = 0.0
-        self.total_trades = 0
-        self.winning_trades = 0
-        self.win_rate = 0.52
-        self.daily_start_equity = self.equity
-        self.current_day = date.today()
-        self.log_file = "polyclaw_mega_live_trades.jsonl"
 
-        print("=" * 85)
-        print("POLYCLAW MEGA AGGRESSIVE - FULL LIVE VERSION")
-        print(f"min_edge={MIN_EDGE} | kelly={KELLY_FRACTION} | max_pos={MAX_POSITION_PCT}")
-        print(f"AUTO_EXECUTE = {AUTO_EXECUTE}")
-        print("=" * 85)
+def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
+    """One full scan → size → execute → record cycle."""
+    bankroll = get_bankroll()
+    adapter = adapter or PolymarketAdapter(bankroll)
 
-    def _get_adaptive_edge(self, base_edge, recent_wins, recent_losses):
-        if not ADAPTIVE_MODE:
-            return base_edge
-        adjustment = 0.0
-        if recent_wins > recent_losses + 2:
-            adjustment = -WIN_STREAK_BOOST
-        elif recent_losses > recent_wins + 2:
-            adjustment = LOSS_STREAK_PENALTY
-        return max(0.015, base_edge + adjustment)
+    if kill_switch_tripped():
+        logger.warning("kill switch tripped — cycle skipped")
+        return {"status": "halted", "reason": "kill_switch"}
 
-    def _calculate_edge(self, market_implied_prob):
-        noise = random.gauss(0, NOISE_STD)
-        model_prob = max(0.01, min(0.99, market_implied_prob + PERSISTENT_EDGE_BIAS + noise))
-        return model_prob, model_prob - market_implied_prob
+    snapshot = bankroll.snapshot()
+    logger.info(
+        "cycle start | equity=$%.2f exposure=$%.2f available=$%.2f today=$%.2f%s",
+        snapshot["equity"], snapshot["exposure"], snapshot["available"],
+        snapshot["realized_today"],
+        "" if adapter.is_live() else " [DRY RUN]",
+    )
 
-    def _kelly_size(self, edge, model_prob, recent_performance):
-        if abs(edge) < MIN_EDGE:
-            return 0.0
-        p = model_prob
-        q = 1 - p
-        b = 1.0
-        kelly = max(0, (b * p - q) / b)
-        multiplier = 1.3 if recent_performance > 0.65 else (0.6 if recent_performance < 0.45 else 1.0)
-        return min(kelly * KELLY_FRACTION * multiplier, MAX_POSITION_PCT)
+    # Score resolved forecasts first — calibration data compounds.
+    try:
+        resolve_predictions()
+    except Exception as exc:
+        logger.debug("resolve_predictions failed: %s", exc)
 
-    def _check_risk_limits(self):
-        if date.today() != self.current_day:
-            self.daily_start_equity = self.equity
-            self.current_day = date.today()
-            return False
+    opportunities = scan_opportunities(min_edge=MIN_EDGE)
+    trades_taken: List[Dict[str, Any]] = []
 
-        daily_loss = (self.daily_start_equity - self.equity) / self.daily_start_equity
-        if daily_loss >= DAILY_LOSS_LIMIT_PCT:
-            print(f"\nDAILY LOSS LIMIT HIT ({daily_loss*100:.1f}%)")
-            return True
-        if self.max_drawdown >= MAX_DD_HARD_STOP:
-            print(f"\nHARD DRAWDOWN STOP ({self.max_drawdown*100:.1f}%)")
-            return True
-        return False
+    for fc in opportunities[:MAX_TRADES_PER_CYCLE]:
+        if fc.confidence < MIN_CONFIDENCE:
+            continue
+        side_label, token_id = _pick_side(fc)
+        if not token_id:
+            continue
+        size = _kelly_size(fc, side_label, snapshot["equity"], bankroll.max_position)
+        if size < 1.0:  # Polymarket min order ≈ $1
+            logger.info("skip %s — Kelly size $%.2f below $1 minimum",
+                        fc.question[:60], size)
+            continue
 
-    def execute_real_trade(self, edge, model_prob, bet_amount):
-        if not AUTO_EXECUTE:
-            return False, 0
-        print(f"[LIVE] Attempting real order | Edge={edge*100:.2f}% | Size=${bet_amount:.2f}")
-        # TODO: Replace this placeholder with actual order creation using client.create_order + post_order
-        # You need market token_id, proper price, size in shares, etc.
-        success = random.random() > 0.2
-        return success, (bet_amount * 0.03 if success else 0)
+        result = adapter.place_market_buy(token_id, size)
+        if not result.success:
+            logger.warning("order failed for %s: %s", fc.question[:60], result.error)
+            continue
 
-    def scan_and_trade(self):
-        if self._check_risk_limits():
-            time.sleep(SCAN_INTERVAL_SECONDS * 3)
-            return
+        trade_id = bankroll.record_trade(
+            token_id=token_id, side=side_label, size_usd=size,
+            price=fc.market_price, order_id=result.order_id,
+            simulated=result.simulated, market_id=fc.market_id,
+        )
+        trades_taken.append({
+            "trade_id": trade_id,
+            "question": fc.question,
+            "side": side_label,
+            "size_usd": size,
+            "edge": fc.edge,
+            "model_prob": fc.model_probability,
+            "market_price": fc.market_price,
+            "simulated": result.simulated,
+            "order_id": result.order_id,
+        })
+        logger.info(
+            "%s %s $%.2f on '%s' | edge=%.1f%% model=%.2f mkt=%.2f",
+            "[DRY]" if result.simulated else "[LIVE]",
+            side_label, size, fc.question[:60],
+            fc.edge * 100, fc.model_probability, fc.market_price,
+        )
 
-        market_implied = random.uniform(0.20, 0.80)
-        model_prob, edge = self._calculate_edge(market_implied)
-        recent_wr = self.winning_trades / max(self.total_trades, 1)
-        adaptive_edge = self._get_adaptive_edge(MIN_EDGE, self.winning_trades, self.total_trades - self.winning_trades)
+    final = bankroll.snapshot()
+    return {
+        "status": "ok",
+        "live": adapter.is_live(),
+        "opportunities": len(opportunities),
+        "trades_taken": trades_taken,
+        "bankroll": final,
+        "treasury": TREASURY_ADDRESS,
+    }
 
-        if abs(edge) < adaptive_edge:
-            return
 
-        bet_fraction = self._kelly_size(edge, model_prob, recent_wr)
-        if bet_fraction <= 0:
-            return
+def main() -> None:
+    adapter = PolymarketAdapter()
+    if not adapter.is_live():
+        logger.warning(
+            "DRY-RUN MODE — no real orders will be sent. To go live: "
+            "POLYCLAW_LIVE=true + POLYMARKET_PRIVATE_KEY in env, "
+            "and `pip install py-clob-client`."
+        )
+    if os.getenv("POLYCLAW_LOOP", "0") != "1":
+        result = run_cycle(adapter)
+        print("\n=== CYCLE RESULT ===")
+        for k, v in result.items():
+            print(f"{k}: {v}")
+        return
 
-        bet_amount = self.equity * bet_fraction
-
-        if AUTO_EXECUTE:
-            success, pnl = self.execute_real_trade(edge, model_prob, bet_amount)
-            if not success:
-                return
-        else:
-            won = random.random() < model_prob
-            pnl = bet_amount if won else -bet_amount
-
-        self.equity += pnl
-        self.total_trades += 1
-        if pnl > 0:
-            self.winning_trades += 1
-
-        outcome = 1.0 if pnl > 0 else 0.0
-        self.win_rate = (WIN_RATE_EMA_ALPHA * outcome) + ((1 - WIN_RATE_EMA_ALPHA) * self.win_rate)
-
-        if self.equity > self.peak_equity:
-            self.peak_equity = self.equity
-        current_dd = (self.peak_equity - self.equity) / self.peak_equity
-        if current_dd > self.max_drawdown:
-            self.max_drawdown = current_dd
-
-        trade = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "edge": round(edge, 4),
-            "bet_amount": round(bet_amount, 2),
-            "pnl": round(pnl, 2),
-            "equity": round(self.equity, 2),
-            "win_rate": round(self.win_rate, 4),
-            "max_dd": round(self.max_drawdown, 4),
-            "live": AUTO_EXECUTE
-        }
-        with open(self.log_file, "a") as f:
-            f.write(json.dumps(trade) + "\n")
-
-        mode = "LIVE" if AUTO_EXECUTE else "PAPER"
-        status = "WIN " if pnl > 0 else "LOSS"
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] [{mode}] {status} | Edge={edge*100:.2f}% | Bet=${bet_amount:.2f} | P&L=${pnl:+.2f} | Eq=${self.equity:,.2f} | WR={self.win_rate*100:.1f}% | DD={self.max_drawdown*100:.1f}%")
-
-    def run(self):
-        while True:
-            try:
-                self.scan_and_trade()
-                time.sleep(SCAN_INTERVAL_SECONDS)
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                print(f"Loop error: {e}")
-                time.sleep(SCAN_INTERVAL_SECONDS * 2)
+    logger.info("starting loop, interval=%ds", CYCLE_INTERVAL_SEC)
+    while True:
+        try:
+            run_cycle(adapter)
+        except Exception:
+            logger.exception("cycle crashed — continuing after interval")
+        time.sleep(CYCLE_INTERVAL_SEC)
 
 
 if __name__ == "__main__":
-    MegaPolyclaw().run()
+    main()
