@@ -40,7 +40,7 @@ def _make_sinc_manager(mock_response: int = 100) -> SINCAccessManager:
 
 class TestABIHelpers:
     def test_encode_address_pads_to_64_chars(self):
-        addr = "0xAf9B539D8043C634b7E611818518BA7E850F289e"
+        addr = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
         encoded = _encode_address(addr)
         assert len(encoded) == 64
         assert encoded.startswith("0" * 24)
@@ -92,11 +92,11 @@ class TestTTLCache:
 class TestSINCAccessManager:
     def test_get_balance_returns_rpc_value(self):
         mgr = _make_sinc_manager(mock_response=250)
-        assert mgr.get_balance("0xAf9B539D8043C634b7E611818518BA7E850F289e") == 250
+        assert mgr.get_balance("0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac") == 250
 
     def test_get_balance_caches_result(self):
         mgr = _make_sinc_manager(mock_response=500)
-        addr = "0xAf9B539D8043C634b7E611818518BA7E850F289e"
+        addr = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
         mgr.get_balance(addr)
         mgr.get_balance(addr)
         assert mgr._eth_call.call_count == 1  # type: ignore[union-attr]
