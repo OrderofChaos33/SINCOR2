@@ -177,7 +177,7 @@ For each of NFT, curve, hook:
 **7.1 — Switch `.env` to mainnet vars:**
 ```
 # Comment out Sepolia treasury, replace with the real mainnet treasury:
-TREASURY=0xAf9B539D8043C634b7E611818518BA7E850F289e   # or whichever address you control with hardware wallet
+TREASURY=0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac   # canonical treasury — hardware-wallet controlled
 
 # V4 Base mainnet (do NOT use Sepolia values):
 POOL_MANAGER=0x498581fF718922c3f8e6A244956aF099B2652b2b
