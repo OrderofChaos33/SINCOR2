@@ -11,26 +11,13 @@ import {ISincPriceOracle, ISincSwapRouter} from "./interfaces/ISincLoop.sol";
 
 /// @title SINCLending — isolated SINC-collateral / USDC-debt market with lending-loop ROI variants
 /// @notice Compound-style index accounting (WAD-scaled, per-second linear accrual), kinked rate
-///         model, $1 SINC price-floor aware collateral valuation, and three preset loop variants
-///         (lever-long SINC: deposit SINC → borrow USDC → swap to SINC → re-deposit).
-///
-///         Loop economics (honest math, enforced by simulateLoopROI and openLoop):
-///           After n loops at LTV λ on initial collateral value C:
-///             collateral = C · Σᵢ₌₀..n λⁱ        leverage = Σᵢ₌₀..n λⁱ  →  1/(1−λ) as n→∞
-///             debt       = C · Σᵢ₌₁..n λⁱ
-///           Net ROI over horizon h (years) with SINC price move p (bps) and borrow APR r:
-///             PnL = collateral·(1+p) − debt·(1+r·h) − C
-///           At p = 0 the loop LOSES the borrow cost — the variants are a leverage dial, not free yield.
-///
-///         Treasury (canonical): 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac (reserves flow here).
+///         model, $1 SINC price-floor aware collateral valuation, and preset loop variants.
 contract SINCLending is ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     uint256 public constant WAD = 1e18;
     uint256 public constant BPS = 10_000;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
-
-    // ------------------------------------------------------------------ immutables / admin
 
     IERC20 public immutable SINC;              // 18 decimals
     IERC20 public immutable USDC;              // 6 decimals
@@ -39,33 +26,25 @@ contract SINCLending is ReentrancyGuard, Pausable {
     address public guardian;
     address public treasury;
 
-    /// @notice Floor price for collateral valuation (USDC 6dp per SINC). The protocol's $1 floor
-    ///         controller backs this; set to 0 to value purely at oracle price.
     uint256 public priceFloor = 1e6; // $1.00
 
-    // ------------------------------------------------------------------ risk params
-
-    uint256 public maxLTVBps = 7_500;          // absolute cap for any loop variant
+    uint256 public maxLTVBps = 7_500;
     uint256 public liquidationThresholdBps = 8_000;
     uint256 public liquidationBonusBps = 500;  // 5%
     uint256 public closeFactorBps = 5_000;     // max 50% of debt per liquidation
     uint256 public reserveFactorBps = 1_000;   // 10% of interest → treasury reserves
 
-    // ------------------------------------------------------------------ rate model (kinked, APR in WAD/sec terms)
-
     uint256 public baseRateBps = 200;          // 2% APR
-    uint256 public slope1Bps = 1_000;          // +10% APR at 100% util below kink
-    uint256 public slope2Bps = 10_000;         // +100% APR above kink
+    uint256 public slope1Bps = 1_000;
+    uint256 public slope2Bps = 10_000;
     uint256 public kinkBps = 8_000;            // 80% utilization kink
 
-    // ------------------------------------------------------------------ market state
-
-    uint256 public totalSupplyShares;          // supplier shares (USDC side)
+    uint256 public totalSupplyShares;
     uint256 public totalBorrowShares;
-    uint256 public totalCash;                  // USDC sitting in the contract (excl. reserves)
-    uint256 public totalBorrows;               // USDC principal+interest owed
-    uint256 public totalReserves;              // USDC owed to treasury
-    uint256 public totalCollateral;            // SINC deposited (18dp)
+    uint256 public totalCash;
+    uint256 public totalBorrows;
+    uint256 public totalReserves;
+    uint256 public totalCollateral;
 
     uint256 public borrowIndex = WAD;
     uint256 public lastAccrual;
@@ -74,11 +53,9 @@ contract SINCLending is ReentrancyGuard, Pausable {
     mapping(address => uint256) public borrowSharesOf;
     mapping(address => uint256) public collateralOf;
 
-    // ------------------------------------------------------------------ loop variants
-
     struct LoopVariant {
-        uint256 ltvBps;      // per-loop borrow fraction of current collateral value
-        uint256 maxLoops;    // iteration cap
+        uint256 ltvBps;
+        uint256 maxLoops;
         bool active;
     }
 
@@ -87,9 +64,7 @@ contract SINCLending is ReentrancyGuard, Pausable {
     uint256 public constant AGGRESSIVE = 2;
 
     mapping(uint256 => LoopVariant) public loopVariants;
-    uint256 public loopCount;                  // number of configured variants
-
-    // ------------------------------------------------------------------ events
+    uint256 public loopCount;
 
     event Supplied(address indexed user, uint256 usdc, uint256 shares);
     event Redeemed(address indexed user, uint256 shares, uint256 usdc);
@@ -102,6 +77,12 @@ contract SINCLending is ReentrancyGuard, Pausable {
     event LoopClosed(address indexed user, uint256 debtRepaid, uint256 collateralReturned);
     event ReservesSwept(address indexed to, uint256 amount);
     event VariantConfigured(uint256 indexed variantId, uint256 ltvBps, uint256 maxLoops, bool active);
+    event PriceFloorUpdated(uint256 newFloor);
+    event RiskParamsUpdated(uint256 maxLtvBps, uint256 liquidationThresholdBps, uint256 liquidationBonusBps, uint256 closeFactorBps);
+    event RateModelUpdated(uint256 baseRateBps, uint256 slope1Bps, uint256 slope2Bps, uint256 kinkBps);
+    event OracleUpdated(address newOracle);
+    event SwapRouterUpdated(address newRouter);
+    event TreasuryUpdated(address newTreasury);
 
     error Unauthorized();
     error ZeroAmount();
@@ -109,6 +90,7 @@ contract SINCLending is ReentrancyGuard, Pausable {
     error InsufficientLiquidity();
     error InsufficientCollateral();
     error UnhealthyPosition();
+    error PositionHealthy();
     error NoDebt();
     error VariantInactive();
     error LoopLimitExceeded();
@@ -118,8 +100,6 @@ contract SINCLending is ReentrancyGuard, Pausable {
         if (msg.sender != guardian) revert Unauthorized();
         _;
     }
-
-    // ------------------------------------------------------------------ ctor
 
     constructor(IERC20 _sinc, IERC20 _usdc, ISincPriceOracle _oracle, ISincSwapRouter _router, address _guardian, address _treasury) {
         if (address(_sinc) == address(0) || address(_usdc) == address(0) || address(_oracle) == address(0)
@@ -134,10 +114,9 @@ contract SINCLending is ReentrancyGuard, Pausable {
         treasury = _treasury;
         lastAccrual = block.timestamp;
 
-        // Preset ROI variants
         _setVariant(CONSERVATIVE, 5_000, 2, true);   // ≤ ~1.97x leverage
-        _setVariant(BALANCED, 6_500, 3, true);       // ≤ ~2.80x leverage
-        _setVariant(AGGRESSIVE, 7_500, 4, true);     // ≤ ~3.91x leverage
+        _setVariant(BALANCED, 6_500, 3, true);       // ≤ ~2.86x leverage
+        _setVariant(AGGRESSIVE, 7_500, 4, true);     // ≤ ~4.00x leverage
     }
 
     // ================================================================== interest accrual
@@ -181,14 +160,11 @@ contract SINCLending is ReentrancyGuard, Pausable {
 
     // ================================================================== pricing
 
-    /// @notice Collateral valuation price: oracle price raised to at least the floor.
-    ///         (Floor exists because the ecosystem's floor controller defends $1; set floor=0 to disable.)
     function collateralPrice() public view returns (uint256) {
         uint256 p = oracle.sincPriceUSDC();
         return p > priceFloor ? p : priceFloor;
     }
 
-    /// @notice USDC value (6dp) of a SINC amount (18dp).
     function sincValueUSDC(uint256 sincAmount) public view returns (uint256) {
         return FullMath.mulDiv(sincAmount, collateralPrice(), 1e18);
     }
@@ -229,7 +205,6 @@ contract SINCLending is ReentrancyGuard, Pausable {
     }
 
     function _supplyExchangeRateView() internal view returns (uint256) {
-        // view-safe: projects accrual without writing (approximation for dashboards)
         uint256 cash = totalCash;
         uint256 borrows = totalBorrows;
         uint256 reserves = totalReserves;
@@ -285,7 +260,7 @@ contract SINCLending is ReentrancyGuard, Pausable {
         if (usdcAmount == 0) revert ZeroAmount();
         accrueInterest();
         USDC.safeTransferFrom(msg.sender, address(this), usdcAmount);
-        _repay(msg.sender, usdcAmount);
+        _repayLedger(msg.sender, usdcAmount);
     }
 
     function _borrow(address user, uint256 usdcAmount) internal {
@@ -299,7 +274,9 @@ contract SINCLending is ReentrancyGuard, Pausable {
         emit Borrowed(user, usdcAmount, shares);
     }
 
-    function _repay(address user, uint256 usdcAmount) internal returns (uint256 applied) {
+    /// @dev Ledger-only repayment: updates shares/borrows/cash, refunds overpayment to `user`.
+    ///      Contains no state writes after its final external call (CEI-clean for callers).
+    function _repayLedger(address user, uint256 usdcAmount) internal returns (uint256 applied) {
         uint256 debt = borrowBalance(user);
         applied = usdcAmount > debt ? debt : usdcAmount;
         bool fullRepay = applied == debt;
@@ -311,9 +288,9 @@ contract SINCLending is ReentrancyGuard, Pausable {
         totalBorrowShares -= sharesBurn;
         totalBorrows -= applied;
         totalCash += applied;
-        // refund overpayment
-        if (usdcAmount > applied) USDC.safeTransfer(user, usdcAmount - applied);
+        uint256 refund = usdcAmount - applied;
         emit Repaid(user, applied, sharesBurn);
+        if (refund > 0) USDC.safeTransfer(user, refund); // final external call — no writes after
     }
 
     function borrowBalance(address user) public view returns (uint256) {
@@ -350,31 +327,29 @@ contract SINCLending is ReentrancyGuard, Pausable {
     function liquidate(address user, uint256 repayAmount) external nonReentrant {
         if (repayAmount == 0) revert ZeroAmount();
         accrueInterest();
-        if (_isHealthy(user)) revert Unauthorized(); // only unhealthy positions are liquidatable
+        if (_isHealthy(user)) revert PositionHealthy();
         uint256 debt = borrowBalance(user);
         uint256 maxClose = FullMath.mulDiv(debt, closeFactorBps, BPS);
         uint256 repay_ = repayAmount > maxClose ? maxClose : repayAmount;
-
-        USDC.safeTransferFrom(msg.sender, address(this), repay_);
-        _repay(user, repay_);
 
         // seize SINC worth repay_ * (1 + bonus), valued at collateral price
         uint256 seizeValue = repay_ + FullMath.mulDiv(repay_, liquidationBonusBps, BPS);
         uint256 seizeSinc = FullMath.mulDiv(seizeValue, 1e18, collateralPrice());
         if (seizeSinc > collateralOf[user]) seizeSinc = collateralOf[user];
+
+        // --- effects (all ledger state settled before any external call) ---
+        _repayLedger(user, repay_);
         collateralOf[user] -= seizeSinc;
         totalCollateral -= seizeSinc;
+
+        // --- interactions ---
+        USDC.safeTransferFrom(msg.sender, address(this), repay_);
         SINC.safeTransfer(msg.sender, seizeSinc);
         emit Liquidated(user, msg.sender, repay_, seizeSinc);
     }
 
     // ================================================================== lending loops (lever-long SINC)
 
-    /// @notice Open a leveraged SINC loop: deposit SINC, then iterate {borrow USDC at variant LTV,
-    ///         swap USDC→SINC, re-deposit as collateral}.
-    /// @param variantId CONSERVATIVE / BALANCED / AGGRESSIVE (or guardian-added)
-    /// @param sincAmount initial SINC collateral (18dp)
-    /// @param loops iterations (≤ variant.maxLoops)
     function openLoop(uint256 variantId, uint256 sincAmount, uint256 loops)
         external
         nonReentrant
@@ -408,42 +383,32 @@ contract SINCLending is ReentrancyGuard, Pausable {
         emit LoopOpened(msg.sender, variantId, sincAmount, loops, collateralOf[msg.sender], borrowBalance(msg.sender));
     }
 
-    /// @notice Fully unwind: swap just enough SINC collateral to USDC to clear the debt,
-    ///         return the remainder. Reverts if collateral can't cover debt (liquidation territory).
     function closeLoop() external nonReentrant {
         accrueInterest();
         address user = msg.sender;
         uint256 debt = borrowBalance(user);
         if (debt == 0) revert NoDebt();
 
-        // SINC needed at current router-implied price; +1% buffer for swap fee/rounding
         uint256 sincNeeded = FullMath.mulDiv(debt, 1e18, collateralPrice());
-        sincNeeded += FullMath.mulDiv(sincNeeded, 100, BPS);
-        if (sincNeeded > collateralOf[user]) revert InsufficientCollateral();
+        sincNeeded += FullMath.mulDiv(sincNeeded, 100, BPS); // +1% buffer for swap fee/rounding
+        uint256 userColl = collateralOf[user];
+        if (sincNeeded > userColl) revert InsufficientCollateral();
+        uint256 remaining = userColl - sincNeeded;
 
-        collateralOf[user] -= sincNeeded;
-        totalCollateral -= sincNeeded;
+        // --- effects: entire collateral position settled before any external call ---
+        collateralOf[user] = 0;
+        totalCollateral -= userColl;
+
+        // --- interactions (trusted guardian-set router; whole tx reverts on failure) ---
         SINC.safeIncreaseAllowance(address(swapRouter), sincNeeded);
         uint256 usdcOut = swapRouter.swapSINCForUSDC(sincNeeded);
-        _repay(user, usdcOut);
+        _repayLedger(user, usdcOut); // any surplus USDC refunds to user inside
 
         if (borrowBalance(user) > 1) revert SolvencyBreached(); // dust of 1 wei tolerated
-        uint256 remaining = collateralOf[user];
-        if (remaining > 0) {
-            collateralOf[user] = 0;
-            totalCollateral -= remaining;
-            SINC.safeTransfer(user, remaining);
-        }
+        if (remaining > 0) SINC.safeTransfer(user, remaining);
         emit LoopClosed(user, debt, remaining);
     }
 
-    /// @notice Projected loop economics for a variant over a horizon. Pure arithmetic on current rates.
-    /// @param collateralValueUSDC initial collateral value (6dp)
-    /// @param priceChangeBps hypothetical SINC price move over the horizon (signed, ±)
-    /// @param horizonDays holding period for borrow-cost accrual
-    /// @return leverageBps final collateral / initial collateral
-    /// @return roiBps projected net ROI on initial collateral (signed)
-    /// @return borrowCostBps borrow cost as % of initial collateral (unsigned component of roiBps)
     function simulateLoopROI(uint256 collateralValueUSDC, uint256 variantId, int256 priceChangeBps, uint256 horizonDays)
         external
         view
@@ -452,24 +417,20 @@ contract SINCLending is ReentrancyGuard, Pausable {
         LoopVariant storage v = loopVariants[variantId];
         if (!v.active) revert VariantInactive();
 
-        // leverage = Σᵢ₌₀..n λⁱ in BPS terms, computed iteratively (WAD fixed point)
         uint256 lambda = FullMath.mulDiv(v.ltvBps, WAD, BPS);
-        uint256 term = WAD;               // λ⁰
-        uint256 sum = WAD;                // running Σ λⁱ
+        uint256 term = WAD;
+        uint256 sum = WAD;
         for (uint256 i = 0; i < v.maxLoops; i++) {
             term = FullMath.mulDiv(term, lambda, WAD);
             sum += term;
         }
         leverageBps = FullMath.mulDiv(sum, BPS, WAD);
 
-        // debt fraction of initial collateral = leverage − 1
-        // borrow cost = debtFraction · borrowAPR · (horizonDays/365)
         uint256 debtFracWad = sum - WAD;
         uint256 aprWad = FullMath.mulDiv(borrowAPRBps(), WAD, BPS);
         uint256 costWad = FullMath.mulDiv(debtFracWad, aprWad * horizonDays, SECONDS_PER_YEAR / 1 days);
         borrowCostBps = FullMath.mulDiv(costWad, BPS, WAD);
 
-        // price PnL = leverage · priceChange (signed)
         int256 pricePnlBps = int256(FullMath.mulDiv(sum, BPS, WAD)) * priceChangeBps / int256(BPS);
         roiBps = pricePnlBps - int256(borrowCostBps);
     }
@@ -496,20 +457,38 @@ contract SINCLending is ReentrancyGuard, Pausable {
         emit ReservesSwept(treasury, amt);
     }
 
-    function setPriceFloor(uint256 floor_) external onlyGuardian { priceFloor = floor_; }
+    function setPriceFloor(uint256 floor_) external onlyGuardian {
+        priceFloor = floor_;
+        emit PriceFloorUpdated(floor_);
+    }
     function setRiskParams(uint256 _maxLtv, uint256 _liqThreshold, uint256 _liqBonus, uint256 _closeFactor) external onlyGuardian {
         if (_liqThreshold > 9_000 || _maxLtv >= _liqThreshold || _liqBonus > 2_000 || _closeFactor > BPS) revert InvalidConfig();
         maxLTVBps = _maxLtv;
         liquidationThresholdBps = _liqThreshold;
         liquidationBonusBps = _liqBonus;
         closeFactorBps = _closeFactor;
+        emit RiskParamsUpdated(_maxLtv, _liqThreshold, _liqBonus, _closeFactor);
     }
     function setRateModel(uint256 _base, uint256 _s1, uint256 _s2, uint256 _kink) external onlyGuardian {
         if (_kink > BPS) revert InvalidConfig();
         baseRateBps = _base; slope1Bps = _s1; slope2Bps = _s2; kinkBps = _kink;
+        emit RateModelUpdated(_base, _s1, _s2, _kink);
     }
-    function setOracle(ISincPriceOracle _oracle) external onlyGuardian { oracle = _oracle; }
-    function setSwapRouter(ISincSwapRouter _router) external onlyGuardian { swapRouter = _router; }
+    function setOracle(ISincPriceOracle _oracle) external onlyGuardian {
+        if (address(_oracle) == address(0)) revert InvalidConfig();
+        oracle = _oracle;
+        emit OracleUpdated(address(_oracle));
+    }
+    function setSwapRouter(ISincSwapRouter _router) external onlyGuardian {
+        if (address(_router) == address(0)) revert InvalidConfig();
+        swapRouter = _router;
+        emit SwapRouterUpdated(address(_router));
+    }
+    function setTreasury(address _treasury) external onlyGuardian {
+        if (_treasury == address(0)) revert InvalidConfig();
+        treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
+    }
     function pause() external onlyGuardian { _pause(); }
     function unpause() external onlyGuardian { _unpause(); }
 }
