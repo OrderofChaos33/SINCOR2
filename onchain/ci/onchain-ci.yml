@@ -1,0 +1,65 @@
+name: onchain-ci
+
+on:
+  push:
+    paths:
+      - "onchain/**"
+      - ".github/workflows/onchain-ci.yml"
+  pull_request:
+    paths:
+      - "onchain/**"
+  workflow_dispatch:
+
+jobs:
+  forge-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies (if libs are not vendored)
+        working-directory: onchain
+        run: |
+          if [ ! -d lib/forge-std ]; then
+            forge install foundry-rs/forge-std@v1.9.7 --no-commit
+            forge install OpenZeppelin/openzeppelin-contracts@v4.9.6 --no-commit
+            forge install Uniswap/v4-core@v4.0.0 --no-commit
+          fi
+
+      - name: Build
+        working-directory: onchain
+        run: forge build --sizes
+
+      - name: Test
+        working-directory: onchain
+        run: forge test -vvv
+
+  slither:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies (if libs are not vendored)
+        working-directory: onchain
+        run: |
+          if [ ! -d lib/forge-std ]; then
+            forge install foundry-rs/forge-std@v1.9.7 --no-commit
+            forge install OpenZeppelin/openzeppelin-contracts@v4.9.6 --no-commit
+            forge install Uniswap/v4-core@v4.0.0 --no-commit
+          fi
+
+      - name: Install Slither
+        run: pip install slither-analyzer
+
+      - name: Run Slither (fails on medium+ findings)
+        working-directory: onchain
+        run: slither . --config-file slither.config.json
