@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
@@ -12,6 +13,9 @@ import {ISincPriceOracle, ISincSwapRouter} from "./interfaces/ISincLoop.sol";
 /// @title SINCLending — isolated SINC-collateral / USDC-debt market with lending-loop ROI variants
 /// @notice Compound-style index accounting (WAD-scaled, per-second linear accrual), kinked rate
 ///         model, $1 SINC price-floor aware collateral valuation, and preset loop variants.
+/// @dev SINC's decimals are read from the token at construction (canonical SINC v3 on Base is
+///      8 decimals). All SINC↔USDC valuation math normalizes by `sincUnit` (= 10**decimals), so
+///      the market is correct for any ERC-20 collateral with ≤ 18 decimals.
 contract SINCLending is ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
@@ -19,8 +23,9 @@ contract SINCLending is ReentrancyGuard, Pausable {
     uint256 public constant BPS = 10_000;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
 
-    IERC20 public immutable SINC;              // 18 decimals
+    IERC20 public immutable SINC;              // decimals read at construction (8 for canonical SINC v3)
     IERC20 public immutable USDC;              // 6 decimals
+    uint256 public immutable sincUnit;         // 10 ** SINC.decimals() — one whole SINC in raw units
     ISincPriceOracle public oracle;
     ISincSwapRouter public swapRouter;
     address public guardian;
@@ -106,8 +111,14 @@ contract SINCLending is ReentrancyGuard, Pausable {
             || address(_router) == address(0) || _guardian == address(0) || _treasury == address(0)) {
             revert InvalidConfig();
         }
+        uint8 sincDecimals = 18; // ERC-20 default when decimals() is not implemented
+        try IERC20Metadata(address(_sinc)).decimals() returns (uint8 d) {
+            if (d > 18) revert InvalidConfig(); // keeps 10**d and mulDiv math in safe range
+            sincDecimals = d;
+        } catch {}
         SINC = _sinc;
         USDC = _usdc;
+        sincUnit = 10 ** sincDecimals;
         oracle = _oracle;
         swapRouter = _router;
         guardian = _guardian;
@@ -166,7 +177,7 @@ contract SINCLending is ReentrancyGuard, Pausable {
     }
 
     function sincValueUSDC(uint256 sincAmount) public view returns (uint256) {
-        return FullMath.mulDiv(sincAmount, collateralPrice(), 1e18);
+        return FullMath.mulDiv(sincAmount, collateralPrice(), sincUnit);
     }
 
     // ================================================================== suppliers (USDC)
@@ -334,7 +345,7 @@ contract SINCLending is ReentrancyGuard, Pausable {
 
         // seize SINC worth repay_ * (1 + bonus), valued at collateral price
         uint256 seizeValue = repay_ + FullMath.mulDiv(repay_, liquidationBonusBps, BPS);
-        uint256 seizeSinc = FullMath.mulDiv(seizeValue, 1e18, collateralPrice());
+        uint256 seizeSinc = FullMath.mulDiv(seizeValue, sincUnit, collateralPrice());
         if (seizeSinc > collateralOf[user]) seizeSinc = collateralOf[user];
 
         // --- effects (all ledger state settled before any external call) ---
@@ -350,6 +361,11 @@ contract SINCLending is ReentrancyGuard, Pausable {
 
     // ================================================================== lending loops (lever-long SINC)
 
+    /// @dev Accepted-risk (AUDIT.md A1): each loop iteration necessarily writes ledger state
+    ///      after the router swap — the amount bought is only known post-swap. Reentry is blocked
+    ///      by the nonReentrant mutex, the router is a trusted guardian-set address, and the loop
+    ///      is bounded by the variant's maxLoops.
+    // slither-disable-next-line reentrancy-no-eth
     function openLoop(uint256 variantId, uint256 sincAmount, uint256 loops)
         external
         nonReentrant
@@ -389,7 +405,7 @@ contract SINCLending is ReentrancyGuard, Pausable {
         uint256 debt = borrowBalance(user);
         if (debt == 0) revert NoDebt();
 
-        uint256 sincNeeded = FullMath.mulDiv(debt, 1e18, collateralPrice());
+        uint256 sincNeeded = FullMath.mulDiv(debt, sincUnit, collateralPrice());
         sincNeeded += FullMath.mulDiv(sincNeeded, 100, BPS); // +1% buffer for swap fee/rounding
         uint256 userColl = collateralOf[user];
         if (sincNeeded > userColl) revert InsufficientCollateral();

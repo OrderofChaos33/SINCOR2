@@ -13,13 +13,18 @@ import {ISincPriceOracle, ISincSwapRouter} from "../src/interfaces/ISincLoop.sol
 
 /// @title Deploy — one-click deployment of the SINC shared-liquidity + lending stack
 /// @notice Usage:
-///   forge script script/Deploy.s.sol --broadcast --rpc-url $POLYGON_RPC --verify
+///   forge script script/Deploy.s.sol --broadcast --rpc-url $RPC_URL
 ///
 ///   Env vars:
 ///     PRIVATE_KEY        (required) deployer key — becomes default guardian/owner
-///     SINC_TOKEN         (required) SINC ERC-20 address (18 dp)
+///     SINC_TOKEN         (required) SINC ERC-20 address (decimals auto-detected; canonical
+///                        SINC v3 on Base = 0x9C8cd8d3961F445D653713dE65C6578bE11668e7, 8 dp)
 ///     USDC_TOKEN         (required) USDC ERC-20 address (6 dp)
-///     POOL_MANAGER       (required for hook) Uniswap V4 PoolManager on target chain
+///                        Base:    0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+///                        Polygon: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
+///     POOL_MANAGER       (required for hook) Uniswap V4 PoolManager — SAME address on every
+///                        chain incl. Base & Polygon:
+///                        0x498581fF718922c3f8e6A244956aF099B2652b2b
 ///     SINC_ORACLE        (required for lending) ISincPriceOracle implementation
 ///     SINC_ROUTER        (required for lending) ISincSwapRouter implementation
 ///     GUARDIAN           (optional) defaults to deployer
