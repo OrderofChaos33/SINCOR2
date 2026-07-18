@@ -1,93 +1,84 @@
 # ============================================================================
-# SINCOR2 Production Requirements
+# SINCOR2 Production Requirements - Consolidated Security Update 2026-07-19
+# (lands PR #80 dep upgrades; keeps PyJWT 2.13.0 from #73 + py-clob-client)
 # ============================================================================
 # Core Framework
-Flask==3.0.0
+Flask==3.0.3
 Flask-JWT-Extended==4.7.1
-Flask-Limiter==3.5.0
-Flask-Cors==4.0.0
-Werkzeug==3.0.0
-gunicorn==21.2.0
+Flask-Limiter==3.8.0
+Flask-Cors==5.0.0
+Werkzeug==3.0.6
+gunicorn==23.0.0
 
 # Web & HTTP
-requests==2.31.0
-urllib3==2.0.7
-httpx==0.25.1
+requests==2.32.3
+urllib3==2.2.3
+httpx==0.27.2
 
 # Data & Serialization
-Pydantic==2.4.2
-pydantic-core==2.10.1
-pydantic[email]==2.4.2
-python-dateutil==2.8.2
-pytz==2023.3
+Pydantic==2.9.2
+pydantic-core==2.23.4
+pydantic[email]==2.9.2
+python-dateutil==2.9.0.post0
+pytz==2024.2
 
 # Database
-SQLAlchemy==2.0.23
-alembic==1.12.1
+SQLAlchemy==2.0.36
+alembic==1.14.0
+Mako==1.3.6
 sqlite3-backup==0.3.2
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 
 # Cryptography & Security
-cryptography==41.0.7
+cryptography==43.0.3
 PyJWT==2.13.0
-bcrypt==4.1.1
-python-dotenv==1.0.0
+bcrypt==4.2.0
+python-dotenv==1.0.1
 
 # API Integrations
-stripe==6.7.0
+stripe==11.1.1
 resend==2.7.0
-anthropic==0.7.1
-aiohttp==3.9.1
+anthropic==0.39.0
+aiohttp==3.10.10
 
 # Polyclaw live trading (Polymarket CLOB) — required for POLYCLAW_LIVE=true
 py-clob-client>=0.17.0
 
 # Scheduling & Async
 APScheduler==3.10.4
-aiofiles==23.2.1
-asyncio-contextmanager==1.0.1
+aiofiles==24.1.0
 
 # Logging & Observability
-watchtower==3.0.1
+watchtower==3.3.1
 python-json-logger==2.0.7
-opentelemetry-api==1.21.0
-opentelemetry-sdk==1.21.0
-opentelemetry-exporter-otlp==1.21.0
+opentelemetry-api==1.27.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp==1.27.0
 
 # PDF Generation
-Reportlab==4.0.7
-WeasyPrint==59.0
-Pillow==10.1.0
+ReportLab==4.2.5
+WeasyPrint==62.3
+Pillow==10.4.0
 
 # Web Scraping & Parsing
-BeautifulSoup4==4.12.2
+BeautifulSoup4==4.12.3
 html5lib==1.1
-lxml==4.9.3
+lxml==5.3.0
 
 # Machine Learning / Data Science
-numpy==1.24.3
-pandas==2.1.3
-scikit-learn==1.3.2
+numpy==1.26.4
+pandas==2.2.3
+scikit-learn==1.5.2
 
-# Optional: Advanced Time Series Forecasting (Nixtla ecosystem - production recommended for TOA & Predictive Engine)
-# Install with: pip install "statsforecast[dev]" "neuralforecast[dev]" nixtla  (or use requirements-forecasting.txt)
-# These enable high-accuracy probabilistic forecasting, GPU acceleration, and model comparison.
-# Current default (KernelForecaster) is zero-extra-dep for portability.
+# Utilities
+click==8.1.7
+pyyaml==6.0.2
+pyaml==24.1.0
+python-slugify==8.0.4
+tenacity==9.0.0
+
+# Optional forecasting (uncomment for full TOA GPU/Nixtla)
 # statsforecast
 # neuralforecast
 # nixtla
 # darts
-
-# Utilities
-click==8.1.7
-pyyaml==6.0.1
-pyaml==23.12.0
-python-slugify==8.0.1
-tenacity==8.2.3
-
-# Development (optional, see requirements-dev.txt)
-# pytest
-# pytest-cov
-# black
-# flake8
-# mypy
