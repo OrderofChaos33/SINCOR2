@@ -1,0 +1,7 @@
+{
+  "filter_paths": "lib/",
+  "detectors_to_exclude": "incorrect-exp,divide-before-multiply,incorrect-equality,naming-convention,solc-version,assembly,low-level-calls",
+  "exclude_informational": false,
+  "exclude_optimization": false,
+  "fail_on": "medium"
+}
