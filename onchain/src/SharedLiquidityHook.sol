@@ -17,32 +17,13 @@ import {ISharedLiquidityVault} from "./interfaces/ISharedLiquidityVault.sol";
 import {IAccountingHub} from "./interfaces/IAccountingHub.sol";
 
 /// @title SharedLiquidityHook — V4 hook wiring SINC/USDC pools into the SharedLiquidityVault
-/// @notice Extends the IntentHookV2 hardening pattern (onlyPoolManager, nonReentrant, treasury
-///         routing, optional AccountingHub, live MEV donation path) with Aqua/Fluid-style
-///         shared-liquidity virtual accounting.
-///
-///         Flow (Aqua "pull at execution" semantics):
-///           beforeSwap:  resolve the pool's vault strategy + LP route (hookData-encoded LP, else
-///                        the strategy's default backer — typically treasury 0x09E2…12Ac), then pull
-///                        output-side capital from the LP's VIRTUAL allocation into this hook.
-///           afterSwap:   settle the drawn principal back into the vault, compute the protocol fee
-///                        on the positive delta (FullMath, IntentHookV2-identical), and credit any
-///                        surplus the hook actually holds to the LP via the vault's settle path.
-///
-///         Never-bricks guarantee: every vault interaction is try/catch — a depleted virtual
-///         allocation can never revert a user's swap. The hook is additive: pools without a
-///         registered strategy pass straight through (zero delta), exactly like IntentHookV2.
-///
-///         NOTE (same staged posture as IntentHookV2): this contract performs the full virtual
-///         accounting + capital pull/settle cycle. Injecting pulled capital into the PoolManager's
-///         delta (beforeSwapReturnDelta / settle) is a deliberate follow-up and does not affect the
-///         accounting guarantees tested here.
+/// @notice Extends the IntentHookV2 hardening pattern with Aqua/Fluid-style shared-liquidity
+///         virtual accounting. Pulls output-side capital at execution time, settles after swap.
+///         Never-bricks: all vault interactions are try/catch; unregistered pools pass through.
 contract SharedLiquidityHook is IHooks, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
-
-    // ------------------------------------------------------------------ storage
 
     IPoolManager public immutable poolManager;
     ISharedLiquidityVault public immutable vault;
@@ -54,11 +35,9 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
 
     uint256 public constant MAX_PROTOCOL_FEE_BPS = 100;
 
-    /// @dev pool → vault strategyId (registered by owner)
     mapping(PoolId => uint256) public poolStrategy;
     mapping(PoolId => bool) public poolRegistered;
 
-    /// @dev pending draw state for the in-flight swap (V4 swaps are atomic per tx)
     struct PendingDraw {
         address lp;
         uint256 strategyId;
@@ -70,8 +49,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
 
     uint256 public totalMEVDonated;
 
-    // ------------------------------------------------------------------ events
-
     event PoolStrategyRegistered(PoolId indexed poolId, uint256 indexed strategyId);
     event VirtualLiquidityPulled(PoolId indexed poolId, address indexed lp, address token, uint256 amount);
     event VirtualLiquiditySettled(PoolId indexed poolId, address indexed lp, address token, uint256 principal, uint256 lpFee);
@@ -80,6 +57,7 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
     event ProtocolFeeUpdated(uint256 newFeeBps);
     event TreasuryUpdated(address newTreasury);
     event HubUpdated(address newHub);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event MEVDonationAccepted(address indexed token, uint256 amount, address indexed from);
     event DirectETHDonationReceived(uint256 amount, address indexed from);
     event DonationsWithdrawn(address indexed token, uint256 amount, address to);
@@ -98,8 +76,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         _;
     }
 
-    // ------------------------------------------------------------------ ctor
-
     constructor(IPoolManager _poolManager, ISharedLiquidityVault _vault, address _treasury, uint256 _feeBps) {
         if (_treasury == address(0)) revert InvalidTreasury();
         if (_feeBps > MAX_PROTOCOL_FEE_BPS) revert FeeTooHigh();
@@ -109,12 +85,9 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         owner = msg.sender;
         protocolFeeBps = _feeBps;
 
-        // Pre-approve the vault to pull back settlements (SINC + USDC only, per vault design)
         IERC20(address(_vault.SINC())).safeIncreaseAllowance(address(_vault), type(uint256).max);
         IERC20(address(_vault.USDC())).safeIncreaseAllowance(address(_vault), type(uint256).max);
     }
-
-    // ------------------------------------------------------------------ admin
 
     function registerPoolStrategy(PoolKey calldata key, uint256 strategyId) external onlyOwner {
         poolStrategy[key.toId()] = strategyId;
@@ -141,12 +114,10 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
 
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert Unauthorized();
+        emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
     }
 
-    // ------------------------------------------------------------------ hook callbacks (live)
-
-    /// @dev Pull output-side virtual liquidity at execution time. Additive & never-bricks.
     function beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata hookData)
         external
         override
@@ -157,11 +128,9 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         PoolId poolId = key.toId();
         uint256 strategyId = poolStrategy[poolId];
         if (!_pending.active && poolRegistered[poolId] && strategiesActive(strategyId)) {
-            // Route: explicit LP in hookData (Aqua-style per-maker routing) else strategy default backer
             address lp = _decodeLp(hookData);
             if (lp == address(0)) lp = vault.strategyDefaultBacker(strategyId);
 
-            // Output-side currency: the side the pool must pay out
             (Currency outCurrency, uint256 estOut) = _outputSide(key, params);
             address outToken = Currency.unwrap(outCurrency);
 
@@ -180,7 +149,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    /// @dev Settle drawn principal back to the vault; compute protocol fee (IntentHookV2 pattern).
     function afterSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata, BalanceDelta delta, bytes calldata)
         external
         override
@@ -199,7 +167,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
                 try vault.settleUp(p.strategyId, p.lp, p.token, principal, 0, 0) {
                     emit VirtualLiquiditySettled(poolId, p.lp, p.token, principal, 0);
                 } catch (bytes memory reason) {
-                    // Capital stays in the hook; owner can recover via recoverERC20. Still never bricks.
                     emit VirtualPullSkipped(poolId, reason);
                 }
             }
@@ -208,8 +175,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         _captureProtocolFeeSafe(key, delta);
         return (IHooks.afterSwap.selector, 0);
     }
-
-    // ------------------------------------------------------------------ unused hooks (permission set matches IntentHookV2: all off)
 
     function beforeInitialize(address, PoolKey calldata, uint160) external pure override returns (bytes4) {
         revert HookNotImplemented();
@@ -232,8 +197,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
 
     error HookNotImplemented();
 
-    // ------------------------------------------------------------------ fee capture (calculation + event; IntentHookV2-identical)
-
     function _captureProtocolFeeSafe(PoolKey calldata key, BalanceDelta delta) internal {
         if (protocolFeeBps == 0) return;
 
@@ -247,8 +210,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         }
         if (feeAmount > 0) emit FeeCaptured(feeCurrency, feeAmount, treasury);
     }
-
-    // ------------------------------------------------------------------ MEV donation path (LIVE, IntentHookV2-identical hardening)
 
     function acceptMEVDonation(address token, uint256 amount) external payable nonReentrant {
         uint256 received;
@@ -299,16 +260,11 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         emit DonationsWithdrawn(token, amount, to);
     }
 
-    /// @notice Recovery for capital left in the hook after a failed settle (defense in depth).
     function recoverERC20(address token, uint256 amount, address to) external onlyOwner nonReentrant {
         IERC20(token).safeTransfer(to, amount);
     }
 
-    // ------------------------------------------------------------------ internals
-
     function strategiesActive(uint256 strategyId) internal view returns (bool) {
-        // strategyId 0 is a valid id; an unregistered pool maps to 0 as well, so also require
-        // that the vault reports an active hook == this contract for that strategy.
         try vault.strategyHook(strategyId) returns (address h) {
             return h == address(this);
         } catch {
@@ -322,9 +278,6 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         }
     }
 
-    /// @dev Output-side currency + conservative size estimate for the pull.
-    ///      exactInput (amountSpecified < 0): estimate ≈ |amountSpecified| of the OTHER currency.
-    ///      exactOutput (amountSpecified > 0): exact = amountSpecified of the other currency.
     function _outputSide(PoolKey calldata key, IPoolManager.SwapParams calldata params)
         internal
         pure
