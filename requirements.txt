@@ -1,5 +1,6 @@
 # ============================================================================
 # SINCOR2 Production Requirements - Consolidated Security Update 2026-07-17
+# (merge-resolved 2026-07-19: keep PyJWT 2.13.0 + py-clob-client from main)
 # ============================================================================
 # Core Framework
 Flask==3.0.3
@@ -30,7 +31,7 @@ psycopg2-binary==2.9.10
 
 # Cryptography & Security
 cryptography==43.0.3
-PyJWT==2.9.0
+PyJWT==2.13.0
 bcrypt==4.2.0
 python-dotenv==1.0.1
 
@@ -39,6 +40,9 @@ stripe==11.1.1
 resend==2.7.0
 anthropic==0.39.0
 aiohttp==3.10.10
+
+# Polyclaw live trading (Polymarket CLOB) — required for POLYCLAW_LIVE=true
+py-clob-client>=0.17.0
 
 # Scheduling & Async
 APScheduler==3.10.4
