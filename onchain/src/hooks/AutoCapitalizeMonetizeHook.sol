@@ -1,44 +1,252 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-// AutoCapitalizeMonetizeHook.sol
-// Fees from looped/yield pools auto-route to SINC treasury, buyback, LP deepen, agent rewards.
-// Closes the create->optimize->monetize->capitalize->market% loop onchain.
-// 24/7 accountability via events. Production: Timelock for fee splits, SINC burn on monetize.
-
- import {BaseLendingLoopHookContainer} from "./BaseLendingLoopHookContainer.sol";
-import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "v4-core/src/libraries/Hooks.sol";
+import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
+import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
+import {ModifyLiquidityParams, SwapParams} from "v4-core/src/types/PoolOperation.sol";
+import {BeforeSwapDelta} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract AutoCapitalizeMonetizeHook is BaseLendingLoopHookContainer {
+/// @title AutoCapitalizeMonetizeHook (v2, standalone)
+/// @notice Replaces the non-compiling v1 sketch. Captures a protocol fee on every
+///         swap via the afterSwap return-delta, banks it as real tokens held by
+///         this contract, and splits swept balances per configurable bps:
+///
+///           treasuryBps  -> protocol treasury (hard revenue)
+///           reserveBps   -> retained on-contract as the buyback / LP-deepen
+///                           reserve, accounted per currency for a keeper to act on
+///
+///         Fee base is the UNSPECIFIED side of the swap (output for exact-in,
+///         input for exact-out), the same convention as Uniswap's reference
+///         fee-taking hooks.
+///
+///         Permissions: afterSwap + afterSwapReturnDelta. Deploy address MUST
+///         carry exactly those flag bits (mine via CREATE2, see test).
+///         NOT a reserve-holding contract for user funds - fees only.
+contract AutoCapitalizeMonetizeHook is IHooks {
+    using PoolIdLibrary for PoolKey;
     using SafeERC20 for IERC20;
 
-    address public sincTreasury; // Your treasury or router
-    uint256 public feeToTreasuryBps = 3000; // 30% example
-    uint256 public feeToBuybackBps = 4000; // 40% SINC buyback/burn
-    uint256 public feeToLPDeepenBps = 3000; // 30% deepen SINC LP
+    IPoolManager public immutable poolManager;
 
-    constructor(IPoolManager _poolManager, address _guardian, address _sincTreasury) BaseLendingLoopHookContainer(_poolManager, _guardian) {
-        sincTreasury = _sincTreasury;
+    address public owner;
+    address public treasury;
+
+    uint256 public feeBps; // protocol fee on unspecified side, cap 10%
+    uint256 public treasuryBps; // share of swept fees -> treasury; rest -> reserve
+    uint256 public constant MAX_FEE_BPS = 1000;
+
+    /// @notice Fees banked per currency (lifetime accounting; reserve = balance - swept)
+    mapping(Currency => uint256) public totalCaptured;
+    mapping(Currency => uint256) public totalSwept;
+
+    event FeeCaptured(PoolId indexed poolId, Currency indexed currency, uint256 amount);
+    event Swept(Currency indexed currency, uint256 toTreasury, uint256 toReserve);
+    event FeeBpsUpdated(uint256 newFeeBps);
+    event TreasuryBpsUpdated(uint256 newTreasuryBps);
+    event TreasuryUpdated(address newTreasury);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    error Unauthorized();
+    error UnauthorizedCallback();
+    error FeeTooHigh();
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
     }
 
-    function _afterSwap(...) internal override returns (bytes4, int128) {
-        // Production: Calculate protocol fees from delta or hook state
-        // uint256 feeAmount = ... ;
-        // IERC20(key.currency0).safeTransfer(sincTreasury, feeAmount * feeToTreasuryBps / 10000);
-        // Execute buyback or LP add for remaining (via router or internal swap)
-        // Emit monetize events for agent tracking and market% calc
-        return BaseLendingLoopHookContainer._afterSwap(sender, key, params, delta, hookData);
+    modifier onlyPoolManager() {
+        if (msg.sender != address(poolManager)) revert UnauthorizedCallback();
+        _;
     }
 
-    // Guardian can update splits (production: timelock)
-    function updateFeeSplits(uint256 t, uint256 b, uint256 l) external {
-        require(msg.sender == guardian, "Only guardian");
-        feeToTreasuryBps = t;
-        feeToBuybackBps = b;
-        feeToLPDeepenBps = l;
+    constructor(IPoolManager _poolManager, address _treasury, uint256 _feeBps, uint256 _treasuryBps) {
+        require(address(_poolManager) != address(0) && _treasury != address(0), "Zero address");
+        if (_feeBps > MAX_FEE_BPS || _treasuryBps > 10_000) revert FeeTooHigh();
+        poolManager = _poolManager;
+        treasury = _treasury;
+        feeBps = _feeBps;
+        treasuryBps = _treasuryBps;
+        owner = msg.sender;
+    }
+
+    // ==================== IHooks surface (only afterSwap is live) ====================
+
+    function getHookPermissions() public pure returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: false,
+            afterInitialize: false,
+            beforeAddLiquidity: false,
+            afterAddLiquidity: false,
+            beforeRemoveLiquidity: false,
+            afterRemoveLiquidity: false,
+            beforeSwap: false,
+            afterSwap: true,
+            beforeDonate: false,
+            afterDonate: false,
+            beforeSwapReturnDelta: false,
+            afterSwapReturnDelta: true,
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
+    }
+
+    function beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata)
+        external
+        pure
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
+        revert UnauthorizedCallback();
+    }
+
+    function afterSwap(
+        address,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        BalanceDelta delta,
+        bytes calldata
+    ) external onlyPoolManager returns (bytes4, int128) {
+        if (feeBps == 0) return (this.afterSwap.selector, 0);
+
+        // Unspecified side: exact-in -> output currency, exact-out -> input currency
+        bool exactInput = params.amountSpecified < 0;
+        bool feeOnCurrency0 = exactInput ? !params.zeroForOne : params.zeroForOne;
+        int128 side = feeOnCurrency0 ? delta.amount0() : delta.amount1();
+        uint256 base = side < 0 ? uint256(uint128(-side)) : uint256(uint128(side));
+
+        uint256 feeAmount = (base * feeBps) / 10_000;
+        if (feeAmount == 0) return (this.afterSwap.selector, 0);
+
+        Currency feeCurrency = feeOnCurrency0 ? key.currency0 : key.currency1;
+        poolManager.take(feeCurrency, address(this), feeAmount);
+        totalCaptured[feeCurrency] += feeAmount;
+
+        emit FeeCaptured(key.toId(), feeCurrency, feeAmount);
+        return (this.afterSwap.selector, int128(int256(feeAmount)));
+    }
+
+    // ==================== Remaining IHooks stubs (never called: no flags) ====================
+
+    function beforeInitialize(address, PoolKey calldata, uint160) external pure returns (bytes4) {
+        revert UnauthorizedCallback();
+    }
+
+    function afterInitialize(address, PoolKey calldata, uint160, int24) external pure returns (bytes4) {
+        revert UnauthorizedCallback();
+    }
+
+    function beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
+        revert UnauthorizedCallback();
+    }
+
+    function afterAddLiquidity(
+        address,
+        PoolKey calldata,
+        ModifyLiquidityParams calldata,
+        BalanceDelta,
+        BalanceDelta,
+        bytes calldata
+    ) external pure returns (bytes4, BalanceDelta) {
+        revert UnauthorizedCallback();
+    }
+
+    function beforeRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
+        revert UnauthorizedCallback();
+    }
+
+    function afterRemoveLiquidity(
+        address,
+        PoolKey calldata,
+        ModifyLiquidityParams calldata,
+        BalanceDelta,
+        BalanceDelta,
+        bytes calldata
+    ) external pure returns (bytes4, BalanceDelta) {
+        revert UnauthorizedCallback();
+    }
+
+    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
+        revert UnauthorizedCallback();
+    }
+
+    function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
+        external
+        pure
+        returns (bytes4)
+    {
+        revert UnauthorizedCallback();
+    }
+
+    // ==================== MONETIZATION ====================
+
+    /// @notice Sweep banked fees: treasuryBps to treasury, remainder stays as the
+    ///         on-contract buyback / LP-deepen reserve. Keeper-compoundable.
+    function sweep(Currency currency) external {
+        uint256 balance = IERC20(Currency.unwrap(currency)).balanceOf(address(this));
+        uint256 captured = totalCaptured[currency];
+        uint256 swept = totalSwept[currency];
+        uint256 available = balance < captured - swept ? balance : captured - swept;
+        if (available == 0) return;
+
+        uint256 toTreasury = (available * treasuryBps) / 10_000;
+        uint256 toReserve = available - toTreasury;
+
+        totalSwept[currency] = swept + available;
+        if (toTreasury > 0) IERC20(Currency.unwrap(currency)).safeTransfer(treasury, toTreasury);
+
+        emit Swept(currency, toTreasury, toReserve);
+    }
+
+    /// @notice Spend reserve on buyback / LP-deepen. Owner-gated; the keeper pattern.
+    ///         v2 keeps execution off-contract (owner routes via its own call) to
+    ///         avoid embedding a router dependency in a fee contract.
+    function releaseReserve(Currency currency, uint256 amount, address to) external onlyOwner {
+        require(to != address(0), "Zero address");
+        IERC20(Currency.unwrap(currency)).safeTransfer(to, amount);
+    }
+
+    // ==================== ADMIN ====================
+
+    function setFeeBps(uint256 newFeeBps) external onlyOwner {
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
+        feeBps = newFeeBps;
+        emit FeeBpsUpdated(newFeeBps);
+    }
+
+    function setTreasuryBps(uint256 newTreasuryBps) external onlyOwner {
+        if (newTreasuryBps > 10_000) revert FeeTooHigh();
+        treasuryBps = newTreasuryBps;
+        emit TreasuryBpsUpdated(newTreasuryBps);
+    }
+
+    function setTreasury(address newTreasury) external onlyOwner {
+        require(newTreasury != address(0), "Zero address");
+        treasury = newTreasury;
+        emit TreasuryUpdated(newTreasury);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "Zero address");
+        emit OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
     }
 }

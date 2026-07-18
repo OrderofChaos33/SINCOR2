@@ -3,6 +3,13 @@ pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+/// @title PhantomCreditToken (pMEV)
+/// @notice Ephemeral working-capital credit for the Moebius MEV loop.
+///         Mintable/burnable ONLY by the MoebiusMEVHook. Net supply outside
+///         the pool is zero at every transaction boundary: searchers must
+///         return (burn) the full flash amount within the same unlock frame.
+///         Supply resting in the pMEV/realAsset pool is hook-seeded inventory
+///         (the central bank's balance sheet), backed by the hook's LP position.
 contract PhantomCreditToken is ERC20 {
     address public immutable hook;
 
