@@ -10,29 +10,67 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /// @title LiquidityAmplifierHook
-/// @notice Production-ready additive V4 hook for SINCOR liquidity amplification.
-///         Pulls idle LP capital from ERC-4626 yield vaults (Morpho/Aerodrome style) for swaps,
-///         returns it + fees immediately after. LPs earn continuous yield + swap fees.
-///         Additive to SincLimitOrderHook (no changes to existing). Agents interact via SINCOR2 A2A.
-///         High profit potential: massive capital efficiency for LPs and deeper liquidity for the ecosystem.
-contract LiquidityAmplifierHook is BaseHook {
+/// @notice Production-oriented additive Uniswap V4 hook for SINCOR liquidity amplification.
+///         Designed for shared/virtual liquidity (Aqua/Fluid-inspired) + yield vault integration.
+///         Pulls idle capital from ERC-4626 style vaults or RehypothecationAdapter for swaps,
+///         returns capital + fees immediately after. LPs earn continuous external yield + swap fees.
+///         Fully additive to SincLimitOrderHook and IntentHookV2. No interference with existing pools.
+///         Guardian-controlled. Ready for A2A agent interaction and AccountingHub wiring.
+/// @dev Boss task #78 progress: core structure, events, permissions, and vault mapping complete.
+///      Full JIT liquidity deployment and exact amountSpecified math left as production TODOs
+///      (requires poolManager.unlock + modifyLiquidity in the same callback context).
+contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using BeforeSwapDeltaLibrary for BeforeSwapDelta;
     using PoolIdLibrary for PoolKey;
 
-    // Yield vault for idle capital (ERC4626 compatible, e.g. Morpho, Aerodrome).
+    /// @notice Yield vault (ERC-4626 compatible) or RehypothecationAdapter per pool
     mapping(PoolId => address) public yieldVaults;
 
-    address public guardian;
+    /// @notice Optional AccountingHub for protocol fee / rehypo tracking
+    address public accountingHub;
 
-    event LiquidityPulled(PoolId indexed poolId, uint256 amount0, uint256 amount1);
-    event LiquidityReturned(PoolId indexed poolId, uint256 amount0, uint256 amount1, uint256 fees);
+    address public guardian;
+    address public owner;
+
+    // Safety
+    uint256 public constant MAX_PULL_BPS = 5000; // 50% of available vault assets max per swap (tuneable)
+    bool public paused;
+
+    event LiquidityPulled(PoolId indexed poolId, address indexed vault, uint256 amount0, uint256 amount1);
+    event LiquidityReturned(PoolId indexed poolId, address indexed vault, uint256 amount0, uint256 amount1, uint256 fees);
     event YieldVaultUpdated(PoolId indexed poolId, address vault);
+    event AccountingHubUpdated(address hub);
+    event GuardianUpdated(address newGuardian);
+    event Paused(bool isPaused);
+
+    error OnlyGuardian();
+    error OnlyOwner();
+    error PausedError();
+    error InvalidVault();
+
+    modifier onlyGuardian() {
+        if (msg.sender != guardian && msg.sender != owner) revert OnlyGuardian();
+        _;
+    }
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert OnlyOwner();
+        _;
+    }
+
+    modifier whenNotPaused() {
+        if (paused) revert PausedError();
+        _;
+    }
 
     constructor(IPoolManager _poolManager, address _guardian) BaseHook(_poolManager) {
+        require(_guardian != address(0), "zero guardian");
         guardian = _guardian;
+        owner = msg.sender;
     }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
@@ -54,91 +92,123 @@ contract LiquidityAmplifierHook is BaseHook {
         });
     }
 
+    // ==================== ADMIN ====================
+
+    function setYieldVault(PoolId poolId, address vault) external onlyGuardian {
+        if (vault == address(0)) revert InvalidVault();
+        yieldVaults[poolId] = vault;
+        emit YieldVaultUpdated(poolId, vault);
+    }
+
+    function setAccountingHub(address hub) external onlyOwner {
+        accountingHub = hub;
+        emit AccountingHubUpdated(hub);
+    }
+
+    function setGuardian(address newGuardian) external onlyOwner {
+        require(newGuardian != address(0), "zero");
+        guardian = newGuardian;
+        emit GuardianUpdated(newGuardian);
+    }
+
+    function setPaused(bool _paused) external onlyGuardian {
+        paused = _paused;
+        emit Paused(_paused);
+    }
+
+    // ==================== HOOK CALLBACKS ====================
+
     function _beforeAddLiquidity(
-        address sender,
-        PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata params,
-        bytes calldata hookData
-    ) internal override returns (bytes4) {
-        // Pass-through (additive). Extend with A2A agent validation if desired.
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyLiquidityParams calldata,
+        bytes calldata
+    ) internal override whenNotPaused returns (bytes4) {
         return BaseHook.beforeAddLiquidity.selector;
     }
 
     function _afterAddLiquidity(
-        address sender,
-        PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata params,
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta delta,
-        BalanceDelta feesAccrued,
-        bytes calldata hookData
+        BalanceDelta,
+        bytes calldata
     ) internal override returns (bytes4, BalanceDelta) {
         return (BaseHook.afterAddLiquidity.selector, delta);
     }
 
     function _beforeRemoveLiquidity(
-        address sender,
-        PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata params,
-        bytes calldata hookData
-    ) internal override returns (bytes4) {
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyLiquidityParams calldata,
+        bytes calldata
+    ) internal override whenNotPaused returns (bytes4) {
         return BaseHook.beforeRemoveLiquidity.selector;
     }
 
     function _afterRemoveLiquidity(
-        address sender,
-        PoolKey calldata key,
-        IPoolManager.ModifyLiquidityParams calldata params,
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyLiquidityParams calldata,
         BalanceDelta delta,
-        BalanceDelta feesAccrued,
-        bytes calldata hookData
+        BalanceDelta,
+        bytes calldata
     ) internal override returns (bytes4, BalanceDelta) {
         return (BaseHook.afterRemoveLiquidity.selector, delta);
     }
 
+    /// @dev Core amplification path. Production: compute required liquidity from params.amountSpecified,
+    ///      pull from vault via ERC4626.withdraw or RehypothecationAdapter, temporarily add as concentrated
+    ///      liquidity around current tick for the swap, then clean up in afterSwap.
     function _beforeSwap(
-        address sender,
+        address,
         PoolKey calldata key,
         IPoolManager.SwapParams calldata params,
-        bytes calldata hookData
-    ) internal override returns (bytes4, BeforeSwapDelta, uint24) {
+        bytes calldata
+    ) internal override whenNotPaused nonReentrant returns (bytes4, BeforeSwapDelta, uint24) {
         PoolId poolId = key.toId();
         address vault = yieldVaults[poolId];
 
         if (vault != address(0)) {
-            // TODO / Production: Calculate exact needed liquidity from params.amountSpecified.
-            // Pull from ERC4626 vault (non-custodial withdraw).
-            // Deploy as temporary concentrated liquidity for this swap.
-            emit LiquidityPulled(poolId, 0, 0); // Fill with actual amounts in full impl
+            // PRODUCTION TODO:
+            // 1. Calculate exact amounts needed from params.amountSpecified + current tick/liquidity
+            // 2. Call vault.withdraw(...) or adapter equivalent (non-custodial)
+            // 3. Use poolManager.modifyLiquidity inside unlockCallback to deploy temporary range
+            // 4. Track pulled amounts for afterSwap return
+            // For now emit event so monitoring / A2A agents can observe activity
+            emit LiquidityPulled(poolId, vault, 0, 0);
         }
 
+        // Fee remains 0 here (additive). Dynamic fees handled by SincLimitOrderHook if both present.
         return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
     function _afterSwap(
-        address sender,
+        address,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
+        IPoolManager.SwapParams calldata,
         BalanceDelta delta,
-        bytes calldata hookData
-    ) internal override returns (bytes4, int128) {
+        bytes calldata
+    ) internal override nonReentrant returns (bytes4, int128) {
         PoolId poolId = key.toId();
         address vault = yieldVaults[poolId];
 
         if (vault != address(0)) {
-            // TODO / Production: Return unused liquidity + collected fees to vault.
-            // LPs earn swap fees + ongoing vault yield.
-            emit LiquidityReturned(poolId, 0, 0, 0);
+            // PRODUCTION TODO:
+            // 1. Remove temporary liquidity
+            // 2. Calculate fees earned (delta)
+            // 3. Return principal + fees to vault / AccountingHub
+            // 4. Optional: route protocol cut of fees to treasury via hub.recordProtocolFee
+            emit LiquidityReturned(poolId, vault, 0, 0, 0);
         }
 
         return (BaseHook.afterSwap.selector, 0);
     }
 
-    function setYieldVault(PoolId poolId, address vault) external {
-        require(msg.sender == guardian, "Only guardian");
-        yieldVaults[poolId] = vault;
-        emit YieldVaultUpdated(poolId, vault);
-    }
+    // ==================== VIEW HELPERS ====================
 
-    // Production notes kept from original for deployment guidance.
-    // This hook is additive and does not touch existing SincLimitOrderHook or other pools.
+    function getVault(PoolId poolId) external view returns (address) {
+        return yieldVaults[poolId];
+    }
 }
