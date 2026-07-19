@@ -10,25 +10,28 @@ on:
       - "onchain/**"
   workflow_dispatch:
 
+env:
+  # public Base RPC for fork tests (Integration + LimitOrderHook suites)
+  BASE_RPC_URL: https://base-rpc.publicnode.com
+
 jobs:
   forge-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Install dependencies (if libs are not vendored)
+      - name: Install dependencies (pinned — must match DEPLOYING.md)
         working-directory: onchain
         run: |
-          if [ ! -d lib/forge-std ]; then
-            forge install foundry-rs/forge-std@v1.9.7 --no-commit
-            forge install OpenZeppelin/openzeppelin-contracts@v4.9.6 --no-commit
-            forge install Uniswap/v4-core@v4.0.0 --no-commit
-          fi
+          forge install foundry-rs/forge-std@v1.9.7
+          forge install OpenZeppelin/openzeppelin-contracts@v5.5.0
+          forge install Uniswap/v4-core@d153b048868a60c2403a3ef5b2301bb247884d46
+          forge install Uniswap/v4-periphery@7ebd04b161745b75ed0c24ba2df3bc7c25f65606
+          forge install Uniswap/permit2@cc56ad0f3439c502c246fc5cfcc3db92bb8b7219
+          forge install OpenZeppelin/uniswap-hooks@26dc8e53f812a1ca390d470342adb6cd8c3286ad
 
       - name: Build
         working-directory: onchain
@@ -42,20 +45,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Install dependencies (if libs are not vendored)
+      - name: Install dependencies (pinned — must match DEPLOYING.md)
         working-directory: onchain
         run: |
-          if [ ! -d lib/forge-std ]; then
-            forge install foundry-rs/forge-std@v1.9.7 --no-commit
-            forge install OpenZeppelin/openzeppelin-contracts@v4.9.6 --no-commit
-            forge install Uniswap/v4-core@v4.0.0 --no-commit
-          fi
+          forge install foundry-rs/forge-std@v1.9.7
+          forge install OpenZeppelin/openzeppelin-contracts@v5.5.0
+          forge install Uniswap/v4-core@d153b048868a60c2403a3ef5b2301bb247884d46
+          forge install Uniswap/v4-periphery@7ebd04b161745b75ed0c24ba2df3bc7c25f65606
+          forge install Uniswap/permit2@cc56ad0f3439c502c246fc5cfcc3db92bb8b7219
+          forge install OpenZeppelin/uniswap-hooks@26dc8e53f812a1ca390d470342adb6cd8c3286ad
 
       - name: Install Slither
         run: pip install slither-analyzer
