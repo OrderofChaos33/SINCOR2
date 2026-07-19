@@ -3,15 +3,18 @@ pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 
 import {IAccountingHub} from "./interfaces/IAccountingHub.sol";
 import {ISharedLiquidityVault} from "./interfaces/ISharedLiquidityVault.sol";
 
 /// @title SharedLiquidityVault — Aqua/Fluid-inspired shared-liquidity layer for SINC/USDC
-/// @notice Single liquidity layer holding real SINC/USDC balances with *virtual* accounting on top.
+/// @notice LP capital stays deposited here and is *virtually* allocated to multiple strategies
+///         (hooks). A strategy hook may draw down real capital for the duration of a swap and
+///         must settle principal (+fees) afterwards. Cross-strategy draws are bounded by the
+///         LP's real balance, not by per-strategy virtual balances.
 contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVault {
     using SafeERC20 for IERC20;
 
@@ -32,12 +35,16 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
 
     uint256 public nextStrategyId;
 
+    // LP real capital (deposits minus withdrawals)
     mapping(address lp => mapping(address token => uint256)) public realBalance;
+    // Virtual commitment per LP/strategy/token (Fluid-style liquidity layers)
     mapping(address lp => mapping(uint256 strategyId => mapping(address token => uint256))) public virtualAlloc;
+    // Outstanding draws (real capital currently lent out by a strategy)
     mapping(address lp => mapping(uint256 strategyId => mapping(address token => uint256))) public outstanding;
     mapping(uint256 strategyId => mapping(address token => uint256)) public strategyOutstanding;
     mapping(address lp => mapping(address token => uint256)) public lpOutstandingTotal;
     mapping(address token => uint256) public outstandingTotal;
+    // Fee claims (accrued, unharvested)
     mapping(address token => uint256) public feeClaimsTotal;
     mapping(address lp => mapping(address token => uint256)) public accruedFees;
 
@@ -94,6 +101,8 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
         treasury = _treasury;
     }
 
+    // ==================== LP REAL LIQUIDITY ====================
+
     function deposit(address token, uint256 amount)
         external
         nonReentrant
@@ -101,7 +110,6 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
         supported(token)
     {
         if (amount == 0) revert ZeroAmount();
-        // effects before interactions (CEI) — SINC/USDC are known non-rebasing tokens
         realBalance[msg.sender][token] += amount;
         _bumpTotals(token, int256(amount));
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
@@ -123,6 +131,8 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
         emit Withdrawn(msg.sender, token, amount);
     }
 
+    // ==================== VIRTUAL ALLOCATION ====================
+
     function allocateVirtual(uint256 strategyId, address token, uint256 amount)
         external
         whenNotPaused
@@ -143,12 +153,14 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
     {
         if (amount == 0) revert ZeroAmount();
         uint256 alloc = virtualAlloc[msg.sender][strategyId][token];
-        if (amount > alloc) revert InsufficientVirtualAlloc(amount, alloc);
+        if (amount > alloc) revert InsufficientVirtualAlloc(alloc, amount);
         uint256 drawn = outstanding[msg.sender][strategyId][token];
         if (alloc - amount < drawn) revert OutstandingAllocation(drawn);
         virtualAlloc[msg.sender][strategyId][token] = alloc - amount;
         emit VirtualDeallocated(msg.sender, strategyId, token, amount);
     }
+
+    // ==================== STRATEGY DRAWDOWN / SETTLEMENT ====================
 
     function drawDown(uint256 strategyId, address lp, address token, uint256 amount)
         external
@@ -193,7 +205,6 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
 
         uint256 protocolCut = 0;
         uint256 lpCut = 0;
-        // --- effects: all ledger state settled before any external call ---
         if (principal > 0) {
             outstanding[lp][strategyId][token] = drawn - principal;
             lpOutstandingTotal[lp][token] -= principal;
@@ -209,7 +220,6 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
             }
         }
 
-        // --- interactions ---
         uint256 total = principal + fee;
         if (total > 0) IERC20(token).safeTransferFrom(msg.sender, address(this), total);
         if (protocolCut > 0) IERC20(token).safeTransfer(treasury, protocolCut);
@@ -228,6 +238,8 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
         IERC20(token).safeTransfer(to == address(0) ? msg.sender : to, amt);
         emit FeesHarvested(msg.sender, token, amt, to);
     }
+
+    // ==================== VIEWS ====================
 
     function freeBalance(address lp, address token) public view returns (uint256) {
         return realBalance[lp][token] - lpOutstandingTotal[lp][token];
@@ -264,6 +276,8 @@ contract SharedLiquidityVault is ReentrancyGuard, Pausable, ISharedLiquidityVaul
         uint256 assets = IERC20(token).balanceOf(address(this)) + outstandingTotal[token];
         return assets >= claims;
     }
+
+    // ==================== GUARDIAN ADMIN ====================
 
     function registerStrategy(address hook, address defaultBacker, uint256 capSINC, uint256 capUSDC)
         external
