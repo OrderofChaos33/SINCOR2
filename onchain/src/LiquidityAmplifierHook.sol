@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {BaseHook} from "@uniswap/v4-periphery/src/base/hooks/BaseHook.sol";
+import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {SwapParams, ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @title LiquidityAmplifierHook
 /// @notice Production-oriented additive Uniswap V4 hook for SINCOR liquidity amplification.
@@ -22,6 +23,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 /// @dev Boss task #78 progress: core structure, events, permissions, and vault mapping complete.
 ///      Full JIT liquidity deployment and exact amountSpecified math left as production TODOs
 ///      (requires poolManager.unlock + modifyLiquidity in the same callback context).
+///      NOTE: BaseHook (v4-periphery utils) validates permission-bit address flags at
+///      construction — production deploys MUST use CREATE2 at a mined address (HookMiner).
 contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using BeforeSwapDeltaLibrary for BeforeSwapDelta;
@@ -121,7 +124,7 @@ contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     function _beforeAddLiquidity(
         address,
         PoolKey calldata,
-        IPoolManager.ModifyLiquidityParams calldata,
+        ModifyLiquidityParams calldata,
         bytes calldata
     ) internal override whenNotPaused returns (bytes4) {
         return BaseHook.beforeAddLiquidity.selector;
@@ -130,7 +133,7 @@ contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     function _afterAddLiquidity(
         address,
         PoolKey calldata,
-        IPoolManager.ModifyLiquidityParams calldata,
+        ModifyLiquidityParams calldata,
         BalanceDelta delta,
         BalanceDelta,
         bytes calldata
@@ -141,7 +144,7 @@ contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     function _beforeRemoveLiquidity(
         address,
         PoolKey calldata,
-        IPoolManager.ModifyLiquidityParams calldata,
+        ModifyLiquidityParams calldata,
         bytes calldata
     ) internal override whenNotPaused returns (bytes4) {
         return BaseHook.beforeRemoveLiquidity.selector;
@@ -150,7 +153,7 @@ contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     function _afterRemoveLiquidity(
         address,
         PoolKey calldata,
-        IPoolManager.ModifyLiquidityParams calldata,
+        ModifyLiquidityParams calldata,
         BalanceDelta delta,
         BalanceDelta,
         bytes calldata
@@ -164,7 +167,7 @@ contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     function _beforeSwap(
         address,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
+        SwapParams calldata params,
         bytes calldata
     ) internal override whenNotPaused nonReentrant returns (bytes4, BeforeSwapDelta, uint24) {
         PoolId poolId = key.toId();
@@ -187,7 +190,7 @@ contract LiquidityAmplifierHook is BaseHook, ReentrancyGuard {
     function _afterSwap(
         address,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata,
+        SwapParams calldata,
         BalanceDelta delta,
         bytes calldata
     ) internal override nonReentrant returns (bytes4, int128) {

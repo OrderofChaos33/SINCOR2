@@ -5,13 +5,14 @@ import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {SwapParams, ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {ISharedLiquidityVault} from "./interfaces/ISharedLiquidityVault.sol";
 import {IAccountingHub} from "./interfaces/IAccountingHub.sol";
@@ -118,7 +119,7 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         owner = newOwner;
     }
 
-    function beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata hookData)
+    function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
         external
         override
         onlyPoolManager
@@ -149,7 +150,7 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function afterSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata, BalanceDelta delta, bytes calldata)
+    function afterSwap(address, PoolKey calldata key, SwapParams calldata, BalanceDelta delta, bytes calldata)
         external
         override
         onlyPoolManager
@@ -182,13 +183,13 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
     function afterInitialize(address, PoolKey calldata, uint160, int24) external pure override returns (bytes4) {
         revert HookNotImplemented();
     }
-    function beforeAddLiquidity(address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, bytes calldata)
+    function beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
         external pure override returns (bytes4) { revert HookNotImplemented(); }
-    function afterAddLiquidity(address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata)
+    function afterAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata)
         external pure override returns (bytes4, BalanceDelta) { revert HookNotImplemented(); }
-    function beforeRemoveLiquidity(address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, bytes calldata)
+    function beforeRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata)
         external pure override returns (bytes4) { revert HookNotImplemented(); }
-    function afterRemoveLiquidity(address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata)
+    function afterRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata)
         external pure override returns (bytes4, BalanceDelta) { revert HookNotImplemented(); }
     function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata)
         external pure override returns (bytes4) { revert HookNotImplemented(); }
@@ -278,7 +279,7 @@ contract SharedLiquidityHook is IHooks, ReentrancyGuard {
         }
     }
 
-    function _outputSide(PoolKey calldata key, IPoolManager.SwapParams calldata params)
+    function _outputSide(PoolKey calldata key, SwapParams calldata params)
         internal
         pure
         returns (Currency outCurrency, uint256 estOut)
