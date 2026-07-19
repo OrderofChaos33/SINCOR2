@@ -24,7 +24,7 @@ jobs:
       - name: Deploy vault + staging hook on Base
         working-directory: onchain
         env:
-          PRIVATE_KEY: ${{ secrets.BASE_PRIVATE_KEY }}
+          PRIVATE_KEY: ${{ secrets.TEMP1 }}
         run: |
           echo "PRIVATE_KEY=$PRIVATE_KEY" > .env
           chmod +x script/deploy-base.sh
