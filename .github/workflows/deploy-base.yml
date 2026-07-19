@@ -24,10 +24,11 @@ jobs:
       - name: Deploy vault + staging hook on Base
         working-directory: onchain
         env:
-          PRIVATE_KEY: ${{ secrets.TEMP1 }}
+          RAW_PRIVATE_KEY: ${{ secrets.TEMP1 }}
         run: |
-          K="${PRIVATE_KEY#0x}"          # tolerate missing 0x prefix in secret
-          echo "PRIVATE_KEY=0x$K" > .env
+          K="${RAW_PRIVATE_KEY#0x}"      # tolerate missing 0x prefix in secret
+          export PRIVATE_KEY="0x$K"      # process env overrides .env for forge
+          echo "PRIVATE_KEY=$PRIVATE_KEY" > .env
           chmod +x script/deploy-base.sh
           ./script/deploy-base.sh
 
