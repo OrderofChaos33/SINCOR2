@@ -26,7 +26,8 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.TEMP1 }}
         run: |
-          echo "PRIVATE_KEY=$PRIVATE_KEY" > .env
+          K="${PRIVATE_KEY#0x}"          # tolerate missing 0x prefix in secret
+          echo "PRIVATE_KEY=0x$K" > .env
           chmod +x script/deploy-base.sh
           ./script/deploy-base.sh
 
