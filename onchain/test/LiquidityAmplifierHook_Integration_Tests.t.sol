@@ -7,61 +7,73 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {HookMiner} from "@uniswap/v4-periphery/src/utils/HookMiner.sol";
 
-// Production integration/fork tests extending your existing SincLimitOrderHook.t.sol and Integration.t.sol.
-// Additive only — tests new hook behavior on parallel pools. No impact on existing limit-order logic or contracts.
-// Best practices: Comprehensive coverage of liquidity pull/return, agent A2A simulation, yield vault integration, security.
-
+/// @notice LiquidityAmplifierHook tests. v4-periphery utils/BaseHook validates the
+///         hook address permission flags at construction, so the hook is deployed
+///         via CREATE2 at a HookMiner-mined address (same as production).
 contract LiquidityAmplifierHookTest is Test {
     using PoolIdLibrary for PoolKey;
 
     LiquidityAmplifierHook hook;
-    IPoolManager poolManager; // Mock or fork to Base V4 PoolManager
-    address guardian = address(0xGuardian);
+    IPoolManager poolManager;
+    address guardian = makeAddr("guardian");
 
     function setUp() public {
-        // Production: Fork Base or use mock. Extend your existing test setup.
-        poolManager = IPoolManager(address(0xMockPoolManager)); // Replace with actual or vm.createSelectFork
-        hook = new LiquidityAmplifierHook(poolManager, guardian);
+        poolManager = IPoolManager(makeAddr("poolManager"));
 
-        // Example: Set a yield vault for a test pool (SINC/USDC style).
-        // hook.setYieldVault(somePoolId, mockVault);
+        uint160 flags = uint160(
+            Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.AFTER_ADD_LIQUIDITY_FLAG
+                | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | Hooks.AFTER_REMOVE_LIQUIDITY_FLAG
+                | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG
+        );
+        bytes memory constructorArgs = abi.encode(poolManager, guardian);
+        (address hookAddress, bytes32 salt) = HookMiner.find(
+            address(this), flags, type(LiquidityAmplifierHook).creationCode, constructorArgs
+        );
+        hook = new LiquidityAmplifierHook{salt: salt}(poolManager, guardian);
+        require(address(hook) == hookAddress, "hook address mismatch");
     }
 
     function testHookPermissions() public view {
         Hooks.Permissions memory permissions = hook.getHookPermissions();
         assertTrue(permissions.beforeAddLiquidity);
         assertTrue(permissions.afterAddLiquidity);
+        assertTrue(permissions.beforeRemoveLiquidity);
+        assertTrue(permissions.afterRemoveLiquidity);
         assertTrue(permissions.beforeSwap);
         assertTrue(permissions.afterSwap);
-        // Confirms additive compatibility with V4 and your existing hook patterns.
-    }
-
-    function testIdleYieldPullAndReturn() public {
-        // Simulate swap on configured pool.
-        // Verify capital pulled from vault, swap executes, unused returned + fees.
-        // Production: Full accounting, event checks, agent A2A payment simulation.
-        // assertEq(vaultBalanceAfter, expected); // Yield preserved + fees added.
-    }
-
-    function testAgentA2ATaskSimulation() public {
-        // Simulate SINCOR2 A2A task calling hook functions (range optimize, rebalance).
-        // Verify AXM payment intent validation (reuse your existing router logic).
-        // Check events emitted for dashboard/monitoring.
     }
 
     function testGuardianControls() public {
-        // Test setYieldVault only callable by guardian.
-        // Production: Extend with timelock simulation.
+        PoolKey memory key;
+        PoolId poolId = key.toId();
+        address vault = makeAddr("vault");
+
+        // third party (not guardian, not owner) cannot set a yield vault
+        vm.prank(makeAddr("rando"));
+        vm.expectRevert(LiquidityAmplifierHook.OnlyGuardian.selector);
+        hook.setYieldVault(poolId, vault);
+
+        // guardian can
         vm.prank(guardian);
-        // hook.setYieldVault(...);
-        // assertEq(hook.yieldVaults(poolId), vault);
+        hook.setYieldVault(poolId, vault);
+        assertEq(hook.getVault(poolId), vault);
     }
 
-    function testNoBreakExistingHook() public {
-        // Critical: Confirm no state or logic interference with SincLimitOrderHook.
-        // Run in same test suite as your existing tests — passes unchanged.
+    function testPauseBlocksAndUnpauses() public {
+        vm.prank(guardian);
+        hook.setPaused(true);
+        vm.prank(guardian);
+        hook.setPaused(false);
     }
 
-    // Additional production tests ready: Gas benchmarks, multi-pool, volatility scenarios, IL hedge via agent, circuit breaker.
+    function testOwnershipAndHub() public {
+        address hub = makeAddr("hub");
+        vm.prank(makeAddr("rando"));
+        vm.expectRevert(LiquidityAmplifierHook.OnlyOwner.selector);
+        hook.setAccountingHub(hub);
+        hook.setAccountingHub(hub); // deployer is owner
+        assertEq(hook.accountingHub(), hub);
+    }
 }

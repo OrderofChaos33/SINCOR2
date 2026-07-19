@@ -10,6 +10,7 @@ import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
 import {BalanceDelta, toBalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 
@@ -23,7 +24,7 @@ contract SharedLiquidityHookTest is Test {
     MockERC20 usdc;
 
     address guardian = makeAddr("guardian");
-    address treasury = 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac; // canonical SINCOR2 treasury
+    address treasury = 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac;
     address pm = makeAddr("poolManager");
     address lpA = makeAddr("lpA");
     address lpB = makeAddr("lpB");
@@ -36,10 +37,10 @@ contract SharedLiquidityHookTest is Test {
         sinc = new MockERC20("SINC", "SINC", 18);
         usdc = new MockERC20("USD Coin", "USDC", 6);
         vault = new SharedLiquidityVault(sinc, usdc, guardian, treasury);
-        hook = new SharedLiquidityHook(IPoolManager(pm), vault, treasury, 10); // 0.10% protocol fee
+        hook = new SharedLiquidityHook(IPoolManager(pm), vault, treasury, 10);
 
         vm.prank(guardian);
-        strategyId = vault.registerStrategy(address(hook), lpA, 0, 0); // lpA = default backer
+        strategyId = vault.registerStrategy(address(hook), lpA, 0, 0);
 
         (Currency c0, Currency c1) = address(sinc) < address(usdc)
             ? (Currency.wrap(address(sinc)), Currency.wrap(address(usdc)))
@@ -66,11 +67,9 @@ contract SharedLiquidityHookTest is Test {
         vm.stopPrank();
     }
 
-    function _swapParams(bool zeroForOne, int256 amountSpecified) internal pure returns (IPoolManager.SwapParams memory) {
-        return IPoolManager.SwapParams({zeroForOne: zeroForOne, amountSpecified: amountSpecified, sqrtPriceLimitX96: 0});
+    function _swapParams(bool zeroForOne, int256 amountSpecified) internal pure returns (SwapParams memory) {
+        return SwapParams({zeroForOne: zeroForOne, amountSpecified: amountSpecified, sqrtPriceLimitX96: 0});
     }
-
-    // --------------------------------------------------------------- access control
 
     function test_onlyPoolManagerCanCallHooks() public {
         vm.expectRevert(SharedLiquidityHook.Unauthorized.selector);
@@ -80,13 +79,10 @@ contract SharedLiquidityHookTest is Test {
         hook.afterSwap(trader, key, _swapParams(true, -1000e6), toBalanceDelta(0, 0), "");
     }
 
-    // --------------------------------------------------------------- pull at execution
-
     function test_beforeSwapPullsOutputSideVirtualLiquidity() public {
         _fundLpA();
-        // trader sells SINC (currency?) — make USDC the output side by choosing direction
         bool usdcIs0 = Currency.unwrap(key.currency0) == address(usdc);
-        bool zeroForOne = !usdcIs0; // sell the other token → USDC is output
+        bool zeroForOne = !usdcIs0; // selling SINC for USDC
 
         vm.prank(pm);
         hook.beforeSwap(trader, key, _swapParams(zeroForOne, -50_000e6), "");
@@ -103,6 +99,7 @@ contract SharedLiquidityHookTest is Test {
         vm.prank(pm);
         hook.beforeSwap(trader, key, _swapParams(zeroForOne, -50_000e6), "");
 
+        // swap consumes less than pulled; hook settles only what it actually holds
         BalanceDelta delta = usdcIs0 ? toBalanceDelta(-48_000e6, 50_000e6) : toBalanceDelta(50_000e6, -48_000e6);
         vm.prank(pm);
         hook.afterSwap(trader, key, _swapParams(zeroForOne, -50_000e6), delta, "");
@@ -114,7 +111,6 @@ contract SharedLiquidityHookTest is Test {
 
     function test_hookDataRoutesToSpecificLP() public {
         _fundLpA();
-        // lpB also deposits + allocates
         vm.startPrank(lpB);
         vault.deposit(address(usdc), 100_000e6);
         vault.allocateVirtual(strategyId, address(usdc), 100_000e6);
@@ -129,8 +125,6 @@ contract SharedLiquidityHookTest is Test {
         assertEq(vault.outstanding(lpB, strategyId, address(usdc)), 10_000e6);
         assertEq(vault.outstanding(lpA, strategyId, address(usdc)), 0);
     }
-
-    // --------------------------------------------------------------- never-bricks
 
     function test_unregisteredPoolPassesThrough() public {
         _fundLpA();
@@ -148,25 +142,20 @@ contract SharedLiquidityHookTest is Test {
     }
 
     function test_depletedLiquidityDoesNotRevertSwap() public {
-        // lpA has no deposits at all — draw must be skipped, swap proceeds
+        // no LPs funded — beforeSwap must not revert, just skip the pull
         vm.prank(pm);
         hook.beforeSwap(trader, key, _swapParams(true, -10_000e6), "");
         assertEq(usdc.balanceOf(address(hook)), 0);
     }
 
-    // --------------------------------------------------------------- fee accounting (IntentHookV2 parity)
-
     function test_protocolFeeEmittedOnPositiveDelta() public {
         _fundLpA();
         BalanceDelta delta = toBalanceDelta(-48_000e6, 50_000e6);
-        // 10 bps of 50_000e6 = 50e6 on the positive side
         vm.expectEmit(true, true, true, true);
         emit SharedLiquidityHook.FeeCaptured(key.currency1, 50e6, treasury);
         vm.prank(pm);
         hook.afterSwap(trader, key, _swapParams(true, -48_000e6), delta, "");
     }
-
-    // --------------------------------------------------------------- MEV donation parity
 
     function test_mevDonationRoutesToTreasury() public {
         uint256 before = treasury.balance;
