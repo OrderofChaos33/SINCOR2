@@ -37,3 +37,15 @@ BASE_CHAIN_ID=8453
 | `0xAf9B539D8043C634b7E611818518BA7E850F289e` | Legacy treasury — superseded by `0x09E2…12Ac` |
 
 > **`buy_watcher.js`** now defaults to `0x75dE…`. Override with `SINC_BONDING_CURVE` if needed.
+
+---
+
+## Deployed 2026-07-19 (shared-liquidity stack)
+
+| Contract | Address | Status |
+|----------|---------|--------|
+| SharedLiquidityVault | `0xeA90a257e5Dae20a0472C4812775F28614459bb6` | LIVE (verified onchain) |
+| SharedLiquidityHook (staging) | `0x5A20BfEc6Caa3A94246eCCCb36F27F4980152dC0` | LIVE (verified onchain) — production pool attachment pending CREATE2 mining |
+
+- Deployer/guardian (temporary, rotate to multisig): `0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a`
+- Deployment record: `onchain/deployments/base-8453.json` · Deploy run: https://github.com/OrderofChaos33/SINCOR2/actions/runs/29692254556
