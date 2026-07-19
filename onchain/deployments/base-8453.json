@@ -1,0 +1,33 @@
+{
+  "network": "base",
+  "chainId": 8453,
+  "deployedAt": "2026-07-19T15:11Z",
+  "deployer": "0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a",
+  "guardian": "0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a",
+  "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+  "contracts": {
+    "SharedLiquidityVault": {
+      "address": "0xeA90a257e5Dae20a0472C4812775F28614459bb6",
+      "bytecodeBytes": 7811,
+      "verified": {
+        "SINC": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+        "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "guardian": "0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a",
+        "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+      }
+    },
+    "SharedLiquidityHook": {
+      "address": "0x5A20BfEc6Caa3A94246eCCCb36F27F4980152dC0",
+      "bytecodeBytes": 6354,
+      "protocolFeeBps": 10,
+      "verified": {
+        "vault": "0xeA90a257e5Dae20a0472C4812775F28614459bb6",
+        "owner": "0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a",
+        "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+      },
+      "note": "STAGING hook \u2014 production pool attachment requires CREATE2-mined address (AUDIT.md \u00a74)"
+    }
+  },
+  "deployRun": "https://github.com/OrderofChaos33/SINCOR2/actions/runs/29692254556",
+  "onchainVerification": "eth_getCode + eth_call state reads via base-rpc.publicnode.com 2026-07-19"
+}
