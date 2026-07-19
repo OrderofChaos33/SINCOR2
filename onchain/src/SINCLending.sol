@@ -373,6 +373,7 @@ contract SINCLending is ReentrancyGuard, Pausable {
         emit LoopOpened(msg.sender, variantId, sincAmount, loops, collateralOf[msg.sender], borrowBalance(msg.sender));
     }
 
+    // slither-disable-next-line reentrancy-no-eth -- CEI: collateral ledger zeroed before external swap calls; nonReentrant guard
     function closeLoop() external nonReentrant {
         accrueInterest();
         address user = msg.sender;
