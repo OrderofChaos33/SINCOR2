@@ -73,7 +73,7 @@ scikit-learn==1.5.2
 # Utilities
 click==8.1.7
 pyyaml==6.0.2
-pyaml==24.1.0
+pyaml==26.7.0
 python-slugify==8.0.4
 tenacity==9.0.0
 
