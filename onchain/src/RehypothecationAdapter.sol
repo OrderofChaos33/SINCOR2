@@ -121,14 +121,15 @@ contract RehypothecationAdapter is ReentrancyGuard {
             emit ReconciliationFailed(actualDelta, amountWithdrawn);
         }
 
+        // CEI: update deposit state BEFORE the external hub call (slither reentrancy-no-eth)
         uint256 remainingShares = dep.sharesReceived - sharesToBurn;
-        hub.recordRehypoWithdrawal(onBehalfOf, depositId, amountWithdrawn, actualDelta, remainingShares);
-
         if (remainingShares == 0) {
             dep.active = false;
         } else {
             dep.sharesReceived = remainingShares;
         }
+
+        hub.recordRehypoWithdrawal(onBehalfOf, depositId, amountWithdrawn, actualDelta, remainingShares);
 
         if (amountWithdrawn > 0) {
             underlying.safeTransfer(address(hub), amountWithdrawn);
