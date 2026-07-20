@@ -107,9 +107,7 @@ contract SincSwapRouter is ISincSwapRouter, Ownable, ReentrancyGuard, IERC721Rec
 
         // 4. Buy SINC on the bonding curve; aggregate bound vs oracle price.
         uint256 minSinc = _oracleSincOut(usdcIn);
-        uint256 before = SINC.balanceOf(address(this));
-        curve.buy{value: wethOut}(wethOut, address(0));
-        sincOut = SINC.balanceOf(address(this)) - before;
+        sincOut = curve.buy{value: wethOut}(wethOut, address(0));
         if (sincOut < minSinc) revert Slippage(minSinc, sincOut);
 
         // 5. Deliver SINC to caller.
@@ -127,9 +125,7 @@ contract SincSwapRouter is ISincSwapRouter, Ownable, ReentrancyGuard, IERC721Rec
         // 2. Sell into the bonding curve, bounded against its own quote.
         uint256 minEth = FullMath.mulDiv(curve.getSellRefund(sincIn), BPS - quoteSlippageBps, BPS);
         SINC.forceApprove(address(curve), sincIn);
-        uint256 ethBefore = address(this).balance;
-        curve.sell(sincIn);
-        uint256 ethOut = address(this).balance - ethBefore;
+        uint256 ethOut = curve.sell(sincIn);
         if (ethOut < minEth) revert Slippage(minEth, ethOut);
 
         // 3. Wrap and swap WETH -> USDC via Aerodrome, bounded by BOTH the pool

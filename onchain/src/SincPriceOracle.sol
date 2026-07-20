@@ -90,8 +90,9 @@ contract SincPriceOracle is AccessControl, ISincPriceOracle {
     }
 
     function _ethUsd() internal view returns (uint256) {
-        (, int256 answer,, uint256 updatedAt,) = ethUsdFeed.latestRoundData();
+        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = ethUsdFeed.latestRoundData();
         if (answer <= 0) revert InvalidPrice();
+        if (answeredInRound < roundId) revert StalePrice(); // round not finalized
         if (block.timestamp - updatedAt > heartbeat) revert StalePrice();
         return uint256(answer);
     }
