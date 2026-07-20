@@ -90,6 +90,8 @@ contract SincPriceOracle is AccessControl, ISincPriceOracle {
     }
 
     function _ethUsd() internal view returns (uint256) {
+        // slither-disable-next-line unused-return -- startedAt is not a freshness signal;
+        // roundId/answeredInRound/updatedAt are all consumed below.
         (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = ethUsdFeed.latestRoundData();
         if (answer <= 0) revert InvalidPrice();
         if (answeredInRound < roundId) revert StalePrice(); // round not finalized
