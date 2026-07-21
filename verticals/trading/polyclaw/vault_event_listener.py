@@ -19,7 +19,7 @@ Run standalone::
 Environment:
     WEB3_PROVIDER or BASE_RPC_URL   Base RPC endpoint (default mainnet.base.org)
     VAULT_ADDRESS                   vault contract (default: canonical deployment)
-    SINC_ADDRESS                    SINC token (18 decimals; USDC assumed 6)
+    SINC_ADDRESS                    SINC token (8 decimals; USDC assumed 6)
     VAULT_POLL_INTERVAL_SEC         poll interval (default 30)
     VAULT_CONFIRMATIONS             blocks to wait before ingesting (default 3)
     VAULT_LISTENER_STATE_PATH       state file (default /data/vault_listener_state.json)
@@ -72,7 +72,8 @@ def _uint(word: str) -> int:
 
 
 def _token_decimals(token: str, sinc_address: str = SINC_ADDRESS) -> int:
-    return 18 if token.lower() == sinc_address.lower() else 6
+    # canonical: SINC has 8 decimals (CANONICAL_ADDRESSES.md), USDC 6
+    return 8 if token.lower() == sinc_address.lower() else 6
 
 
 def _human(raw: int, token: str) -> float:
