@@ -1,0 +1,70 @@
+{
+  "name": "SINCOR2 Yield Optimizer",
+  "description": "DeFi yield vertical: SharedLiquidityVault drawdown sizing for high-EV Polyclaw positions and lending loops on Base. Every proposal passes an Auditor validation gate.",
+  "version": "0.1.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR2",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "yield-evaluation",
+      "name": "Yield Opportunity Evaluation",
+      "description": "Scores a Polymarket edge or lending-loop spread against a vault lane's availableDraw; returns EV net of funding cost.",
+      "tags": ["defi", "yield", "vault", "ev"],
+      "examples": ["Evaluate a 12% edge market against strategy lane 0.", "Is this lane worth a drawdown?"],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "drawdown-proposal",
+      "name": "Auditor-Gated Drawdown Proposal",
+      "description": "Produces paste-ready drawDown calldata sized within availableDraw, only after Auditor approval.",
+      "tags": ["defi", "vault", "drawdown", "calldata"],
+      "examples": ["Propose a drawdown for this high-EV position."],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "settlement-processing",
+      "name": "settleUp Callback Processing",
+      "description": "Encodes settleUp calldata, updates win-rate calibration, and feeds the observer/improver loop.",
+      "tags": ["defi", "settlement", "calibration"],
+      "examples": ["Settle position with principal 2960 and fee 266."],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "loop-scan",
+      "name": "Lending Loop Scanner",
+      "description": "Ranks lending-loop spreads across vault lanes, Auditor-filtered, by expected value.",
+      "tags": ["defi", "lending", "loops"],
+      "examples": ["Scan all lanes for loop spreads above 2.5%."],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [{"apiKey": []}],
+  "documentationUrl": "https://getsincor.com/docs/api"
+}
