@@ -9,6 +9,7 @@ This is the piece that enables long-term compounding advantage.
 
 from __future__ import annotations
 
+import collections
 import logging
 from dataclasses import dataclass, field
 from typing import Dict, Any, List
@@ -38,17 +39,25 @@ class ObserverImproverAgent:
     This agent is what makes the system get better over time autonomously.
     """
 
-    def __init__(self):
+    def __init__(self, window: int = 50):
         self.health = SystemHealth()
         self.observations: List[Dict[str, Any]] = []
+        # Rolling outcome window — win rate is computed over the last
+        # `window` resolved trades, not just the current cycle.  Without
+        # this, single-trade cycles (e.g. vault settleUp callbacks) make
+        # recent_win_rate thrash between 0 and 1 and falsely trip the
+        # poor_calibration regime.
+        self._trade_window: "collections.deque" = collections.deque(maxlen=window)
 
     def observe_cycle(self, metrics: Dict[str, Any], recent_trades: List[Dict[str, Any]]):
         """Run observation on latest cycle results."""
         self.health.max_drawdown = metrics.get("max_drawdown", 0.0)
 
-        if recent_trades:
-            wins = sum(1 for t in recent_trades if t.get("correct", False))
-            self.health.recent_win_rate = wins / len(recent_trades)
+        for t in recent_trades:
+            self._trade_window.append(t)
+        if self._trade_window:
+            wins = sum(1 for t in self._trade_window if t.get("correct", False))
+            self.health.recent_win_rate = wins / len(self._trade_window)
 
         # Simple calibration check (placeholder - real version would use proper scoring)
         self.health.calibration_error = abs(self.health.recent_win_rate - 0.55)
