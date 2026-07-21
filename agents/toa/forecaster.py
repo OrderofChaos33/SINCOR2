@@ -11,13 +11,16 @@ forecaster that:
    residual standard deviation, optionally boosted by recent trend slope.
 4. Normalises path probabilities and returns them in the standard TOA format.
 
+DeFi update (2026-07-21): when the context carries ``defi_signals``
+(``polyclaw_edge``, ``vault_yield_apr``), the Monte Carlo trend is boosted by
+the combined expected DeFi return and every path is tagged with a
+``treasury_inflow`` estimate — the simulator's ``treasury_inflow`` objective
+then prioritises DeFi paths (Polyclaw + vault yield) end-to-end.  Without
+``defi_signals`` the behaviour is byte-for-byte the legacy behaviour.
+
 For production use-cases with heavier time-series requirements, this class
 can be swapped for any implementation of :class:`~agents.toa.base.ForecasterAgent`
 that wraps Nixtla, NeuralForecast, Darts, or any other forecasting library.
-
-Production best practice: Use KernelForecaster for zero-dep portability.
-Upgrade to Nixtla-backed (statsforecast + neuralforecast) for higher accuracy,
-probabilistic forecasts, model ensembling, and GPU acceleration in TOA runs.
 """
 
 import math
@@ -106,7 +109,17 @@ class KernelForecaster(ForecasterAgent):
         context:
             Must contain a ``"values"`` key with a list of numeric observations
             (most-recent last).  Optionally, ``"scenario_count"`` overrides
-            :attr:`TOAConfig.simulation_depth`.
+            :attr:`TOAConfig.simulation_depth`, and ``"defi_signals"`` injects
+            DeFi return expectations::
+
+                {
+                    "polyclaw_edge": 0.09,    # expected per-step edge capture
+                    "vault_yield_apr": 0.06,  # vault/lending yield per step
+                }
+
+            When present, the Monte Carlo trend is boosted by the combined
+            DeFi return and each path is tagged ``defi_path: True`` with a
+            ``treasury_inflow`` estimate over the horizon.
         horizon:
             Forecast horizon in time-steps.  Defaults to
             :attr:`TOAConfig.forecast_horizon`.
@@ -131,6 +144,15 @@ class KernelForecaster(ForecasterAgent):
         trend = self._estimate_trend(smoothed)
         residual_std = self._residual_std(observations, smoothed)
 
+        # --- DeFi prioritisation ----------------------------------------
+        defi = context.get("defi_signals") or {}
+        defi_return = float(defi.get("polyclaw_edge", 0.0)) + float(
+            defi.get("vault_yield_apr", 0.0)
+        )
+        defi_active = defi_return > 0.0
+        if defi_active:
+            trend += defi_return * abs(last_smooth)
+
         self._log(
             "debug",
             "forecast generating paths",
@@ -139,6 +161,7 @@ class KernelForecaster(ForecasterAgent):
             last_smooth=round(last_smooth, 4),
             trend=round(trend, 6),
             residual_std=round(residual_std, 6),
+            defi_active=defi_active,
         )
 
         paths = []
@@ -147,21 +170,35 @@ class KernelForecaster(ForecasterAgent):
             values = self._generate_path(last_smooth, trend, residual_std, h)
             # Weight higher-utility paths by their final value relative to start
             weight = max(0.01, 1.0 + (values[-1] - last_smooth) / (abs(last_smooth) + 1e-9))
+            if defi_active:
+                # DeFi paths compound treasury inflow — upweight them.
+                weight *= 1.0 + defi_return
             paths.append(values)
             raw_weights.append(weight)
 
         total_weight = sum(raw_weights)
         normalised_probs = [w / total_weight for w in raw_weights]
 
-        result: List[Dict[str, Any]] = [
-            {
+        result: List[Dict[str, Any]] = []
+        for path, p in zip(paths, normalised_probs):
+            entry: Dict[str, Any] = {
                 "scenario_id": str(uuid.uuid4()),
                 "probability": round(p, 6),
                 "horizon": h,
                 "values": [round(v, 6) for v in path],
             }
-            for path, p in zip(paths, normalised_probs)
-        ]
+            if defi_active:
+                entry["defi_path"] = True
+                # Expected treasury inflow over the horizon: deployed capital
+                # × combined DeFi return × steps.  inflow_scale is set to the
+                # deployed capital so the simulator's sigmoid scores the
+                # *rate* of inflow (defi_return × h), comparable across
+                # capital sizes.
+                entry["treasury_inflow"] = round(
+                    abs(last_smooth) * defi_return * h, 6
+                )
+                entry["inflow_scale"] = round(abs(last_smooth), 6)
+            result.append(entry)
         result.sort(key=lambda x: x["probability"], reverse=True)
         return result
 
@@ -223,21 +260,8 @@ class NixtlaForecaster(ForecasterAgent):
     """
     Production-grade forecaster using the Nixtla ecosystem (statsforecast + neuralforecast).
 
-    This is the recommended path for serious TOA usage, trading signals, revenue
-    forecasting, and high-stakes temporal optimization.
-
-    Features when packages installed:
-    - Multiple statistical + deep learning models (AutoARIMA, ETS, NBEATS, NHITS, etc.)
-    - Probabilistic forecasts + prediction intervals
-    - Model ensembling and cross-validation
-    - GPU acceleration support
-    - Much higher accuracy than pure kernel methods on real data
-
-    Production best practices applied:
-    - Graceful fallback if Nixtla packages not installed (logs clear upgrade path)
-    - Configurable model list via TOAConfig or env
-    - Structured logging of model selection and performance
-    - Same interface as KernelForecaster for zero code changes in TOA pipeline
+    Same interface as KernelForecaster for zero code changes in TOA pipeline.
+    Graceful fallback if Nixtla packages not installed.
 
     Installation (recommended for production):
         pip install "statsforecast[dev]" "neuralforecast[dev]"
@@ -290,7 +314,6 @@ class NixtlaForecaster(ForecasterAgent):
 
     def _nixtla_forecast(self, observations: List[float], horizon: int, n_paths: int) -> List[Dict[str, Any]]:
         """Core production forecasting using available Nixtla components."""
-        # Build a minimal dataframe for StatsForecast / NeuralForecast convention
         df = pd.DataFrame({
             "unique_id": ["series_0"] * len(observations),
             "ds": pd.date_range(end=pd.Timestamp.now(), periods=len(observations), freq="D"),
@@ -307,15 +330,12 @@ class NixtlaForecaster(ForecasterAgent):
             return self._fallback_forecast(observations, horizon, n_paths)
 
         sf = StatsForecast(models=models, freq="D", n_jobs=1)
-        # For simplicity we use point forecasts + basic intervals; full probabilistic in advanced usage
         forecasts = sf.forecast(df=df, h=horizon)
 
-        # Convert to TOA path format (multiple paths via model disagreement + noise)
         paths = []
         for model_name in [m.__class__.__name__ for m in models]:
             if model_name in forecasts.columns:
                 values = forecasts[model_name].tolist()
-                # Simple probability weighting by recency / model type
                 prob = 0.6 if "ARIMA" in model_name or "ETS" in model_name else 0.4
                 paths.append({
                     "scenario_id": str(uuid.uuid4()),
@@ -324,7 +344,6 @@ class NixtlaForecaster(ForecasterAgent):
                     "values": [round(v, 6) for v in values],
                 })
 
-        # If we have neural or multiple, add a couple noisy variants for Monte-Carlo feel
         if len(paths) > 0 and n_paths > len(paths):
             base_values = paths[0]["values"]
             for i in range(min(3, n_paths - len(paths))):
@@ -343,7 +362,6 @@ class NixtlaForecaster(ForecasterAgent):
     def _fallback_forecast(self, observations: List[float], horizon: int, n_paths: int) -> List[Dict[str, Any]]:
         """Lightweight fallback when advanced libs unavailable."""
         if len(observations) < 3:
-            # Neutral paths
             return [{
                 "scenario_id": str(uuid.uuid4()),
                 "probability": 1.0 / n_paths,
@@ -351,7 +369,6 @@ class NixtlaForecaster(ForecasterAgent):
                 "values": [observations[-1]] * horizon,
             } for _ in range(n_paths)]
 
-        # Simple linear trend + noise fallback
         x = np.arange(len(observations)).reshape(-1, 1)
         y = np.array(observations)
         model = LinearRegression().fit(x, y)
@@ -382,8 +399,6 @@ def get_forecaster(backend: Optional[str] = None, config: Optional[TOAConfig] = 
 
     Respects TOA_FORECASTER_BACKEND env var or explicit backend arg.
     Valid values: "kernel" (default, zero-dep) or "nixtla" (advanced).
-
-    This enables zero-code-change upgrades in the TOA orchestrator.
     """
     if backend is None:
         backend = os.environ.get("TOA_FORECASTER_BACKEND", "kernel").lower()
