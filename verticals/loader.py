@@ -13,6 +13,7 @@ from verticals.dental.agent import DentalAgent
 from verticals.healthcare.agent import HealthcareAgent
 from verticals.lead_gen.agent import LeadGenAgent
 from verticals.trading.agent import TradingAgent
+from verticals.trading.yield_optimizer_agent import YieldOptimizerAgent
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ VERTICAL_AGENT_CLASSES: Tuple[Type[VerticalAgent], ...] = (
     ComplianceAgent,
     TradingAgent,
     LeadGenAgent,
+    YieldOptimizerAgent,
 )
 
 # Maps A2A skill ids (from Agent Cards or SINCOR catalogue) to vertical agents.
@@ -40,6 +42,10 @@ SKILL_VERTICAL_MAP: Dict[str, str] = {
     "polymarket-execution": "trading_intelligence_agent",
     "trading-signals": "trading_intelligence_agent",
     "polymarket-eval": "trading_intelligence_agent",
+    "yield-evaluation": "yield_optimizer_agent",
+    "drawdown-proposal": "yield_optimizer_agent",
+    "settlement-processing": "yield_optimizer_agent",
+    "loop-scan": "yield_optimizer_agent",
     "lead-enrichment-outbound": "lead_generation_agent",
     "icp-matching": "lead_generation_agent",
     "lead-enrichment": "lead_generation_agent",
@@ -48,16 +54,26 @@ SKILL_VERTICAL_MAP: Dict[str, str] = {
 
 
 def load_agent_cards() -> List[dict]:
-    """Return Agent Card JSON payloads from each vertical pack."""
+    """Return Agent Card JSON payloads from each vertical pack.
+
+    Each pack's canonical card is ``agent_card.json``; packs hosting more
+    than one agent (e.g. trading) may ship additional ``*_card.json`` files,
+    which are loaded after the canonical one.
+    """
     cards: List[dict] = []
     for pack_dir in sorted(_VERTICALS_ROOT.iterdir()):
-        card_path = pack_dir / "agent_card.json"
-        if not card_path.is_file():
-            continue
-        try:
-            cards.append(json.loads(card_path.read_text(encoding="utf-8")))
-        except (json.JSONDecodeError, OSError) as exc:
-            logger.warning("Skipping invalid agent card %s: %s", card_path, exc)
+        card_paths = []
+        canonical = pack_dir / "agent_card.json"
+        if canonical.is_file():
+            card_paths.append(canonical)
+        card_paths.extend(
+            p for p in sorted(pack_dir.glob("*_card.json")) if p != canonical
+        )
+        for card_path in card_paths:
+            try:
+                cards.append(json.loads(card_path.read_text(encoding="utf-8")))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("Skipping invalid agent card %s: %s", card_path, exc)
     return cards
 
 
