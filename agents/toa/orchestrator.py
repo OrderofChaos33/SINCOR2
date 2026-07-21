@@ -10,13 +10,23 @@ pipeline and exposes hooks for:
 * Routing the selected action plans via SINCOR2's :class:`~core.router.TaskRouter`.
 * Persisting session state across runs via :class:`~agents.toa.state.TOAStateStore`.
 
+DeFi update (2026-07-21):
+* :meth:`ingest_vault_event` maps SharedLiquidityVault events (Settled,
+  DrawDown, FeesHarvested, Deposited, Withdrawn) straight into the feedback
+  loop — vault outcomes now refine the next forecast cycle automatically.
+* :meth:`run_defi` runs the pipeline with DeFi signals injected into the
+  forecaster and a treasury-inflow-heavy objective override, so Monte Carlo
+  sims prioritise Polyclaw + vault yield paths.
+
 Usage::
 
     from agents.toa import TOAOrchestrator
 
     toa = TOAOrchestrator()
-    result = toa.run(context={"values": [100, 102, 105, 108, 110]})
-    # result["action_plan"] contains ranked, actionable task dispatches.
+    result = toa.run_defi(
+        context={"values": [100, 102, 105, 108, 110]},
+        defi_signals={"polyclaw_edge": 0.09, "vault_yield_apr": 0.06},
+    )
 """
 
 import logging
@@ -34,6 +44,20 @@ from .state import TOAStateStore
 
 logger = logging.getLogger("sincor.toa.orchestrator")
 
+# Source label used when vault events enter the feedback loop.
+VAULT_FEEDBACK_SOURCE = "shared_liquidity_vault"
+
+# Objective weight override for DeFi-prioritised runs.  Treasury inflow
+# dominates; risk keeps a veto.  Normalised internally by the simulator.
+DEFI_OBJECTIVE_WEIGHTS: Dict[str, float] = {
+    "treasury_inflow": 0.40,
+    "revenue": 0.25,
+    "risk": 0.20,
+    "timeline": 0.05,
+    "compliance": 0.05,
+    "governance": 0.05,
+}
+
 
 class TOAOrchestrator:
     """Coordinates the TOA forecast → simulate → collapse pipeline.
@@ -42,27 +66,6 @@ class TOAOrchestrator:
     module interact with.  It wires together the four sub-agent types,
     manages session state, and integrates with the SINCOR2 task router
     when one is provided.
-
-    Parameters
-    ----------
-    config:
-        TOA configuration.  Defaults to environment-driven config.
-    forecaster:
-        Custom :class:`~agents.toa.base.ForecasterAgent`.  Defaults to
-        :class:`~agents.toa.forecaster.KernelForecaster`.
-    simulator:
-        Custom :class:`~agents.toa.base.SimulatorAgent`.  Defaults to
-        :class:`~agents.toa.simulator.MonteCarloSimulator`.
-    collapser:
-        Custom :class:`~agents.toa.base.CollapserAgent`.  Defaults to
-        :class:`~agents.toa.collapser.WFCCollapser`.
-    feedback_agent:
-        Custom :class:`~agents.toa.base.FeedbackAgent`.  Defaults to
-        :class:`~agents.toa.feedback.RollingFeedbackAgent`.
-    task_router:
-        Optional SINCOR2 :class:`~core.router.TaskRouter` instance.  When
-        provided, the orchestrator automatically dispatches the top-ranked
-        action plan as a routed task.
     """
 
     def __init__(
@@ -102,31 +105,6 @@ class TOAOrchestrator:
         4. Run :meth:`~agents.toa.base.CollapserAgent.collapse` to select top-k.
         5. Optionally dispatch the best action via the task router.
         6. Persist updated state.
-
-        Parameters
-        ----------
-        context:
-            Execution context.  Must include ``"values"`` (list of floats) for
-            the default :class:`~agents.toa.forecaster.KernelForecaster`.
-        objectives:
-            Per-run objective weight overrides.
-        top_k:
-            Number of action paths to return.
-
-        Returns
-        -------
-        Dict[str, Any]
-            Keys:
-
-            * ``"run_id"`` — unique identifier for this run.
-            * ``"run_count"`` — total lifetime runs.
-            * ``"elapsed_ms"`` — wall-clock time of the pipeline in ms.
-            * ``"forecast_paths"`` — raw forecast path count.
-            * ``"evaluated_paths"`` — evaluated path count.
-            * ``"action_plan"`` — list of collapsed, ranked action dicts.
-            * ``"route_decision"`` — router result for the top action (or
-              ``None`` if no router is configured).
-            * ``"feedback_summary"`` — current feedback buffer summary.
         """
         run_id = str(uuid.uuid4())
         start_time = time.monotonic()
@@ -205,29 +183,90 @@ class TOAOrchestrator:
             "feedback_summary": feedback_summary,
         }
 
+    def run_defi(
+        self,
+        context: Dict[str, Any],
+        defi_signals: Optional[Dict[str, float]] = None,
+        objectives: Optional[Dict[str, float]] = None,
+        top_k: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Run the pipeline prioritising DeFi paths (Polyclaw + vault yield).
+
+        Injects ``defi_signals`` into the forecaster context (boosting Monte
+        Carlo trend and tagging paths with ``treasury_inflow`` estimates) and
+        scores with :data:`DEFI_OBJECTIVE_WEIGHTS` unless overridden.
+
+        Parameters
+        ----------
+        context:
+            Standard run context (must include ``"values"``).
+        defi_signals:
+            ``{"polyclaw_edge": float, "vault_yield_apr": float}`` — combined
+            per-step expected DeFi return.
+        objectives:
+            Optional override for the DeFi objective weights.
+        top_k:
+            Number of action paths to return.
+        """
+        ctx = dict(context)
+        if defi_signals:
+            ctx["defi_signals"] = defi_signals
+        return self.run(
+            context=ctx,
+            objectives=objectives or dict(DEFI_OBJECTIVE_WEIGHTS),
+            top_k=top_k,
+        )
+
     def ingest_feedback(self, event: Dict[str, Any]) -> None:
-        """Ingest an execution result or external signal into the feedback loop.
+        """Ingest an execution result or external signal into the feedback loop."""
+        self.feedback_agent.ingest(event)
+
+    def ingest_vault_event(self, event: Dict[str, Any]) -> None:
+        """Ingest a SharedLiquidityVault event into the feedback loop.
+
+        Maps on-chain vault events to feedback signals so vault outcomes
+        continuously refine the forecaster's priors:
+
+        * ``Settled``       — success; quality 5 when fee > 0 else 3.
+        * ``FeesHarvested`` — success; quality 5.
+        * ``DrawDown``      — neutral observation; quality 3.
+        * ``Deposited``     — success; quality 4.
+        * ``Withdrawn``     — neutral observation; quality 3.
 
         Parameters
         ----------
         event:
-            Feedback event dict.  See
-            :meth:`~agents.toa.feedback.RollingFeedbackAgent.ingest` for
-            the expected structure.
+            Dict with ``"event"`` (vault event name) plus its args, e.g.
+            ``{"event": "Settled", "lp": "0x…", "strategyId": 0,
+            "principal": 2960.0, "fee": 266.4}``.
         """
-        self.feedback_agent.ingest(event)
+        name = str(event.get("event", ""))
+        fee = float(event.get("fee", event.get("amount", 0.0)) or 0.0)
+
+        if name == "Settled":
+            success, quality = True, (5.0 if fee > 0 else 3.0)
+        elif name == "FeesHarvested":
+            success, quality = True, 5.0
+        elif name == "Deposited":
+            success, quality = True, 4.0
+        elif name in ("DrawDown", "Withdrawn"):
+            success, quality = True, 3.0
+        else:
+            success, quality = False, 1.0
+
+        self.ingest_feedback({
+            "source": VAULT_FEEDBACK_SOURCE,
+            "timestamp": event.get("timestamp", ""),
+            "payload": {
+                "success": success,
+                "quality_rating": quality,
+                "vault_event": name,
+                **{k: v for k, v in event.items() if k not in ("event", "timestamp")},
+            },
+        })
 
     def register_objective(self, name: str, fn: Any) -> None:
-        """Register a custom objective function with the underlying simulator.
-
-        Parameters
-        ----------
-        name:
-            Objective key (must match a key in the objective weights config to
-            be included in scoring).
-        fn:
-            Callable ``(path: Dict) -> float``.
-        """
+        """Register a custom objective function with the underlying simulator."""
         if isinstance(self.simulator, MonteCarloSimulator):
             self.simulator.register_objective(name, fn)
         else:
