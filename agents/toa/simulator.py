@@ -11,6 +11,10 @@ Objective function pluggability:
     Register custom objective callables with
     :meth:`MonteCarloSimulator.register_objective`.  Each callable receives a
     single path dict and returns a float score in [0, 1].
+
+DeFi update (2026-07-21): added the built-in ``treasury_inflow`` objective so
+DeFi paths (Polyclaw + vault yield) that carry explicit fee-capture estimates
+outscore paths that do not compound the treasury.
 """
 
 from typing import Any, Callable, Dict, List, Optional
@@ -25,9 +29,10 @@ ObjectiveFn = Callable[[Dict[str, Any]], float]
 class MonteCarloSimulator(SimulatorAgent):
     """Scores forecast paths using a pluggable objective function registry.
 
-    Built-in objectives (``revenue``, ``risk``, ``timeline``, ``compliance``,
-    ``governance``) derive normalised scores from path statistics.  You can
-    override any built-in or add new objectives at runtime.
+    Built-in objectives (``revenue``, ``treasury_inflow``, ``risk``,
+    ``timeline``, ``compliance``, ``governance``) derive normalised scores
+    from path statistics.  You can override any built-in or add new
+    objectives at runtime.
 
     Parameters
     ----------
@@ -118,6 +123,7 @@ class MonteCarloSimulator(SimulatorAgent):
     def _register_builtin_objectives(self) -> None:
         """Register all built-in objective scoring functions."""
         self.register_objective("revenue", self._score_revenue)
+        self.register_objective("treasury_inflow", self._score_treasury_inflow)
         self.register_objective("risk", self._score_risk)
         self.register_objective("timeline", self._score_timeline)
         self.register_objective("compliance", self._score_compliance)
@@ -134,6 +140,30 @@ class MonteCarloSimulator(SimulatorAgent):
         growth = (terminal - values[0]) / start
         # Map growth onto [0, 1]: 0 → 0.5, +100 % → ~0.87, −100 % → ~0.27
         return 1.0 / (1.0 + pow(2.718281828, -growth))
+
+    @staticmethod
+    def _score_treasury_inflow(path: Dict[str, Any]) -> float:
+        """Fee capture / treasury inflow carried by the path.
+
+        DeFi-aware paths (Polyclaw drawdowns, vault yield, lending loops)
+        carry an explicit ``treasury_inflow`` estimate in absolute units —
+        protocol fees + harvestable yield expected over the horizon.  The
+        score is a sigmoid of inflow relative to ``inflow_scale`` (default
+        1000 units, injectable per path), so:
+
+            inflow 0        → 0.50
+            inflow = scale  → ~0.73
+            inflow = 3×scale→ ~0.88
+
+        Paths without an inflow estimate score a neutral 0.5 — the objective
+        only differentiates when DeFi signal is actually present.
+        """
+        inflow = path.get("treasury_inflow")
+        if inflow is None:
+            return 0.5
+        scale = abs(float(path.get("inflow_scale", 1000.0))) + 1e-9
+        x = float(inflow) / scale
+        return 1.0 / (1.0 + pow(2.718281828, -x))
 
     @staticmethod
     def _score_risk(path: Dict[str, Any]) -> float:

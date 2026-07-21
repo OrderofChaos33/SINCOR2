@@ -4,11 +4,26 @@ from __future__ import annotations
 
 All settings are read from environment variables with safe defaults so the
 module is deployable without any additional configuration.
+
+DeFi update (2026-07-21): ``treasury_inflow`` is now a first-class objective.
+Default weights were rebalanced so fee capture / treasury inflow carries
+real weight in Monte Carlo scoring; override with TOA_OBJECTIVE_WEIGHTS.
 """
 
 import os
 from dataclasses import dataclass, field
 from typing import Dict, List
+
+# Default objective weights, rebalanced to prioritise DeFi treasury inflow
+# alongside revenue.  Sums to 1.0.
+DEFAULT_OBJECTIVE_WEIGHTS: Dict[str, float] = {
+    "revenue": 0.30,
+    "treasury_inflow": 0.20,
+    "risk": 0.20,
+    "timeline": 0.15,
+    "compliance": 0.075,
+    "governance": 0.075,
+}
 
 
 @dataclass
@@ -29,16 +44,12 @@ class TOAConfig:
     # Number of Monte Carlo iterations per scenario.
     monte_carlo_iterations: int = 1_000
     # Objective function weights (must sum to 1.0 or be normalised internally).
-    objective_weights: Dict[str, float] = field(default_factory=lambda: {
-        "revenue": 0.35,
-        "risk": 0.25,
-        "timeline": 0.20,
-        "compliance": 0.10,
-        "governance": 0.10,
-    })
+    objective_weights: Dict[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_OBJECTIVE_WEIGHTS)
+    )
     # Registered objective labels in priority order (highest first).
     objective_priority: List[str] = field(default_factory=lambda: [
-        "revenue", "risk", "timeline", "compliance", "governance"
+        "treasury_inflow", "revenue", "risk", "timeline", "compliance", "governance"
     ])
     # Where to persist TOA state across sessions (empty = memory-only).
     state_path: str = ""
@@ -76,13 +87,7 @@ class TOAConfig:
             top_k_paths=int(os.environ.get("TOA_TOP_K_PATHS", 5)),
             forecast_horizon=int(os.environ.get("TOA_FORECAST_HORIZON", 12)),
             monte_carlo_iterations=int(os.environ.get("TOA_MONTE_CARLO_ITERATIONS", 1_000)),
-            objective_weights=weights or {
-                "revenue": 0.35,
-                "risk": 0.25,
-                "timeline": 0.20,
-                "compliance": 0.10,
-                "governance": 0.10,
-            },
+            objective_weights=weights or dict(DEFAULT_OBJECTIVE_WEIGHTS),
             state_path=os.environ.get("TOA_STATE_PATH", ""),
             structured_logging=os.environ.get("TOA_STRUCTURED_LOGGING", "true").lower() == "true",
             feedback_buffer_size=int(os.environ.get("TOA_FEEDBACK_BUFFER_SIZE", 500)),
