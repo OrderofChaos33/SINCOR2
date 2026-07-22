@@ -1,0 +1,21 @@
+{
+  "department": "negotiators",
+  "tasks": [
+    {
+      "id": "negotiators-outreach-seq",
+      "title": "Advance outreach sequences",
+      "interval_minutes": 480,
+      "prompt": "For each qualified lead in the ledger, draft or advance the outreach sequence: message, value prop tied to their numbers, call-to-action. Compliance rule: no promises of returns, no unverified claims. Queue for auditor validation before send.",
+      "kpis": ["sequences_advanced"],
+      "requires": ["scouts-prospect-defi"]
+    },
+    {
+      "id": "negotiators-deal-review",
+      "title": "Deal pipeline review",
+      "interval_minutes": 720,
+      "prompt": "Review the deal pipeline: stage per lead, stall reasons, next action with date. Compute contracted vs projected revenue. Flag anything needing CEO decision.",
+      "kpis": ["pipeline_velocity"],
+      "requires": []
+    }
+  ]
+}

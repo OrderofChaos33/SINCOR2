@@ -1,0 +1,21 @@
+{
+  "department": "toa",
+  "tasks": [
+    {
+      "id": "toa-daily-sync",
+      "title": "Daily forecast-simulate-collapse sync",
+      "interval_minutes": 1440,
+      "prompt": "Run the daily sync: (1) ingest treasury snapshot and department KPIs from the ledger; (2) forecast each active path's 7-day revenue contribution; (3) simulate collapse — what breaks if the top path goes to zero; (4) reprioritize departments; (5) emit tomorrow's dispatch order with per-department targets tied to treasury inflow.",
+      "kpis": ["treasury_inflow_usd", "dispatch_orders"],
+      "requires": ["auditors-eod-report"]
+    },
+    {
+      "id": "toa-metrics-heartbeat",
+      "title": "Treasury metrics heartbeat",
+      "interval_minutes": 360,
+      "prompt": "Snapshot treasury balances (SINC, AXM, USDC on Base) and adapter positions. Compare to previous snapshot. Alert if any balance moves beyond threshold or if inflow stalls 48h.",
+      "kpis": ["snapshots"],
+      "requires": []
+    }
+  ]
+}

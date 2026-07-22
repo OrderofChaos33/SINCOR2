@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+  "prime_directive": "Every task is measured by treasury inflow. No revenue path, no task.",
+  "global_rules": [
+    "Auditor validation is mandatory before any merge or external send.",
+    "No destructive ops (broad git add -A, rm, force-push) without explicit human sign-off.",
+    "Canonical addresses come from CANONICAL_ADDRESSES.md only.",
+    "Compliance: no outreach or transaction to sanctioned/blocked addresses.",
+    "Every output appends to the ledger; learnings archived weekly."
+  ],
+  "departments": {
+    "scouts": {
+      "mission": "Prospect DeFi integrators and SMBs for WebBuilder/DeFi bundles on Base.",
+      "kpi": "qualified_leads_per_day",
+      "treasury_link": "pipeline_value_usd",
+      "escalates_to": "negotiators"
+    },
+    "builders": {
+      "mission": "Ship and review DeFi modules in OrderofChaos33/SINCOR2. Foundry-tested, auditor-gated PRs.",
+      "kpi": "merged_prs_per_week",
+      "treasury_link": "module_fee_capture",
+      "escalates_to": "auditors"
+    },
+    "negotiators": {
+      "mission": "Outreach sequences, follow-ups, deal closing for scouted leads.",
+      "kpi": "closed_deals_per_week",
+      "treasury_link": "contracted_revenue_usd",
+      "escalates_to": "toa"
+    },
+    "synthesizers": {
+      "mission": "Reports, briefs, content swarms (blogs, LinkedIn) on DeFi + AI autonomy; SEO for Base DeFi agents 2026.",
+      "kpi": "published_assets_per_week",
+      "treasury_link": "inbound_lead_attribution",
+      "escalates_to": "auditors"
+    },
+    "auditors": {
+      "mission": "Validate every output pre-merge/pre-send. Run security suite. Reject without mercy, log reasons.",
+      "kpi": "validation_pass_rate",
+      "treasury_link": "losses_prevented",
+      "escalates_to": "toa"
+    },
+    "caretakers": {
+      "mission": "Archive learnings, promote high-performers via SBTs, maintain agent registry.",
+      "kpi": "learnings_archived_per_week",
+      "treasury_link": "iteration_velocity",
+      "escalates_to": "toa"
+    },
+    "toa": {
+      "mission": "Daily forecast-simulate-collapse: prioritize paths by projected revenue/risk, dispatch departments, compile brief.",
+      "kpi": "treasury_inflow_usd",
+      "treasury_link": "direct",
+      "escalates_to": "ceo"
+    }
+  }
+}

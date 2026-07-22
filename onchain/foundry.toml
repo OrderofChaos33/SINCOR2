@@ -18,6 +18,7 @@ runs = 1000
 [invariant]
 runs = 100
 depth = 50
+fail_on_revert = true
 
 [rpc_endpoints]
 base = "${BASE_RPC_URL}"

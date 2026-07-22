@@ -1,0 +1,21 @@
+{
+  "department": "scouts",
+  "tasks": [
+    {
+      "id": "scouts-prospect-defi",
+      "title": "Prospect DeFi integrators on Base",
+      "interval_minutes": 360,
+      "prompt": "Identify 5 candidate DeFi integrators or protocols on Base that could integrate SINC liquidity modules or the Fluid amplifier. For each: name, why they fit, integration surface, estimated deal size, contact path. Output as structured list.",
+      "kpis": ["qualified_leads"],
+      "requires": []
+    },
+    {
+      "id": "scouts-prospect-smb",
+      "title": "Prospect SMBs for WebBuilder/DeFi bundles",
+      "interval_minutes": 360,
+      "prompt": "Identify 5 SMB segments that would pay for a website + embedded DeFi payment/treasury bundle settled in SINC/AXM. For each: segment, pain, bundle pitch, willingness-to-pay estimate, acquisition channel.",
+      "kpis": ["qualified_leads"],
+      "requires": []
+    }
+  ]
+}
