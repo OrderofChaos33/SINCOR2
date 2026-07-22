@@ -6,69 +6,91 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
-import {TickMath} from "v4-core/src/libraries/TickMath.sol";
-import {MoebiusMEVHook} from "../src/hooks/MoebiusMEVHook.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/// @title InitializeMoebiusPool — bring up a pMEV/realAsset dynamic-fee pool
-/// @notice Steps, in order, against an already-deployed MoebiusMEVHook + pMEV:
+interface IMoebiusHook {
+    function pToken() external view returns (address);
+    function setPoolSwapFee(PoolKey calldata key, uint24 newFee) external;
+    function seedLiquidity(
+        PoolKey calldata key, int24 tickLower, int24 tickUpper, uint256 liquidity, uint256 maxReal, uint256 amountPmev
+    ) external payable;
+}
+
+/// @title InitializeMoebiusPool
+/// @notice Second (and final) activation step after DeployMoebius:
+///         initializes the pMEV/<realAsset> pool, sets the swap fee (policy
+///         lever #2), and seeds the redemption window (central bank balance sheet).
 ///
-///           1. poolManager.initialize(key, sqrtPriceX96) with the dynamic-fee
-///              flag (0x800000) and hooks = the Moebius hook.
-///           2. hook.setPoolSwapFee(key, fee) — policy lever #2.
-///           3. hook.seedLiquidity(...) — the central-bank desk gives pMEV a price.
+///         Env: DEPLOYER_PRIVATE_KEY, POOL_MANAGER, HOOK, REAL_ASSET (0x0 = native ETH),
+///         SQRT_PRICE_X96 (1:1 = 79228162514264337593543950336), TICK_SPACING, SWAP_FEE,
+///         TICK_LOWER, TICK_UPPER, LIQUIDITY, MAX_REAL, AMOUNT_PMEV
 ///
-///         Env:
-///           PRIVATE_KEY       owner key (must be hook owner for steps 2-3)
-///           POOL_MANAGER      v4 PoolManager
-///           MOEBIUS_HOOK      deployed MoebiusMEVHook
-///           PMEV_TOKEN        deployed PhantomCreditToken
-///           REAL_ASSET        real asset (address(0) for native ETH)
-///           POOL_FEE          initial dynamic fee (e.g. 3000 = 0.3%)
-///           TICK_SPACING      e.g. 60
-///           SQRT_PRICE_X96    initial price
-///           SEED_LIQUIDITY    v4 liquidity delta for the seed position
-///           SEED_MAX_REAL     max real asset to escrow for the seed
-///           SEED_PMEV         pMEV to mint for the seed
+///         Run: forge script script/InitializeMoebiusPool.s.sol --rpc-url $BASE_RPC --broadcast
 contract InitializeMoebiusPool is Script {
-    uint24 internal constant DYNAMIC_FEE_FLAG = 0x800000;
+    uint24 internal constant DYNAMIC_FEE = 0x800000;
 
-    function run() external {
-        address poolManager = vm.envAddress("POOL_MANAGER");
-        MoebiusMEVHook hook = MoebiusMEVHook(vm.envAddress("MOEBIUS_HOOK"));
-        address pmev = vm.envAddress("PMEV_TOKEN");
-        address real = vm.envAddress("REAL_ASSET");
-        uint24 fee = uint24(vm.envUint("POOL_FEE"));
-        int24 spacing = int24(int256(vm.envUint("TICK_SPACING")));
-        uint160 sqrtPrice = uint160(vm.envUint("SQRT_PRICE_X96"));
-        uint256 seedLiq = vm.envUint("SEED_LIQUIDITY");
-        uint256 seedMaxReal = vm.envUint("SEED_MAX_REAL");
-        uint256 seedPmev = vm.envUint("SEED_PMEV");
-        uint256 key = vm.envUint("PRIVATE_KEY");
+    struct Cfg {
+        address poolManager;
+        address hook;
+        address realAsset;
+        uint160 sqrtPriceX96;
+        int24 tickSpacing;
+        uint24 swapFee;
+        int24 tickLower;
+        int24 tickUpper;
+        uint256 liquidity;
+        uint256 maxReal;
+        uint256 amountPmev;
+    }
 
-        // currency0 must sort below currency1 (native = address(0) sorts lowest)
-        (Currency c0, Currency c1) = real == address(0) || real < pmev
-            ? (Currency.wrap(real), Currency.wrap(pmev))
-            : (Currency.wrap(pmev), Currency.wrap(real));
+    function run() external returns (PoolKey memory key) {
+        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        Cfg memory c = _loadCfg();
 
-        PoolKey memory poolKey = PoolKey({
-            currency0: c0,
-            currency1: c1,
-            fee: DYNAMIC_FEE_FLAG,
-            tickSpacing: spacing,
-            hooks: IHooks(address(hook))
+        address pToken = IMoebiusHook(c.hook).pToken();
+
+        // Currency sorting: address(0) (native) sorts first
+        bool pTokenIs0 = pToken == address(0) || (c.realAsset != address(0) && pToken < c.realAsset);
+        key = PoolKey({
+            currency0: Currency.wrap(pTokenIs0 ? pToken : c.realAsset),
+            currency1: Currency.wrap(pTokenIs0 ? c.realAsset : pToken),
+            fee: DYNAMIC_FEE,
+            tickSpacing: c.tickSpacing,
+            hooks: IHooks(c.hook)
         });
 
-        vm.startBroadcast(key);
+        vm.startBroadcast(deployerKey);
 
-        IPoolManager(poolManager).initialize(poolKey, sqrtPrice);
-        hook.setPoolSwapFee(poolKey, fee);
+        IPoolManager(c.poolManager).initialize(key, c.sqrtPriceX96);
+        IMoebiusHook(c.hook).setPoolSwapFee(key, c.swapFee);
 
-        int24 tickLower = (TickMath.MIN_TICK / spacing) * spacing;
-        int24 tickUpper = (TickMath.MAX_TICK / spacing) * spacing;
-        hook.seedLiquidity(poolKey, tickLower, tickUpper, seedLiq, seedMaxReal, seedPmev);
+        if (c.realAsset == address(0)) {
+            IMoebiusHook(c.hook).seedLiquidity{value: c.maxReal}(
+                key, c.tickLower, c.tickUpper, c.liquidity, c.maxReal, c.amountPmev
+            );
+        } else {
+            IERC20(c.realAsset).approve(c.hook, c.maxReal);
+            IMoebiusHook(c.hook).seedLiquidity(key, c.tickLower, c.tickUpper, c.liquidity, c.maxReal, c.amountPmev);
+        }
 
         vm.stopBroadcast();
 
-        console2.log("pMEV pool initialized + seeded");
+        console2.log("Pool initialized. pMEV:", pToken, "realAsset:", c.realAsset);
+        console2.log("Swap fee:", c.swapFee, "| liquidity:", c.liquidity);
+        console2.log("ACTIVATED. Searchers can now call executeMEV().");
+    }
+
+    function _loadCfg() internal returns (Cfg memory c) {
+        c.poolManager = vm.envAddress("POOL_MANAGER");
+        c.hook = vm.envAddress("HOOK");
+        c.realAsset = vm.envAddress("REAL_ASSET");
+        c.sqrtPriceX96 = uint160(vm.envUint("SQRT_PRICE_X96"));
+        c.tickSpacing = int24(int256(vm.envInt("TICK_SPACING")));
+        c.swapFee = uint24(vm.envUint("SWAP_FEE"));
+        c.tickLower = int24(int256(vm.envInt("TICK_LOWER")));
+        c.tickUpper = int24(int256(vm.envInt("TICK_UPPER")));
+        c.liquidity = vm.envUint("LIQUIDITY");
+        c.maxReal = vm.envUint("MAX_REAL");
+        c.amountPmev = vm.envUint("AMOUNT_PMEV");
     }
 }
