@@ -1,54 +1,56 @@
-# Moebius v2 — Sealed-Bid Escrow
+# Moebius v2 — Sealed-Bid Rewrite (2026-07-17)
 
-## What changed and why
+## Why the rewrite
 
-v1 collected its "tax" by requiring the searcher to *declare* its own profit and
-then pay 20% of that declaration to LPs, with a `nonReentrant` guard it didn't
-need (the function had no external calls). Three structural problems:
+v1's tax was levied on the searcher's **self-declared** `expectedProfit`, enforced
+only by sniffing the hook's own token balance before/after. Two fatal problems:
 
-1. **Self-declared profit is gameable to dust.** A searcher atomically wraps its
-   real profit in a secondary tx, calls `executeMEV` with `declaredProfit = 0`,
-   and pays nothing.
-2. **Balance-sniffing enforcement is griefable.** `totalRepaid >=
-   principal + lpTax` reads the *hook's* token balance; anyone can dust the hook
-   and satisfy the invariant for the searcher.
-3. **No auction.** One searcher per tx, no competition, tax decoupled from the
-   true value of the flow.
+1. **Honor system**: declare 1 wei, pay dust, keep the arb. No competition = no tax.
+2. **Griefable accounting**: anyone could dust the hook with the real asset and
+   distort `balanceBefore`, DoS-ing `executeMEV` or corrupting tax math.
 
-v2 replaces the honor system with an **escrowed sealed bid**:
+## What changed
 
-1. Searcher escrows a hard `bid` in the pool's **real asset** up front
-   (`transferFrom` / `msg.value`). No bid, no flash credit.
-2. Hook flash-mints pMEV working capital inside `unlockCallback`.
-3. Searcher runs its loop and must return (burn) **100%** of the pMEV —
-   enforced by the token, which reverts the whole tx (escrow included) on
-   shortfall.
-4. The escrowed bid is split deterministically: **80% donated to in-range LPs
-   via `PoolManager.donate`, 20% paid to protocol treasury.**
-
-Competition between searchers for the same flow pushes bids toward true arb
-value. The bid IS the tax.
-
-## Policy levers
-
-| Lever | Function | Notes |
+| Area | v1 | v2 |
 |---|---|---|
-| Policy rate floor | `setMinBidBps(bps)` | `bid >= flashAmount * minBidBps / 10_000`; capped at 10% |
-| Pool swap fee | `setPoolSwapFee(key, fee)` | pMEV pools must be dynamic-fee; owner sets the fee |
-| Treasury | `setTreasury(addr)` | receives 20% of every escrowed bid |
+| Tax basis | Declared `expectedProfit` | Hard **escrowed bid**, pulled upfront via transferFrom / msg.value |
+| Enforcement | Balance sniffing | Deterministic split of escrow: 80% LP donation / 20% treasury |
+| Under-declaration | Possible | Meaningless — the bid IS the tax; searchers compete on bid size |
+| Policy rate | None | `minBidBps` floor: bid >= flashAmount * rate (scales with capital used) |
+| Swap fee | N/A | `setPoolSwapFee` — hook owns dynamic-fee pMEV pools (lever #2) |
+| Pool config | Static fee | **Dynamic fee flag (0x800000) required** — zero-flag hooks are only valid with dynamic fee pools |
+| Deployment | Not specified | CREATE2 salt mining for zero lower-14 flag bits + nonce prediction for the pMEV/hook circular dependency |
+| Reentrancy | Transient guard on entry | Same + typed unlock actions (MEV / SEED), nested-unlock payload revalidation |
+| FoT tokens | Unhandled | Rejected at escrow (`FeeOnTransferNotSupported`) |
 
-## Deploy invariants
+Also new: `seedLiquidity` — the central-bank desk. The hook flash-mints pMEV
+inventory and pairs it with the owner's real asset into an LP position the hook
+owns. This is what gives pMEV a price and searchers a venue. Unabsorbed pMEV is
+burned; unspent real asset is refunded.
 
-- Hook address must carry **zero** lower-14 hook-flag bits → CREATE2-mine the
-  salt (see `DeployMoebius.s.sol`).
-- pMEV pools must be initialized with the **dynamic fee flag** (`0x800000`).
-- `PhantomCreditToken` is deployed with the *target* hook address, so mine the
-  hook address first, then deploy the token with it.
-- `seedLiquidity` (owner-only) gives pMEV its price: the hook flash-mints
-  inventory, pairs it with the owner's real asset, and holds the LP position.
+## Test results (forge test, solc 0.8.26, cancun)
 
-## Test coverage
+10/10 passing, including:
+- full cycle: flash mint -> pool sell -> rebuy -> burn -> 20/80 bid split
+- bid below policy floor reverts
+- non-returning searcher: entire tx reverts, escrow returned (atomicity)
+- reentrant executeMEV blocked
+- only hook can mint/burn pMEV
+- admin gates on policy rate / rescue
 
-`onchain/test/MoebiusMEVHook.t.sol` — 10 cases: bid floor, fee-on-transfer
-rejection, escrow exactness, full-burn enforcement, LP/treasury split,
-policy-rate admin, pool-fee lever, seed liquidity, rescue, ownership.
+## Activation runbook
+
+1. `forge script script/DeployMoebius.s.sol --rpc-url $BASE_RPC --broadcast --verify`
+   (env: DEPLOYER_PRIVATE_KEY, POOL_MANAGER=0x498581fF718922c3f8e6A244956aF099B2652b2b,
+   TREASURY, MIN_BID_BPS)
+2. Initialize pMEV/<realAsset> pool: `fee = 0x800000`, `hooks = <hook>`, chosen tickSpacing.
+3. Owner: `setPoolSwapFee(key, fee)`.
+4. Owner: `seedLiquidity(key, tickLower, tickUpper, liquidity, maxReal, amountPmev)`.
+5. Ship a reference searcher (see test/mocks/MockSearcher.sol for the settlement pattern).
+
+## Still open before mainnet funds
+
+- External audit (this is a reserve-holding contract).
+- `owner` should be a multisig, not an EOA.
+- Native-asset (ETH) realAsset path is implemented but only ERC20 is covered in tests.
+- Donate reverts if the pool has no in-range liquidity at current tick — keep seed range wide.
