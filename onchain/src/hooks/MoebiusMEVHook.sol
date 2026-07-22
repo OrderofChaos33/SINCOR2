@@ -218,9 +218,6 @@ contract MoebiusMEVHook is IUnlockCallback, ReentrancyGuardTransient {
     function _runSeed(PoolKey memory key, int24 tickLower, int24 tickUpper, uint256 liquidity, uint256 amountPmev)
         internal
     {
-        Currency realAsset = _validateKeyAndGetRealAsset(key);
-
-        // Mint inventory, add the position (hook owns it), settle both sides from escrow+mint
         pToken.mintEphemeral(address(this), amountPmev);
 
         // second return (hook delta) is always zero: this hook has no liquidity deltas
@@ -236,28 +233,99 @@ contract MoebiusMEVHook is IUnlockCallback, ReentrancyGuardTransient {
             ""
         );
 
-        _settleDeltaCurrency(key.currency0, delta.amount0(), realAsset);
-        _settleDeltaCurrency(key.currency1, delta.amount1(), realAsset);
+        // Settle what the position actually consumed
+        _settleDeltaCurrency(key.currency0, delta.amount0());
+        _settleDeltaCurrency(key.currency1, delta.amount1());
 
-        // Burn whatever pMEV the position did not absorb (no free float from seeding)
-        uint256 pLeft = IERC20(address(pToken)).balanceOf(address(this));
-        if (pLeft > 0) pToken.burnEphemeral(address(this), pLeft);
+        // Burn any pMEV the position didn't absorb
+        uint256 pMevLeft = IERC20(address(pToken)).balanceOf(address(this));
+        if (pMevLeft > 0) pToken.burnEphemeral(address(this), pMevLeft);
     }
 
-    // ==================== ADMIN ====================
+    // ==================== INTERNALS ====================
 
-    /// @notice Policy lever #1: floor on searcher bids (bps of flash amount)
+    function _validateKeyAndGetRealAsset(PoolKey memory key) internal view returns (Currency realAsset) {
+        if (address(key.hooks) != address(this)) revert InvalidPoolKey();
+        address c0 = Currency.unwrap(key.currency0);
+        address c1 = Currency.unwrap(key.currency1);
+        if (c0 == c1) revert InvalidPoolKey();
+        if (c0 == address(pToken)) return key.currency1;
+        if (c1 == address(pToken)) return key.currency0;
+        revert InvalidPoolKey();
+    }
+
+    /// @dev Pull the bid/seed escrow into this contract. Native = msg.value, else transferFrom.
+    function _escrow(Currency realAsset, address from, uint256 amount) internal {
+        if (amount == 0) {
+            if (msg.value != 0) revert BadEscrow();
+            return;
+        }
+        if (realAsset.isAddressZero()) {
+            if (msg.value != amount) revert BadEscrow();
+        } else {
+            if (msg.value != 0) revert BadEscrow();
+            uint256 before = IERC20(Currency.unwrap(realAsset)).balanceOf(address(this));
+            IERC20(Currency.unwrap(realAsset)).safeTransferFrom(from, address(this), amount);
+            // Reject fee-on-transfer assets outright: escrow math must be exact
+            if (IERC20(Currency.unwrap(realAsset)).balanceOf(address(this)) - before != amount) {
+                revert FeeOnTransferNotSupported();
+            }
+        }
+    }
+
+    /// @dev Pay out tokens this contract holds (outside the PoolManager lock).
+    ///      Reachable destinations are exactly: (1) protocolTreasury - a governed
+    ///      storage sink set only by the owner; (2) msg.sender of the onlyOwner,
+    ///      nonReentrant seedLiquidity entrypoint, refunding the owner's OWN
+    ///      unspent escrow. No third-party-controlled destination exists.
+    function _payout(Currency realAsset, address to, uint256 amount) internal {
+        if (realAsset.isAddressZero()) {
+            // adjudicated false positive: destinations restricted as documented above
+            // slither-disable-next-line arbitrary-send-eth
+            (bool ok,) = to.call{value: amount}("");
+            require(ok, "Native payout failed");
+        } else {
+            IERC20(Currency.unwrap(realAsset)).safeTransfer(to, amount);
+        }
+    }
+
+    /// @dev Settle a PoolManager debt using tokens this contract holds (inside the lock).
+    function _settleFromSelf(Currency currency, uint256 amount) internal {
+        if (currency.isAddressZero()) {
+            // slither-disable-next-line unused-return
+            poolManager.settle{value: amount}();
+        } else {
+            poolManager.sync(currency);
+            IERC20(Currency.unwrap(currency)).safeTransfer(address(poolManager), amount);
+            // slither-disable-next-line unused-return
+            poolManager.settle();
+        }
+    }
+
+    function _settleDeltaCurrency(Currency currency, int128 deltaAmount) internal {
+        if (deltaAmount >= 0) return; // positive delta = PoolManager owes us; leave as claim
+        _settleFromSelf(currency, uint256(uint128(-deltaAmount)));
+    }
+
+    function _selfBalance(Currency currency) internal view returns (uint256) {
+        return currency.isAddressZero() ? address(this).balance : IERC20(Currency.unwrap(currency)).balanceOf(address(this));
+    }
+
+    // ==================== ADMIN (monetary policy) ====================
+
     function setMinBidBps(uint256 newMinBidBps) external onlyOwner {
         if (newMinBidBps > MAX_MIN_BID_BPS) revert RateTooHigh();
         minBidBps = newMinBidBps;
         emit PolicyRateUpdated(newMinBidBps);
     }
 
-    /// @notice Policy lever #2: set the swap fee on a pMEV pool (must be dynamic-fee)
-    function setPoolSwapFee(PoolKey calldata key, uint24 fee) external onlyOwner {
+    /// @notice Policy lever #2: set the swap fee of a hook-owned dynamic-fee pool.
+    ///         pMEV pools must be initialized with the dynamic fee flag (0x800000)
+    ///         because this hook carries zero permission flags.
+    function setPoolSwapFee(PoolKey calldata key, uint24 newFee) external onlyOwner {
         _validateKeyAndGetRealAsset(key);
-        poolManager.updateDynamicLPFee(key, fee);
-        emit PoolSwapFeeUpdated(key.toId(), fee);
+        poolManager.updateDynamicLPFee(key, newFee);
+        emit PoolSwapFeeUpdated(key.toId(), newFee);
     }
 
     function setTreasury(address newTreasury) external onlyOwner {
@@ -279,85 +347,4 @@ contract MoebiusMEVHook is IUnlockCallback, ReentrancyGuardTransient {
     function rescue(Currency currency, uint256 amount) external onlyOwner {
         _payout(currency, protocolTreasury, amount);
     }
-
-    // ==================== INTERNALS ====================
-
-    function _validateKeyAndGetRealAsset(PoolKey memory key) internal view returns (Currency realAsset) {
-        if (address(key.hooks) != address(this)) revert InvalidPoolKey();
-        if (Currency.unwrap(key.currency0) == address(pToken)) return key.currency1;
-        if (Currency.unwrap(key.currency1) == address(pToken)) return key.currency0;
-        revert InvalidPoolKey();
-    }
-
-    /// @dev Pull the bid/seed escrow into this contract BEFORE entering the PM lock.
-    function _escrow(Currency realAsset, address from, uint256 amount) internal {
-        if (amount == 0) {
-            if (realAsset.isAddressZero()) require(msg.value == 0, "BadEscrow");
-            return;
-        }
-        if (realAsset.isAddressZero()) {
-            if (msg.value != amount) revert BadEscrow();
-        } else {
-            uint256 before = IERC20(Currency.unwrap(realAsset)).balanceOf(address(this));
-            IERC20(realAsset == Currency.wrap(address(0)) ? address(0) : Currency.unwrap(realAsset)).safeTransferFrom(
-                from, address(this), amount
-            );
-            uint256 received = IERC20(Currency.unwrap(realAsset)).balanceOf(address(this)) - before;
-            if (received != amount) revert FeeOnTransferNotSupported();
-        }
-    }
-
-    /// @dev Settle a negative delta owed by the hook during an unlock frame.
-    ///      Pays from hook-held pMEV (burn-side) or escrowed real asset.
-    function _settleDeltaCurrency(Currency currency, int128 deltaAmount, Currency realAsset) internal {
-        if (deltaAmount >= 0) return;
-        uint256 owed = uint256(uint128(-deltaAmount));
-        if (currency == realAsset) {
-            _settleFromSelf(realAsset, owed);
-        } else {
-            // pMEV side: settle from the minted inventory held by the hook
-            poolManager.sync(currency);
-            IERC20(Currency.unwrap(currency)).safeTransfer(address(poolManager), owed);
-            // slither-disable-next-line unused-return
-            poolManager.settle();
-        }
-    }
-
-    function _settleFromSelf(Currency currency, uint256 amount) internal {
-        if (amount == 0) return;
-        if (currency.isAddressZero()) {
-            // slither-disable-next-line unused-return
-            poolManager.settle{value: amount}();
-        } else {
-            poolManager.sync(currency);
-            IERC20(Currency.unwrap(currency)).safeTransfer(address(poolManager), amount);
-            // slither-disable-next-line unused-return
-            poolManager.settle();
-        }
-    }
-
-    function _selfBalance(Currency currency) internal view returns (uint256) {
-        return currency.isAddressZero()
-            ? address(this).balance
-            : IERC20(Currency.unwrap(currency)).balanceOf(address(this));
-    }
-
-    /// @dev Pay out tokens this contract holds (outside the PoolManager lock).
-    ///      Reachable destinations are exactly: (1) protocolTreasury - a governed
-    ///      storage sink set only by the owner; (2) msg.sender of the onlyOwner,
-    ///      nonReentrant seedLiquidity entrypoint, refunding the owner's OWN
-    ///      unspent escrow. No third-party-controlled destination exists.
-    function _payout(Currency realAsset, address to, uint256 amount) internal {
-        if (realAsset.isAddressZero()) {
-            // adjudicated false positive: destinations restricted as documented above
-            // slither-disable-next-line arbitrary-send-eth
-            (bool ok,) = to.call{value: amount}("");
-            require(ok, "Native payout failed");
-        } else {
-            IERC20(Currency.unwrap(realAsset)).safeTransfer(to, amount);
-        }
-    }
-
-    /// @dev Accept native escrow/refunds.
-    receive() external payable {}
 }
