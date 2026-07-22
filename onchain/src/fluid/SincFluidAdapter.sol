@@ -18,15 +18,19 @@ import {IFluidLiquidity, IFluidDexFactory, IFluidDexT1, IFluidVaultT1, IFToken} 
 ///   Stage 2 (after Fluid governance deploys/lists the SINC-USDC DEX): the pair
 ///           is supplied via DexT1.deposit() as SMART COLLATERAL — the position is
 ///           the LP liquidity itself and earns swap fees while it can back borrows.
-///           deployDex is deployer-auth gated by Fluid governance (verified); the
-///           pair must be created/listed by Fluid or a governance-authorized deployer.
+///           deployDex is deployer-auth gated by Fluid governance (verified in
+///           factory main.sol); the pair must be created/listed by Fluid or a
+///           governance-authorized deployer.
 ///
 ///   Stage 3 (treasury-only, after Stage 2): smart debt / VaultT2 operate() lets
 ///           treasury borrow against the smart-collateral LP to compound depth.
 ///           Guardian-gated. Per-user borrowing is deliberately NOT pooled here —
 ///           each user's debt position must be their own Fluid account.
 ///
-/// @dev    SINC has 8 decimals; USDC has 6. All amounts are raw token units.
+/// @dev    Pool token order: Fluid DEX T1 orders token0/token1 by token address.
+///         USDC 0x8335…fCD6… < SINC 0x9C8c…d396…, so for SINC-USDC:
+///         token0 = USDC (6 decimals), token1 = SINC (8 decimals). All external
+///         functions here take (sincAmt, usdcAmt) and re-order internally.
 ///         Token approvals target the Fluid Liquidity contract (the layer that
 ///         settles every Fluid protocol), fUSDC for the lending leg.
 ///         Wired into SharedLiquidityVault as a strategy backer (registerStrategy).
@@ -41,8 +45,8 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     address public constant DEX_RESOLVER = 0x11D80CfF056Cef4F9E6d23da8672fE9873e5cC07;
     address public constant LENDING_RESOLVER = 0x48D32f49aFeAEC7AE66ad7B9264f446fc11a1569;
 
-    IERC20 public immutable SINC;
-    IERC20 public immutable USDC;
+    IERC20 public immutable SINC;   // token1 in pool order
+    IERC20 public immutable USDC;   // token0 in pool order
     address public immutable guardian;
     address public treasury;
 
@@ -62,10 +66,10 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
 
     event FluidDepositUSDC(address indexed user, uint256 assets, uint256 shares);
     event FluidWithdrawUSDC(address indexed user, uint256 assets, uint256 shares);
-    event DexSupplied(address indexed user, address indexed dex, uint256 token0Amt, uint256 token1Amt, uint256 shares);
-    event DexWithdrawn(address indexed user, address indexed dex, uint256 token0Amt, uint256 token1Amt, uint256 shares);
-    event SmartDebtBorrowed(address indexed dex, uint256 token0Amt, uint256 token1Amt, uint256 shares, address to);
-    event SmartDebtRepaid(address indexed dex, uint256 token0Amt, uint256 token1Amt, uint256 shares);
+    event DexSupplied(address indexed user, address indexed dex, uint256 sincAmt, uint256 usdcAmt, uint256 shares);
+    event DexWithdrawn(address indexed user, address indexed dex, uint256 sincAmt, uint256 usdcAmt, uint256 shares);
+    event SmartDebtBorrowed(address indexed dex, uint256 usdcBorrowed, uint256 sincBorrowed, uint256 shares, address to);
+    event SmartDebtRepaid(address indexed dex, uint256 usdcRepaid, uint256 sincRepaid, uint256 shares);
     event VaultOperated(address indexed vault, uint256 nftId, int256 newCol, int256 newDebt, address to);
     event FluidDexUpdated(address dex);
     event SmartVaultUpdated(address vault);
@@ -103,7 +107,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     // ==================== STAGE 1 — FLUID LENDING (permissionless, live) ====================
 
     /// @notice Deposit USDC into Fluid fUSDC. Shares are held by the adapter and
-    ///         accounted per user. Live multiplier: reads via LendingResolver / convertToAssets.
+    ///         accounted per user. Live value: userValueUSDC() / LendingResolver.
     function depositUSDC(uint256 assets) external nonReentrant whenNotPaused returns (uint256 shares) {
         if (assets == 0) revert ZeroAmount();
         USDC.safeTransferFrom(msg.sender, address(this), assets);
@@ -132,8 +136,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
 
     /// @notice Supply SINC + USDC into the SINC-USDC Fluid DEX as smart collateral.
     ///         The resulting position IS the pool's LP liquidity and earns swap fees.
-    ///         token0/token1 amounts are in pool order — check DexResolver.constantsView()
-    ///         (SINC 0x9C8c… > USDC 0x8335…, so SINC is likely token1; confirm on-chain).
+    ///         Internal call uses pool order: token0 = USDC, token1 = SINC.
     function supplyToDex(uint256 sincAmt, uint256 usdcAmt, uint256 minShares)
         external nonReentrant whenNotPaused returns (uint256 shares)
     {
@@ -144,7 +147,8 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
         if (sincAmt > 0) SINC.safeTransferFrom(msg.sender, address(this), sincAmt);
         if (usdcAmt > 0) USDC.safeTransferFrom(msg.sender, address(this), usdcAmt);
 
-        shares = IFluidDexT1(dex).deposit(sincAmt, usdcAmt, minShares, false);
+        // DexT1.deposit(token0Amt, token1Amt, minShares, estimate) — pool order.
+        shares = IFluidDexT1(dex).deposit(usdcAmt, sincAmt, minShares, false);
         dexColShares[msg.sender] += shares;
         totalDexColShares += shares;
         emit DexSupplied(msg.sender, dex, sincAmt, usdcAmt, shares);
@@ -156,7 +160,8 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     {
         address dex = fluidDex;
         if (dex == address(0)) revert DexNotSet();
-        shares = IFluidDexT1(dex).withdraw(sincAmt, usdcAmt, maxShares, msg.sender);
+        // DexT1.withdraw(token0Amt, token1Amt, maxShares, to) — pool order.
+        shares = IFluidDexT1(dex).withdraw(usdcAmt, sincAmt, maxShares, msg.sender);
         uint256 owned = dexColShares[msg.sender];
         if (shares > owned) revert InsufficientShares(shares, owned);
         dexColShares[msg.sender] = owned - shares;
@@ -168,28 +173,31 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
 
     /// @notice Treasury borrows against smart-collateral LP. Debt itself is deployed
     ///         as LP liquidity (Fluid smart debt) once enabled on the pair.
-    function borrowSmartDebt(uint256 shares, uint256 minToken0Borrow, uint256 minToken1Borrow, address to)
+    ///         minToken0Borrow = USDC leg, minToken1Borrow = SINC leg (pool order).
+    function borrowSmartDebt(uint256 shares, uint256 minUsdcBorrow, uint256 minSincBorrow, address to)
         external onlyGuardian nonReentrant whenNotPaused
     {
         address dex = fluidDex;
         if (dex == address(0)) revert DexNotSet();
-        (uint256 a0, uint256 a1) = IFluidDexT1(dex).borrowPerfect(shares, minToken0Borrow, minToken1Borrow, to == address(0) ? treasury : to);
+        (uint256 usdcOut, uint256 sincOut) =
+            IFluidDexT1(dex).borrowPerfect(shares, minUsdcBorrow, minSincBorrow, to == address(0) ? treasury : to);
         totalDebtShares += shares;
-        emit SmartDebtBorrowed(dex, a0, a1, shares, to);
+        emit SmartDebtBorrowed(dex, usdcOut, sincOut, shares, to);
     }
 
-    /// @notice Repay smart debt. Pulls repayment tokens from the guardian caller.
-    function paybackSmartDebt(uint256 token0Amt, uint256 token1Amt, uint256 minShares)
+    /// @notice Repay smart debt. Pulls repayment tokens from the guardian caller
+    ///         (adapter already holds max Liquidity approvals).
+    function paybackSmartDebt(uint256 usdcAmt, uint256 sincAmt, uint256 minShares)
         external onlyGuardian nonReentrant returns (uint256 shares)
     {
         address dex = fluidDex;
         if (dex == address(0)) revert DexNotSet();
-        if (token0Amt > 0) IERC20(IFluidDexT1(dex) == IFluidDexT1(dex) ? address(SINC) : address(SINC)).forceApprove(address(LIQUIDITY), type(uint256).max); // idempotent
-        if (token0Amt > 0) SINC.safeTransferFrom(msg.sender, address(this), token0Amt);
-        if (token1Amt > 0) USDC.safeTransferFrom(msg.sender, address(this), token1Amt);
-        shares = IFluidDexT1(dex).payback(token0Amt, token1Amt, minShares, false);
+        if (usdcAmt > 0) USDC.safeTransferFrom(msg.sender, address(this), usdcAmt);
+        if (sincAmt > 0) SINC.safeTransferFrom(msg.sender, address(this), sincAmt);
+        // DexT1.payback(token0Amt, token1Amt, minShares, estimate) — pool order.
+        shares = IFluidDexT1(dex).payback(usdcAmt, sincAmt, minShares, false);
         totalDebtShares = shares > totalDebtShares ? 0 : totalDebtShares - shares;
-        emit SmartDebtRepaid(dex, token0Amt, token1Amt, shares);
+        emit SmartDebtRepaid(dex, usdcAmt, sincAmt, shares);
     }
 
     /// @notice Direct Fluid Vault operate (VaultT2/T4 once listed). Unified entry:

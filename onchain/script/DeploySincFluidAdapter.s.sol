@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SincFluidAdapter} from "../src/fluid/SincFluidAdapter.sol";
 
 /// @notice Deploys SincFluidAdapter on Base (8453).
@@ -26,7 +27,7 @@ contract DeploySincFluidAdapter is Script {
         require(block.chainid == 8453, "Base mainnet only");
 
         vm.startBroadcast();
-        SincFluidAdapter adapter = new SincFluidAdapter(IERC20Like(sinc), IERC20Like(usdc), guardian, treasury);
+        SincFluidAdapter adapter = new SincFluidAdapter(IERC20(sinc), IERC20(usdc), guardian, treasury);
         vm.stopBroadcast();
 
         console.log("SincFluidAdapter:", address(adapter));
@@ -34,8 +35,4 @@ contract DeploySincFluidAdapter is Script {
         console.log("  treasury:", treasury);
         console.log("Next: register as strategy backer in SharedLiquidityVault 0xeA90a257e5Dae20a0472C4812775F28614459bb6");
     }
-}
-
-interface IERC20Like {
-    function balanceOf(address) external view returns (uint256);
 }
