@@ -23,13 +23,25 @@ contract MockSwapRouter is IUnlockCallback {
         poolManager = IPoolManager(_poolManager);
     }
 
-    function addLiquidity(PoolKey calldata key, int24 tickLower, int24 tickUpper, uint256 liquidity) external {
+    /// @dev Accept native ETH for native-currency pools (input side / liquidity).
+    receive() external payable {}
+
+    function addLiquidity(PoolKey calldata key, int24 tickLower, int24 tickUpper, uint256 liquidity)
+        external
+        payable
+    {
         poolManager.unlock(abi.encode(ACTION_LIQ, key, tickLower, tickUpper, liquidity, msg.sender));
+        _refundNative();
     }
 
-    function swapExactIn(PoolKey calldata key, bool zeroForOne, uint256 amountIn) external returns (uint256 amountOut) {
+    function swapExactIn(PoolKey calldata key, bool zeroForOne, uint256 amountIn)
+        external
+        payable
+        returns (uint256 amountOut)
+    {
         bytes memory result =
             poolManager.unlock(abi.encode(ACTION_SWAP, key, zeroForOne, amountIn, msg.sender));
+        _refundNative();
         return abi.decode(result, (uint256));
     }
 
@@ -80,8 +92,22 @@ contract MockSwapRouter is IUnlockCallback {
     }
 
     function _pay(Currency currency, uint256 amount, address payer) internal {
+        if (currency.isAddressZero()) {
+            // Native: settle directly with value (sync is ERC20-only)
+            poolManager.settle{value: amount}();
+            return;
+        }
         poolManager.sync(currency);
         IERC20(Currency.unwrap(currency)).transferFrom(payer, address(poolManager), amount);
         poolManager.settle();
+    }
+
+    /// @dev Return unspent native to the original caller after the unlock frame.
+    function _refundNative() internal {
+        uint256 leftover = address(this).balance;
+        if (leftover > 0) {
+            (bool ok,) = msg.sender.call{value: leftover}("");
+            require(ok, "refund failed");
+        }
     }
 }

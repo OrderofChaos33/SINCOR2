@@ -50,7 +50,7 @@ contract AutoCapitalizeMonetizeHook is IHooks {
     event Swept(Currency indexed currency, uint256 toTreasury, uint256 toReserve);
     event FeeBpsUpdated(uint256 newFeeBps);
     event TreasuryBpsUpdated(uint256 newTreasuryBps);
-    event TreasuryUpdated(address newTreasury);
+    event TreasuryUpdated(address indexed newTreasury);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     error Unauthorized();
@@ -125,8 +125,9 @@ contract AutoCapitalizeMonetizeHook is IHooks {
         if (feeAmount == 0) return (this.afterSwap.selector, 0);
 
         Currency feeCurrency = feeOnCurrency0 ? key.currency0 : key.currency1;
-        poolManager.take(feeCurrency, address(this), feeAmount);
+        // CEI: accounting write precedes the external PoolManager call
         totalCaptured[feeCurrency] += feeAmount;
+        poolManager.take(feeCurrency, address(this), feeAmount);
 
         emit FeeCaptured(key.toId(), feeCurrency, feeAmount);
         return (this.afterSwap.selector, int128(int256(feeAmount)));
@@ -200,8 +201,10 @@ contract AutoCapitalizeMonetizeHook is IHooks {
 
     /// @notice Sweep banked fees: treasuryBps to treasury, remainder stays as the
     ///         on-contract buyback / LP-deepen reserve. Keeper-compoundable.
+    ///         Handles both ERC20 and native-ETH fee currencies (ETH pools are
+    ///         the common case on Base).
     function sweep(Currency currency) external {
-        uint256 balance = IERC20(Currency.unwrap(currency)).balanceOf(address(this));
+        uint256 balance = _selfBalance(currency);
         uint256 captured = totalCaptured[currency];
         uint256 swept = totalSwept[currency];
         uint256 available = balance < captured - swept ? balance : captured - swept;
@@ -211,18 +214,37 @@ contract AutoCapitalizeMonetizeHook is IHooks {
         uint256 toReserve = available - toTreasury;
 
         totalSwept[currency] = swept + available;
-        if (toTreasury > 0) IERC20(Currency.unwrap(currency)).safeTransfer(treasury, toTreasury);
+        if (toTreasury > 0) _payout(currency, treasury, toTreasury);
 
         emit Swept(currency, toTreasury, toReserve);
     }
 
-    /// @notice Spend reserve on buyback / LP-deepen. Owner-gated; the keeper pattern.
-    ///         v2 keeps execution off-contract (owner routes via its own call) to
-    ///         avoid embedding a router dependency in a fee contract.
-    function releaseReserve(Currency currency, uint256 amount, address to) external onlyOwner {
-        require(to != address(0), "Zero address");
-        IERC20(Currency.unwrap(currency)).safeTransfer(to, amount);
+    /// @notice Release reserve for buyback / LP-deepen. Owner-gated; the keeper
+    ///         pattern. Pays ONLY the governed treasury sink - the owner deploys
+    ///         the capital from there, so no arbitrary destination exists on-contract.
+    function releaseReserve(Currency currency, uint256 amount) external onlyOwner {
+        _payout(currency, treasury, amount);
     }
+
+    // ==================== INTERNALS ====================
+
+    function _selfBalance(Currency currency) internal view returns (uint256) {
+        return currency.isAddressZero()
+            ? address(this).balance
+            : IERC20(Currency.unwrap(currency)).balanceOf(address(this));
+    }
+
+    function _payout(Currency currency, address to, uint256 amount) internal {
+        if (currency.isAddressZero()) {
+            (bool ok,) = to.call{value: amount}("");
+            require(ok, "Native payout failed");
+        } else {
+            IERC20(Currency.unwrap(currency)).safeTransfer(to, amount);
+        }
+    }
+
+    /// @dev Accept native ETH from PoolManager.take on native-currency pools.
+    receive() external payable {}
 
     // ==================== ADMIN ====================
 
