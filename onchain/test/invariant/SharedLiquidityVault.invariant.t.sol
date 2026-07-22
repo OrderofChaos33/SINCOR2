@@ -120,17 +120,22 @@ contract VaultHandler is Test {
     }
 }
 
-/// @notice Invariant: vault solvency + accounting integrity across arbitrary sequences.
+/// @notice Invariants: solvency + accounting integrity + token conservation
+///         across arbitrary multi-LP, multi-strategy sequences.
 contract SharedLiquidityVaultInvariantTest is Test {
     SharedLiquidityVault vault;
     MockERC20 sinc;
     MockERC20 usdc;
     VaultHandler handler;
 
+    address constant TREASURY = address(0x5000);
+    uint256 constant MINTED_PER_ACTOR_USDC = 1_000_000e6;
+    uint256 constant MINTED_PER_ACTOR_SINC = 1_000_000e18;
+
     function setUp() public {
         sinc = new MockERC20("SINC", "SINC", 18);
         usdc = new MockERC20("USD Coin", "USDC", 6);
-        vault = new SharedLiquidityVault(sinc, usdc, address(0x4000), address(0x5000));
+        vault = new SharedLiquidityVault(sinc, usdc, address(0x4000), TREASURY);
         handler = new VaultHandler(vault, sinc, usdc, address(0x4000));
         targetContract(address(handler));
     }
@@ -146,14 +151,20 @@ contract SharedLiquidityVaultInvariantTest is Test {
         assertEq(vault.outstandingTotal(address(sinc)), handler.ghostOutstanding(address(sinc)));
     }
 
-    /// Drawn capital is always held by the strategy hooks (nothing vanishes).
-    function invariant_drawnCapitalHeldByHooks() public view {
-        address h0 = handler.hooks(0);
-        address h1 = handler.hooks(1);
-        assertEq(
-            usdc.balanceOf(h0) + usdc.balanceOf(h1) + usdc.balanceOf(address(vault)) + usdc.balanceOf(address(0x5000)),
-            3_000_000e6 - usdc.balanceOf(handler.lps(0)) - usdc.balanceOf(handler.lps(1)) - usdc.balanceOf(handler.lps(2))
-            + usdc.balanceOf(handler.lps(0)) + usdc.balanceOf(handler.lps(1)) + usdc.balanceOf(handler.lps(2))
-        );
+    /// Conservation: every minted token sits in exactly one of
+    /// {LPs, hooks, vault, treasury} — nothing minted, nothing vanished.
+    function invariant_tokenConservation() public view {
+        uint256 usdcSum = usdc.balanceOf(address(vault)) + usdc.balanceOf(TREASURY);
+        uint256 sincSum = sinc.balanceOf(address(vault)) + sinc.balanceOf(TREASURY);
+        for (uint256 i = 0; i < 3; i++) {
+            usdcSum += usdc.balanceOf(handler.lps(i));
+            sincSum += sinc.balanceOf(handler.lps(i));
+        }
+        for (uint256 i = 0; i < 2; i++) {
+            usdcSum += usdc.balanceOf(handler.hooks(i));
+            sincSum += sinc.balanceOf(handler.hooks(i));
+        }
+        assertEq(usdcSum, 5 * MINTED_PER_ACTOR_USDC);
+        assertEq(sincSum, 5 * MINTED_PER_ACTOR_SINC);
     }
 }

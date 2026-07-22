@@ -7,6 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import {IFluidLiquidity, IFluidDexFactory, IFluidDexT1, IFluidVaultT1, IFToken} from "./FluidInterfaces.sol";
+import {IComplianceGuard} from "../ComplianceGuard.sol";
 
 /// @title  SincFluidAdapter — vault deposit/withdraw extension onto Fluid's unified layer (Base)
 /// @notice Three-stage amplifier for SINC liquidity:
@@ -33,6 +34,7 @@ import {IFluidLiquidity, IFluidDexFactory, IFluidDexT1, IFluidVaultT1, IFToken} 
 ///         functions here take (sincAmt, usdcAmt) and re-order internally.
 ///         Token approvals target the Fluid Liquidity contract (the layer that
 ///         settles every Fluid protocol), fUSDC for the lending leg.
+///         Optional ComplianceGuard screens user entry/exit when set.
 ///         Wired into SharedLiquidityVault as a strategy backer (registerStrategy).
 contract SincFluidAdapter is ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
@@ -54,6 +56,8 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     address public fluidDex;
     /// @notice Fluid VaultT2 (smart col SINC-USDC LP / debt) — address(0) until listed
     address public smartVault;
+    /// @notice Compliance gate — address(0) disables screening
+    IComplianceGuard public compliance;
 
     // per-user accounting (adapter holds the Fluid positions; users hold claims)
     mapping(address user => uint256 fShares) public fUsdcShares;
@@ -74,6 +78,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     event FluidDexUpdated(address dex);
     event SmartVaultUpdated(address vault);
     event TreasuryUpdated(address treasury);
+    event ComplianceUpdated(address guard);
     event Rescued(address indexed token, address indexed to, uint256 amount);
 
     error OnlyGuardian();
@@ -82,9 +87,17 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     error VaultNotSet();
     error InsufficientShares(uint256 requested, uint256 available);
     error ZeroAddress();
+    error ComplianceBlocked(address account);
 
     modifier onlyGuardian() {
         if (msg.sender != guardian) revert OnlyGuardian();
+        _;
+    }
+
+    modifier compliant(address account) {
+        if (address(compliance) != address(0) && !compliance.isAllowed(account)) {
+            revert ComplianceBlocked(account);
+        }
         _;
     }
 
@@ -108,7 +121,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
 
     /// @notice Deposit USDC into Fluid fUSDC. Shares are held by the adapter and
     ///         accounted per user. Live value: userValueUSDC() / LendingResolver.
-    function depositUSDC(uint256 assets) external nonReentrant whenNotPaused returns (uint256 shares) {
+    function depositUSDC(uint256 assets) external nonReentrant whenNotPaused compliant(msg.sender) returns (uint256 shares) {
         if (assets == 0) revert ZeroAmount();
         USDC.safeTransferFrom(msg.sender, address(this), assets);
         shares = F_USDC.deposit(assets, address(this));
@@ -117,7 +130,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     }
 
     /// @notice Redeem fUSDC shares back to USDC for the caller.
-    function withdrawUSDC(uint256 shares) external nonReentrant returns (uint256 assets) {
+    function withdrawUSDC(uint256 shares) external nonReentrant compliant(msg.sender) returns (uint256 assets) {
         if (shares == 0) revert ZeroAmount();
         uint256 owned = fUsdcShares[msg.sender];
         if (shares > owned) revert InsufficientShares(shares, owned);
@@ -138,7 +151,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     ///         The resulting position IS the pool's LP liquidity and earns swap fees.
     ///         Internal call uses pool order: token0 = USDC, token1 = SINC.
     function supplyToDex(uint256 sincAmt, uint256 usdcAmt, uint256 minShares)
-        external nonReentrant whenNotPaused returns (uint256 shares)
+        external nonReentrant whenNotPaused compliant(msg.sender) returns (uint256 shares)
     {
         address dex = fluidDex;
         if (dex == address(0)) revert DexNotSet();
@@ -156,7 +169,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
 
     /// @notice Withdraw smart-collateral liquidity; underlying tokens go to the caller.
     function withdrawFromDex(uint256 sincAmt, uint256 usdcAmt, uint256 maxShares)
-        external nonReentrant returns (uint256 shares)
+        external nonReentrant compliant(msg.sender) returns (uint256 shares)
     {
         address dex = fluidDex;
         if (dex == address(0)) revert DexNotSet();
@@ -234,6 +247,11 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     function setSmartVault(address v) external onlyGuardian {
         smartVault = v;
         emit SmartVaultUpdated(v);
+    }
+
+    function setCompliance(address guard) external onlyGuardian {
+        compliance = IComplianceGuard(guard);
+        emit ComplianceUpdated(guard);
     }
 
     function setTreasury(address t) external onlyGuardian {
