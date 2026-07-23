@@ -277,6 +277,30 @@ class PolyclawCoreAgent:
         )
         self.win_rate_ema = max(min(self.win_rate_ema, 0.85), 0.35)
 
+    def execute(self, route: str = "public", **kwargs) -> Dict[str, Any]:
+        """Thin execution wrapper called by the earning scheduler.
+
+        The live trading loop in ``polyclaw_mega_aggressive_live.run_cycle()``
+        owns the actual CLOB orders.  This method exists so
+        ``polyclaw_earning_scheduler.py`` can call ``agent.execute(route=...,
+        **market_context)`` without crashing and receives a structured result
+        that can be fed back through the decision router.
+
+        Override or extend this method to attach vault drawdown or on-chain
+        execution when those paths are fully wired.
+        """
+        logger.info(
+            "[CORE] execute route=%s capital=%.2f",
+            route, kwargs.get("available_capital_usd", 0),
+        )
+        return {
+            "status": "ok",
+            "route": route,
+            "pnl_usd": 0.0,
+            "reason": "execution_deferred_to_live_loop",
+            "agent": self.name,
+        }
+
     def get_status(self) -> Dict[str, Any]:
         return {
             "agent": self.name,
