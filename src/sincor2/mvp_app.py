@@ -37,6 +37,10 @@ logging.basicConfig(
 logger = logging.getLogger('sincor2')
 
 
+def _fiat_payments_disabled() -> bool:
+    return False
+
+
 def _env_first(*keys: str, default: str = '') -> str:
     """Return the first non-empty environment variable from *keys."""
     for key in keys:
@@ -291,9 +295,7 @@ try:
 except Exception as e:
     logger.warning(f"[PAYMENTS] Platform payments init failed: {e}")
     PLATFORM_PAYMENTS_AVAILABLE = False
-
-    def fiat_payments_enabled() -> bool:
-        return False
+    fiat_payments_enabled = _fiat_payments_disabled
 
 # Legacy Stripe — only when LEGACY_FIAT_PAYMENTS_ENABLED=true
 STRIPE_AVAILABLE = False

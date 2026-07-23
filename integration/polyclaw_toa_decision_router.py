@@ -51,6 +51,7 @@ except ImportError:
 # Tighter than the old hardcoded 0.82 — driven by real simulation quality.
 # ---------------------------------------------------------------------------
 _MIN_CONFIDENCE = 0.65
+_MAX_CONFIDENCE = 0.95
 # Minimum position size used as denominator in quality scaling (prevents ÷0).
 _MIN_FEEDBACK_SIZE_USD = 1.0
 # Quality scale for TOA feedback: neutral at _QUALITY_NEUTRAL, bounds [min, max].
@@ -175,7 +176,7 @@ class PolyclawTOADecisionRouter:
         # the go/no-go decision.  composite_score (utility × probability)
         # drives risk level but shouldn't gate confidence by itself, because
         # with equal probability paths it's small even when quality is high.
-        confidence = round(min(0.95, utility), 4)
+        confidence = round(min(_MAX_CONFIDENCE, utility), 4)
 
         # Position size: equity-proportional, utility-scaled.
         size_usd = round(available_capital * max_risk_pct * utility, 2)
@@ -272,7 +273,7 @@ class PolyclawTOADecisionRouter:
 
         # Always feed result back into TOA so the forecaster improves next cycle.
         if self.toa is not None:
-            size = max(abs(float(decision.get("size_usd") or _MIN_FEEDBACK_SIZE_USD)), _MIN_FEEDBACK_SIZE_USD)
+            size = max(abs(float(decision.get("size_usd", 0.0))), _MIN_FEEDBACK_SIZE_USD)
             # Quality scale: neutral at _QUALITY_NEUTRAL; rises/falls with realised PnL / size.
             quality = max(_QUALITY_MIN, min(_QUALITY_MAX, _QUALITY_NEUTRAL + (pnl / size) * _QUALITY_SCALE_FACTOR))
             self.toa.ingest_feedback({
@@ -299,7 +300,11 @@ class PolyclawTOADecisionRouter:
         logger.info(
             "[ROUTER] cycle complete | pnl=%.2f | route=%s | feedback_events=%s",
             pnl, decision.get("route"),
-            self.toa.feedback_agent.event_count if self.toa else "n/a",
+            (
+                self.toa.feedback_agent.event_count
+                if self.toa and getattr(self.toa, "feedback_agent", None)
+                else "n/a"
+            ),
         )
 
     def _renegade_fallback(self, *args, **kwargs) -> Dict[str, Any]:
