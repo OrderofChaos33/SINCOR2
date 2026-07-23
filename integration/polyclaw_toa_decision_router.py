@@ -21,7 +21,7 @@ across scheduled calls and the system genuinely improves over time.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Callable, Dict, Optional
 from datetime import datetime
 
 # TOA full stack — zero stubs
@@ -30,14 +30,14 @@ try:
     _TOA_AVAILABLE = True
 except ImportError:
     logging.warning("TOA not importable — router will use conservative defaults")
-    TOAOrchestrator = None  # type: ignore[assignment,misc]
+    TOAOrchestrator = None  # type: ignore[assignment]
     _TOA_AVAILABLE = False
 
 try:
     from resilience.circuit_breaker import CircuitBreaker
     _CB_AVAILABLE = True
 except ImportError:
-    CircuitBreaker = None  # type: ignore[assignment,misc]
+    CircuitBreaker = None  # type: ignore[assignment]
     _CB_AVAILABLE = False
 
 try:
@@ -86,15 +86,17 @@ class PolyclawTOADecisionRouter:
             "circuit_breaker_enabled": True,
             "renegade_circuit_name": "renegade_dark_pool",
         }
-        self.toa: Optional["TOAOrchestrator"] = TOAOrchestrator() if _TOA_AVAILABLE else None  # type: ignore[name-defined]
-        self.breaker: Optional[Any] = (
+        self.toa: Optional["TOAOrchestrator"] = (
+            TOAOrchestrator() if (_TOA_AVAILABLE and TOAOrchestrator is not None) else None
+        )
+        self.breaker: Optional["CircuitBreaker"] = (
             CircuitBreaker(
                 name=self.config["renegade_circuit_name"],
                 failure_threshold=5,
                 reset_timeout=60,
                 fallback=self._renegade_fallback,
             )
-            if (_CB_AVAILABLE and self.config.get("circuit_breaker_enabled"))
+            if (_CB_AVAILABLE and CircuitBreaker is not None and self.config.get("circuit_breaker_enabled"))
             else None
         )
         logger.info(
@@ -218,7 +220,7 @@ class PolyclawTOADecisionRouter:
     def route_and_execute(
         self,
         market_context: Dict[str, Any],
-        polyclaw_execute_func,
+        polyclaw_execute_func: Callable[..., Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Run one full earning cycle.
 
@@ -327,7 +329,7 @@ def _get_router() -> PolyclawTOADecisionRouter:
 
 
 def run_polyclaw_earning_cycle(
-    market_context: Dict[str, Any], execute_func
+    market_context: Dict[str, Any], execute_func: Callable[..., Dict[str, Any]]
 ) -> Dict[str, Any]:
     """Entry point for the scheduled earning cycle.
 
