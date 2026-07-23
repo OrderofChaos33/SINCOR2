@@ -24,6 +24,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
+from sincor2.data_paths import migrate_legacy_orders_db
 from sincor2.pdf_generator import get_pdf_generator
 from sincor2.email_sender import get_email_sender
 
@@ -290,7 +291,9 @@ try:
 except Exception as e:
     logger.warning(f"[PAYMENTS] Platform payments init failed: {e}")
     PLATFORM_PAYMENTS_AVAILABLE = False
-    fiat_payments_enabled = lambda: False  # type: ignore
+
+    def fiat_payments_enabled() -> bool:
+        return False
 
 # Legacy Stripe — only when LEGACY_FIAT_PAYMENTS_ENABLED=true
 STRIPE_AVAILABLE = False
@@ -550,8 +553,6 @@ def sanitize_string(value, max_length=200):
 # ============================================================================
 # DATABASE SETUP (SQLite for orders)
 # ============================================================================
-
-from sincor2.data_paths import migrate_legacy_orders_db, orders_db_path
 
 DB_PATH = str(migrate_legacy_orders_db())
 
@@ -2323,7 +2324,7 @@ def api_webbuilder_project_get(project_id):
     denied = _require_admin(request)
     if denied:
         return denied
-    from sincor2.webbuilder_studio import get_project, migration_status
+    from sincor2.webbuilder_studio import get_project
 
     p = get_project(project_id)
     if not p:
@@ -3626,4 +3627,3 @@ if __name__ == '__main__':
     # Never run debug in production
     debug = os.environ.get('FLASK_ENV') == 'development' and not os.environ.get('RAILWAY_ENVIRONMENT')
     app.run(host='0.0.0.0', port=port, debug=debug)  # nosec B104 — required for Railway deployment
-
