@@ -28,8 +28,8 @@ from datetime import datetime
 try:
     from agents.toa.orchestrator import TOAOrchestrator
     _TOA_AVAILABLE = True
-except ImportError as _toa_err:
-    logging.warning("TOA not importable: %s — router will use conservative defaults", _toa_err)
+except ImportError:
+    logging.warning("TOA not importable — router will use conservative defaults")
     TOAOrchestrator = None  # type: ignore[assignment,misc]
     _TOA_AVAILABLE = False
 
@@ -51,6 +51,15 @@ except ImportError:
 # Tighter than the old hardcoded 0.82 — driven by real simulation quality.
 # ---------------------------------------------------------------------------
 _MIN_CONFIDENCE = 0.65
+# Minimum position size used as denominator in quality scaling (prevents ÷0).
+_MIN_FEEDBACK_SIZE_USD = 1.0
+# Quality scale for TOA feedback: neutral at _QUALITY_NEUTRAL, bounds [min, max].
+_QUALITY_MIN = 1.0
+_QUALITY_MAX = 5.0
+_QUALITY_NEUTRAL = 3.0
+_QUALITY_SCALE_FACTOR = 2.0
+# Material PnL threshold above which self-funding wheels are triggered.
+_MATERIAL_PNL_THRESHOLD_USD = 50.0
 
 
 class PolyclawTOADecisionRouter:
@@ -76,7 +85,7 @@ class PolyclawTOADecisionRouter:
             "circuit_breaker_enabled": True,
             "renegade_circuit_name": "renegade_dark_pool",
         }
-        self.toa: Optional[Any] = TOAOrchestrator() if _TOA_AVAILABLE else None
+        self.toa: Optional["TOAOrchestrator"] = TOAOrchestrator() if _TOA_AVAILABLE else None  # type: ignore[name-defined]
         self.breaker: Optional[Any] = (
             CircuitBreaker(
                 name=self.config["renegade_circuit_name"],
@@ -263,9 +272,9 @@ class PolyclawTOADecisionRouter:
 
         # Always feed result back into TOA so the forecaster improves next cycle.
         if self.toa is not None:
-            size = max(abs(float(decision.get("size_usd") or 1.0)), 1.0)
-            # Quality 1–5: neutral at 3.0; scales with realised PnL / size.
-            quality = max(1.0, min(5.0, 3.0 + (pnl / size) * 2.0))
+            size = max(abs(float(decision.get("size_usd") or _MIN_FEEDBACK_SIZE_USD)), _MIN_FEEDBACK_SIZE_USD)
+            # Quality scale: neutral at _QUALITY_NEUTRAL; rises/falls with realised PnL / size.
+            quality = max(_QUALITY_MIN, min(_QUALITY_MAX, _QUALITY_NEUTRAL + (pnl / size) * _QUALITY_SCALE_FACTOR))
             self.toa.ingest_feedback({
                 "source": "polyclaw_execution",
                 "payload": {
@@ -277,7 +286,7 @@ class PolyclawTOADecisionRouter:
                 },
             })
 
-        if abs(pnl) > 50:
+        if abs(pnl) > _MATERIAL_PNL_THRESHOLD_USD:
             logger.info(
                 "[ROUTER] material PnL=%.2f — self-funding wheels (AccountingHub / "
                 "RehypothecationAdapter / IntentHookV2) queued for wiring",
