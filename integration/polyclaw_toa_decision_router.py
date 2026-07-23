@@ -276,7 +276,8 @@ class PolyclawTOADecisionRouter:
         # Always feed result back into TOA so the forecaster improves next cycle.
         if self.toa is not None:
             size = max(abs(float(decision.get("size_usd", 0.0))), _MIN_FEEDBACK_SIZE_USD)
-            # Quality scale: neutral at _QUALITY_NEUTRAL; rises/falls with realised PnL / size.
+            # Quality scale: neutral at _QUALITY_NEUTRAL; each +50%/-50% realised
+            # PnL versus position size shifts quality by ±1 point before clamping.
             quality = max(_QUALITY_MIN, min(_QUALITY_MAX, _QUALITY_NEUTRAL + (pnl / size) * _QUALITY_SCALE_FACTOR))
             self.toa.ingest_feedback({
                 "source": "polyclaw_execution",

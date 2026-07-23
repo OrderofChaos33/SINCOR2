@@ -37,7 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger('sincor2')
 
 
-def _fiat_payments_disabled() -> bool:
+def _fiat_payments_unavailable() -> bool:
     return False
 
 
@@ -295,7 +295,7 @@ try:
 except Exception as e:
     logger.warning(f"[PAYMENTS] Platform payments init failed: {e}")
     PLATFORM_PAYMENTS_AVAILABLE = False
-    fiat_payments_enabled = _fiat_payments_disabled
+    fiat_payments_enabled = _fiat_payments_unavailable
 
 # Legacy Stripe — only when LEGACY_FIAT_PAYMENTS_ENABLED=true
 STRIPE_AVAILABLE = False
