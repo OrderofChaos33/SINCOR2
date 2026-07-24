@@ -18,9 +18,19 @@ FROM python:3.11-slim AS runtime
 WORKDIR /app
 
 # Install runtime dependencies only
+# libpango/libcairo/libgdk-pixbuf/libglib/libffi/libharfbuzz are required by
+# WeasyPrint (src/sincor2/pdf_generator.py) for PDF generation; without them
+# the app fails at startup with "OSError: cannot load library 'gobject-2.0-0'".
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf2.0-0 \
+    libglib2.0-0 \
+    libffi8 \
+    libharfbuzz0b \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
