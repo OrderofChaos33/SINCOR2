@@ -18,9 +18,18 @@ FROM python:3.11-slim AS runtime
 WORKDIR /app
 
 # Install runtime dependencies only
+# WeasyPrint requires: libpango, libcairo, libgdk-pixbuf, libglib, libffi, libharfbuzz
+# (imported in src/sincor2/pdf_generator.py for PDF generation)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf2.0-0 \
+    libglib2.0-0 \
+    libffi8 \
+    libharfbuzz0b \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -64,3 +73,4 @@ CMD ["/bin/sh", "-c", \
      --access-logfile - \
      --error-logfile - \
      --log-level info"]
+
