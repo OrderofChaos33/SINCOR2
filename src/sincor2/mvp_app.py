@@ -487,8 +487,11 @@ except Exception as e:
 def log_request():
     """Log incoming requests, record start time, enforce HTTPS in production."""
     g.start_time = time.time()
-    # Enforce HTTPS in production (Railway sets X-Forwarded-Proto)
-    if request.headers.get('X-Forwarded-Proto', 'https') == 'http':
+    # Enforce HTTPS in production (Railway sets X-Forwarded-Proto).
+    # Skip redirect for /health and /favicon.ico so Railway's internal health
+    # checker (which hits the container over plain HTTP) always gets a 200.
+    if request.path not in ('/health', '/favicon.ico') and \
+            request.headers.get('X-Forwarded-Proto', 'https') == 'http':
         url = request.url.replace('http://', 'https://', 1)
         return redirect(url, code=301)
     if request.path not in ('/health', '/favicon.ico'):

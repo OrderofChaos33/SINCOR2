@@ -22,6 +22,8 @@ except ImportError:
     logger.warning("Polyclaw earning scheduler not available yet")
     POLYCLAW_EARNING_ENABLED = False
 
+_scheduler = None
+
 
 def run_daily_ops():
     """Existing daily operations - now includes Polyclaw earning machine."""
@@ -42,6 +44,47 @@ def run_daily_ops():
         logger.info("Polyclaw earning machine not yet enabled")
 
     logger.info("Daily operations complete")
+
+
+def start_daily_ops_scheduler(app=None):
+    """Start the daily ops background scheduler.
+
+    Returns a BackgroundScheduler instance (or None if APScheduler is absent).
+    """
+    global _scheduler
+
+    if _scheduler is not None:
+        return _scheduler
+
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+    except ImportError:
+        logger.warning("[DAILY_OPS] APScheduler not installed — daily ops disabled")
+        return None
+
+    scheduler = BackgroundScheduler(daemon=True)
+    scheduler.add_job(
+        run_daily_ops,
+        trigger=CronTrigger(hour=6, minute=0),  # 06:00 UTC daily
+        id="daily_ops",
+        max_instances=1,
+        coalesce=True,
+        replace_existing=True,
+    )
+    scheduler.start()
+    _scheduler = scheduler
+    logger.info("[DAILY_OPS] Daily ops scheduler started (06:00 UTC)")
+    return scheduler
+
+
+def stop_daily_ops_scheduler():
+    """Stop the daily ops scheduler if running."""
+    global _scheduler
+    if _scheduler and _scheduler.running:
+        _scheduler.shutdown(wait=False)
+        logger.info("[DAILY_OPS] Daily ops scheduler stopped")
+    _scheduler = None
 
 
 if __name__ == "__main__":
