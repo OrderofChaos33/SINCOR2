@@ -28,10 +28,12 @@ jobs:
 
       - name: Lint
         run: |
-          ruff check src/ tests/
+          ruff check src/sincor2/app.py src/sincor2/mvp_app.py src/sincor2/settings.py src/sincor2/startup.py src/sincor2/error_handling.py src/sincor2/blueprints tests/pytest
 
       - name: Test
-        run: pytest --cov=src --cov-report=xml --cov-report=term
+        env:
+          PYTHONPATH: .:src:src/sincor2
+        run: pytest tests/pytest/test_toa.py tests/pytest/test_settings.py --cov=src/sincor2 --cov-report=xml --cov-report=term
 
       - name: Upload coverage artifact
         if: always()

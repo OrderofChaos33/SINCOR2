@@ -290,7 +290,7 @@ try:
 except Exception as e:
     logger.warning(f"[PAYMENTS] Platform payments init failed: {e}")
     PLATFORM_PAYMENTS_AVAILABLE = False
-    fiat_payments_enabled = lambda: False  # type: ignore
+    fiat_payments_enabled = lambda: False  # noqa: E731
 
 # Legacy Stripe — only when LEGACY_FIAT_PAYMENTS_ENABLED=true
 STRIPE_AVAILABLE = False
@@ -456,7 +456,6 @@ except Exception as e:
 # DeFi Execution Engine — Arbitrage + Liquidations + Flash Loans + HFQ
 try:
     import threading
-    from pathlib import Path
     defi_engine_script = Path(__file__).parent.parent.parent / ".." / ".openclaw" / "workspace" / "defi_execution_engine.py"
     if defi_engine_script.exists():
         logger.info("[DEFI] DeFi Execution Engine: INITIALIZING")
@@ -551,7 +550,7 @@ def sanitize_string(value, max_length=200):
 # DATABASE SETUP (SQLite for orders)
 # ============================================================================
 
-from sincor2.data_paths import migrate_legacy_orders_db, orders_db_path
+from sincor2.data_paths import migrate_legacy_orders_db  # noqa: E402
 
 DB_PATH = str(migrate_legacy_orders_db())
 
@@ -2323,7 +2322,7 @@ def api_webbuilder_project_get(project_id):
     denied = _require_admin(request)
     if denied:
         return denied
-    from sincor2.webbuilder_studio import get_project, migration_status
+    from sincor2.webbuilder_studio import get_project
 
     p = get_project(project_id)
     if not p:

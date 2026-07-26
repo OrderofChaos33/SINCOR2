@@ -9,7 +9,7 @@ os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
 os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_123456789012345678901234567890")
 
-import pytest
+import pytest  # noqa: E402
 
 
 class MockStripeCheckout:
