@@ -102,7 +102,7 @@ def treasury_snapshot() -> dict:
 
 # ---------------------------------------------------------------- dispatch
 
-def llm_dispatch(envelope: dict) -> dict | None:
+def llm_dispatch(envelope: dict) -> "dict | None":
     """POST to an OpenAI-compatible worker if configured. None when unconfigured."""
     endpoint = os.environ.get("SINCOR_LLM_ENDPOINT")
     if not endpoint:
