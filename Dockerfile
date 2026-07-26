@@ -1,4 +1,5 @@
 # Multi-stage build for production (small, secure, fast, Railway-ready)
+# CACHE BUST 2026-07-26-v2 — force fresh pip layer after WeasyPrint removal
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -10,7 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy requirements and install to user directory (cached layer)
 COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+# Explicitly ensure WeasyPrint is never present even if a stale wheel exists
+RUN pip install --user --no-cache-dir -r requirements.txt \
+    && pip uninstall -y weasyprint 2>/dev/null || true
 
 # Production runtime stage
 FROM python:3.11-slim AS runtime

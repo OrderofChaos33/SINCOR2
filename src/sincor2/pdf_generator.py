@@ -3,142 +3,97 @@ SINCOR PDF Generation Module
 
 Generates tier-specific training guide PDFs on-demand.
 Supports: Starter (30 pages), Professional (60 pages), Enterprise (120+ pages)
-Uses: ReportLab for reliable PDF generation with optional WeasyPrint fallback.
+Uses ReportLab only. WeasyPrint is intentionally NOT imported — it requires
+system libs (gobject/pango/cairo) that are absent on python:*-slim and was
+crashing gunicorn workers with OSError during import.
 """
 
-import os
-import io
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple
 
 logger = logging.getLogger('sincor2.pdf')
 
-# Try to import PDF libraries in order of preference.
-# Broad except: WeasyPrint (and some ReportLab backends) raise OSError when
-# shared libraries are missing on slim images. That must NOT kill app import.
+# ReportLab only. Never import weasyprint at module level.
+REPORTLAB_AVAILABLE = False
+WEASYPRINT_AVAILABLE = False  # permanently disabled for Railway slim compatibility
+
 try:
-    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, Image as RLImage
+    from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib import colors
     from reportlab.pdfgen import canvas
     REPORTLAB_AVAILABLE = True
 except Exception as e:
-    REPORTLAB_AVAILABLE = False
     logger.warning("[PDF] ReportLab unavailable: %s", e)
-
-try:
-    from weasyprint import HTML, CSS
-    WEASYPRINT_AVAILABLE = True
-except Exception as e:
-    WEASYPRINT_AVAILABLE = False
-    logger.warning("[PDF] WeasyPrint unavailable (expected on slim images): %s", e)
 
 
 class TrainingGuideGenerator:
     """Generate tier-specific training guide PDFs."""
 
     def __init__(self, output_dir: str = None):
-        """Initialize PDF generator with output directory."""
         if output_dir is None:
-            # Default to project root /files/guides/
             project_root = Path(__file__).parent.parent.parent
             output_dir = project_root / 'files' / 'guides'
 
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"[PDF] Output directory: {self.output_dir}")
+        logger.info("[PDF] Output directory: %s (reportlab=%s)", self.output_dir, REPORTLAB_AVAILABLE)
 
     def generate_starter_guide(self, order_id: str) -> Tuple[str, int]:
-        """
-        Generate 30-page Starter tier training guide.
-
-        Returns:
-            (filepath, page_count)
-        """
         filename = f"sincor-starter-guide-{order_id}.pdf"
         filepath = self.output_dir / filename
-
         content = self._get_starter_guide_content()
         return self._generate_pdf(filepath, "SINCOR Starter Guide", content, 30)
 
     def generate_professional_guide(self, order_id: str) -> Tuple[str, int]:
-        """
-        Generate 60-page Professional tier training guide.
-
-        Returns:
-            (filepath, page_count)
-        """
         filename = f"sincor-professional-guide-{order_id}.pdf"
         filepath = self.output_dir / filename
-
         content = self._get_professional_guide_content()
         return self._generate_pdf(filepath, "SINCOR Professional Guide", content, 60)
 
     def generate_enterprise_guide(self, order_id: str) -> Tuple[str, int]:
-        """
-        Generate 120+ page Enterprise tier training guide.
-
-        Returns:
-            (filepath, page_count)
-        """
         filename = f"sincor-enterprise-guide-{order_id}.pdf"
         filepath = self.output_dir / filename
-
         content = self._get_enterprise_guide_content()
         return self._generate_pdf(filepath, "SINCOR Enterprise Guide", content, 120)
 
     def generate_quickstart_checklist(self, order_id: str) -> Tuple[str, int]:
-        """
-        Generate 1-page quick-start checklist.
-
-        Returns:
-            (filepath, page_count)
-        """
         filename = f"quickstart-checklist-{order_id}.pdf"
         filepath = self.output_dir / filename
-
         content = self._get_quickstart_content()
         return self._generate_pdf(filepath, "30-Day Quick-Start Checklist", content, 1)
 
     def _generate_pdf(self, filepath: Path, title: str, content: str, expected_pages: int) -> Tuple[str, int]:
-        """Generate PDF from HTML/text content."""
         try:
             if REPORTLAB_AVAILABLE:
                 return self._generate_with_reportlab(filepath, title, content, expected_pages)
-            elif WEASYPRINT_AVAILABLE:
-                return self._generate_with_weasyprint(filepath, title, content, expected_pages)
-            else:
-                # Fallback: create placeholder PDF
-                return self._generate_placeholder_pdf(filepath, title)
+            return self._generate_placeholder_pdf(filepath, title)
         except Exception as e:
-            logger.error(f"[PDF] Error generating {filepath.name}: {e}")
+            logger.error("[PDF] Error generating %s: %s", filepath.name, e)
             raise
 
     def _generate_with_reportlab(self, filepath: Path, title: str, content: str, expected_pages: int) -> Tuple[str, int]:
-        """Generate PDF using ReportLab library."""
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
         from reportlab.lib.units import inch
         from reportlab.lib.pagesizes import letter
 
-        # Create PDF document
         doc = SimpleDocTemplate(
             str(filepath),
             pagesize=letter,
-            rightMargin=0.75*inch,
-            leftMargin=0.75*inch,
-            topMargin=1*inch,
-            bottomMargin=0.75*inch,
-            title=title
+            rightMargin=0.75 * inch,
+            leftMargin=0.75 * inch,
+            topMargin=1 * inch,
+            bottomMargin=0.75 * inch,
+            title=title,
         )
 
-        # Define styles
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -147,9 +102,8 @@ class TrainingGuideGenerator:
             textColor=colors.HexColor('#667eea'),
             spaceAfter=30,
             alignment=TA_CENTER,
-            fontName='Helvetica-Bold'
+            fontName='Helvetica-Bold',
         )
-
         heading_style = ParagraphStyle(
             'CustomHeading',
             parent=styles['Heading2'],
@@ -157,154 +111,56 @@ class TrainingGuideGenerator:
             textColor=colors.HexColor('#764ba2'),
             spaceAfter=12,
             spaceBefore=12,
-            fontName='Helvetica-Bold'
+            fontName='Helvetica-Bold',
         )
-
         body_style = ParagraphStyle(
             'CustomBody',
             parent=styles['BodyText'],
             fontSize=11,
             alignment=TA_JUSTIFY,
             spaceAfter=12,
-            leading=14
+            leading=14,
         )
 
-        # Build content
         story = []
         story.append(Paragraph(title, title_style))
         story.append(Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y')}", styles['Normal']))
         story.append(Spacer(1, 20))
 
-        # Parse content and add to story
         sections = content.split('\n\n')
         for section in sections:
             section = section.strip()
             if not section:
                 continue
-
             if section.startswith('# '):
-                # Heading
-                heading_text = section[2:].strip()
-                story.append(Paragraph(heading_text, heading_style))
+                story.append(Paragraph(section[2:].strip(), heading_style))
             elif section.startswith('## '):
-                # Subheading
-                subheading_text = section[3:].strip()
-                story.append(Paragraph(subheading_text, heading_style))
+                story.append(Paragraph(section[3:].strip(), heading_style))
             else:
-                # Body text
                 story.append(Paragraph(section, body_style))
-
             story.append(Spacer(1, 10))
 
-        # Build PDF
         doc.build(story)
-        logger.info(f"[PDF] Generated: {filepath.name} ({expected_pages} pages)")
-
-        return str(filepath), expected_pages
-
-    def _generate_with_weasyprint(self, filepath: Path, title: str, content: str, expected_pages: int) -> Tuple[str, int]:
-        """Generate PDF using WeasyPrint library."""
-        from weasyprint import HTML
-
-        # Create HTML wrapper
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>{title}</title>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    max-width: 8.5in;
-                    margin: 0.5in;
-                }}
-                h1 {{
-                    color: #667eea;
-                    font-size: 28pt;
-                    text-align: center;
-                    margin-top: 0;
-                }}
-                h2 {{
-                    color: #764ba2;
-                    font-size: 16pt;
-                    margin-top: 20px;
-                    page-break-after: avoid;
-                }}
-                p {{
-                    text-align: justify;
-                    margin-bottom: 12px;
-                }}
-                .timestamp {{
-                    text-align: center;
-                    font-size: 10pt;
-                    color: #999;
-                    margin-bottom: 20px;
-                }}
-                page-break {{
-                    page-break-after: always;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>{title}</h1>
-            <div class="timestamp">Generated on {datetime.now().strftime('%B %d, %Y')}</div>
-            <div class="content">
-                {self._convert_markdown_to_html(content)}
-            </div>
-        </body>
-        </html>
-        """
-
-        HTML(string=html_content).write_pdf(str(filepath))
-        logger.info(f"[PDF] Generated: {filepath.name} ({expected_pages} pages)")
-
+        logger.info("[PDF] Generated: %s (%s pages)", filepath.name, expected_pages)
         return str(filepath), expected_pages
 
     def _generate_placeholder_pdf(self, filepath: Path, title: str) -> Tuple[str, int]:
-        """Generate minimal placeholder PDF when no library available."""
         try:
-            from reportlab.pdfgen import canvas
+            from reportlab.pdfgen import canvas as rl_canvas
             from reportlab.lib.pagesizes import letter
 
-            c = canvas.Canvas(str(filepath), pagesize=letter)
+            c = rl_canvas.Canvas(str(filepath), pagesize=letter)
             c.drawString(100, 750, title)
             c.drawString(100, 700, "This is a placeholder PDF.")
             c.drawString(100, 680, "PDF generation infrastructure is being set up.")
             c.save()
-
-            logger.warning(f"[PDF] Generated placeholder: {filepath.name}")
+            logger.warning("[PDF] Generated placeholder: %s", filepath.name)
             return str(filepath), 1
         except Exception as e:
-            logger.error(f"[PDF] Could not generate even placeholder: {e}")
+            logger.error("[PDF] Could not generate even placeholder: %s", e)
             raise
 
-    def _convert_markdown_to_html(self, content: str) -> str:
-        """Convert simple markdown to HTML."""
-        import re
-
-        html = content
-
-        # Convert headings
-        html = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
-        html = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
-
-        # Convert bold
-        html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html)
-
-        # Convert paragraphs (double newline = new paragraph)
-        paragraphs = html.split('\n\n')
-        html = ''.join(f'<p>{p.strip()}</p>' if p.strip() and not p.strip().startswith('<') else p
-                      for p in paragraphs)
-
-        return html
-
-    # ========== GUIDE CONTENT METHODS ==========
-
     def _get_starter_guide_content(self) -> str:
-        """Content for 30-page Starter guide."""
         return """
 # SINCOR Starter Guide: Quick 30-Day Setup
 
@@ -420,7 +276,6 @@ Your dashboard shows real-time metrics for your top 3 agents.
 """
 
     def _get_professional_guide_content(self) -> str:
-        """Content for 60-page Professional guide."""
         return """
 # SINCOR Professional Guide: 12-Week Multi-Agent Deployment
 
@@ -553,7 +408,6 @@ Ready for Enterprise features?
 """
 
     def _get_enterprise_guide_content(self) -> str:
-        """Content for 120+ page Enterprise guide."""
         return """
 # SINCOR Enterprise Guide: Complete White-Label Deployment
 
@@ -761,7 +615,6 @@ Your single point of contact for:
 """
 
     def _get_quickstart_content(self) -> str:
-        """Content for 1-page quick-start checklist."""
         return """
 # 30-Day Quick-Start Checklist
 
