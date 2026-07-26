@@ -780,9 +780,9 @@ def polyclaw_status():
     try:
         from pathlib import Path
         trades_log = Path.home() / ".openclaw" / "workspace" / "polyclaw_trades.jsonl"
-        
+
         scheduler_running = polyclaw_scheduler is not None and polyclaw_scheduler.running if polyclaw_scheduler else False
-        
+
         total_trades = 0
         total_profit = 0.0
         if trades_log.exists():
@@ -791,7 +791,7 @@ def polyclaw_status():
                     trade = json.loads(line)
                     total_trades += 1
                     total_profit += trade.get('net_profit_percent', 0)
-        
+
         return jsonify({
             'enabled': os.getenv('POLYCLAW_ENABLED', 'true').lower() == 'true',
             'scheduler_running': scheduler_running,

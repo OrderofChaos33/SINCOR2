@@ -141,7 +141,7 @@ app.template_folder = 'templates'
 try:
     from sincor2.stripe_routes import init_stripe_routes
     from sincor2.stripe_checkout import StripeCheckout
-    
+
     stripe_processor = StripeCheckout()
     init_stripe_routes(app, stripe_processor)
     print("✓ Stripe routes initialized")
