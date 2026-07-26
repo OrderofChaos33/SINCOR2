@@ -461,7 +461,6 @@ except Exception as e:
 # DeFi Execution Engine — Arbitrage + Liquidations + Flash Loans + HFQ
 try:
     import threading
-    from pathlib import Path
     defi_engine_script = Path(__file__).parent.parent.parent / ".." / ".openclaw" / "workspace" / "defi_execution_engine.py"
     if defi_engine_script.exists():
         logger.info("[DEFI] DeFi Execution Engine: INITIALIZING")
