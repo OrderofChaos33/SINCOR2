@@ -32,12 +32,14 @@ from datetime import datetime
 # Production imports
 try:
     from integration.polyclaw_toa_decision_router import run_polyclaw_earning_cycle
-except ImportError:
-    print("[FATAL] integration.polyclaw_toa_decision_router not found. Run the resilience push first.")
-    exit(1)
+except ImportError as _e:
+    raise ImportError(
+        "integration.polyclaw_toa_decision_router not found. "
+        "Ensure the integration/ directory is present in your PYTHONPATH."
+    ) from _e
 
 try:
-    from src.sincor2.production_logger import get_logger
+    from sincor2.production_logger import get_logger
     logger = get_logger(__name__)
 except ImportError:
     logging.basicConfig(level=logging.INFO)
