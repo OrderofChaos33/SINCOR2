@@ -52,7 +52,7 @@ USER appuser
 
 # Healthcheck (assumes /health endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
+    CMD ["/bin/sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
 
 # Run with Gunicorn via sh so Railway's $PORT env var is expanded.
 # (JSON exec form passes "$PORT" literally -> gunicorn aborts with
