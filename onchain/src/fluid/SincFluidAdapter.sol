@@ -250,6 +250,7 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     }
 
     function setCompliance(address guard) external onlyGuardian {
+        require(guard == address(0) || guard.code.length != 0, "compliance must be contract");
         compliance = IComplianceGuard(guard);
         emit ComplianceUpdated(guard);
     }
