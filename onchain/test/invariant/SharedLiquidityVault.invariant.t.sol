@@ -113,7 +113,11 @@ contract VaultHandler is Test {
         uint256 drawn = vault.outstanding(lp, sids[i], address(t));
         if (drawn == 0) return;
         uint256 unit = address(t) == address(usdc) ? 1e6 : 1e18;
-        uint256 fee = bound(feeSeed, 0, 10_000 * unit);
+        uint256 bal = t.balanceOf(hooks[i]);
+        uint256 maxFee = bal > drawn ? bal - drawn : 0;
+        uint256 feeCap = 10_000 * unit;
+        if (maxFee < feeCap) feeCap = maxFee;
+        uint256 fee = bound(feeSeed, 0, feeCap);
         vm.prank(hooks[i]);
         vault.settleUp(sids[i], lp, address(t), drawn, fee, 500);
         ghostOutstanding[address(t)] -= drawn;
