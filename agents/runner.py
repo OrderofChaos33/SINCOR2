@@ -164,8 +164,11 @@ def main() -> None:
     args = set(sys.argv[1:])
     force_task = None
     if "--task" in sys.argv:
-        force_task = sys.argv[sys.argv.index("--task") + 1]
-
+        i = sys.argv.index("--task")
+        if i + 1 >= len(sys.argv):
+            print("error: --task requires a task id", file=sys.stderr)
+            sys.exit(2)
+        force_task = sys.argv[i + 1]
     if "--metrics" in args:
         snap = treasury_snapshot()
         ledger_write({"type": "metrics", **snap})
