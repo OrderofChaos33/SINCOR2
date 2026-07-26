@@ -59,8 +59,12 @@ def start_daily_ops_scheduler(app=None):
         logger.warning("[DAILY_OPS] APScheduler not installed — daily ops loop not started")
         return None
 
-    hour = int(os.environ.get("DAILY_OPS_HOUR", "6"))
-    minute = int(os.environ.get("DAILY_OPS_MINUTE", "0"))
+    try:
+        hour = max(0, min(23, int(os.environ.get("DAILY_OPS_HOUR", "6"))))
+        minute = max(0, min(59, int(os.environ.get("DAILY_OPS_MINUTE", "0"))))
+    except (ValueError, TypeError):
+        logger.warning("[DAILY_OPS] Invalid DAILY_OPS_HOUR/MINUTE — using defaults 06:00")
+        hour, minute = 6, 0
 
     _scheduler = BackgroundScheduler(daemon=True)
     _scheduler.add_job(
