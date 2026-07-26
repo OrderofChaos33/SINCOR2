@@ -3,7 +3,7 @@ SINCOR PDF Generation Module
 
 Generates tier-specific training guide PDFs on-demand.
 Supports: Starter (30 pages), Professional (60 pages), Enterprise (120+ pages)
-Uses: ReportLab for reliable PDF generation with fallback to WeasyPrint
+Uses: ReportLab for reliable PDF generation with optional WeasyPrint fallback.
 """
 
 import os
@@ -15,7 +15,9 @@ from typing import Tuple, Optional
 
 logger = logging.getLogger('sincor2.pdf')
 
-# Try to import PDF libraries in order of preference
+# Try to import PDF libraries in order of preference.
+# Broad except: WeasyPrint (and some ReportLab backends) raise OSError when
+# shared libraries are missing on slim images. That must NOT kill app import.
 try:
     from reportlab.lib.pagesizes import letter, A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -25,16 +27,16 @@ try:
     from reportlab.lib import colors
     from reportlab.pdfgen import canvas
     REPORTLAB_AVAILABLE = True
-except ImportError:
+except Exception as e:
     REPORTLAB_AVAILABLE = False
-    logger.warning("[PDF] ReportLab not installed, PDF generation will use fallback")
+    logger.warning("[PDF] ReportLab unavailable: %s", e)
 
 try:
     from weasyprint import HTML, CSS
     WEASYPRINT_AVAILABLE = True
-except ImportError:
+except Exception as e:
     WEASYPRINT_AVAILABLE = False
-    logger.warning("[PDF] WeasyPrint not installed")
+    logger.warning("[PDF] WeasyPrint unavailable (expected on slim images): %s", e)
 
 
 class TrainingGuideGenerator:

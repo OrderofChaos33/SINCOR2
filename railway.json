@@ -4,8 +4,9 @@
     "builder": "DOCKERFILE"
   },
   "deploy": {
+    "startCommand": "gunicorn sincor2.mvp_app:app --bind 0.0.0.0:${PORT:-8080} --workers 2 --worker-class sync --timeout 180 --preload --access-logfile - --error-logfile - --log-level info",
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 90,
+    "healthcheckTimeout": 180,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
