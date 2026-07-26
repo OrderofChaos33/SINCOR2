@@ -145,13 +145,15 @@ def run_task(dept_cfg: dict, dept_name: str, task: dict, force: bool, state: dic
         "kpis": task["kpis"],
         "treasury": treasury_snapshot() if "metrics" in task["id"] or dept_name == "toa" else None,
     }
-    (OUTBOX / f"{task['id']}-{int(now())}.json").write_text(json.dumps(envelope, indent=2))
+    envelope_path = OUTBOX / f"{task['id']}-{int(now())}.json"
+    envelope_path.write_text(json.dumps(envelope, indent=2))
 
     status = "queued"
     try:
         resp = llm_dispatch(envelope)
         if resp is not None:
             (RESULTS / f"{task['id']}-{int(now())}.json").write_text(json.dumps(resp, indent=2))
+            envelope_path.unlink()
             status = "dispatched"
     except Exception as e:
         status = f"dispatch_error: {e}"
