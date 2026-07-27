@@ -412,9 +412,9 @@ def _process_payment_event(event_data):
     @stripe_bp.route('/dashboard', methods=['GET'])
     def revenue_dashboard():
         """Get real-time revenue metrics"""
-        if not ORCHESTRATOR_AVAILABLE or not orchestrator:
+        if not ORCHESTRATOR_AVAILABLE or not get_orchestrator:
             return jsonify({'error': 'Revenue orchestrator not available'}), 503
         
-        dashboard_data = orchestrator.get_dashboard_data()
+        dashboard_data = get_orchestrator.get_dashboard_data()
         return jsonify(dashboard_data), 200
 

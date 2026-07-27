@@ -315,7 +315,7 @@ def get_recursive_optimizer(
 
 
 # Integration helper for app startup / existing schedulers
- def integrate_with_app(app: Any, hitl: Any = None, toa: Any = None, meta: Any = None) -> None:
+def integrate_with_app(app: Any, hitl: Any = None, toa: Any = None, meta: Any = None) -> None:
     """Call from startup.py or app factory to wire the optimizer. Non-breaking."""
     opt = get_recursive_optimizer(hitl_protocol=hitl, toa_orchestrator=toa, meta_optimizer=meta)
     if opt.enabled:
