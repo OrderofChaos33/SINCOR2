@@ -1,9 +1,4 @@
-"""Safe PDF entrypoint — never crash gunicorn on import.
-
-Railway Metal can serve a stale snapshot where pdf_generator still does
-`from weasyprint import ...`. This wrapper absorbs that failure so
-/health stays up. PDF routes return 503 until a clean image ships.
-"""
+"""Safe PDF entrypoint — never crash gunicorn on import. FORCE 2026-07-27-v5"""
 
 from __future__ import annotations
 
@@ -17,12 +12,12 @@ try:
     def get_pdf_generator(output_dir: str | None = None):
         return _real_get_pdf_generator(output_dir)
 
-    logger.info("[PDF] ReportLab generator loaded via pdf_loader")
-except Exception as exc:  # noqa: BLE001 — must never kill worker boot
+    logger.info("[PDF] ReportLab generator loaded via pdf_loader (v5)")
+except Exception as exc:  # noqa: BLE001
     logger.warning("[PDF] generator import failed (non-fatal): %s", exc)
 
     def get_pdf_generator(output_dir: str | None = None):  # type: ignore[misc]
         raise RuntimeError(
             f"PDF generator unavailable: {exc}. "
-            "Redeploy with a clean image (no WeasyPrint)."
+            "Set Railway NO_CACHE=1 and redeploy for a clean image."
         ) from exc
