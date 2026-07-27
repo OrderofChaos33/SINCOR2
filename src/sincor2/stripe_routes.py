@@ -415,6 +415,7 @@ def _process_payment_event(event_data):
         if not ORCHESTRATOR_AVAILABLE or not get_orchestrator:
             return jsonify({'error': 'Revenue orchestrator not available'}), 503
         
-        dashboard_data = get_orchestrator.get_dashboard_data()
+        _orch = get_orchestrator()
+        dashboard_data = _orch.get_dashboard_data()
         return jsonify(dashboard_data), 200
 
