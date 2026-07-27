@@ -3,6 +3,7 @@
 # (lands PR #80 dep upgrades; keeps PyJWT 2.13.0 from #73 + py-clob-client)
 # 2026-07-26: removed WeasyPrint (ReportLab is primary; WeasyPrint needs system
 # libs that break slim Railway images and was killing gunicorn import)
+# 2026-07-27-v4: cachebust marker — do not re-add weasyprint
 # ============================================================================
 # Core Framework
 Flask==3.0.3
@@ -77,9 +78,3 @@ pyyaml==6.0.2
 pyaml==26.7.0
 python-slugify==8.0.4
 tenacity==9.0.0
-
-# Optional forecasting (uncomment for full TOA GPU/Nixtla)
-# statsforecast
-# neuralforecast
-# nixtla
-# darts

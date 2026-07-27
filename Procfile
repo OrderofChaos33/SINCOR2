@@ -1,1 +1,1 @@
-web: python -m gunicorn sincor2.mvp_app:app --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 180 --access-logfile - --error-logfile - --log-level info
+web: rm -rf /home/appuser/.local/lib/python3.11/site-packages/weasyprint* 2>/dev/null; python -m gunicorn sincor2.mvp_app:app --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 180 --access-logfile - --error-logfile - --log-level info
