@@ -1304,6 +1304,11 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 
+def create_app():
+    """Application factory for testing and programmatic use."""
+    return app
+
+
 # ==================== MAIN ====================
 
 if __name__ == '__main__':

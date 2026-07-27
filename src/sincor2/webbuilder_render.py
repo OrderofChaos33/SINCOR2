@@ -44,6 +44,8 @@ def build_site_html(project: dict, discovery: dict[str, Any], lane: str = "draft
 
     phone_cta = f'<a class="cta secondary" href="tel:{_esc(phone.replace(" ", ""))}">Call now</a>' if phone else ""
 
+    noindex_tag = '<meta name="robots" content="noindex, nofollow">' if is_preview else ""
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,7 +53,7 @@ def build_site_html(project: dict, discovery: dict[str, Any], lane: str = "draft
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{_esc(name)}</title>
   <meta name="description" content="{_esc(snippet[:160])}">
-  {"<meta name=\"robots\" content=\"noindex, nofollow\">" if is_preview else ""}
+  {noindex_tag}
   <meta property="og:title" content="{_esc(name)}">
   <meta property="og:description" content="{_esc(snippet[:160])}">
   <script type="application/ld+json">{json.dumps({
