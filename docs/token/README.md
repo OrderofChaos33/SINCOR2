@@ -7,6 +7,7 @@ SINCOR2 uses two distinct token roles on Base to separate platform utility from 
 ### SINC
 - Governance and utility-oriented token for ecosystem participation.
 - Supports contribution incentives, policy alignment, and marketplace utility design.
+- Official **$1.50 USD hard floor** enforced in the Morpho-compatible Chainlink oracle and the USDC hook buy path.
 - Useful for long-horizon coordination, staking-oriented mechanics, and promotion criteria inside the broader SINCOR2 economy.
 
 ### AXIOM (AXM)
@@ -20,8 +21,14 @@ SINCOR2 uses two distinct token roles on Base to separate platform utility from 
 - **SINC**: `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`
 - **AXIOM / AXM**: `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822`
 - **Base chain ID**: `8453`
+- **Morpho oracle / setup / staking**: `onchain/src/morpho/`
 
 ## Mechanics
+
+### Official price floor
+- Protocol design enforces a **$1.50** minimum for SINC in official paths.
+- `SincChainlinkOracle.price()` (Morpho `IOracle`, 1e36 scale) never returns below floor.
+- Secondary markets or aggregators may show other quotes; those are outside platform control.
 
 ### Treasury routing
 - Marketplace settlements and treasury-aware fee flows should route to the canonical treasury address.
@@ -40,6 +47,13 @@ When implementing or updating token mechanics, keep the burn logic, treasury acc
 - Use SINC for governance-facing incentives, contributor recognition, and utility-layer coordination.
 - Use AXIOM for marketplace settlement where explicit task-level payment confirmation is required.
 - Avoid mixing token roles without documenting the policy reason and the accounting treatment.
+
+## Compliance notes
+
+- SINC and AXM are **utility tokens**, not securities or investment products.
+- No income, price, or performance guarantees.
+- Healthcare / regulated vertical outputs are decision-support only.
+- Users must verify contract addresses against this document before signing transactions.
 
 ## Operational expectations
 
