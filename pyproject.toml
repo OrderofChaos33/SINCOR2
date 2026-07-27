@@ -47,8 +47,6 @@ dev = [
     "ruff==0.1.8",
     "mypy>=1.7.0",
     "isort>=5.13.0",
-    "ruff>=0.1.0",
-    "numpy>=1.24.0",
 ]
 
 [project.urls]
@@ -87,38 +85,6 @@ profile = "black"
 line_length = 100
 skip_gitignore = true
 known_first_party = ["sincor2"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py39"
-
-[tool.ruff.lint]
-# Ignore pre-existing violations; enable progressively as code is cleaned up
-ignore = [
-    "BLE001",  # blind exception catch
-    "C401",    # set comprehension
-    "DTZ003", "DTZ005", "DTZ006", "DTZ007", "DTZ011",  # datetime timezone
-    "E722",    # bare except
-    "EXE001",  # shebang present but not executable
-    "F401",    # unused imports
-    "F541",    # f-string without placeholders
-    "F811",    # redefinition of unused name
-    "F821",    # undefined name
-    "F841",    # local variable assigned but never used
-    "FA100",   # future annotations
-    "FURB136", "FURB157", "FURB167",  # refurb suggestions
-    "G201",    # logging.exception inside except
-    "I001",    # isort import order
-    "LOG014", "LOG015",  # logging call issues
-    "PERF102", # dict.items() micro-optimisation
-    "PIE796", "PIE810",  # misc improvements
-    "PLR1722", "PLW0602", "PLW1508", "PLW1510",  # pylint suggestions
-    "RUF010", "RUF012", "RUF013", "RUF015", "RUF017", "RUF019", "RUF022", "RUF046", "RUF059", "RUF100",  # ruff-specific
-    "S110",    # try-except-pass
-    "SIM102", "SIM103", "SIM115", "SIM117", "SIM118",  # simplification suggestions
-    "TRY002", "TRY203", "TRY401",  # try/except style
-    "UP006", "UP032", "UP035", "UP037", "UP045",  # pyupgrade suggestions
-]
 
 [tool.mypy]
 python_version = "3.9"

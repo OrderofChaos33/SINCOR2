@@ -78,13 +78,3 @@ pyyaml==6.0.2
 pyaml==26.7.0
 python-slugify==8.0.4
 tenacity==9.0.0
-<<<<<<< HEAD
-
-# Optional forecasting (uncomment for full TOA GPU/Nixtla)
-# statsforecast
-# neuralforecast
-# nixtla
-# darts
-
-=======
->>>>>>> origin/main

@@ -28,11 +28,7 @@ jobs:
 
       - name: Lint
         run: |
-<<<<<<< HEAD
-          flake8 src/ tests/ --select=E9,F821 --max-line-length=100
-=======
           ruff check src/sincor2/app.py src/sincor2/mvp_app.py src/sincor2/settings.py src/sincor2/startup.py src/sincor2/error_handling.py src/sincor2/blueprints tests/pytest
->>>>>>> origin/main
 
       - name: Test
         env:
