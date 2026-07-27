@@ -1,14 +1,12 @@
 # Railway config-as-code
-# CRITICAL: In the Railway dashboard service Variables, set:
-#   NO_CACHE=1
-# Then Deploy. Remove NO_CACHE after one successful healthy deploy.
+# To force a full rebuild on Metal, set service variable NO_CACHE=1 once, deploy, then remove it.
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [build.args]
-CACHEBUST = "20260727v5"
+CACHEBUST = "20260727v6"
 
 [deploy]
 healthcheckPath = "/health"
