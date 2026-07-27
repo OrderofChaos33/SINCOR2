@@ -1,5 +1,6 @@
 # Multi-stage build for production (small, secure, fast, Railway-ready)
-# CACHE BUST 2026-07-26-v2 — force fresh pip layer after WeasyPrint removal
+# CACHE BUST 2026-07-27-v3 — invalidate Metal builder snapshot after WeasyPrint crash
+ARG CACHEBUST=20260727v3
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -11,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy requirements and install to user directory (cached layer)
 COPY requirements.txt .
-# Explicitly ensure WeasyPrint is never present even if a stale wheel exists
+# ReportLab only — never install WeasyPrint (needs gobject/pango system libs)
 RUN pip install --user --no-cache-dir -r requirements.txt \
     && pip uninstall -y weasyprint 2>/dev/null || true
 
@@ -20,19 +21,10 @@ FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Install runtime dependencies only
-# WeasyPrint requires: libpango, libcairo, libgdk-pixbuf, libglib, libffi, libharfbuzz
-# (imported in src/sincor2/pdf_generator.py for PDF generation)
+# Minimal runtime deps (no WeasyPrint system libs needed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
-    libpango-1.0-0 \
-    libpangoft2-1.0-0 \
-    libcairo2 \
-    libgdk-pixbuf2.0-0 \
-    libglib2.0-0 \
-    libffi8 \
-    libharfbuzz0b \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -51,7 +43,9 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
     PORT=8080 \
     PIP_NO_CACHE_DIR=1
 
-# Copy application code
+# Copy application code (CACHEBUST forces this layer to rebuild)
+ARG CACHEBUST=20260727v3
+RUN echo "cachebust=${CACHEBUST}"
 COPY --chown=appuser:appuser . .
 
 # Create persistent data directory
@@ -61,20 +55,19 @@ RUN mkdir -p /data && chown -R appuser:appuser /data
 USER appuser
 
 # Healthcheck (assumes /health endpoint)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ.get('PORT', '8080'), timeout=5)" || exit 1
 
 # Run with Gunicorn via sh so Railway's $PORT env var is expanded.
-# --preload loads the app once in master (catches import errors early and
-# speeds worker start). Bind 0.0.0.0 so Railway healthcheck can reach it.
+# NO --preload: master would die if any worker import fails, and heavy
+# module-level schedulers delay port bind past healthcheck windows.
+# Single worker for faster first /health response on Railway Metal.
 CMD ["/bin/sh", "-c", \
      "gunicorn sincor2.mvp_app:app \
      --bind 0.0.0.0:${PORT} \
-     --workers 2 \
+     --workers 1 \
      --worker-class sync \
      --timeout 180 \
-     --preload \
      --access-logfile - \
      --error-logfile - \
      --log-level info"]
-
