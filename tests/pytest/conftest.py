@@ -1,4 +1,5 @@
 import os
+import pytest
 
 # Set test env before any sincor2 modules import (app.py calls create_app at import time).
 os.environ.setdefault("FLASK_ENV", "test")
@@ -8,8 +9,6 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-char-minimum-ok"
 os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
 os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_123456789012345678901234567890")
-
-import pytest
 
 
 class MockStripeCheckout:
