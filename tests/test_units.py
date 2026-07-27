@@ -268,17 +268,18 @@ test("Invalid credentials rejected", test_invalid_credentials)
 
 # ==================== SUMMARY ====================
 
-print("\n" + "="*60)
-print("SUMMARY")
-print("="*60)
-print(f"Total:  {passed + failed}")
-print(f"Passed: {passed}")
-print(f"Failed: {failed}")
-print("="*60 + "\n")
+if __name__ == '__main__':
+    print("\n" + "="*60)
+    print("SUMMARY")
+    print("="*60)
+    print(f"Total:  {passed + failed}")
+    print(f"Passed: {passed}")
+    print(f"Failed: {failed}")
+    print("="*60 + "\n")
 
-if failed > 0:
-    print("RESULT: FAILED")
-    sys.exit(1)
-else:
-    print("RESULT: PASSED")
-    sys.exit(0)
+    if failed > 0:
+        print("RESULT: FAILED")
+        sys.exit(1)
+    else:
+        print("RESULT: PASSED")
+        sys.exit(0)
