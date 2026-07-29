@@ -24,8 +24,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
-from sincor2.data_paths import migrate_legacy_orders_db
-from sincor2.pdf_generator import get_pdf_generator
+from sincor2.data_paths import data_dir, migrate_legacy_orders_db
+from sincor2.pdf_loader import get_pdf_generator
 from sincor2.email_sender import get_email_sender
 
 # Configure structured logging
@@ -319,7 +319,7 @@ if fiat_payments_enabled():
 else:
     logger.info("[APP] Stripe/PayPal disabled — use /buy with SINC or AXM")
 # PDF Generator initialization
-pdf_guides_dir = os.path.join(project_root, 'files', 'guides')
+pdf_guides_dir = str(data_dir() / 'files' / 'guides')
 try:
     pdf_generator = get_pdf_generator(pdf_guides_dir)
     logger.info(f"[PDF] PDF generator initialized for: {pdf_guides_dir}")
