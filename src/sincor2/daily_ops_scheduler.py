@@ -18,10 +18,9 @@ except ImportError:
     logger.warning("Polyclaw earning scheduler not available yet")
     POLYCLAW_EARNING_ENABLED = False
 
-from sincor2.scheduler import (
-    start_daily_ops_scheduler as start_daily_ops_scheduler,
-    stop_daily_ops_scheduler as stop_daily_ops_scheduler,
-)
+from sincor2.scheduler import start_daily_ops_scheduler, stop_daily_ops_scheduler
+
+__all__ = ["run_daily_ops", "start_daily_ops_scheduler", "stop_daily_ops_scheduler"]
 
 
 def run_daily_ops():
