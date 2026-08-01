@@ -409,7 +409,7 @@ try:
     if daily_ops_scheduler:
         _atexit_daily.register(stop_daily_ops_scheduler)
         logger.info("[DAILY_OPS] Daily ops scheduler started")
-except Exception as e:
+except BaseException as e:
     logger.warning(f"[DAILY_OPS] Scheduler init failed: {e}")
     daily_ops_scheduler = None
 
