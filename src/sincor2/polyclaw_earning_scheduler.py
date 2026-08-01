@@ -29,13 +29,6 @@ import os
 import logging
 from datetime import datetime
 
-# Production imports
-try:
-    from integration.polyclaw_toa_decision_router import run_polyclaw_earning_cycle
-except ImportError:
-    print("[FATAL] integration.polyclaw_toa_decision_router not found. Run the resilience push first.")
-    exit(1)
-
 try:
     from src.sincor2.production_logger import get_logger
     logger = get_logger(__name__)
@@ -43,10 +36,21 @@ except ImportError:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
+# Production imports
+try:
+    from integration.polyclaw_toa_decision_router import run_polyclaw_earning_cycle
+except BaseException as exc:
+    logger.warning(
+        "integration.polyclaw_toa_decision_router unavailable; "
+        "scheduled earning cycle disabled: %s",
+        exc,
+    )
+    run_polyclaw_earning_cycle = None
+
 try:
     from verticals.trading.polyclaw.core_agent import PolyclawCoreAgent
-except ImportError:
-    logger.error("PolyclawCoreAgent not importable. Check path.")
+except BaseException as exc:
+    logger.error("PolyclawCoreAgent not importable. Check path: %s", exc)
     PolyclawCoreAgent = None
 
 
@@ -85,6 +89,10 @@ def run_scheduled_cycle():
     This is what you schedule.
     """
     logger.info("=== Polyclaw Earning Cycle Starting ===")
+
+    if run_polyclaw_earning_cycle is None:
+        logger.warning("Polyclaw earning cycle skipped: decision router unavailable")
+        return {"status": "skipped", "reason": "decision_router_unavailable"}
 
     context = get_market_context()
 
