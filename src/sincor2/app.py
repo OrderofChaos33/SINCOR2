@@ -7,9 +7,10 @@ ADDED: Rate Limiting for DDoS protection
 """
 
 import os
+import uuid
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, make_response
+from flask import Flask, render_template, request, jsonify, send_file, make_response, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Load environment variables from .env file
@@ -131,11 +132,11 @@ except Exception as e:
     fulfillment_system = None
 
 # Initialize Flask app
-app = Flask(__name__)
+project_root = Path(__file__).resolve().parents[2]
+template_dir = project_root / "templates"
+static_dir = project_root / "static"
+app = Flask(__name__, template_folder=str(template_dir), static_folder=str(static_dir))
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-in-production')
-
-# Configure template folder
-app.template_folder = 'templates'
 
 # Initialize Stripe routes (MUST be after app creation, BEFORE other routes)
 try:
@@ -175,6 +176,19 @@ else:
     print("WARNING: Security Headers NOT available - vulnerable to XSS, clickjacking!")
 
 # Add COOP header for PayPal popup compatibility
+@app.before_request
+def attach_request_ids():
+    request_id = (
+        request.headers.get("X-Request-ID")
+        or request.headers.get("X-Correlation-ID")
+        or uuid.uuid4().hex
+    )
+    correlation_id = request.headers.get("X-Correlation-ID") or request_id
+    g.request_id = request_id
+    g.correlation_id = correlation_id
+    request.request_id = request_id
+
+
 @app.after_request
 def set_coop_header(response):
     """
@@ -183,6 +197,8 @@ def set_coop_header(response):
     Required for PayPal buttons to open payment popups properly.
     """
     response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
+    response.headers["X-Request-ID"] = getattr(g, "request_id", uuid.uuid4().hex)
+    response.headers["X-Correlation-ID"] = getattr(g, "correlation_id", response.headers["X-Request-ID"])
     return response
 
 # Initialize production logging
