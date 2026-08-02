@@ -5,7 +5,6 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "python -m gunicorn sincor2.mvp_app:app --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 180 --access-logfile - --error-logfile - --log-level info",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 180,
     "restartPolicyType": "ON_FAILURE",
