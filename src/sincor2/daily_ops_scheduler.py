@@ -14,7 +14,7 @@ except ImportError:
 try:
     from sincor2.polyclaw_earning_scheduler import run_scheduled_cycle
     POLYCLAW_EARNING_ENABLED = True
-except BaseException as exc:
+except (Exception, SystemExit) as exc:
     logger.warning("Polyclaw earning scheduler not available yet: %s", exc)
     POLYCLAW_EARNING_ENABLED = False
 

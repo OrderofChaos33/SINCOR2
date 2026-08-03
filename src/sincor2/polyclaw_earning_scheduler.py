@@ -30,7 +30,7 @@ import logging
 from datetime import datetime
 
 try:
-    from src.sincor2.production_logger import get_logger
+    from sincor2.production_logger import get_logger
     logger = get_logger(__name__)
 except ImportError:
     logging.basicConfig(level=logging.INFO)
@@ -39,7 +39,7 @@ except ImportError:
 # Production imports — graceful degradation so a missing integration never kills startup
 try:
     from integration.polyclaw_toa_decision_router import run_polyclaw_earning_cycle
-except BaseException as exc:
+except (Exception, SystemExit) as exc:
     logger.warning(
         "integration.polyclaw_toa_decision_router unavailable; "
         "scheduled earning cycle disabled: %s",
@@ -49,7 +49,7 @@ except BaseException as exc:
 
 try:
     from verticals.trading.polyclaw.core_agent import PolyclawCoreAgent
-except BaseException as exc:
+except (Exception, SystemExit) as exc:
     logger.error("PolyclawCoreAgent not importable. Check path: %s", exc)
     PolyclawCoreAgent = None
 
