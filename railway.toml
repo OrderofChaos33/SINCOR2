@@ -10,3 +10,9 @@ healthcheckPath = "/health"
 healthcheckTimeout = 180
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
+<<<<<<< HEAD
+=======
+# startCommand intentionally omitted — Dockerfile CMD already does correct
+# shell expansion of ${PORT}. Setting startCommand here was passing the
+# literal string "$PORT" to gunicorn and causing healthcheck failures.
+>>>>>>> origin/main

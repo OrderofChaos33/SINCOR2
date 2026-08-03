@@ -5,7 +5,10 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
+<<<<<<< HEAD
     "startCommand": "python -m gunicorn sincor2.mvp_app:app --config gunicorn.conf.py",
+=======
+>>>>>>> origin/main
     "healthcheckPath": "/health",
     "healthcheckTimeout": 180,
     "restartPolicyType": "ON_FAILURE",
