@@ -682,8 +682,9 @@ def _probe_database() -> tuple[bool, str]:
         with sqlite3.connect(DB_PATH, timeout=3) as conn:
             conn.execute('SELECT 1').fetchone()
         return True, 'ok'
-    except sqlite3.Error as exc:
-        return False, f'db_error:{exc}'
+    except sqlite3.Error:
+        logger.exception('[HEALTH] database probe failed')
+        return False, 'db_error'
 
 
 def _probe_jsonrpc(url: str, method: str = 'eth_chainId', timeout: int = 3) -> tuple[bool, str]:
@@ -697,8 +698,9 @@ def _probe_jsonrpc(url: str, method: str = 'eth_chainId', timeout: int = 3) -> t
         if result:
             return True, str(result)
         return False, 'missing_result'
-    except (urllib_error.URLError, TimeoutError, ValueError, OSError) as exc:
-        return False, f'rpc_error:{exc}'
+    except (urllib_error.URLError, TimeoutError, ValueError, OSError):
+        logger.exception('[HEALTH] jsonrpc probe failed')
+        return False, 'rpc_error'
 
 
 def _build_runtime_health_report(include_optional: bool = True) -> dict:
