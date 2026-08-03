@@ -82,6 +82,7 @@
   </div>
 </div>
 
+<script src="/static/js/sinc_wallet.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let checkout = null;
@@ -147,24 +148,8 @@ async function refreshQuote() {
 }
 
 async function connectWallet() {
-  if (!window.ethereum) {
-    showErr('No wallet detected. Install MetaMask or Rabby.');
-    return;
-  }
-  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-  if (chainId !== '0x2105') {
-    try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x2105' }],
-      });
-    } catch (e) {
-      showErr('Switch to Base network (chain 8453) to pay.');
-      return;
-    }
-  }
-  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-  account = accounts[0];
+  const result = await window.SincWallet.connect();
+  account = result.account;
   $('wallet').textContent = account;
   await refreshQuote();
 }
@@ -234,10 +219,18 @@ async function verifyPayment() {
 }
 
 $('btn-quote').addEventListener('click', refreshQuote);
-$('btn-connect').addEventListener('click', connectWallet);
+$('btn-connect').addEventListener('click', () => connectWallet().catch((e) => {
+  showErr(e.message || 'Wallet connection failed');
+}));
 $('btn-pay').addEventListener('click', sendPayment);
 $('btn-verify').addEventListener('click', verifyPayment);
 $('plan').addEventListener('change', refreshQuote);
+
+window.SincWallet.getAccount().then((wallet) => {
+  if (!wallet) return;
+  account = wallet;
+  $('wallet').textContent = account;
+}).catch(() => {});
 
 loadPlans().then(refreshQuote);
 </script>
