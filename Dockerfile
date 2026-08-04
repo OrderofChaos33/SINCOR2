@@ -40,5 +40,4 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ.get('PORT', '8080'), timeout=5)" || exit 1
 
-# Single-line shell form guarantees ${PORT} is expanded by /bin/sh
-CMD ["/bin/sh", "-c", "exec python -m gunicorn sincor2.mvp_app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --worker-class sync --timeout 180 --access-logfile - --error-logfile - --log-level info"]
+CMD ["python", "-m", "gunicorn", "sincor2.mvp_app:app", "--config", "gunicorn.conf.py"]
