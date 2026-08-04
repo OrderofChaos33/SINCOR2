@@ -1,0 +1,130 @@
+id: E-harvest-claim-agent
+name: Harvest Claim Agent
+version: "1.0.0"
+archetype: Builder
+description: >
+  Manages the full lifecycle of the SINCOR Harvest Moon claim campaign:
+  eligibility verification, Merkle proof serving, on-chain claim monitoring,
+  post-claim conversion follow-up, and daily gate reporting.
+
+# ── Activation gate ───────────────────────────────────────────────────────────
+activation:
+  requires_env: HARVEST_PAGE_ENABLED
+  default: "false"  # Off until product conversion gate is cleared
+  kill_switch: "HARVEST_PAGE_ENABLED=false"
+
+# ── Responsibilities ──────────────────────────────────────────────────────────
+responsibilities:
+  - Monitor /api/harvest/status every 5 minutes; report to TOA check-in loop
+  - Serve eligibility checks and proofs via /api/harvest/eligibility and /api/harvest/claim
+  - Watch HarvestClaim contract events on Base mainnet (Claimed, Paused, Swept)
+  - Confirm on-chain claims via /api/harvest/confirm
+  - Fire post-claim conversion sequence (demo offer, plan upgrade prompt)
+  - Log harvest_gate_checkin events with current gate status
+  - Alert on: claim volume spike, high error rate, contract pause triggered
+  - Generate daily summary for CEO check-in loop and TOA revenue ranking
+
+# ── Skills exposed to A2A marketplace ────────────────────────────────────────
+skills:
+  - id: harvest.eligibility_check
+    name: "Check Harvest Eligibility"
+    description: "Check whether a wallet address is eligible for SINC utility access credits"
+    inputs:
+      - name: address
+        type: string
+        required: true
+        description: "0x-prefixed Base wallet address"
+    outputs:
+      - name: eligible
+        type: boolean
+      - name: amount_wei
+        type: string
+      - name: proof
+        type: array
+    cost_sinc: 0  # Free eligibility check
+    endpoint: "GET /api/harvest/eligibility"
+
+  - id: harvest.claim_initiation
+    name: "Initiate Harvest Claim"
+    description: "Retrieve Merkle proof for on-chain SINC utility access credit claim"
+    inputs:
+      - name: address
+        type: string
+        required: true
+    outputs:
+      - name: proof
+        type: array
+      - name: amount_wei
+        type: string
+      - name: contract_address
+        type: string
+    cost_sinc: 0  # Proof serving is free
+    endpoint: "POST /api/harvest/claim"
+
+  - id: harvest.conversion_event
+    name: "Log Conversion Event"
+    description: "Record a post-claim conversion event (plan upgrade, paid skill, demo)"
+    inputs:
+      - name: address
+        type: string
+        required: true
+      - name: event_type
+        type: string
+        required: true
+        enum: [plan_upgrade, paid_skill_call, demo_scheduled, demo_completed]
+      - name: metadata
+        type: object
+        required: false
+    cost_sinc: 0
+    endpoint: "POST /api/harvest/conversion_event"
+
+# ── Monitoring thresholds ─────────────────────────────────────────────────────
+monitoring:
+  alert_on:
+    claim_volume_per_hour: 500      # Alert if > 500 claims/hr (possible bot)
+    error_rate_percent: 5           # Alert if > 5% of requests error
+    contract_paused: true           # Always alert on pause event
+  report_interval_minutes: 5
+  report_to:
+    - toa_orchestrator
+    - ceo_checkin_loop
+    - operator_dashboard
+
+# ── Post-claim conversion sequence ────────────────────────────────────────────
+conversion_sequence:
+  trigger: harvest.claim_confirmed
+  steps:
+    - delay_minutes: 5
+      action: send_agent_intro
+      message: >
+        Your SINC utility access credits are ready. Here are 3 things you can do
+        with them right now on the SINCOR platform.
+    - delay_hours: 24
+      action: offer_demo
+      message: >
+        Ready to see your agents work? Book a 15-minute live demo — we'll show
+        you how to get ROI from your first agent task.
+    - delay_days: 3
+      action: plan_upgrade_prompt
+      condition: no_paid_plan
+      message: >
+        Your credits unlock full access. Upgrade to Starter and your agents
+        start working immediately.
+
+# ── TOA ranking signals ────────────────────────────────────────────────────────
+toa_signals:
+  - metric: harvest_conversion_rate
+    weight: 0.10
+    description: "% of claimants who upgrade to a paid plan within 30 days"
+    target: 0.15  # 15% conversion target
+  - metric: harvest_treasury_delta
+    weight: 0.05
+    description: "Net treasury inflow attributable to harvest-originated customers"
+
+# ── References ────────────────────────────────────────────────────────────────
+references:
+  gate_doc: docs/launch/HARVEST_GATE.md
+  claim_spec: docs/launch/CLAIM_SPEC.md
+  blueprint: src/sincor2/blueprints/harvest.py
+  contract: onchain/src/HarvestClaim.sol
+  merkle_script: scripts/generate_harvest_merkle.py

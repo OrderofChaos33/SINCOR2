@@ -4,6 +4,11 @@
 
 **Primary metric**: Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`.
 
+> **🌕 Harvest Moon Activation** — Sep 26, 2026 16:48 UTC  
+> All Harvest Moon build tracks execute in parallel with the tracks below.  
+> **Gate**: No public Harvest push until product conversion gate is cleared.  
+> See: [`docs/launch/HARVEST_GATE.md`](launch/HARVEST_GATE.md) | [`docs/launch/CLAIM_SPEC.md`](launch/CLAIM_SPEC.md) | [`docs/launch/ASSET_INVENTORY_2026-08.md`](launch/ASSET_INVENTORY_2026-08.md)
+
 ---
 
 ## 1. A2A — Outside Agents in the Ecosystem (HIGHEST PRIORITY)

@@ -878,9 +878,17 @@ def home():
     return render_template('home.html', **price_ctx)
 
 
-# ============================================================================
-# AUTHENTICATION ENDPOINTS
-# ============================================================================
+@app.route('/harvest')
+@app.route('/early')
+def harvest_page():
+    """Harvest Moon agent access credits page."""
+    import os as _os
+    if _os.environ.get('HARVEST_PAGE_ENABLED', 'true').lower() in ('false', '0', 'off'):
+        return render_template('error.html', code=404, title='Not Found',
+                               message='Page not found.'), 404
+    return render_template('harvest.html')
+
+
 
 # Admin credentials � must be set via environment variables in production
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', '')

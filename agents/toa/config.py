@@ -16,13 +16,15 @@ from typing import Dict, List
 
 # Default objective weights, rebalanced to prioritise DeFi treasury inflow
 # alongside revenue.  Sums to 1.0.
+# Harvest Moon update (2026-08-04): harvest_conversion added as a ranked signal.
 DEFAULT_OBJECTIVE_WEIGHTS: Dict[str, float] = {
-    "revenue": 0.30,
+    "revenue": 0.28,
     "treasury_inflow": 0.20,
+    "harvest_conversion": 0.07,
     "risk": 0.20,
-    "timeline": 0.15,
+    "timeline": 0.13,
     "compliance": 0.075,
-    "governance": 0.075,
+    "governance": 0.045,
 }
 
 
@@ -49,7 +51,7 @@ class TOAConfig:
     )
     # Registered objective labels in priority order (highest first).
     objective_priority: List[str] = field(default_factory=lambda: [
-        "treasury_inflow", "revenue", "risk", "timeline", "compliance", "governance"
+        "treasury_inflow", "revenue", "harvest_conversion", "risk", "timeline", "compliance", "governance"
     ])
     # Where to persist TOA state across sessions (empty = memory-only).
     state_path: str = ""

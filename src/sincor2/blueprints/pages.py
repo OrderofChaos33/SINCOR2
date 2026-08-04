@@ -104,3 +104,13 @@ def billing():
 @pages_bp.get("/refer")
 def refer():
     return render_template("refer.html")
+
+
+@pages_bp.get("/harvest")
+@pages_bp.get("/early")
+def harvest():
+    import os
+    if os.environ.get("HARVEST_PAGE_ENABLED", "true").lower() in ("false", "0", "off"):
+        from flask import abort
+        abort(404)
+    return render_template("harvest.html")

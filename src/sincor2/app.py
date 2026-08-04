@@ -307,7 +307,17 @@ def index():
     return render_template('home.html')
 
 
-@app.route('/api/waitlist', methods=['POST'])
+@app.route('/harvest')
+@app.route('/early')
+def harvest_page():
+    """Harvest Moon agent access credits page."""
+    import os as _os
+    if _os.environ.get('HARVEST_PAGE_ENABLED', 'true').lower() in ('false', '0', 'off'):
+        from flask import abort
+        abort(404)
+    return render_template('harvest.html')
+
+
 @limiter.limit(PUBLIC_LIMITS) if limiter else lambda f: f
 def join_waitlist():
     """Handle waitlist signups (RATE LIMITED + VALIDATED)"""
@@ -1372,6 +1382,12 @@ def create_app():
         app.register_blueprint(router.blueprint)
     except Exception as e:
         print(f"A2A integration not available: {e}")
+    try:
+        from sincor2.blueprints.harvest import harvest_bp, init_harvest_db
+        init_harvest_db()
+        app.register_blueprint(harvest_bp)
+    except Exception as e:
+        print(f"Harvest blueprint not available: {e}")
     return app
 
 
