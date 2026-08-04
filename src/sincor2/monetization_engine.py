@@ -806,6 +806,72 @@ class MonetizationEngine:
         
         return actions
 
+    # ── DeFi fee event ingest (observable real-time inflow) ── #
+
+    def record_defi_fee_event(
+        self,
+        source: str,
+        amount_usd: float,
+        asset: str = "USDC",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Record an on-chain DeFi fee event (TWAMMI, NeutralYield, etc.) so that
+        Treasury inflow is observable in real time from the Business Engine.
+
+        Increments ``monetization_metrics.total_revenue`` and the
+        ``RevenueStream.AGENT_SERVICES`` bucket.  Thread-safe for simple
+        in-process use; replace with a persistent store for multi-process.
+
+        Args:
+            source:     Agent or hook identifier (e.g. ``"twammi_hook"``, ``"neutral_yield_agent"``).
+            amount_usd: Fee amount in USD equivalent.
+            asset:      Token symbol (informational, e.g. ``"USDC"``).
+            metadata:   Optional extra context logged alongside the event.
+        """
+        if amount_usd <= 0:
+            return
+
+        self.monetization_metrics.total_revenue += amount_usd
+
+        defi_bucket = self.monetization_metrics.revenue_by_stream.get(
+            RevenueStream.AGENT_SERVICES, 0.0
+        )
+        self.monetization_metrics.revenue_by_stream[RevenueStream.AGENT_SERVICES] = (
+            defi_bucket + amount_usd
+        )
+
+        event: Dict[str, Any] = {
+            "type": "defi_fee_event",
+            "source": source,
+            "amount_usd": amount_usd,
+            "asset": asset,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        if metadata:
+            event.update(metadata)
+
+        # Surface in the closed_deals log so existing reporting picks it up
+        self.closed_deals.append(
+            {
+                "opportunity_id": f"defi_fee_{source}_{int(time.time())}",
+                "revenue_stream": RevenueStream.AGENT_SERVICES.value,
+                "actual_revenue": amount_usd,
+                "success": True,
+                "client_segment": "defi",
+                **event,
+            }
+        )
+
+        import logging as _logging
+        _logging.getLogger("sincor.monetization").info(
+            "DeFi fee event recorded | source=%s amount=$%.4f asset=%s cumulative=$%.2f",
+            source,
+            amount_usd,
+            asset,
+            self.monetization_metrics.total_revenue,
+        )
+
 # Monetization acceleration tactics
 ACCELERATION_TACTICS = {
     "rapid_qualification": {
