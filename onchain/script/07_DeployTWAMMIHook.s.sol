@@ -57,7 +57,7 @@ contract DeployTWAMMIHook is Script {
             assembly {
                 hookAddr := create2(0, add(creationCode, 0x20), mload(creationCode), salt)
             }
-            require(hookAddr != address(0), "CREATE2 failed — try a different salt");
+            require(hookAddr != address(0), "CREATE2 failed - try a different salt");
         } else {
             // Standard CREATE (no salt needed for non-hook-bit-flagged deploy)
             TWAMMIHook hook = new TWAMMIHook(IPoolManager(poolManager), treasury, feeBps);
