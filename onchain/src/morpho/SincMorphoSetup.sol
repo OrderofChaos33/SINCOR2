@@ -41,7 +41,7 @@ contract SincMorphoSetup is Ownable {
     }
 
     /// @notice Create a Morpho market with SINC as collateral
-    function createMarket(address loanToken, address irm, uint256 lltv) external onlyOwner returns (bytes32 marketId) {
+    function deployMarket(address loanToken, address irm, uint256 lltv) external onlyOwner returns (bytes32 marketId) {
         IMorpho.MarketParams memory params = IMorpho.MarketParams({
             loanToken: loanToken,
             collateralToken: address(SINC),
@@ -59,7 +59,7 @@ contract SincMorphoSetup is Ownable {
 
     /// @notice Convenience: create SINC/USDC market with AdaptiveCurve + common LLTV
     function createSincUsdcMarket(uint256 lltv) external onlyOwner returns (bytes32) {
-        return createMarket(USDC, ADAPTIVE_CURVE_IRM, lltv);
+        return deployMarket(USDC, ADAPTIVE_CURVE_IRM, lltv);
     }
 
     function recoverToken(address token, uint256 amount) external onlyOwner {
