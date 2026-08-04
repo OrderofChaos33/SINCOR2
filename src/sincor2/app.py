@@ -137,6 +137,15 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-
 # Configure template folder
 app.template_folder = 'templates'
 
+# Register A2A blueprint (agent-to-agent protocol endpoints)
+try:
+    from sincor2.a2a_integration import A2ARouter
+    _a2a_router = A2ARouter()
+    app.register_blueprint(_a2a_router.blueprint)
+    print("✓ A2A routes initialized")
+except Exception as _a2a_err:
+    print(f"WARNING: A2A routes not available: {_a2a_err}")
+
 # Initialize Stripe routes (MUST be after app creation, BEFORE other routes)
 try:
     from sincor2.stripe_routes import init_stripe_routes

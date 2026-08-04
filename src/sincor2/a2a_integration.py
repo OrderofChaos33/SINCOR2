@@ -44,16 +44,19 @@ Quick start
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import sqlite3
 import threading
+import time
 import urllib.request as _urllib_request
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 logger = logging.getLogger("sincor.a2a")
 
@@ -85,6 +88,23 @@ A2A_PROTOCOL_VERSION = "1.0.1"        # A2A spec version advertised in AgentCard
 # Tunable limits
 BASE_RPC_TIMEOUT     = int(os.getenv("BASE_RPC_TIMEOUT", "10"))   # seconds
 TASK_LIST_MAX_PAGE   = int(os.getenv("TASK_LIST_MAX_PAGE", "1000"))
+
+# Pricing engine: target fills per 24h window before price adjustment is triggered
+PRICE_ADJUST_TARGET_FILLS = int(os.getenv("PRICE_ADJUST_TARGET_FILLS", "10"))
+# Price adjustment step: ±10% of current price per 24h cycle
+PRICE_ADJUST_STEP = float(os.getenv("PRICE_ADJUST_STEP", "0.10"))
+# Free-quota calls granted to verified external A2A callers per skill (top 5 skills)
+FREE_QUOTA_PER_CALLER = int(os.getenv("A2A_FREE_QUOTA_PER_CALLER", "5"))
+# Top 5 skills eligible for free quota (subsidised for external agent discovery)
+FREE_QUOTA_SKILLS = frozenset({
+    "lead-enrichment",
+    "competitor-intel",
+    "outreach-sequence",
+    "market-forecast",
+    "content-blog",
+})
+# High-reputation threshold: callers with >= this many settled calls get priority
+REPUTATION_HIGH_THRESHOLD = int(os.getenv("A2A_REPUTATION_HIGH_THRESHOLD", "10"))
 
 # Non-production environments where on-chain / payment checks are skipped
 _DEV_ENVS: frozenset = frozenset({"development", "dev", "test", "testing", "local"})
@@ -123,22 +143,47 @@ class AgentSkill:
     examples: List[str]
     input_modes:  List[str] = field(default_factory=list)
     output_modes: List[str] = field(default_factory=list)
+    # Pricing fields (set per-skill; fall back to global defaults if zero)
+    axm_price_wei: int = 0          # AXM payment amount in wei (18 decimals)
+    sinc_price: int = 0             # SINC payment amount (whole tokens, decimals=0)
+    # Input/output JSON Schema (draft-07 subset; empty dict = freeform)
+    input_schema: Dict[str, Any] = field(default_factory=dict)
+    output_schema: Dict[str, Any] = field(default_factory=dict)
+    # Estimated execution latency in seconds (0 = unspecified)
+    estimated_latency_seconds: int = 0
+    # Minimum caller reputation score required (0 = open to all)
+    reputation_floor: int = 0
+    # Number of free calls granted to new verified A2A callers (0 = no free quota)
+    free_quota: int = 0
 
     def __post_init__(self) -> None:
         if not self.input_modes:
             self.input_modes = ["text/plain", "application/json"]
         if not self.output_modes:
             self.output_modes = ["text/plain", "application/json"]
+        # Back-fill global defaults when per-skill prices are not set
+        if self.axm_price_wei == 0:
+            self.axm_price_wei = AXM_PRICE_PER_TASK
+        if self.sinc_price == 0:
+            self.sinc_price = SINC_PRICE_PER_TASK
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "id":           self.id,
-            "name":         self.name,
-            "description":  self.description,
-            "tags":         self.tags,
-            "examples":     self.examples,
-            "inputModes":   self.input_modes,
-            "outputModes":  self.output_modes,
+            "id":                       self.id,
+            "name":                     self.name,
+            "description":              self.description,
+            "tags":                     self.tags,
+            "examples":                 self.examples,
+            "inputModes":               self.input_modes,
+            "outputModes":              self.output_modes,
+            "axmPriceWei":              str(self.axm_price_wei),
+            "axmPriceDisplay":          f"{self.axm_price_wei / 10**18:.4f} AXM",
+            "sincPrice":                self.sinc_price,
+            "inputSchema":              self.input_schema,
+            "outputSchema":             self.output_schema,
+            "estimatedLatencySeconds":  self.estimated_latency_seconds,
+            "reputationFloor":          self.reputation_floor,
+            "freeQuota":                self.free_quota,
         }
 
 
@@ -315,19 +360,7 @@ class A2ATask:
 # ---------------------------------------------------------------------------
 
 SINCOR_SKILLS: List[AgentSkill] = [
-    AgentSkill(
-        id="market-intelligence",
-        name="Market & Competitive Intelligence",
-        description=(
-            "Rapid market scans, competitor analysis, SWOT generation, and industry "
-            "landscape summaries.  Powered by Scout-archetype agents."
-        ),
-        tags=["market", "competitive-analysis", "research", "SINC", "AXIOM"],
-        examples=[
-            "Give me a competitive landscape for AI infrastructure startups in 2026.",
-            "Who are the top 5 competitors to a DeFi yield aggregator on Base?",
-        ],
-    ),
+    # ── P0 Priority Skills (fully subsidised free quota) ──────────────────
     AgentSkill(
         id="lead-enrichment",
         name="Lead Enrichment & Outbound Prospecting",
@@ -340,7 +373,565 @@ SINCOR_SKILLS: List[AgentSkill] = [
             "Enrich and score this list of 50 SaaS companies for enterprise fit.",
             "Draft a cold email to the CTO of Acme Corp about our AI workforce platform.",
         ],
+        axm_price_wei=int(2.5 * 10**18),   # 2.5 AXM → 30-50% margin after 50% burn
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["company"],
+            "properties": {
+                "company": {"type": "string", "description": "Company name or domain"},
+                "segment": {"type": "string", "description": "Target ICP segment"},
+                "enrichment_fields": {
+                    "type": "array", "items": {"type": "string"},
+                    "description": "Fields to enrich: email, linkedin, revenue, headcount, …",
+                },
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "leads": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "company": {"type": "string"},
+                            "contact_name": {"type": "string"},
+                            "email": {"type": "string"},
+                            "fit_score": {"type": "number", "minimum": 0, "maximum": 100},
+                            "outreach_draft": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=FREE_QUOTA_PER_CALLER,
     ),
+    AgentSkill(
+        id="competitor-intel",
+        name="Competitor Intelligence & SWOT",
+        description=(
+            "Rapid competitor scans, positioning gap analysis, SWOT generation, and "
+            "market landscape summaries. Powered by Scout-archetype agents."
+        ),
+        tags=["market", "competitive-analysis", "research", "SINC", "AXIOM"],
+        examples=[
+            "Give me a competitive landscape for AI infrastructure startups in 2026.",
+            "Who are the top 5 competitors to a DeFi yield aggregator on Base?",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["target"],
+            "properties": {
+                "target": {"type": "string", "description": "Company or product to analyse"},
+                "market": {"type": "string", "description": "Market / industry vertical"},
+                "depth": {"type": "string", "enum": ["quick", "detailed"],
+                          "description": "quick=top-5 summary, detailed=full SWOT"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "competitors": {"type": "array", "items": {"type": "object"}},
+                "swot": {"type": "object",
+                         "properties": {
+                             "strengths": {"type": "array", "items": {"type": "string"}},
+                             "weaknesses": {"type": "array", "items": {"type": "string"}},
+                             "opportunities": {"type": "array", "items": {"type": "string"}},
+                             "threats": {"type": "array", "items": {"type": "string"}},
+                         }},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=FREE_QUOTA_PER_CALLER,
+    ),
+    AgentSkill(
+        id="outreach-sequence",
+        name="Outreach Sequence Builder",
+        description=(
+            "Generate multi-touch outbound sequences (email, LinkedIn, SMS) tailored "
+            "to a specific ICP. Powered by Negotiator + Builder agents."
+        ),
+        tags=["sales", "outreach", "email", "linkedin", "sequence"],
+        examples=[
+            "Build a 5-touch email sequence for SMB dental practices in Texas.",
+            "Write a LinkedIn InMail sequence for Series-A CFOs interested in AI finance tools.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["icp", "offer"],
+            "properties": {
+                "icp": {"type": "string", "description": "Ideal customer profile"},
+                "offer": {"type": "string", "description": "Value proposition to communicate"},
+                "touches": {"type": "integer", "minimum": 1, "maximum": 10,
+                            "description": "Number of sequence steps"},
+                "channels": {"type": "array", "items": {"type": "string",
+                              "enum": ["email", "linkedin", "sms"]}},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "sequence": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "step": {"type": "integer"},
+                            "channel": {"type": "string"},
+                            "delay_days": {"type": "integer"},
+                            "subject": {"type": "string"},
+                            "body": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=FREE_QUOTA_PER_CALLER,
+    ),
+    AgentSkill(
+        id="healthcare-credential-check",
+        name="Healthcare Provider Credential Check",
+        description=(
+            "Verify provider NPI, specialty, state licences, DEA registration, "
+            "and payer credentialing status. Powered by Auditor agents."
+        ),
+        tags=["healthcare", "credentialing", "compliance", "rcm", "npi"],
+        examples=[
+            "Verify NPI 1234567890 is credentialed with Aetna in Texas.",
+            "Check Dr Jane Smith's DEA and state licence status for Florida.",
+        ],
+        axm_price_wei=int(4.0 * 10**18),
+        sinc_price=4,
+        input_schema={
+            "type": "object",
+            "required": ["provider_npi"],
+            "properties": {
+                "provider_npi": {"type": "string", "description": "10-digit NPI"},
+                "provider_name": {"type": "string"},
+                "state": {"type": "string", "description": "2-letter US state code"},
+                "payer_ids": {"type": "array", "items": {"type": "string"},
+                              "description": "Payer IDs to check credentialing for"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "npi_valid": {"type": "boolean"},
+                "specialty": {"type": "string"},
+                "licence_status": {"type": "string"},
+                "dea_active": {"type": "boolean"},
+                "payer_credentialing": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "payer_id": {"type": "string"},
+                            "status": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="dental-billing-scrub",
+        name="Dental Billing Scrub & Claims Cleanup",
+        description=(
+            "Scrub dental claims for code accuracy, CDT compliance, missing attachments, "
+            "and prior-auth flags before submission. Powered by Auditor agents."
+        ),
+        tags=["dental", "billing", "rcm", "cdt", "claims", "compliance"],
+        examples=[
+            "Scrub this batch of 20 dental claims for CDT coding errors before submission.",
+            "Flag any claims missing X-ray attachments for payer XYZ.",
+        ],
+        axm_price_wei=int(3.5 * 10**18),
+        sinc_price=4,
+        input_schema={
+            "type": "object",
+            "required": ["claims"],
+            "properties": {
+                "claims": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "claim_id": {"type": "string"},
+                            "cdt_codes": {"type": "array", "items": {"type": "string"}},
+                            "tooth_number": {"type": "string"},
+                            "provider_npi": {"type": "string"},
+                            "payer_id": {"type": "string"},
+                            "attachments": {"type": "array", "items": {"type": "string"}},
+                        },
+                    },
+                },
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "clean_claims": {"type": "array", "items": {"type": "object"}},
+                "flagged_claims": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "claim_id": {"type": "string"},
+                            "issues": {"type": "array", "items": {"type": "string"}},
+                            "suggested_fix": {"type": "string"},
+                        },
+                    },
+                },
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=40,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="compliance-sbom",
+        name="Compliance SBOM & Regulatory Filing",
+        description=(
+            "Generate a Software Bill of Materials (SBOM), run licence compliance checks, "
+            "and produce regulatory filing artefacts. Powered by Auditor agents."
+        ),
+        tags=["compliance", "sbom", "regulatory", "licence", "audit"],
+        examples=[
+            "Generate an SPDX SBOM for the SINCOR2 repo and flag GPL-incompatible licences.",
+            "Produce a regulatory artefact package for FDA 510(k) SaMD submission.",
+        ],
+        axm_price_wei=int(5.0 * 10**18),
+        sinc_price=5,
+        input_schema={
+            "type": "object",
+            "required": ["repository"],
+            "properties": {
+                "repository": {"type": "string", "description": "GitHub owner/repo"},
+                "artifacts": {"type": "array", "items": {"type": "string"},
+                              "description": "Dependency manifests to scan"},
+                "format": {"type": "string", "enum": ["spdx", "cyclonedx"],
+                           "description": "SBOM output format"},
+                "regulation": {"type": "string",
+                               "description": "Applicable regulation (e.g. FDA-SaMD, HIPAA, SOC2)"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "sbom": {"type": "object"},
+                "licence_issues": {"type": "array", "items": {"type": "object"}},
+                "compliance_score": {"type": "number"},
+                "filing_artefact": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=60,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="market-forecast",
+        name="Market Forecast & Scenario Planning",
+        description=(
+            "Forward-looking market forecasts with confidence intervals, Monte Carlo "
+            "simulations, and 'what-if' scenario modelling. Powered by Synthesizer agents."
+        ),
+        tags=["analytics", "forecasting", "data-science", "monte-carlo"],
+        examples=[
+            "Model ARR growth under three expansion scenarios for Q3 2026.",
+            "Forecast SINC token price trajectory given current bonding curve and volume.",
+        ],
+        axm_price_wei=int(4.0 * 10**18),
+        sinc_price=4,
+        input_schema={
+            "type": "object",
+            "required": ["subject"],
+            "properties": {
+                "subject": {"type": "string", "description": "What to forecast"},
+                "horizon": {"type": "string", "description": "Time horizon (e.g. 30d, 1y)"},
+                "scenarios": {"type": "array", "items": {"type": "string"},
+                              "description": "Named scenarios to model"},
+                "data": {"type": "object", "description": "Historical data points (optional)"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "forecast": {"type": "object"},
+                "scenarios": {"type": "array", "items": {"type": "object"}},
+                "confidence_interval": {"type": "object"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=35,
+        reputation_floor=0,
+        free_quota=FREE_QUOTA_PER_CALLER,
+    ),
+    AgentSkill(
+        id="deal-scoring",
+        name="Deal Scoring & Pipeline Prioritisation",
+        description=(
+            "Score open deals by ICP fit, intent signals, and close probability. "
+            "Prioritise pipeline and surface next-best actions. Powered by Director agents."
+        ),
+        tags=["sales", "crm", "pipeline", "scoring", "deal"],
+        examples=[
+            "Score my 15 open enterprise deals and rank by close probability.",
+            "Which deals should I focus on to hit Q3 quota?",
+        ],
+        axm_price_wei=int(2.5 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["deals"],
+            "properties": {
+                "deals": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "deal_id": {"type": "string"},
+                            "company": {"type": "string"},
+                            "value": {"type": "number"},
+                            "stage": {"type": "string"},
+                            "last_activity": {"type": "string"},
+                        },
+                    },
+                },
+                "target_quota": {"type": "number"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "scored_deals": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "deal_id": {"type": "string"},
+                            "score": {"type": "number"},
+                            "close_probability": {"type": "number"},
+                            "next_action": {"type": "string"},
+                            "priority_rank": {"type": "integer"},
+                        },
+                    },
+                },
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="content-blog",
+        name="Content & Blog Post Generation",
+        description=(
+            "High-quality blog posts, technical articles, thought-leadership pieces, "
+            "and social copy. Powered by Builder + Synthesizer agents."
+        ),
+        tags=["content", "writing", "marketing", "blog", "documentation"],
+        examples=[
+            "Write a 1500-word blog post on tokenised AI compute markets.",
+            "Create a LinkedIn article on how SMB dental practices can automate billing.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["topic"],
+            "properties": {
+                "topic": {"type": "string"},
+                "audience": {"type": "string"},
+                "tone": {"type": "string", "enum": ["professional", "casual", "technical"]},
+                "length_words": {"type": "integer", "minimum": 200, "maximum": 5000},
+                "seo_keywords": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "body": {"type": "string"},
+                "meta_description": {"type": "string"},
+                "word_count": {"type": "integer"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=FREE_QUOTA_PER_CALLER,
+    ),
+    AgentSkill(
+        id="cashflow-recovery",
+        name="Cash-Flow Recovery & Invoice Management",
+        description=(
+            "Identify overdue invoices, draft recovery sequences, and escalate "
+            "collections automatically. Settles in AXM/SINC. Powered by Negotiator agents."
+        ),
+        tags=["finance", "collections", "ar", "invoice", "cashflow"],
+        examples=[
+            "Identify all overdue invoices >30 days and generate recovery email sequences.",
+            "Calculate total recoverable AR for a dental practice and prioritise by balance.",
+        ],
+        axm_price_wei=int(3.5 * 10**18),
+        sinc_price=4,
+        input_schema={
+            "type": "object",
+            "required": ["invoices"],
+            "properties": {
+                "invoices": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "invoice_id": {"type": "string"},
+                            "amount": {"type": "number"},
+                            "due_date": {"type": "string", "format": "date"},
+                            "debtor_name": {"type": "string"},
+                            "debtor_email": {"type": "string"},
+                        },
+                    },
+                },
+                "escalation_threshold_days": {"type": "integer", "default": 30},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "overdue_invoices": {"type": "array", "items": {"type": "object"}},
+                "recovery_sequences": {"type": "array", "items": {"type": "object"}},
+                "total_recoverable": {"type": "number"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="local-business-site-builder",
+        name="Local Business Site Builder",
+        description=(
+            "Discover local businesses via Yelp/Google Places, enrich their profile, "
+            "and generate a ready-to-deploy single-page site scaffold. "
+            "Flagship vertical for external agent resale. Powered by Scout + Builder agents."
+        ),
+        tags=["local-business", "website", "leadgen", "scout", "vertical"],
+        examples=[
+            "Find all dental practices in Austin TX without a modern website and build page scaffolds.",
+            "Generate a landing-page template for Smith Plumbing in Chicago.",
+        ],
+        axm_price_wei=int(5.0 * 10**18),
+        sinc_price=5,
+        input_schema={
+            "type": "object",
+            "required": ["location"],
+            "properties": {
+                "location": {"type": "string", "description": "City, state or ZIP code"},
+                "category": {"type": "string", "description": "Business type (e.g. dental, plumbing)"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50,
+                          "description": "Max businesses to process"},
+                "business_name": {"type": "string", "description": "For single-business mode"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "businesses": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "address": {"type": "string"},
+                            "phone": {"type": "string"},
+                            "site_scaffold": {"type": "string",
+                                              "description": "HTML/Markdown site template"},
+                        },
+                    },
+                },
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=60,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="toa-decision",
+        name="TOA Strategic Decision & Routing",
+        description=(
+            "Submit a multi-option decision to the Temporal Optimization Agent (TOA). "
+            "TOA runs Monte Carlo simulations, scores options by utility, and returns "
+            "a ranked action plan with confidence intervals. Powered by TOA + Director agents."
+        ),
+        tags=["toa", "strategy", "decision", "monte-carlo", "optimization"],
+        examples=[
+            "Should I expand to the UK market in Q4 or double down on US mid-market?",
+            "Rank these three product roadmap options by projected 90-day revenue impact.",
+        ],
+        axm_price_wei=int(6.0 * 10**18),
+        sinc_price=6,
+        input_schema={
+            "type": "object",
+            "required": ["options"],
+            "properties": {
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "description": {"type": "string"},
+                            "estimated_cost": {"type": "number"},
+                            "estimated_revenue_impact": {"type": "number"},
+                        },
+                    },
+                },
+                "context": {"type": "string",
+                            "description": "Additional business context for the simulation"},
+                "horizon_days": {"type": "integer", "default": 90},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "ranked_options": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "utility_score": {"type": "number"},
+                            "confidence": {"type": "number"},
+                            "rationale": {"type": "string"},
+                        },
+                    },
+                },
+                "recommended_action": {"type": "string"},
+                "simulation_summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    # ── Legacy / backward-compat skills kept under their original IDs ──────
     AgentSkill(
         id="contract-negotiation",
         name="Contract Negotiation Support",
@@ -353,32 +944,9 @@ SINCOR_SKILLS: List[AgentSkill] = [
             "Review this SaaS MSA and flag high-risk clauses.",
             "Draft counter-terms for the liability cap in section 8.",
         ],
-    ),
-    AgentSkill(
-        id="content-creation",
-        name="Content & Deliverable Generation",
-        description=(
-            "Blog posts, decks, reports, social copy, and technical documentation. "
-            "Powered by Builder + Synthesizer agents."
-        ),
-        tags=["content", "writing", "marketing", "documentation"],
-        examples=[
-            "Write a 1500-word blog post on tokenised AI compute markets.",
-            "Create a 10-slide pitch deck for a DeFi lending product.",
-        ],
-    ),
-    AgentSkill(
-        id="predictive-analytics",
-        name="Predictive Analytics & Scenario Planning",
-        description=(
-            "Forward-looking forecasts with confidence intervals, Monte Carlo "
-            "simulations, and 'what-if' scenario modelling."
-        ),
-        tags=["analytics", "forecasting", "data-science"],
-        examples=[
-            "Model our ARR growth under three expansion scenarios for Q3 2026.",
-            "What's the probability of SINC token reaching $0.50 given current curve trajectory?",
-        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        estimated_latency_seconds=30,
     ),
     AgentSkill(
         id="quality-audit",
@@ -392,6 +960,9 @@ SINCOR_SKILLS: List[AgentSkill] = [
             "Audit this marketing copy for accuracy and FTC compliance.",
             "Review this Python module for security issues.",
         ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        estimated_latency_seconds=20,
     ),
     AgentSkill(
         id="agent-lifecycle",
@@ -405,6 +976,9 @@ SINCOR_SKILLS: List[AgentSkill] = [
             "Promote E-Auriga-01 to Senior rank based on last 30 days performance.",
             "Retire E-Vega-02 and redistribute its active tasks.",
         ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        estimated_latency_seconds=10,
     ),
     AgentSkill(
         id="axiom-payment",
@@ -417,6 +991,9 @@ SINCOR_SKILLS: List[AgentSkill] = [
         examples=[
             "Verify tx 0xabc… on Base for 1 AXM and unlock task T-123.",
         ],
+        axm_price_wei=0,  # payment-verification skill itself is free
+        sinc_price=0,
+        estimated_latency_seconds=5,
     ),
 ]
 
@@ -433,11 +1010,12 @@ def build_agent_card() -> AgentCard:
         description=(
             "SINCOR is a production-grade autonomous AI workforce platform running "
             "43 specialised agents across 7 archetypes (Scout, Builder, Synthesizer, "
-            "Negotiator, Director, Auditor, Caretaker). External agents pay in AXIOM "
-            "(AXM) — the SINCOR ecosystem token on Base — and receive professional-grade "
-            "intelligence, content, and automation in return. "
-            "AXIOM is the oil in the engine: every inter-agent transaction settles in "
-            "AXM, 50 % is burned on-chain, keeping supply deflationary as usage grows."
+            "Negotiator, Director, Auditor, Caretaker). External agents pay in SINC "
+            "or AXIOM (AXM) — the SINCOR ecosystem tokens on Base — and receive "
+            "professional-grade intelligence, content, and automation in return. "
+            "Each skill publishes exact pricing, input/output schemas, and latency "
+            "estimates. The top 5 skills offer a free quota for new external callers. "
+            "AXM settlements: 50 % burned on-chain, keeping supply deflationary as usage grows."
         ),
         version=PLATFORM_VERSION,
         supported_interfaces=[
@@ -459,19 +1037,10 @@ def build_agent_card() -> AgentCard:
         default_input_modes=["text/plain", "application/json"],
         default_output_modes=["text/plain", "application/json"],
         skills=SINCOR_SKILLS,
-        security_schemes={
-            "apiKey": {
-                "type": "apiKey",
-                "in":   "header",
-                "name": "X-API-Key",
-                "description": (
-                    "Obtain a key at https://getsincor.com/api-keys. "
-                    "Each task also requires a confirmed AXM payment on Base — "
-                    "see the axiom-payment skill for the x402 payment flow."
-                ),
-            },
-        },
-        security_requirements=[{"apiKey": []}],
+        # No API key required — quote and task submission are open to all A2A callers.
+        # Payment is enforced on-chain via AXM/SINC transfer confirmation.
+        security_schemes={},
+        security_requirements=[],
         documentation_url=f"{PLATFORM_URL}/docs/a2a",
     )
 
@@ -500,6 +1069,250 @@ if _env not in _DEV_ENVS and \
         "Set A2A_TASK_STORE=redis and REDIS_URL for production deployments. "
         "Tasks will be lost on restart and are not shared across workers."
     )
+
+
+# ---------------------------------------------------------------------------
+# Skill Pricing Engine  (fill-rate tracking + 24 h auto-adjustment)
+# ---------------------------------------------------------------------------
+
+class _SkillPriceEngine:
+    """
+    Tracks quote and fill counts per skill and adjusts prices every 24 hours.
+
+    Adjustment rule:
+      - If fill_count >= PRICE_ADJUST_TARGET_FILLS  → increase price by PRICE_ADJUST_STEP
+      - If fill_count == 0                          → decrease price by PRICE_ADJUST_STEP
+      - Otherwise                                   → no change
+
+    Prices are adjusted relative to each skill's current price and are bounded
+    to [50% of initial, 500% of initial] to prevent runaway drift.
+
+    Thread-safe. Prices are stored in memory; the adjustment background thread
+    starts automatically on first instantiation.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        # skill_id → current axm_price_wei (mutable copy from SINCOR_SKILLS)
+        self._prices: Dict[str, int] = {
+            s.id: s.axm_price_wei for s in SINCOR_SKILLS
+        }
+        # initial prices kept for bounding
+        self._initial_prices: Dict[str, int] = dict(self._prices)
+        # fill counter: skill_id → count since last adjustment
+        self._fills: Dict[str, int] = {s.id: 0 for s in SINCOR_SKILLS}
+        # quote counter
+        self._quotes: Dict[str, int] = {s.id: 0 for s in SINCOR_SKILLS}
+        # Start background adjustment thread (daemon — does not block shutdown)
+        self._thread = threading.Thread(
+            target=self._adjustment_loop, daemon=True, name="a2a-price-adjuster"
+        )
+        self._thread.start()
+
+    def get_price(self, skill_id: str) -> int:
+        with self._lock:
+            return self._prices.get(skill_id, AXM_PRICE_PER_TASK)
+
+    def record_quote(self, skill_id: str) -> None:
+        with self._lock:
+            self._quotes[skill_id] = self._quotes.get(skill_id, 0) + 1
+
+    def record_fill(self, skill_id: str) -> None:
+        with self._lock:
+            self._fills[skill_id] = self._fills.get(skill_id, 0) + 1
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Return a public snapshot of current prices and fill counts."""
+        with self._lock:
+            return {
+                sid: {
+                    "axm_price_wei": self._prices[sid],
+                    "fills_24h": self._fills[sid],
+                    "quotes_24h": self._quotes[sid],
+                }
+                for sid in self._prices
+            }
+
+    def _adjustment_loop(self) -> None:
+        """Run forever; sleep 24h between adjustments."""
+        while True:
+            time.sleep(24 * 3600)
+            self._adjust()
+
+    def _adjust(self) -> None:
+        with self._lock:
+            for skill_id, current_price in list(self._prices.items()):
+                fills = self._fills.get(skill_id, 0)
+                initial = self._initial_prices.get(skill_id, AXM_PRICE_PER_TASK) or 1
+                if fills >= PRICE_ADJUST_TARGET_FILLS:
+                    new_price = int(current_price * (1 + PRICE_ADJUST_STEP))
+                elif fills == 0:
+                    new_price = int(current_price * (1 - PRICE_ADJUST_STEP))
+                else:
+                    new_price = current_price
+                # Bound to [50% initial, 500% initial]
+                new_price = max(initial // 2, min(new_price, initial * 5))
+                if new_price != current_price:
+                    logger.info(
+                        "Price adjustment skill=%s  old=%.4f AXM  new=%.4f AXM  fills_24h=%d",
+                        skill_id, current_price / 10**18, new_price / 10**18, fills,
+                    )
+                self._prices[skill_id] = new_price
+                # Reset counters
+                self._fills[skill_id] = 0
+                self._quotes[skill_id] = 0
+
+
+# Module-level singleton
+_price_engine = _SkillPriceEngine()
+
+
+# ---------------------------------------------------------------------------
+# Reputation Ledger  (SQLite-backed)
+# ---------------------------------------------------------------------------
+
+class ReputationLedger:
+    """
+    Persists and queries external A2A caller reputation based on successful
+    AXM/SINC settlements.
+
+    Schema:
+        settlements(caller_id TEXT, skill_id TEXT, task_id TEXT,
+                    axm_paid_wei INTEGER, ts INTEGER, PRIMARY KEY(task_id))
+
+    The ledger is stored in the SINCOR data directory so it survives restarts.
+    Thread-safe via a per-instance lock.
+    """
+
+    def __init__(self, db_path: Optional[str] = None) -> None:
+        self._lock = threading.Lock()
+        if db_path is None:
+            try:
+                from sincor2.data_paths import data_dir
+                db_path = str(data_dir() / "a2a_reputation.db")
+            except Exception:
+                db_path = os.path.join(
+                    os.path.dirname(__file__), "..", "..", "..", "data", "a2a_reputation.db"
+                )
+        self._db_path = db_path
+        self._init_db()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self) -> None:
+        with self._lock:
+            conn = self._connect()
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS settlements (
+                    caller_id  TEXT NOT NULL,
+                    skill_id   TEXT NOT NULL,
+                    task_id    TEXT NOT NULL,
+                    axm_paid_wei INTEGER NOT NULL DEFAULT 0,
+                    ts         INTEGER NOT NULL,
+                    PRIMARY KEY (task_id)
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_caller ON settlements (caller_id)"
+            )
+            conn.commit()
+            conn.close()
+
+    def record(self, caller_id: str, skill_id: str, task_id: str,
+               axm_paid_wei: int = 0) -> None:
+        with self._lock:
+            conn = self._connect()
+            conn.execute(
+                "INSERT OR IGNORE INTO settlements (caller_id, skill_id, task_id, "
+                "axm_paid_wei, ts) VALUES (?, ?, ?, ?, ?)",
+                (caller_id, skill_id, task_id, axm_paid_wei, int(time.time())),
+            )
+            conn.commit()
+            conn.close()
+
+    def score(self, caller_id: str) -> int:
+        """Return the total number of successful settlements for a caller."""
+        with self._lock:
+            conn = self._connect()
+            row = conn.execute(
+                "SELECT COUNT(*) AS cnt FROM settlements WHERE caller_id = ?",
+                (caller_id,),
+            ).fetchone()
+            conn.close()
+            return int(row["cnt"]) if row else 0
+
+    def leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Return top callers ranked by total settlements and AXM volume."""
+        with self._lock:
+            conn = self._connect()
+            rows = conn.execute(
+                """
+                SELECT caller_id,
+                       COUNT(*) AS total_settlements,
+                       SUM(axm_paid_wei) AS total_axm_wei
+                FROM settlements
+                GROUP BY caller_id
+                ORDER BY total_settlements DESC, total_axm_wei DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            conn.close()
+            return [
+                {
+                    "caller_id":          r["caller_id"],
+                    "total_settlements":  r["total_settlements"],
+                    "total_axm_wei":      r["total_axm_wei"],
+                    "total_axm_display":  f"{(r['total_axm_wei'] or 0) / 10**18:.4f} AXM",
+                }
+                for r in rows
+            ]
+
+
+# Module-level singleton
+_reputation_ledger = ReputationLedger()
+
+
+# ---------------------------------------------------------------------------
+# Free-quota tracker  (in-memory; caller_id + skill_id → used count)
+# ---------------------------------------------------------------------------
+
+class _FreeQuotaTracker:
+    """
+    Tracks how many free calls each caller has used for each free-quota skill.
+    Thread-safe; resets on restart (intentional — prevents abuse across deployments).
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._usage: Dict[Tuple[str, str], int] = {}
+
+    def is_free(self, caller_id: str, skill: AgentSkill) -> bool:
+        """Return True if this caller still has free quota for the given skill."""
+        if skill.free_quota <= 0 or skill.id not in FREE_QUOTA_SKILLS:
+            return False
+        key = (caller_id, skill.id)
+        with self._lock:
+            used = self._usage.get(key, 0)
+        return used < skill.free_quota
+
+    def consume(self, caller_id: str, skill_id: str) -> None:
+        """Increment free-quota usage for this caller + skill pair."""
+        key = (caller_id, skill_id)
+        with self._lock:
+            self._usage[key] = self._usage.get(key, 0) + 1
+
+    def remaining(self, caller_id: str, skill: AgentSkill) -> int:
+        key = (caller_id, skill.id)
+        with self._lock:
+            used = self._usage.get(key, 0)
+        return max(0, skill.free_quota - used)
+
+
+_free_quota_tracker = _FreeQuotaTracker()
 
 
 def _now() -> str:
@@ -778,11 +1591,18 @@ class A2ARouter:
             return jsonify({
                 "agents": [
                     {
-                        "id":                 s.id,
-                        "name":               s.name,
-                        "tags":               s.tags,
-                        "sinc_price_per_task": SINC_PRICE_PER_TASK,
-                        "axm_price_per_task": str(AXM_PRICE_PER_TASK),  # legacy
+                        "id":                        s.id,
+                        "name":                      s.name,
+                        "tags":                      s.tags,
+                        "sinc_price":                s.sinc_price,
+                        "sinc_price_per_task":       s.sinc_price,  # backward compat alias
+                        "axm_price_wei":             str(_price_engine.get_price(s.id)),
+                        "axm_price_display":         (
+                            f"{_price_engine.get_price(s.id) / 10**18:.4f} AXM"
+                        ),
+                        "estimated_latency_seconds": s.estimated_latency_seconds,
+                        "reputation_floor":          s.reputation_floor,
+                        "free_quota":                s.free_quota,
                     }
                     for s in SINCOR_SKILLS
                 ],
@@ -793,32 +1613,148 @@ class A2ARouter:
                 "chain_id":        CHAIN_ID,
             })
 
-        # ── SINC/AXIOM payment quote ──────────────────────────────────────────
-        @bp.route("/api/a2a/quote", methods=["POST"])
+        # ── SINC/AXIOM payment quote (GET or POST, no auth required) ─────────
+        @bp.route("/api/a2a/quote", methods=["GET", "POST"])
         def quote():
             from flask import jsonify, request
-            body       = request.get_json(force=True, silent=True) or {}
-            skill_id   = body.get("skill_id", "")
-            skill      = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
+            if request.method == "GET":
+                skill_id = request.args.get("skill_id", "")
+                caller_id = request.args.get("caller_id", "anonymous")
+            else:
+                body = request.get_json(force=True, silent=True) or {}
+                skill_id = body.get("skill_id", "")
+                caller_id = body.get("caller_id", "anonymous")
+
+            skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
             if not skill:
                 return jsonify(_err(f"Unknown skill: {skill_id}", code=-32602)), 400
+
+            current_axm_price = _price_engine.get_price(skill_id)
+            _price_engine.record_quote(skill_id)
+            free_remaining = _free_quota_tracker.remaining(caller_id, skill)
+            is_free_call = free_remaining > 0
+
+            logger.info(
+                "A2A quote  skill=%s  caller=%s  axm=%.4f AXM  free_remaining=%d",
+                skill_id, caller_id, current_axm_price / 10**18, free_remaining,
+            )
+
             return jsonify({
-                "skill_id":           skill_id,
+                "skill_id":                 skill_id,
+                "skill_name":               skill.name,
                 # SINC (primary)
-                "sinc_amount":        SINC_PRICE_PER_TASK,
-                "sinc_contract":      SINC_CONTRACT,
-                # AXIOM (legacy fallback)
-                "axm_price_wei":      str(AXM_PRICE_PER_TASK),
-                "axm_price_display":  f"{AXM_PRICE_PER_TASK / 10**18:.4f} AXM",
-                "axiom_contract":     AXIOM_CONTRACT,
-                "primary_token":      A2A_PRIMARY_TOKEN,
-                "pay_to":             TREASURY_WALLET,
-                "chain_id":           CHAIN_ID,
-                "note": (
-                    f"Pay {SINC_PRICE_PER_TASK} SINC (or {AXM_PRICE_PER_TASK / 10**18:.4f} AXM "
-                    f"for legacy) to the pay_to address on Base (chain 8453) then include the tx hash "
-                    f"in your tasks/send request."
+                "sinc_amount":              skill.sinc_price if not is_free_call else 0,
+                "sinc_contract":            SINC_CONTRACT,
+                # AXM (live price from pricing engine)
+                "axm_price_wei":            str(current_axm_price) if not is_free_call else "0",
+                "axm_price_display":        (
+                    f"{current_axm_price / 10**18:.4f} AXM" if not is_free_call else "FREE"
                 ),
+                "axiom_contract":           AXIOM_CONTRACT,
+                "primary_token":            A2A_PRIMARY_TOKEN,
+                "pay_to":                   TREASURY_WALLET,
+                "chain_id":                 CHAIN_ID,
+                "estimated_latency_seconds": skill.estimated_latency_seconds,
+                "reputation_floor":         skill.reputation_floor,
+                "free_quota_remaining":     free_remaining,
+                "is_free":                  is_free_call,
+                "input_schema":             skill.input_schema,
+                "output_schema":            skill.output_schema,
+                "note": (
+                    "FREE — include caller_id in your tasks/send request (no txHash needed)."
+                    if is_free_call else
+                    f"Pay {skill.sinc_price} SINC (or {current_axm_price / 10**18:.4f} AXM) "
+                    f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request."
+                ),
+            })
+
+        # ── Proof-of-settlement endpoint ──────────────────────────────────────
+        @bp.route("/api/a2a/settle", methods=["POST"])
+        def settle():
+            """
+            Accept a completed task's payment tx hash and return a signed
+            proof-of-settlement JSON that callers can share publicly.
+
+            Required body fields: task_id, tx_hash
+            Optional:            caller_id
+            """
+            from flask import jsonify, request
+            body     = request.get_json(force=True, silent=True) or {}
+            task_id  = body.get("task_id", "")
+            tx_hash  = body.get("tx_hash", "")
+            caller_id = body.get("caller_id", "anonymous")
+
+            task = _get_task(task_id)
+            if not task:
+                return jsonify(_err(f"Task {task_id} not found", code=-32602)), 404
+
+            if task.state not in TaskState.terminal_states():
+                return jsonify(_err("Task is not yet complete", code=-32003)), 400
+
+            # Build deterministic result hash
+            result_content = task.output or task.error or ""
+            result_hash = hashlib.sha256(
+                (task_id + result_content).encode()
+            ).hexdigest()
+
+            proof = {
+                "proof_of_settlement": {
+                    "task_id":        task.id,
+                    "skill_id":       task.skill_id,
+                    "caller_id":      task.caller_id or caller_id,
+                    "tx_hash":        tx_hash or task.tx_hash or "",
+                    "axm_paid_wei":   str(task.axm_paid),
+                    "axm_paid_display": f"{task.axm_paid / 10**18:.4f} AXM",
+                    "burn_amount_wei":  str(task.axm_paid // 2),
+                    "burn_to":        DEAD_ADDRESS,
+                    "treasury_amount_wei": str(task.axm_paid - task.axm_paid // 2),
+                    "treasury":       TREASURY_WALLET,
+                    "result_hash":    result_hash,
+                    "settled_at":     task.updated_at,
+                    "chain_id":       CHAIN_ID,
+                    "basescan_url":   (
+                        f"https://basescan.org/tx/{tx_hash}" if tx_hash else ""
+                    ),
+                }
+            }
+
+            # Record in reputation ledger
+            _reputation_ledger.record(
+                caller_id=task.caller_id or caller_id,
+                skill_id=task.skill_id,
+                task_id=task.id,
+                axm_paid_wei=task.axm_paid,
+            )
+            logger.info(
+                "Proof of settlement issued  task=%s  caller=%s  axm=%.4f AXM  tx=%s",
+                task.id, task.caller_id, task.axm_paid / 10**18, tx_hash,
+            )
+            return jsonify(proof)
+
+        # ── Reputation leaderboard ────────────────────────────────────────────
+        @bp.route("/api/a2a/leaderboard", methods=["GET"])
+        def leaderboard():
+            """Return top external A2A callers by volume and settlement count."""
+            from flask import jsonify, request
+            limit = min(int(request.args.get("limit", 10)), 100)
+            return jsonify({
+                "leaderboard": _reputation_ledger.leaderboard(limit=limit),
+                "description": (
+                    "Top external A2A agents ranked by successful SINC/AXM settlements. "
+                    "High-volume callers receive priority routing and SINC staking boosts."
+                ),
+            })
+
+        # ── Pricing engine snapshot ───────────────────────────────────────────
+        @bp.route("/api/a2a/pricing", methods=["GET"])
+        def pricing():
+            """Return current live prices and 24h fill stats for all skills."""
+            from flask import jsonify
+            return jsonify({
+                "pricing": _price_engine.snapshot(),
+                "adjust_target_fills_per_24h": PRICE_ADJUST_TARGET_FILLS,
+                "adjust_step_pct":             PRICE_ADJUST_STEP * 100,
+                "primary_token":               A2A_PRIMARY_TOKEN,
             })
 
 
@@ -956,23 +1892,36 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
             code=-32602, rpc_id=rpc_id,
         )
 
-    # --- Payment gate (skip for axiom-payment skill and in dev) ----------
+    # --- Reputation score → priority flag --------------------------------
+    caller_reputation = _reputation_ledger.score(caller_id)
+    is_high_rep = caller_reputation >= REPUTATION_HIGH_THRESHOLD
+
+    # --- Free-quota check ------------------------------------------------
+    free_call = _free_quota_tracker.is_free(caller_id, skill)
+
+    # --- Payment gate (skip for free calls, axiom-payment skill, and dev) --
     env = os.getenv("FLASK_ENV", "production").lower()
-    skip_payment = env in _DEV_ENVS
+    skip_payment = env in _DEV_ENVS or free_call
 
     if not skip_payment and skill_id != "axiom-payment":
+        skill_price = _price_engine.get_price(skill_id)
         if not tx_hash:
             return _err(
                 "Payment required. Call /api/a2a/quote to get the AXM amount and "
-                "treasury address, send the transfer on Base, then include txHash.",
+                "treasury address, send the transfer on Base, then include txHash. "
+                f"Current price: {skill_price / 10**18:.4f} AXM",
                 code=-32000, rpc_id=rpc_id,
             )
-        if not PaymentVerifier.is_verified(tx_hash, AXM_PRICE_PER_TASK):
+        if not PaymentVerifier.is_verified(tx_hash, skill_price):
             return _err(
                 f"Payment tx {tx_hash} could not be verified on Base. "
                 "Ensure the transfer is confirmed (≥1 block).",
                 code=-32001, rpc_id=rpc_id,
             )
+
+    # Consume free quota before dispatch
+    if free_call:
+        _free_quota_tracker.consume(caller_id, skill_id)
 
     # --- Create task & dispatch ------------------------------------------
     task = _new_task(
@@ -983,7 +1932,13 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         axm_paid=axm_paid,
         tx_hash=tx_hash,
     )
-    logger.info("A2A task %s created  skill=%s caller=%s", task.id, skill_id, caller_id)
+    # Annotate high-rep and free-call status in metadata
+    task.metadata["high_rep_caller"] = is_high_rep
+    task.metadata["free_call"] = free_call
+    logger.info(
+        "A2A task %s created  skill=%s caller=%s rep=%d high_rep=%s free=%s",
+        task.id, skill_id, caller_id, caller_reputation, is_high_rep, free_call,
+    )
 
     _update_task(task, state=TaskState.WORKING)
     output, error = _dispatch_to_swarm(task)
@@ -1007,13 +1962,50 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
                 task_id=task.id,
             )
             task.history.append(agent_msg)
-        _update_task(task, state=TaskState.COMPLETED, output=output)
 
-        # Record settlement if payment was included
-        if axm_paid > 0 and tx_hash:
-            _record_a2a_settlement(task, axm_paid, tx_hash)
+        # Build proof of settlement
+        result_content = output or ""
+        result_hash = hashlib.sha256((task.id + result_content).encode()).hexdigest()
+        proof = {
+            "task_id":            task.id,
+            "skill_id":           skill_id,
+            "caller_id":          caller_id,
+            "tx_hash":            tx_hash or "",
+            "axm_paid_wei":       str(axm_paid),
+            "burn_amount_wei":    str(axm_paid // 2),
+            "burn_to":            DEAD_ADDRESS,
+            "treasury_amount_wei": str(axm_paid - axm_paid // 2),
+            "treasury":           TREASURY_WALLET,
+            "result_hash":        result_hash,
+            "settled_at":         _now(),
+            "chain_id":           CHAIN_ID,
+            "basescan_url":       (
+                f"https://basescan.org/tx/{tx_hash}" if tx_hash else ""
+            ),
+            "free_call":          free_call,
+        }
+        _update_task(task, state=TaskState.COMPLETED, output=output,
+                     metadata={**task.metadata, "proof_of_settlement": proof})
 
-    return _rpc_ok(_task_to_rpc(task, history_length=history_length), rpc_id=rpc_id)
+        # Record settlement and update pricing fill count
+        if (axm_paid > 0 and tx_hash) or free_call:
+            _record_a2a_settlement(task, axm_paid, tx_hash or "")
+            _reputation_ledger.record(
+                caller_id=caller_id,
+                skill_id=skill_id,
+                task_id=task.id,
+                axm_paid_wei=axm_paid,
+            )
+            _price_engine.record_fill(skill_id)
+            _fire_toa_feedback(task, success=True)
+
+    task_dict = _task_to_rpc(task, history_length=history_length)
+    # Surface proof of settlement at top-level for convenience
+    if "proof_of_settlement" in task.metadata:
+        task_dict["proof_of_settlement"] = task.metadata["proof_of_settlement"]
+    if is_high_rep:
+        task_dict["priority"] = True
+    return _rpc_ok(task_dict, rpc_id=rpc_id)
 
 
 def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:
@@ -1355,6 +2347,35 @@ def _handle_resubscribe(body: Dict[str, Any]) -> Generator[str, None, None]:
                 },
             }
             yield _sse_event(artifact_event)
+
+
+# ---------------------------------------------------------------------------
+# TOA feedback hook
+# ---------------------------------------------------------------------------
+
+def _fire_toa_feedback(task: "A2ATask", success: bool) -> None:
+    """
+    Send task outcome data to the TOA decision router so future bid pricing
+    and skill routing can improve over time.
+
+    Fires asynchronously in a daemon thread to avoid blocking the response.
+    """
+    def _send() -> None:
+        try:
+            from integration.polyclaw_toa_decision_router import get_router
+            router = get_router()
+            router.ingest_feedback({
+                "task_id":    task.id,
+                "skill_id":   task.skill_id,
+                "caller_id":  task.caller_id,
+                "axm_paid":   task.axm_paid,
+                "success":    success,
+                "ts":         task.updated_at,
+            })
+        except Exception as exc:
+            logger.debug("TOA feedback skipped (router unavailable): %s", exc)
+
+    threading.Thread(target=_send, daemon=True, name="toa-feedback").start()
 
 
 # ---------------------------------------------------------------------------

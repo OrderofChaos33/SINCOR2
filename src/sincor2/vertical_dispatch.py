@@ -14,20 +14,30 @@ logger = logging.getLogger(__name__)
 # Maps A2A skill ids for cross-cutting SINCOR skills to AgencyKernel task types.
 _KERNEL_SKILL_MAP: Dict[str, str] = {
     "market-intelligence": "market_analysis",
+    "competitor-intel":    "market_analysis",
     "lead-enrichment": "lead_enrichment",
+    "outreach-sequence": "outreach_sequencing",
     "contract-negotiation": "contract_review",
     "content-creation": "content_generation",
+    "content-blog": "content_generation",
     "predictive-analytics": "predictive_analysis",
+    "market-forecast": "predictive_analysis",
+    "deal-scoring": "deal_scoring",
     "quality-audit": "quality_audit",
     "agent-lifecycle": "agent_management",
     "axiom-payment": "payment_verification",
+    "toa-decision": "toa_decision",
+    "cashflow-recovery": "cashflow_recovery",
+    "local-business-site-builder": "local_business_site",
 }
 
 _SKILL_TASK_TYPE_MAP: Dict[str, str] = {
     "healthcare-rcm": "eligibility_verification",
     "provider-credentialing": "credentialing_workflow",
+    "healthcare-credential-check": "credentialing_workflow",
     "dental-ops": "appointment_scheduling",
     "dental-compliance": "hipaa_compliance_check",
+    "dental-billing-scrub": "dental_billing_scrub",
     "regulatory-compliance": "sbom_generation",
     "n8n-workflow-bridge": "n8n_workflow_bridge",
     "compliance-sbom": "sbom_generation",
@@ -39,7 +49,17 @@ _SKILL_TASK_TYPE_MAP: Dict[str, str] = {
     "lead-enrichment-outbound": "lead_enrichment",
     "lead-enrichment": "lead_enrichment",
     "lead-outreach": "outreach_sequencing",
+    "outreach-sequence": "outreach_sequencing",
     "icp-matching": "icp_matching",
+    "cashflow-recovery": "cashflow_recovery",
+    "local-business-site-builder": "local_business_site",
+    "deal-scoring": "deal_scoring",
+    "market-forecast": "predictive_analysis",
+    "competitor-intel": "market_analysis",
+    "content-blog": "content_generation",
+    "toa-decision": "toa_decision",
+    "healthcare-credential-check": "credentialing_workflow",
+    "dental-billing-scrub": "dental_billing_scrub",
 }
 
 
@@ -84,12 +104,77 @@ def _normalize_demo_payload(
     elif skill_id == "polymarket-execution":
         normalized.setdefault("market_id", "demo-market")
 
-    elif skill_id in {"lead-enrichment-outbound", "lead-enrichment"}:
+    elif skill_id in {"lead-enrichment-outbound", "lead-enrichment", "outreach-sequence"}:
         normalized.setdefault("company", "Acme Corp")
         normalized.setdefault("segment", "B2B SaaS")
+        normalized.setdefault("icp", "B2B SaaS companies with 10-200 employees")
+        normalized.setdefault("offer", "AI workforce automation platform")
 
     elif skill_id in {"icp-matching", "lead-outreach"}:
         normalized.setdefault("profile", {"industry": "software", "team_size": 50})
+
+    elif skill_id in {"healthcare-credential-check", "provider-credentialing"}:
+        normalized.setdefault("provider_id", "PROVIDER-DEMO")
+        normalized.setdefault("provider_npi", "1234567890")
+        normalized.setdefault("provider_name", "Demo Provider")
+        normalized.setdefault("specialty", "family_medicine")
+        normalized.setdefault("state", "TX")
+        normalized.setdefault("payer_ids", ["BCBS01"])
+
+    elif skill_id == "dental-billing-scrub":
+        normalized.setdefault("claims", [
+            {
+                "claim_id": "DEMO-CLM-001",
+                "cdt_codes": ["D0120", "D0274"],
+                "tooth_number": "14",
+                "provider_npi": "1234567890",
+                "payer_id": "DELTA01",
+                "attachments": [],
+            }
+        ])
+
+    elif skill_id == "cashflow-recovery":
+        normalized.setdefault("invoices", [
+            {
+                "invoice_id": "INV-DEMO-001",
+                "amount": 1500.00,
+                "due_date": str(date.today()),
+                "debtor_name": "Demo Client LLC",
+                "debtor_email": "billing@democlient.com",
+            }
+        ])
+        normalized.setdefault("escalation_threshold_days", 30)
+
+    elif skill_id == "local-business-site-builder":
+        normalized.setdefault("location", "Austin, TX")
+        normalized.setdefault("category", "dental")
+        normalized.setdefault("limit", 5)
+
+    elif skill_id == "deal-scoring":
+        normalized.setdefault("deals", [
+            {
+                "deal_id": "DEAL-DEMO-001",
+                "company": "Prospect Inc",
+                "value": 25000,
+                "stage": "negotiation",
+                "last_activity": str(date.today()),
+            }
+        ])
+
+    elif skill_id == "toa-decision":
+        normalized.setdefault("options", [
+            {"label": "Option A", "description": "Demo option A",
+             "estimated_cost": 10000, "estimated_revenue_impact": 50000},
+            {"label": "Option B", "description": "Demo option B",
+             "estimated_cost": 5000, "estimated_revenue_impact": 30000},
+        ])
+        normalized.setdefault("horizon_days", 90)
+
+    elif skill_id in {"market-forecast", "competitor-intel"}:
+        normalized.setdefault("subject", "AI workflow automation")
+        normalized.setdefault("target", "SINCOR")
+        normalized.setdefault("market", "AI SaaS")
+        normalized.setdefault("horizon", "90d")
 
     return normalized
 
