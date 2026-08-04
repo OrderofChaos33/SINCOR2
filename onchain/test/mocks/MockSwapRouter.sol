@@ -50,17 +50,17 @@ contract MockSwapRouter is IUnlockCallback {
         bytes32 action = abi.decode(data, (bytes32));
 
         if (action == ACTION_LIQ) {
-            (, PoolKey memory key, int24 tickLower, int24 tickUpper, uint256 liquidity, address payer) =
+            (, PoolKey memory liqKey, int24 tickLower, int24 tickUpper, uint256 liquidity, address liqPayer) =
                 abi.decode(data, (bytes32, PoolKey, int24, int24, uint256, address));
-            (BalanceDelta delta,) = poolManager.modifyLiquidity(
-                key,
+            (BalanceDelta liqDelta,) = poolManager.modifyLiquidity(
+                liqKey,
                 ModifyLiquidityParams({
                     tickLower: tickLower, tickUpper: tickUpper, liquidityDelta: int256(liquidity), salt: bytes32(0)
                 }),
                 ""
             );
-            _settleDelta(key.currency0, delta.amount0(), payer);
-            _settleDelta(key.currency1, delta.amount1(), payer);
+            _settleDelta(liqKey.currency0, liqDelta.amount0(), liqPayer);
+            _settleDelta(liqKey.currency1, liqDelta.amount1(), liqPayer);
             return "";
         }
 
