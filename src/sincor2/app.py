@@ -134,8 +134,8 @@ except Exception as e:
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-in-production')
 
-# Configure template folder
-app.template_folder = 'templates'
+# Configure template folder (resolve to root-level templates directory)
+app.template_folder = str(Path(__file__).resolve().parent.parent.parent / 'templates')
 
 # Initialize Stripe routes (MUST be after app creation, BEFORE other routes)
 try:
@@ -181,8 +181,13 @@ def set_coop_header(response):
     Set Cross-Origin-Opener-Policy header to allow PayPal popups.
     This fixes the spinning popup issue with PayPal JavaScript SDK.
     Required for PayPal buttons to open payment popups properly.
+    Also sets X-Request-ID for request correlation.
     """
+    import uuid
+    from flask import g
     response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
+    request_id = getattr(g, 'request_id', None) or str(uuid.uuid4())
+    response.headers['X-Request-ID'] = request_id
     return response
 
 # Initialize production logging
@@ -210,15 +215,18 @@ def login():
         return jsonify({'error': 'Authentication system not available'}), 503
 
     try:
-        auth_data = request.get_json()
+        auth_data = request.get_json() or {}
 
         username = auth_data.get('username')
         password = auth_data.get('password')
 
         if not username or not password:
             return jsonify({
-                'success': False,
-                'error': 'Username and password required'
+                'status': 'error',
+                'code': 'invalid_request',
+                'message': 'Username and password are required',
+                'details': {},
+                'request_id': None,
             }), 400
 
         # Authenticate user
@@ -1306,6 +1314,64 @@ def internal_error(error):
 
 def create_app():
     """Application factory for testing and programmatic use."""
+    try:
+        from sincor2.error_handling import register_error_handlers
+        register_error_handlers(app)
+    except Exception as e:
+        print(f"Error handlers not available: {e}")
+    try:
+        from sincor2.sinc_access import SINCAccessManager, SINCMeter
+        app.extensions["sinc_access"] = SINCAccessManager()
+        app.extensions["sinc_meter"] = SINCMeter()
+    except Exception as e:
+        print(f"SINC access manager not available: {e}")
+    try:
+        from sincor2.platform_bootstrap import bootstrap_platform
+        bootstrap_platform(app)
+    except Exception as e:
+        print(f"Platform bootstrap not available: {e}")
+    # Register Stripe processor into extensions so blueprints can access it.
+    try:
+        import sincor2.app as _self
+        stripe_cls = getattr(_self, "StripeCheckout", None)
+        if stripe_cls is None:
+            from sincor2.stripe_checkout import StripeCheckout as stripe_cls  # type: ignore[assignment]
+        app.extensions["stripe_checkout"] = stripe_cls(
+            api_key=os.environ.get("STRIPE_SECRET_KEY")
+        )
+    except Exception as e:
+        print(f"Stripe extension not available: {e}")
+    try:
+        from sincor2.blueprints.auth import auth_bp
+        app.register_blueprint(auth_bp)
+    except Exception as e:
+        print(f"Auth blueprint not available: {e}")
+    try:
+        from sincor2.blueprints.marketplace import marketplace_bp
+        app.register_blueprint(marketplace_bp)
+    except Exception as e:
+        print(f"Marketplace blueprint not available: {e}")
+    try:
+        from sincor2.blueprints.payments import payments_bp
+        app.register_blueprint(payments_bp)
+    except Exception as e:
+        print(f"Payments blueprint not available: {e}")
+    try:
+        from sincor2.blueprints.sinc import sinc_bp
+        app.register_blueprint(sinc_bp)
+    except Exception as e:
+        print(f"SINC blueprint not available: {e}")
+    try:
+        from sincor2.blueprints.waitlist import waitlist_bp
+        app.register_blueprint(waitlist_bp)
+    except Exception as e:
+        print(f"Waitlist blueprint not available: {e}")
+    try:
+        from sincor2.a2a_integration import A2ARouter
+        router = A2ARouter()
+        app.register_blueprint(router.blueprint)
+    except Exception as e:
+        print(f"A2A integration not available: {e}")
     return app
 
 

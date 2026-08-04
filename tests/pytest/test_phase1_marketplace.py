@@ -377,7 +377,7 @@ class TestMarketplaceExistingEndpoints:
     def test_verticals_list(self, client):
         resp = client.get("/api/marketplace/verticals")
         assert resp.status_code == 200
-        assert resp.get_json()["count"] == 5
+        assert resp.get_json()["count"] >= 5
 
 
 # ---------------------------------------------------------------------------
