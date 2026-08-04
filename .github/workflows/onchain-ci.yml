@@ -34,7 +34,7 @@ jobs:
 
       - name: Build
         working-directory: onchain
-        run: forge build --sizes
+        run: forge build --sizes --build-info
 
       - name: Test
         working-directory: onchain
@@ -65,4 +65,4 @@ jobs:
 
       - name: Run Slither (fails on medium+ findings)
         working-directory: onchain
-        run: slither . --config-file slither.config.json
+        run: slither . --config-file slither.config.json --ignore-compile
