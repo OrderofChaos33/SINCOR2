@@ -90,8 +90,8 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
     /// @notice Manual price update (Morpho-scaled). Only usable while useManual = true.
     /// @param newPrice Morpho-scaled value (e.g. 1.5e34 for $1.50)
     function updateManualPrice(uint256 newPrice) external onlyOwner whenNotPaused {
-        uint256 floorScaled = PRICE_FLOOR_8DEC * SCALE_FACTOR;
-        if (newPrice < floorScaled) revert PriceBelowFloor();
+        uint256 floorValue = PRICE_FLOOR_8DEC * SCALE_FACTOR;
+        if (newPrice < floorValue) revert PriceBelowFloor();
         _manualPrice = newPrice;
         _manualTimestamp = block.timestamp;
         emit PriceUpdated(newPrice, block.timestamp);
