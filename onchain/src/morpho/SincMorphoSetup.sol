@@ -41,7 +41,7 @@ contract SincMorphoSetup is Ownable {
     }
 
     /// @notice Create a Morpho market with SINC as collateral
-    function deployMarket(address loanToken, address irm, uint256 lltv) external onlyOwner returns (bytes32 marketId) {
+    function deployMarket(address loanToken, address irm, uint256 lltv) public onlyOwner returns (bytes32 marketId) {
         IMorpho.MarketParams memory params = IMorpho.MarketParams({
             loanToken: loanToken,
             collateralToken: address(SINC),
