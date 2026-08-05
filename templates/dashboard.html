@@ -139,7 +139,7 @@
     .agent-name{font-weight:600;font-size:.88rem}
     .role{font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--violet);background:rgba(157,140,255,.1);border:1px solid rgba(157,140,255,.2);padding:.08rem .4rem;border-radius:6px}
     .st{display:inline-flex;align-items:center;gap:.32rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.05em}
-    .st.active{color:var(--sig)} .st.idle{color:var(--amber)}
+    .st.active{color:var(--sig)} .st.idle{color:var(--amber)} .st.provisioning{color:var(--ink-3)}
     .st i{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
     .st.active i{animation:pulse 2.2s infinite}
     .agent-task{font-size:.79rem;color:var(--ink-3);margin-top:.28rem;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -293,30 +293,30 @@
       </div>
     </div>
 
-    {% if demo_mode %}
     <div class="demo">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-      <span><b>Sample telemetry.</b> Live per-agent metrics stream in once your SINC subscription is active.</span>
+      <span><b>Live telemetry coming soon.</b> Agent activity metrics will stream here once the swarm bus is connected to your account. Account and subscription details below are real.</span>
     </div>
-    {% endif %}
 
     <div class="wrap">
 
       <!-- KPI ROW -->
       <section>
-        <div class="eyebrow">Performance · last 7 days</div>
+        <div class="eyebrow">Account overview</div>
         <div class="kpis">
           {% for s in stats %}
           <div class="kpi rv" style="animation-delay:{{ loop.index0 * 60 }}ms">
             <div class="kpi-top">
               <span class="kpi-ic">{{ s.icon }}</span>
+              {% if s.delta %}
               <span class="kpi-delta {{ s.trend }}">
-                {% if s.trend == 'up' %}▲{% else %}▼{% endif %} {{ s.delta }}
+                {% if s.trend == 'up' %}▲{% elif s.trend == 'down' %}▼{% endif %} {{ s.delta }}
               </span>
+              {% endif %}
             </div>
             <div class="kpi-val">{{ s.value }}</div>
             <div class="kpi-lab">{{ s.label }} <span class="kpi-unit">/ {{ s.unit }}</span></div>
-            <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none" data-spark="{{ s.spark|join(',') }}"></svg>
+            {% if s.spark %}<svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none" data-spark="{{ s.spark|join(',') }}"></svg>{% endif %}
           </div>
           {% endfor %}
         </div>
@@ -332,7 +332,7 @@
             <div class="card">
               <div class="card-h">
                 <h3>Your Agent Team</h3>
-                <span class="meta">avg utilisation {{ avg_util }}%</span>
+                {% if avg_util is not none %}<span class="meta">avg utilisation {{ avg_util }}%</span>{% else %}<span class="meta">telemetry pending</span>{% endif %}
               </div>
               <div class="agent-list">
                 {% for a in agents %}
@@ -347,10 +347,17 @@
                     <div class="agent-task">{{ a.task }}</div>
                   </div>
                   <div class="agent-right">
+                    {% if a.util is not none %}
                     <div class="util">
                       <div class="util-bar"><div class="util-fill" style="width:{{ a.util }}%"></div></div>
                       <div class="util-txt">{{ a.util }}% load</div>
                     </div>
+                    {% else %}
+                    <div class="util">
+                      <div class="util-bar"><div class="util-fill" style="width:0%"></div></div>
+                      <div class="util-txt" style="color:var(--ink-3)">— pending</div>
+                    </div>
+                    {% endif %}
                     <span class="last">↻ {{ a.last }}</span>
                   </div>
                 </div>
@@ -361,9 +368,9 @@
 
           <!-- TIMELINE -->
           <section id="activity">
-            <div class="eyebrow">Live activity</div>
+            <div class="eyebrow">Account activity</div>
             <div class="card">
-              <div class="card-h"><h3>Recent Agent Actions</h3><span class="meta">auto-refresh 30s</span></div>
+              <div class="card-h"><h3>Account Events</h3><span class="meta">real events only</span></div>
               <div class="tl">
                 {% for e in timeline %}
                 <div class="tl-row">
@@ -381,6 +388,7 @@
           <div class="card">
             <div class="card-h"><h3>Resource Budget</h3><span class="meta">resets daily</span></div>
             <div class="use">
+              {% if usage.sinc_used is not none %}
               <div class="use-item">
                 <div class="use-top"><b>SINC compute</b><span class="use-num">{{ '{:,}'.format(usage.sinc_used) }} / {{ '{:,}'.format(usage.sinc_cap) }}</span></div>
                 <div class="bar"><i class="fill-sinc" style="width:{{ (usage.sinc_used / usage.sinc_cap * 100)|round }}%"></i></div>
@@ -393,6 +401,9 @@
                 <div class="use-top"><b>Tasks today</b><span class="use-num">{{ usage.tasks_today }} / {{ usage.tasks_cap }}</span></div>
                 <div class="bar"><i class="fill-task" style="width:{{ (usage.tasks_today / usage.tasks_cap * 100)|round }}%"></i></div>
               </div>
+              {% else %}
+              <p style="color:var(--ink-3);font-size:.85rem;padding:.5rem 0">Live usage telemetry is not yet available for your account. Data will appear here once agent activity begins.</p>
+              {% endif %}
             </div>
           </div>
 
@@ -400,7 +411,6 @@
             <div class="card-h"><h3>Your Plan</h3><span class="plan-badge">{{ tier|upper }}</span></div>
             <div class="plan">
               <div class="plan-row"><span>Agents provisioned</span><b>{{ num_agents }}</b></div>
-              <div class="plan-row"><span>Active now</span><b style="color:var(--sig)">{{ active_agents }}</b></div>
               {% if member_since %}<div class="plan-row"><span>Member since</span><b>{{ member_since }}</b></div>{% endif %}
               <div class="plan-row"><span>Renews</span><b>{{ renewal }}</b></div>
             </div>
