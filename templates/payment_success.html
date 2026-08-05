@@ -64,6 +64,9 @@
         </div>
 
         <div class="flex flex-col sm:flex-row gap-4">
+            <a href="/dashboard{% if session_id %}?session_id={{ session_id }}{% endif %}" class="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-3 px-6 rounded-xl font-bold text-center hover:from-emerald-700 hover:to-emerald-800 transition">
+                Open Membership Dashboard →
+            </a>
             <a href="/" class="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 px-6 rounded-xl font-bold text-center hover:from-purple-700 hover:to-purple-800 transition">
                 ← Back to Home
             </a>

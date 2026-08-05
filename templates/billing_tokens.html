@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Billing — SINCOR</title>
+  <title>Membership Dashboard — SINCOR</title>
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
@@ -17,7 +17,23 @@
     .mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--cyan)}
     .muted{color:var(--muted);font-size:14px}
     .active{color:var(--green);font-weight:700}
+    .expiring{color:#fbbf24;font-weight:700}
     .lapsed{color:#f87171;font-weight:700}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:rgba(6,182,212,.14);color:var(--cyan);font-size:12px;font-weight:700}
+    .hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}
+    .hero h1{margin:0 0 8px}
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .stack{display:flex;flex-direction:column;gap:10px}
+    .notice{padding:12px 14px;border-radius:10px;font-size:14px;border:1px solid rgba(255,255,255,.08);display:none}
+    .notice.info{display:block;background:rgba(6,182,212,.08);color:#bae6fd}
+    .notice.success{display:block;background:rgba(52,211,153,.1);color:#bbf7d0}
+    .notice.error{display:block;background:rgba(248,113,113,.1);color:#fecaca}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+    .metric{background:#0b1120;border:1px solid rgba(139,92,246,.18);border-radius:12px;padding:14px}
+    .metric .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+    .metric .value{font-size:24px;font-weight:700;margin-top:6px}
+    .empty{padding:14px;border:1px dashed rgba(255,255,255,.12);border-radius:12px}
+    @media (max-width:640px){.hero-actions{width:100%}.hero-actions a,.hero-actions button{flex:1;text-align:center;justify-content:center}}
     table{width:100%;border-collapse:collapse;font-size:14px}
     td,th{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
   </style>
@@ -25,58 +41,151 @@
 <body>
 <div class="wrap">
   <a href="/" class="muted">← Home</a>
-  <h1>Wallet billing</h1>
-  <p class="muted">Subscriptions are paid in <strong>SINC</strong> on Base. Connect the wallet you paid from.</p>
+  <div class="hero">
+    <div>
+      <span class="pill">Membership dashboard</span>
+      <h1>Your plan and wallet access</h1>
+      <p class="muted">Connect the wallet you used on Base to load active memberships, renewal dates, and quick account actions.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="btn-ghost" href="/dashboard">Open dashboard</a>
+      <a class="btn-ghost" href="/buy">Upgrade or renew</a>
+    </div>
+  </div>
+
+  <div id="status" class="notice info">Connect your wallet to load membership details.</div>
 
   <div class="card">
-    <button class="btn-primary" id="btn-connect" type="button">Connect wallet</button>
-    <p class="mono" id="wallet" style="margin-top:12px"></p>
-    <div id="subs" style="margin-top:16px"></div>
+    <div class="stack">
+      <button class="btn-primary" id="btn-connect" type="button">Connect wallet</button>
+      <p class="mono" id="wallet"></p>
+      <div id="wallet-picker" style="display:none; padding:14px; background:#0b1120; border:1px solid rgba(139,92,246,.18); border-radius:12px;">
+        <p class="muted" style="margin-bottom:10px">On mobile, open this page in your wallet app or use WalletConnect.</p>
+        <div class="hero-actions">
+          <button class="btn-ghost" type="button" data-wallet="metamask">MetaMask</button>
+          <button class="btn-ghost" type="button" data-wallet="coinbase">Coinbase Wallet</button>
+          <button class="btn-ghost" type="button" data-wallet="rainbow">Rainbow</button>
+          <button class="btn-ghost" type="button" data-wallet="walletconnect">WalletConnect</button>
+        </div>
+      </div>
+      <div id="metrics" class="grid" style="display:none"></div>
+      <div id="subs"></div>
+    </div>
   </div>
 
   <div class="card">
-    <p class="muted">Need a new plan or renewal?</p>
-    <a class="btn-ghost" href="/buy">Pay with SINC / AXM →</a>
+    <p class="muted">Need a new plan, renewal, or onboarding handoff?</p>
+    <div class="hero-actions">
+      <a class="btn-ghost" href="/buy">Pay with SINC / AXM →</a>
+      <a class="btn-ghost" href="/onboarding">Continue onboarding</a>
+    </div>
   </div>
 </div>
+<script src="/static/js/sinc_wallet.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 
+function setStatus(message, tone = 'info') {
+  const el = $('status');
+  el.className = 'notice ' + tone;
+  el.textContent = message;
+}
+
+function shortWallet(wallet) {
+  return wallet ? wallet.slice(0, 6) + '...' + wallet.slice(-4) : '';
+}
+
+function planTone(status, endDate) {
+  if (status !== 'active') return 'lapsed';
+  const diff = endDate.getTime() - Date.now();
+  return diff <= 7 * 24 * 60 * 60 * 1000 ? 'expiring' : 'active';
+}
+
+function planLabel(status, endDate) {
+  if (status !== 'active') return 'Expired';
+  return planTone(status, endDate) === 'expiring' ? 'Renew soon' : 'Active';
+}
+
+function renderMetrics(subs) {
+  const metrics = $('metrics');
+  const active = subs.filter((s) => s.status === 'active');
+  const latest = subs[0];
+  const nextEnd = latest?.period_end ? latest.period_end.slice(0, 10) : '—';
+  metrics.innerHTML = `
+    <div class="metric"><div class="label">Memberships</div><div class="value">${subs.length}</div></div>
+    <div class="metric"><div class="label">Active plans</div><div class="value">${active.length}</div></div>
+    <div class="metric"><div class="label">Current plan</div><div class="value">${latest?.product_name || 'None'}</div></div>
+    <div class="metric"><div class="label">Next renewal</div><div class="value">${nextEnd}</div></div>
+  `;
+  metrics.style.display = 'grid';
+}
+
 async function loadSubs(wallet) {
-  const res = await fetch('/api/platform/subscription?wallet=' + encodeURIComponent(wallet));
-  const data = await res.json();
   const el = $('subs');
-  if (!data.ok || !data.subscriptions.length) {
-    el.innerHTML = '<p class="muted">No subscriptions found for this wallet. <a href="/buy">Subscribe at /buy</a></p>';
-    return;
+  setStatus('Loading membership data…', 'info');
+  el.innerHTML = '';
+  $('metrics').style.display = 'none';
+  try {
+    const res = await fetch('/api/platform/subscription?wallet=' + encodeURIComponent(wallet));
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Could not load memberships');
+    if (!data.subscriptions.length) {
+      setStatus('No memberships were found for this wallet yet.', 'info');
+      el.innerHTML = '<div class="empty"><p class="muted">No subscriptions found for this wallet. <a href="/buy">Start a plan at /buy</a>.</p></div>';
+      return;
+    }
+    renderMetrics(data.subscriptions);
+    const now = new Date();
+    let html = '<table><tr><th>Plan</th><th>Status</th><th>Renews / ends</th><th></th></tr>';
+    data.subscriptions.forEach((s) => {
+      const end = new Date(s.period_end);
+      const tone = planTone(s.status, end);
+      const label = planLabel(s.status, end);
+      html += `<tr>
+        <td>${s.product_name}</td>
+        <td class="${tone}">${label}</td>
+        <td>${s.period_end ? s.period_end.slice(0, 10) : '—'}</td>
+        <td><a class="btn-ghost" href="/buy?plan=${encodeURIComponent(s.plan_id || '')}">Renew</a></td>
+      </tr>`;
+    });
+    html += '</table>';
+    el.innerHTML = html;
+    const latest = data.subscriptions[0];
+    const latestEnd = latest?.period_end ? new Date(latest.period_end) : now;
+    setStatus(
+      latest && latest.status === 'active' && latestEnd > now
+        ? `Loaded ${data.subscriptions.length} membership record(s) for ${shortWallet(wallet)}.`
+        : `Loaded membership history for ${shortWallet(wallet)}.`,
+      'success'
+    );
+  } catch (err) {
+    setStatus(err.message || 'Could not load memberships.', 'error');
+    el.innerHTML = '<div class="empty"><p class="muted">We could not load your membership details right now. Please try again or contact support.</p></div>';
   }
-  const now = new Date();
-  let html = '<table><tr><th>Plan</th><th>Status</th><th>Renews / ends</th><th></th></tr>';
-  data.subscriptions.forEach((s) => {
-    const end = new Date(s.period_end);
-    const active = end > now && s.status === 'active';
-    html += `<tr>
-      <td>${s.product_name}</td>
-      <td class="${active ? 'active' : 'lapsed'}">${active ? 'Active' : 'Expired'}</td>
-      <td>${s.period_end.slice(0, 10)}</td>
-      <td><a class="btn-ghost" href="/buy?plan=${s.plan_id}">Renew</a></td>
-    </tr>`;
-  });
-  html += '</table>';
-  el.innerHTML = html;
 }
 
 async function connect() {
-  if (!window.ethereum) { alert('Install MetaMask or Rabby'); return; }
-  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-  const w = accounts[0];
+  setStatus('Connecting wallet…', 'info');
+  const { account: w } = await window.SincWallet.connect();
   $('wallet').textContent = w;
   await loadSubs(w);
 }
 
-$('btn-connect').addEventListener('click', connect);
+SincWallet.wirePicker('wallet-picker');
+$('btn-connect').addEventListener('click', () => connect().catch((err) => {
+  const picker = $('wallet-picker');
+  if (picker && SincWallet.shouldShowMobilePicker()) picker.style.display = 'block';
+  setStatus(err.message || 'Wallet connection failed.', 'error');
+}));
 const q = new URLSearchParams(location.search).get('wallet');
 if (q) { $('wallet').textContent = q; loadSubs(q); }
+else {
+  SincWallet.getAccount().then((wallet) => {
+    if (!wallet) return;
+    $('wallet').textContent = wallet;
+    loadSubs(wallet);
+  }).catch(() => {});
+}
 </script>
 </body>
 </html>

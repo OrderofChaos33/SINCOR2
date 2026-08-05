@@ -60,11 +60,6 @@ def axiom():
     return render_template("axiom.html")
 
 
-@pages_bp.get("/dashboard")
-def dashboard():
-    return render_template("dashboard.html")
-
-
 @pages_bp.get("/operator")
 def operator_dashboard():
     return render_template("operator_dashboard.html")
