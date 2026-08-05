@@ -1,0 +1,19 @@
+{
+  "name": "sinc-aqua",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ship": "tsx scripts/ship-sinc-strategy.ts",
+    "ship:execute": "tsx scripts/ship-sinc-strategy.ts --execute"
+  },
+  "dependencies": {
+    "@1inch/aqua-sdk": "latest",
+    "@1inch/swap-vm-sdk": "latest",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
