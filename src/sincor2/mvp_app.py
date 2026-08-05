@@ -2210,8 +2210,7 @@ def dashboard():
     profile = {}
     p = db.execute('SELECT * FROM customer_profiles WHERE email=?', (email,)).fetchone()
     if p:
-        cols = [d[0] for d in db.execute('SELECT * FROM customer_profiles LIMIT 0').description]
-        profile = dict(zip(cols, p))
+        profile = dict(p)
 
     # Load most recent confirmed order
     order = {}
@@ -2264,7 +2263,6 @@ def dashboard():
          'task': 'Awaiting first task assignment'}
         for name, role, icon in agent_defs[:num_agents]
     ]
-    active_agents = 0
     avg_util = None
 
     # KPI tiles — no fabricated numbers; show real order count and join date
@@ -2296,10 +2294,10 @@ def dashboard():
         'dashboard.html',
         profile=profile, order=order, agents=agents, stats=stats,
         timeline=timeline, usage=usage,
-        tier=tier, num_agents=num_agents, active_agents=active_agents, avg_util=avg_util,
+        tier=tier, num_agents=num_agents, avg_util=avg_util,
         company=company, fname=fname, use_case=use_case,
         member_since=member_since, renewal=renewal,
-        email=email, demo_mode=False,
+        email=email,
         order_id=order.get('order_id', ''),
     )
 

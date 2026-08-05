@@ -228,7 +228,7 @@
     </a>
     <a class="nav-item" href="#agents">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-      Agents <span class="tag">{{ active_agents }}</span>
+      Agents <span class="tag">{{ agents|length }}</span>
     </a>
     <a class="nav-item" href="#activity">
       <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
@@ -276,11 +276,11 @@
       <div id="overview">
         <h1>{% if fname %}Welcome back, {{ fname }}{% else %}Agent Operations{% endif %}</h1>
         <div class="sub">
-          {% if company and company != 'Your Company' %}{{ company }} · {% endif %}{{ tier }} Plan · {{ use_case }}
+          {% if company %}{{ company }} · {% endif %}{{ tier }} Plan{% if use_case %} · {{ use_case }}{% endif %}
         </div>
       </div>
       <div class="top-actions">
-        <span class="live"><span class="dot"></span>{{ active_agents }}/{{ agents|length }} LIVE</span>
+        <span class="live"><span class="dot"></span>{{ agents|length }} PROVISIONED</span>
         <div class="seg" id="range">
           <button data-r="24h">24H</button>
           <button data-r="7d" class="on">7D</button>
@@ -288,7 +288,7 @@
         </div>
         <a class="btn btn-primary" href="/products/{{ tier|lower }}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Deploy Agent
+          Upgrade
         </a>
       </div>
     </div>
