@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import datetime, timezone
 
 from flask import Flask, g, has_request_context
 
@@ -11,6 +13,7 @@ _LOG_FORMAT = (
     "request_id=%(request_id)s correlation_id=%(correlation_id)s %(message)s"
 )
 _REQUEST_ID_FACTORY_INSTALLED = False
+_BOOT_RUN_ID = f"boot-{uuid.uuid4().hex[:12]}"
 
 
 def configure_logging() -> None:
@@ -63,11 +66,29 @@ def run_startup_initializers(app: Flask, settings: Settings) -> None:
     if not any(isinstance(log_filter, _RequestIdFilter) for log_filter in root_logger.filters):
         root_logger.addFilter(_RequestIdFilter())
 
-    app.logger.info("Startup complete")
+    def _boot_log(phase: str, outcome: str, detail: str) -> None:
+        app.logger.info(
+            "startup_event phase=%s outcome=%s run_id=%s ts=%s detail=%s",
+            phase,
+            outcome,
+            _BOOT_RUN_ID,
+            datetime.now(timezone.utc).isoformat(),
+            detail,
+        )
+
+    _boot_log("startup", "begin", "initializing runtime settings")
     app.config["SINCOR_SETTINGS"] = settings
+    _boot_log("startup", "ok", "settings bound to flask app")
     if not settings.stripe_secret_key:
-        app.logger.info("Stripe integration disabled: STRIPE_SECRET_KEY is not configured.")
+        _boot_log("stripe", "disabled", "STRIPE_SECRET_KEY not configured")
+    else:
+        _boot_log("stripe", "enabled", "STRIPE_SECRET_KEY configured")
     if not settings.anthropic_api_key:
-        app.logger.info("Anthropic integration disabled: ANTHROPIC_API_KEY is not configured.")
+        _boot_log("anthropic", "disabled", "ANTHROPIC_API_KEY not configured")
+    else:
+        _boot_log("anthropic", "enabled", "ANTHROPIC_API_KEY configured")
     if not settings.base_rpc_url:
-        app.logger.info("Base RPC integration disabled: BASE_RPC_URL is not configured.")
+        _boot_log("base_rpc", "disabled", "BASE_RPC_URL not configured")
+    else:
+        _boot_log("base_rpc", "enabled", "BASE_RPC_URL configured")
+    _boot_log("startup", "complete", "runtime startup initializers complete")

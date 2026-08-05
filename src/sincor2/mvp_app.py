@@ -9,8 +9,11 @@ import json
 import time
 import logging
 import sqlite3
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -665,12 +668,106 @@ PRODUCT_CATALOG = {
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint for Railway and monitoring."""
-    return jsonify({
-        'status': 'healthy',
+    return jsonify(_build_runtime_health_report(include_optional=True)), 200
+
+
+@app.route('/ready', methods=['GET'])
+def readiness():
+    """Readiness endpoint for deep infrastructure checks."""
+    payload = _build_runtime_health_report(include_optional=True)
+    status_code = 200 if payload.get('readiness', {}).get('ready') else 503
+    return jsonify(payload), status_code
+
+
+def _probe_database() -> tuple[bool, str]:
+    """Validate DB connectivity for runtime health."""
+    try:
+        with sqlite3.connect(DB_PATH, timeout=3) as conn:
+            conn.execute('SELECT 1').fetchone()
+        return True, 'ok'
+    except sqlite3.Error:
+        logger.exception('[HEALTH] database probe failed')
+        return False, 'db_error'
+
+
+def _probe_jsonrpc(url: str, method: str = 'eth_chainId', timeout: int = 3) -> tuple[bool, str]:
+    """Probe JSON-RPC endpoint and return readiness result."""
+    payload = json.dumps({'jsonrpc': '2.0', 'id': 'health', 'method': method, 'params': []}).encode('utf-8')
+    req = urllib_request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+    try:
+        with urllib_request.urlopen(req, timeout=timeout) as response:
+            body = json.loads(response.read().decode('utf-8'))
+        result = body.get('result')
+        if result:
+            return True, str(result)
+        return False, 'missing_result'
+    except (urllib_error.URLError, TimeoutError, ValueError, OSError):
+        logger.exception('[HEALTH] jsonrpc probe failed')
+        return False, 'rpc_error'
+
+
+def _build_runtime_health_report(include_optional: bool = True) -> dict:
+    """Build runtime health and readiness payload with component checks."""
+    run_id = request.headers.get('X-Run-ID', '')
+    request_id = request.headers.get('X-Request-ID', '')
+    correlation_id = request.headers.get('X-Correlation-ID', request_id or run_id)
+    now = datetime.utcnow().isoformat()
+
+    db_ready, db_detail = _probe_database()
+    base_rpc_url = os.environ.get('BASE_RPC_URL', '').strip()
+    base_ready, base_detail = (True, 'not_configured')
+    if base_rpc_url:
+        base_ready, base_detail = _probe_jsonrpc(base_rpc_url)
+
+    stripe_configured = bool((os.environ.get('STRIPE_SECRET_KEY') or '').strip())
+    paypal_configured = bool((os.environ.get('PAYPAL_REST_API_ID') or '').strip())
+    anthropic_configured = bool((os.environ.get('ANTHROPIC_API_KEY') or '').strip())
+
+    checks = {
+        'database': {'ready': db_ready, 'critical': True, 'detail': db_detail},
+        'base_rpc': {'ready': base_ready, 'critical': bool(base_rpc_url), 'detail': base_detail},
+        'stripe': {'ready': (not stripe_configured) or bool(STRIPE_AVAILABLE), 'critical': False, 'detail': 'configured' if stripe_configured else 'not_configured'},
+        'paypal': {'ready': True, 'critical': False, 'detail': 'configured' if paypal_configured else 'not_configured'},
+        'anthropic': {'ready': True, 'critical': False, 'detail': 'configured' if anthropic_configured else 'not_configured'},
+    }
+    if not include_optional:
+        checks = {k: v for k, v in checks.items() if v.get('critical')}
+
+    critical_ready = all(check['ready'] for check in checks.values() if check.get('critical'))
+    overall_ready = all(check['ready'] for check in checks.values())
+    degraded = critical_ready and not overall_ready
+    payload = {
+        'status': 'healthy' if critical_ready else 'degraded',
         'service': 'SINCOR2 MVP',
-        'timestamp': datetime.utcnow().isoformat(),
-        'version': '1.0.0-mvp'
-    }), 200
+        'timestamp': now,
+        'version': '1.0.0-mvp',
+        'checks': checks,
+        'readiness': {
+            'ready': critical_ready,
+            'degraded': degraded,
+            'confidence': 1.0 if critical_ready else 0.2,
+        },
+        'context': {
+            'run_id': run_id or f'health-{uuid.uuid4().hex[:12]}',
+            'agent_id': 'mvp_runtime',
+            'task_id': request_id or correlation_id or '-',
+            'correlation_id': correlation_id or '-',
+        },
+    }
+    logger.info(
+        '[HEALTH] %s',
+        json.dumps(
+            {
+                'event': 'runtime_health_probe',
+                'outcome': payload['status'],
+                'readiness': payload['readiness'],
+                'checks': {key: val.get('detail') for key, val in checks.items()},
+                'context': payload['context'],
+                'ts': now,
+            }
+        ),
+    )
+    return payload
 
 
 @app.route('/api/ops/schedulers', methods=['GET'])
