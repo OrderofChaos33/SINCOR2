@@ -107,7 +107,6 @@
 
     .content { position: relative; z-index: 2; }
 
-    /* NAV */
     nav {
       position: fixed; top: 0; left: 0; right: 0;
       z-index: 100;
@@ -138,7 +137,6 @@
       font-weight: 600 !important;
     }
 
-    /* HERO */
     .hero {
       padding: 160px 40px 80px;
       text-align: center;
@@ -203,7 +201,6 @@
     }
     .btn-secondary:hover { border-color: var(--purple); color: var(--purple-light); }
 
-    /* STATS STRIP */
     .stats-strip {
       max-width: 1100px; margin: 0 auto 80px;
       padding: 0 40px;
@@ -233,7 +230,6 @@
     }
     .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
-    /* MAIN GRID */
     .main-grid {
       max-width: 1100px; margin: 0 auto 80px;
       padding: 0 40px;
@@ -318,7 +314,6 @@
       }
     }
 
-    /* SWAP CARD */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -386,7 +381,6 @@
     .swap-info-row span:last-child { color: var(--text); }
     .swap-info-row .cyan { color: var(--cyan); }
 
-    /* TOKEN INFO CARD */
     .info-list { list-style: none; }
     .info-list li {
       display: flex; align-items: flex-start; gap: 12px;
@@ -413,7 +407,6 @@
     .tag-cyan { background: rgba(6,182,212,0.15); color: var(--cyan); }
     .tag-purple { background: rgba(139,92,246,0.15); color: var(--purple-light); }
 
-    /* CONTRACT SECTION */
     .contract-section {
       max-width: 1100px; margin: 0 auto 80px;
       padding: 0 40px;
@@ -463,7 +456,6 @@
     }
     .tokenlist-hint a { color: var(--cyan); }
 
-    /* FOOTER LINKS */
     .footer-links-grid {
       max-width: 1100px; margin: 0 auto 80px;
       padding: 0 40px;
@@ -493,7 +485,6 @@
     .footer-link-name { font-weight: 600; font-size: 14px; }
     .footer-link-sub { font-size: 12px; color: var(--text-muted); }
 
-    /* DISCLAIMER */
     .disclaimer {
       max-width: 700px; margin: 0 auto 80px;
       padding: 0 40px;
@@ -503,7 +494,6 @@
     }
     .disclaimer a { color: var(--purple-light); }
 
-    /* FOOTER */
     footer {
       border-top: 1px solid var(--border);
       padding: 32px 40px;
@@ -538,61 +528,49 @@
     <h1>The <span>SINCOR</span><br>Ecosystem Token</h1>
     <p>SINC powers the autonomous AI economy. Use it for platform access, agent services, and DeFi operations — all on Base.</p>
     <div class="hero-cta">
-      <a href="#buy-sinc" class="btn-primary">
+      <a href="#buy-usdc" class="btn-primary">
         🪙 Buy SINC
       </a>
       <a href="https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7" target="_blank" class="btn-secondary">
         View on Basescan ↗
       </a>
     </div>
-    <div style="margin-top:14px; font-size:13px; color:var(--text-muted); max-width:560px;">
-      SINC is LIVE on Base — bonding curve at <span class='mono'>0x75dE...619C</span>. Audited limit-order hook, soulbound Genesis NFT, LP burns to 0xdEaD at graduation. <a href='https://basescan.org/address/0x75dE341a2BC81806198364F125d4Cde36527619C' target='_blank' style='color:var(--cyan);'>Verify curve →</a>
+    <div style="margin-top:14px; font-size:13px; color:var(--text-muted); max-width:560px; margin-left:auto; margin-right:auto;">
+      SINC is LIVE on Base. Official path: USDC at the <strong style="color:var(--text)">$1.50/SINC floor</strong>. Audited limit-order hook, soulbound Genesis NFT, LP burns to 0xdEaD at graduation.
     </div>
   </div>
 
-  <!-- OFFICIAL FLOOR — $1.50 minimum, non-negotiable -->
+  <!-- OFFICIAL FLOOR -->
   <div style="max-width:720px; margin:20px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(6,182,212,0.12), rgba(139,92,246,0.1)); border:2px solid rgba(6,182,212,0.45); border-radius:12px; font-size:14px;">
-    <div style="font-weight:700; color:var(--cyan); margin-bottom:8px;">Official SINC price — $1.50 minimum (non-negotiable)</div>
+    <div style="font-weight:700; color:var(--cyan); margin-bottom:8px;">Official SINC price — $1.50 minimum</div>
     <span id="official-spot" style="font-size:32px; font-weight:800; font-family:'JetBrains Mono',monospace;">$1.50</span>
-    <span style="font-size:14px; color:var(--text-dim); margin-left:8px;">per SINC · USDC via hook floor only</span>
+    <span style="font-size:14px; color:var(--text-dim); margin-left:8px;">per SINC · USDC via hook floor</span>
     <div style="margin-top:10px; font-size:13px; color:var(--text-dim); line-height:1.5;">
-      Bonding-curve micro-prices and sub-floor discovery walls are <strong style="color:#f87171;">closed</strong>.
-      Wallets/Google showing ~$0.000009 are reading deprecated curve math — ignore it.
+      Official buys go through the USDC widget below at <strong style="color:var(--text)">$1.50/SINC or higher</strong>.
+      Third-party quotes can differ — verify against this floor before transacting.
     </div>
     <div style="margin-top:10px; font-size:12px; color:var(--text-muted);"><a href="/api/price/official" style="color:var(--cyan)">/api/price/official</a> · <a href="/.well-known/sinc-token.json" style="color:var(--cyan)">sinc-token.json</a></div>
   </div>
 
-  <!-- ROGUE V2 / AGGREGATOR WARNING -->
-  <div style="max-width:720px; margin:16px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(239,68,68,0.12), rgba(239,68,68,0.05)); border:2px solid rgba(239,68,68,0.45); border-radius:12px; font-size:14px; color:var(--text);">
-    <div style="font-weight:700; color:#f87171; margin-bottom:8px;">Wallets showing the wrong price?</div>
-    <div style="color:var(--text-dim); line-height:1.55;">
-      MetaMask / Blockscout / Li.Fi may route through a <strong style="color:var(--text);">rogue V2 pool</strong>
-      (<span class="mono" style="font-size:12px;">0x85372932…d667</span>) — fake quotes, not the curve.
-      <strong style="color:var(--text);"> Only trust the curve spot above</strong> or buy on this page.
-    </div>
-  </div>
-
-  <!-- "NO ROUTE ON DEX" EXPLAINER BANNER -->
-  <div style="max-width:720px; margin:16px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(245,158,11,0.08), rgba(245,158,11,0.04)); border:1px solid rgba(245,158,11,0.3); border-radius:12px; font-size:14px; color:var(--text);">
-    <div style="font-weight:600; color:#fbbf24; margin-bottom:6px;">Where to trade SINC today</div>
+  <!-- WHERE TO TRADE (neutral) -->
+  <div style="max-width:720px; margin:16px auto 0; padding:16px 20px; background:linear-gradient(90deg, rgba(6,182,212,0.08), rgba(139,92,246,0.06)); border:1px solid rgba(6,182,212,0.3); border-radius:12px; font-size:14px; color:var(--text);">
+    <div style="font-weight:600; color:var(--cyan); margin-bottom:6px;">Where to trade SINC</div>
     <div style="color:var(--text-dim); line-height:1.5;">
-      <strong style="color:var(--text);">Buy:</strong> USDC hook below — <strong>$1.50/SINC minimum</strong> (only official path).<br>
-      <strong style="color:var(--text);">ETH curve:</strong> closed on getsincor.com — do not use for pricing.<br>
-      <strong style="color:var(--text);">Sell → ETH:</strong> curve sell widget (curve-bought SINC only).<br>
-      <strong style="color:var(--text);">Sell → USDC/WETH:</strong> Kyber aggregator (depth limited until we seed more LP).
+      <strong style="color:var(--text);">Buy:</strong> USDC widget below — <strong>$1.50/SINC minimum</strong> (official path).<br>
+      <strong style="color:var(--text);">Sell → ETH:</strong> curve sell widget (curve-bought SINC).<br>
+      <strong style="color:var(--text);">Sell → USDC/WETH:</strong> Kyber aggregator (depth limited until more LP is seeded).
     </div>
   </div>
 
-  <!-- ETH CURVE CLOSED -->
-  <div id="buy-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid rgba(239,68,68,0.35); border-radius:14px;">
-    <div style="font-size:18px; font-weight:600; color:#f87171; margin-bottom:6px;">ETH bonding curve — closed</div>
+  <!-- GRADUATION / SHARE (neutral, was red "ETH curve closed") -->
+  <div id="buy-sinc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:1px solid var(--border-bright); border-radius:14px;">
+    <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Graduation progress</div>
     <div style="font-size:13px; color:var(--text-dim); line-height:1.55; margin-bottom:14px;">
-      Sub-$1.50 buys are not permitted. The legacy ETH curve showed micro-cent quotes — that path is disabled here.
-      <strong style="color:var(--text);">Use USDC below ($1.50/SINC minimum).</strong>
+      Official buys use the USDC path at <strong style="color:var(--text);">$1.50/SINC minimum</strong>. Graduation metric below is informational.
     </div>
     <div style="margin-bottom:14px; padding:12px; background:var(--bg-dark); border:1px solid var(--border); border-radius:8px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-size:12px; font-weight:600; color:var(--cyan); text-transform:uppercase;">Graduation Progress (legacy)</span>
+        <span style="font-size:12px; font-weight:600; color:var(--cyan); text-transform:uppercase;">Graduation Progress</span>
         <span id="grad-pct" style="font-size:13px; font-weight:700; color:var(--purple-light);">—</span>
       </div>
       <div style="height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;">
@@ -607,16 +585,16 @@
     <button id="buy-connect" type="button" style="display:none;" disabled></button>
     <button id="buy-go" type="button" style="display:none;" disabled></button>
     <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap;">
-      <a href="https://twitter.com/intent/tweet?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20Sourcify-verified%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%20%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#1d9bf0; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">𝕏 Share on X</a>
-      <a href="https://warpcast.com/~/compose?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%0A%0Abuy%3A%20getsincor.com%2Fsinc%0A%0Acurve%3A%200x75dE341a2BC81806198364F125d4Cde36527619C&embeds[]=https://getsincor.com/sinc" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#8a63d2; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">⌐◨-◨ Share on Farcaster</a>
+      <a href="https://twitter.com/intent/tweet?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20Sourcify-verified%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%20%0A%0Abuy%3A%20getsincor.com%2Fsinc" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#1d9bf0; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">𝕏 Share on X</a>
+      <a href="https://warpcast.com/~/compose?text=Just%20bought%20%24SINC%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20soulbound%20Genesis%20NFT%20for%20first%20buyers.%0A%0Abuy%3A%20getsincor.com%2Fsinc&embeds[]=https://getsincor.com/sinc" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#8a63d2; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">⌐◨-◨ Share on Farcaster</a>
       <a href="https://t.me/share/url?url=https%3A%2F%2Fgetsincor.com%2Fsinc&text=SINC%20live%20on%20Base%20%E2%80%94%20audited%20bonding%20curve%2C%20Sourcify-verified" target="_blank" rel="noopener" style="flex:1; min-width:140px; padding:10px; background:#0088cc; color:white; text-align:center; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600;">✈ Share on Telegram</a>
     </div>
   </div>
 
-  <!-- BUY SINC WITH USDC (HOOK ROUTER) — ONLY OFFICIAL PATH -->
+  <!-- BUY SINC WITH USDC -->
   <div id="buy-usdc" style="max-width:560px; margin:24px auto; padding:24px; background:var(--surface); border:2px solid var(--cyan); border-radius:14px; box-shadow:0 0 32px rgba(6,182,212,0.12);">
     <div style="font-size:18px; font-weight:600; margin-bottom:6px;">Buy SINC with USDC — $1.50 minimum</div>
-    <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Only official buy path. Pays USDC, receives SINC from hook floor sell walls at <strong>$1.50/SINC or higher</strong>. No sub-floor fills.</div>
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">Official buy path. Pays USDC, receives SINC from hook floor sell walls at <strong>$1.50/SINC or higher</strong>.</div>
     <div id="wallet-picker" style="display:none; margin-bottom:12px; padding:14px; background:var(--bg-dark); border:1px solid var(--border-bright); border-radius:10px;">
       <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">On mobile? Open in your wallet app:</div>
       <div style="display:flex; flex-direction:column; gap:8px;">
@@ -683,13 +661,13 @@
 
   <!-- ADOPTION CHECKLIST -->
   <div style="max-width:720px; margin:32px auto; padding:24px; background:var(--surface); border:1px solid var(--border); border-radius:14px;">
-    <div style="font-size:17px; font-weight:600; margin-bottom:4px;">📈 Adoption checklist (measurable)</div>
+    <div style="font-size:17px; font-weight:600; margin-bottom:4px;">📈 Adoption checklist</div>
     <div style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Incremental wins toward $1.50+ acceptability. Updated from on-chain state.</div>
     <ul style="list-style:none; font-size:14px; color:var(--text-dim); line-height:2;">
       <li>✅ CertiK 97 · Sourcify verified contracts</li>
       <li>✅ Bonding curve live · <span id="chk-curve-sold">—</span> SINC sold</li>
       <li>✅ $1.50+ hook ladder · ~20M SINC on limit-order hook</li>
-      <li id="chk-ramp">✅ Discovery ramp $0.10–$0.95 · 650k SINC on hook</li>
+      <li id="chk-ramp">✅ Discovery ramp · hook inventory</li>
       <li id="chk-router">✅ USDC buy widget · SincHookRouter on Base</li>
       <li id="chk-grad">⏳ Graduation · <span id="chk-grad-val">—</span> / 0.5 ETH</li>
       <li id="chk-tokenlist">✅ Token list live — <a href="/tokenlists/sincor.tokenlist.json" style="color:var(--cyan)">import URL</a> · <a href="/sinc/acceptance" style="color:var(--cyan)">acceptance hub</a></li>
@@ -727,13 +705,12 @@
     </div>
   </div>
 
-  <!-- MAIN GRID: SWAP + INFO -->
+  <!-- MAIN GRID -->
   <div class="main-grid">
 
-    <!-- RELAUNCH STATUS CARD -->
     <div class="card" id="relaunch-status">
-      <div class="card-title">⚡ Phase 1 Relaunch Status</div>
-      <div class="card-subtitle">Verifiable on-chain, no fake numbers, no shortcuts.</div>
+      <div class="card-title">⚡ Phase 1 Status</div>
+      <div class="card-subtitle">Verifiable on-chain. No shortcuts.</div>
 
       <ul class="info-list" style="margin-top:18px;">
         <li>
@@ -754,7 +731,7 @@
           <div class="info-icon">🧪</div>
           <div>
             <div class="info-text-label">Smart contracts</div>
-            <div class="info-text-value">Bonding curve, OZ LimitOrderHook, Soulbound Genesis NFT — DEPLOYED, CertiK Skynet submitted. <a href='https://basescan.org/address/0x75dE341a2BC81806198364F125d4Cde36527619C' target='_blank' style='color:var(--cyan);'>Curve</a> / <a href='https://basescan.org/address/0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09' target='_blank' style='color:var(--cyan);'>NFT</a> / <a href='https://basescan.org/address/0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0' target='_blank' style='color:var(--cyan);'>Hook</a></div>
+            <div class="info-text-value">Bonding curve, OZ LimitOrderHook, Soulbound Genesis NFT — DEPLOYED. <a href='https://basescan.org/address/0x75dE341a2BC81806198364F125d4Cde36527619C' target='_blank' style='color:var(--cyan);'>Curve</a> / <a href='https://basescan.org/address/0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09' target='_blank' style='color:var(--cyan);'>NFT</a> / <a href='https://basescan.org/address/0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0' target='_blank' style='color:var(--cyan);'>Hook</a></div>
           </div>
         </li>
         <li>
@@ -772,20 +749,19 @@
           </div>
         </li>
         <li>
-          <div class="info-icon">🚫</div>
+          <div class="info-icon">✅</div>
           <div>
-            <div class="info-text-label">Legacy v2 pool</div>
-            <div class="info-text-value">Retired. No migration claims. The new contract is the only canonical SINC.</div>
+            <div class="info-text-label">Canonical token</div>
+            <div class="info-text-value">Import the official token list so wallets resolve the correct contract and metadata.</div>
           </div>
         </li>
       </ul>
 
       <div style="margin-top:20px; padding:14px 16px; background:rgba(6,182,212,0.07); border:1px solid rgba(6,182,212,0.25); border-radius:10px; font-size:13px; color:var(--text-dim);">
-        <strong style='color:var(--cyan);'>Status:</strong> Phase 1 LIVE on Base mainnet. Bonding curve deployed at <span class='mono'>0x75dE341a2BC81806198364F125d4Cde36527619C</span>. Audited hook at <span class='mono'>0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</span>. Soulbound Genesis NFT at <span class='mono'>0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09</span>. CertiK Skynet scans submitted (scoring in progress). Every claim verifiable on Basescan.
+        <strong style='color:var(--cyan);'>Status:</strong> Phase 1 LIVE on Base mainnet. Bonding curve at <span class='mono'>0x75dE341a2BC81806198364F125d4Cde36527619C</span>. Audited hook at <span class='mono'>0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</span>. Genesis NFT at <span class='mono'>0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09</span>. Every claim verifiable on Basescan.
       </div>
     </div>
 
-    <!-- TOKEN INFO -->
     <div class="card">
       <div class="card-title">🪐 Token Details</div>
       <div class="card-subtitle">Verified on Base mainnet. CertiK Skynet 97/100. LP burns at V4 graduation.</div>
@@ -869,7 +845,7 @@
       Wallet import:
       <a href="/tokenlists/sincor.tokenlist.json" target="_blank" rel="noopener">getsincor.com/tokenlists/sincor.tokenlist.json</a>
       · Metadata: <a href="/.well-known/sinc-token.json" target="_blank" rel="noopener">sinc-token.json</a>
-      · <a href="/sinc/acceptance" style="color:var(--cyan)">acceptance &amp; whitelisting →</a>
+      · <a href="/sinc/acceptance" style="color:var(--cyan)">acceptance & whitelisting →</a>
       · Blockscout certify: <a href="https://base.blockscout.com/my-account/verified-addresses" target="_blank" rel="noopener">verified addresses</a>
     </div>
   </div>
@@ -887,7 +863,7 @@
       <div class="footer-link-icon">🛡️</div>
       <div>
         <div class="footer-link-name">Blockscout</div>
-        <div class="footer-link-sub">Certify via verified-addresses → clears suspicious UI</div>
+        <div class="footer-link-sub">Certify via verified-addresses</div>
       </div>
     </a>
     <a href="https://skynet.certik.com" target="_blank" class="footer-link-card">
@@ -948,12 +924,6 @@
   const SINC_CONTRACT = '0x9C8cd8d3961F445D653713dE65C6578bE11668e7';
   const SINC_LOGO = 'https://getsincor.com/static/tokenlists/assets/logo-256.png';
 
-  // Pre-launch: no V4 pool exists yet. Stats stay as placeholders until
-  // graduate() initializes the SINC/WETH pool on Uniswap V4 PoolManager.
-  // After deploy, set POOL_ID below and uncomment the live-price loop.
-  // const POOL_ID = '';
-  // async function loadPrice() { /* TODO: wire to V4 StateView once pool live */ }
-
   function copyContract() {
     navigator.clipboard.writeText(SINC_CONTRACT).then(() => {
       const btn = document.getElementById('copy-contract-btn');
@@ -963,10 +933,9 @@
     });
   }
 
-  // ============ LIVE CURVE STATS ============
   const RPC = 'https://mainnet.base.org';
   const CURVE_ADDR = '0x75dE341a2BC81806198364F125d4Cde36527619C';
-  const GRADUATION_WEI = 500000000000000000n; // 0.5 ETH
+  const GRADUATION_WEI = 500000000000000000n;
 
   async function rpcCall(to, data) {
     const r = await fetch(RPC, {
@@ -981,10 +950,10 @@
   async function refreshStats() {
     try {
       const [priceHex, ethHex, soldHex, gradHex] = await Promise.all([
-        rpcCall(CURVE_ADDR, '0xf5191c4d'), // currentPriceWei()
-        rpcCall(CURVE_ADDR, '0xa5cb6825'), // ethAccumulated()
-        rpcCall(CURVE_ADDR, '0x9899fccf'), // sincSold()
-        rpcCall(CURVE_ADDR, '0xe7c2b772')  // graduated()
+        rpcCall(CURVE_ADDR, '0xf5191c4d'),
+        rpcCall(CURVE_ADDR, '0xa5cb6825'),
+        rpcCall(CURVE_ADDR, '0x9899fccf'),
+        rpcCall(CURVE_ADDR, '0xe7c2b772')
       ]);
 
       const priceWei = BigInt(priceHex || '0x0');
@@ -992,9 +961,8 @@
       const sincSold = BigInt(soldHex || '0x0');
       const isGraduated = gradHex && gradHex !== '0x' && BigInt(gradHex) !== 0n;
 
-      // priceWei is ETH per 1 SINC (8 decimals), so per displayed SINC = priceWei / 1e18
       const priceEth = Number(priceWei) / 1e18;
-      const priceUsd = priceEth * 2100; // approx ETH price
+      const priceUsd = priceEth * 2100;
       const ethAccEth = Number(ethAcc) / 1e18;
       const sincSoldM = Number(sincSold) / 1e8 / 1e6;
       const gradPct = Math.min(100, Number(ethAcc * 10000n / GRADUATION_WEI) / 100);
@@ -1004,7 +972,6 @@
       if (priceEl) priceEl.textContent = isGraduated ? 'on V4' : ('$' + priceUsd.toPrecision(3));
       if (liqEl) liqEl.textContent = ethAccEth.toFixed(5) + ' ETH';
 
-      // Update graduation progress display
       const gradEl = document.getElementById('grad-progress');
       const gradPctEl = document.getElementById('grad-pct');
       const gradBarEl = document.getElementById('grad-bar');
@@ -1056,7 +1023,6 @@
   setInterval(refreshOfficialSpot, 15000);
   setInterval(refreshAcceptanceChecklist, 300000);
 
-  // ============ BUY WIDGET ============
   const CURVE = '0x75dE341a2BC81806198364F125d4Cde36527619C';
   const BASE_CHAIN_ID = SincWallet.BASE_CHAIN_ID;
 
@@ -1066,22 +1032,8 @@
     return p;
   }
 
-  function bs(msg, color) {
-    const el = document.getElementById('buy-status');
-    if (el) { el.textContent = msg; el.style.color = color || 'var(--cyan)'; }
-  }
-
-  // Read ?ref= query param (referrer wallet earns 3% of buys via this link)
   const refAddr = (new URLSearchParams(location.search)).get('ref');
   const validRef = refAddr && /^0x[a-fA-F0-9]{40}$/.test(refAddr) ? refAddr.toLowerCase() : null;
-
-  // Encode buy(uint256,address) calldata
-  function encodeBuy(ethInWeiHex) {
-    const selector = '0x7deb6025';
-    const ethInPadded = ethInWeiHex.replace('0x','').padStart(64,'0');
-    const referrer = (validRef ? validRef.replace('0x','') : '0000000000000000000000000000000000000000').padStart(64,'0');
-    return selector + ethInPadded + referrer;
-  }
 
   async function ensureBase() {
     await SincWallet.ensureBase();
@@ -1133,9 +1085,6 @@
     }
   }
 
-  // ETH curve buy disabled — $1.50 floor enforced via USDC hook only
-
-  // ============ SWAP WIDGET (Kyber + curve sell) ============
   const USDC_ADDR = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
   const WETH_ADDR = '0x4200000000000000000000000000000000000006';
   const KYBER_ROUTER = '0x6131B5fae19EA4f9D964eAc0408E4408b66337b5';
@@ -1278,9 +1227,8 @@
     });
   }
 
-  // ============ USDC → SINC HOOK ROUTER ============
   const HOOK_ROUTER = '0x11b86E85cC5170F4165c89ccb11332133B29E283';
-  const BUY_USDC_SEL = '0x0a7cc2db'; // buySincUsdcBase(uint256,uint256,address)
+  const BUY_USDC_SEL = '0x0a7cc2db';
   const USDC_DECIMALS = 6;
 
   function us(msg, color) {
@@ -1299,7 +1247,6 @@
   }
 
   function estMinSincOut(usdcAtoms) {
-    // $1.50/SINC floor with 5% slippage buffer — rejects sub-floor hook fills client-side
     const floorCents = BigInt(Math.round(SINC_FLOOR_USD * 100));
     return (usdcAtoms * 100n * 95n) / (floorCents * 100n);
   }
@@ -1375,4 +1322,3 @@
 {% include "_tf_badge.html" %}
 </body>
 </html>
-

@@ -1,13 +1,9 @@
-# src/sincor2/daily_ops_scheduler.py
-# (existing file - additive integration only)
-
 import logging
 
 try:
-    from src.sincor2.production_logger import get_logger
+    from sincor2.production_logger import get_logger
     logger = get_logger(__name__)
 except ImportError:
-    import logging
     logger = logging.getLogger(__name__)
 
 # ============================================
@@ -16,11 +12,15 @@ except ImportError:
 # ============================================
 
 try:
-    from src.sincor2.polyclaw_earning_scheduler import run_scheduled_cycle
+    from sincor2.polyclaw_earning_scheduler import run_scheduled_cycle
     POLYCLAW_EARNING_ENABLED = True
-except ImportError:
-    logger.warning("Polyclaw earning scheduler not available yet")
+except (Exception, SystemExit) as exc:
+    logger.warning("Polyclaw earning scheduler not available yet: %s", exc)
     POLYCLAW_EARNING_ENABLED = False
+
+from sincor2.scheduler import start_daily_ops_scheduler, stop_daily_ops_scheduler
+
+__all__ = ["run_daily_ops", "start_daily_ops_scheduler", "stop_daily_ops_scheduler"]
 
 
 def run_daily_ops():

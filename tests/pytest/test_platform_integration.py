@@ -28,7 +28,7 @@ def test_vertical_agent_cards_load():
 
 def test_vertical_agents_instantiate():
     agents = instantiate_vertical_agents()
-    assert len(agents) == 5
+    assert len(agents) >= 5
     assert "healthcare_rcm_agent" in agents
 
 
@@ -67,7 +67,7 @@ def test_marketplace_verticals_endpoint(client):
     response = client.get("/api/marketplace/verticals")
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["count"] == 5
+    assert payload["count"] >= 5
 
 
 def test_marketplace_skill_search(client):

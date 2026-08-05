@@ -82,7 +82,7 @@ class TestProofState:
 
 
 class TestHashingEncoder:
-    def _ps(self, goal: str = "⊢ P") -> "ProofState":
+    def _ps(self, goal: str = "⊢ P") -> "ProofState":  # noqa: F821
         from sincor2.sinax.encoder import ProofState
         return ProofState(goal=goal)
 
@@ -189,7 +189,7 @@ class TestEncoderRegistry:
 # Phase 2 — Graph Store
 # ===========================================================================
 
-def _make_node(goal: str, depth: int = 0) -> "ProofStateNode":
+def _make_node(goal: str, depth: int = 0) -> "ProofStateNode":  # noqa: F821
     from sincor2.sinax.graph_store import ProofStateNode
     from sincor2.sinax.encoder import ProofState, HashingEncoder
     ps = ProofState(goal=goal)
@@ -204,7 +204,7 @@ def _make_node(goal: str, depth: int = 0) -> "ProofStateNode":
 
 
 def _make_edge(src_id: str, tgt_id: str, tactic: str = "intro",
-               verified: bool = True) -> "TacticEdge":
+               verified: bool = True) -> "TacticEdge":  # noqa: F821
     from sincor2.sinax.graph_store import TacticEdge, VerificationResult
     return TacticEdge(
         edge_id=str(uuid.uuid4()),

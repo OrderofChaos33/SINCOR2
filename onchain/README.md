@@ -13,45 +13,55 @@ Foundry project for all SINCOR ecosystem smart contracts, deployed on **Base** (
 
 Both tokens: fixed supply, no mint, no owner, no tax, no proxy. Verified on Basescan.
 
+**Official price floor:** $1.50 USD per SINC (enforced in Morpho oracle + USDC hook path).
+
+**Treasury (owner for Morpho setup / oracle):** `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`
+
 ---
 
 ## Contract directory
 
 ```
 src/
-├── SINC_v3.sol            # SINC ERC-20 (100 M, 8 dec) — canonical token
-├── Axiom.sol              # AXIOM ERC-20 (1 B, 18 dec) — A2A settlement token
 ├── SincBondingCurve.sol   # Constant-product bonding curve for SINC Phase 1
 ├── SincGenesisNFT.sol     # Soulbound ERC-721 minted to Phase 1 buyers
-└── SincLimitOrderHook.sol # Uniswap V4 hook: limit orders + anti-sandwich fee
+├── SincLimitOrderHook.sol # Uniswap V4 hook: limit orders + anti-sandwich fee
+├── Axiom.sol              # AXIOM ERC-20 — A2A settlement token
+├── SincPriceOracle.sol    # Curve + ETH/USD style price helper
+├── interfaces/
+│   └── AggregatorV3Interface.sol  # Chainlink AggregatorV3
+└── morpho/
+    ├── SincChainlinkOracle.sol  # Morpho IOracle — hybrid manual+feed, hard $1.50 floor
+    ├── SincMorphoSetup.sol      # Morpho Blue market creation helper (AdaptiveCurveIRM)
+    └── SincStaking.sol          # Staking with pause + emergency withdraw
 
 script/
-├── 00_DeployMockSinc.s.sol         # Test helper — mock SINC for fork tests
-├── 01_DeployGenesisNFT.s.sol       # Deploy Genesis NFT (curve address needed)
-├── 02_DeployBondingCurve.s.sol     # Deploy SincBondingCurve
-├── 03_FundCurveWithSINC.s.sol      # Transfer 65 M SINC into curve
-├── 04_MineHookAddress.s.sol        # CREATE2 salt mining for hook permissions
-├── 05_DeployHook.s.sol             # Deploy SincLimitOrderHook at mined address
-└── 06_DeployAxiom.s.sol            # Deploy AXIOM token (reference / Sepolia)
-
-test/
-├── Integration.t.sol
-├── SincBondingCurve.Math.t.sol
-├── SincBondingCurve.Graduation.t.sol
-├── SincBondingCurve.Referral.t.sol
-├── SincBondingCurve.NFTMint.t.sol
-├── SincBondingCurve.NoRug.t.sol
-├── SincGenesisNFT.t.sol
-├── SincLimitOrderHook.t.sol
-└── SincLimitOrderHook.AntiSandwich.t.sol
+├── 00_DeployMockSinc.s.sol … 06_DeployAxiom.s.sol
+└── Deploy.s.sol, DeployMoebius.s.sol, …
 ```
 
-Root-level ABI files (used by the Flask backend and frontend):
+---
 
-| File | Description |
-|------|-------------|
-| `SINC_v3.sol` + `SINCBondingCurve_abi.json` | SINC token + legacy bonding curve ABI |
-| `Axiom_abi.json` | AXIOM token ABI |
+## Morpho Blue — SINC/USDC oracle (July 2026)
+
+`SincChainlinkOracle` implements Morpho’s `IOracle.price()` at **1e36 scale** for SINC (8 decimals) / USDC (6 decimals).
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `PRICE_FLOOR_8DEC` | `150_000_000` | $1.50 with 8-dec Chainlink-style answer |
+| `SCALE_FACTOR` | `1e26` | Converts 8-dec feed → Morpho 1e36 for 8/6 pair |
+| Floor Morpho-scaled | `1.5e34` | Minimum `price()` return |
+
+Behavior:
+
+- Starts in **manual mode** at exact floor (treasury owner).
+- `setFeed(address)` switches to Chainlink-style `AggregatorV3Interface`.
+- Any feed answer below $1.50 is **clamped to floor**.
+- Staleness, invalid round, and zero-price reverts are enforced.
+
+`SincMorphoSetup` targets Morpho Blue on Base (`0xBBBB…`) with AdaptiveCurveIRM and a `createSincUsdcMarket` helper.
+
+`SincStaking` supports reward accounting and `emergencyWithdraw` when paused.
 
 ---
 
@@ -69,11 +79,11 @@ Copy `onchain/.env.example` to `onchain/.env` and fill in:
 
 | Variable | Description |
 |----------|-------------|
-| `BASE_RPC_URL` | Base mainnet RPC (Alchemy / Infura) |
+| `BASE_RPC_URL` | Base mainnet RPC |
 | `BASE_SEPOLIA_RPC_URL` | Base Sepolia RPC |
-| `BASESCAN_API_KEY` | For contract verification |
-| `DEPLOYER_PRIVATE_KEY` | Hot wallet for scripts (NEVER the treasury key) |
-| `TREASURY_ADDRESS` | Treasury wallet — receives token supply at deploy |
+| `BASESCAN_API_KEY` | Contract verification |
+| `DEPLOYER_PRIVATE_KEY` | Hot wallet for scripts (never the treasury key) |
+| `TREASURY_ADDRESS` | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` |
 
 ## Test
 
@@ -82,27 +92,9 @@ forge test -vvv
 forge test --match-contract SincBondingCurve -vvv
 ```
 
-## Deploy to Sepolia
+## Deploy notes
 
-```bash
-# SINC ecosystem
-forge script script/01_DeployGenesisNFT.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast --verify
-forge script script/02_DeployBondingCurve.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast --verify
-
-# AXIOM (AXM)
-forge script script/06_DeployAxiom.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast --verify
-```
-
-## Deploy to Base mainnet
-
-```bash
-# SINC ecosystem — run in order; each script writes to runbook_state.json
-forge script script/01_DeployGenesisNFT.s.sol --rpc-url $BASE_RPC_URL --broadcast --verify
-forge script script/02_DeployBondingCurve.s.sol --rpc-url $BASE_RPC_URL --broadcast --verify
-forge script script/04_MineHookAddress.s.sol --rpc-url $BASE_RPC_URL
-forge script script/05_DeployHook.s.sol --rpc-url $BASE_RPC_URL --broadcast --verify
-forge script script/03_FundCurveWithSINC.s.sol --rpc-url $BASE_RPC_URL --broadcast
-```
+Deploy scripts live under `script/`. Run in order against Sepolia first, then Base. Morpho oracle / setup contracts should be deployed with **treasury as `initialOwner`**.
 
 ---
 
@@ -110,18 +102,16 @@ forge script script/03_FundCurveWithSINC.s.sol --rpc-url $BASE_RPC_URL --broadca
 
 | Bucket | Amount | Notes |
 |--------|--------|-------|
-| Bonding curve (Phase 1 + LP seed) | 65 M | Consumed by buyers, remainder paired into V4 LP and burned |
+| Bonding curve (Phase 1 + LP seed) | 65 M | Consumed by buyers; remainder paired into V4 LP and burned |
 | Concentrated $1.50 ceiling LP | 5 M | Single-tick V4 position |
-| Sell-side limit-order ladder | 20 M | 7 rungs $0.01 → $1.40 via SincLimitOrderHook |
+| Sell-side limit-order ladder | 20 M | Hook ladder |
 | Sablier 24-month linear vest | 10 M | Non-cancellable stream |
 
 ## Supply allocation (AXIOM — 1 B)
 
 | Bucket | Amount | Notes |
 |--------|--------|-------|
-| Ecosystem / A2A treasury | 80 % | Funds agent-to-agent payment pool |
+| Ecosystem / A2A treasury | 80 % | Agent-to-agent payment pool |
 | Team / development | 10 % | 24-month vest recommended |
 | Liquidity (Uniswap V4) | 10 % | Seeded at launch; LP burned |
-
-> 80 % of AXIOM trading fees are routed via the team wallet back into the SINCOR treasury (off-chain commitment, publicly auditable on Basescan).
 
