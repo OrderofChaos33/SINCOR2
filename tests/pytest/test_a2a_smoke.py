@@ -3,8 +3,6 @@
 """A2A integration smoke tests — covers the new skill catalogue, pricing,
 quote endpoint, settlement proof, leaderboard, and reputation routing."""
 
-import pytest
-
 # ── Discovery ────────────────────────────────────────────────────────────────
 
 def test_agent_card_endpoint(client):
