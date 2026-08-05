@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from flask import Blueprint, current_app, jsonify
 from flask_jwt_extended import jwt_required
+
+logger = logging.getLogger(__name__)
 
 monitoring_bp = Blueprint("monitoring", __name__)
 
@@ -83,3 +86,48 @@ def dashboard_metrics():
             },
         }
     )
+
+
+@monitoring_bp.get("/api/metrics/treasury")
+def treasury_metrics():
+    """
+    CEO KPI endpoint: treasury balances + 24h inflow ledger.
+
+    On-chain snapshot is best-effort. Ledger is always local and authoritative
+    for recorded events. Never exposes keys or signer material.
+    """
+    try:
+        from sincor2.treasury_inflow import get_treasury_snapshot, ledger_summary_24h
+    except ImportError:
+        try:
+            from src.sincor2.treasury_inflow import (
+                get_treasury_snapshot,
+                ledger_summary_24h,
+            )
+        except ImportError as exc:
+            logger.error("treasury_inflow import failed: %s", exc)
+            return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
+
+    include_onchain = True
+    try:
+        settings = current_app.config.get("SINCOR_SETTINGS")
+        if settings and not getattr(settings, "base_rpc_url", None):
+            # still attempt default public RPC inside get_treasury_snapshot
+            pass
+    except Exception:
+        pass
+
+    try:
+        snap = get_treasury_snapshot(include_onchain=include_onchain)
+        summary = ledger_summary_24h()
+        return jsonify(
+            {
+                "status": "ok",
+                "kpi": "treasury_inflow",
+                "snapshot": snap.to_dict(),
+                "ledger_24h": summary,
+            }
+        ), 200
+    except Exception as exc:
+        logger.exception("treasury metrics failed")
+        return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
