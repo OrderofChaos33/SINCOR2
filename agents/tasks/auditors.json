@@ -1,0 +1,21 @@
+{
+  "department": "auditors",
+  "tasks": [
+    {
+      "id": "auditors-validate-outputs",
+      "title": "Validate pending outputs",
+      "interval_minutes": 120,
+      "prompt": "Review all outputs in agents/results/ not yet validated. For each: correctness check, compliance check (no sanction exposure, no fabricated data, no overclaiming), security check for code. Verdict PASS/FAIL with reasons. FAILs route back to the producing department.",
+      "kpis": ["outputs_validated", "rejection_reasons_logged"],
+      "requires": []
+    },
+    {
+      "id": "auditors-eod-report",
+      "title": "EOD auditor report",
+      "interval_minutes": 1440,
+      "prompt": "Compile the end-of-day auditor report: PRs merged, CI status, test coverage deltas (unit/fuzz/invariant), compliance events, incidents, and a PASS/FAIL verdict on the day's output. This goes to the CEO review queue.",
+      "kpis": ["eod_reports"],
+      "requires": ["auditors-validate-outputs"]
+    }
+  ]
+}

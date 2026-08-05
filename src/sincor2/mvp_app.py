@@ -555,6 +555,9 @@ def sanitize_string(value, max_length=200):
 # DATABASE SETUP (SQLite for orders)
 # ============================================================================
 
+from sincor2.data_paths import migrate_legacy_orders_db  # noqa: E402
+
+
 DB_PATH = str(migrate_legacy_orders_db())
 
 

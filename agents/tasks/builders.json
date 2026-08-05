@@ -1,0 +1,21 @@
+{
+  "department": "builders",
+  "tasks": [
+    {
+      "id": "builders-ci-watch",
+      "title": "Watch SINCOR2 CI and open PRs",
+      "interval_minutes": 60,
+      "prompt": "Check OrderofChaos33/SINCOR2: failing CI runs, open PRs awaiting review, new issues. Summarize blockers and propose the next highest-ROI code action. Never merge without auditor validation.",
+      "kpis": ["ci_green", "prs_reviewed"],
+      "requires": []
+    },
+    {
+      "id": "builders-module-next",
+      "title": "Propose next DeFi module per TOA priority",
+      "interval_minutes": 720,
+      "prompt": "Given the current repo state (v4 hooks, SharedLiquidityVault, SincFluidAdapter, ComplianceGuard), propose the next module by projected fee capture / risk. Include: spec sketch, test plan (unit+fuzz+invariant), deploy path via `cd onchain && make ship`.",
+      "kpis": ["module_specs"],
+      "requires": ["builders-ci-watch"]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# SINCOR agent-ops — system cron for 24/7 operation
+# Install:  crontab agents/crontab.example   (edit REPO path first)
+# Requires: python3 (stdlib only), BASE_RPC_URL optional (defaults to publicnode)
+
+REPO=/path/to/SINCOR2
+
+# Dispatcher heartbeat — runs every due task, queues/dispatches envelopes
+*/15 * * * * cd $REPO && /usr/bin/python3 agents/runner.py --once >> agents/logs/runner.log 2>&1
+
+# Treasury scoreboard — hourly metrics heartbeat
+0 * * * * cd $REPO && /usr/bin/python3 agents/runner.py --metrics >> agents/logs/metrics.log 2>&1
+
+# TOA daily sync — 13:00 UTC (forecast-simulate-collapse, dispatch order)
+0 13 * * * cd $REPO && /usr/bin/python3 agents/runner.py --task toa-daily-sync >> agents/logs/toa.log 2>&1
+
+# Auditor EOD report — 22:00 UTC (CEO review queue)
+0 22 * * * cd $REPO && /usr/bin/python3 agents/runner.py --task auditors-eod-report >> agents/logs/auditors.log 2>&1
