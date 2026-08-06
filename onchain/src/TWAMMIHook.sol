@@ -344,7 +344,7 @@ contract TWAMMIHook is BaseHook, ReentrancyGuard {
         // Fee skim on gross executed volume (internalized + residual)
         uint256 grossVolume = accumZ + accumO;
         if (grossVolume > 0 && protocolFeeBps > 0) {
-            feeAmount = FullMath.mulDivUp(grossVolume, protocolFeeBps, 10_000);
+            feeAmount = FullMath.mulDivRoundingUp(grossVolume, protocolFeeBps, 10_000);
             rawResidual = rawResidual > feeAmount ? rawResidual - feeAmount : 0;
         }
         residual = rawResidual;
@@ -399,7 +399,7 @@ contract TWAMMIHook is BaseHook, ReentrancyGuard {
         // Post-swap: capture any fee from swap output and route to treasury.
         int128 amount1 = delta.amount1();
         if (amount1 > 0 && protocolFeeBps > 0) {
-            uint256 fee = FullMath.mulDivUp(uint256(int256(amount1)), protocolFeeBps, 10_000);
+            uint256 fee = FullMath.mulDivRoundingUp(uint256(int256(amount1)), protocolFeeBps, 10_000);
             _skimFeeToTreasury(Currency.unwrap(key.currency1), fee);
         }
         return (BaseHook.afterSwap.selector, 0);
