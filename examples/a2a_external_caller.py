@@ -26,8 +26,8 @@ import time
 import uuid
 from typing import Any, Dict, Optional
 
-import urllib.request
 import urllib.error
+import urllib.request
 
 PLATFORM = os.getenv("SINCOR_URL", "https://getsincor.com").rstrip("/")
 SIMULATE = os.getenv("A2A_SIMULATE", "0") == "1" or "--simulate" in sys.argv
@@ -78,7 +78,7 @@ def quote(skill_id: str) -> Dict[str, Any]:
 
 
 def submit(skill_id: str, input_text: str, tx_hash: Optional[str] = None) -> Dict[str, Any]:
-    print(f"[3] Submitting task …")
+    print("[3] Submitting task …")
     body = {
         "jsonrpc": "2.0",
         "id": str(uuid.uuid4()),
@@ -136,8 +136,8 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        card = discover()
-        q = quote(args.skill)
+        discover()
+        quote(args.skill)
 
         tx_hash = None
         if args.simulate or SIMULATE:
