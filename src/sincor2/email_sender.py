@@ -319,7 +319,7 @@ https://getsincor.com
     def _render_thank_you_email(self, customer_name: str, tier: str,
                                order_id: str, download_urls: Dict[str, str]) -> str:
         """Render thank-you email HTML."""
-        agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 42}
+        agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 45}
         agent_count = agent_counts.get(tier, 10)
 
         guide_url = download_urls.get(tier.lower(), f"/files/guides/sincor-{tier.lower()}-guide-{order_id}.pdf")
@@ -445,7 +445,7 @@ https://getsincor.com
 
             <h2 style="color: #667eea; margin-top: 30px;">Your {tier} Plan Includes</h2>
             <ul style="line-height: 2; color: #555;">
-                <li>{{'Scout, Synthesizer, Builder Agents' if tier == 'Starter' else 'All Scout/Synthesizer/Builder plus Negotiator, Caretaker Agents' if tier == 'Professional' else 'All 42 AI Agents with custom development'}} </li>
+                <li>{{'Scout, Synthesizer, Builder Agents' if tier == 'Starter' else 'All Scout/Synthesizer/Builder plus Negotiator, Caretaker Agents' if tier == 'Professional' else 'All 45 AI Agents with custom development'}} </li>
                 <li>{{'5 core integrations' if tier == 'Starter' else '15 enterprise integrations' if tier == 'Professional' else '25+ white-label integrations'}}</li>
                 <li>{{'Email support - 24 hour response' if tier == 'Starter' else 'Priority support - 4 hour response' if tier == 'Professional' else '24/7 dedicated success manager'}}</li>
                 <li>Full knowledge base access</li>
