@@ -3,8 +3,6 @@
 """A2A integration smoke tests — covers the new skill catalogue, pricing,
 quote endpoint, settlement proof, leaderboard, and reputation routing."""
 
-import pytest
-
 # ── Discovery ────────────────────────────────────────────────────────────────
 
 def test_agent_card_endpoint(client):
@@ -192,4 +190,3 @@ def test_a2a_settle_completed_task(client):
     assert pos.get("task_id") == task_id
     assert "result_hash" in pos
     assert "settled_at" in pos
-
