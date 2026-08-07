@@ -14,6 +14,9 @@ cycle now runs the REAL stack:
     execution_adapter                         CLOB FOK orders (dry-run default)
     shadow_portfolio                          silent 25% TOA-blend A/B twin
 
+On LIVE startup it also forces CLOB client init + on-chain USDC.e/CTF
+approvals so a quiet market scan cannot leave a funded wallet unapproved.
+
 It also registers the REAL ``/api/polyclaw/status`` view. Because mvp_app.py
 initialises this scheduler before defining its own legacy status route,
 Flask's first-registered rule wins and this real implementation serves the
@@ -24,11 +27,46 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 _scheduler: Optional[Any] = None
+_live_adapter: Optional[Any] = None
+_bootstrap_error: Optional[str] = None
+
+
+def _bootstrap_live_client() -> None:
+    """Warm CLOB client + on-chain allowances immediately in live mode.
+
+    Must not raise into the web worker — failures are logged and stored for
+    status. Without this, allowances only ran on the first successful order
+    path and never executed when no opportunity passed filters.
+    """
+    global _live_adapter, _bootstrap_error
+    if os.getenv("POLYCLAW_LIVE", "false").lower() != "true":
+        return
+    if not os.getenv("POLYMARKET_PRIVATE_KEY", "").strip():
+        _bootstrap_error = "POLYMARKET_PRIVATE_KEY not set"
+        logger.error("[POLYCLAW] live mode on but %s", _bootstrap_error)
+        return
+    try:
+        from sincor2.execution_adapter import PolymarketAdapter
+
+        adapter = PolymarketAdapter()
+        # Force full live init: API creds + USDC.e/CTF approvals + CLOB cache.
+        adapter._get_client()
+        _live_adapter = adapter
+        _bootstrap_error = None
+        logger.info(
+            "[POLYCLAW] live bootstrap OK address=%s allowances_ready=%s",
+            adapter.trading_address(),
+            adapter._allowances_ready,
+        )
+    except Exception as exc:
+        _bootstrap_error = str(exc)[:300]
+        logger.exception("[POLYCLAW] live bootstrap FAILED: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -42,11 +80,31 @@ def _status_view():
     scheduler_running = bool(
         _scheduler is not None and getattr(_scheduler, "running", False)
     )
+    live = os.getenv("POLYCLAW_LIVE", "false").lower() == "true"
+    addr = None
+    allowances_ready = False
+    if _live_adapter is not None:
+        try:
+            addr = _live_adapter.trading_address()
+            allowances_ready = bool(getattr(_live_adapter, "_allowances_ready", False))
+        except Exception:
+            pass
+    if addr is None:
+        try:
+            from sincor2.execution_adapter import PolymarketAdapter
+
+            addr = PolymarketAdapter().trading_address()
+        except Exception:
+            pass
+
     base = {
         "enabled": os.getenv("POLYCLAW_ENABLED", "true").lower() == "true",
         "scheduler_running": scheduler_running,
-        "live_mode": os.getenv("POLYCLAW_LIVE", "false").lower() == "true",
+        "live_mode": live,
         "cycle_interval_sec": int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "90")),
+        "trading_address": addr,
+        "allowances_ready": allowances_ready,
+        "bootstrap_error": _bootstrap_error,
         "timestamp": datetime.utcnow().isoformat(),
     }
     # Admin-only financial detail (auth helpers live in mvp_app; by request
@@ -124,7 +182,16 @@ def start_polyclaw_scheduler(app: Any = None) -> Optional[Any]:
 
     def _job() -> None:
         try:
-            result = run_cycle()
+            # Re-attempt bootstrap if a previous start failed (e.g. RPC blip).
+            if (
+                os.getenv("POLYCLAW_LIVE", "false").lower() == "true"
+                and (
+                    _live_adapter is None
+                    or not getattr(_live_adapter, "_allowances_ready", False)
+                )
+            ):
+                _bootstrap_live_client()
+            result = run_cycle(adapter=_live_adapter)
             if result.get("status") == "halted":
                 logger.warning("[POLYCLAW] cycle halted: kill switch")
         except Exception:
@@ -141,6 +208,15 @@ def start_polyclaw_scheduler(app: Any = None) -> Optional[Any]:
     )
     scheduler.start()
     _scheduler = scheduler
+
+    # Do not block gunicorn worker boot on Polygon RPC; run approvals async.
+    if os.getenv("POLYCLAW_LIVE", "false").lower() == "true":
+        threading.Thread(
+            target=_bootstrap_live_client,
+            name="polyclaw-live-bootstrap",
+            daemon=True,
+        ).start()
+
     logger.info(
         "[POLYCLAW] live scheduler started (every %ds, mode=%s)",
         interval,
@@ -150,11 +226,12 @@ def start_polyclaw_scheduler(app: Any = None) -> Optional[Any]:
 
 
 def stop_polyclaw_scheduler() -> None:
-    global _scheduler
+    global _scheduler, _live_adapter
     if _scheduler is not None and _scheduler.running:
         _scheduler.shutdown(wait=False)
         logger.info("[POLYCLAW] scheduler stopped")
     _scheduler = None
+    _live_adapter = None
 
 
 if __name__ == "__main__":
