@@ -1,5 +1,6 @@
 /**
  * SINCOR wallet helper — injected provider (desktop / in-app browser) + WalletConnect (mobile).
+ * Hard Base-only: no transaction is allowed unless eth_chainId === 0x2105 (8453).
  */
 (function (global) {
   const BASE_CHAIN_ID = '0x2105';
@@ -79,6 +80,9 @@
     return hasInjected() ? getInjected() : null;
   }
 
+  /**
+   * Attempt to switch/add Base. Does not re-verify after switch.
+   */
   async function ensureBase(provider) {
     provider = provider || getProvider();
     if (!provider) throw new Error('Wallet not connected');
@@ -102,11 +106,49 @@
     }
   }
 
+  /**
+   * Hard guard: switch if needed, then re-read chainId.
+   * Throws unless the wallet is confirmed on Base (0x2105).
+   * Call this immediately before every eth_sendTransaction.
+   */
+  async function requireBase(provider) {
+    provider = provider || getProvider();
+    if (!provider) throw new Error('Wallet not connected');
+
+    await ensureBase(provider);
+
+    // Re-read after switch — do not trust that the switch succeeded
+    const chainId = await provider.request({ method: 'eth_chainId' });
+    if (String(chainId).toLowerCase() !== BASE_CHAIN_ID) {
+      throw new Error(
+        'Wrong network. Switch to Base (chain 8453) and try again. ' +
+          'Current chainId: ' +
+          chainId
+      );
+    }
+    return provider;
+  }
+
+  /**
+   * Safe send: requireBase then eth_sendTransaction.
+   * params is the single tx object (from, to, data, value, ...).
+   */
+  async function sendTransaction(txParams) {
+    const provider = await requireBase();
+    if (!txParams || typeof txParams !== 'object') {
+      throw new Error('sendTransaction: missing tx params');
+    }
+    return provider.request({
+      method: 'eth_sendTransaction',
+      params: [txParams],
+    });
+  }
+
   async function connectViaInjected() {
     const p = getInjected();
     if (!p) throw new Error('No wallet in this browser');
     activeProvider = p;
-    await ensureBase(p);
+    await requireBase(p);
     const accounts = await p.request({ method: 'eth_requestAccounts' });
     if (!accounts || !accounts[0]) throw new Error('No account returned');
     return { provider: p, account: accounts[0] };
@@ -116,7 +158,7 @@
     const p = await getWalletConnectProvider();
     if (!p.session) await p.enable();
     activeProvider = p;
-    await ensureBase(p);
+    await requireBase(p);
     const accounts = await p.request({ method: 'eth_requestAccounts' });
     if (!accounts || !accounts[0]) throw new Error('WalletConnect: no account');
     return { provider: p, account: accounts[0] };
@@ -134,6 +176,20 @@
     if (!p) return null;
     const accounts = await p.request({ method: 'eth_accounts' });
     return accounts && accounts[0] ? accounts[0] : null;
+  }
+
+  /**
+   * True only if provider is present AND currently on Base.
+   */
+  async function isOnBase() {
+    const p = getProvider();
+    if (!p) return false;
+    try {
+      const chainId = await p.request({ method: 'eth_chainId' });
+      return String(chainId).toLowerCase() === BASE_CHAIN_ID;
+    } catch (_) {
+      return false;
+    }
   }
 
   function openMetaMask() {
@@ -193,6 +249,9 @@
     connectViaInjected,
     connectViaWalletConnect,
     ensureBase,
+    requireBase,
+    sendTransaction,
+    isOnBase,
     getAccount,
     openMetaMask,
     openCoinbaseWallet,
