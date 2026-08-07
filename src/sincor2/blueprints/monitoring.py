@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
 
 logger = logging.getLogger(__name__)
@@ -130,4 +130,78 @@ def treasury_metrics():
         ), 200
     except Exception as exc:
         logger.exception("treasury metrics failed")
+        return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
+
+
+@monitoring_bp.get("/api/polyclaw/bankroll")
+def polyclaw_bankroll():
+    """Current Polyclaw bankroll + risk gate snapshot."""
+    try:
+        from sincor2.bankroll import get_bankroll
+    except ImportError:
+        try:
+            from src.sincor2.bankroll import get_bankroll
+        except ImportError as exc:
+            return jsonify({"status": "error", "detail": str(exc)}), 503
+
+    try:
+        br = get_bankroll()
+        snap = br.snapshot()
+        open_trades = br.open_trades()
+        dry_open = sum(1 for t in open_trades if t.get("simulated"))
+        live_open = sum(1 for t in open_trades if not t.get("simulated"))
+        return jsonify({
+            "status": "ok",
+            "bankroll": snap,
+            "open_trades": {
+                "total": len(open_trades),
+                "dry_run": dry_open,
+                "live": live_open,
+            },
+            "limits": {
+                "start_capital": br.start_capital,
+                "max_position_pct": br.max_position_pct,
+                "max_leverage": br.max_leverage,
+                "daily_loss_pct": br.daily_loss_pct,
+                "max_drawdown": br.max_drawdown,
+            },
+        }), 200
+    except Exception as exc:
+        logger.exception("bankroll snapshot failed")
+        return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
+
+
+@monitoring_bp.post("/api/polyclaw/clear-dry-runs")
+def polyclaw_clear_dry_runs():
+    """Close all simulated/dry-run open trades and release stuck exposure.
+
+    This is the fix when available=$0 because dry-run cycles piled up
+    open exposure that never settled.
+    """
+    try:
+        from sincor2.bankroll import get_bankroll
+    except ImportError:
+        try:
+            from src.sincor2.bankroll import get_bankroll
+        except ImportError as exc:
+            return jsonify({"status": "error", "detail": str(exc)}), 503
+
+    try:
+        br = get_bankroll()
+        before = br.snapshot()
+        closed = br.clear_open_dry_runs()
+        # Also clear kill switch if it was tripped only by stale state
+        if br.kill_switch_active():
+            br.clear_kill_switch()
+        after = br.snapshot()
+        logger.info("cleared %d dry-run open trades | available $%.2f → $%.2f",
+                    closed, before.get("available", 0), after.get("available", 0))
+        return jsonify({
+            "status": "ok",
+            "closed_dry_runs": closed,
+            "before": before,
+            "after": after,
+        }), 200
+    except Exception as exc:
+        logger.exception("clear-dry-runs failed")
         return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
