@@ -62,6 +62,7 @@ class Bankroll:
         self.max_drawdown = float(os.getenv("TRADING_MAX_DRAWDOWN", "0.20"))
         self.max_leverage = float(os.getenv("TRADING_MAX_LEVERAGE", "3.0"))
         self._init_db()
+        self._auto_clear_stuck_dry_runs()
 
     # ------------------------------------------------------------------
     # Schema
@@ -109,6 +110,36 @@ class Bankroll:
                 "INSERT OR IGNORE INTO risk_state(key, value) VALUES('peak_equity', ?)",
                 (str(self.start_capital),),
             )
+
+    def _auto_clear_stuck_dry_runs(self) -> None:
+        """On startup: if exposure is over the leverage ceiling and every open
+        trade is simulated, close those dry-runs so available capital is not
+        permanently stuck at $0.
+        """
+        try:
+            exp = self.open_exposure()
+            cap = self.max_exposure()
+            if exp <= cap:
+                return
+            opens = self.open_trades()
+            if not opens:
+                return
+            if any(not t.get("simulated") for t in opens):
+                # Real live exposure exists — do not touch it.
+                logger.warning(
+                    "open exposure $%.2f exceeds max $%.2f but live trades present — not auto-clearing",
+                    exp, cap,
+                )
+                return
+            closed = self.clear_open_dry_runs()
+            if self.kill_switch_active():
+                self.clear_kill_switch()
+            logger.info(
+                "auto-cleared %d stuck dry-run trades (exposure $%.2f → available restored)",
+                closed, exp,
+            )
+        except Exception as exc:
+            logger.warning("auto-clear dry-runs failed: %s", exc)
 
     # ------------------------------------------------------------------
     # State helpers
