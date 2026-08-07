@@ -1,11 +1,11 @@
 {
   "name": "sinc-aqua",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "ship": "tsx scripts/ship-sinc-strategy.ts",
-    "ship:execute": "tsx scripts/ship-sinc-strategy.ts --execute"
+    "ship:dry-run": "tsx scripts/ship-sinc-strategy.ts --dry-run"
   },
   "dependencies": {
     "@1inch/aqua-sdk": "latest",
