@@ -1,0 +1,16 @@
+---
+engines:
+  eslint:
+    exclude_paths:
+      - "**/*"
+  pmd:
+    exclude_paths:
+      - "**/*"
+  "pmd-legacy":
+    exclude_paths:
+      - "**/*"
+
+exclude_paths:
+  - "requirements.lock"
+  - "static/**/*.jpg"
+  - "static/**/*.png"
