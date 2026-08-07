@@ -1,97 +1,80 @@
 # 1inch Aqua Integration for SINC (Base)
 
-**Status: LIVE**  
-Production ship path for SINC liquidity on 1inch Aqua (Base). No simulation default.
+**Status: LIVE (hardened 2026-08-07)**  
+Production ship path for SINC on 1inch Aqua. See `SECURITY.md` for pen-test findings and fixes.
 
-**Purpose:** Multiply effective SINC liquidity via 1inch Aqua shared self-custodial layer without locking tokens. One wallet balance backs multiple concurrent strategies (Shared Liquidity Ratio ≥ 2–3×).
+**Purpose:** Multiply effective SINC liquidity via shared self-custodial layer. One wallet balance backs multiple strategies (SLR ≥ 2–3×).
 
-## Critical Security Notes
+## Security gates (required)
 
-1. **Self-custodial by design.** Aqua registry never takes custody. Tokens remain in the maker wallet under a standard ERC-20 allowance. Tokens only move on a successful fill (atomic pull + push).
-2. **Allowance is revocable.** Revoke the Aqua registry allowance at any time.
-3. **No private keys in this repo.** Script uses `process.env.PRIVATE_KEY` only at runtime.
-4. **Live by default.** `pnpm ship` broadcasts. Use `--dry-run` only when you explicitly want calldata preview.
-5. **Official addresses only.** All contract addresses from the 1inch SDKs (`NetworkEnum.COINBASE`).
-6. **Complementary** to existing SharedLiquidityHook / Morpho setup — does not conflict.
+1. **Self-custodial** — tokens stay in maker wallet until fill; allowance revocable.
+2. **`CONFIRM=LIVE`** required for any broadcast (prevents accidental ships).
+3. **Amount caps** — default max 100k SINC / 5 WETH per ship (`MAX_SINC_SHIP` / `MAX_WETH_SHIP`).
+4. **Preflight** — balance, allowance, chainId 8453, estimateGas before send.
+5. **Pinned addresses** — SDK registry/router cross-checked against `constants.ts`.
+6. **Not the Polyclaw key** — use treasury / `ONCHAIN_EXECUTOR_PRIVATE_KEY` only.
+7. **No keys in repo** — `PRIVATE_KEY` env only; never logged.
 
-## Canonical Addresses (Base, chainId 8453)
+## Canonical addresses (Base)
 
-| Contract | Address | Notes |
-|----------|---------|-------|
-| Aqua Registry | `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` | From `@1inch/aqua-sdk` |
-| AquaSwapVMRouter | `0x111111338c5091e8440b67b168bae16a668ac0de` | From `@1inch/swap-vm-sdk` |
-| SINC | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | 8 decimals |
-| WETH | `0x4200000000000000000000000000000000000006` | 18 decimals |
-| USDC (native Circle) | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | 6 decimals |
+| Contract | Address |
+|----------|---------|
+| Aqua Registry | `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` |
+| AquaSwapVMRouter | `0x111111338c5091e8440b67b168bae16a668ac0de` |
+| SINC | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` |
+| WETH | `0x4200000000000000000000000000000000000006` |
+| USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| Treasury (maker) | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` |
 
-## Prerequisites
+## Setup
 
 ```bash
 cd onchain/aqua
 pnpm install
 ```
 
-## Approve tokens (one-time per token)
+Approve once:
 
-```solidity
-SINC.approve(0x1111113ccf1426a8e30e2bff5e005d929bf6a90a, type(uint256).max);
-WETH.approve(0x1111113ccf1426a8e30e2bff5e005d929bf6a90a, type(uint256).max);
+```text
+SINC.approve(0x1111113ccf1426a8e30e2bff5e005d929bf6a90a, max)
+WETH.approve(0x1111113ccf1426a8e30e2bff5e005d929bf6a90a, max)
 ```
 
-Or use https://1inch.com/aqua (handles approval + position creation).
-
-## Usage — LIVE
+## Usage
 
 ```bash
-# Default live ship (constant-product SINC/WETH, 0.30% fee)
+# Preview calldata only
+MAKER_ADDRESS=0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac pnpm ship:dry-run
+
+# LIVE ship
+CONFIRM=LIVE \
 MAKER_ADDRESS=0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac \
 PRIVATE_KEY=0x... \
 pnpm ship
 
-# Custom amounts
-SINC_AMOUNT=5000 WETH_AMOUNT=0.05 \
-MAKER_ADDRESS=0x... PRIVATE_KEY=0x... \
+# Custom size (still subject to caps)
+CONFIRM=LIVE SINC_AMOUNT=5000 WETH_AMOUNT=0.05 \
+MAKER_ADDRESS=0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac \
+PRIVATE_KEY=0x... \
 pnpm ship
-
-# Optional: preview calldata only
-MAKER_ADDRESS=0x... pnpm ship:dry-run
 ```
 
-Env overrides:
-- `SINC_AMOUNT` (default `1000`)
-- `WETH_AMOUNT` (default `0.01`)
-- `FEE_BPS` (default `30`)
-- `BASE_RPC_URL` (default `https://mainnet.base.org`)
-
-PRIVATE_KEY address **must** match MAKER_ADDRESS or the script aborts.
-
-## What the script does
-
-1. Builds `AquaXYCAmmStrategy.new().withFeeTokenIn(FEE_BPS).build()`
-2. Wraps in `Order.new({ maker, program, traits: MakerTraits.default() })`
-3. Calls `aqua.ship()` via official SDK → valid ship calldata
-4. Broadcasts on Base unless `--dry-run` is passed
-
-## Recommended positions
-
-1. Full-range / constant-product (this script) — discovery volume
-2. Concentrated around $1.50 floor — use `AquaXYCAmmStrategy.newConcentrate(...)` once basic flow is confirmed live
-3. Parallel SINC/USDC strategy for stable pair depth
+Env:
+- `SINC_AMOUNT` (default `1000`), `WETH_AMOUNT` (default `0.01`), `FEE_BPS` (default `30`)
+- `MAX_SINC_SHIP` / `MAX_WETH_SHIP` — raise only deliberately
+- `BASE_RPC_URL` — prefer private RPC in production
+- `CONFIRM=LIVE` — mandatory for broadcast
 
 ## What this does NOT do
 
-- Does not lock or transfer tokens into any pool
-- Does not create new Uniswap V4 pools
-- Does not touch SharedLiquidityVault or Morpho markets
-- Does not burn, mint, or change SINC supply
+- Lock tokens into a pool
+- Create Uniswap V4 pools
+- Touch SharedLiquidityVault / Morpho
+- Change SINC supply
 
 ## References
 
-- 1inch Aqua docs: https://business.1inch.com/portal/documentation/aqua/
-- Aqua SDK: https://github.com/1inch/sdks/tree/master/typescript/aqua
-- SwapVM SDK: https://github.com/1inch/sdks/tree/master/typescript/swap-vm
-- Aqua public app: https://1inch.com/aqua
-
----
-
-SINCOR / getsincor.com — LIVE 2026-08-07
+- `SECURITY.md` — this surface’s audit
+- `../AUDIT.md` — vault/hook/lending audit
+- https://business.1inch.com/portal/documentation/aqua/
+- https://1inch.com/aqua
