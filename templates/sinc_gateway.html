@@ -1036,7 +1036,7 @@
   const validRef = refAddr && /^0x[a-fA-F0-9]{40}$/.test(refAddr) ? refAddr.toLowerCase() : null;
 
   async function ensureBase() {
-    await SincWallet.ensureBase();
+    await SincWallet.requireBase();
   }
 
   SincWallet.wirePicker('wallet-picker');
@@ -1185,10 +1185,12 @@
         ss('Approve + swap in wallet...');
         const approveData = '0x095ea7b3000000000000000000000000' + KYBER_ROUTER.slice(2).toLowerCase()
           + atoms.toString(16).padStart(64, '0');
+        await SincWallet.requireBase();
         await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: SINC_CONTRACT, data: approveData }]
         });
+        await SincWallet.requireBase();
         const txHash = await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: built.routerAddress || KYBER_ROUTER, data: built.data, value: '0x0' }]
@@ -1210,11 +1212,13 @@
         ss('Curve sell: approve then sell...');
         const approveData = '0x095ea7b3000000000000000000000000' + CURVE.slice(2).toLowerCase()
           + atoms.toString(16).padStart(64, '0');
+        await SincWallet.requireBase();
         await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: SINC_CONTRACT, data: approveData }]
         });
         const sellData = '0xe4849b32' + atoms.toString(16).padStart(64, '0');
+        await SincWallet.requireBase();
         const txHash = await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: swapUser, to: CURVE, data: sellData }]
@@ -1302,11 +1306,13 @@
         us('Approve USDC, then buy through hook...');
         const maxApprove = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
         const approveData = '0x095ea7b3' + pad64(HOOK_ROUTER) + maxApprove.slice(2);
+        await SincWallet.requireBase();
         await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: usdcUser, to: USDC_ADDR, data: approveData }]
         });
         const buyData = BUY_USDC_SEL + pad64(usdcAtoms) + pad64(minSinc) + '0'.repeat(64);
+        await SincWallet.requireBase();
         const txHash = await walletProvider().request({
           method: 'eth_sendTransaction',
           params: [{ from: usdcUser, to: HOOK_ROUTER, data: buyData }]
