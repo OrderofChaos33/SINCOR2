@@ -7,6 +7,7 @@ gone. Everything here flows through the real stack:
 
     forecasting_engine.scan_opportunities()   real Polymarket data → model probs
     bankroll.can_open()                       equity-proportional risk gates
+    (optional) TOA gate                       re-score / gate top opportunities
     execution_adapter.place_market_buy()      CLOB FOK orders (dry-run default)
     bankroll.record_trade()                   durable SQLite ledger
     shadow_portfolio                          silent 25% TOA-blend A/B twin
@@ -16,7 +17,7 @@ Live mode requires ALL of:
   POLYMARKET_PRIVATE_KEY=0x...        (Polygon EOA, funded with USDC + MATIC)
   pip install py-clob-client
 
-Without them the runner still does the full scan/sizing loop but every order
+Without them the runner still does the full scan/size loop but every order
 is a clearly-logged dry run. There is no silent "looks live" mode anymore.
 
 Sizing policy — ALWAYS GROWING, no fixed dollar ceiling:
@@ -30,6 +31,10 @@ markets at a 0.75 book / 0.25 TOA blend. Resolved markets score both
 portfolios with real settlement math. Run `compare_performance()` any time
 for the live-vs-shadow scoreboard; promotion decisions come from that data.
 
+2026-08-07: Optional TOA gate (POLYCLAW_TOA_GATE=true) re-scores top
+opportunities before capital is committed. Richer signals (edge, liquidity,
+volume, hours_to_resolution) are passed when the gate is active.
+
 Run one cycle:    python -m sincor2.polyclaw_mega_aggressive_live
 Run forever:      POLYCLAW_LOOP=1 python -m sincor2.polyclaw_mega_aggressive_live
 """
@@ -40,6 +45,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -63,13 +69,19 @@ TREASURY_ADDRESS = os.getenv(
     "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 )
 
-MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.04"))          # 4% min |edge|
-MIN_CONFIDENCE = float(os.getenv("POLYCLAW_MIN_CONFIDENCE", "0.4"))
+MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.06"))          # raised for quality
+MIN_CONFIDENCE = float(os.getenv("POLYCLAW_MIN_CONFIDENCE", "0.50"))
 KELLY_FRACTION = float(os.getenv("POLYCLAW_KELLY_FRACTION", "0.5"))  # half-Kelly
 # Wager floor = Polymarket's ≈$1 exchange minimum.
 MIN_WAGER_USD = float(os.getenv("POLYCLAW_MIN_WAGER_USD", "1.0"))
-MAX_TRADES_PER_CYCLE = int(os.getenv("POLYCLAW_MAX_TRADES_PER_CYCLE", "3"))
+MAX_TRADES_PER_CYCLE = int(os.getenv("POLYCLAW_MAX_TRADES_PER_CYCLE", "2"))
 CYCLE_INTERVAL_SEC = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "90"))  # 90s loop
+
+# Optional TOA gate — when true, top opportunities are re-scored / gated by TOA
+# before capital is committed. Safe default is false so existing deployments
+# keep working; enable for tighter risk control.
+TOA_GATE_ENABLED = os.getenv("POLYCLAW_TOA_GATE", "false").lower() == "true"
+TOA_GATE_MIN_CONFIDENCE = float(os.getenv("POLYCLAW_TOA_GATE_MIN_CONF", "0.60"))
 
 
 def _kelly_size(fc: Forecast, side: str, equity: float, cap: float) -> float:
@@ -98,8 +110,71 @@ def _pick_side(fc: Forecast) -> tuple[str, str]:
     return "BUY_NO", (fc.token_id_no or "")
 
 
+def _hours_to_resolution(fc: Forecast) -> float:
+    """Best-effort hours until market end. Falls back to 72h if unknown."""
+    end = getattr(fc, "end_date", None) or (fc.__dict__.get("end_date") if hasattr(fc, "__dict__") else None)
+    if not end:
+        return 72.0
+    try:
+        if isinstance(end, str):
+            # Accept ISO or common formats
+            end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+        else:
+            end_dt = end
+        now = datetime.now(timezone.utc)
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=timezone.utc)
+        delta = (end_dt - now).total_seconds() / 3600.0
+        return max(0.0, delta)
+    except Exception:
+        return 72.0
+
+
+def _toa_gate_opportunity(fc: Forecast, bankroll_snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """Optional TOA re-score / gate for a single opportunity.
+
+    Returns {"allow": bool, "decision": dict or None, "reason": str}.
+    Never raises — on any failure it allows the trade (fail-open) so the
+    live loop remains robust.
+    """
+    if not TOA_GATE_ENABLED:
+        return {"allow": True, "decision": None, "reason": "toa_gate_disabled"}
+
+    try:
+        from integration.polyclaw_toa_decision_router import _get_router
+
+        router = _get_router()
+        hours = _hours_to_resolution(fc)
+        context = {
+            "available_capital_usd": bankroll_snapshot.get("available", bankroll_snapshot.get("equity", 50.0)),
+            "max_risk_pct": 0.08,
+            "equity_history": [bankroll_snapshot.get("equity", 50.0)] * 6,
+            "polyclaw_edge": abs(fc.edge),
+            "top_edge": abs(fc.edge),
+            "avg_edge": abs(fc.edge),
+            "top_confidence": fc.confidence,
+            "liquidity_usd": getattr(fc, "liquidity_usd", 0.0) or 0.0,
+            "volume_24h": getattr(fc, "volume_24h", 0.0) or 0.0,
+            "hours_to_resolution": hours,
+            "vault_yield_apr": 0.0,
+            "scenario_count": 20,  # lighter for per-trade gate
+        }
+        decision = router.get_toa_decision(context)
+        conf = float(decision.get("confidence", 0.0))
+        allow = decision.get("action") == "trade" and conf >= TOA_GATE_MIN_CONFIDENCE
+        reason = (
+            f"toa_allow conf={conf:.3f}"
+            if allow
+            else f"toa_block action={decision.get('action')} conf={conf:.3f} < {TOA_GATE_MIN_CONFIDENCE}"
+        )
+        return {"allow": allow, "decision": decision, "reason": reason}
+    except Exception as exc:
+        logger.debug("TOA gate failed open: %s", exc)
+        return {"allow": True, "decision": None, "reason": f"toa_gate_error_fail_open:{exc}"}
+
+
 def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
-    """One full scan → size → execute → record → shadow-score cycle."""
+    """One full scan → size → (optional TOA gate) → execute → record → shadow-score cycle."""
     bankroll = get_bankroll()
     adapter = adapter or PolymarketAdapter(bankroll)
 
@@ -110,9 +185,10 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
     snapshot = bankroll.snapshot()
     logger.info(
         "cycle start | equity=$%.2f exposure=$%.2f available=$%.2f "
-        "max_pos=$%.2f today=$%.2f%s",
+        "max_pos=$%.2f today=$%.2f toa_gate=%s%s",
         snapshot["equity"], snapshot["exposure"], snapshot["available"],
         snapshot["max_position"], snapshot["realized_today"],
+        TOA_GATE_ENABLED,
         "" if adapter.is_live() else " [DRY RUN]",
     )
 
@@ -133,6 +209,7 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
 
     opportunities = scan_opportunities(min_edge=MIN_EDGE)
     trades_taken: List[Dict[str, Any]] = []
+    toa_blocked = 0
 
     # Shadow portfolio silently paper-trades the same scan at 25% TOA blend.
     try:
@@ -140,7 +217,7 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         if shadow_opened:
             logger.info("[SHADOW] opened %d paper trades", shadow_opened)
     except Exception as exc:
-        logger.debug("shadow record failed: %s", exc)
+        logger.debug("shadow record failed: %s", exp)
 
     for fc in opportunities[:MAX_TRADES_PER_CYCLE]:
         if fc.confidence < MIN_CONFIDENCE:
@@ -154,6 +231,15 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
             logger.info("skip '%s' — Kelly size $%.2f below $%.2f wager floor",
                         fc.question[:60], size, MIN_WAGER_USD)
             continue
+
+        # Optional TOA gate before capital commitment
+        gate = _toa_gate_opportunity(fc, snapshot)
+        if not gate["allow"]:
+            toa_blocked += 1
+            logger.info("[TOA-GATE] blocked '%s' — %s", fc.question[:50], gate["reason"])
+            continue
+        if gate["decision"]:
+            logger.info("[TOA-GATE] allowed '%s' — %s", fc.question[:50], gate["reason"])
 
         result = adapter.place_market_buy(token_id, size)
         if not result.success:
@@ -175,6 +261,8 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
             "market_price": fc.market_price,
             "simulated": result.simulated,
             "order_id": result.order_id,
+            "toa_gated": TOA_GATE_ENABLED,
+            "toa_decision": gate.get("decision"),
         })
         logger.info(
             "%s %s $%.2f on '%s' | edge=%.1f%% model=%.2f mkt=%.2f",
@@ -189,6 +277,8 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         "live": adapter.is_live(),
         "opportunities": len(opportunities),
         "trades_taken": trades_taken,
+        "toa_blocked": toa_blocked,
+        "toa_gate_enabled": TOA_GATE_ENABLED,
         "bankroll": final,
         "ab_test": shadow_portfolio.compare_performance(),
         "treasury": TREASURY_ADDRESS,
@@ -210,7 +300,7 @@ def main() -> None:
             print(f"{k}: {v}")
         return
 
-    logger.info("starting loop, interval=%ds", CYCLE_INTERVAL_SEC)
+    logger.info("starting loop, interval=%ds, toa_gate=%s", CYCLE_INTERVAL_SEC, TOA_GATE_ENABLED)
     while True:
         try:
             run_cycle(adapter)
