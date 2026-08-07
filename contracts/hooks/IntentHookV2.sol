@@ -282,7 +282,7 @@ contract IntentHookV2 is BaseHook, ReentrancyGuard {
         uint256 totalSupply
     ) internal pure returns (uint256 reduction, uint256 newBalance) {
         if (totalSupply == 0) return (0, currentBalance);
-        reduction = FullMath.mulDivUp(sharesToBurn, currentBalance, totalSupply);
+        reduction = FullMath.mulDiv(sharesToBurn, currentBalance, totalSupply) + (mulmod(sharesToBurn, currentBalance, totalSupply) > 0 ? 1 : 0);
         newBalance = currentBalance > reduction ? currentBalance - reduction : 0;
         return (reduction, newBalance);
     }
