@@ -1,16 +1,16 @@
 """Bankroll and risk accounting for Polyclaw trading.
 
 Everything is PROPORTIONAL to current equity — there is no fixed dollar
-ceiling. The account starts at ``POLYCLAW_CAPITAL_USD`` (default $20) and
+ceiling. The account starts at ``POLYCLAW_CAPITAL_USD`` (default $50) and
 every limit scales as realized profit compounds:
 
     equity = starting capital + realized PnL   (open positions at cost)
 
-- Position size:   up to POLYCLAW_MAX_POSITION_PCT (15%) of equity
-                   → $20 bankroll ≈ $0.30–$3 wagers, $3,000 ≈ $30–$300
-- Total exposure:  up to TRADING_MAX_LEVERAGE (2x) of equity
-- Daily loss stop: POLYCLAW_DAILY_LOSS_PCT (25%) of equity → kill switch
-- Drawdown stop:   TRADING_MAX_DRAWDOWN (15%) off peak equity → kill switch
+- Position size:   up to POLYCLAW_MAX_POSITION_PCT (25%) of equity
+                   → $50 bankroll ≈ $1–$12.50 wagers, $3,000 ≈ $30–$750
+- Total exposure:  up to TRADING_MAX_LEVERAGE (3x) of equity
+- Daily loss stop: POLYCLAW_DAILY_LOSS_PCT (30%) of equity → kill switch
+- Drawdown stop:   TRADING_MAX_DRAWDOWN (20%) off peak equity → kill switch
 
 So the system is always growing: bigger equity → bigger wagers → bigger
 absolute limits, with the same relative discipline at every level.
@@ -55,12 +55,12 @@ class Bankroll:
         self.db_path = db_path or _db_path()
         self._lock = threading.Lock()
         # Starting bankroll — a floor, not a cap. Equity grows from here.
-        self.start_capital = float(os.getenv("POLYCLAW_CAPITAL_USD", "20"))
+        self.start_capital = float(os.getenv("POLYCLAW_CAPITAL_USD", "50"))
         # Proportional limits (fractions of current equity)
-        self.max_position_pct = float(os.getenv("POLYCLAW_MAX_POSITION_PCT", "0.15"))
-        self.daily_loss_pct = float(os.getenv("POLYCLAW_DAILY_LOSS_PCT", "0.25"))
-        self.max_drawdown = float(os.getenv("TRADING_MAX_DRAWDOWN", "0.15"))
-        self.max_leverage = float(os.getenv("TRADING_MAX_LEVERAGE", "2.0"))
+        self.max_position_pct = float(os.getenv("POLYCLAW_MAX_POSITION_PCT", "0.25"))
+        self.daily_loss_pct = float(os.getenv("POLYCLAW_DAILY_LOSS_PCT", "0.30"))
+        self.max_drawdown = float(os.getenv("TRADING_MAX_DRAWDOWN", "0.20"))
+        self.max_leverage = float(os.getenv("TRADING_MAX_LEVERAGE", "3.0"))
         self._init_db()
 
     # ------------------------------------------------------------------
@@ -184,11 +184,11 @@ class Bankroll:
     # -- Dynamic (equity-proportional) limits ---------------------------
 
     def max_position_size(self) -> float:
-        """Max notional for ONE position right now (15% of equity default)."""
+        """Max notional for ONE position right now (25% of equity default)."""
         return self.equity() * self.max_position_pct
 
     def daily_loss_limit_usd(self) -> float:
-        """Daily realized-loss stop in USD (25% of equity default)."""
+        """Daily realized-loss stop in USD (30% of equity default)."""
         return max(1.0, self.equity() * self.daily_loss_pct)
 
     def max_exposure(self) -> float:
@@ -252,6 +252,19 @@ class Bankroll:
                 "VALUES(?,?,?,?,1,'open')",
                 (self._now(), "dry-run", "BUY", size_usd),
             )
+
+    def clear_open_dry_runs(self) -> int:
+        """Close all simulated/dry-run open trades (releases stuck exposure).
+
+        Use this when dry-run cycles have piled up open exposure and the
+        bankroll is permanently at available=$0 even though nothing is live.
+        """
+        with self._connect() as conn:
+            cur = conn.execute(
+                "UPDATE trades SET status='closed', realized_pnl=0 "
+                "WHERE status='open' AND simulated=1"
+            )
+            return cur.rowcount
 
     # ------------------------------------------------------------------
     # Trade ledger
