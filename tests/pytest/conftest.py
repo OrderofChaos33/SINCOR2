@@ -1,6 +1,4 @@
 import os
-import pytest
-
 # Set test env before any sincor2 modules import (app.py calls create_app at import time).
 os.environ.setdefault("FLASK_ENV", "test")
 os.environ.setdefault("ENVIRONMENT", "test")
