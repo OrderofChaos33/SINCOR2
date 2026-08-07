@@ -10,7 +10,7 @@ Integrates:
 - Self-funding wheels (IntentHookV2 MEV, RehypothecationAdapter, AccountingHub) - NOW ACTIVATED
 
 TOA wiring (live):
-    market_context → KernelForecaster (Monte Carlo paths with DeFi signals)
+    market_context → KernelForecaster / Nixtla (Monte Carlo paths with richer DeFi signals)
                    → MonteCarloSimulator (utility scores: revenue, treasury_inflow, risk…)
                    → WFCCollapser (ranked action plan)
                    → confidence + size derived from composite_score + utility_score
@@ -18,9 +18,16 @@ TOA wiring (live):
 
 The router is a module-level singleton so the TOA feedback buffer accumulates
 across scheduled calls and the system genuinely improves over time.
+
+2026-08-07 upgrades:
+- Richer defi_signals (real edge, liquidity, volume, time-to-resolution, confidence)
+- Higher scenario_count (40 default)
+- Lower min_size_for_renegade for small bankrolls
+- Explicit utility/composite vs realized PnL calibration logging
 """
 
 import logging
+import os
 from typing import Any, Callable, Dict, Optional
 from datetime import datetime
 
@@ -58,10 +65,9 @@ except ImportError:
 # Python side triggers via deploy scripts or future adapter. For now: log + treasury record + script hook.
 
 # ---------------------------------------------------------------------------
-# Confidence gate: minimum composite score from TOA before committing capital.
-# Tighter than the old hardcoded 0.82 — driven by real simulation quality.
+# Confidence gate: minimum utility from TOA before committing capital.
 # ---------------------------------------------------------------------------
-_MIN_CONFIDENCE = 0.65
+_MIN_CONFIDENCE = float(os.getenv("TOA_MIN_CONFIDENCE", "0.65"))
 _MAX_CONFIDENCE = 0.95
 # Minimum position size used as denominator in quality scaling (prevents ÷0).
 _MIN_FEEDBACK_SIZE_USD = 1.0
@@ -72,6 +78,10 @@ _QUALITY_NEUTRAL = 3.0
 _QUALITY_SCALE_FACTOR = 2.0
 # Material PnL threshold above which self-funding wheels are triggered.
 _MATERIAL_PNL_THRESHOLD_USD = 50.0
+# Higher scenario count for better path exploration (was 10).
+_DEFAULT_SCENARIO_COUNT = int(os.getenv("TOA_SCENARIO_COUNT", "40"))
+# Lower Renegade threshold so small bankrolls can still use private routing when size justifies it.
+_DEFAULT_MIN_SIZE_RENEGADE = float(os.getenv("TOA_MIN_SIZE_RENEGADE", "150"))
 
 
 class PolyclawTOADecisionRouter:
@@ -79,12 +89,12 @@ class PolyclawTOADecisionRouter:
     Routes each Polyclaw earning cycle through the full TOA pipeline.
 
     TOA pipeline per cycle:
-      1. Build values series (bankroll equity or capital anchor) + DeFi signals.
-      2. KernelForecaster generates Monte Carlo scenario paths.
+      1. Build values series (bankroll equity or capital anchor) + richer DeFi signals.
+      2. KernelForecaster / Nixtla generates Monte Carlo scenario paths.
       3. MonteCarloSimulator scores paths on revenue/treasury_inflow/risk objectives.
       4. WFCCollapser collapses to ranked action plan.
-      5. Top action's composite_score → confidence; utility_score → position size.
-      6. After execution, ingest_feedback() feeds result back into TOA.
+      5. Top action's composite_score → risk; utility_score → confidence + position size.
+      6. After execution, ingest_feedback() feeds result back into TOA + calibration log.
 
     Renegade routing: orders >= min_size_for_renegade go through the dark pool
     circuit (protected by CircuitBreaker); smaller orders use public DEX path.
@@ -92,10 +102,11 @@ class PolyclawTOADecisionRouter:
 
     def __init__(self, config: Optional[Dict] = None):
         self.config = config or {
-            "min_size_for_renegade": 1000,
+            "min_size_for_renegade": _DEFAULT_MIN_SIZE_RENEGADE,
             "simulation_gate_enabled": True,
             "circuit_breaker_enabled": True,
             "renegade_circuit_name": "renegade_dark_pool",
+            "scenario_count": _DEFAULT_SCENARIO_COUNT,
         }
         self.toa: Optional["TOAOrchestrator"] = (
             TOAOrchestrator() if (_TOA_AVAILABLE and TOAOrchestrator is not None) else None
@@ -112,8 +123,12 @@ class PolyclawTOADecisionRouter:
         )
         self.treasury = TreasuryPolicy() if _TREASURY_AVAILABLE and TreasuryPolicy else None
         logger.info(
-            "[ROUTER] initialized | toa=%s circuit_breaker=%s treasury=%s",
-            _TOA_AVAILABLE, _CB_AVAILABLE and self.config.get("circuit_breaker_enabled"), _TREASURY_AVAILABLE,
+            "[ROUTER] initialized | toa=%s circuit_breaker=%s treasury=%s scenario_count=%s min_renegade=$%.0f",
+            _TOA_AVAILABLE,
+            _CB_AVAILABLE and self.config.get("circuit_breaker_enabled"),
+            _TREASURY_AVAILABLE,
+            self.config.get("scenario_count"),
+            self.config.get("min_size_for_renegade"),
         )
 
     # ------------------------------------------------------------------
@@ -141,19 +156,58 @@ class PolyclawTOADecisionRouter:
         available_capital = float(market_context.get("available_capital_usd", 5000.0))
         max_risk_pct = float(market_context.get("max_risk_pct", 0.08))
 
-        # Values series: use capital anchor as a flat baseline when no richer
-        # equity history is available.  A real history series (e.g. bankroll
-        # equity snapshots) will give the forecaster a better trend signal.
+        # Values series: prefer real equity history when provided.
         equity_history: list = market_context.get("equity_history") or [available_capital] * 6
 
+        # ------------------------------------------------------------------
+        # Richer defi_signals — real edge + liquidity/volume/time signals
+        # from forecasting_engine opportunities when available.
+        # ------------------------------------------------------------------
+        top_edge = float(market_context.get("polyclaw_edge", market_context.get("top_edge", 0.04)))
+        avg_edge = float(market_context.get("avg_edge", top_edge))
+        top_confidence = float(market_context.get("top_confidence", 0.5))
+        liquidity_usd = float(market_context.get("liquidity_usd", market_context.get("top_liquidity", 0.0)))
+        volume_24h = float(market_context.get("volume_24h", 0.0))
+        hours_to_resolution = float(market_context.get("hours_to_resolution", 72.0))
+        vault_yield_apr = float(market_context.get("vault_yield_apr", 0.0))
+
+        # Normalize time-to-resolution into a mild boost/penalty signal (near-term is noisier).
+        # >48h preferred; <12h heavily discounted in the edge we feed TOA.
+        time_factor = 1.0
+        if hours_to_resolution < 12:
+            time_factor = 0.4
+        elif hours_to_resolution < 24:
+            time_factor = 0.7
+        elif hours_to_resolution > 168:  # >1 week
+            time_factor = 0.9
+
+        effective_edge = max(0.0, top_edge * time_factor * (0.5 + 0.5 * top_confidence))
+
         defi_signals = {
-            "polyclaw_edge": float(market_context.get("polyclaw_edge", 0.04)),
-            "vault_yield_apr": float(market_context.get("vault_yield_apr", 0.0)),
+            "polyclaw_edge": effective_edge,
+            "vault_yield_apr": vault_yield_apr,
+            # Extra signals consumed by richer forecasters / future objectives
+            "avg_edge": avg_edge,
+            "top_confidence": top_confidence,
+            "liquidity_usd": liquidity_usd,
+            "volume_24h": volume_24h,
+            "hours_to_resolution": hours_to_resolution,
+            "time_factor": time_factor,
         }
+
+        scenario_count = int(
+            market_context.get("scenario_count", self.config.get("scenario_count", _DEFAULT_SCENARIO_COUNT))
+        )
 
         try:
             result = self.toa.run_defi(
-                context={"values": equity_history, "scenario_count": 10},
+                context={
+                    "values": equity_history,
+                    "scenario_count": scenario_count,
+                    # Pass liquidity/volume as soft context for future objective use
+                    "liquidity_usd": liquidity_usd,
+                    "volume_24h": volume_24h,
+                },
                 defi_signals=defi_signals,
             )
         except Exception as exc:
@@ -185,17 +239,14 @@ class PolyclawTOADecisionRouter:
         composite = float(top.get("composite_score", 0.0))
         utility = float(top.get("utility_score", 0.0))
 
-        # Confidence: utility_score reflects how well the top path scores on
-        # revenue/treasury_inflow/risk objectives — this is what matters for
-        # the go/no-go decision.  composite_score (utility × probability)
-        # drives risk level but shouldn't gate confidence by itself, because
-        # with equal probability paths it's small even when quality is high.
+        # Confidence: utility_score is the primary go/no-go signal.
         confidence = round(min(_MAX_CONFIDENCE, utility), 4)
 
         # Position size: equity-proportional, utility-scaled.
         size_usd = round(available_capital * max_risk_pct * utility, 2)
 
-        # Routing: Renegade for large/private orders; public DEX otherwise.
+        # Routing: Renegade for larger/private orders; public otherwise.
+        # Threshold is now low enough for small bankrolls to benefit when size justifies it.
         route = (
             "renegade"
             if size_usd >= self.config["min_size_for_renegade"]
@@ -216,12 +267,15 @@ class PolyclawTOADecisionRouter:
             "toa_utility": utility,
             "toa_top_rationale": top.get("rationale", ""),
             "toa_feedback_signal": result.get("feedback_summary", {}).get("feedback_signal", 0.5),
+            "effective_edge_fed": effective_edge,
+            "time_factor": time_factor,
+            "scenario_count": scenario_count,
             "timestamp": datetime.utcnow().isoformat(),
         }
 
         logger.info(
-            "[ROUTER] TOA decision: %s via %s | size=$%.2f | confidence=%.3f | composite=%.4f",
-            decision["action"], route, size_usd, confidence, composite,
+            "[ROUTER] TOA decision: %s via %s | size=$%.2f | confidence=%.3f | composite=%.4f | edge_fed=%.3f | scenarios=%d",
+            decision["action"], route, size_usd, confidence, composite, effective_edge, scenario_count,
         )
         return decision
 
@@ -237,11 +291,11 @@ class PolyclawTOADecisionRouter:
         """Run one full earning cycle.
 
         Steps:
-        1. Get TOA decision (real pipeline).
+        1. Get TOA decision (real pipeline with richer signals).
         2. Apply simulation gate (confidence threshold).
         3. Route via Renegade (circuit-breaker protected) or public DEX.
         4. Execute via Polyclaw.
-        5. Feed result back into TOA feedback loop.
+        5. Feed result back into TOA feedback loop + calibration log.
         """
         decision = self.get_toa_decision(market_context)
 
@@ -276,21 +330,24 @@ class PolyclawTOADecisionRouter:
         }
 
     # ------------------------------------------------------------------
-    # Post-execution: feedback + self-funding (ACTIVATED)
+    # Post-execution: feedback + self-funding + calibration logging
     # ------------------------------------------------------------------
 
     def _record_and_trigger_self_funding(self, execution_result: Dict, decision: Dict) -> None:
         """Feed trade result into TOA and trigger self-funding wheels on material PnL.
-        Now wired: Treasury record + onchain hooks trigger notes/scripts.
+        Explicitly logs utility/composite vs realized PnL for live calibration.
         """
         pnl = float(execution_result.get("pnl_usd", 0.0))
+        utility = float(decision.get("toa_utility", 0.0))
+        composite = float(decision.get("toa_composite", 0.0))
+        size = max(abs(float(decision.get("size_usd", 0.0))), _MIN_FEEDBACK_SIZE_USD)
 
         # Always feed result back into TOA so the forecaster improves next cycle.
         if self.toa is not None:
-            size = max(abs(float(decision.get("size_usd", 0.0))), _MIN_FEEDBACK_SIZE_USD)
-            # Quality scale: neutral at _QUALITY_NEUTRAL; each +50%/-50% realised
-            # PnL versus position size shifts quality by ±1 point before clamping.
-            quality = max(_QUALITY_MIN, min(_QUALITY_MAX, _QUALITY_NEUTRAL + (pnl / size) * _QUALITY_SCALE_FACTOR))
+            quality = max(
+                _QUALITY_MIN,
+                min(_QUALITY_MAX, _QUALITY_NEUTRAL + (pnl / size) * _QUALITY_SCALE_FACTOR),
+            )
             self.toa.ingest_feedback({
                 "source": "polyclaw_execution",
                 "payload": {
@@ -299,25 +356,28 @@ class PolyclawTOADecisionRouter:
                     "pnl_usd": pnl,
                     "route": decision.get("route"),
                     "confidence": decision.get("confidence"),
+                    "toa_utility": utility,
+                    "toa_composite": composite,
                 },
             })
+
+        # Calibration log — track TOA scores vs realized outcome for gate/size tuning.
+        logger.info(
+            "[TOA-CALIB] utility=%.4f composite=%.4f size=$%.2f pnl=$%.2f success=%s route=%s conf=%.3f",
+            utility, composite, size, pnl, pnl >= 0, decision.get("route"), decision.get("confidence", 0.0),
+        )
 
         if abs(pnl) > _MATERIAL_PNL_THRESHOLD_USD:
             logger.info(
                 "[ROUTER] material PnL=%.2f — SELF-FUNDING WHEELS ACTIVATED (AccountingHub / RehypothecationAdapter / IntentHookV2)",
                 pnl,
             )
-            # ACTIVATED: Record to treasury
             if self.treasury:
                 try:
-                    self.treasury.record_inflow(pnl * 0.8, source="polyclaw_self_funding")  # 80% to treasury example
+                    self.treasury.record_inflow(pnl * 0.8, source="polyclaw_self_funding")
                 except Exception as e:
                     logger.warning(f"Treasury record failed: {e}")
 
-            # Onchain triggers (run these scripts manually or via scheduler for now):
-            # 1. AccountingHub.record_trade(...) - use onchain/script or future Python adapter
-            # 2. RehypothecationAdapter on yield spread > threshold
-            # 3. Route large SINC via Renegade/IntentHookV2 (zero public impact) - see onchain/script/Deploy*.s.sol
             logger.info("[ROUTER] Self-funding onchain hooks queued. Run onchain/script/deploy-base.sh or specific hook scripts to capture MEV/fees to Treasury.")
 
         logger.info(
