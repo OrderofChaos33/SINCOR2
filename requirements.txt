@@ -42,8 +42,10 @@ resend==2.7.0
 anthropic==0.39.0
 aiohttp==3.10.10
 
-# Polyclaw live trading (Polymarket CLOB)
+# Polyclaw live trading (Polymarket CLOB + on-chain EOA approvals)
 py-clob-client>=0.17.0
+web3>=6.0.0
+eth-account>=0.10.0
 
 # Scheduling & Async
 APScheduler==3.10.4
