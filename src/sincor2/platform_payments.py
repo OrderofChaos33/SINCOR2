@@ -72,7 +72,7 @@ PLATFORM_PLANS: dict[str, dict[str, Any]] = {
         "usd_reference": 2997,
         "token": "SINC",
         "billing": "month",
-        "agents": 42,
+        "agents": 45,  # up to 45; orchestration agent decides dispatch count
     },
 }
 
@@ -315,6 +315,7 @@ def list_plans() -> list[dict[str, Any]]:
                 "treasury": TREASURY,
                 "chain_id": CHAIN_ID,
                 "spot_available": display > 0,
+                "agents": plan.get("agents"),
             }
         )
     return out

@@ -263,7 +263,7 @@ class OrderFulfillmentSystem:
         agent_counts = {
             'Starter': 10,
             'Professional': 25,
-            'Enterprise': 42
+            'Enterprise': 45  # up to 45; orchestration decides dispatch
         }
         return agent_counts.get(plan_name, 0)
 
