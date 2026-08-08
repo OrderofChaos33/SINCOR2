@@ -108,7 +108,7 @@ _ERC1155_ABI = [
         "stateMutability": "nonpayable",
         "inputs": [
             {"name": "operator", "type": "address"},
-            {"name": "approved", "type": "bool"},
+            {"name": "approved", "type": "bool"}],
         ],
         "outputs": [],
     },
@@ -169,6 +169,45 @@ def clear_kill_switch() -> None:
         get_bankroll().clear_kill_switch()
     finally:
         HALT_FILE.unlink(missing_ok=True)
+
+
+def _make_polygon_web3(rpc_url: str) -> "Web3":
+    """Create a Web3 instance for Polygon with POA middleware injected.
+
+    Polygon (and most L2s that still carry extraData) will raise
+    ExtraDataLengthError without this. Must be applied before any
+    eth.get_balance / estimate_gas / etc.
+    """
+    from web3 import Web3
+
+    w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 30}))
+
+    # Prefer the classic name, fall back to the newer rename.
+    injected = False
+    try:
+        from web3.middleware import geth_poa_middleware
+
+        w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+        injected = True
+    except ImportError:
+        pass
+
+    if not injected:
+        try:
+            from web3.middleware import ExtraDataToPOAMiddleware
+
+            w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+            injected = True
+        except ImportError:
+            logger.warning(
+                "No POA middleware found in this web3.py — Polygon calls may fail "
+                "with ExtraDataLengthError"
+            )
+
+    if injected:
+        logger.debug("POA middleware injected for Polygon RPC %s", rpc_url)
+
+    return w3
 
 
 class PolymarketAdapter:
@@ -303,7 +342,8 @@ class PolymarketAdapter:
                 "(pip install web3 eth-account)"
             ) from exc
 
-        w3 = Web3(Web3.HTTPProvider(POLYGON_RPC_URL, request_kwargs={"timeout": 30}))
+        # CRITICAL: Polygon is POA — must inject middleware or ExtraDataLengthError
+        w3 = _make_polygon_web3(POLYGON_RPC_URL)
         if not w3.is_connected():
             raise LiveTradingNotEnabled(
                 f"cannot reach Polygon RPC: {POLYGON_RPC_URL}"
