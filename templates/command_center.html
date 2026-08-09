@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR2 Command Center</title>
+  <link rel="icon" href="/static/sincor_favicon.png">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Tailwind (CDN for production-ready utility classes) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'cc-navy':  '#07091a',
+            'cc-dark':  '#0d1224',
+            'cc-panel': '#111827',
+            'cc-gold':  '#FFD700',
+            'cc-cyan':  '#00D4FF',
+            'cc-green': '#00FF88',
+            'cc-red':   '#FF4B5C',
+            'cc-amber': '#FFA500',
+            'cc-violet':'#9F7AEA',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ── Base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #07091a;
+      --dark:   #0d1224;
+      --panel:  #111827;
+      --gold:   #FFD700;
+      --cyan:   #00D4FF;
+      --green:  #00FF88;
+      --red:    #FF4B5C;
+      --amber:  #FFA500;
+      --violet: #9F7AEA;
+    }
+    html, body { height: 100%; overflow-x: hidden; }
+    body {
+      background: var(--navy);
+      color: #E2E8F0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+    }
+
+    /* ── Scrollbar ──────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--dark); }
+    ::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.3); border-radius: 3px; }
+
+    /* ── Animated gradient header ───────────────────────────── */
+    .cc-header-gradient {
+      background: linear-gradient(135deg, #07091a 0%, #0f1535 40%, #0a0f1e 100%);
+      border-bottom: 1px solid rgba(255,215,0,0.25);
+    }
+
+    /* ── Gold glow text ─────────────────────────────────────── */
+    .glow-gold  { color: var(--gold);  text-shadow: 0 0 12px rgba(255,215,0,0.6); }
+    .glow-cyan  { color: var(--cyan);  text-shadow: 0 0 12px rgba(0,212,255,0.5); }
+    .glow-green { color: var(--green); text-shadow: 0 0 12px rgba(0,255,136,0.5); }
+    .glow-red   { color: var(--red);   text-shadow: 0 0 12px rgba(255,75,92,0.5); }
+
+    /* ── Panel card ─────────────────────────────────────────── */
+    .cc-card {
+      background: var(--panel);
+      border: 1px solid rgba(255,215,0,0.12);
+      border-radius: 12px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+      transition: border-color 0.3s;
+      overflow: hidden;
+    }
+    .cc-card:hover { border-color: rgba(255,215,0,0.28); }
+
+    /* ── Card header bar ────────────────────────────────────── */
+    .cc-card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(255,215,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(90deg, rgba(255,215,0,0.06) 0%, transparent 100%);
+    }
+    .cc-card-body { padding: 16px 20px; }
+
+    /* ── Status pill ────────────────────────────────────────── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .pill-green  { background: rgba(0,255,136,0.12); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+    .pill-amber  { background: rgba(255,165,0,0.12);  color: var(--amber); border: 1px solid rgba(255,165,0,0.3); }
+    .pill-red    { background: rgba(255,75,92,0.12);  color: var(--red);   border: 1px solid rgba(255,75,92,0.3); }
+    .pill-cyan   { background: rgba(0,212,255,0.10);  color: var(--cyan);  border: 1px solid rgba(0,212,255,0.3); }
+    .pill-gold   { background: rgba(255,215,0,0.10);  color: var(--gold);  border: 1px solid rgba(255,215,0,0.3); }
+    .pill-violet { background: rgba(159,122,234,0.12);color: var(--violet);border: 1px solid rgba(159,122,234,0.3); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot-green  { background: var(--green);  animation: blink 1.5s infinite; }
+    .dot-red    { background: var(--red);    animation: blink 1s infinite; }
+    .dot-amber  { background: var(--amber); }
+    .dot-gold   { background: var(--gold); }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    /* ── Progress bar ───────────────────────────────────────── */
+    .progress-track {
+      height: 6px; border-radius: 3px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+    .progress-green  { background: linear-gradient(90deg, var(--green), #00aa55); }
+    .progress-amber  { background: linear-gradient(90deg, var(--amber), #cc7a00); }
+    .progress-red    { background: linear-gradient(90deg, var(--red), #cc0000); }
+    .progress-cyan   { background: linear-gradient(90deg, var(--cyan), #0088cc); }
+    .progress-gold   { background: linear-gradient(90deg, var(--gold), #cc9900); }
+    .progress-violet { background: linear-gradient(90deg, var(--violet), #6b46c1); }
+
+    /* ── OCEAN trait bar ────────────────────────────────────── */
+    .trait-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.06);
+      position: relative;
+      overflow: hidden;
+    }
+    .trait-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+
+    /* ── Market feed entry ──────────────────────────────────── */
+    .feed-item {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      animation: fadeSlideIn 0.35s ease;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .feed-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    /* ── Button ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-kill {
+      background: rgba(255,75,92,0.15);
+      color: var(--red);
+      border: 1px solid rgba(255,75,92,0.35);
+    }
+    .btn-kill:hover:not(:disabled) {
+      background: rgba(255,75,92,0.3);
+      box-shadow: 0 0 12px rgba(255,75,92,0.4);
+    }
+    .btn-reinstate {
+      background: rgba(0,255,136,0.12);
+      color: var(--green);
+      border: 1px solid rgba(0,255,136,0.35);
+    }
+    .btn-reinstate:hover:not(:disabled) {
+      background: rgba(0,255,136,0.25);
+      box-shadow: 0 0 12px rgba(0,255,136,0.3);
+    }
+    .btn-gold {
+      background: linear-gradient(135deg, rgba(255,215,0,0.18), rgba(255,215,0,0.08));
+      color: var(--gold);
+      border: 1px solid rgba(255,215,0,0.35);
+    }
+    .btn-gold:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,215,0,0.15));
+      box-shadow: 0 0 14px rgba(255,215,0,0.3);
+    }
+    .btn-cyan {
+      background: rgba(0,212,255,0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(0,212,255,0.35);
+    }
+    .btn-cyan:hover:not(:disabled) { background: rgba(0,212,255,0.22); }
+
+    /* ── Tab navigation ─────────────────────────────────────── */
+    .tab-bar { display: flex; gap: 2px; border-bottom: 1px solid rgba(255,215,0,0.12); }
+    .tab-btn {
+      padding: 10px 18px;
+      font-size: 12px; font-weight: 600;
+      color: #94A3B8;
+      cursor: pointer;
+      border: none; background: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-btn:hover:not(.active) { color: #CBD5E1; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Grade form ─────────────────────────────────────────── */
+    .form-input {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,215,0,0.18);
+      border-radius: 7px;
+      color: #E2E8F0;
+      padding: 8px 12px;
+      font-size: 13px;
+      width: 100%;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .form-input:focus { border-color: rgba(255,215,0,0.5); }
+    .form-label { font-size: 11px; font-weight: 600; color: #94A3B8; margin-bottom: 5px; display: block; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    /* ── Scrollable list ────────────────────────────────────── */
+    .scroll-list { overflow-y: auto; max-height: 340px; }
+
+    /* ── Metric card ────────────────────────────────────────── */
+    .metric-tile {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,215,0,0.1);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .metric-tile-value { font-size: 28px; font-weight: 700; line-height: 1; }
+    .metric-tile-label { font-size: 11px; color: #64748B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ── Animated line ──────────────────────────────────────── */
+    .scan-line {
+      position: absolute;
+      left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,215,0,0.4), transparent);
+      animation: scan 4s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes scan { from { top: 0; } to { top: 100%; } }
+
+    /* ── Toast notification ─────────────────────────────────── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      display: flex; flex-direction: column; gap: 10px;
+      z-index: 9999;
+    }
+    .toast {
+      background: var(--panel);
+      border: 1px solid rgba(255,215,0,0.25);
+      border-radius: 10px;
+      padding: 12px 18px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      animation: toastIn 0.3s ease;
+      min-width: 240px;
+      max-width: 360px;
+    }
+    @keyframes toastIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:none; } }
+
+    /* ── Responsive layout ──────────────────────────────────── */
+    .cc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto;
+      gap: 16px;
+    }
+    .cc-grid-wide { grid-column: span 2; }
+    @media (max-width: 900px) {
+      .cc-grid { grid-template-columns: 1fr; }
+      .cc-grid-wide { grid-column: span 1; }
+    }
+
+    /* ── Rank badge ─────────────────────────────────────────── */
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ HEADER -->
+<header class="cc-header-gradient sticky top-0 z-50">
+  <div class="max-w-screen-2xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <img src="/static/sincor_nav_icon.png" alt="SINCOR" class="h-8 w-8 object-contain">
+      <div>
+        <div class="text-lg font-bold glow-gold tracking-wide">SINCOR<span class="text-white font-light">2</span> Command Center</div>
+        <div class="text-xs text-slate-500 tracking-widest font-semibold uppercase">Market Intelligence &amp; Control</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-6">
+      <!-- Connection status -->
+      <div class="flex items-center gap-2 text-xs font-semibold" id="conn-status">
+        <span class="dot dot-amber"></span><span class="text-amber-400">Connecting…</span>
+      </div>
+      <!-- Live clock -->
+      <div class="text-xs text-slate-500 font-mono" id="live-clock">--:--:-- UTC</div>
+      <!-- Nav links -->
+      <a href="/dashboard" class="pill pill-cyan text-xs">Dashboard</a>
+      <a href="/admin" class="pill pill-gold text-xs">Admin</a>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════ TOP METRICS -->
+<div class="max-w-screen-2xl mx-auto px-6 pt-6 pb-2">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="top-metrics">
+    <div class="metric-tile">
+      <div class="metric-tile-label">Active Tasks</div>
+      <div class="metric-tile-value glow-gold" id="m-active-tasks">—</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-tile-label">Bids Today</div>
+      <div class="metric-tile-value glow-cyan" id="m-bids-today">—</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-tile-label">Completions</div>
+      <div class="metric-tile-value glow-green" id="m-completions">—</div>
+    </div>
+    <div class="metric-tile">
+      <div class="metric-tile-label">Agents Online</div>
+      <div class="metric-tile-value glow-violet" id="m-agents-online">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ MAIN GRID -->
+<main class="max-w-screen-2xl mx-auto px-6 py-4">
+  <div class="cc-grid">
+
+    <!-- ── LEFT COL ──────────────────────────────────────────── -->
+
+    <!-- LIVE MARKET FEED -->
+    <div class="cc-card cc-grid-wide relative">
+      <div class="scan-line"></div>
+      <div class="cc-card-header">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">📡</span>
+          <span class="font-bold glow-gold tracking-wide">Live Market Feed</span>
+          <span class="pill pill-green"><span class="dot dot-green"></span>LIVE</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-500" id="feed-event-count">0 events</span>
+          <button class="btn btn-cyan text-xs" onclick="clearFeed()">Clear</button>
+        </div>
+      </div>
+      <div class="cc-card-body scroll-list" id="market-feed" style="max-height:280px;">
+        <div class="text-slate-600 text-sm py-4 text-center">Waiting for market events…</div>
+      </div>
+    </div>
+
+    <!-- AGENT ROSTER -->
+    <div class="cc-card">
+      <div class="cc-card-header">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">🤖</span>
+          <span class="font-bold glow-cyan tracking-wide">Agent Roster</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <input class="form-input text-xs" style="width:140px;padding:5px 10px;" id="agent-search" placeholder="Search agents…" oninput="filterRoster()">
+          <span class="pill pill-cyan" id="roster-count">0 agents</span>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tab-bar px-4 pt-1">
+        <button class="tab-btn active" onclick="switchTab('roster','identity')">Identity</button>
+        <button class="tab-btn" onclick="switchTab('roster','personality')">Personality</button>
+        <button class="tab-btn" onclick="switchTab('roster','career')">Career</button>
+        <button class="tab-btn" onclick="switchTab('roster','memory')">Memory</button>
+      </div>
+
+      <!-- Identity tab -->
+      <div class="tab-panel active scroll-list px-4 py-2" id="roster-identity" style="max-height:360px;">
+        <div class="text-slate-600 text-sm py-8 text-center">Loading roster…</div>
+      </div>
+
+      <!-- Personality tab -->
+      <div class="tab-panel scroll-list px-4 py-2" id="roster-personality" style="max-height:360px;">
+        <div class="text-slate-600 text-sm py-8 text-center">Loading roster…</div>
+      </div>
+
+      <!-- Career tab -->
+      <div class="tab-panel scroll-list px-4 py-2" id="roster-career" style="max-height:360px;">
+        <div class="text-slate-600 text-sm py-8 text-center">Loading roster…</div>
+      </div>
+
+      <!-- Memory tab -->
+      <div class="tab-panel px-4 py-3" id="roster-memory">
+        <div class="flex gap-2 mb-3">
+          <select class="form-input text-xs" style="width:200px;padding:6px 10px;" id="memory-agent-select">
+            <option value="">— select agent —</option>
+          </select>
+          <button class="btn btn-cyan" onclick="loadAgentMemory()">Load</button>
+        </div>
+        <div id="memory-view" class="scroll-list" style="max-height:280px;">
+          <div class="text-slate-600 text-sm py-4 text-center">Select an agent to view memory.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KILLSWITCH CONSOLE -->
+    <div class="cc-card">
+      <div class="cc-card-header">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">⚡</span>
+          <span class="font-bold glow-red tracking-wide">Killswitch Console</span>
+          <span class="pill pill-amber">Token Budgets</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-cyan text-xs" onclick="refreshKillswitch()">⟳ Refresh</button>
+        </div>
+      </div>
+      <div class="cc-card-body scroll-list" id="killswitch-panel" style="max-height:360px;">
+        <div class="text-slate-600 text-sm py-8 text-center">Loading…</div>
+      </div>
+    </div>
+
+    <!-- QUALITY SCORING FORM -->
+    <div class="cc-card">
+      <div class="cc-card-header">
+        <div class="flex items-center gap-3">
+          <span class="text-xl">🏆</span>
+          <span class="font-bold glow-violet tracking-wide">Quality Scoring</span>
+        </div>
+        <span class="pill pill-violet">Feedback Loop</span>
+      </div>
+      <div class="cc-card-body">
+        <form id="grade-form" onsubmit="submitGrade(event)">
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label class="form-label">Task ID</label>
+              <input class="form-input" id="gf-task-id" placeholder="TX-abc12345" required>
+            </div>
+            <div>
+              <label class="form-label">Agent ID</label>
+              <input class="form-input" id="gf-agent-id" placeholder="E-auriga-01" required>
+            </div>
+          </div>
+
+          <!-- Overall grade slider -->
+          <div class="mb-4">
+            <label class="form-label">Overall Grade <span class="text-white font-bold" id="grade-display">5.0</span> / 10</label>
+            <input type="range" class="w-full accent-yellow-400" id="gf-grade"
+              min="0" max="10" step="0.5" value="5"
+              oninput="document.getElementById('grade-display').textContent=this.value">
+            <div class="flex justify-between text-xs text-slate-600 mt-1">
+              <span>Poor</span><span>Average</span><span>Perfect</span>
+            </div>
+          </div>
+
+          <!-- Dimension scores -->
+          <div class="grid grid-cols-3 gap-2 mb-4">
+            <div>
+              <label class="form-label">Accuracy /10</label>
+              <input class="form-input" type="number" id="gf-accuracy" min="0" max="10" step="0.5" placeholder="7">
+            </div>
+            <div>
+              <label class="form-label">Completeness /10</label>
+              <input class="form-input" type="number" id="gf-completeness" min="0" max="10" step="0.5" placeholder="7">
+            </div>
+            <div>
+              <label class="form-label">Clarity /10</label>
+              <input class="form-input" type="number" id="gf-clarity" min="0" max="10" step="0.5" placeholder="7">
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Comments</label>
+            <textarea class="form-input" id="gf-comments" rows="2" placeholder="Optional feedback…"></textarea>
+          </div>
+
+          <div id="grade-result" class="hidden mb-3 p-3 rounded-lg text-sm border"></div>
+
+          <button type="submit" class="btn btn-gold w-full justify-center text-sm">
+            ★ Submit Grade &amp; Adjust Merit
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- /cc-grid -->
+</main>
+
+<!-- ═══════════════════════════════════════════════════════════ TOAST -->
+<div id="toast-container"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ SCRIPTS -->
+<script>
+/* ─── Utilities ──────────────────────────────────────────────────────── */
+function fmt(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return isNaN(d) ? ts : d.toLocaleTimeString('en-US', {hour12:false});
+}
+function fmtNum(n) { return (n == null || n === '') ? '—' : Number(n).toLocaleString(); }
+function pct(v) { return Math.round(Number(v) || 0); }
+
+function toast(msg, type='info') {
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  const icons = {info:'ℹ️', success:'✅', warn:'⚠️', error:'🚨'};
+  const colors = {info:'border-cyan-700', success:'border-green-700', warn:'border-amber-600', error:'border-red-700'};
+  el.className = `toast ${colors[type]||''}`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transform='translateX(20px)'; el.style.transition='all 0.3s'; setTimeout(()=>el.remove(),320); }, 4000);
+}
+
+function clearFeed() {
+  const feed = document.getElementById('market-feed');
+  feed.innerHTML = '<div class="text-slate-600 text-sm py-4 text-center">Feed cleared.</div>';
+  feedEventCount = 0;
+  document.getElementById('feed-event-count').textContent = '0 events';
+}
+
+/* ─── Live Clock ─────────────────────────────────────────────────────── */
+function updateClock() {
+  const now = new Date();
+  const hh = String(now.getUTCHours()).padStart(2,'0');
+  const mm = String(now.getUTCMinutes()).padStart(2,'0');
+  const ss = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('live-clock').textContent = `${hh}:${mm}:${ss} UTC`;
+}
+setInterval(updateClock, 1000); updateClock();
+
+/* ─── Tab switching ──────────────────────────────────────────────────── */
+const _activeTab = {};
+function switchTab(group, name) {
+  _activeTab[group] = name;
+  document.querySelectorAll(`#roster-${name}`).forEach(()=>{});
+  const panels = document.querySelectorAll('.tab-panel');
+  panels.forEach(p => p.classList.remove('active'));
+  const btns = document.querySelectorAll('.tab-btn');
+  btns.forEach(b => b.classList.remove('active'));
+  const panel = document.getElementById(`roster-${name}`);
+  if (panel) panel.classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'memory') return;  // handled separately
+  renderRosterTab(name);
+}
+
+/* ─── SSE Market Feed ────────────────────────────────────────────────── */
+let feedEventCount = 0;
+const eventIconMap = {
+  snapshot:        { icon:'📊', label:'Snapshot',    cls:'bg-slate-800' },
+  task_posted:     { icon:'📋', label:'Task Posted', cls:'bg-blue-900/30' },
+  bid_submitted:   { icon:'💰', label:'Bid',         cls:'bg-yellow-900/30' },
+  task_awarded:    { icon:'🏆', label:'Awarded',     cls:'bg-green-900/30' },
+  task_completed:  { icon:'✅', label:'Completed',   cls:'bg-green-900/20' },
+  task_graded:     { icon:'★',  label:'Graded',      cls:'bg-violet-900/30' },
+  agent_killed:    { icon:'🔴', label:'KILLED',      cls:'bg-red-900/30' },
+  agent_reinstated:{ icon:'🟢', label:'Reinstated',  cls:'bg-green-900/30' },
+  heartbeat:       null,
+};
+
+function appendFeedItem(eventType, data) {
+  const cfg = eventIconMap[eventType];
+  if (!cfg) return;
+
+  const feed = document.getElementById('market-feed');
+  if (feed.querySelector('.text-slate-600')) feed.innerHTML = '';
+
+  feedEventCount++;
+  document.getElementById('feed-event-count').textContent = `${feedEventCount} events`;
+
+  const el = document.createElement('div');
+  el.className = 'feed-item';
+
+  let detail = '';
+  if (eventType === 'snapshot') {
+    detail = `${(data.active_tasks||[]).length} active tasks · ${(data.recent_transactions||[]).length} recent tx`;
+    updateTopMetrics(data);
+  } else if (eventType === 'task_posted') {
+    detail = `<span class="text-white font-semibold">${data.goal||data.task_id||''}</span> · Budget: ${fmtNum(data.budget_tokens)} tokens`;
+  } else if (eventType === 'bid_submitted') {
+    const price = data.estimated_cost_tokens ? `${fmtNum(data.estimated_cost_tokens)} tok` : '';
+    detail = `<span class="glow-gold">${data.agent_id||''}</span> bid on <span class="text-cyan-400">${data.task_id||''}</span> · ${price} · conf <span class="glow-green">${pct((data.confidence||0)*100)}%</span>`;
+  } else if (eventType === 'task_awarded') {
+    detail = `<span class="glow-gold">${data.winner_agent_id||''}</span> won <span class="text-cyan-400">${data.task_id||''}</span> · score ${(data.winner_score||0).toFixed(3)}`;
+  } else if (eventType === 'task_completed') {
+    detail = `<span class="text-cyan-400">${data.task_id||''}</span> · quality ${pct((data.quality||0)*100)}% · merit +${fmtNum(data.merit_earned)}`;
+  } else if (eventType === 'task_graded') {
+    detail = `<span class="text-cyan-400">${data.task_id||''}</span> graded <span class="glow-gold">${data.grade}/10</span> · merit Δ${data.merit_delta>0?'+':''}${data.merit_delta}`;
+  } else if (eventType === 'agent_killed') {
+    detail = `<span class="glow-red">${data.agent_id||''}</span> KILLED — ${data.reason||'operator override'}`;
+  } else if (eventType === 'agent_reinstated') {
+    detail = `<span class="glow-green">${data.agent_id||''}</span> reinstated`;
+  }
+
+  el.innerHTML = `
+    <div class="feed-icon ${cfg.cls}">${cfg.icon}</div>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">${cfg.label}</span>
+        <span class="text-xs text-slate-600">${fmt(data.ts||data.timestamp)}</span>
+      </div>
+      <div class="text-sm text-slate-300">${detail}</div>
+    </div>`;
+
+  feed.insertBefore(el, feed.firstChild);
+  // Cap at 80 entries
+  while (feed.children.length > 80) feed.removeChild(feed.lastChild);
+}
+
+function updateTopMetrics(snapshot) {
+  const tasks = (snapshot.active_tasks||[]);
+  const stats = snapshot.stats||{};
+  document.getElementById('m-active-tasks').textContent = tasks.length;
+  document.getElementById('m-bids-today').textContent = fmtNum(stats.total_bids_received||0);
+  document.getElementById('m-completions').textContent = fmtNum(stats.successful_completions||0);
+  // count agents from roster (updated separately)
+}
+
+let _sse = null;
+function connectSSE() {
+  if (_sse) _sse.close();
+  const cs = document.getElementById('conn-status');
+  cs.innerHTML = '<span class="dot dot-amber"></span><span class="text-amber-400">Connecting…</span>';
+
+  _sse = new EventSource('/api/command-center/market-feed');
+
+  _sse.addEventListener('open', () => {
+    cs.innerHTML = '<span class="dot dot-green"></span><span class="text-green-400">Connected</span>';
+    toast('Market feed connected', 'success');
+  });
+
+  ['snapshot','task_posted','bid_submitted','task_awarded','task_completed',
+   'task_graded','agent_killed','agent_reinstated'].forEach(t => {
+    _sse.addEventListener(t, e => {
+      try { appendFeedItem(t, JSON.parse(e.data)); } catch(_) {}
+    });
+  });
+
+  _sse.addEventListener('heartbeat', () => {
+    const d = new Date();
+    document.getElementById('live-clock').dataset.lastHb = d.toISOString();
+  });
+
+  _sse.onerror = () => {
+    cs.innerHTML = '<span class="dot dot-red"></span><span class="text-red-400">Disconnected — retrying…</span>';
+    _sse.close();
+    setTimeout(connectSSE, 5000);
+  };
+}
+
+/* ─── Agent Roster ───────────────────────────────────────────────────── */
+let _rosterData = [];
+const traitColors = {O:'#9F7AEA',C:'#00D4FF',E:'#FFD700',A:'#00FF88',N:'#FF4B5C'};
+const traitLabels = {O:'Openness',C:'Conscientiousness',E:'Extraversion',A:'Agreeableness',N:'Neuroticism'};
+const tierColors = {Hatch:'#94A3B8',Junior:'#60A5FA',Senior:'#34D399',Lead:'#FFD700',Director:'#FF6B35'};
+const tierEmoji  = {Hatch:'🥚',Junior:'⭐',Senior:'🌟',Lead:'💎',Director:'👑'};
+
+function filterRoster() {
+  const q = document.getElementById('agent-search').value.toLowerCase();
+  const tab = document.querySelector('.tab-btn.active')?.textContent?.toLowerCase() || 'identity';
+  const name = tab === 'identity' ? 'identity' : tab === 'personality' ? 'personality' : tab === 'career' ? 'career' : null;
+  if (name) renderRosterTab(name, q);
+}
+
+function renderRosterTab(tab, q='') {
+  if (!_rosterData.length) return;
+  const agents = q
+    ? _rosterData.filter(a => (a.name||'').toLowerCase().includes(q) || (a.agent_id||'').toLowerCase().includes(q))
+    : _rosterData;
+  const el = document.getElementById(`roster-${tab}`);
+  if (!el) return;
+
+  if (tab === 'identity') {
+    el.innerHTML = agents.map(a => `
+      <div class="flex items-center gap-3 py-3 border-b border-white/5">
+        <div class="rank-badge" style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2);">
+          ${tierEmoji[a.career?.current_tier]||'🤖'}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-white">${a.name||a.agent_id}</span>
+            <span class="pill pill-cyan text-xs">${a.archetype||'—'}</span>
+            ${a.secondary_archetype?`<span class="pill pill-violet text-xs">${a.secondary_archetype}</span>`:''}
+          </div>
+          <div class="text-xs text-slate-500 mt-0.5">${a.agent_id} · ${(a.specializations||[]).slice(0,2).join(', ')||'no specializations'}</div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div class="text-sm font-bold glow-gold">${fmtNum(a.merit_points)} pts</div>
+          <div class="text-xs text-slate-500">${a.tasks_completed} tasks · ${a.success_rate}%</div>
+        </div>
+      </div>`).join('') || '<div class="text-slate-600 text-sm py-4 text-center">No agents found.</div>';
+  }
+
+  if (tab === 'personality') {
+    el.innerHTML = agents.map(a => {
+      const traits = Object.entries(a.personality||{}).map(([k,v]) => `
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-400">${traitLabels[k]||k}</span>
+            <span style="color:${traitColors[k]}">${Math.round(v*100)}%</span>
+          </div>
+          <div class="trait-bar">
+            <div class="trait-fill" style="width:${v*100}%;background:${traitColors[k]};"></div>
+          </div>
+        </div>`).join('');
+      return `
+        <div class="py-3 border-b border-white/5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="font-semibold text-white">${a.name||a.agent_id}</span>
+            <span class="pill pill-cyan text-xs">${a.archetype||'—'}</span>
+          </div>
+          <div class="grid grid-cols-1 gap-2">${traits}</div>
+          <div class="flex gap-4 mt-2 text-xs text-slate-500">
+            <span>Risk <strong class="text-white">${Math.round((a.style?.risk||0)*100)}%</strong></span>
+            <span>Directness <strong class="text-white">${Math.round((a.style?.directness||0)*100)}%</strong></span>
+          </div>
+        </div>`;
+    }).join('') || '<div class="text-slate-600 text-sm py-4 text-center">No agents found.</div>';
+  }
+
+  if (tab === 'career') {
+    el.innerHTML = agents.map(a => {
+      const c = a.career||{};
+      const tier = c.current_tier||'Hatch';
+      const color = tierColors[tier]||'#94A3B8';
+      const toNext = c.to_next_promotion||0;
+      const pctToNext = c.next_tier
+        ? Math.min(100, 100 - Math.round((toNext / ({Junior:500,Senior:2000,Lead:5000,Director:10000}[c.next_tier]||1))*100))
+        : 100;
+      return `
+        <div class="flex items-center gap-3 py-3 border-b border-white/5">
+          <div class="rank-badge" style="background:rgba(255,255,255,0.04);border:1px solid ${color}33;">
+            ${tierEmoji[tier]||'🤖'}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-semibold text-white">${a.name||a.agent_id}</span>
+              <span class="pill text-xs" style="background:${color}22;color:${color};border:1px solid ${color}55;">${tier}</span>
+            </div>
+            ${c.next_tier ? `
+              <div class="progress-track mt-1" title="${toNext} pts to ${c.next_tier}">
+                <div class="progress-fill" style="width:${pctToNext}%;background:linear-gradient(90deg,${color},${color}99);"></div>
+              </div>
+              <div class="text-xs text-slate-600 mt-1">${fmtNum(toNext)} pts to <strong style="color:${color}">${c.next_tier}</strong></div>
+            ` : `<div class="text-xs text-slate-500 mt-1">Max tier achieved 👑</div>`}
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="text-sm font-bold" style="color:${color}">${fmtNum(a.merit_points)}</div>
+            <div class="text-xs text-slate-600">merit pts</div>
+          </div>
+        </div>`;
+    }).join('') || '<div class="text-slate-600 text-sm py-4 text-center">No agents found.</div>';
+  }
+}
+
+function buildMemorySelect() {
+  const sel = document.getElementById('memory-agent-select');
+  sel.innerHTML = '<option value="">— select agent —</option>' +
+    _rosterData.map(a => `<option value="${a.agent_id}">${a.name||a.agent_id}</option>`).join('');
+}
+
+async function loadRoster() {
+  try {
+    const r = await fetch('/api/command-center/agents');
+    const data = await r.json();
+    _rosterData = data.agents || [];
+    document.getElementById('roster-count').textContent = `${_rosterData.length} agents`;
+    document.getElementById('m-agents-online').textContent = _rosterData.length;
+    renderRosterTab('identity');
+    buildMemorySelect();
+  } catch(e) {
+    toast('Roster load failed: ' + e.message, 'error');
+  }
+}
+
+/* ─── Agent Memory ───────────────────────────────────────────────────── */
+async function loadAgentMemory() {
+  const sel = document.getElementById('memory-agent-select');
+  const agentId = sel.value;
+  if (!agentId) { toast('Select an agent first', 'warn'); return; }
+  const view = document.getElementById('memory-view');
+  view.innerHTML = '<div class="text-slate-500 text-sm py-4 text-center">Loading…</div>';
+  try {
+    const r = await fetch(`/api/command-center/agents/${encodeURIComponent(agentId)}/memory`);
+    const data = await r.json();
+    const hist = data.task_history || [];
+    if (!hist.length) {
+      view.innerHTML = '<div class="text-slate-600 text-sm py-4 text-center">No task history found.</div>';
+      return;
+    }
+    view.innerHTML = hist.slice().reverse().map(tx => `
+      <div class="py-2 border-b border-white/5">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-mono text-slate-400">${tx.task_id||tx.transaction_id||'—'}</span>
+          <span class="text-xs text-slate-600">${fmt(tx.recorded_at)}</span>
+        </div>
+        <div class="flex gap-4 text-xs">
+          <span class="text-slate-400">Quality <strong class="text-white">${pct((tx.completion_quality||0)*100)}%</strong></span>
+          <span class="text-slate-400">Merit <strong class="glow-gold">+${fmtNum(tx.merit_points_earned)}</strong></span>
+          <span class="text-slate-400">Time <strong class="text-white">${tx.completion_time||'—'}m</strong></span>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    view.innerHTML = `<div class="text-red-400 text-sm py-4 text-center">Error: ${e.message}</div>`;
+  }
+}
+
+/* ─── Killswitch Console ─────────────────────────────────────────────── */
+async function refreshKillswitch() {
+  const panel = document.getElementById('killswitch-panel');
+  try {
+    const r = await fetch('/api/command-center/killswitch');
+    const data = await r.json();
+    const agents = data.agents || {};
+    const entries = Object.values(agents);
+    if (!entries.length) {
+      panel.innerHTML = '<div class="text-slate-600 text-sm py-4 text-center">No agent budgets tracked yet.</div>';
+      return;
+    }
+    entries.sort((a,b) => (b.utilisation_pct||0) - (a.utilisation_pct||0));
+    panel.innerHTML = entries.map(s => {
+      const pctV = s.utilisation_pct||0;
+      const barClass = pctV >= 90 ? 'progress-red' : pctV >= 70 ? 'progress-amber' : 'progress-green';
+      const killed = s.killed;
+      return `
+        <div class="py-3 border-b border-white/5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="font-semibold text-white text-sm">${s.name||s.agent_id}</span>
+            ${killed ? '<span class="pill pill-red">KILLED</span>' : ''}
+            ${pctV>=100&&!killed?'<span class="pill pill-red">CEILING HIT</span>':''}
+            <span class="text-xs text-slate-500 ml-auto font-mono">${s.tokens_used_today||0} / ${s.daily_ceiling||0}</span>
+          </div>
+          <div class="progress-track mb-2">
+            <div class="progress-fill ${barClass}" style="width:${Math.min(100,pctV)}%;"></div>
+          </div>
+          <div class="flex items-center justify-between text-xs">
+            <span class="${pctV>=90?'text-red-400':pctV>=70?'text-amber-400':'text-slate-500'}">${pctV.toFixed(1)}% used · ${fmtNum(s.tokens_remaining)} remaining</span>
+            <div class="flex gap-2">
+              ${killed
+                ? `<button class="btn btn-reinstate" style="padding:4px 12px;font-size:11px;" onclick="agentAction('${s.agent_id}','reinstate')">Reinstate</button>`
+                : `<button class="btn btn-kill" style="padding:4px 12px;font-size:11px;" onclick="agentAction('${s.agent_id}','kill')">Kill</button>`}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    panel.innerHTML = `<div class="text-red-400 text-sm py-4 text-center">Error: ${e.message}</div>`;
+  }
+}
+
+async function agentAction(agentId, action) {
+  const reason = action === 'kill' ? (prompt(`Kill reason for ${agentId}:`) || 'operator_override') : undefined;
+  try {
+    const body = {action};
+    if (reason) body.reason = reason;
+    const r = await fetch(`/api/command-center/killswitch/${encodeURIComponent(agentId)}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`Agent ${agentId} ${action === 'kill' ? '⛔ killed' : '✅ reinstated'}`, action==='kill'?'warn':'success');
+      setTimeout(refreshKillswitch, 600);
+    } else {
+      toast('Action failed: ' + (d.error||'unknown'), 'error');
+    }
+  } catch(e) {
+    toast('Request failed: ' + e.message, 'error');
+  }
+}
+
+/* ─── Quality Scoring ─────────────────────────────────────────────────── */
+async function submitGrade(ev) {
+  ev.preventDefault();
+  const taskId   = document.getElementById('gf-task-id').value.trim();
+  const agentId  = document.getElementById('gf-agent-id').value.trim();
+  const grade    = parseFloat(document.getElementById('gf-grade').value);
+  const accuracy     = document.getElementById('gf-accuracy').value;
+  const completeness = document.getElementById('gf-completeness').value;
+  const clarity      = document.getElementById('gf-clarity').value;
+  const comments     = document.getElementById('gf-comments').value.trim();
+  const resultEl = document.getElementById('grade-result');
+
+  const dims = {};
+  if (accuracy)     dims.accuracy     = parseFloat(accuracy);
+  if (completeness) dims.completeness = parseFloat(completeness);
+  if (clarity)      dims.clarity      = parseFloat(clarity);
+
+  try {
+    const r = await fetch('/api/command-center/grade-task', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({task_id:taskId, agent_id:agentId, grade, dimension_scores:dims, comments}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      resultEl.className = 'mb-3 p-3 rounded-lg text-sm border border-green-700 bg-green-900/20 text-green-300';
+      const delta = d.merit_delta;
+      resultEl.textContent = `✅ Grade ${grade}/10 submitted · Merit delta: ${delta>0?'+':''}${delta} pts for ${agentId}`;
+      resultEl.classList.remove('hidden');
+      toast(`Grade submitted: ${grade}/10 · ${delta>0?'+':''}${delta} merit`, 'success');
+    } else {
+      resultEl.className = 'mb-3 p-3 rounded-lg text-sm border border-red-700 bg-red-900/20 text-red-400';
+      resultEl.textContent = '❌ ' + (d.error||'Unknown error');
+      resultEl.classList.remove('hidden');
+    }
+  } catch(e) {
+    toast('Grade submission failed: ' + e.message, 'error');
+  }
+}
+
+/* ─── Auto-refresh intervals ─────────────────────────────────────────── */
+// Roster every 60s, killswitch every 15s
+setInterval(loadRoster, 60_000);
+setInterval(refreshKillswitch, 15_000);
+
+/* ─── Boot ───────────────────────────────────────────────────────────── */
+(async function boot() {
+  connectSSE();
+  await loadRoster();
+  await refreshKillswitch();
+
+  // Initial metric snapshot via polling fallback
+  try {
+    const r = await fetch('/api/command-center/market-snapshot');
+    const s = await r.json();
+    updateTopMetrics(s);
+  } catch(_) {}
+})();
+</script>
+</body>
+</html>
