@@ -403,10 +403,10 @@
 
       <!-- Tab bar -->
       <div class="tab-bar px-4 pt-1">
-        <button class="tab-btn active" onclick="switchTab('roster','identity')">Identity</button>
-        <button class="tab-btn" onclick="switchTab('roster','personality')">Personality</button>
-        <button class="tab-btn" onclick="switchTab('roster','career')">Career</button>
-        <button class="tab-btn" onclick="switchTab('roster','memory')">Memory</button>
+        <button class="tab-btn active" onclick="switchTab('roster','identity',event)">Identity</button>
+        <button class="tab-btn" onclick="switchTab('roster','personality',event)">Personality</button>
+        <button class="tab-btn" onclick="switchTab('roster','career',event)">Career</button>
+        <button class="tab-btn" onclick="switchTab('roster','memory',event)">Memory</button>
       </div>
 
       <!-- Identity tab -->
@@ -565,16 +565,15 @@ setInterval(updateClock, 1000); updateClock();
 
 /* ─── Tab switching ──────────────────────────────────────────────────── */
 const _activeTab = {};
-function switchTab(group, name) {
+function switchTab(group, name, evt) {
   _activeTab[group] = name;
-  document.querySelectorAll(`#roster-${name}`).forEach(()=>{});
   const panels = document.querySelectorAll('.tab-panel');
   panels.forEach(p => p.classList.remove('active'));
   const btns = document.querySelectorAll('.tab-btn');
   btns.forEach(b => b.classList.remove('active'));
   const panel = document.getElementById(`roster-${name}`);
   if (panel) panel.classList.add('active');
-  event.target.classList.add('active');
+  if (evt && evt.target) evt.target.classList.add('active');
   if (name === 'memory') return;  // handled separately
   renderRosterTab(name);
 }

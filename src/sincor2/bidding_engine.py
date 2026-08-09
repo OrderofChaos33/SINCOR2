@@ -14,6 +14,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
+import threading
 import traceback
 import uuid
 from datetime import datetime, timezone
@@ -402,15 +403,18 @@ class BiddingEngine:
 
 
 # ---------------------------------------------------------------------------
-# Module-level singleton (lazy)
+# Module-level singleton (lazy, thread-safe)
 # ---------------------------------------------------------------------------
 
 _engine: Optional[BiddingEngine] = None
+_engine_lock = threading.Lock()
 
 
 def get_bidding_engine(token_controller: Any = None) -> BiddingEngine:
     """Return the module-level BiddingEngine singleton, creating it if needed."""
     global _engine
     if _engine is None:
-        _engine = BiddingEngine(token_controller=token_controller)
+        with _engine_lock:
+            if _engine is None:
+                _engine = BiddingEngine(token_controller=token_controller)
     return _engine

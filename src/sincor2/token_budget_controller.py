@@ -352,6 +352,7 @@ def bootstrap_from_agent_yamls(agents_dir: str = "agents") -> None:
 
     ctrl = get_controller()
     pattern = os.path.join(agents_dir, "E-*.yaml")
+    registered = 0
     for path in _glob.glob(pattern):
         try:
             with open(path, "r", encoding="utf-8") as fh:
@@ -362,7 +363,8 @@ def bootstrap_from_agent_yamls(agents_dir: str = "agents") -> None:
             )
             if agent_id:
                 ctrl.register_agent(agent_id, ceiling)
+                registered += 1
         except (OSError, KeyError, TypeError, ValueError) as exc:
             logger.warning("[TOKEN_BUDGET] skipping %s: %s", path, exc)
 
-    logger.info("[TOKEN_BUDGET] bootstrap complete (%s agents)", len(ctrl._agents))
+    logger.info("[TOKEN_BUDGET] bootstrap complete (%s agents)", registered)

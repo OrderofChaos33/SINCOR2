@@ -141,8 +141,8 @@ def _load_agent_yamls(agents_dir: Optional[str] = None) -> List[Dict[str, Any]]:
                 data = _yaml.safe_load(fh)
             if isinstance(data, dict):
                 results.append(data)
-        except (OSError, Exception):
-            pass
+        except Exception as exc:
+            logger.debug("[CC] skipping agent YAML %s: %s", path, exc)
     return results
 
 
@@ -371,7 +371,7 @@ def get_agents():
         return jsonify({"agents": roster, "count": len(roster)})
     except Exception as exc:
         logger.error("[CC] get_agents failed: %s", exc)
-        return jsonify({"agents": [], "count": 0, "error": str(exc)}), 500
+        return jsonify({"agents": [], "count": 0, "error": "internal_error"}), 500
 
 
 @command_center_bp.get("/api/command-center/agents/<agent_id>/memory")
@@ -433,7 +433,7 @@ def get_agent_memory(agent_id: str):
             "agent_id": agent_id,
             "episodic_events": [],
             "task_history": [],
-            "error": str(exc),
+            "error": "internal_error",
         }), 200  # 200 — dashboard degrades gracefully
 
 
@@ -455,7 +455,7 @@ def killswitch_status():
         return jsonify({"agents": statuses, "count": len(statuses)})
     except Exception as exc:
         logger.error("[CC] killswitch_status failed: %s", exc)
-        return jsonify({"agents": {}, "error": str(exc)}), 500
+        return jsonify({"agents": {}, "error": "internal_error"}), 500
 
 
 @command_center_bp.post("/api/command-center/killswitch/<agent_id>")
@@ -489,7 +489,7 @@ def killswitch_action(agent_id: str):
             return jsonify({"ok": False, "error": f"unknown action: {action}"}), 400
     except Exception as exc:
         logger.error("[CC] killswitch_action failed agent=%s: %s", agent_id, exc)
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        return jsonify({"ok": False, "error": "internal_error"}), 500
 
 
 # --- Quality Scoring Form ---
@@ -544,8 +544,12 @@ def grade_task():
                 })
 
                 old_avg = float(rep.get("average_quality", 0.0))
-                old_count = int(rep.get("tasks_completed", 1)) or 1
-                rep["average_quality"] = (old_avg * old_count + normalised) / (old_count + 1)
+                # Use a dedicated grades_count to track number of feedback entries,
+                # separate from tasks_completed so the weighted average is correct.
+                old_count = int(rep.get("grades_count", 0))
+                new_count = old_count + 1
+                rep["average_quality"] = (old_avg * old_count + normalised) / new_count
+                rep["grades_count"] = new_count
 
                 # Merit delta: grade relative to neutral (0.5) × 100 pts
                 merit_delta = int((normalised - 0.5) * 200)
@@ -624,10 +628,11 @@ def grade_task():
         })
 
     except ValueError as exc:
-        return jsonify({"ok": False, "error": f"invalid grade value: {exc}"}), 400
+        logger.warning("[CC] grade_task invalid value: %s", exc)
+        return jsonify({"ok": False, "error": "invalid_grade_value"}), 400
     except Exception as exc:
         logger.error("[CC] grade_task failed: %s", exc)
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        return jsonify({"ok": False, "error": "internal_error"}), 500
 
 
 # --- One-shot market snapshot ---
@@ -640,4 +645,4 @@ def market_snapshot():
         return jsonify(snapshot)
     except Exception as exc:
         logger.error("[CC] market_snapshot failed: %s", exc)
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "internal_error"}), 500
