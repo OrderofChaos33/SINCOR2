@@ -144,6 +144,7 @@ contract TWAMMIHook is BaseHook, ReentrancyGuard {
     error InvalidOrder();
     error OrderNotActive();
     error ZeroAmount();
+    error MathOverflow();
 
     // ─────────────────────────── Modifiers ───────────────────────────── //
 
@@ -429,6 +430,7 @@ contract TWAMMIHook is BaseHook, ReentrancyGuard {
     function _mulDivUp(uint256 a, uint256 b, uint256 denominator) internal pure returns (uint256 result) {
         result = FullMath.mulDiv(a, b, denominator);
         if (mulmod(a, b, denominator) > 0) {
+            if (result == type(uint256).max) revert MathOverflow();
             unchecked {
                 result += 1;
             }
