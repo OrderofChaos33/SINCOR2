@@ -53,6 +53,13 @@
   animation: gradient-shift 6s ease-in-out infinite;
 }
 
+.gradient-text {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 /* Hero section with complex gradient */
 .hero-premium {
   background: radial-gradient(circle at 20% 80%, #120078 0%, transparent 50%),
