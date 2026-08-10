@@ -1,0 +1,10 @@
+---
+exclude_paths:
+  - "static/**"
+  - "**/*.jpg"
+  - "**/*.jpeg"
+  - "**/*.png"
+  - "**/*.gif"
+  - "**/*.ico"
+  - "**/*.pdf"
+  - "**/*.lock"
