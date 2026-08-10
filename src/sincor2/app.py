@@ -1376,6 +1376,22 @@ def create_app():
     except Exception as e:
         print(f"Waitlist blueprint not available: {e}")
     try:
+        from sincor2.blueprints.command_center import command_center_bp
+        app.register_blueprint(command_center_bp)
+        # Bootstrap token budget controller from agent YAML definitions
+        try:
+            from sincor2.token_budget_controller import bootstrap_from_agent_yamls
+            import os as _os
+            _agents_dir = _os.path.join(
+                _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
+                "agents",
+            )
+            bootstrap_from_agent_yamls(_agents_dir)
+        except Exception as _tbc_err:
+            print(f"Token budget bootstrap warning: {_tbc_err}")
+    except Exception as e:
+        print(f"Command center blueprint not available: {e}")
+    try:
         from sincor2.a2a_integration import A2ARouter
         router = A2ARouter()
         app.register_blueprint(router.blueprint)
