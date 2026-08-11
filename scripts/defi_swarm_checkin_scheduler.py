@@ -12,7 +12,7 @@ import time
 import logging
 import sys
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Real integrations
 try:
@@ -49,6 +49,7 @@ logger = logging.getLogger("sincor.defi_scheduler")
 
 CHECK_INTERVAL_SECONDS = 300  # 5 minutes
 
+
 class DeFiSwarmScheduler:
     def __init__(self):
         self.toa = TOAOrchestrator() if TOAOrchestrator else None
@@ -78,6 +79,8 @@ class DeFiSwarmScheduler:
 
                 if self.router and run_polyclaw_earning_cycle:
                     def dummy_execute(route="public", **ctx):
+                        # Synthetic until live execution path replaces this.
+                        # Marked projected in ledger below.
                         pnl = 12.5 + (i * 0.5)
                         return {"status": "ok", "pnl_usd": pnl, "route": route, "project": project_id}
 
@@ -92,36 +95,66 @@ class DeFiSwarmScheduler:
                             "project": project_id,
                             "pnl_usd": pnl,
                             "status": result.get("status"),
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "projected": True,
                         })
 
-                    logger.info(f"Check-in Swarm {i}/26 Project {project_id}: Cycle {result.get('status')} | PnL ${pnl:.2f} -> Treasury")
+                    logger.info(f"Check-in Swarm {i}/26 Project {project_id}: Cycle {result.get('status')} | PnL ${pnl:.2f} -> Treasury (projected)")
                 else:
                     logger.warning(f"Swarm {i}: Router/TOA not available - conservative mode")
 
             except Exception as e:
                 logger.error(f"Swarm {i} check-in error: {e}. TOA self-healing...")
                 if self.toa:
-                    self.toa.ingest_feedback({"source": "error", "swarm_id": i, "error": str(e)})
+                    try:
+                        self.toa.ingest_feedback({"source": "error", "swarm_id": i, "error": str(e)})
+                    except Exception:
+                        pass
 
-        # Yield aggregator dry-run plan (Project #1) — measurement only
+        # Yield Aggregator — Project #1 measurement + fee projection to Treasury
         if self.yield_agg:
             try:
-                plan = self.yield_agg.plan_rebalance(capital_usd=5000.0, risk_budget=0.30)
+                capital = 5000.0
+                plan = self.yield_agg.plan_rebalance(capital_usd=capital, risk_budget=0.30)
+                pnl_sim = self.yield_agg.simulate_year_pnl(capital_usd=capital, risk_budget=0.30)
+                fee_usd = float(pnl_sim.get("expected_fee_to_treasury_usd", 0.0))
+                # Daily pro-rata of annual fee projection for 5-min cycle visibility
+                daily_fee_proj = fee_usd / 365.0
+                total_inflow_projection += daily_fee_proj
+
                 logger.info(
-                    "YieldAggregator dry-run: blended_apr=%.2f%% allocations=%d mode=%s",
+                    "YieldAggregator: blended_apr=%.2f%% allocations=%d mode=%s daily_fee_proj=$%.4f",
                     plan.expected_blended_apr * 100,
                     len(plan.allocations),
                     plan.mode,
+                    daily_fee_proj,
                 )
+
                 if self.toa:
                     self.toa.ingest_feedback({
                         "source": "yield_aggregator",
                         "blended_apr": plan.expected_blended_apr,
                         "allocations": len(plan.allocations),
                         "mode": plan.mode,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "expected_fee_to_treasury_usd_annual": fee_usd,
+                        "daily_fee_proj": daily_fee_proj,
+                        "plan": plan.to_dict(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     })
+
+                if record_inflow and daily_fee_proj > 0:
+                    try:
+                        record_inflow(
+                            daily_fee_proj,
+                            asset="USD",
+                            source="yield_aggregator_fee_proj",
+                            usd_estimate=daily_fee_proj,
+                            projected=True,
+                            note=f"scheduler_cycle_{self.cycle_count}_annual_fee_prorata",
+                        )
+                    except Exception as e:
+                        logger.error("record_inflow (yield fee) failed: %s", e)
+
             except Exception as e:
                 logger.warning("YieldAggregator plan failed: %s", e)
 
@@ -138,7 +171,8 @@ class DeFiSwarmScheduler:
                 )
             except Exception as e:
                 logger.error("record_inflow failed: %s", e)
-        logger.info(f"Cycle complete | Projected Treasury Inflow this round: ${total_inflow_projection:.2f}")
+
+        logger.info(f"Cycle complete | Projected Treasury Inflow this round: ${total_inflow_projection:.4f}")
         return total_inflow_projection
 
     def simulate_revenue_paths(self, projects):
@@ -176,6 +210,7 @@ class DeFiSwarmScheduler:
             except Exception as e:
                 logger.error(f"Scheduler error: {e}. Self-improving via TOA. Continuing...")
                 time.sleep(60)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
