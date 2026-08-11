@@ -58,6 +58,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from sincor2 import treasury_inflow as _treasury_inflow
+
 logger = logging.getLogger("sincor.a2a")
 
 # ---------------------------------------------------------------------------
@@ -79,6 +81,8 @@ SINC_PRICE_PER_TASK = int(os.getenv("SINC_PRICE_PER_TASK", "1"))  # 1 SINC defau
 
 # Legacy AXIOM price per task (wei, 18 decimals) — kept for backward compatibility.
 AXM_PRICE_PER_TASK = int(os.getenv("AXM_PRICE_PER_TASK", str(1 * 10**18)))  # 1 AXM default
+A2A_PLATFORM_FEE_BPS = int(os.getenv("A2A_PLATFORM_FEE_BPS", "500"))
+_BPS_DENOM = 10_000
 
 PLATFORM_URL     = os.getenv("PLATFORM_URL", "https://getsincor.com")
 PLATFORM_NAME    = "SINCOR Agent Swarm"
@@ -1319,6 +1323,11 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _compute_platform_fee_wei(amount_wei: int) -> int:
+    amount = amount_wei if amount_wei >= 0 else 0
+    return (amount * A2A_PLATFORM_FEE_BPS) // _BPS_DENOM
+
+
 def _new_task(skill_id: str, input_text: str, caller_id: str,
               session_id: str, axm_paid: int = 0,
               tx_hash: Optional[str] = None) -> A2ATask:
@@ -1638,6 +1647,7 @@ class A2ARouter:
                 "A2A quote  skill=%s  caller=%s  axm=%.4f AXM  free_remaining=%d",
                 skill_id, caller_id, current_axm_price / 10**18, free_remaining,
             )
+            platform_fee_wei = _compute_platform_fee_wei(current_axm_price) if not is_free_call else 0
 
             return jsonify({
                 "skill_id":                 skill_id,
@@ -1650,6 +1660,16 @@ class A2ARouter:
                 "axm_price_display":        (
                     f"{current_axm_price / 10**18:.4f} AXM" if not is_free_call else "FREE"
                 ),
+                "platform_fee_bps":         A2A_PLATFORM_FEE_BPS,
+                "platform_fee_wei":         str(platform_fee_wei),
+                "treasury_fee_split": {
+                    "to": TREASURY_WALLET,
+                    "platform_fee_bps": A2A_PLATFORM_FEE_BPS,
+                    "platform_fee_wei": str(platform_fee_wei),
+                    "platform_fee_display": (
+                        f"{platform_fee_wei / 10**18:.4f} AXM" if platform_fee_wei else "0.0000 AXM"
+                    ),
+                },
                 "axiom_contract":           AXIOM_CONTRACT,
                 "primary_token":            A2A_PRIMARY_TOKEN,
                 "pay_to":                   TREASURY_WALLET,
@@ -2011,7 +2031,7 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
 def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:
     """Create a settlement record in the platform coordinator for a paid A2A task."""
     try:
-        from decimal import Decimal
+        from decimal import Decimal, InvalidOperation
 
         from flask import current_app, has_request_context
 
@@ -2037,11 +2057,29 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
             token_symbol="AXIOM",
             expires_in_minutes=settlement_expiry,
         )
-        settlement.confirm_payment(
+        settlement_record = settlement.confirm_payment(
             quote_id=quote.quote_id,
             tx_hash=tx_hash,
             confirmed_amount=amount_display,
         )
+        try:
+            fee_amount = Decimal(str(settlement_record.platform_fee))
+        except (InvalidOperation, TypeError, ValueError):
+            logger.warning(
+                "Invalid platform_fee on settlement record task=%s fee=%r",
+                task.id,
+                getattr(settlement_record, "platform_fee", None),
+            )
+            fee_amount = Decimal("0")
+        if fee_amount > 0:
+            _treasury_inflow.record_inflow(
+                fee_amount,
+                asset=settlement_record.token_symbol,
+                source="a2a_settlement",
+                tx_hash=tx_hash,
+                note=f"a2a task {task.id} platform fee",
+                projected=False,
+            )
         logger.info(
             "A2A settlement recorded task=%s axm=%.4f tx=%s",
             task.id,
