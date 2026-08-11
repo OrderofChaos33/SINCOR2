@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify
 from flask_jwt_extended import jwt_required
 
 logger = logging.getLogger(__name__)
