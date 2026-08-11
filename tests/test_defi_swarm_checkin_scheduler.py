@@ -11,7 +11,6 @@ class _DummyTOA:
         self.feedback.append(payload)
 
 
-
 def test_scheduler_reports_hook_metrics_to_toa(monkeypatch):
     monkeypatch.setattr(scheduler_module, "fetch_hook_status", lambda chain_id: {
         "chain_id": chain_id,

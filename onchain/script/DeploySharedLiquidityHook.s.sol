@@ -11,11 +11,12 @@ import {ISharedLiquidityVault} from "../src/interfaces/ISharedLiquidityVault.sol
 /// @notice Deploys SharedLiquidityHook on a CREATE2-mined address with V4 hook flags:
 ///         BEFORE_SWAP + AFTER_SWAP (0xC0).
 contract DeploySharedLiquidityHook is Script {
-    uint160 internal constant HOOK_MASK = 0x3FFF;
+    // Uniswap V4 hook flags occupy address low bits [0..13].
+    uint160 internal constant HOOK_FLAGS_MASK = 0x3FFF;
 
     function run() external returns (address hookAddress, bytes32 salt) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        address create2Factory = vm.envOr("CREATE2_FACTORY", vm.addr(deployerPrivateKey));
 
         IPoolManager poolManager = IPoolManager(vm.envAddress("POOL_MANAGER"));
         ISharedLiquidityVault vault = ISharedLiquidityVault(vm.envAddress("VAULT"));
@@ -33,15 +34,15 @@ contract DeploySharedLiquidityHook is Script {
         for (uint256 i = 0; i < maxSaltIterations; i++) {
             salt = bytes32(i);
             address predicted = address(
-                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), deployer, salt, codeHash))))
+                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), create2Factory, salt, codeHash))))
             );
-            if ((uint160(predicted) & HOOK_MASK) == required) {
+            if ((uint160(predicted) & HOOK_FLAGS_MASK) == required) {
                 hookAddress = predicted;
                 found = true;
                 break;
             }
         }
-        require(found, "salt not found");
+        require(found, "No valid CREATE2 salt found within HOOK_SALT_MAX_ITERATIONS");
 
         vm.startBroadcast(deployerPrivateKey);
         SharedLiquidityHook deployed = new SharedLiquidityHook{salt: salt}(poolManager, vault, treasury, feeBps);

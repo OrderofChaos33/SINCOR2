@@ -20,21 +20,25 @@ MAINNET = {
     "sinc": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
     "explorer": "https://basescan.org",
 }
-
-SEPOLIA = {
-    "hook": os.environ.get("BASE_SEPOLIA_SHARED_LIQUIDITY_HOOK", MAINNET["hook"]),
-    "router": os.environ.get("BASE_SEPOLIA_SINC_SWAP_ROUTER", MAINNET["router"]),
-    "usdc": os.environ.get("BASE_SEPOLIA_USDC", MAINNET["usdc"]),
-    "curve": os.environ.get("BASE_SEPOLIA_SINC_CURVE", MAINNET["curve"]),
-    "sinc": os.environ.get("BASE_SEPOLIA_SINC", MAINNET["sinc"]),
-    "explorer": "https://sepolia.basescan.org",
-}
 GRADUATION_ETH = 0.5
+
+
+def _addresses_for_chain(chain_id: int) -> dict:
+    if chain_id == 84532:
+        return {
+            "hook": os.environ.get("BASE_SEPOLIA_SHARED_LIQUIDITY_HOOK", MAINNET["hook"]),
+            "router": os.environ.get("BASE_SEPOLIA_SINC_SWAP_ROUTER", MAINNET["router"]),
+            "usdc": os.environ.get("BASE_SEPOLIA_USDC", MAINNET["usdc"]),
+            "curve": os.environ.get("BASE_SEPOLIA_SINC_CURVE", MAINNET["curve"]),
+            "sinc": os.environ.get("BASE_SEPOLIA_SINC", MAINNET["sinc"]),
+            "explorer": "https://sepolia.basescan.org",
+        }
+    return MAINNET
 
 
 def fetch_hook_status(chain_id: int | None = None) -> dict:
     active_chain_id = chain_id if chain_id is not None else int(os.environ.get("HOOK_CHAIN_ID", "8453"))
-    active = SEPOLIA if active_chain_id == 84532 else MAINNET
+    active = _addresses_for_chain(active_chain_id)
     base = fetch_stats()
     eth = base.get("curve_eth_accumulated", 0.0)
     grad_pct = min(100.0, round(eth / GRADUATION_ETH * 100, 2)) if GRADUATION_ETH else 0.0

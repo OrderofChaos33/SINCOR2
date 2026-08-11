@@ -12,7 +12,7 @@ import time
 import logging
 import argparse
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Real integrations
 try:
@@ -107,7 +107,7 @@ class DeFiSwarmScheduler:
                             "project": project_id,
                             "pnl_usd": pnl,
                             "status": result.get("status"),
-                            "timestamp": datetime.utcnow().isoformat(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
                         })
 
                     logger.info(f"Check-in Swarm {i}/26 Project {project_id}: Cycle {result.get('status')} | PnL ${pnl:.2f} -> Treasury")
@@ -135,7 +135,7 @@ class DeFiSwarmScheduler:
                         "blended_apr": plan.expected_blended_apr,
                         "allocations": len(plan.allocations),
                         "mode": plan.mode,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     })
             except Exception as e:
                 logger.warning("YieldAggregator plan failed: %s", e)
@@ -158,7 +158,7 @@ class DeFiSwarmScheduler:
                         "sinc_in_hook_pm_m": hook_status.get("sinc_in_hook_pm_m", 0.0),
                         "curve_eth_accumulated": hook_status.get("curve_eth_accumulated", 0.0),
                         "graduation_pct": hook_status.get("graduation_pct", 0.0),
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     })
             except Exception as e:
                 logger.warning("Hook metrics fetch failed: %s", e)

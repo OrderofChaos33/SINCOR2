@@ -15,10 +15,11 @@ def test_fetch_hook_status_defaults_to_mainnet(monkeypatch):
 
 def test_fetch_hook_status_sepolia_overrides(monkeypatch):
     monkeypatch.setattr(hook_stats, "fetch_stats", lambda: {"curve_eth_accumulated": 0.5, "official_floor_usd": 1.5})
+    monkeypatch.setenv("BASE_SEPOLIA_SHARED_LIQUIDITY_HOOK", "0xabc")
 
     status = hook_stats.fetch_hook_status(chain_id=84532)
 
     assert status["chain_id"] == 84532
-    assert status["hook_address"] == hook_stats.SEPOLIA["hook"]
+    assert status["hook_address"] == "0xabc"
     assert "sepolia.basescan.org/address" in status["basescan"]["hook"]
     assert status["graduation_pct"] == 100.0
