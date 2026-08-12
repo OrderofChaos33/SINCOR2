@@ -27,7 +27,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
-from sincor2.data_paths import data_dir, migrate_legacy_orders_db
+from sincor2.data_paths import data_dir
 from sincor2.pdf_loader import get_pdf_generator
 from sincor2.email_sender import get_email_sender
 
