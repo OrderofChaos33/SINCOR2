@@ -1,0 +1,63 @@
+# SINCOR Agent Profit Loops — config
+# All values are conservative defaults. Override via env or CLI.
+
+network:
+  chain_id: 8453
+  preconf_rpc: "https://mainnet-preconf.base.org"
+  standard_rpc: "https://mainnet.base.org"
+  # Prefer preconf for reads + submission when available
+
+addresses:
+  sinc: "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+  usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  sinc_limit_order_hook: "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0"
+  shared_liquidity_vault: "0xeA90a257e5Dae20a0472C4812775F28614459bb6"
+  fluid_adapter: ""          # set after DeploySincFluidAdapter
+  pool_manager: "0x498581fF718922c3f8e6A244956aF099B2652b2b"
+  position_manager: "0x7C5f5A4bBd8fD63184577525326123B519429bDc"
+  treasury: "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+
+safety:
+  max_daily_notional_usdc: 500
+  max_single_tx_usdc: 100
+  min_health_factor: 1.25
+  max_inventory_sinc_pct: 5.0
+  kill_switch_price_deviation_bps: 300
+  reserve_usdc: 50
+  max_slippage_bps: 50
+  dry_run_default: true
+
+loops:
+  fluid_yield:
+    enabled: true
+    interval_sec: 120
+    min_deposit_usdc: 20
+    harvest_threshold_usdc: 5
+    recycle_to_ladder_pct: 70
+    recycle_to_inventory_pct: 30
+
+  vault_fee_compound:
+    enabled: true
+    interval_sec: 300
+    min_fee_threshold_usdc: 2
+    to_ladder_pct: 60
+    to_vault_compound_pct: 40
+
+  ladder_mm:
+    enabled: true
+    interval_sec: 30
+    target_price_usd: 1.50
+    sell_ladder_ticks: 8
+    buy_ladder_ticks: 6
+    quote_size_sinc: 50          # per level, small while thin
+    quote_size_usdc: 5
+    min_spread_bps: 30
+    widen_on_large_pending: true
+    large_pending_usdc_threshold: 200
+
+  # Future — enable only after Fluid/Morpho SINC markets live
+  leverage_loop:
+    enabled: false
+    max_leverage: 2.0
+    min_health_factor: 1.30
+    rebalance_interval_sec: 600
