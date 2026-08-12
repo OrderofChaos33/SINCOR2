@@ -93,10 +93,37 @@ class RebalancePlan:
     warnings: List[str] = field(default_factory=list)
     executed: bool = False
 
+    def expected_fee_to_treasury_usd(self, horizon_years: float = 1.0) -> float:
+        """Projected protocol fee routed to treasury over horizon."""
+        gross = self.total_capital_usd * self.expected_blended_apr * horizon_years
+        return round(gross * (self.fee_to_treasury_bps / 10_000), 6)
+
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["allocations"] = [a.to_dict() for a in self.allocations]
+        d["expected_fee_to_treasury_usd_1y"] = self.expected_fee_to_treasury_usd(1.0)
+        d["top_strategies"] = [
+            {"id": a.strategy_id, "weight": a.weight, "apr": a.estimated_apr}
+            for a in self.allocations[:3]
+        ]
         return d
+
+    def toa_summary(self) -> Dict[str, Any]:
+        """Compact payload for TOA.ingest_feedback — self-improving loop."""
+        return {
+            "source": "yield_aggregator",
+            "mode": self.mode,
+            "capital_usd": self.total_capital_usd,
+            "blended_apr": self.expected_blended_apr,
+            "max_risk": self.max_risk_score,
+            "expected_fee_to_treasury_usd_1y": self.expected_fee_to_treasury_usd(1.0),
+            "top_strategies": [
+                a.strategy_id for a in self.allocations[:3]
+            ],
+            "n_allocations": len(self.allocations),
+            "treasury": self.treasury,
+            "timestamp": self.timestamp,
+        }
 
 
 # Default strategy universe — conservative, Base-native oriented
@@ -178,11 +205,9 @@ class YieldAggregator:
             if s.risk_score > risk_budget + 1e-9:
                 continue
             if capital_usd < s.min_liquidity_usd and s.kind != StrategyKind.CASH:
-                # still allow tiny capital into cash
                 continue
             out.append(s)
         if not out:
-            # always fall back to cash
             cash = next((s for s in self.strategies if s.kind == StrategyKind.CASH), None)
             if cash:
                 out = [cash]
@@ -222,18 +247,16 @@ class YieldAggregator:
                 warnings=warnings,
             )
 
-        # Score: higher APR / (1 + risk) wins; cash always gets a floor weight
         scores: Dict[str, float] = {}
         for s in eligible:
             if s.kind == StrategyKind.CASH:
-                scores[s.id] = 0.15  # floor
+                scores[s.id] = 0.15
             else:
                 scores[s.id] = max(s.estimated_apr, 0.0) / (1.0 + s.risk_score)
 
         total_score = sum(scores.values()) or 1.0
         raw_weights = {sid: sc / total_score for sid, sc in scores.items()}
 
-        # Cap single-strategy concentration
         capped: Dict[str, float] = {}
         overflow = 0.0
         for sid, w in raw_weights.items():
@@ -244,7 +267,6 @@ class YieldAggregator:
                 capped[sid] = w
 
         if overflow > 0:
-            # redistribute overflow to under-cap strategies proportional to remaining room
             room = {
                 sid: max(MAX_SINGLE_STRATEGY_PCT - w, 0.0) for sid, w in capped.items()
             }
@@ -252,7 +274,6 @@ class YieldAggregator:
             for sid in capped:
                 capped[sid] += overflow * (room[sid] / room_sum)
 
-        # Normalize
         wsum = sum(capped.values()) or 1.0
         weights = {sid: w / wsum for sid, w in capped.items()}
 
@@ -314,11 +335,12 @@ class YieldAggregator:
             executed=executed,
         )
         logger.info(
-            "Yield rebalance plan: capital=$%.2f blended_apr=%.2f%% mode=%s strategies=%d",
+            "Yield rebalance plan: capital=$%.2f blended_apr=%.2f%% mode=%s strategies=%d fee_1y~$%.4f",
             capital_usd,
             plan.expected_blended_apr * 100,
             mode,
             len(allocations),
+            plan.expected_fee_to_treasury_usd(1.0),
         )
         return plan
 
