@@ -1,0 +1,9 @@
+---
+exclude_paths:
+  - "static/**/*.jpg"
+  - "static/**/*.jpeg"
+  - "static/**/*.png"
+  - "static/**/*.svg"
+  - "static/**/*.gif"
+  - "static/**/*.ico"
+  - "static/**/*.webp"
