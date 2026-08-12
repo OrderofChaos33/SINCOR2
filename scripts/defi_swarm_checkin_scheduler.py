@@ -104,24 +104,27 @@ class DeFiSwarmScheduler:
                 if self.toa:
                     self.toa.ingest_feedback({"source": "error", "swarm_id": i, "error": str(e)})
 
-        # Yield aggregator dry-run plan (Project #1) — measurement only
+        # Yield aggregator dry-run plan (Project #1) — measurement only + rich TOA feedback
         if self.yield_agg:
             try:
                 plan = self.yield_agg.plan_rebalance(capital_usd=5000.0, risk_budget=0.30)
                 logger.info(
-                    "YieldAggregator dry-run: blended_apr=%.2f%% allocations=%d mode=%s",
+                    "YieldAggregator dry-run: blended_apr=%.2f%% allocations=%d mode=%s fee_1y~$%.4f",
                     plan.expected_blended_apr * 100,
                     len(plan.allocations),
                     plan.mode,
+                    plan.expected_fee_to_treasury_usd(1.0),
                 )
                 if self.toa:
-                    self.toa.ingest_feedback({
+                    # Prefer compact TOA summary when available (2026-08-12 enrichment)
+                    feedback = plan.toa_summary() if hasattr(plan, "toa_summary") else {
                         "source": "yield_aggregator",
                         "blended_apr": plan.expected_blended_apr,
                         "allocations": len(plan.allocations),
                         "mode": plan.mode,
                         "timestamp": datetime.utcnow().isoformat(),
-                    })
+                    }
+                    self.toa.ingest_feedback(feedback)
             except Exception as e:
                 logger.warning("YieldAggregator plan failed: %s", e)
 
