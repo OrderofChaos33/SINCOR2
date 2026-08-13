@@ -1,0 +1,3 @@
+onchain/**/*.ts
+onchain/sdk/fluid-amplify.js
+static/js/sinc_wallet.js
