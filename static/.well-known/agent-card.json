@@ -1,7 +1,7 @@
 {
   "name": "SINCOR Agent Swarm",
-  "description": "Production autonomous AI workforce. 42 specialized agents across 7 archetypes (Scout, Builder, Synthesizer, Negotiator, Director, Auditor, Caretaker). External agents pay in SINC or AXIOM on Base and receive professional intelligence, content, and automation. Top skills offer free quota for discovery. 50% of AXM settlements burned on-chain.",
-  "version": "2.0.0",
+  "description": "Production autonomous AI workforce. 42 specialized agents across 7 archetypes. Core differentiator: Temporal Optimization Agent (TOA) — forecast → Monte Carlo → wave-function-collapse for ranked action plans. External agents pay in SINC or AXIOM on Base. Healthcare credentialing and compliance verticals live. 50% of AXM settlements burned on-chain.",
+  "version": "2.1.0",
   "supportedInterfaces": [
     {
       "url": "https://getsincor.com/api/a2a",
@@ -21,6 +21,18 @@
   "defaultInputModes": ["text/plain", "application/json"],
   "defaultOutputModes": ["text/plain", "application/json"],
   "skills": [
+    {
+      "id": "toa-decision",
+      "name": "TOA Strategic Decision & Outcome Collapse",
+      "description": "Submit multi-option decisions to the Temporal Optimization Agent. Kernel forecasts + Monte Carlo multi-criteria simulation + wave-function-collapse ranking. Returns top-k action plans optimized for long-term positive outcomes.",
+      "tags": ["toa", "strategy", "decision", "optimization", "monte-carlo", "wfc"],
+      "examples": ["Should I expand to the UK market in Q4 or double down on US mid-market under current liquidity constraints?"],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"],
+      "sincPrice": 6,
+      "estimatedLatencySeconds": 45,
+      "freeQuota": 0
+    },
     {
       "id": "lead-enrichment",
       "name": "Lead Enrichment & Outbound Prospecting",
@@ -46,16 +58,16 @@
       "freeQuota": 5
     },
     {
-      "id": "outreach-sequence",
-      "name": "Outreach Sequence Builder",
-      "description": "Generate multi-touch outbound sequences tailored to a specific ICP.",
-      "tags": ["sales", "outreach", "email", "linkedin"],
-      "examples": ["Build a 5-touch email sequence for SMB dental practices in Texas."],
+      "id": "healthcare-credential-check",
+      "name": "Healthcare Credential Check",
+      "description": "NPI, licences, DEA, payer credentialing status for healthcare operators.",
+      "tags": ["healthcare", "credentialing", "compliance", "b2b"],
+      "examples": ["Verify credential status and license expiry for this provider NPI."],
       "inputModes": ["text/plain", "application/json"],
-      "outputModes": ["text/plain", "application/json"],
-      "sincPrice": 3,
-      "estimatedLatencySeconds": 20,
-      "freeQuota": 5
+      "outputModes": ["application/json"],
+      "sincPrice": 4,
+      "estimatedLatencySeconds": 45,
+      "freeQuota": 0
     },
     {
       "id": "market-forecast",
@@ -70,16 +82,16 @@
       "freeQuota": 5
     },
     {
-      "id": "toa-decision",
-      "name": "TOA Strategic Decision & Routing",
-      "description": "Submit multi-option decisions to the Temporal Optimization Agent for ranked action plans.",
-      "tags": ["toa", "strategy", "decision", "optimization"],
-      "examples": ["Should I expand to the UK market in Q4 or double down on US mid-market?"],
+      "id": "outreach-sequence",
+      "name": "Outreach Sequence Builder",
+      "description": "Generate multi-touch outbound sequences tailored to a specific ICP.",
+      "tags": ["sales", "outreach", "email", "linkedin"],
+      "examples": ["Build a 5-touch email sequence for SMB dental practices in Texas."],
       "inputModes": ["text/plain", "application/json"],
       "outputModes": ["text/plain", "application/json"],
-      "sincPrice": 6,
-      "estimatedLatencySeconds": 45,
-      "freeQuota": 0
+      "sincPrice": 3,
+      "estimatedLatencySeconds": 20,
+      "freeQuota": 5
     }
   ],
   "documentationUrl": "https://getsincor.com/docs",
