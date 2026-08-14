@@ -5,6 +5,8 @@ quote endpoint, settlement proof, leaderboard, and reputation routing."""
 
 import pytest
 
+from sincor2 import a2a_integration
+
 # ── Discovery ────────────────────────────────────────────────────────────────
 
 def test_agent_card_endpoint(client):
@@ -99,8 +101,6 @@ def test_a2a_quote_free_quota_skill(client):
 
 def test_a2a_quote_non_free_skill(client):
     """compliance-sbom has no free quota."""
-    from sincor2 import a2a_integration
-
     response = client.post(
         "/api/a2a/quote",
         json={"skill_id": "compliance-sbom", "caller_id": "test-caller-001"},

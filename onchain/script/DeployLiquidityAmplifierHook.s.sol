@@ -12,8 +12,8 @@ import {LiquidityAmplifierHook} from "../src/LiquidityAmplifierHook.sol";
 contract DeployLiquidityAmplifierHook is Script {
     function run() external returns (address hookAddress, bytes32 salt) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address guardian = vm.envOr("GUARDIAN", vm.addr(deployerPrivateKey));
-        address create2Factory = vm.envOr("CREATE2_FACTORY", vm.addr(deployerPrivateKey));
+        address deployer = vm.addr(deployerPrivateKey);
+        address guardian = vm.envOr("GUARDIAN", deployer);
         IPoolManager poolManager = IPoolManager(vm.envAddress("POOL_MANAGER"));
 
         uint160 flags = uint160(
@@ -21,7 +21,7 @@ contract DeployLiquidityAmplifierHook is Script {
                 | Hooks.AFTER_REMOVE_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG
         );
         bytes memory constructorArgs = abi.encode(poolManager, guardian);
-        (hookAddress, salt) = HookMiner.find(create2Factory, flags, type(LiquidityAmplifierHook).creationCode, constructorArgs);
+        (hookAddress, salt) = HookMiner.find(deployer, flags, type(LiquidityAmplifierHook).creationCode, constructorArgs);
 
         vm.startBroadcast(deployerPrivateKey);
         LiquidityAmplifierHook hook = new LiquidityAmplifierHook{salt: salt}(poolManager, guardian);

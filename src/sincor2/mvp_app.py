@@ -485,16 +485,18 @@ except Exception as e:
 # SECURITY MIDDLEWARE
 # ============================================================================
 
+HEALTHCHECK_PATHS = ('/health', '/ready', '/favicon.ico')
+
+
 @app.before_request
 def log_request():
     """Log incoming requests, record start time, enforce HTTPS in production."""
     g.start_time = time.time()
-    health_paths = ('/health', '/ready', '/favicon.ico')
     # Enforce HTTPS in production (Railway sets X-Forwarded-Proto)
-    if request.path not in health_paths and request.headers.get('X-Forwarded-Proto', 'https') == 'http':
+    if request.path not in HEALTHCHECK_PATHS and request.headers.get('X-Forwarded-Proto', 'https') == 'http':
         url = request.url.replace('http://', 'https://', 1)
         return redirect(url, code=301)
-    if request.path not in health_paths:
+    if request.path not in HEALTHCHECK_PATHS:
         logger.info(f"{request.method} {request.path}")
 
 
@@ -520,7 +522,7 @@ def apply_security_headers(response):
 
     # Log response timing
     elapsed = time.time() - getattr(g, 'start_time', time.time())
-    if request.path not in ('/health', '/ready', '/favicon.ico'):
+    if request.path not in HEALTHCHECK_PATHS:
         logger.info(f"{request.method} {request.path} ? {response.status_code} ({elapsed:.3f}s)")
 
     return response

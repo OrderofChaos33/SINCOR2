@@ -16,7 +16,7 @@ contract DeploySharedLiquidityHook is Script {
 
     function run() external returns (address hookAddress, bytes32 salt) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address create2Factory = vm.envOr("CREATE2_FACTORY", vm.addr(deployerPrivateKey));
+        address deployer = vm.addr(deployerPrivateKey);
 
         IPoolManager poolManager = IPoolManager(vm.envAddress("POOL_MANAGER"));
         ISharedLiquidityVault vault = ISharedLiquidityVault(vm.envAddress("VAULT"));
@@ -34,9 +34,9 @@ contract DeploySharedLiquidityHook is Script {
         for (uint256 i = 0; i < maxSaltIterations; i++) {
             salt = bytes32(i);
             address predicted = address(
-                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), create2Factory, salt, codeHash))))
+                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), deployer, salt, codeHash))))
             );
-            if ((uint160(predicted) & HOOK_FLAGS_MASK) == required) {
+            if ((uint160(predicted) & required) == required) {
                 hookAddress = predicted;
                 found = true;
                 break;

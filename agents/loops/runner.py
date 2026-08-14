@@ -69,6 +69,16 @@ class LoopRunner:
     def _record_notional(self, amount_usdc: float) -> None:
         self.safety.daily_notional_usdc += amount_usdc
 
+    def _available_usdc_balance(self) -> float:
+        raw_value = os.getenv("AGENT_AVAILABLE_USDC")
+        if raw_value is None:
+            return 0.0
+        try:
+            return max(0.0, float(raw_value))
+        except ValueError:
+            log.warning("Invalid AGENT_AVAILABLE_USDC=%r; treating balance as zero", raw_value)
+            return 0.0
+
     def kill(self, reason: str) -> None:
         self.safety.paused = True
         self.safety.pause_reason = reason
@@ -87,7 +97,12 @@ class LoopRunner:
 
         min_dep = self.cfg["loops"]["fluid_yield"]["min_deposit_usdc"]
         max_tx = self.cfg["safety"]["max_single_tx_usdc"]
-        amount = min(min_dep, max_tx)
+        reserve = self.cfg["safety"]["reserve_usdc"]
+        available = max(0.0, self._available_usdc_balance() - reserve)
+        amount = min(available, max_tx)
+        if amount < min_dep:
+            log.info("[fluid_yield] available %.2f USDC below min deposit %.2f; skipping", available, min_dep)
+            return
 
         if not self._check_daily_cap(amount):
             return
