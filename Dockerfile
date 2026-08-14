@@ -17,6 +17,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,8 +37,9 @@ RUN mkdir -p /data && chown -R appuser:appuser /data /home/appuser/.local
 
 USER appuser
 
-# Healthcheck uses the real PORT at runtime
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD python -c "import os, urllib.request; port=os.environ.get('PORT','8080'); urllib.request.urlopen(f'http://localhost:{port}/health', timeout=5); urllib.request.urlopen(f'http://localhost:{port}/ready', timeout=5)" || exit 1
+# Healthcheck uses the real PORT at runtime and avoids deep readiness probes
+# that can flap during deploys when optional upstreams are unavailable.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ["/bin/sh", "-c", "curl -fsS http://localhost:${PORT}/health >/dev/null || exit 1"]
 
 CMD ["python", "-m", "gunicorn", "sincor2.mvp_app:app", "--config", "gunicorn.conf.py"]

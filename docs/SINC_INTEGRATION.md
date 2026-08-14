@@ -260,6 +260,8 @@ to build off-chain analytics, leaderboards, and activity feeds.
 Every `create_quote()` returns a `sinc_amount` field. `confirm_payment()` automatically
 routes 5% of the SINC amount to the treasury and records `platform_fee` and `payee_amount`
 on the `SettlementRecord`.
+`/api/a2a/quote` also exposes `platform_fee_*` and `treasury_fee_split` fields so callers
+can see the fee amount and canonical treasury destination before submitting payment.
 
 **Agent Cards:** `AgentCardRecord` now includes:
 - `sinc_price_per_call` (default 1)

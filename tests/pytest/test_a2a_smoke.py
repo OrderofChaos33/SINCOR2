@@ -3,6 +3,8 @@
 """A2A integration smoke tests — covers the new skill catalogue, pricing,
 quote endpoint, settlement proof, leaderboard, and reputation routing."""
 
+import pytest
+
 # ── Discovery ────────────────────────────────────────────────────────────────
 
 def test_agent_card_endpoint(client):
@@ -97,6 +99,8 @@ def test_a2a_quote_free_quota_skill(client):
 
 def test_a2a_quote_non_free_skill(client):
     """compliance-sbom has no free quota."""
+    from sincor2 import a2a_integration
+
     response = client.post(
         "/api/a2a/quote",
         json={"skill_id": "compliance-sbom", "caller_id": "test-caller-001"},
@@ -105,6 +109,12 @@ def test_a2a_quote_non_free_skill(client):
     data = response.get_json()
     assert data.get("is_free") is False
     assert int(data["axm_price_wei"]) > 0
+    assert data.get("platform_fee_bps") == 500
+    assert int(data.get("platform_fee_wei", "0")) > 0
+    fee_split = data.get("treasury_fee_split", {})
+    assert fee_split.get("to") == a2a_integration.TREASURY_WALLET
+    assert fee_split.get("platform_fee_bps") == 500
+    assert int(fee_split.get("platform_fee_wei", "0")) == int(data["platform_fee_wei"])
 
 
 # ── Agent registry ────────────────────────────────────────────────────────────
@@ -190,3 +200,48 @@ def test_a2a_settle_completed_task(client):
     assert pos.get("task_id") == task_id
     assert "result_hash" in pos
     assert "settled_at" in pos
+
+
+def test_a2a_send_records_treasury_inflow_for_fee_only(client, app, monkeypatch):
+    from types import SimpleNamespace
+
+    from sincor2 import treasury_inflow
+
+    recorded = []
+
+    def _fake_record_inflow(amount, **kwargs):
+        recorded.append({"amount": amount, **kwargs})
+        return SimpleNamespace()
+
+    monkeypatch.setattr(treasury_inflow, "record_inflow", _fake_record_inflow)
+
+    class _FakeSettlement:
+        def create_quote(self, **kwargs):
+            return SimpleNamespace(quote_id="quote-test")
+
+        def confirm_payment(self, **kwargs):
+            return SimpleNamespace(platform_fee="0.5000", token_symbol="AXIOM")
+
+    app.extensions["sincor_platform"]["settlement"] = _FakeSettlement()
+
+    response = client.post(
+        "/api/a2a",
+        json={
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "message/send",
+            "params": {
+                "skillId": "compliance-sbom",
+                "axmPaidWei": str(10**18),
+                "txHash": "0xA2AFEE01",
+                "message": {"parts": [{"text": "Run compliance scan"}]},
+            },
+        },
+    )
+    assert response.status_code == 200
+    assert len(recorded) == 1
+    assert recorded[0]["amount"] == pytest.approx(0.5)
+    assert recorded[0]["asset"] == "AXIOM"
+    assert recorded[0]["source"] == "a2a_settlement"
+    assert recorded[0]["projected"] is False
+    assert recorded[0]["tx_hash"] == "0xA2AFEE01"

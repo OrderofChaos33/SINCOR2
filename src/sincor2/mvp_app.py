@@ -489,11 +489,12 @@ except Exception as e:
 def log_request():
     """Log incoming requests, record start time, enforce HTTPS in production."""
     g.start_time = time.time()
+    health_paths = ('/health', '/ready', '/favicon.ico')
     # Enforce HTTPS in production (Railway sets X-Forwarded-Proto)
-    if request.headers.get('X-Forwarded-Proto', 'https') == 'http':
+    if request.path not in health_paths and request.headers.get('X-Forwarded-Proto', 'https') == 'http':
         url = request.url.replace('http://', 'https://', 1)
         return redirect(url, code=301)
-    if request.path not in ('/health', '/favicon.ico'):
+    if request.path not in health_paths:
         logger.info(f"{request.method} {request.path}")
 
 
@@ -519,7 +520,7 @@ def apply_security_headers(response):
 
     # Log response timing
     elapsed = time.time() - getattr(g, 'start_time', time.time())
-    if request.path not in ('/health', '/favicon.ico'):
+    if request.path not in ('/health', '/ready', '/favicon.ico'):
         logger.info(f"{request.method} {request.path} ? {response.status_code} ({elapsed:.3f}s)")
 
     return response
