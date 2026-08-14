@@ -199,10 +199,15 @@ class DeFiSwarmScheduler:
         while self.running:
             try:
                 self.cycle_count += 1
-                self.check_in_all_swarms()
+                projected_inflow = self.check_in_all_swarms()
                 revenue_paths = self.simulate_revenue_paths(self.projects)
                 if revenue_paths:
-                    logger.info(f"TOA Revenue Paths prioritized: {len(revenue_paths)} top actions. Treasury focus active.")
+                    logger.info(
+                        "TOA Revenue Paths prioritized: %s top actions. Treasury focus active. "
+                        "Projected inflow this cycle: $%.2f",
+                        len(revenue_paths),
+                        projected_inflow,
+                    )
 
                 if once:
                     logger.info("One-shot complete. Exiting.")

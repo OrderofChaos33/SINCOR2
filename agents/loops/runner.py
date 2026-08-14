@@ -149,16 +149,18 @@ class LoopRunner:
         # 3. Rebalance inventory via SincSwapRouter if skew > max_inventory_sinc_pct
 
     def run_once(self, loops: list[str]) -> None:
+        if "all" in loops:
+            self.loop_fluid_yield()
+            self.loop_vault_fee_compound()
+            self.loop_ladder_mm()
+            return
+
         for name in loops:
             if name == "fluid_yield":
                 self.loop_fluid_yield()
             elif name == "vault_fee_compound":
                 self.loop_vault_fee_compound()
             elif name == "ladder_mm":
-                self.loop_ladder_mm()
-            elif name == "all":
-                self.loop_fluid_yield()
-                self.loop_vault_fee_compound()
                 self.loop_ladder_mm()
             else:
                 log.warning("Unknown loop: %s", name)
