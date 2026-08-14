@@ -205,10 +205,10 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = load_config()
-    live = args.live and not cfg["safety"].get("dry_run_default", True)
-    if args.live and cfg["safety"].get("dry_run_default", True):
+    dry_run_default = bool(cfg["safety"].get("dry_run_default", False))
+    live = args.live and not dry_run_default
+    if args.live and dry_run_default:
         log.warning("config still has dry_run_default=true; forcing dry-run. Set dry_run_default: false to go live.")
-        live = False
 
     runner = LoopRunner(cfg, live=live)
     loops = [x.strip() for x in args.loop.split(",") if x.strip()]
