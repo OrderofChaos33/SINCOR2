@@ -44,7 +44,8 @@ jobs:
         with:
           # Check https://github.com/codacy/codacy-analysis-cli#project-token to get your project token from your Codacy repository
           # You can also omit the token and run the tools that support default configurations
-          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          # Intentionally omit project-token to avoid remote ruleset/tool-config failures.
+          # For this workflow we only need local/default tool configs to generate SARIF.
           verbose: true
           output: results.sarif
           format: sarif
