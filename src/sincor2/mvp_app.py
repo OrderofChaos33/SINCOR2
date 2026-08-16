@@ -832,7 +832,7 @@ def ops_schedulers_status():
             }
         ),
         'polyclaw': {
-            'enabled': os.environ.get('POLYCLAW_ENABLED', 'true').lower() == 'true',
+            'enabled': os.environ.get('POLYCLAW_ENABLED', 'false').lower() == 'true',
             'running': bool(polyclaw_scheduler and polyclaw_scheduler.running),
             'next_run': _job_next(polyclaw_scheduler, 'polyclaw_scan'),
         },
