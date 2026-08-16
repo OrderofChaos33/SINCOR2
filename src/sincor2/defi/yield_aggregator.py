@@ -12,6 +12,8 @@ Safety rules (hard):
   actual signing/broadcast stays outside this module.
 - Every rebalance is risk-capped (max allocation %, min liquidity, max slippage).
 - Fees route conceptually to the canonical treasury address.
+- plan_id + audit dict on every RebalancePlan for traceability.
+- Optional record_fee_estimate_to_ledger for treasury_inflow KPI.
 
 Strategies are adapters. Real protocol integrations plug in here without
 changing the agent YAML or swarm scheduler.
@@ -22,6 +24,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+import uuid
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -39,9 +42,9 @@ SHARED_LIQUIDITY_HOOK = os.getenv(
 )
 
 EXECUTE_LIVE = os.getenv("EXECUTE_LIVE", "0").strip() == "1"
-MAX_SINGLE_STRATEGY_PCT = float(os.getenv("YIELD_MAX_SINGLE_STRATEGY_PCT", "0.40"))
-MAX_SLIPPAGE_BPS = int(os.getenv("YIELD_MAX_SLIPPAGE_BPS", "50"))
-MIN_CAPITAL_USD = float(os.getenv("YIELD_MIN_CAPITAL_USD", "10.0"))
+MAX_SINGLE_STRATEGY_PCT = float(os.getenv("YIELD_MAX_SINGLE_STRATEGY_PCT", "0.35"))
+MAX_SLIPPAGE_BPS = int(os.getenv("YIELD_MAX_SLIPPAGE_BPS", "30"))
+MIN_CAPITAL_USD = float(os.getenv("YIELD_MIN_CAPITAL_USD", "5.0"))
 
 
 class StrategyKind(str, Enum):
@@ -80,6 +83,7 @@ class StrategyAllocation:
 class RebalancePlan:
     """Result of a dry-run (or live-intent) rebalance."""
 
+    plan_id: str
     timestamp: float
     mode: str  # "dry_run" | "live_intent"
     total_capital_usd: float
@@ -92,6 +96,7 @@ class RebalancePlan:
     intents: List[Dict[str, Any]] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     executed: bool = False
+    audit: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -116,9 +121,9 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         name="Morpho-style USDC Lending",
         kind=StrategyKind.STABLE_LENDING,
         protocol="morpho_blue",
-        estimated_apr=0.045,
-        risk_score=0.15,
-        min_liquidity_usd=1000.0,
+        estimated_apr=0.048,
+        risk_score=0.14,
+        min_liquidity_usd=50.0,
         notes="Isolated market lending; oracle + IRM constrained",
     ),
     YieldStrategy(
@@ -126,18 +131,18 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         name="Aave-style USDC Supply",
         kind=StrategyKind.STABLE_LENDING,
         protocol="aave_v3",
-        estimated_apr=0.038,
-        risk_score=0.12,
-        min_liquidity_usd=1000.0,
+        estimated_apr=0.041,
+        risk_score=0.11,
+        min_liquidity_usd=50.0,
     ),
     YieldStrategy(
         id="shared_liq_vault",
         name="SINCOR SharedLiquidityVault",
         kind=StrategyKind.SHARED_LIQUIDITY,
         protocol="sincor_shared_liquidity",
-        estimated_apr=0.08,
-        risk_score=0.25,
-        min_liquidity_usd=500.0,
+        estimated_apr=0.085,
+        risk_score=0.22,
+        min_liquidity_usd=25.0,
         notes=f"Vault {SHARED_LIQUIDITY_VAULT}; hook {SHARED_LIQUIDITY_HOOK}",
     ),
     YieldStrategy(
@@ -145,9 +150,9 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         name="Uniswap V4 Stable CLMM",
         kind=StrategyKind.CONCENTRATED_LP,
         protocol="uniswap_v4",
-        estimated_apr=0.06,
-        risk_score=0.35,
-        min_liquidity_usd=2000.0,
+        estimated_apr=0.065,
+        risk_score=0.32,
+        min_liquidity_usd=100.0,
         notes="Concentrated stable pair; IL risk managed by range",
     ),
 ]
@@ -159,13 +164,13 @@ class YieldAggregator:
 
     Usage:
         agg = get_default_aggregator()
-        plan = agg.plan_rebalance(capital_usd=5000, risk_budget=0.30)
+        plan = agg.plan_rebalance(capital_usd=325, risk_budget=0.28, source="toa_alpha")
         # plan is always dry-run unless EXECUTE_LIVE=1
     """
 
     def __init__(self, strategies: Optional[List[YieldStrategy]] = None):
         self.strategies = list(strategies or DEFAULT_STRATEGIES)
-        self.fee_to_treasury_bps = 10  # 0.10% protocol fee concept
+        self.fee_to_treasury_bps = 15  # 0.15% protocol fee concept
 
     def list_strategies(self, enabled_only: bool = True) -> List[YieldStrategy]:
         if enabled_only:
@@ -178,11 +183,9 @@ class YieldAggregator:
             if s.risk_score > risk_budget + 1e-9:
                 continue
             if capital_usd < s.min_liquidity_usd and s.kind != StrategyKind.CASH:
-                # still allow tiny capital into cash
                 continue
             out.append(s)
         if not out:
-            # always fall back to cash
             cash = next((s for s in self.strategies if s.kind == StrategyKind.CASH), None)
             if cash:
                 out = [cash]
@@ -191,14 +194,26 @@ class YieldAggregator:
     def plan_rebalance(
         self,
         capital_usd: float,
-        risk_budget: float = 0.30,
+        risk_budget: float = 0.28,
         prefer_treasury_fee: bool = True,
+        source: str = "toa_dispatch",
     ) -> RebalancePlan:
         """
         Build a rebalance plan. Pure function of inputs + strategy table.
-        Does not touch chain.
+        Does not touch chain. Emits plan_id + audit.
         """
+        plan_id = f"yp-{uuid.uuid4().hex[:12]}"
         warnings: List[str] = []
+        audit: Dict[str, Any] = {
+            "plan_id": plan_id,
+            "source": source,
+            "capital_requested": capital_usd,
+            "risk_budget": risk_budget,
+            "execute_live_env": EXECUTE_LIVE,
+        }
+
+        if capital_usd < 0:
+            raise ValueError("capital_usd must be non-negative")
 
         if capital_usd < MIN_CAPITAL_USD:
             warnings.append(
@@ -210,6 +225,7 @@ class YieldAggregator:
         if not eligible:
             warnings.append("no eligible strategies; empty plan")
             return RebalancePlan(
+                plan_id=plan_id,
                 timestamp=time.time(),
                 mode="dry_run",
                 total_capital_usd=capital_usd,
@@ -220,20 +236,19 @@ class YieldAggregator:
                 treasury=TREASURY,
                 vault=SHARED_LIQUIDITY_VAULT,
                 warnings=warnings,
+                audit=audit,
             )
 
-        # Score: higher APR / (1 + risk) wins; cash always gets a floor weight
         scores: Dict[str, float] = {}
         for s in eligible:
             if s.kind == StrategyKind.CASH:
-                scores[s.id] = 0.15  # floor
+                scores[s.id] = 0.18
             else:
-                scores[s.id] = max(s.estimated_apr, 0.0) / (1.0 + s.risk_score)
+                scores[s.id] = max(s.estimated_apr, 0.0) / (1.0 + s.risk_score * 1.15)
 
         total_score = sum(scores.values()) or 1.0
         raw_weights = {sid: sc / total_score for sid, sc in scores.items()}
 
-        # Cap single-strategy concentration
         capped: Dict[str, float] = {}
         overflow = 0.0
         for sid, w in raw_weights.items():
@@ -244,7 +259,6 @@ class YieldAggregator:
                 capped[sid] = w
 
         if overflow > 0:
-            # redistribute overflow to under-cap strategies proportional to remaining room
             room = {
                 sid: max(MAX_SINGLE_STRATEGY_PCT - w, 0.0) for sid, w in capped.items()
             }
@@ -252,7 +266,6 @@ class YieldAggregator:
             for sid in capped:
                 capped[sid] += overflow * (room[sid] / room_sum)
 
-        # Normalize
         wsum = sum(capped.values()) or 1.0
         weights = {sid: w / wsum for sid, w in capped.items()}
 
@@ -288,6 +301,7 @@ class YieldAggregator:
                 intents.append(
                     {
                         "action": "allocate",
+                        "plan_id": plan_id,
                         "strategy_id": alloc.strategy_id,
                         "capital_usd": alloc.capital_usd,
                         "max_slippage_bps": MAX_SLIPPAGE_BPS,
@@ -299,7 +313,12 @@ class YieldAggregator:
         else:
             warnings.append("dry_run mode (set EXECUTE_LIVE=1 to emit live intents)")
 
+        audit["allocations_count"] = len(allocations)
+        audit["blended_apr"] = round(blended, 6)
+        audit["max_risk"] = round(max_risk, 6)
+
         plan = RebalancePlan(
+            plan_id=plan_id,
             timestamp=time.time(),
             mode=mode,
             total_capital_usd=capital_usd,
@@ -312,22 +331,26 @@ class YieldAggregator:
             intents=intents,
             warnings=warnings,
             executed=executed,
+            audit=audit,
         )
         logger.info(
-            "Yield rebalance plan: capital=$%.2f blended_apr=%.2f%% mode=%s strategies=%d",
+            "Yield rebalance plan %s: capital=$%.2f blended_apr=%.2f%% mode=%s strategies=%d source=%s",
+            plan_id,
             capital_usd,
             plan.expected_blended_apr * 100,
             mode,
             len(allocations),
+            source,
         )
         return plan
 
-    def simulate_year_pnl(self, capital_usd: float, risk_budget: float = 0.30) -> Dict[str, Any]:
+    def simulate_year_pnl(self, capital_usd: float, risk_budget: float = 0.28) -> Dict[str, Any]:
         """Simple expected PnL helper for TOA / CEO projections."""
         plan = self.plan_rebalance(capital_usd, risk_budget=risk_budget)
         expected = capital_usd * plan.expected_blended_apr
         fee = expected * (plan.fee_to_treasury_bps / 10_000)
         return {
+            "plan_id": plan.plan_id,
             "capital_usd": capital_usd,
             "expected_gross_usd": round(expected, 4),
             "expected_fee_to_treasury_usd": round(fee, 4),
@@ -335,6 +358,29 @@ class YieldAggregator:
             "blended_apr": plan.expected_blended_apr,
             "plan": plan.to_dict(),
         }
+
+    def record_fee_estimate_to_ledger(
+        self, plan: RebalancePlan, projected: bool = True
+    ) -> Optional[Any]:
+        """Push expected annualized fee into treasury_inflow ledger (projected)."""
+        try:
+            from sincor2.treasury_inflow import record_inflow
+
+            expected = plan.total_capital_usd * plan.expected_blended_apr
+            fee = expected * (plan.fee_to_treasury_bps / 10_000)
+            if fee <= 0:
+                return None
+            return record_inflow(
+                fee,
+                asset="USD",
+                source="yield_fee_estimate",
+                usd_estimate=fee,
+                note=f"plan_id={plan.plan_id} blended_apr={plan.expected_blended_apr}",
+                projected=projected,
+            )
+        except Exception as exc:
+            logger.warning("Could not record fee estimate: %s", exc)
+            return None
 
 
 _default_agg: Optional[YieldAggregator] = None
