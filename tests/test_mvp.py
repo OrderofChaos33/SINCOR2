@@ -5,10 +5,6 @@ Validates core endpoints, auth, and payment flows.
 Run: pytest tests/test_mvp.py -v
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 import json
 import pytest
 from sincor2.mvp_app import app

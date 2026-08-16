@@ -43,12 +43,9 @@ from __future__ import annotations
 
 import logging
 import os
-import sys
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sincor2.bankroll import get_bankroll
 from sincor2.execution_adapter import PolymarketAdapter, kill_switch_tripped

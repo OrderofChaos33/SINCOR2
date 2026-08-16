@@ -171,7 +171,7 @@ def clear_kill_switch() -> None:
         HALT_FILE.unlink(missing_ok=True)
 
 
-def _make_polygon_web3(rpc_url: str) -> "Web3":
+def _make_polygon_web3(rpc_url: str) -> Any:
     """Create a Web3 instance for Polygon with POA middleware injected.
 
     Polygon (and most L2s that still carry extraData) will raise
