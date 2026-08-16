@@ -135,13 +135,18 @@ def _status_view():
     return jsonify(base), 200
 
 
+def polyclaw_status_view():
+    """Public status view shared by scheduler and Flask routes."""
+    return _status_view()
+
+
 def _register_status_route(app: Any) -> None:
     """Register the real status view; Flask's first-registered rule wins."""
     try:
         app.add_url_rule(
             "/api/polyclaw/status",
             endpoint="polyclaw_live_status",
-            view_func=_status_view,
+            view_func=polyclaw_status_view,
             methods=["GET"],
         )
         logger.info("[POLYCLAW] real /api/polyclaw/status registered")

@@ -871,9 +871,9 @@ def outreach_status():
 def polyclaw_status():
     """Show Polyclaw autonomous trading agent status."""
     try:
-        from sincor2.polyclaw_scheduler import _status_view
+        from sincor2.polyclaw_scheduler import polyclaw_status_view
 
-        return _status_view()
+        return polyclaw_status_view()
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
