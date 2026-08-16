@@ -4,14 +4,16 @@
 **Primary KPI:** Realized Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`  
 **Mode:** No theater. Measured results only. Self-improving loops mandatory and must actually consume their own output. Cash loading windows used immediately for productive DeFi (Yield Aggregator first). Overlapping accountability enforced.
 
+**Update timestamp:** 2026-08-16 ~14:00 UTC (mid-day refresh)
+
 ## 1. Monetization & Capital — Where We Stand
 
-**Treasury (`0x09E289…12Ac`) live snapshot (BaseScan multichain, 16 Aug 2026 ~07:50 UTC):**
+**Treasury (`0x09E289…12Ac`) live snapshot (BaseScan multichain confirmed):**
 - Base USDC: 286.5207 USDC (~$286.43)
 - Base ETH: 0.00779894 ETH (~$14.66 @ ~$1,879)
 - ETH mainnet residual: ~0.0035 ETH (~$6.58)
 - Polygon residual USDC / USDC.e: ~$17.27
-- **Net liquid ~$324.94** (up sharply from ~$28 on 15 Aug)
+- **Net liquid ~$324.94** (material cash loading window vs ~$28 prior day)
 - SINC residual: secondary depth still near-zero; official floor $1.50 via bonding curve + limit-order hook only
 - Recent activity includes USDC accumulation and minor swaps. Still **no confirmed platform fee / A2A settlement / subscription inflow tagged in ledger as `projected=false` + tx_hash** in the last 24h window. Capital improved but source of the USDC delta is not yet instrumented as platform revenue.
 
@@ -55,7 +57,7 @@ Overlapping accountability: every swarm reports into TOA + ledger every cycle. F
 - External A2A surface is the highest-leverage traction path: any compliant agent can discover, quote, pay in AXM/SINC, execute.
 - DeFi multiplier (Yield Aggregator + SharedLiquidityVault + V4 hooks) is correctly gated behind cash and now has capital to test under controlled flags.
 - Homepage / pricing / Agent Cards still need conversion polish for B2B verticals.
-- Prior tracking issue #153 remains open; P0/P1 items from 15 Aug still material.
+- Prior tracking issues #153/#154/#155 remain open; P0/P1 items from 15 Aug still material.
 
 **Action Plan (Swarm Agents):**
 - All 26 DeFi swarms: continue 5-min check-ins. Feed every cycle’s yield plan + simulated PnL into TOA using the new treasury balances. Consume ranking changes next cycle. No idle.
@@ -94,7 +96,7 @@ Overlapping accountability: every swarm reports into TOA + ledger every cycle. F
 
 ### P0 — On-Chain Compile & CI Guardian
 - `forge build && forge test` clean (solc 0.8.26 pinned).
-- Slither medium+ clean on changed contracts.
+- ofSlither medium+ clean on changed contracts.
 - No behavior change to already-deployed production contracts.
 
 ### P0 — Cash Loading Window → Yield Aggregator (EXECUTE NOW)
@@ -102,6 +104,7 @@ Overlapping accountability: every swarm reports into TOA + ledger every cycle. F
 - Prefer SharedLiquidityVault / Morpho-style stable strategies.
 - Wire plan + simulated PnL into TOA feedback this cycle.
 - Live intents only under `EXECUTE_LIVE=1` + signer + explicit checklist. Never from code defaults.
+- Update scheduler capital input from hardcoded 5000 to live ~325 reality so plans are honest.
 
 ### P1 — External A2A Liquidity (highest traction leverage)
 - Production-quality `examples/a2a_external_caller.py`: discover → quote → submit → poll status.
@@ -143,7 +146,7 @@ Results only. Scale on measured inflow.
 
 ---
 
-**— CEO / TOA Oversight**  
+— **CEO / TOA Oversight**  
 Next brief: 17 Aug 2026 or on first realized inflow event.  
-Canonical addresses and treasury policy unchanged. Tracking issue #153 remains open until material actions close; new tracking issue opened for 16 Aug cash loading + remaining P0/P1.  
+Canonical addresses and treasury policy unchanged. Tracking issues #153/#154/#155 remain open until material actions close.  
 Primary metric never changes: Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`.
