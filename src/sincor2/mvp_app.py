@@ -832,7 +832,7 @@ def ops_schedulers_status():
             }
         ),
         'polyclaw': {
-            'enabled': os.environ.get('POLYCLAW_ENABLED', 'false').lower() == 'true',
+            'enabled': os.environ.get('POLYCLAW_ENABLED', 'true').lower() == 'true',
             'running': bool(polyclaw_scheduler and polyclaw_scheduler.running),
             'next_run': _job_next(polyclaw_scheduler, 'polyclaw_scan'),
         },
@@ -871,31 +871,9 @@ def outreach_status():
 def polyclaw_status():
     """Show Polyclaw autonomous trading agent status."""
     try:
-        from pathlib import Path
-        trades_log = Path.home() / ".openclaw" / "workspace" / "polyclaw_trades.jsonl"
-        
-        scheduler_running = polyclaw_scheduler is not None and polyclaw_scheduler.running if polyclaw_scheduler else False
-        
-        total_trades = 0
-        total_profit = 0.0
-        if trades_log.exists():
-            for line in trades_log.read_text().strip().split('\n'):
-                if line:
-                    trade = json.loads(line)
-                    total_trades += 1
-                    total_profit += trade.get('net_profit_percent', 0)
-        
-        return jsonify({
-            'enabled': os.getenv('POLYCLAW_ENABLED', 'true').lower() == 'true',
-            'scheduler_running': scheduler_running,
-            'auto_execute': os.getenv('POLYCLAW_AUTO_EXECUTE', 'true').lower() == 'true',
-            'risk_level': os.getenv('POLYCLAW_RISK_LEVEL', 'medium'),
-            'alert_threshold': float(os.getenv('POLYCLAW_ALERT_THRESHOLD', '0.5')),
-            'scan_interval': int(os.getenv('POLYCLAW_SCAN_INTERVAL', '60')),
-            'total_trades_executed': total_trades,
-            'total_profit_percent': round(total_profit, 2),
-            'wallet_address': '0x35cb3bf1b29F81d325EB9A7225a3E87fE7B37D6f',
-        }), 200
+        from sincor2.polyclaw_scheduler import _status_view
+
+        return _status_view()
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

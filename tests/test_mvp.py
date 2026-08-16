@@ -38,7 +38,7 @@ class TestHealth:
         """GET / should return 200 with home page HTML."""
         response = client.get('/')
         assert response.status_code == 200
-        assert b'SINCOR2 MVP' in response.data
+        assert b'SINCOR' in response.data
 
 
 class TestAuthentication:

@@ -217,7 +217,7 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         if shadow_opened:
             logger.info("[SHADOW] opened %d paper trades", shadow_opened)
     except Exception as exc:
-        logger.debug("shadow record failed: %s", exp)
+        logger.debug("shadow record failed: %s", exc)
 
     for fc in opportunities[:MAX_TRADES_PER_CYCLE]:
         if fc.confidence < MIN_CONFIDENCE:

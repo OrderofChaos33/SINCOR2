@@ -108,7 +108,7 @@ _ERC1155_ABI = [
         "stateMutability": "nonpayable",
         "inputs": [
             {"name": "operator", "type": "address"},
-            {"name": "approved", "type": "bool"}],
+            {"name": "approved", "type": "bool"},
         ],
         "outputs": [],
     },
