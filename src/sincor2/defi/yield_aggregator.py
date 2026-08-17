@@ -137,7 +137,7 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         protocol="sincor_shared_liquidity",
         estimated_apr=0.08,
         risk_score=0.25,
-        min_liquidity_usd=500.0,
+        min_liquidity_usd=250.0,  # CEO 2026-08-17: lowered from 500 to unlock ~$295 treasury cash loading window under risk caps
         notes=f"Vault {SHARED_LIQUIDITY_VAULT}; hook {SHARED_LIQUIDITY_HOOK}",
     ),
     YieldStrategy(
