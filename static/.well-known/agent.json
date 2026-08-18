@@ -1,18 +1,45 @@
 {
   "name": "SINCOR Agent Swarm",
-  "description": "Production autonomous AI workforce. 42 specialized agents. Pay in SINC/AXM on Base.",
+  "description": "Production autonomous AI workforce. 43 specialized agents across Scout, Builder, Synthesizer, Negotiator, Director, Auditor, Caretaker. External agents pay in AXIOM (AXM) on Base; 50% of each settlement is burned. Full A2A v1.0.1 card at /.well-known/agent-card.json once A2ARouter is registered on the production app.",
   "url": "https://getsincor.com/api/a2a",
   "version": "2.0.0",
+  "protocolVersion": "1.0.1",
+  "provider": {
+    "organization": "SINCOR",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
   "skills": [
-    {"id": "lead-enrichment", "name": "Lead Enrichment", "sinc_price": 3},
-    {"id": "competitor-intel", "name": "Competitor Intelligence", "sinc_price": 2},
-    {"id": "outreach-sequence", "name": "Outreach Sequence", "sinc_price": 3},
-    {"id": "market-forecast", "name": "Market Forecast", "sinc_price": 4},
-    {"id": "toa-decision", "name": "TOA Decision", "sinc_price": 6}
+    {"id": "lead-enrichment", "name": "Lead Enrichment & Outbound Prospecting", "tags": ["sales", "leads"], "axmPriceDisplay": "2.5000 AXM", "freeQuota": 5},
+    {"id": "competitor-intel", "name": "Competitor Intelligence & SWOT", "tags": ["market", "research"], "axmPriceDisplay": "2.0000 AXM", "freeQuota": 5},
+    {"id": "outreach-sequence", "name": "Outreach Sequence Builder", "tags": ["sales", "outreach"], "axmPriceDisplay": "3.0000 AXM", "freeQuota": 5},
+    {"id": "healthcare-credential-check", "name": "Healthcare Provider Credential Check", "tags": ["healthcare", "rcm"], "axmPriceDisplay": "4.0000 AXM", "freeQuota": 0},
+    {"id": "dental-billing-scrub", "name": "Dental Billing Scrub & Claims Cleanup", "tags": ["dental", "billing"], "axmPriceDisplay": "3.5000 AXM", "freeQuota": 0},
+    {"id": "compliance-sbom", "name": "Compliance SBOM & Regulatory Filing", "tags": ["compliance", "sbom"], "axmPriceDisplay": "5.0000 AXM", "freeQuota": 0},
+    {"id": "market-forecast", "name": "Market Forecast & Scenario Planning", "tags": ["analytics", "forecasting"], "axmPriceDisplay": "4.0000 AXM", "freeQuota": 5},
+    {"id": "deal-scoring", "name": "Deal Scoring & Pipeline Prioritisation", "tags": ["sales", "crm"], "axmPriceDisplay": "2.5000 AXM", "freeQuota": 0},
+    {"id": "content-blog", "name": "Content & Blog Post Generation", "tags": ["content", "marketing"], "axmPriceDisplay": "2.0000 AXM", "freeQuota": 5},
+    {"id": "cashflow-recovery", "name": "Cash-Flow Recovery & Invoice Management", "tags": ["finance", "collections"], "axmPriceDisplay": "3.5000 AXM", "freeQuota": 0},
+    {"id": "local-business-site-builder", "name": "Local Business Site Builder", "tags": ["local-business", "website"], "axmPriceDisplay": "5.0000 AXM", "freeQuota": 0},
+    {"id": "toa-decision", "name": "TOA Strategic Decision & Routing", "tags": ["toa", "strategy"], "axmPriceDisplay": "6.0000 AXM", "freeQuota": 0}
   ],
-  "provider": {"organization": "SINCOR", "url": "https://getsincor.com"},
   "authentication": {
     "schemes": [],
-    "description": "No API key required. Payment enforced on-chain via SINC/AXM transfer to treasury."
+    "description": "No API key. Payment enforced on-chain via AXM transfer to treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac on Base (8453)."
+  },
+  "settlement": {
+    "primary_token": "AXIOM",
+    "contract": "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822",
+    "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+    "burn_to": "0x000000000000000000000000000000000000dEaD",
+    "burn_split": "50%",
+    "treasury_split": "50%",
+    "chain_id": 8453
   }
 }
