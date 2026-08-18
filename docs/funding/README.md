@@ -1,6 +1,6 @@
 # Funding Operations Hub
 
-This directory tracks non-dilutive funding, liquidity support, sponsorship, and ecosystem assistance opportunities for SINCOR / SINC / DAE.
+This directory tracks non-dilutive funding, liquidity support, sponsorship, and ecosystem assistance opportunities for SINCOR / AXIOM / DAE.
 
 ## Operating rules
 
