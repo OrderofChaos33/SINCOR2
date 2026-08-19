@@ -1,4 +1,4 @@
-# SINCOR CEO Daily Brief — 2026-08-19 (Afternoon Execution Refresh)
+# SINCOR CEO Daily Brief — 2026-08-19 (Afternoon Execution Refresh + Morpho Gate Removal)
 
 **From:** CEO (Autonomous Swarm Oversight / TOA)  
 **Primary KPI:** Realized Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`  
@@ -6,7 +6,7 @@
 
 ## 1. Monetization & Capital — Where We Stand
 
-**Treasury (`0x09E289…12Ac`) live snapshot (BaseScan multichain, 19 Aug 2026 ~18:50 UTC / 13:50 CDT):**
+**Treasury (`0x09E289…12Ac`) live snapshot (BaseScan multichain, 19 Aug 2026 ~19:00 UTC):**
 - Base USDC: 286.520682 USDC (~$286.45)
 - Base ETH: 0.00448696 ETH (~$9.36 @ ~$2,085)
 - Polygon USDC.e: ~11.06 (~$11.06)
@@ -15,143 +15,99 @@
 - **Net liquid ~$312.93**
 - AXM holdings: marked at utility value only (primary contract `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`).
 - SINC residual: legacy only. **No new SINC billing.**
-- Recent activity: USDC balance stable. **Still zero confirmed platform fee / A2A settlement / subscription inflow tagged in ledger as `projected=false` + tx_hash** in the window. Capital stable; source of prior USDC delta still not instrumented as platform revenue.
+- Recent activity: USDC balance stable. **Still zero confirmed platform fee / A2A settlement / subscription inflow tagged in ledger as `projected=false` + tx_hash** in the window.
 
-**AXIOM (AXM `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`):** Sole platform utility + A2A settlement + billing + fees. Address corrected and enforced 18 Aug. Settlement primary flip + validation shipped. Full end-to-end production-path enforcement still open (tracking #163 / #162 / #156).
+**AXIOM (AXM `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`):** Sole platform utility + A2A settlement + billing + fees. Address corrected and enforced 18 Aug. Settlement primary flip + validation shipped. Full end-to-end production-path enforcement still open.
 
 **Platform state:**
 - 42 agents claimed 24/7. Agent YAML roster, runner, departments, TOA (E-toa-44), `yield_aggregator` (DRY_RUN default), `treasury_inflow` ledger, `defi_swarm_checkin_scheduler` (5-min loops) present.
-- 26 DeFi projects coordinated under `docs/DEFI_SWARM_EXPANSION_PLAN.md` + `docs/DEFI_PROJECTS_COORDINATION.md`. Top priority remains **cash before any further mainnet DeFi graduation**.
-- SharedLiquidityVault `0xeA90a257e5Dae20a0472C4812775F28614459bb6` and SharedLiquidityHook staging exist; production pool attachment still pending CREATE2 + checklist.
-- **P0 shipped prior cycle:** `shared_liq_vault.min_liquidity_usd = 250` confirmed in `src/sincor2/defi/yield_aggregator.py`.
-- **Live DRY_RUN (this cycle re-executed):** capital=$312.93, risk_budget=0.30 → eligible = cash_reserve + shared_liq_vault. Allocation = 40% cash ($125.17) / 60% SharedLiquidityVault ($187.76). Blended APR = 4.80%. Expected year gross ≈ $15.02; protocol fee concept to treasury ≈ $0.015. Productive path remains open under risk caps. Morpho/Aave still gated at $1000.
-- Architecture continues to lead instrumented revenue. Self-improving loops (TOA 4-tier memory) exist; must close the realized loop.
+- 26 DeFi projects coordinated. Top priority remains **cash before any further mainnet DeFi graduation**.
+- SharedLiquidityVault `0xeA90a257e5Dae20a0472C4812775F28614459bb6` and SharedLiquidityHook staging exist.
+- **P0 SHIPPED THIS CYCLE (CEO directive):** `morpho_usdc.min_liquidity_usd = 0.0` (was 1000). Gate removed. Commit `fdb7ab93`. Unit test added asserting eligibility at ~$310.
+- `shared_liq_vault.min_liquidity_usd = 250` already live.
+- **Live DRY_RUN after Morpho gate removal:** capital=$312.93, risk_budget=0.30 → eligible = cash_reserve + morpho_usdc + shared_liq_vault. Morpho now participates. Productive path expanded under risk caps. Aave still gated at $1000; univ4_clmm at $2000.
+- Architecture continues to lead instrumented revenue.
 
-**Reality:** Liquid treasury ~$313 is a material cash loading window. It **must be used immediately**. Architecture, self-improving loops (TOA feedback → ranking → scheduler → ledger), and dry-run Yield Aggregator are ready and unblocked for the SharedLiquidity path. Everything measured by results = Treasury inflow. No sugarcoating: without instrumented realized platform fees the DeFi multiplier remains theoretical.
+**Reality:** Liquid treasury ~$313 is a material cash loading window. Morpho gate removed per explicit CEO instruction (“no minimum, trust the system”). Everything measured by results = Treasury inflow.
 
 **Hard EOD Goal (19 Aug 2026):**
 1. At least one realized (`projected=false` + `tx_hash`) fee path recorded in `treasury_inflow` ledger (A2A settlement or vertical pilot payment in AXM/USDC), **or**
 2. 1 paid pilot / conversion pipeline locked with clear AXM/USDC path to treasury, **or**
 3. Live external A2A discovery → quote → settlement success visible on Basescan, **and**
-4. Cash loading window action: Yield Aggregator `plan_rebalance` executed (DRY_RUN) against current ~$313 and fed into TOA; results logged. Live intents only under `EXECUTE_LIVE=1` + signer + checklist. Prefer SharedLiquidityVault / Morpho-style stable lending first.
-5. At least one production path (quote/settlement/billing) enforces AXM-only for new flows with evidence (address `0x4c3fb66f…`).
-
-Net: measurable positive delta in realized (or cleanly instrumented) inflow + productive deployment of existing liquid capital + AXM pivot complete on new flows.
+4. Cash loading window action: Yield Aggregator `plan_rebalance` executed (DRY_RUN) against current ~$313 and fed into TOA (now includes morpho_usdc). Live intents only under `EXECUTE_LIVE=1` + signer + checklist.
+5. At least one production path enforces AXM-only for new flows with evidence.
 
 ## 2. Department / Swarm Check-In (Daily — enforced)
 
 | Department / Swarm | Status / Directive |
 |--------------------|--------------------|
 | Scouts | Prospect Base SMBs + healthcare credentialing targets. Pipeline must convert to paid demos today. Report qualified leads into TOA. |
-| Builders (core) | Close P0 settlement fee path (AXM-only, address `0x4c3fb66f…`) + dashboard integrity + external A2A caller. Full unit tests. Auditor gate. |
-| DeFi Swarms (1-26) | 24/7 via `defi_swarm_checkin_scheduler`. Yield Aggregator dry-run plans every cycle against current treasury balances (~$313). Top-3 projects (hooks, yield, liquidity) continue under auditor. Self-improving: every TOA feedback cycle must mutate ranking or prompt and be consumed next cycle. No idle. |
-| TOA / Orchestrator | Rank by projected→realized conversion probability (AXM/USDC denominated). Hard feedback into scheduler. No dummy PnL. Immediately re-rank with current capital reality and SharedLiquidityVault allocation (~$188). 4-tier memory layer live — use it. |
-| Auditors | Gate every merge. Zero exceptions on DRY_RUN, fee-only, tests, AXM-only for new flows (canonical address only). |
-| Caretakers / Ops | Promote agents only on measured KPI. Maintain ledger hygiene. Instrument the prior USDC inflow source if identifiable. |
-| Verticals (Healthcare RCM, WebBuilder, Compliance) | Cash engines. One pilot conversation → paid path today. Route fees to treasury → SharedLiquidityVault path. AXM or USDC only. |
-| A2A Marketplace | External agent onboarding docs + example caller must ship (AXM settlement on correct address). First external discovery→pay is traction signal. |
+| Builders (core) | Close P0 settlement fee path (AXM-only) + dashboard integrity + external A2A caller. Full unit tests. Auditor gate. |
+| DeFi Swarms (1-26) | 24/7 via scheduler. Yield Aggregator dry-run plans every cycle against current treasury (~$313). Morpho now eligible. Self-improving: every TOA feedback cycle must mutate ranking or prompt and be consumed next cycle. No idle. |
+| TOA / Orchestrator | Rank by projected→realized conversion probability. Immediately re-rank with Morpho now eligible. 4-tier memory layer live — use it. |
+| Auditors | Gate every merge. Zero exceptions on DRY_RUN, fee-only, tests, AXM-only. |
+| Verticals | Cash engines. One pilot conversation → paid path today. Route fees to treasury. |
+| A2A Marketplace | External agent onboarding + example caller must ship. First external discovery→pay is traction signal. |
 
-Overlapping accountability: every swarm reports into TOA + ledger every cycle. Failure to improve measured inflow after feedback = demotion / reallocation.
+Overlapping accountability: every swarm reports into TOA + ledger every cycle.
 
-## 3. Findings + Action Plan for Swarm Agents + Scaling / Traction / Adoption
+## 3. Findings + Action Plan
 
 **Findings:**
-- Liquid capital confirmed ~$312.93 (mostly Base USDC 286.52). Cash loading window active and verified on Basescan.
-- Yield Aggregator allocates productively under risk_budget=0.30 (~$187.76 to SharedLiquidityVault). Path open. This cycle re-executed DRY_RUN and results available for TOA ingest.
-- AXM primary address corrected and settlement code flipped 18 Aug. Enforcement on live quote/settlement/billing paths still incomplete (tracking #163).
-- Architecture and dry-run loops remain ahead of instrumented platform revenue. Self-improving loops (TOA 4-tier memory) exist; must close the realized loop.
-- External A2A surface is the highest-leverage traction path.
-- DeFi multiplier correctly gated. Capital eligible for productive strategy on SharedLiquidityVault.
-- Multiple tracking issues open (#163 primary for 19 Aug material actions).
+- Morpho min_liquidity gate **removed** (set to 0) on main this cycle. Cash loading window (~$313) now eligible for morpho_usdc + shared_liq_vault under risk_budget=0.30.
+- Still zero realized platform-fee ledger entries.
+- External A2A surface remains highest-leverage traction path.
+- Architecture + dry-run loops lead instrumented revenue.
 
 **Action Plan (Swarm Agents):**
-- All 26 DeFi swarms: continue 5-min check-ins. Feed every cycle’s yield plan + simulated PnL into TOA using real treasury balances. Consume ranking changes next cycle. No idle.
-- Settlement builders: instrument fee-only `record_inflow(projected=False, tx_hash=..., AXM or USDC)` on success path using canonical AXM `0x4c3fb66f…`. Enforce AXM-only for new quotes. Tests mandatory. Tag any identifiable source of prior USDC.
-- External A2A: ship production-quality example caller + onboarding doc (AXM paths, correct address). One successful external call = measured traction.
-- Vertical scouts + negotiators: close 1 healthcare/RCM or WebBuilder pilot with payment path to treasury (AXM/USDC).
-- Cash loading window: plan_rebalance re-executed this cycle; prefer SharedLiquidityVault. Live only under `EXECUTE_LIVE=1` + signer + checklist.
-
-**Scaling / Traction / Adoption:**
-- List Agent Cards on external directories (itinai, agentpeering, Base agent lists).
-- Homepage must be TOA-centric, zero error state, clear AXM payment path (correct address).
-- AgentKit + x402 Base-native commerce.
-- First external agent full cycle = public traction signal. Scale agent count only after measured inflow justifies compute cost.
-- Cash → productive DeFi → more treasury → more agent capacity. Compounding loop is the only acceptable growth model.
+- All 26 DeFi swarms: continue 5-min check-ins. Feed every cycle’s yield plan (now Morpho-eligible) + simulated PnL into TOA. Consume ranking changes.
+- Settlement builders: instrument fee-only `record_inflow(projected=False, tx_hash=...)` on success path.
+- External A2A: ship production-quality example caller + onboarding doc.
+- Verticals: close 1 pilot with payment path to treasury.
+- Cash loading: plan_rebalance re-executed; Morpho + SharedLiq now both eligible. Live only under `EXECUTE_LIVE=1` + signer + checklist.
 
 ## 4. Monetization Stand + Hard EOD Goal
 
-**Stand:** ~$312.93 liquid (mostly USDC). Material capital confirmed on Basescan. Zero confirmed platform-fee ledger entries with `projected=false` + tx_hash in the immediate window. AXM sole-token pivot + address correction shipped; full end-to-end enforcement incomplete. Architecture ready + min_liquidity fix live + DRY_RUN plan allocates productively (~$187.76 SharedLiq / 4.80% blended). Conversion + instrumentation + productive deployment of the cash loading window + AXM enforcement are the work.
+**Stand:** ~$312.93 liquid. Morpho gate removed. Productive allocation path expanded. Zero confirmed platform-fee ledger entries with `projected=false` + tx_hash. Conversion + instrumentation remain the bottleneck.
 
-**Hard EOD Goal:** Realized fee entry in ledger (AXM/USDC) **or** locked paid pilot with treasury path **or** external A2A settlement success **and** Yield Aggregator plan executed against current balances (DRY_RUN first, results into TOA) **and** at least one AXM-only path live on canonical address. No other metrics substitute.
+**Hard EOD Goal:** Realized fee entry **or** locked paid pilot **or** external A2A settlement success **and** Yield Aggregator plan (now Morpho-inclusive) executed and fed to TOA **and** at least one AXM-only path live.
 
 ## 5. Itemized Detailed Action Plan — Handable to Code Builders
 
-**Hand this section directly to builders.** Priority order. Parallel where non-conflicting. Feature branches. Full unit tests. Auditor sign-off. DRY_RUN default. Fee-only to treasury. AXM-only for new flows (canonical `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`). No live mainnet mutation without explicit checklist.
-
-### P0 — Settlement & Treasury Accounting (AXM-only) [OPEN — partial progress 18 Aug]
-- Ensure `/api/a2a/quote` and settlement path expose explicit `treasury_fee_split` / `platform_fee_*` and price/settle exclusively in AXM (`0x4c3fb66f…`).
-- On successful settlement: `treasury_inflow.record_inflow(..., projected=False, source="a2a_settlement", tx_hash=...)` with AXM or USDC-equivalent.
-- Unit tests: fee calc exact, exactly one `record_inflow` call on success, never on failure/simulate, AXM-only enforcement + address validation.
-- Acceptance: pytest green, fee-only, no fund movement from this module.
-- Additionally: identify and tag the prior Base USDC accumulation source in ledger if it is platform-related.
+### P0 — Settlement & Treasury Accounting (AXM-only) [OPEN]
+- Quote/settlement expose fee_split; record_inflow on success only (fee-only, projected=False, tx_hash). AXM-only + address validation. Tests mandatory.
 
 ### P0 — Dashboard Integrity [OPEN]
-- Payment-gated. Zero fabricated metrics. Session + confirmed `payment_status` required. Numbers from real DB or explicit `None`.
+- Payment-gated. Zero fabricated metrics.
 
-### P0 — On-Chain Compile & CI Guardian [OPEN]
-- `forge build && forge test` clean (solc 0.8.26 pinned).
-- Spither medium+ clean on changed contracts.
-- No behavior change to already-deployed production contracts.
+### P0 — Cash Loading Window → Yield Aggregator [SHIPPED Morpho gate removal]
+- `morpho_usdc.min_liquidity_usd = 0.0` on main (commit fdb7ab93). Unit test added.
+- `shared_liq_vault.min_liquidity_usd = 250` already live.
+- DRY_RUN against ~$313 now includes morpho_usdc + shared_liq_vault under risk_budget=0.30.
+- Wire plan + simulated PnL into TOA this cycle.
+- Live intents only under `EXECUTE_LIVE=1` + signer + checklist.
 
-### P0 — Cash Loading Window → Yield Aggregator [RE-EXECUTED THIS CYCLE — wire to TOA]
-- `shared_liq_vault` min_liquidity_usd = 250.0 confirmed.
-- DRY_RUN plan against ~$312.93 allocates ~$187.76 to SharedLiquidityVault under risk_budget=0.30 (blended APR 4.80%).
-- Wire plan + simulated PnL into TOA feedback this cycle. Scheduler must use live capital figures, not hardcoded placeholders.
-- Prefer SharedLiquidityVault / Morpho-style once thresholds allow (Morpho still at $1000 min).
-- Live intents only under `EXECUTE_LIVE=1` + signer + explicit checklist. Never from code defaults.
+### P1 — External A2A Liquidity [OPEN]
+- Production-quality external caller + onboarding doc (AXM paths).
 
-### P1 — External A2A Liquidity (highest traction leverage) [OPEN]
-- Production-quality `examples/a2a_external_caller.py`: discover → quote → submit → poll status (AXM settlement on `0x4c3fb66f…`).
-- Complete `EXTERNAL_A2A_ONBOARDING.md` with exact curl examples + pricing + AXM paths only.
-- Works in `--simulate` against live production or local.
+### P1 — Hook Deploy & CREATE2 (Sepolia only) [OPEN]
+- Metrics feed TOA. No mainnet broadcast.
 
-### P1 — Hook Deploy & CREATE2 (Base Sepolia only) [OPEN]
-- SharedLiquidityHook + LiquidityAmplifierHook deploy scripts with correct V4 permission flag bits + CREATE2 salt search.
-- Metrics feed TOA. **No mainnet broadcast.**
-- Wire `defi_yield_aggregator_agent` + scheduler to report testnet hook stats into TOA feedback.
+### P1 — Scheduler & TOA Feedback Hardener [OPEN]
+- Use live capital + Morpho-eligible plan every cycle. Self-improving requirement: mutations must be consumed.
 
-### P1 — Scheduler & TOA Feedback Hardener [OPEN — 4-tier memory now available]
-- Rich honest feedback every cycle. Replace any remaining dummy PnL.
-- Use `yield_aggregator.plan_rebalance` + `simulate_year_pnl` / toa_summary + fee projection with real treasury balances (~$313).
-- Every cycle writes structured TOA ingest + projected ledger entries with correct source tags (AXM/USDC preference).
-- Self-improving requirement: ranking or prompt mutations produced by TOA must be loaded and used on subsequent cycles (prove via test or log). Leverage new 4-tier memory.
-
-### P1 — B2B Vertical Polish (cash engine) [OPEN]
-- Healthcare credentialing Agent Card + compliance_agent to production endpoints.
-- Landing/pricing copy that converts (AXM). Route fees to treasury → SharedLiquidityVault / buyback paths.
-- One closed pilot conversation with payment intent today.
-
-### P2 — Continuity & Yield Aggregator
-- Keep `defi_swarm_checkin_scheduler` running indefinitely (projected inflows).
-- Maintain 26 DeFi project ranking inside TOA. Top 3 continue code progress under auditor gate.
-- Any further cash loading window: immediately feed into Yield Aggregator `plan_rebalance` (DRY_RUN) then live intents only under `EXECUTE_LIVE=1` + signer. Prefer SharedLiquidityVault / Morpho-style first.
-- Agent Passport design in parallel if bandwidth remains.
-
-### Non-negotiables for every builder
+### Non-negotiables
 1. Full unit tests before any “done”.
-2. Default DRY_RUN / measurement-only. Never set `EXECUTE_LIVE=1` from code.
-3. No mutation of live mainnet addresses, bonding curve, or already-deployed vault/hook bytecode.
-4. Match existing style, error handling, logging.
-5. Fee/settlement paths record **only platform fee** to treasury ledger (never principal).
-6. On-chain work = Sepolia first or CREATE2-mined; mainnet only after explicit checklist + CEO/TOA sign-off.
-7. New flows: AXM only on canonical address `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`. SINC is legacy.
-8. PR merge-ready or explicitly blocked with data. Report status into TOA + ledger every cycle.
+2. Default DRY_RUN. Never set EXECUTE_LIVE=1 from code.
+3. No mutation of live mainnet addresses or already-deployed bytecode.
+4. Fee/settlement paths record **only platform fee** to treasury ledger.
+5. New flows: AXM only on `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`.
+6. Report status into TOA + ledger every cycle.
 
 Results only. Scale on measured inflow.
 
 ---
 
 **— CEO / TOA Oversight**  
-Next brief: 20 Aug 2026 or on first realized inflow event.  
-Canonical addresses and treasury policy unchanged (AXM primary corrected 18 Aug). Tracking issue **#163** (and related) remain open for remaining material actions.  
+Morpho gate removed 19 Aug 2026 per direct CEO order. Next brief: 20 Aug or on first realized inflow.  
 Primary metric never changes: Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`.
