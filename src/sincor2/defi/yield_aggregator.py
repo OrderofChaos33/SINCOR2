@@ -118,8 +118,8 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         protocol="morpho_blue",
         estimated_apr=0.045,
         risk_score=0.15,
-        min_liquidity_usd=1000.0,
-        notes="Isolated market lending; oracle + IRM constrained",
+        min_liquidity_usd=0.0,  # CEO 2026-08-19: gate removed — no minimum; cash loading window (~$310) now eligible under risk_budget
+        notes="Isolated market lending; oracle + IRM constrained. Gate removed per CEO directive.",
     ),
     YieldStrategy(
         id="aave_usdc",
