@@ -26,7 +26,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,11 +47,8 @@ SHARED_LIQUIDITY_HOOK = os.getenv(
 ).lower()
 USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".lower()
 
-# Only these targets may receive capital
 WHITELIST_TARGETS = {
     SHARED_LIQUIDITY_VAULT,
-    # Morpho Blue / Aave-style markets can be added here once addresses are locked
-    # For now SharedLiquidityVault is the primary productive target under $313
 }
 
 MAX_DAILY_USD = float(os.getenv("TREASURY_EXEC_MAX_DAILY_USD", "150.0"))
@@ -76,9 +72,7 @@ def _ensure_dirs() -> None:
 
 
 def kill_switch_tripped() -> bool:
-    if HALT_FILE.exists():
-        return True
-    return False
+    return HALT_FILE.exists()
 
 
 def trip_kill_switch(reason: str) -> None:
@@ -106,7 +100,6 @@ def _queue_intent(intent: Dict[str, Any]) -> None:
 
 
 def _daily_spent() -> float:
-    """Sum of successful live spends recorded today in the audit log."""
     if not AUDIT_LOG.exists():
         return 0.0
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -125,6 +118,36 @@ def _daily_spent() -> float:
     except OSError:
         pass
     return total
+
+
+def _import_yield_aggregator():
+    try:
+        from src.sincor2.defi.yield_aggregator import get_default_aggregator
+        return get_default_aggregator
+    except ImportError:
+        from sincor2.defi.yield_aggregator import get_default_aggregator
+        return get_default_aggregator
+
+
+def _import_record_inflow():
+    try:
+        from src.sincor2.treasury_inflow import record_inflow
+        return record_inflow
+    except ImportError:
+        from sincor2.treasury_inflow import record_inflow
+        return record_inflow
+
+
+def _import_fetch_balances():
+    try:
+        from src.sincor2.treasury_inflow import fetch_onchain_balances
+        return fetch_onchain_balances
+    except ImportError:
+        try:
+            from sincor2.treasury_inflow import fetch_onchain_balances
+            return fetch_onchain_balances
+        except ImportError:
+            return None
 
 
 @dataclass
@@ -146,11 +169,6 @@ class TreasuryExecutionAgent:
     """
     Autonomous agent capable of executing the Yield Aggregator plan against
     the live treasury while the operator is away.
-
-    Usage:
-        agent = TreasuryExecutionAgent()
-        result = agent.run_cycle()
-        # result.mode tells you what actually happened
     """
 
     def __init__(self) -> None:
@@ -159,7 +177,6 @@ class TreasuryExecutionAgent:
         self.max_single = MAX_SINGLE_TX_USD
 
     def _resolve_key(self) -> Optional[str]:
-        """Never log the key. Prefer ONCHAIN_EXECUTOR_PRIVATE_KEY."""
         for name in (
             "ONCHAIN_EXECUTOR_PRIVATE_KEY",
             "TREASURY_EXEC_PRIVATE_KEY",
@@ -182,40 +199,30 @@ class TreasuryExecutionAgent:
         return EXECUTE_LIVE and bool(self._resolve_key()) and not kill_switch_tripped()
 
     def get_live_capital(self) -> float:
-        """Best-effort live USDC balance of treasury. Falls back to env override."""
         override = os.getenv("YIELD_CAPITAL_USD")
         if override:
             try:
                 return float(override)
             except ValueError:
                 pass
-        try:
-            from sincor2.treasury_inflow import fetch_onchain_balances
-            bal = fetch_onchain_balances()
-            if bal.get("rpc_ok"):
-                return float(bal.get("usdc", 0.0))
-        except Exception as exc:
-            logger.warning("on-chain balance fetch failed: %s", exc)
-        # last known confirmed figure
+        fetch = _import_fetch_balances()
+        if fetch:
+            try:
+                bal = fetch()
+                if bal.get("rpc_ok"):
+                    return float(bal.get("usdc", 0.0))
+            except Exception as exc:
+                logger.warning("on-chain balance fetch failed: %s", exc)
         return 312.93
 
     def plan(self, capital_usd: Optional[float] = None) -> Dict[str, Any]:
-        from sincor2.defi.yield_aggregator import get_default_aggregator
-
+        get_default_aggregator = _import_yield_aggregator()
         capital = capital_usd if capital_usd is not None else self.get_live_capital()
         agg = get_default_aggregator()
         plan = agg.plan_rebalance(capital_usd=capital, risk_budget=0.30)
         return plan.to_dict()
 
     def run_cycle(self, force_capital: Optional[float] = None) -> ExecutionResult:
-        """
-        One full cycle:
-        1. Read capital
-        2. Build yield plan
-        3. Apply safety rails
-        4. Either queue intents or (if fully live) attempt execution
-        5. Audit + optional realized fee record
-        """
         warnings: List[str] = []
 
         if kill_switch_tripped():
@@ -241,7 +248,6 @@ class TreasuryExecutionAgent:
         plan = self.plan(capital)
         allocations = plan.get("allocations", [])
 
-        # Filter to actionable (non-cash) slices under single-tx and remaining daily caps
         actionable: List[Dict[str, Any]] = []
         for a in allocations:
             sid = a.get("strategy_id", "")
@@ -266,9 +272,8 @@ class TreasuryExecutionAgent:
                 True, "dry_run", capital_usd=capital, allocations=allocations, warnings=warnings
             )
 
-        # Always record the measured plan projection
         try:
-            from sincor2.treasury_inflow import record_inflow
+            record_inflow = _import_record_inflow()
             expected_fee = capital * float(plan.get("expected_blended_apr", 0)) * (
                 float(plan.get("fee_to_treasury_bps", 10)) / 10_000
             )
@@ -283,9 +288,7 @@ class TreasuryExecutionAgent:
         except Exception as exc:
             warnings.append(f"ledger write failed: {exc}")
 
-        # Decide mode
         if not self.is_live_capable():
-            # INTENT QUEUE mode — safe while operator is away
             for a in actionable:
                 intent = {
                     "action": "allocate",
@@ -320,12 +323,7 @@ class TreasuryExecutionAgent:
                 warnings=warnings,
             )
 
-        # LIVE path — key present, EXECUTE_LIVE=1, kill switch clear
-        # We deliberately do NOT auto-broadcast raw USDC transfers without a
-        # confirmed deposit ABI for the target vault. Instead we emit a live
-        # intent package that the OnChainExecutor can sign once the exact
-        # call data is known. This keeps the agent capable while preventing
-        # accidental principal loss from incomplete protocol adapters.
+        # LIVE path armed — still requires confirmed deposit calldata before raw broadcast
         txs: List[str] = []
         live_warnings = list(warnings)
         live_warnings.append(
