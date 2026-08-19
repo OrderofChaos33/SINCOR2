@@ -76,5 +76,11 @@ skills:
 supportedInterfaces:
 - type: a2a
   url: /a2a/defi-yield/v1
+runtime_targets:
+  base_sepolia:
+    chain_id: 84532
+    shared_liquidity_hook_env: BASE_SEPOLIA_SHARED_LIQUIDITY_HOOK
+    shared_liquidity_vault_env: BASE_SEPOLIA_SHARED_LIQUIDITY_VAULT
+    sinc_swap_router_env: BASE_SEPOLIA_SINC_SWAP_ROUTER
 provider:
   name: SINCOR2 DeFi Swarms
