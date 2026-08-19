@@ -3,7 +3,7 @@ from __future__ import annotations
 """Settlement coordination for A2A task payments and treasury routing.
 
 AXIOM (AXM) is the PRIMARY and sole settlement token for all new A2A quotes,
-billing, and platform fees per CEO directive 2026-08-16.
+billing, and platform fees per CEO directive 2026-08-16 (corrected address 2026-08-18).
 SINC is retained strictly for legacy residual holders and explicit opt-in.
 
 Platform fee: 5 % of every confirmed payment is routed to the treasury.
@@ -22,7 +22,7 @@ from uuid import uuid4
 logger = logging.getLogger(__name__)
 
 TREASURY_ADDRESS = os.getenv('TREASURY_ADDRESS', '0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac')
-AXIOM_TOKEN = os.getenv('AXIOM_CONTRACT_ADDRESS', '0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822')
+AXIOM_TOKEN = os.getenv('AXIOM_CONTRACT_ADDRESS', '0x4c3fb66f14fbaa2088c9ae91017ba770da53715a')
 SINC_TOKEN = os.getenv('SINC_CONTRACT_ADDRESS', '0x9C8cd8d3961F445D653713dE65C6578bE11668e7')
 BASE_CHAIN_ID = int(os.getenv('BASE_CHAIN_ID', '8453'))
 

@@ -2,13 +2,15 @@
 
 **Single source of truth. If any other file disagrees, this file wins.**
 
-**2026-08-16 CEO DIRECTIVE:** AXIOM (AXM) is now the **sole** platform and A2A settlement token. SINC is legacy only.
+**2026-08-18 CEO CORRECTION:** The live AXIOM (AXM) A2A Settlement token is `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` (deployed today). Previous address `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` is stale/dead and must not be used.
+
+**2026-08-16 CEO DIRECTIVE (still active):** AXIOM (AXM) is the **sole** platform and A2A settlement token. SINC is legacy only.
 
 ## Live, verified contracts
 
 | Role | Address | Notes |
 |---|---|---|
-| **AXIOM (AXM) token** | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | **PRIMARY** — sole platform utility + A2A settlement + billing |
+| **AXIOM (AXM) token** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | **PRIMARY** — sole platform utility + A2A settlement + billing (deployed 2026-08-18) |
 | **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Platform treasury (A2A routing, fees) |
 | **SINC token (legacy)** | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | 8 decimals. Legacy holders only. No new billing. |
 | **SincBondingCurve (legacy)** | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Residual SINC sale. Do not expand. |
@@ -20,7 +22,7 @@
 ## Environment overrides
 
 ```bash
-AXIOM_CONTRACT_ADDRESS=0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822
+AXIOM_CONTRACT_ADDRESS=0x4c3fb66f14fbaa2088c9ae91017ba770da53715a
 TREASURY_ADDRESS=0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac
 # SINC retained for legacy reads only
 SINC_CONTRACT_ADDRESS=0x9C8cd8d3961F445D653713dE65C6578bE11668e7
@@ -32,6 +34,7 @@ BASE_CHAIN_ID=8453
 
 | Address | Why wrong |
 |---|---|
+| `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | Previous incorrect AXM entry (dead PumpClawToken) |
 | `0xb627F53E08AD7d455e787d052C18D6877020E2BF` | Old bonding curve |
 | `0x25cA41Dac29f892c72A53500853eC45a5FfF90aa` | Superseded bonding curve |
 | `0x49E392de962Fa835B862F59E78611c69E930b5C4` | Dead-liquidity v2 SINC |
