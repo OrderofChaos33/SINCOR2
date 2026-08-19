@@ -81,3 +81,15 @@ def test_cash_loading_window_allocates_shared_liq():
     shared = next(a for a in plan.allocations if a.strategy_id == "shared_liq_vault")
     assert shared.capital_usd > 0
     assert plan.expected_blended_apr > 0.0
+
+
+def test_morpho_gate_removed_cash_loading():
+    """CEO 2026-08-19: Morpho min_liquidity set to 0. ~$310 treasury must be eligible for morpho_usdc."""
+    agg = YieldAggregator()
+    plan = agg.plan_rebalance(capital_usd=310.0, risk_budget=0.30)
+    assert plan.mode == "dry_run"
+    ids = {a.strategy_id for a in plan.allocations}
+    assert "morpho_usdc" in ids, "morpho_usdc must be eligible after gate removal (min_liquidity=0)"
+    morpho = next(a for a in plan.allocations if a.strategy_id == "morpho_usdc")
+    assert morpho.capital_usd > 0
+    assert plan.expected_blended_apr > 0.0
