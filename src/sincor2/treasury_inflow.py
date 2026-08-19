@@ -9,6 +9,7 @@ Single source of measured results for the CEO KPI: Treasury inflow.
 - Safe for production: never moves funds; only observes and records
 
 Canonical treasury: 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac (Base 8453)
+Canonical AXM: 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a (corrected 2026-08-18)
 """
 
 from __future__ import annotations
@@ -36,8 +37,9 @@ TREASURY_ADDRESS = os.getenv(
 SINC_CONTRACT = os.getenv(
     "SINC_CONTRACT_ADDRESS", "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
 ).lower()
+# CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
 AXM_CONTRACT = os.getenv(
-    "AXIOM_CONTRACT_ADDRESS", "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822"
+    "AXIOM_CONTRACT_ADDRESS", "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
 ).lower()
 USDC_CONTRACT = os.getenv(
     "USDC_CONTRACT_ADDRESS", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"

@@ -1,4 +1,8 @@
-"""SINC + AXIOM platform payments — replaces Stripe/PayPal for SINCOR billing."""
+"""SINC + AXIOM platform payments — replaces Stripe/PayPal for SINCOR billing.
+
+CEO 2026-08-18/19: AXM primary address corrected to 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a.
+New flows prefer AXM. SINC is legacy for residual subscription renewals only.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +21,8 @@ _spot_cache: dict[str, tuple[float, float | None]] = {}
 
 # Canonical Base mainnet (see CANONICAL_ADDRESSES.md)
 SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
-AXM = "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822"
+# CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
+AXM = "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
 TREASURY = os.environ.get("PLATFORM_TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac")
 CHAIN_ID = 8453
 
@@ -27,7 +32,7 @@ AXM_DECIMALS = 18
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 AMOUNT_TOLERANCE_BPS = 150  # 1.5% underpayment slack for spot drift
 
-# SINC = platform subscriptions · AXM = one-off intel / agent execution
+# AXM = primary for new flows (reports, one-offs, A2A). SINC = legacy subscriptions only.
 PLATFORM_PLANS: dict[str, dict[str, Any]] = {
     "report": {
         "label": "One-Time Report",
@@ -44,7 +49,7 @@ PLATFORM_PLANS: dict[str, dict[str, Any]] = {
         "product_name": "Professional",
         "order_type": "subscription",
         "usd_reference": 149,
-        "token": "SINC",
+        "token": "AXM",  # CEO 2026-08-19: new flows AXM-only
         "billing": "month",
     },
     "starter": {
@@ -52,7 +57,7 @@ PLATFORM_PLANS: dict[str, dict[str, Any]] = {
         "product_name": "Starter",
         "order_type": "subscription",
         "usd_reference": 297,
-        "token": "SINC",
+        "token": "AXM",  # CEO 2026-08-19: new flows AXM-only
         "billing": "month",
         "agents": 10,
     },
@@ -61,7 +66,7 @@ PLATFORM_PLANS: dict[str, dict[str, Any]] = {
         "product_name": "Professional",
         "order_type": "subscription",
         "usd_reference": 997,
-        "token": "SINC",
+        "token": "AXM",  # CEO 2026-08-19: new flows AXM-only
         "billing": "month",
         "agents": 25,
     },
@@ -70,7 +75,7 @@ PLATFORM_PLANS: dict[str, dict[str, Any]] = {
         "product_name": "Enterprise",
         "order_type": "subscription",
         "usd_reference": 2997,
-        "token": "SINC",
+        "token": "AXM",  # CEO 2026-08-19: new flows AXM-only
         "billing": "month",
         "agents": 45,  # up to 45; orchestration agent decides dispatch count
     },
@@ -100,7 +105,7 @@ def init_platform_payments_db() -> None:
             email TEXT,
             plan_id TEXT NOT NULL,
             product_name TEXT NOT NULL,
-            token TEXT NOT NULL DEFAULT 'SINC',
+            token TEXT NOT NULL DEFAULT 'AXM',
             status TEXT NOT NULL DEFAULT 'active',
             period_start TEXT NOT NULL,
             period_end TEXT NOT NULL,
