@@ -1,4 +1,7 @@
-"""Wallet acceptance + whitelist listing status."""
+"""Wallet acceptance + whitelist listing status.
+
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
-SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
 TOKEN_LIST = "https://getsincor.com/tokenlists/sincor.tokenlist.json"
 
 
