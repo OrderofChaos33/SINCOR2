@@ -1,6 +1,7 @@
 """SINC + AXIOM platform payments — replaces Stripe/PayPal for SINCOR billing.
 
 CEO 2026-08-18/19: AXM primary address corrected to 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a.
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
 New flows prefer AXM. SINC is legacy for residual subscription renewals only.
 """
 
@@ -20,7 +21,7 @@ _SPOT_CACHE_TTL_SEC = int(os.environ.get("PLATFORM_SPOT_CACHE_TTL_SEC", "60"))
 _spot_cache: dict[str, tuple[float, float | None]] = {}
 
 # Canonical Base mainnet (see CANONICAL_ADDRESSES.md)
-SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
 # CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
 AXM = "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
 TREASURY = os.environ.get("PLATFORM_TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac")
