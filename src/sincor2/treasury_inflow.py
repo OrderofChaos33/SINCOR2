@@ -10,6 +10,7 @@ Single source of measured results for the CEO KPI: Treasury inflow.
 
 Canonical treasury: 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac (Base 8453)
 Canonical AXM: 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a (corrected 2026-08-18)
+Canonical SINC: 0xe1D836087F6573b665d25CE088793E916D7892f8 (updated 2026-08-19, 8 decimals)
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ TREASURY_ADDRESS = os.getenv(
     "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 ).lower()
 SINC_CONTRACT = os.getenv(
-    "SINC_CONTRACT_ADDRESS", "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+    "SINC_CONTRACT_ADDRESS", "0xe1D836087F6573b665d25CE088793E916D7892f8"
 ).lower()
 # CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
 AXM_CONTRACT = os.getenv(
