@@ -18,6 +18,7 @@ What it does:
 Everything is measured by treasury inflow. The ledger is the single record.
 
 CEO 2026-08-18/19: AXM primary address corrected to 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a.
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
 """
 
 import json
@@ -37,7 +38,7 @@ STATE = ROOT / "state"
 
 TREASURY = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 TOKENS = {
-    "SINC": ("0x9C8cd8d3961F445D653713dE65C6578bE11668e7", 8),
+    "SINC": ("0xe1D836087F6573b665d25CE088793E916D7892f8", 8),
     # CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
     "AXM": ("0x4c3fb66f14fbaa2088c9ae91017ba770da53715a", 18),
     "USDC": ("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6),
