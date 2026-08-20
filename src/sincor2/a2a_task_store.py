@@ -145,11 +145,11 @@ class RedisTaskStore(TaskStore):
     def __init__(self, redis_url: Optional[str] = None) -> None:
         try:
             import redis
-        except ImportError as exc:
+        except ImportError as err:
             raise RuntimeError(
                 "redis package required for A2A_TASK_STORE=redis. "
                 "Add redis>=5.0.0 to requirements and install."
-            ) from exc
+            ) from err
 
         url = redis_url or os.getenv("REDIS_URL") or os.getenv("REDIS_PRIVATE_URL")
         if not url:
@@ -233,8 +233,8 @@ def get_task_store() -> TaskStore:
                 _store_instance = RedisTaskStore()
                 logger.info("A2A TaskStore: redis")
                 return _store_instance
-            except Exception as exc:
-                logger.error("RedisTaskStore failed to init: %s — falling back to sqlite", exc)
+            except Exception as err:
+                logger.error("RedisTaskStore failed to init: %s — falling back to sqlite", err)
                 mode = "sqlite"
 
         if mode == "sqlite":
@@ -242,8 +242,8 @@ def get_task_store() -> TaskStore:
                 _store_instance = SqliteTaskStore()
                 logger.info("A2A TaskStore: sqlite (PersistentStore)")
                 return _store_instance
-            except Exception as exc:
-                logger.error("SqliteTaskStore failed: %s — falling back to memory", e xc)
+            except Exception as err:
+                logger.error("SqliteTaskStore failed: %s — falling back to memory", err)
                 mode = "memory"
 
         if is_prod and mode == "memory":
