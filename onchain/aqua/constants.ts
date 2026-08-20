@@ -6,6 +6,8 @@
  * Canonical vanity pair (2026-07-19 / 2026-07-26):
  *   Registry  0x1111113ccf1426a8e30e2bff5e005d929bf6a90a
  *   SwapVM    0x111111338c5091e8440b67b168bae16a668ac0de
+ *
+ * CEO 2026-08-19: SINC updated to 0xe1D836087F6573b665d25CE088793E916D7892f8 (8 decimals).
  */
 
 export const BASE_CHAIN_ID = 8453;
@@ -18,7 +20,7 @@ export const AQUA_REGISTRY =
 export const AQUA_SWAP_VM_ROUTER =
   "0x111111338c5091e8440b67b168bae16a668ac0de" as const;
 
-export const SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7" as const;
+export const SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8" as const;
 export const WETH = "0x4200000000000000000000000000000000000006" as const;
 export const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 
