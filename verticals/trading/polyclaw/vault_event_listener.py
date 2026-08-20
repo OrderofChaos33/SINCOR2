@@ -11,6 +11,8 @@ a state file.
 Zero new dependencies — plain JSON-RPC over ``requests`` (already in
 requirements.txt).  Read-only: never signs, never sends transactions.
 
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
+
 Run standalone::
 
     python -m verticals.trading.polyclaw.vault_event_listener            # loop
@@ -48,7 +50,7 @@ DEFAULT_RPC = os.environ.get(
     "BASE_RPC_URL", os.environ.get("WEB3_PROVIDER", "https://mainnet.base.org")
 )
 SINC_ADDRESS = os.environ.get(
-    "SINC_ADDRESS", "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+    "SINC_ADDRESS", "0xe1D836087F6573b665d25CE088793E916D7892f8"
 )
 BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 
