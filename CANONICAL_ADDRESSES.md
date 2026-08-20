@@ -2,9 +2,11 @@
 
 **Single source of truth. If any other file disagrees, this file wins.**
 
-**2026-08-18 CEO CORRECTION:** The live AXIOM (AXM) A2A Settlement token is `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` (deployed today). Previous address `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` is stale/dead and must not be used.
+**2026-08-19 CEO UPDATE:** Live SINC token is now `0xe1D836087F6573b665d25CE088793E916D7892f8` (8 decimals). Previous address `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` is retired.
 
-**2026-08-16 CEO DIRECTIVE (still active):** AXIOM (AXM) is the **sole** platform and A2A settlement token. SINC is legacy only.
+**2026-08-18 CEO CORRECTION:** The live AXIOM (AXM) A2A Settlement token is `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` (deployed 2026-08-18). Previous address `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` is stale/dead and must not be used.
+
+**2026-08-16 CEO DIRECTIVE (still active):** AXIOM (AXM) is the **sole** platform and A2A settlement token for new flows. SINC remains for residual / legacy holders.
 
 ## Live, verified contracts
 
@@ -12,7 +14,7 @@
 |---|---|---|
 | **AXIOM (AXM) token** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | **PRIMARY** — sole platform utility + A2A settlement + billing (deployed 2026-08-18) |
 | **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Platform treasury (A2A routing, fees) |
-| **SINC token (legacy)** | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | 8 decimals. Legacy holders only. No new billing. |
+| **SINC token** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | **8 decimals.** Live SINC (updated 2026-08-19). |
 | **SincBondingCurve (legacy)** | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Residual SINC sale. Do not expand. |
 | **SincLimitOrderHook** | `0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0` | Legacy |
 | **SincGenesisNFT (soulbound)** | `0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09` | Legacy |
@@ -24,8 +26,7 @@
 ```bash
 AXIOM_CONTRACT_ADDRESS=0x4c3fb66f14fbaa2088c9ae91017ba770da53715a
 TREASURY_ADDRESS=0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac
-# SINC retained for legacy reads only
-SINC_CONTRACT_ADDRESS=0x9C8cd8d3961F445D653713dE65C6578bE11668e7
+SINC_CONTRACT_ADDRESS=0xe1D836087F6573b665d25CE088793E916D7892f8
 SINC_BONDING_CURVE=0x75dE341a2BC81806198364F125d4Cde36527619C
 BASE_CHAIN_ID=8453
 ```
@@ -34,6 +35,7 @@ BASE_CHAIN_ID=8453
 
 | Address | Why wrong |
 |---|---|
+| `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Previous SINC address (retired 2026-08-19) |
 | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | Previous incorrect AXM entry (dead PumpClawToken) |
 | `0xb627F53E08AD7d455e787d052C18D6877020E2BF` | Old bonding curve |
 | `0x25cA41Dac29f892c72A53500853eC45a5FfF90aa` | Superseded bonding curve |
