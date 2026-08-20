@@ -8,6 +8,8 @@ SINC is retained strictly for legacy residual holders and explicit opt-in.
 
 Platform fee: 5 % of every confirmed payment is routed to the treasury.
 The remaining 95 % is recorded for the payee.
+
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
 """
 
 import logging
@@ -23,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 TREASURY_ADDRESS = os.getenv('TREASURY_ADDRESS', '0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac')
 AXIOM_TOKEN = os.getenv('AXIOM_CONTRACT_ADDRESS', '0x4c3fb66f14fbaa2088c9ae91017ba770da53715a')
-SINC_TOKEN = os.getenv('SINC_CONTRACT_ADDRESS', '0x9C8cd8d3961F445D653713dE65C6578bE11668e7')
+SINC_TOKEN = os.getenv('SINC_CONTRACT_ADDRESS', '0xe1D836087F6573b665d25CE088793E916D7892f8')
 BASE_CHAIN_ID = int(os.getenv('BASE_CHAIN_ID', '8453'))
 
 # Primary token selection — DEFAULT IS NOW AXIOM per 2026-08-16 CEO directive.
