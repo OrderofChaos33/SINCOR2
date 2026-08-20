@@ -43,8 +43,9 @@ from sincor2.execution_adapter import KillSwitchTripped, OrderResult, kill_switc
 logger = logging.getLogger("sincor.adapters.metamask_agent_wallet")
 
 # Canonical SINCOR addresses on Base (8453)
+# CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a — previous 0xfF7aF6... is dead
 SINC_TOKEN = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
-AXM_TOKEN = "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822"
+AXM_TOKEN = "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
 TREASURY = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 BASE_CHAIN_ID = 8453
 
