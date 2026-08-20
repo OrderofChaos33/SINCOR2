@@ -1,11 +1,15 @@
 name: CI
 
+# PAUSED — GitHub Actions billing/minutes are locked.
+# Auto push/PR triggers were producing ~40 failed-run notifications/day.
+# Re-enable the push / pull_request blocks AFTER payment is restored.
+# See docs/CI_BILLING_LOCK.md
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
