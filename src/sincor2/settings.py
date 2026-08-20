@@ -110,7 +110,7 @@ class Settings:
             base_rpc_url=os.getenv("BASE_RPC_URL"),
             sinc_contract_address=os.getenv(
                 "SINC_CONTRACT_ADDRESS",
-                "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+                "0xe1D836087F6573b665d25CE088793E916D7892f8",
             ),
             sinc_platform_access_address=os.getenv("SINC_PLATFORM_ACCESS_ADDRESS", ""),
             platform_signer_key=os.getenv("PLATFORM_SIGNER_KEY"),
