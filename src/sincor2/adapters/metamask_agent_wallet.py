@@ -44,7 +44,8 @@ logger = logging.getLogger("sincor.adapters.metamask_agent_wallet")
 
 # Canonical SINCOR addresses on Base (8453)
 # CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a — previous 0xfF7aF6... is dead
-SINC_TOKEN = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+# CEO 2026-08-19: SINC updated to new 8-decimal live contract
+SINC_TOKEN = "0xe1D836087F6573b665d25CE088793E916D7892f8"
 AXM_TOKEN = "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
 TREASURY = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 BASE_CHAIN_ID = 8453
