@@ -1,0 +1,29 @@
+name: CI Fixer Agent
+
+# Manual playbook runner. Do NOT auto-trigger while billing is locked.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why this fixer run was requested"
+        required: false
+        default: "manual health check"
+
+concurrency:
+  group: ci-fixer
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print fixer diagnosis
+        run: |
+          echo "SINCOR CI Fixer — ${{ github.event.inputs.reason }}"
+          echo "If this job even starts, billing minutes are available."
+          echo "Next: restore push/PR triggers in ci.yml, codacy.yml, onchain-ci.yml"
+          echo "See docs/CI_BILLING_LOCK.md"
