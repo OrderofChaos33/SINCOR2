@@ -1,5 +1,6 @@
 """
 Daily email reminder — pending launch drafts need ~5 min approval at /launch/review.
+DISABLED by default per operator request (stop garbage draft emails).
 """
 
 from __future__ import annotations
@@ -131,11 +132,15 @@ def send_launch_review_reminder() -> dict:
 
 
 def start_review_reminder_scheduler(app=None):
-    """Daily cron reminder (default 9:15 AM America/Chicago)."""
+    """Daily cron reminder (default 9:15 AM America/Chicago).
+    DISABLED by default — set LAUNCH_REVIEW_REMINDER_ENABLED=true to re-enable.
+    """
     global _scheduler
 
-    if os.environ.get("LAUNCH_REVIEW_REMINDER_ENABLED", "true").lower() == "false":
-        logger.info("[REVIEW_REMINDER] Disabled (LAUNCH_REVIEW_REMINDER_ENABLED=false)")
+    # Force-disabled by operator request to stop incessant draft emails.
+    # Explicitly require true to enable; default is now false.
+    if os.environ.get("LAUNCH_REVIEW_REMINDER_ENABLED", "false").lower() != "true":
+        logger.info("[REVIEW_REMINDER] Disabled (LAUNCH_REVIEW_REMINDER_ENABLED!=true)")
         return None
 
     try:
