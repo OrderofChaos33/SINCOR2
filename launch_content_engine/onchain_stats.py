@@ -1,4 +1,7 @@
-"""Pull factual on-chain stats via JSON-RPC (no API keys required)."""
+"""Pull factual on-chain stats via JSON-RPC (no API keys required).
+
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +17,7 @@ RPC_CANDIDATES = [
     "https://base-rpc.publicnode.com",
 ]
 RPC_CANDIDATES = [u for u in RPC_CANDIDATES if u]
-SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
 CURVE = "0x75dE341a2BC81806198364F125d4Cde36527619C"
 # Non-negotiable public floor — all official buys quote at or above this USD/SINC.
 SINC_FLOOR_USD = float(os.environ.get("SINC_FLOOR_USD", "1.50"))
