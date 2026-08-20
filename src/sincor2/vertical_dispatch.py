@@ -229,13 +229,11 @@ def dispatch_vertical_task(
     task_payload.setdefault("task_id", task_id or "")
     task_payload.setdefault("caller_id", caller_id)
 
-    # Route through policy-enforced executor for rule checks + retry
     try:
         from core.policy import get_default_executor
         executor = get_default_executor()
         result = executor.execute(agent.run, task_payload)
     except Exception:
-        # Fallback: direct execution (preserves backward compat if policy import fails)
         result = agent.run(task_payload)
 
     output = json.dumps(result, indent=2) if isinstance(result, dict) else str(result)
@@ -243,7 +241,7 @@ def dispatch_vertical_task(
         "Vertical dispatch skill=%s agent=%s status=%s",
         skill_id,
         agent.name,
-        result.get("status"),
+        result.get("status") if isinstance(result, dict) else "ok",
     )
     return output, None
 
@@ -272,7 +270,6 @@ def dispatch_via_router(
     if vertical_result:
         return vertical_result
 
-    # Attempt agency kernel execution for non-vertical skills
     kernel_result = _dispatch_via_agency_kernel(skill_id, input_text)
     if kernel_result:
         return kernel_result
@@ -303,6 +300,10 @@ def _dispatch_via_agency_kernel(
         return None
 
     try:
+        try:
+            import sincor2.agency_kernel_runtime  # noqa: F401 — real tools + execute_task
+        except Exception:
+            pass
         from sincor2.agency_kernel import AgencyKernel
 
         kernel = AgencyKernel()
@@ -321,6 +322,6 @@ def _dispatch_via_agency_kernel(
     except (ImportError, AttributeError):
         logger.debug("AgencyKernel not available for skill=%s", skill_id)
         return None
-    except Exception as exc:
-        logger.warning("AgencyKernel dispatch error skill=%s: %s", skill_id, exc)
+    except Exception as err:
+        logger.warning("AgencyKernel dispatch error skill=%s: %s", skill_id, err)
         return None
