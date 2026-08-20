@@ -76,7 +76,7 @@ def _ensure_task_serialization() -> None:
                 )
             A2AArtifact.from_dict = _art_from  # type: ignore[attr-defined]
 
-        if not hasattr(A2ATask, "to_dict":
+        if not hasattr(A2ATask, "to_dict"):
             def _task_to(self) -> Dict[str, Any]:
                 return {
                     "id": self.id,
