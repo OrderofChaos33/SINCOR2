@@ -73,13 +73,13 @@ def tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
             "results": results,
             "count": len(results),
         }
-    except Exception as exc:
-        logger.warning("web_search failed: %s", e xc)
+    except Exception as err:
+        logger.warning("web_search failed: %s", err)
         return {
             "status": "failed",
             "tool": "web_search",
             "query": query,
-            "error": str(e xc),
+            "error": str(err),
             "results": [],
         }
 
@@ -117,11 +117,11 @@ def tool_python_exec(code: str) -> Dict[str, Any]:
             "tool": "python_exec",
             "outputs": outputs,
         }
-    except Exception as e xc:
+    except Exception as err:
         return {
             "status": "failed",
             "tool": "python_exec",
-            "error": str(e xc),
+            "error": str(err),
         }
 
 
@@ -143,8 +143,8 @@ def tool_file_read(path: str, max_bytes: int = 50_000) -> Dict[str, Any]:
             "content": text,
             "bytes_read": len(data),
         }
-    except Exception as e xc:
-        return {"status": "failed", "tool": "file_read", "error": str(e xc)}
+    except Exception as err:
+        return {"status": "failed", "tool": "file_read", "error": str(err)}
 
 
 def tool_claude_reason(
@@ -175,12 +175,12 @@ def tool_claude_reason(
             "tool": "claude_reason",
             "output": text,
         }
-    except Exception as e xc:
-        logger.warning("claude_reason failed: %s", e xc)
+    except Exception as err:
+        logger.warning("claude_reason failed: %s", err)
         return {
             "status": "failed",
             "tool": "claude_reason",
-            "error": str(e xc),
+            "error": str(err),
         }
 
 
@@ -282,8 +282,8 @@ def run_tools_for_step(
                     evidence.append(str(result["output"])[:300])
             else:
                 errors.append(result.get("error", f"{tool_name} failed"))
-        except Exception as e xc:
-            errors.append(f"{tool_name}: {e xc}")
+        except Exception as err:
+            errors.append(f"{tool_name}: {err}")
             logger.exception("Tool %s raised", tool_name)
 
     status = "success" if not errors else ("partial" if outputs else "failed")
