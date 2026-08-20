@@ -53,7 +53,6 @@ def tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
         with urllib.request.urlopen(req, timeout=12) as resp:
             html = resp.read().decode("utf-8", errors="ignore")
 
-        # crude result extraction
         results = []
         for m in re.finditer(
             r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
@@ -75,19 +74,18 @@ def tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
             "count": len(results),
         }
     except Exception as exc:
-        logger.warning("web_search failed: %s", exc)
+        logger.warning("web_search failed: %s", e xc)
         return {
             "status": "failed",
             "tool": "web_search",
             "query": query,
-            "error": str(exc),
+            "error": str(e xc),
             "results": [],
         }
 
 
 def tool_python_exec(code: str) -> Dict[str, Any]:
     """Restricted Python execution for simple calculations / data transforms."""
-    # Hard deny list
     banned = [
         "import os", "import sys", "import subprocess", "__import__",
         "open(", "exec(", "eval(", "compile(", "getattr", "setattr",
@@ -102,7 +100,6 @@ def tool_python_exec(code: str) -> Dict[str, Any]:
                 "error": f"Banned construct: {b}",
             }
 
-    # Extremely limited globals
     safe_globals: Dict[str, Any] = {
         "__builtins__": {
             "abs": abs, "min": min, "max": max, "sum": sum, "len": len,
@@ -114,7 +111,6 @@ def tool_python_exec(code: str) -> Dict[str, Any]:
     local_ns: Dict[str, Any] = {}
     try:
         exec(code, safe_globals, local_ns)  # noqa: S102
-        # return any non-private locals
         outputs = {k: v for k, v in local_ns.items() if not k.startswith("_")}
         return {
             "status": "success",
@@ -188,10 +184,9 @@ def tool_claude_reason(
         }
 
 
-# Canonical tool registry used by the executor
 TOOL_REGISTRY = {
     "web_search": tool_web_search,
-    "data_scraping": tool_web_search,          # alias
+    "data_scraping": tool_web_search,
     "search": tool_web_search,
     "python_exec": tool_python_exec,
     "execution": tool_python_exec,
@@ -228,8 +223,6 @@ def run_tools_for_step(
 ) -> Dict[str, Any]:
     """
     Execute the tools declared by a PlanStep and return aggregated outputs.
-
-    tools_available can override / inject callables (useful for tests).
     """
     registry = dict(TOOL_REGISTRY)
     if tools_available:
@@ -243,7 +236,6 @@ def run_tools_for_step(
     errors: List[str] = []
     tool_calls = 0
 
-    # Build a default prompt from step context for LLM tools
     default_prompt = (
         f"Step: {step_description}\n"
         f"Inputs: {json.dumps(step_inputs, default=str)[:2000]}\n"
@@ -258,7 +250,6 @@ def run_tools_for_step(
 
         tool_calls += 1
         try:
-            # Dispatch with sensible kwargs per tool family
             if tool_name in ("web_search", "data_scraping", "search"):
                 query = (
                     step_inputs.get("query")
@@ -269,14 +260,12 @@ def run_tools_for_step(
             elif tool_name in ("python_exec", "execution"):
                 code = step_inputs.get("code") or step_inputs.get("python") or ""
                 if not code:
-                    # allow simple expression from description
                     code = step_inputs.get("expression", "result = None")
                 result = fn(code=str(code))
             elif tool_name == "file_read":
                 path = step_inputs.get("path") or step_inputs.get("file") or ""
                 result = fn(path=str(path))
             else:
-                # LLM-backed tools
                 result = fn(
                     prompt=step_inputs.get("prompt") or default_prompt,
                     query=step_inputs.get("query") or step_description,
