@@ -1,4 +1,7 @@
-"""Live hook + curve stats for gateway and acceptance APIs."""
+"""Live hook + curve stats for gateway and acceptance APIs.
+
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +18,7 @@ HOOK = "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0"
 ROUTER = "0x11b86E85cC5170F4165c89ccb11332133B29E283"
 USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 CURVE = "0x75dE341a2BC81806198364F125d4Cde36527619C"
-SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
 GRADUATION_ETH = 0.5
 
 
