@@ -11,12 +11,14 @@
 #
 # Overrides (optional):
 #   BASE_RPC=... DEPLOY_HOOK=0 DEPLOY_LENDING=1 SINC_ORACLE=... SINC_ROUTER=... ./script/deploy-base.sh
+#
+# CEO 2026-08-19: SINC updated to 0xe1D836087F6573b665d25CE088793E916D7892f8 (8 decimals).
 # =============================================================================
 set -euo pipefail
 cd "$(dirname "$0")/.."   # -> onchain/
 
-# --- canonical Base addresses (verified onchain 2026-07-20) ---
-export SINC_TOKEN=0x9C8cd8d3961F445D653713dE65C6578bE11668e7   # SINC v3 · 8 dp · 100M supply
+# --- canonical Base addresses (verified 2026-08-19) ---
+export SINC_TOKEN=0xe1D836087F6573b665d25CE088793E916D7892f8   # SINC · 8 dp · live
 export USDC_TOKEN=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913   # native USDC on Base · 6 dp
 export POOL_MANAGER=0x498581fF718922c3f8e6A244956aF099B2652b2b # Uniswap V4 PoolManager (all chains)
 export TREASURY="${TREASURY:-0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac}"
