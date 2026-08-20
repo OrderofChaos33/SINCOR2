@@ -22,9 +22,6 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("sincor.a2a.store")
 
-# ---------------------------------------------------------------------------
-# Abstract interface
-# ---------------------------------------------------------------------------
 
 class TaskStore(ABC):
     @abstractmethod
@@ -59,10 +56,6 @@ class TaskStore(ABC):
     def list_push(self) -> List[Dict[str, Any]]:
         ...
 
-
-# ---------------------------------------------------------------------------
-# Memory backend (original behaviour)
-# ---------------------------------------------------------------------------
 
 class MemoryTaskStore(TaskStore):
     def __init__(self) -> None:
@@ -103,30 +96,24 @@ class MemoryTaskStore(TaskStore):
             return list(self._push.values())
 
 
-# ---------------------------------------------------------------------------
-# SQLite backend (reuses existing PersistentStore)
-# ---------------------------------------------------------------------------
-
 class SqliteTaskStore(TaskStore):
     """Durable store backed by PersistentStore.a2a_tasks table."""
 
     def __init__(self) -> None:
         from sincor2.persistent_store import get_store
         self._store = get_store()
-        self._push: Dict[str, Dict[str, Any]] = {}  # push configs still in-process for now
+        self._push: Dict[str, Dict[str, Any]] = {}
         self._push_lock = threading.Lock()
 
     def get(self, task_id: str) -> Optional[Dict[str, Any]]:
         return self._store.get_task(task_id)
 
     def put(self, task_id: str, task_dict: Dict[str, Any]) -> None:
-        # ensure id is present
         task_dict = dict(task_dict)
         task_dict["id"] = task_id
         self._store.upsert_task(task_dict)
 
     def delete(self, task_id: str) -> None:
-        # PersistentStore has no delete; we mark as canceled via upsert
         existing = self.get(task_id)
         if existing:
             existing["state"] = "canceled"
@@ -152,10 +139,6 @@ class SqliteTaskStore(TaskStore):
             return list(self._push.values())
 
 
-# ---------------------------------------------------------------------------
-# Redis backend
-# ---------------------------------------------------------------------------
-
 class RedisTaskStore(TaskStore):
     """Redis-backed store. Requires REDIS_URL. Keys: a2a:task:{id}, a2a:push:{id}."""
 
@@ -173,7 +156,6 @@ class RedisTaskStore(TaskStore):
             raise RuntimeError("REDIS_URL (or REDIS_PRIVATE_URL) must be set for A2A_TASK_STORE=redis")
 
         self._r = redis.from_url(url, decode_responses=True, socket_connect_timeout=5)
-        # quick ping
         self._r.ping()
         self._prefix = os.getenv("A2A_REDIS_PREFIX", "a2a")
         logger.info("RedisTaskStore connected  prefix=%s", self._prefix)
@@ -193,10 +175,8 @@ class RedisTaskStore(TaskStore):
     def put(self, task_id: str, task_dict: Dict[str, Any]) -> None:
         task_dict = dict(task_dict)
         task_dict["id"] = task_id
-        # TTL 7 days — long enough for any in-flight A2A work + audit window
         ttl = int(os.getenv("A2A_TASK_TTL_SECONDS", str(7 * 24 * 3600)))
         self._r.set(self._task_key(task_id), json.dumps(task_dict, default=str), ex=ttl)
-        # maintain a set of known task ids for list_all
         self._r.sadd(f"{self._prefix}:task_ids", task_id)
 
     def delete(self, task_id: str) -> None:
@@ -224,7 +204,6 @@ class RedisTaskStore(TaskStore):
         self._r.delete(self._push_key(task_id))
 
     def list_push(self) -> List[Dict[str, Any]]:
-        # scan is acceptable; push configs are few
         keys = self._r.keys(f"{self._prefix}:push:*")
         out = []
         for k in keys:
@@ -233,10 +212,6 @@ class RedisTaskStore(TaskStore):
                 out.append(json.loads(raw))
         return out
 
-
-# ---------------------------------------------------------------------------
-# Factory
-# ---------------------------------------------------------------------------
 
 _store_instance: Optional[TaskStore] = None
 _store_lock = threading.Lock()
@@ -271,7 +246,6 @@ def get_task_store() -> TaskStore:
                 logger.error("SqliteTaskStore failed: %s — falling back to memory", e xc)
                 mode = "memory"
 
-        # memory fallback
         if is_prod and mode == "memory":
             logger.error(
                 "A2A task store is in-memory (non-persistent). "
