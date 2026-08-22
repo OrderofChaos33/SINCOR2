@@ -24,18 +24,18 @@ Adding `.github/workflows/codeql.yml` with `if: false` only skipped the *file* w
 | Repository Actions (`actions/permissions`) | **disabled** |
 | File-based CodeQL (`.github/workflows/codeql.yml`) | **disabled_manually** |
 | CI / Codacy / Security / onchain-ci / deploy-base | manual only (`workflow_dispatch`) |
-| CodeQL **default setup** | still `configured` in Settings (API cannot clear it) |
+| CodeQL **default setup** | **not-configured** |
 
-With Actions disabled at the repo, default CodeQL cannot enqueue new failed runs. That is what stops the “Run failed” mail.
+Proof: commit `03dad38` (`docs/ACTIONS.md`) did **not** enqueue any workflow run — including default CodeQL. The “Run failed” mail stops here.
 
-The default-setup API (`PUT .../code-scanning/default-setup`) returns 404 for the connected GitHub App, and `PUT .../actions/workflows/{id}/disable` returns 422 for the dynamic CodeQL workflow. Repo-level Actions off is the lever that actually works.
+Repo-level Actions off is the lever that worked. `PUT .../code-scanning/default-setup` returned 404 for the connected GitHub App, and `PUT .../actions/workflows/{id}/disable` returned 422 for the dynamic CodeQL workflow.
 
 ## Restore (when billing is fixed)
 
 1. [GitHub billing](https://github.com/settings/billing) — add a payment method / Actions minutes.
-2. Re-enable Actions: repo **Settings → Actions → General → Allow all actions**.
-3. **Before the next push**, disable CodeQL default setup: [Code security](https://github.com/OrderofChaos33/SINCOR2/settings/security_analysis) → CodeQL → Disable. If you skip this, the first push after re-enable will fail again.
+2. Confirm CodeQL default setup is still off: [Code security](https://github.com/OrderofChaos33/SINCOR2/settings/security_analysis).
+3. Re-enable Actions: repo **Settings → Actions → General → Allow all actions**.
 4. Put CI back on push by restoring `on: [push, pull_request]` in `.github/workflows/ci.yml` (and Codacy/security/onchain if you want them).
 5. Re-enable `.github/workflows/codeql.yml` only if you want *advanced* CodeQL, not default setup.
 
-Do not re-enable Actions until step 3 is done.
+Do not re-enable Actions until step 2 is confirmed. If default setup comes back on, the first push will fail again.
