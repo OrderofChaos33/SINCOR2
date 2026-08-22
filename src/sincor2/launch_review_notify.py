@@ -1,6 +1,6 @@
 """
 Daily email reminder — pending launch drafts need ~5 min approval at /launch/review.
-DISABLED by default per operator request (stop garbage draft emails).
+HARD-DISABLED — operator requested all draft reminder emails stopped.
 """
 
 from __future__ import annotations
@@ -16,6 +16,10 @@ logger = logging.getLogger("sincor2.launch_review_notify")
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_ALERT_EMAIL = "court@getsincor.com"
 _scheduler = None
+
+# Operator kill switch. Railway still has LAUNCH_REVIEW_REMINDER_ENABLED=true,
+# so honoring that env var would keep sending. Do not remove until emails are wanted.
+_HARD_DISABLE_REMINDER_EMAILS = True
 
 
 def _review_url() -> str:
@@ -92,7 +96,11 @@ def build_reminder_content() -> tuple[str, str, str, int]:
 
 
 def send_launch_review_reminder() -> dict:
-    """Email daily approval reminder. Works with Resend/SendGrid or logs in stub mode."""
+    """Email daily approval reminder. Hard-disabled — does not send."""
+    if _HARD_DISABLE_REMINDER_EMAILS:
+        logger.info("[REVIEW_REMINDER] Hard-disabled; not sending")
+        return {"ok": False, "error": "hard_disabled"}
+
     to_email = _alert_email()
     if not to_email:
         return {"ok": False, "error": "no_alert_email"}
@@ -132,13 +140,13 @@ def send_launch_review_reminder() -> dict:
 
 
 def start_review_reminder_scheduler(app=None):
-    """Daily cron reminder (default 9:15 AM America/Chicago).
-    DISABLED by default — set LAUNCH_REVIEW_REMINDER_ENABLED=true to re-enable.
-    """
+    """Daily cron reminder. Hard-disabled — will not start."""
     global _scheduler
 
-    # Force-disabled by operator request to stop incessant draft emails.
-    # Explicitly require true to enable; default is now false.
+    if _HARD_DISABLE_REMINDER_EMAILS:
+        logger.info("[REVIEW_REMINDER] Hard-disabled by operator request")
+        return None
+
     if os.environ.get("LAUNCH_REVIEW_REMINDER_ENABLED", "false").lower() != "true":
         logger.info("[REVIEW_REMINDER] Disabled (LAUNCH_REVIEW_REMINDER_ENABLED!=true)")
         return None

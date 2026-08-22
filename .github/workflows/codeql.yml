@@ -1,0 +1,20 @@
+name: CodeQL
+
+# Replaces GitHub default CodeQL setup, which was failing on every push
+# because Actions billing is locked. Manual only until billing is fixed.
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - uses: github/codeql-action/analyze@v3

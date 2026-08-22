@@ -1,10 +1,8 @@
 name: CI
 
+# Paused: GitHub Actions billing is locked, so every push failed in ~1s
+# and spammed "Run failed" notifications. Manual only until billing is fixed.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
