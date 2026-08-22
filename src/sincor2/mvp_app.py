@@ -80,6 +80,8 @@ def inject_auth_state():
     return {
         'is_admin': bool(session.get('is_admin')),
         'admin_username': session.get('admin_username') or '',
+        'is_customer': bool(session.get('user_email')) and not session.get('is_admin'),
+        'username': session.get('username') or session.get('admin_username') or '',
     }
 
 
@@ -121,6 +123,8 @@ def _oauth_provider_ready(name: str) -> bool:
 def _auth_cookie_response(email: str, redirect_url: str = '/dashboard'):
     """Set session + JWT cookie and redirect."""
     session['user_email'] = email
+    if not session.get('username'):
+        session['username'] = (email or '').split('@')[0]
     access_token = create_access_token(identity=email)
     sep = '&' if '?' in redirect_url else '?'
     if 'email=' not in redirect_url:
@@ -172,6 +176,125 @@ def _customer_exists(email: str) -> bool:
     return False
 
 
+def _identity_candidates(identifier: str) -> list:
+    ident = (identifier or '').strip().lower()
+    if not ident:
+        return []
+    out = [ident]
+    if '@' in ident:
+        local = ident.split('@', 1)[0].strip()
+        if local and local not in out:
+            out.append(local)
+    return out
+
+
+def _slug_username(raw: str) -> str:
+    slug = re.sub(r'[^a-z0-9_]+', '', (raw or '').lower())
+    return (slug or 'user')[:24]
+
+
+def _is_admin_identity(identifier: str) -> bool:
+    expected = (os.environ.get('ADMIN_USERNAME') or '').strip().lower()
+    if not expected:
+        return False
+    return expected in _identity_candidates(identifier)
+
+
+def _username_taken(db, username: str, except_email: str = '') -> bool:
+    if not username:
+        return True
+    if _is_admin_identity(username):
+        return True
+    row = db.execute(
+        'SELECT email FROM customer_profiles WHERE lower(username)=? LIMIT 1',
+        (username.lower(),),
+    ).fetchone()
+    if not row:
+        return False
+    email = row['email'] if isinstance(row, sqlite3.Row) else row[0]
+    if except_email and (email or '').lower() == except_email.lower():
+        return False
+    return True
+
+
+def _allocate_username(db, seed: str, email: str) -> str:
+    base = _slug_username(seed or (email or '').split('@')[0])
+    if len(base) < 3:
+        base = (base + 'user')[:8]
+    candidate = base
+    n = 1
+    while _username_taken(db, candidate, except_email=email):
+        n += 1
+        suffix = str(n)
+        candidate = f'{base[:24 - len(suffix)]}{suffix}'
+        if n > 9999:
+            candidate = 'user' + uuid.uuid4().hex[:8]
+            break
+    return candidate
+
+
+def _ensure_customer_username_schema(db) -> None:
+    cols = {row[1] for row in db.execute('PRAGMA table_info(customer_profiles)').fetchall()}
+    if 'username' not in cols:
+        db.execute('ALTER TABLE customer_profiles ADD COLUMN username TEXT')
+        db.commit()
+    missing = db.execute(
+        "SELECT id, email, first_name FROM customer_profiles WHERE username IS NULL OR username = ''"
+    ).fetchall()
+    for row in missing:
+        rid = row['id'] if isinstance(row, sqlite3.Row) else row[0]
+        email = row['email'] if isinstance(row, sqlite3.Row) else row[1]
+        first = row['first_name'] if isinstance(row, sqlite3.Row) else row[2]
+        seed = (first or '').split()[0] if first else (email or '').split('@')[0]
+        uname = _allocate_username(db, seed, email or '')
+        db.execute('UPDATE customer_profiles SET username=? WHERE id=?', (uname, rid))
+    if missing:
+        db.commit()
+    try:
+        db.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_customer_profiles_username '
+            'ON customer_profiles(username)'
+        )
+    except Exception:
+        logger.debug('[DB] username unique index not applied')
+
+
+def _resolve_customer(identifier: str):
+    """Return {email, username} for a customer looked up by email or username."""
+    ident = (identifier or '').strip()
+    if not ident:
+        return None
+    db = get_db()
+    _ensure_customer_username_schema(db)
+    if '@' in ident:
+        email = ident.lower()
+        if not _customer_exists(email):
+            return None
+        row = db.execute(
+            'SELECT email, username FROM customer_profiles WHERE lower(email)=? LIMIT 1',
+            (email,),
+        ).fetchone()
+        if not row:
+            _upsert_lead(email, email.split('@')[0])
+            row = db.execute(
+                'SELECT email, username FROM customer_profiles WHERE lower(email)=? LIMIT 1',
+                (email,),
+            ).fetchone()
+        username = ''
+        if row:
+            username = row['username'] if isinstance(row, sqlite3.Row) else row[1]
+        return {'email': email, 'username': username or email.split('@')[0]}
+    row = db.execute(
+        'SELECT email, username FROM customer_profiles WHERE lower(username)=? LIMIT 1',
+        (ident.lower(),),
+    ).fetchone()
+    if not row:
+        return None
+    email = row['email'] if isinstance(row, sqlite3.Row) else row[0]
+    username = row['username'] if isinstance(row, sqlite3.Row) else row[1]
+    return {'email': email, 'username': username}
+
+
 def _upsert_lead(email: str, name: str) -> None:
     """Persist signup lead into customer_profiles."""
     import secrets
@@ -181,6 +304,7 @@ def _upsert_lead(email: str, name: str) -> None:
     last = parts[1] if len(parts) > 1 else ''
     now = datetime.utcnow().isoformat()
     db = get_db()
+    _ensure_customer_username_schema(db)
     existing = db.execute(
         'SELECT profile_id FROM customer_profiles WHERE email=?', (email,)
     ).fetchone()
@@ -191,11 +315,22 @@ def _upsert_lead(email: str, name: str) -> None:
         )
     else:
         profile_id = 'lead_' + secrets.token_urlsafe(12)
+        uname = _allocate_username(db, first, email)
         db.execute(
             '''INSERT INTO customer_profiles
-               (profile_id, email, first_name, last_name, created_at, updated_at)
-               VALUES (?,?,?,?,?,?)''',
-            (profile_id, email, first, last, now, now),
+               (profile_id, email, first_name, last_name, username, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?)''',
+            (profile_id, email, first, last, uname, now, now),
+        )
+    row = db.execute(
+        'SELECT username FROM customer_profiles WHERE email=?', (email,)
+    ).fetchone()
+    current = (row['username'] if row else '') or ''
+    if not current:
+        uname = _allocate_username(db, first, email)
+        db.execute(
+            'UPDATE customer_profiles SET username=? WHERE email=?',
+            (uname, email),
         )
     db.commit()
 
@@ -574,6 +709,7 @@ def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(DB_PATH)
         g.db.row_factory = sqlite3.Row
+        _ensure_customer_username_schema(g.db)
     return g.db
 
 
@@ -605,7 +741,8 @@ def init_db():
         consent_timestamp TEXT,
         ip_hash TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT
+        updated_at TEXT,
+        username TEXT
     )''')
     db.execute('''CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1022,7 +1159,9 @@ def _admin_credentials_match(username: str, password: str) -> bool:
     expected_pass = _admin_password()
     if not expected_user or not expected_pass:
         return False
-    user_ok = _ct_eq((username or '').lower(), expected_user.lower())
+    user_ok = any(
+        _ct_eq(c, expected_user.lower()) for c in _identity_candidates(username)
+    )
     pass_ok = _ct_eq(password or '', expected_pass)
     return user_ok and pass_ok
 
@@ -1083,6 +1222,7 @@ def _admin_cookie_response(username: str, redirect_url: str = '/admin'):
     identity = _admin_username() or username
     session['is_admin'] = True
     session['admin_username'] = identity
+    session['username'] = identity
     session['user_email'] = identity
     access_token = create_access_token(identity=identity, additional_claims={'role': 'admin'})
     resp = make_response(redirect(_safe_next_url(redirect_url, '/admin')))
@@ -1108,7 +1248,13 @@ def login():
 
     data = request.get_json(silent=True) or {}
     username = sanitize_string(
-        str(data.get('username') or data.get('email') or data.get('user') or ''),
+        str(
+            data.get('username')
+            or data.get('email')
+            or data.get('identifier')
+            or data.get('user')
+            or ''
+        ),
         max_length=254,
     ).strip()
     password = data.get('password', '')
@@ -2924,53 +3070,60 @@ def affiliate_program():
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("8 per minute", exempt_when=lambda: request.method != 'POST')
 def login_page():
-    """Login page — operator username/password (Railway) or customer email."""
+    """Login page — email or username. Staff accounts also send a password."""
     err_key = request.args.get('error', '')
-    next_url = _safe_next_url(request.args.get('next') or request.form.get('next') or '/admin')
+    requested_next = request.args.get('next') or request.form.get('next') or ''
     ctx = {
         'oauth_error': OAUTH_ERROR_MESSAGES.get(err_key, ''),
         'oauth_google': _oauth_provider_ready('google'),
         'oauth_github': _oauth_provider_ready('github'),
         'error': None,
         'success': None,
-        'mode': request.args.get('mode') or 'operator',
-        'next_url': next_url,
-        'username': '',
+        'next_url': requested_next,
+        'identifier': '',
     }
     if request.method == 'POST':
-        intent = (request.form.get('intent') or '').strip().lower()
-        username = (request.form.get('username') or '').strip()
+        identifier = (
+            request.form.get('identifier')
+            or request.form.get('username')
+            or request.form.get('email')
+            or ''
+        ).strip()
         password = request.form.get('password') or ''
-        email = (request.form.get('email') or '').strip().lower()
-        ctx['username'] = username
-
-        operator_attempt = intent == 'operator' or (username and password and intent != 'customer')
-        if operator_attempt:
-            ctx['mode'] = 'operator'
-            if not _admin_username() or not _admin_password():
-                ctx['error'] = 'Operator login is not configured on this server.'
-                return render_template('login.html', **ctx)
-            if not username or not password:
-                ctx['error'] = 'Username and password are required.'
-                return render_template('login.html', **ctx)
-            if _admin_credentials_match(username, password):
-                logger.info('[AUTH] Operator login: %s', _admin_username())
-                return _admin_cookie_response(username, next_url)
-            logger.warning('[AUTH] Failed operator login for %s from %s', username, request.remote_addr)
-            ctx['error'] = 'Invalid username or password.'
+        ctx['identifier'] = identifier
+        if not identifier:
+            ctx['error'] = 'Enter your email or username.'
             return render_template('login.html', **ctx)
 
-        ctx['mode'] = 'customer'
-        if not email or '@' not in email:
-            ctx['error'] = 'Enter a valid email address.'
+        if _is_admin_identity(identifier):
+            if not password:
+                ctx['error'] = 'Password required for this account.'
+                return render_template('login.html', **ctx)
+            if _admin_credentials_match(identifier, password):
+                logger.info('[AUTH] Staff login: %s', _admin_username())
+                dest = _safe_next_url(requested_next, '/admin')
+                return _admin_cookie_response(identifier, dest)
+            logger.warning('[AUTH] Failed staff login for %s from %s', identifier, request.remote_addr)
+            ctx['error'] = 'Invalid email, username, or password.'
             return render_template('login.html', **ctx)
-        if _customer_exists(email):
-            logger.info('[AUTH] Email login: %s', email)
-            return _auth_cookie_response(email, '/dashboard')
-        ctx['error'] = 'No account found for that email. Sign up first or use Google/GitHub.'
+
+        customer = _resolve_customer(identifier)
+        if customer:
+            session['username'] = customer.get('username') or ''
+            dest = _safe_next_url(requested_next, '/dashboard')
+            if dest in ('/admin', '/operator', '/command-center'):
+                dest = '/dashboard'
+            logger.info('[AUTH] Customer login: %s', customer['email'])
+            return _auth_cookie_response(customer['email'], dest)
+        if password:
+            ctx['error'] = 'Invalid email, username, or password.'
+        else:
+            ctx['error'] = 'No account found. Sign up first or continue with Google/GitHub.'
         return render_template('login.html', **ctx)
     if _is_admin_session():
-        return redirect(next_url)
+        return redirect(_safe_next_url(requested_next, '/admin'))
+    if _session_email():
+        return redirect('/dashboard')
     return render_template('login.html', **ctx)
 
 

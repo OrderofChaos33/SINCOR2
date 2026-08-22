@@ -880,6 +880,8 @@
   </ul>
   {% if is_admin %}
   <a href="/admin" style="color:var(--cyan);font-weight:600;font-size:14px;text-decoration:none;margin-right:12px;padding:8px 14px;border:1px solid var(--border-bright);border-radius:10px;">Console</a>
+{% elif is_customer %}
+  <a href="/dashboard" style="color:var(--cyan);font-weight:600;font-size:14px;text-decoration:none;margin-right:12px;padding:8px 14px;border:1px solid var(--border-bright);border-radius:10px;">Dashboard</a>
 {% else %}
   <a href="/login" style="color:var(--text);font-weight:600;font-size:14px;text-decoration:none;margin-right:12px;padding:8px 14px;border:1px solid var(--border-bright);border-radius:10px;">Log in</a>
 {% endif %}
@@ -897,7 +899,7 @@
   
   <div class="hero-buttons">
     <a href="/buy?plan=starter" class="btn btn-primary">→ Deploy Now — pay in SINC</a>
-    <a href="/login" class="btn btn-secondary">Operator log in</a>
+    <a href="/login" class="btn btn-secondary">Log in</a>
     <a href="#pricing" class="btn btn-secondary">See Pricing</a>
     <a href="/whitepaper" class="btn btn-secondary">Whitepaper</a>
     <a href="/pitch" class="btn btn-secondary">Pitch deck</a>

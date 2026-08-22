@@ -102,17 +102,18 @@ class TestAuthentication:
         assert 'user' in data
         assert data['user'] == 'courtadmin'
 
-    def test_login_page_uses_username_not_email(self, client):
-        """GET /login must offer a username field — Railway stores ADMIN_USERNAME."""
+    def test_login_page_email_or_username(self, client):
+        """GET /login offers a single email-or-username field, no Railway copy."""
         response = client.get('/login')
         assert response.status_code == 200
         html = response.data.decode('utf-8')
-        assert 'name="username"' in html
-        assert 'Railway' in html
-        assert 'type="email" id="email" name="email" required' not in html
+        assert 'name="identifier"' in html
+        assert 'Email or username' in html
+        assert 'Railway' not in html
+        assert 'ADMIN_USERNAME' not in html
 
-    def test_operator_form_login_and_console(self, client, monkeypatch):
-        """POST /login with Railway username/password opens /admin."""
+    def test_staff_form_login_and_console(self, client, monkeypatch):
+        """POST /login with staff username/password opens /admin."""
         monkeypatch.setenv('ADMIN_USERNAME', 'courtadmin')
         monkeypatch.setenv('ADMIN_PASSWORD', 'RailwayPass123!')
         denied = client.get('/admin', follow_redirects=False)
@@ -120,16 +121,14 @@ class TestAuthentication:
         assert '/login' in denied.headers.get('Location', '')
 
         bad = client.post('/login', data={
-            'intent': 'operator',
-            'username': 'courtadmin',
+            'identifier': 'courtadmin',
             'password': 'wrong',
         }, follow_redirects=False)
         assert bad.status_code == 200
-        assert b'Invalid username or password' in bad.data
+        assert b'Invalid email, username, or password' in bad.data
 
         ok = client.post('/login', data={
-            'intent': 'operator',
-            'username': 'courtadmin',
+            'identifier': 'courtadmin',
             'password': 'RailwayPass123!',
             'next': '/admin',
         }, follow_redirects=False)
@@ -143,6 +142,35 @@ class TestAuthentication:
 
         home = client.get('/')
         assert b'Console' in home.data
+
+    def test_customer_email_and_username_login(self, client, monkeypatch):
+        """Customers sign in with the email they signed up with, or the username we create."""
+        monkeypatch.setenv('ADMIN_USERNAME', 'courtadmin')
+        monkeypatch.setenv('ADMIN_PASSWORD', 'RailwayPass123!')
+        from sincor2.mvp_app import _upsert_lead, app as flask_app
+        with flask_app.app_context():
+            _upsert_lead('ada@example.com', 'Ada Lovelace')
+            from sincor2.mvp_app import get_db
+            row = get_db().execute(
+                'SELECT username FROM customer_profiles WHERE email=?',
+                ('ada@example.com',),
+            ).fetchone()
+            username = row['username']
+        assert username
+
+        by_email = client.post('/login', data={
+            'identifier': 'ada@example.com',
+        }, follow_redirects=False)
+        assert by_email.status_code in (302, 303)
+        assert '/dashboard' in by_email.headers.get('Location', '')
+
+        client.get('/auth/logout')
+
+        by_user = client.post('/login', data={
+            'identifier': username,
+        }, follow_redirects=False)
+        assert by_user.status_code in (302, 303)
+        assert '/dashboard' in by_user.headers.get('Location', '')
 
 
 class TestCheckout:
