@@ -75,6 +75,14 @@ def inject_social_links():
     return {'social_links': SOCIAL_LINKS}
 
 
+@app.context_processor
+def inject_auth_state():
+    return {
+        'is_admin': bool(session.get('is_admin')),
+        'admin_username': session.get('admin_username') or '',
+    }
+
+
 # Configure JWT � MUST be set in Railway secrets for production
 jwt_secret = os.environ.get('JWT_SECRET_KEY') or os.environ.get('JWT_SECRET')
 if not jwt_secret:
@@ -979,24 +987,67 @@ def home():
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
-# Admin credentials � must be set via environment variables in production
-ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', '')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+# Admin credentials — must be set via environment variables in production.
+# Read live from the environment so Railway vars (and tests) are not frozen at import.
 
-if not ADMIN_USERNAME or not ADMIN_PASSWORD:
-    logger.warning('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not set � admin login disabled')
+
+def _admin_username() -> str:
+    return (os.environ.get('ADMIN_USERNAME') or '').strip()
+
+
+def _admin_password() -> str:
+    return os.environ.get('ADMIN_PASSWORD') or ''
+
+
+ADMIN_USERNAME = _admin_username()
+ADMIN_PASSWORD = _admin_password()
+
+if not _admin_username() or not _admin_password():
+    logger.warning('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not set — admin login disabled')
+
+
+def _ct_eq(left: str, right: str) -> bool:
+    """Constant-time string compare that still returns False on length mismatch."""
+    import hmac
+    a = (left or '').encode('utf-8')
+    b = (right or '').encode('utf-8')
+    if len(a) != len(b):
+        hmac.compare_digest(a, a)
+        return False
+    return hmac.compare_digest(a, b)
+
+
+def _admin_credentials_match(username: str, password: str) -> bool:
+    expected_user = _admin_username()
+    expected_pass = _admin_password()
+    if not expected_user or not expected_pass:
+        return False
+    user_ok = _ct_eq((username or '').lower(), expected_user.lower())
+    pass_ok = _ct_eq(password or '', expected_pass)
+    return user_ok and pass_ok
+
+
+def _safe_next_url(raw: str, default: str = '/admin') -> str:
+    value = (raw or '').strip() or default
+    if not value.startswith('/') or value.startswith('//'):
+        return default
+    return value
 
 
 def _check_admin_token(req):
-    """Return True if the request carries a valid admin JWT."""
+    """Return True if the request carries a valid admin JWT (header or cookie)."""
     from flask_jwt_extended import decode_token
     auth = req.headers.get('Authorization', '')
-    if not auth.startswith('Bearer '):
+    token = ''
+    if auth.startswith('Bearer '):
+        token = auth[7:]
+    elif getattr(req, 'cookies', None):
+        token = req.cookies.get('access_token', '')
+    if not token or not _admin_username():
         return False
-    token = auth[7:]
     try:
         decoded = decode_token(token)
-        return decoded.get('sub') == ADMIN_USERNAME
+        return _ct_eq(str(decoded.get('sub') or '').lower(), _admin_username().lower())
     except Exception:
         return False
 
@@ -1004,20 +1055,43 @@ def _check_admin_token(req):
 def _check_admin_key(req) -> bool:
     """Return True if request carries ADMIN_PASSWORD via header or JSON body."""
     import hmac
-    if not ADMIN_PASSWORD:
+    expected = _admin_password()
+    if not expected:
         return False
     key = req.headers.get('X-Admin-Key', '')
     if not key:
         data = req.get_json(silent=True) or {}
         key = str(data.get('admin_key', ''))
-    return bool(key) and hmac.compare_digest(str(key), str(ADMIN_PASSWORD))
+    return bool(key) and hmac.compare_digest(str(key), str(expected))
+
+
+def _is_admin_session() -> bool:
+    if session.get('is_admin') and _ct_eq(str(session.get('admin_username') or '').lower(), _admin_username().lower()):
+        return True
+    return _check_admin_token(request)
 
 
 def _require_admin(req):
     """Return None if authorized, else (response, status_code)."""
-    if _check_admin_token(req) or _check_admin_key(req):
+    if _check_admin_token(req) or _check_admin_key(req) or (req is request and _is_admin_session()):
         return None
     return jsonify({'error': 'Unauthorized'}), 401
+
+
+def _admin_cookie_response(username: str, redirect_url: str = '/admin'):
+    """Set operator session + JWT cookie and redirect to the command console."""
+    identity = _admin_username() or username
+    session['is_admin'] = True
+    session['admin_username'] = identity
+    session['user_email'] = identity
+    access_token = create_access_token(identity=identity, additional_claims={'role': 'admin'})
+    resp = make_response(redirect(_safe_next_url(redirect_url, '/admin')))
+    resp.set_cookie(
+        'access_token', access_token, httponly=True,
+        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
+        samesite='Lax', max_age=28800,
+    )
+    return resp
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -1025,33 +1099,37 @@ def _require_admin(req):
 def login():
     """
     Admin login endpoint. Validates credentials against ADMIN_USERNAME / ADMIN_PASSWORD
-    environment variables. Returns a signed JWT on success.
+    environment variables. Accepts `username` (preferred) or `email` as the identity field.
+    Returns a signed JWT on success.
     """
-    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+    if not _admin_username() or not _admin_password():
         logger.error('[AUTH] ADMIN_USERNAME or ADMIN_PASSWORD not configured')
         return jsonify({'error': 'Authentication not configured on this server'}), 503
 
     data = request.get_json(silent=True) or {}
-    email = sanitize_string(data.get('email', ''), max_length=254)
+    username = sanitize_string(
+        str(data.get('username') or data.get('email') or data.get('user') or ''),
+        max_length=254,
+    ).strip()
     password = data.get('password', '')
 
-    if not email or not password:
-        return jsonify({'error': 'email and password required'}), 400
+    if not username or not password:
+        return jsonify({'error': 'username and password required'}), 400
 
-    # Constant-time comparison to prevent timing attacks
-    import hmac
-    email_ok = hmac.compare_digest(email.lower(), ADMIN_USERNAME.lower())
-    pass_ok = hmac.compare_digest(str(password), str(ADMIN_PASSWORD))
-
-    if not (email_ok and pass_ok):
-        logger.warning(f'[AUTH] Failed login attempt for: {email} from {request.remote_addr}')
+    if not _admin_credentials_match(username, password):
+        logger.warning(f'[AUTH] Failed login attempt for: {username} from {request.remote_addr}')
         return jsonify({'error': 'Invalid credentials'}), 401
 
-    access_token = create_access_token(identity=email)
-    logger.info(f'[AUTH] Successful login: {email}')
+    identity = _admin_username()
+    access_token = create_access_token(identity=identity, additional_claims={'role': 'admin'})
+    logger.info(f'[AUTH] Successful login: {identity}')
     return jsonify({
         'access_token': access_token,
-        'user': {'email': email},
+        'user': {
+            'username': identity,
+            'email': username if '@' in username else identity,
+            'role': 'admin',
+        },
         'expires_in': 86400
     }), 200
 
@@ -2100,7 +2178,7 @@ def get_customer_orders(email):
 def list_all_orders():
     """Admin endpoint: list all orders. Requires valid admin JWT."""
     current_user = get_jwt_identity()
-    if current_user.lower() != ADMIN_USERNAME.lower():
+    if not _ct_eq(str(current_user or '').lower(), _admin_username().lower()):
         return jsonify({'error': 'Forbidden'}), 403
     db = get_db()
     rows = db.execute("SELECT * FROM orders ORDER BY created_at DESC LIMIT 100").fetchall()
@@ -2844,27 +2922,82 @@ def affiliate_program():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("8 per minute", exempt_when=lambda: request.method != 'POST')
 def login_page():
-    """Login page — email session, OAuth, or admin API."""
+    """Login page — operator username/password (Railway) or customer email."""
     err_key = request.args.get('error', '')
+    next_url = _safe_next_url(request.args.get('next') or request.form.get('next') or '/admin')
     ctx = {
         'oauth_error': OAUTH_ERROR_MESSAGES.get(err_key, ''),
         'oauth_google': _oauth_provider_ready('google'),
         'oauth_github': _oauth_provider_ready('github'),
         'error': None,
         'success': None,
+        'mode': request.args.get('mode') or 'operator',
+        'next_url': next_url,
+        'username': '',
     }
     if request.method == 'POST':
+        intent = (request.form.get('intent') or '').strip().lower()
+        username = (request.form.get('username') or '').strip()
+        password = request.form.get('password') or ''
         email = (request.form.get('email') or '').strip().lower()
+        ctx['username'] = username
+
+        operator_attempt = intent == 'operator' or (username and password and intent != 'customer')
+        if operator_attempt:
+            ctx['mode'] = 'operator'
+            if not _admin_username() or not _admin_password():
+                ctx['error'] = 'Operator login is not configured on this server.'
+                return render_template('login.html', **ctx)
+            if not username or not password:
+                ctx['error'] = 'Username and password are required.'
+                return render_template('login.html', **ctx)
+            if _admin_credentials_match(username, password):
+                logger.info('[AUTH] Operator login: %s', _admin_username())
+                return _admin_cookie_response(username, next_url)
+            logger.warning('[AUTH] Failed operator login for %s from %s', username, request.remote_addr)
+            ctx['error'] = 'Invalid username or password.'
+            return render_template('login.html', **ctx)
+
+        ctx['mode'] = 'customer'
         if not email or '@' not in email:
             ctx['error'] = 'Enter a valid email address.'
             return render_template('login.html', **ctx)
         if _customer_exists(email):
             logger.info('[AUTH] Email login: %s', email)
-            return _auth_cookie_response(email)
+            return _auth_cookie_response(email, '/dashboard')
         ctx['error'] = 'No account found for that email. Sign up first or use Google/GitHub.'
         return render_template('login.html', **ctx)
+    if _is_admin_session():
+        return redirect(next_url)
     return render_template('login.html', **ctx)
+
+
+@app.route('/admin')
+@app.route('/operator')
+def admin_console():
+    """Protected operator command console."""
+    if not _is_admin_session():
+        return redirect('/login?next=/admin')
+    username = session.get('admin_username') or _admin_username() or 'operator'
+    return render_template('admin_console.html', username=username)
+
+
+@app.route('/command-center')
+def command_center_page():
+    """Protected swarm command center."""
+    if not _is_admin_session():
+        return redirect('/login?next=/command-center')
+    try:
+        return render_template('command_center.html')
+    except Exception:
+        return redirect('/admin')
+
+
+@app.route('/logout')
+def logout_alias():
+    return redirect('/auth/logout')
 
 
 @app.route('/forgot-password')

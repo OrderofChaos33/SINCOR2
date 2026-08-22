@@ -44,21 +44,36 @@ class TestHealth:
 class TestAuthentication:
     """Test JWT authentication endpoints."""
     
-    def test_login_success(self, client):
-        """POST /api/auth/login with valid email/password should return access token."""
+    def test_login_success(self, client, monkeypatch):
+        """POST /api/auth/login with valid username/password should return access token."""
+        monkeypatch.setenv('ADMIN_USERNAME', 'courtadmin')
+        monkeypatch.setenv('ADMIN_PASSWORD', 'RailwayPass123!')
         response = client.post('/api/auth/login',
-            data=json.dumps({'email': 'user@example.com', 'password': 'demo'}),
+            data=json.dumps({'username': 'courtadmin', 'password': 'RailwayPass123!'}),
             content_type='application/json')
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'access_token' in data
-        assert data['user']['email'] == 'user@example.com'
+        assert data['user']['username'] == 'courtadmin'
         assert data['expires_in'] == 86400
-    
-    def test_login_missing_email(self, client):
-        """POST /api/auth/login without email should return 400."""
+
+    def test_login_accepts_email_alias(self, client, monkeypatch):
+        """Legacy email field still authenticates against ADMIN_USERNAME."""
+        monkeypatch.setenv('ADMIN_USERNAME', 'courtadmin')
+        monkeypatch.setenv('ADMIN_PASSWORD', 'RailwayPass123!')
         response = client.post('/api/auth/login',
-            data=json.dumps({'password': 'demo'}),
+            data=json.dumps({'email': 'courtadmin', 'password': 'RailwayPass123!'}),
+            content_type='application/json')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'access_token' in data
+
+    def test_login_missing_email(self, client, monkeypatch):
+        """POST /api/auth/login without username should return 400."""
+        monkeypatch.setenv('ADMIN_USERNAME', 'courtadmin')
+        monkeypatch.setenv('ADMIN_PASSWORD', 'RailwayPass123!')
+        response = client.post('/api/auth/login',
+            data=json.dumps({'password': 'RailwayPass123!'}),
             content_type='application/json')
         assert response.status_code == 400
         data = json.loads(response.data)
@@ -69,11 +84,13 @@ class TestAuthentication:
         response = client.get('/api/protected')
         assert response.status_code == 401
     
-    def test_protected_endpoint_with_token(self, client):
+    def test_protected_endpoint_with_token(self, client, monkeypatch):
         """GET /api/protected with valid token should return 200."""
+        monkeypatch.setenv('ADMIN_USERNAME', 'courtadmin')
+        monkeypatch.setenv('ADMIN_PASSWORD', 'RailwayPass123!')
         # First, login to get a token
         login_response = client.post('/api/auth/login',
-            data=json.dumps({'email': 'user@example.com', 'password': 'demo'}),
+            data=json.dumps({'username': 'courtadmin', 'password': 'RailwayPass123!'}),
             content_type='application/json')
         token = json.loads(login_response.data)['access_token']
         
@@ -83,7 +100,49 @@ class TestAuthentication:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'user' in data
-        assert data['user'] == 'user@example.com'
+        assert data['user'] == 'courtadmin'
+
+    def test_login_page_uses_username_not_email(self, client):
+        """GET /login must offer a username field — Railway stores ADMIN_USERNAME."""
+        response = client.get('/login')
+        assert response.status_code == 200
+        html = response.data.decode('utf-8')
+        assert 'name="username"' in html
+        assert 'Railway' in html
+        assert 'type="email" id="email" name="email" required' not in html
+
+    def test_operator_form_login_and_console(self, client, monkeypatch):
+        """POST /login with Railway username/password opens /admin."""
+        monkeypatch.setenv('ADMIN_USERNAME', 'courtadmin')
+        monkeypatch.setenv('ADMIN_PASSWORD', 'RailwayPass123!')
+        denied = client.get('/admin', follow_redirects=False)
+        assert denied.status_code in (302, 303)
+        assert '/login' in denied.headers.get('Location', '')
+
+        bad = client.post('/login', data={
+            'intent': 'operator',
+            'username': 'courtadmin',
+            'password': 'wrong',
+        }, follow_redirects=False)
+        assert bad.status_code == 200
+        assert b'Invalid username or password' in bad.data
+
+        ok = client.post('/login', data={
+            'intent': 'operator',
+            'username': 'courtadmin',
+            'password': 'RailwayPass123!',
+            'next': '/admin',
+        }, follow_redirects=False)
+        assert ok.status_code in (302, 303)
+        assert '/admin' in ok.headers.get('Location', '')
+
+        console = client.get('/admin')
+        assert console.status_code == 200
+        assert b'Command console' in console.data
+        assert b'courtadmin' in console.data
+
+        home = client.get('/')
+        assert b'Console' in home.data
 
 
 class TestCheckout:
