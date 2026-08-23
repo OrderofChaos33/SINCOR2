@@ -15,6 +15,10 @@ services:
       JWT_SECRET_KEY: dev-jwt-secret-key-change-in-production
       DATABASE_URL: sqlite:////data/orders.db
       SINCOR_DATA_DIR: /data
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      SINCOR_TASK_QUEUE: celery
+      A2A_TASK_STORE: redis
     volumes:
       - ./src:/app/src
       - ./templates:/app/templates
@@ -28,6 +32,45 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sincor2-worker
+    command: celery -A sincor2.celery_app.celery worker --loglevel=info --concurrency=2 -Q sincor.long
+    environment:
+      FLASK_ENV: development
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SINCOR_TASK_QUEUE: celery
+      A2A_TASK_STORE: redis
+      SINCOR_DATA_DIR: /data
+      JWT_SECRET_KEY: dev-jwt-secret-key-change-in-production
+      SECRET_KEY: dev-secret-key-change-in-production
+    volumes:
+      - ./src:/app/src
+      - sincor_data:/data
+    networks:
+      - sincor-network
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: sincor2-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - sincor-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   postgres:
     image: postgres:15-alpine

@@ -99,6 +99,22 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
 jwt = JWTManager(app)
 
+# A2A JSON-RPC + discovery. Production gunicorn entry is this module, so the
+# router must live here (app.py already registers it for the test client).
+try:
+    from sincor2.a2a_integration import A2ARouter
+    app.register_blueprint(A2ARouter().blueprint)
+    logger.info('[A2A] Router registered on mvp_app')
+except Exception as _a2a_exc:
+    logger.warning('[A2A] Router not registered: %s', _a2a_exc)
+
+try:
+    from sincor2.task_queue import register_flask_routes as _register_queue_routes
+    _register_queue_routes(app)
+    logger.info('[QUEUE] /api/tasks poll routes registered')
+except Exception as _q_exc:
+    logger.warning('[QUEUE] poll routes not registered: %s', _q_exc)
+
 # OAuth (Google + GitHub)
 oauth = None
 OAUTH_REDIRECT_BASE = _env_first('OAUTH_REDIRECT_BASE_URL', 'PUBLIC_BASE_URL', 'SITE_URL', default='').rstrip('/')
@@ -872,6 +888,17 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
         'paypal': {'ready': True, 'critical': False, 'detail': 'configured' if paypal_configured else 'not_configured'},
         'anthropic': {'ready': True, 'critical': False, 'detail': 'configured' if anthropic_configured else 'not_configured'},
     }
+    try:
+        from sincor2.task_queue import queue_health
+        qh = queue_health()
+        checks['task_queue'] = {
+            'ready': True,
+            'critical': False,
+            'detail': qh.get('backend', 'unknown'),
+            'redis': qh.get('redis'),
+        }
+    except Exception as qexc:
+        checks['task_queue'] = {'ready': True, 'critical': False, 'detail': f'unavailable:{qexc}'}
     if not include_optional:
         checks = {k: v for k, v in checks.items() if v.get('critical')}
 
@@ -2672,9 +2699,10 @@ def api_webbuilder_run(project_id):
     denied = _require_admin(request)
     if denied:
         return denied
-    from sincor2.webbuilder_studio import run_autonomous_phases
+    from sincor2.task_queue import accepted_payload, enqueue
 
-    return jsonify(run_autonomous_phases(project_id))
+    job = enqueue('webbuilder.run', {'project_id': project_id})
+    return jsonify(accepted_payload(job)), 202
 
 
 @app.route('/api/webbuilder/projects/<project_id>/approve', methods=['POST'])
@@ -2723,10 +2751,11 @@ def api_webbuilder_rebuild(project_id):
     denied = _require_admin(request)
     if denied:
         return denied
-    from sincor2.webbuilder_studio import rebuild_draft
+    from sincor2.task_queue import accepted_payload, enqueue
 
     data = request.get_json(silent=True) or {}
-    return jsonify(rebuild_draft(project_id, prompt=data.get('prompt')))
+    job = enqueue('webbuilder.rebuild', {'project_id': project_id, 'prompt': data.get('prompt')})
+    return jsonify(accepted_payload(job)), 202
 
 
 @app.route('/api/webbuilder/projects/<project_id>/republish-preview', methods=['POST'])
@@ -3038,15 +3067,6 @@ def launch_review_action(draft_id):
         result = approve_and_post(draft_id)
         return jsonify(result)
     return jsonify({'ok': False, 'error': 'invalid_action'}), 400
-
-
-@app.route('/.well-known/agent.json')
-def agent_card():
-    """A2A-style agent card for SINCOR swarm discovery."""
-    path = os.path.join(static_dir, '.well-known', 'agent.json')
-    if not os.path.isfile(path):
-        return jsonify({'error': 'agent card not found'}), 404
-    return send_file(path, mimetype='application/json')
 
 
 @app.route('/media-packs')
@@ -3562,7 +3582,7 @@ def content_status():
 @app.route('/admin/content/generate', methods=['POST'])
 @limiter.limit("10 per minute")
 def content_generate():
-    """Manually trigger post generation. Body: {keyword, type, publish}"""
+    """Manually trigger post generation. Returns 202 + task_id; poll /api/tasks/<id>."""
     if not _check_admin_token(request):
         return jsonify({'error': 'Admin access required'}), 403
     try:
@@ -3576,19 +3596,15 @@ def content_generate():
         if ctype not in ('how-to', 'comparison', 'alternatives', 'case-study', 'industry-trend'):
             return jsonify({'error': 'invalid type'}), 400
 
-        from sincor2.content_agent import generate_blog_post, save_post, WordPressPublisher, init_db
-        init_db()
-        model = os.environ.get('CONTENT_MODEL', 'claude-haiku-4-5')
-        post = generate_blog_post(keyword, ctype, model=model)
-        path = save_post(post)
-        result = {"title": post["title"], "slug": post["slug"], "word_count": post["word_count"], "path": str(path)}
+        from sincor2.task_queue import accepted_payload, enqueue
 
-        if do_publish:
-            wp = WordPressPublisher()
-            wp_result = wp.publish(post)
-            result["wordpress"] = wp_result
-
-        return jsonify(result)
+        job = enqueue('content.generate', {
+            'keyword': keyword,
+            'ctype': ctype,
+            'do_publish': bool(do_publish),
+            'model': os.environ.get('CONTENT_MODEL', 'claude-haiku-4-5'),
+        })
+        return jsonify(accepted_payload(job)), 202
     except Exception as e:
         logger.error(f"[CONTENT] Generate error: {e}")
         return jsonify({"error": str(e)}), 500

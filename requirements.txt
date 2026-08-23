@@ -52,6 +52,7 @@ eth-account>=0.10.0
 # Scheduling & Async
 APScheduler==3.10.4
 aiofiles==24.1.0
+celery[redis]>=5.4.0
 
 # Logging & Observability
 watchtower==3.3.1
