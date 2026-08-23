@@ -1442,7 +1442,7 @@ class PaymentVerifier:
                     expected_amount_wei=expected_amount_wei,
                 )
         except Exception as exc:
-            logger.error("PaymentVerifier RPC error: %s", e xc)
+            logger.error("PaymentVerifier RPC error: %s", exc)
 
         if result:
             with cls._lock:
@@ -1571,7 +1571,17 @@ class A2ARouter:
         def tasks_send():
             from flask import jsonify, request
             body = request.get_json(force=True, silent=True) or {}
-            return jsonify(_handle_send(body))
+            payload = _handle_send(body)
+            if payload.get("error"):
+                return jsonify(payload), 400
+            task = payload.get("result") or {}
+            task_id = task.get("id")
+            return jsonify({
+                **payload,
+                "accepted": True,
+                "task_id": task_id,
+                "poll_url": f"/api/a2a/tasks/{task_id}" if task_id else None,
+            }), 202
 
         @bp.route("/api/a2a/tasks/<task_id>", methods=["GET"])
         def tasks_get_rest(task_id: str):
@@ -1922,7 +1932,7 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     if free_call:
         _free_quota_tracker.consume(caller_id, skill_id)
 
-    # --- Create task & dispatch ------------------------------------------
+    # --- Create task & enqueue (never block the gunicorn worker) ----------
     task = _new_task(
         skill_id=skill_id,
         input_text=input_text,
@@ -1939,64 +1949,20 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         task.id, skill_id, caller_id, caller_reputation, is_high_rep, free_call,
     )
 
-    _update_task(task, state=TaskState.WORKING)
-    output, error = _dispatch_to_swarm(task)
-    if error:
-        _update_task(task, state=TaskState.FAILED, error=error)
-    else:
-        # Store output as an artifact
-        if output:
-            artifact = A2AArtifact(
-                artifact_id=str(uuid.uuid4()),
-                parts=[{"text": output}],
-                name="result",
-            )
-            task.artifacts.append(artifact)
-            # Also append the agent reply to history
-            agent_msg = A2AMessage(
-                message_id=str(uuid.uuid4()),
-                role="agent",
-                parts=[{"text": output}],
-                context_id=task.context_id,
-                task_id=task.id,
-            )
-            task.history.append(agent_msg)
+    try:
+        from sincor2.task_queue import enqueue
 
-        # Build proof of settlement
-        result_content = output or ""
-        result_hash = hashlib.sha256((task.id + result_content).encode()).hexdigest()
-        proof = {
-            "task_id":            task.id,
-            "skill_id":           skill_id,
-            "caller_id":          caller_id,
-            "tx_hash":            tx_hash or "",
-            "axm_paid_wei":       str(axm_paid),
-            "burn_amount_wei":    str(axm_paid // 2),
-            "burn_to":            DEAD_ADDRESS,
-            "treasury_amount_wei": str(axm_paid - axm_paid // 2),
-            "treasury":           TREASURY_WALLET,
-            "result_hash":        result_hash,
-            "settled_at":         _now(),
-            "chain_id":           CHAIN_ID,
-            "basescan_url":       (
-                f"https://basescan.org/tx/{tx_hash}" if tx_hash else ""
-            ),
-            "free_call":          free_call,
-        }
-        _update_task(task, state=TaskState.COMPLETED, output=output,
-                     metadata={**task.metadata, "proof_of_settlement": proof})
-
-        # Record settlement and update pricing fill count
-        if (axm_paid > 0 and tx_hash) or free_call:
-            _record_a2a_settlement(task, axm_paid, tx_hash or "")
-            _reputation_ledger.record(
-                caller_id=caller_id,
-                skill_id=skill_id,
-                task_id=task.id,
-                axm_paid_wei=axm_paid,
-            )
-            _price_engine.record_fill(skill_id)
-            _fire_toa_feedback(task, success=True)
+        job = enqueue("a2a.execute", {"task_id": task.id})
+        task.metadata["queue_job_id"] = job.id
+        _update_task(task)
+        # Eager (tests) already finalized the A2A task; reload.
+        task = _get_task(task.id) or task
+    except Exception as exc:
+        logger.exception("Queue enqueue failed for A2A task %s: %s", task.id, exc)
+        _update_task(task, state=TaskState.WORKING)
+        output, error = _dispatch_to_swarm(task)
+        _finalize_a2a_task(task, output, error)
+        task = _get_task(task.id) or task
 
     task_dict = _task_to_rpc(task, history_length=history_length)
     # Surface proof of settlement at top-level for convenience
@@ -2007,17 +1973,99 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     return _rpc_ok(task_dict, rpc_id=rpc_id)
 
 
+def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[str]) -> Dict[str, Any]:
+    """Persist swarm output, proof of settlement, and terminal task state.
+
+    Called from the async worker (and the eager test path). Safe to invoke
+    outside a Flask request context.
+    """
+    if error:
+        _update_task(task, state=TaskState.FAILED, error=error)
+        _fire_toa_feedback(task, success=False)
+        return {"task_id": task.id, "state": task.state.value, "error": error}
+
+    if output:
+        artifact = A2AArtifact(
+            artifact_id=str(uuid.uuid4()),
+            parts=[{"text": output}],
+            name="result",
+        )
+        task.artifacts.append(artifact)
+        agent_msg = A2AMessage(
+            message_id=str(uuid.uuid4()),
+            role="agent",
+            parts=[{"text": output}],
+            context_id=task.context_id,
+            task_id=task.id,
+        )
+        task.history.append(agent_msg)
+
+    result_content = output or ""
+    result_hash = hashlib.sha256((task.id + result_content).encode()).hexdigest()
+    skill_id = task.skill_id
+    caller_id = task.caller_id
+    tx_hash = task.tx_hash
+    axm_paid = task.axm_paid
+    free_call = bool(task.metadata.get("free_call"))
+    proof = {
+        "task_id":             task.id,
+        "skill_id":            skill_id,
+        "caller_id":           caller_id,
+        "tx_hash":             tx_hash or "",
+        "axm_paid_wei":        str(axm_paid),
+        "burn_amount_wei":     str(axm_paid // 2),
+        "burn_to":             DEAD_ADDRESS,
+        "treasury_amount_wei": str(axm_paid - axm_paid // 2),
+        "treasury":            TREASURY_WALLET,
+        "result_hash":         result_hash,
+        "settled_at":          _now(),
+        "chain_id":            CHAIN_ID,
+        "basescan_url":        (
+            f"https://basescan.org/tx/{tx_hash}" if tx_hash else ""
+        ),
+        "free_call":           free_call,
+    }
+    _update_task(task, state=TaskState.COMPLETED, output=output,
+                 metadata={**task.metadata, "proof_of_settlement": proof})
+
+    if (axm_paid > 0 and tx_hash) or free_call:
+        _record_a2a_settlement(task, axm_paid, tx_hash or "")
+        _reputation_ledger.record(
+            caller_id=caller_id,
+            skill_id=skill_id,
+            task_id=task.id,
+            axm_paid_wei=axm_paid,
+        )
+        _price_engine.record_fill(skill_id)
+        _fire_toa_feedback(task, success=True)
+
+    return {
+        "task_id": task.id,
+        "state": task.state.value,
+        "output": output,
+        "proof_of_settlement": proof,
+    }
+
+
 def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:
     """Create a settlement record in the platform coordinator for a paid A2A task."""
     try:
         from decimal import Decimal
 
-        from flask import current_app, has_request_context
+        from flask import current_app, has_app_context, has_request_context
 
-        if not has_request_context():
-            return
-
-        platform_state = current_app.extensions.get("sincor_platform")
+        platform_state = None
+        if has_request_context() or has_app_context():
+            platform_state = current_app.extensions.get("sincor_platform")
+        if not platform_state:
+            for _mod in ("sincor2.app", "sincor2.mvp_app"):
+                try:
+                    import importlib
+                    platform_state = getattr(importlib.import_module(_mod), "app").extensions.get("sincor_platform")
+                    if platform_state:
+                        break
+                except Exception:
+                    continue
         if not platform_state:
             return
 
@@ -2047,51 +2095,91 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
             float(amount_display),
             tx_hash,
         )
-    except Exception as e xc:
-        logger.warning("Settlement record failed for task %s: %s", task.id, e xc)
+    except Exception as exc:
+        logger.warning("Settlement record failed for task %s: %s", task.id, exc)
+
+
+def _sse_status(task: A2ATask, rpc_id: Any, final: bool = False,
+                msg_text: Optional[str] = None) -> str:
+    """A2A TaskStatusUpdateEvent (spec + legacy taskStatus envelope)."""
+    status: Dict[str, Any] = {
+        "state":     task.state.value,
+        "timestamp": task.updated_at,
+    }
+    if msg_text:
+        status["message"] = {
+            "messageId": str(uuid.uuid4()),
+            "role":      "agent",
+            "parts":     [{"kind": "text", "text": msg_text}],
+            "contextId": task.context_id,
+            "taskId":    task.id,
+        }
+    result: Dict[str, Any] = {
+        "kind":      "status-update",
+        "taskId":    task.id,
+        "contextId": task.context_id,
+        "status":    status,
+        "final":     final,
+        "taskStatus": {
+            "taskId":    task.id,
+            "contextId": task.context_id,
+            "status":    status,
+            "final":     final,
+        },
+    }
+    return _sse_event({"jsonrpc": "2.0", "id": rpc_id, "result": result})
+
+
+def _sse_artifact_chunk(
+    task: A2ATask,
+    rpc_id: Any,
+    artifact_id: str,
+    text: str,
+    *,
+    append: bool = True,
+    last_chunk: bool = False,
+) -> str:
+    """A2A TaskArtifactUpdateEvent with append / lastChunk for token streaming."""
+    artifact = {
+        "artifactId": artifact_id,
+        "name": "result",
+        "parts": [{"kind": "text", "text": text}],
+    }
+    result: Dict[str, Any] = {
+        "kind":      "artifact-update",
+        "taskId":    task.id,
+        "contextId": task.context_id,
+        "artifact":  artifact,
+        "append":    append,
+        "lastChunk": last_chunk,
+        "taskArtifact": {
+            "taskId":    task.id,
+            "contextId": task.context_id,
+            "artifact":  artifact,
+            "append":    append,
+            "lastChunk": last_chunk,
+            "final":     last_chunk,
+        },
+    }
+    return _sse_event({"jsonrpc": "2.0", "id": rpc_id, "result": result})
 
 
 def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
     """
-    Handle message/stream — yields SSE events for the A2A v1.0.1 streaming flow.
+    Handle message/stream — real SSE token streaming for A2A v1.0.1.
 
     Event sequence:
       1. TaskStatusUpdateEvent: state=submitted
       2. TaskStatusUpdateEvent: state=working
-      3. (dispatch to swarm)
-      4. TaskArtifactUpdateEvent: artifact with result
+      3. TaskArtifactUpdateEvent chunks (append=true) as tokens arrive
+      4. TaskArtifactUpdateEvent lastChunk=true
       5. TaskStatusUpdateEvent: state=completed (or failed), final=true
+
+    Stays on the HTTP connection (not Celery) so the client can consume
+    tokens live. Long non-stream jobs use message/send + the async queue.
     """
     (rpc_id, skill_id, context_id, caller_id, input_text,
      tx_hash, axm_paid, _) = _extract_send_params(body)
-
-    def _status_event(task: A2ATask, final: bool = False,
-                      msg_text: Optional[str] = None) -> str:
-        status: Dict[str, Any] = {
-            "state":     task.state.value,
-            "timestamp": task.updated_at,
-        }
-        if msg_text:
-            status["message"] = {
-                "messageId": str(uuid.uuid4()),
-                "role":      "agent",
-                "parts":     [{"text": msg_text}],
-                "contextId": task.context_id,
-                "taskId":    task.id,
-            }
-        event: Dict[str, Any] = {
-            "jsonrpc": "2.0",
-            "id":      rpc_id,
-            "result":  {
-                "taskStatus": {
-                    "taskId":    task.id,
-                    "contextId": task.context_id,
-                    "status":    status,
-                    "final":     final,
-                },
-            },
-        }
-        return _sse_event(event)
 
     if not input_text:
         yield _sse_event(_err("No input text in message.parts", -32602, rpc_id))
@@ -2129,54 +2217,54 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
     )
     logger.info("A2A stream task %s  skill=%s caller=%s", task.id, skill_id, caller_id)
 
-    # Event 1: submitted
-    yield _status_event(task)
+    yield _sse_status(task, rpc_id)
 
-    # Event 2: working
     _update_task(task, state=TaskState.WORKING)
-    yield _status_event(task)
+    yield _sse_status(task, rpc_id)
 
-    # Dispatch
-    output, error = _dispatch_to_swarm(task)
+    artifact_id = str(uuid.uuid4())
+    chunks: List[str] = []
+    error: Optional[str] = None
+    try:
+        for token in _dispatch_to_swarm_stream(task):
+            if not token:
+                continue
+            chunks.append(token)
+            yield _sse_artifact_chunk(
+                task, rpc_id, artifact_id, token, append=True, last_chunk=False,
+            )
+    except Exception as exc:
+        logger.exception("A2A stream dispatch failed for %s", task.id)
+        error = str(exc)
+
+    output = "".join(chunks) if chunks else None
+    yield _sse_artifact_chunk(
+        task, rpc_id, artifact_id, "", append=True, last_chunk=True,
+    )
 
     if error:
         _update_task(task, state=TaskState.FAILED, error=error)
-        yield _status_event(task, final=True, msg_text=f"Error: {error}")
+        yield _sse_status(task, rpc_id, final=True, msg_text=f"Error: {error}")
         return
 
-    # Event 3: artifact
     if output:
         artifact = A2AArtifact(
-            artifact_id=str(uuid.uuid4()),
-            parts=[{"text": output}],
+            artifact_id=artifact_id,
+            parts=[{"kind": "text", "text": output}],
             name="result",
         )
         task.artifacts.append(artifact)
         agent_msg = A2AMessage(
             message_id=str(uuid.uuid4()),
             role="agent",
-            parts=[{"text": output}],
+            parts=[{"kind": "text", "text": output}],
             context_id=task.context_id,
             task_id=task.id,
         )
         task.history.append(agent_msg)
-        artifact_event: Dict[str, Any] = {
-            "jsonrpc": "2.0",
-            "id":      rpc_id,
-            "result":  {
-                "taskArtifact": {
-                    "taskId":    task.id,
-                    "contextId": task.context_id,
-                    "artifact":  artifact.to_dict(),
-                    "final":     False,
-                },
-            },
-        }
-        yield _sse_event(artifact_event)
 
-    # Event 4: completed
     _update_task(task, state=TaskState.COMPLETED, output=output)
-    yield _status_event(task, final=True)
+    yield _sse_status(task, rpc_id, final=True)
 
 
 def _handle_get(task_id: str) -> Dict[str, Any]:
@@ -2371,8 +2459,8 @@ def _fire_toa_feedback(task: "A2ATask", success: bool) -> None:
                 "success":    success,
                 "ts":         task.updated_at,
             })
-        except Exception as e xc:
-            logger.debug("TOA feedback skipped (router unavailable): %s", e xc)
+        except Exception as exc:
+            logger.debug("TOA feedback skipped (router unavailable): %s", exc)
 
     threading.Thread(target=_send, daemon=True, name="toa-feedback").start()
 
@@ -2449,9 +2537,42 @@ def _dispatch_to_swarm(task: A2ATask):
         )
         return stub, None
 
-    except Exception as e xc:
+    except Exception as exc:
         logger.exception("Swarm dispatch error for task %s", task.id)
-        return None, str(e xc)
+        return None, str(exc)
+
+
+def _dispatch_to_swarm_stream(task: A2ATask) -> Generator[str, None, None]:
+    """
+    Yield tokens as they arrive.
+
+    Prefer Anthropic `messages.stream()` when ANTHROPIC_API_KEY is set so
+    A2A clients see real token-by-token SSE. Otherwise run the existing
+    (non-streaming) swarm dispatch and chunk the completed string so the
+    wire protocol still emits append/lastChunk events instead of one blob.
+    """
+    from sincor2.llm_stream import chunk_text, has_anthropic, skill_system_prompt, stream_claude
+
+    if has_anthropic():
+        try:
+            yielded = False
+            for token in stream_claude(
+                task.input_text,
+                system=skill_system_prompt(task.skill_id),
+                max_tokens=2048,
+            ):
+                yielded = True
+                yield token
+            if yielded:
+                return
+        except Exception as exc:
+            logger.warning("LLM stream failed for task %s (%s); falling back to dispatch", task.id, exc)
+
+    output, error = _dispatch_to_swarm(task)
+    if error:
+        raise RuntimeError(error)
+    delay = 0.0 if os.getenv("FLASK_ENV", "").lower() in ("test", "testing") else 0.015
+    yield from chunk_text(output or "", delay=delay)
 
 
 # ---------------------------------------------------------------------------

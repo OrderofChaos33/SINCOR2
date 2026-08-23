@@ -16,7 +16,7 @@ import json
 import os
 import asyncio
 import hashlib
-from typing import Dict, List, Optional, Any, Union, Tuple
+from typing import Dict, List, Optional, Any, Union, Tuple, Generator
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 import uuid
@@ -98,6 +98,30 @@ class ClaudeClient:
             error_msg = f"Claude API error: {str(e)}"
             print(error_msg)
             raise Exception(error_msg)
+
+    def stream_sync(
+        self,
+        prompt: str,
+        max_tokens: int = 4000,
+        system: str = None,
+        model: Optional[str] = None,
+    ) -> Generator[str, None, None]:
+        """Yield text deltas from Anthropic `messages.stream()` / `text_stream`."""
+        if not self.client:
+            raise ValueError("Claude API not configured - set ANTHROPIC_API_KEY environment variable")
+
+        if not system:
+            system = "You are a helpful AI assistant for business automation and agent coordination."
+
+        with self.client.messages.stream(
+            model=model or self.model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            for text in stream.text_stream:
+                if text:
+                    yield text
 
 
 @dataclass

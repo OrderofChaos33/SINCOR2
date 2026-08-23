@@ -143,6 +143,12 @@ try:
     _a2a_router = A2ARouter()
     app.register_blueprint(_a2a_router.blueprint)
     print("✓ A2A routes initialized")
+    try:
+        from sincor2.task_queue import register_flask_routes
+        register_flask_routes(app)
+        print("✓ Task queue poll routes initialized")
+    except Exception as _q_err:
+        print(f"WARNING: Task queue routes not available: {_q_err}")
 except Exception as _a2a_err:
     print(f"WARNING: A2A routes not available: {_a2a_err}")
 
@@ -1395,6 +1401,8 @@ def create_app():
         from sincor2.a2a_integration import A2ARouter
         router = A2ARouter()
         app.register_blueprint(router.blueprint)
+        from sincor2.task_queue import register_flask_routes
+        register_flask_routes(app)
     except Exception as e:
         print(f"A2A integration not available: {e}")
     return app
