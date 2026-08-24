@@ -1377,6 +1377,11 @@ def create_app():
     except Exception as e:
         print(f"Cortex blueprint not available: {e}")
     try:
+        from sincor2.blueprints.registry import registry_bp
+        app.register_blueprint(registry_bp)
+    except Exception as e:
+        print(f"Registry blueprint not available: {e}")
+    try:
         from sincor2.blueprints.payments import payments_bp
         app.register_blueprint(payments_bp)
     except Exception as e:

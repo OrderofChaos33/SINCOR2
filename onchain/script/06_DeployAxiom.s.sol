@@ -19,7 +19,8 @@ import {Axiom} from "../src/Axiom.sol";
  * Transfer to the treasury wallet immediately after deployment.
  *
  * Already deployed on Base mainnet:
- *   0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822
+ *   0x4c3fb66f14fbaa2088c9ae91017ba770da53715a
+ *   (previous 0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822 is stale / dead)
  */
 contract DeployAxiom is Script {
     function run() external returns (address) {

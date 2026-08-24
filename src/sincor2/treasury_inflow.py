@@ -27,25 +27,25 @@ from typing import Any, Dict, List, Optional
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
+from sincor2.onchain.constants import (
+    AXIOM_TOKEN,
+    BASE_CHAIN_ID,
+    SINC_TOKEN,
+    TREASURY,
+    USDC_TOKEN,
+    resolve_address,
+)
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Canonical addresses (must match CANONICAL_ADDRESSES.md)
+# Canonical addresses (must match CANONICAL_ADDRESSES.md / onchain.constants)
 # ---------------------------------------------------------------------------
-TREASURY_ADDRESS = os.getenv(
-    "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
-).lower()
-SINC_CONTRACT = os.getenv(
-    "SINC_CONTRACT_ADDRESS", "0xe1D836087F6573b665d25CE088793E916D7892f8"
-).lower()
-# CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
-AXM_CONTRACT = os.getenv(
-    "AXIOM_CONTRACT_ADDRESS", "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
-).lower()
-USDC_CONTRACT = os.getenv(
-    "USDC_CONTRACT_ADDRESS", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-).lower()
-BASE_CHAIN_ID = 8453
+TREASURY_ADDRESS = resolve_address("TREASURY_ADDRESS", TREASURY).lower()
+SINC_CONTRACT = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN).lower()
+AXM_CONTRACT = resolve_address("AXIOM_CONTRACT_ADDRESS", AXIOM_TOKEN).lower()
+USDC_CONTRACT = resolve_address("USDC_CONTRACT_ADDRESS", USDC_TOKEN).lower()
+BASE_CHAIN_ID = BASE_CHAIN_ID
 DEFAULT_RPC = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
 
 # ERC-20 balanceOf(address) selector

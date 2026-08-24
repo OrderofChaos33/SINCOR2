@@ -24,6 +24,7 @@ pydantic==2.9.2
 email-validator==2.2.0
 python-dateutil==2.9.0.post0
 pytz==2024.2
+jsonschema>=4.23.0
 
 # Database
 SQLAlchemy==2.0.36

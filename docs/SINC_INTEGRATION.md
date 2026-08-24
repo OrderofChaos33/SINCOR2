@@ -1,6 +1,9 @@
 # SINC Token Integration
 
-This document describes how SINC (`0x9C8cd8d3961F445D653713dE65C6578bE11668e7` on Base)
+**Live pointers:** `src/sincor2/onchain/constants.py` and `CANONICAL_ADDRESSES.md`.
+This page used to pin retired SINC `0x9C8cd8…`. Do not copy those literals into runtime.
+
+This document describes how SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8` on Base, 8 decimals)
 is integrated as the exclusive access and utility token across the SINCOR2 platform.
 
 ---
@@ -9,12 +12,12 @@ is integrated as the exclusive access and utility token across the SINCOR2 platf
 
 | Contract | Address | Network |
 |---|---|---|
-| SINC v3 | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Base |
+| SINC (live) | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Base |
 | SinCurve (bonding curve) | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Base |
 | SINCPlatformAccess | Set via `SINC_PLATFORM_ACCESS_ADDRESS` env var | Base |
 | Treasury | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Base |
 
-SINC uses `decimals = 0` — all amounts are whole integers (no wei conversion needed).
+SINC uses `decimals = 8`. Amounts in wei are `tokens * 10**8`.
 
 ---
 

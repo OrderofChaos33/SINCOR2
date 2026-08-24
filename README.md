@@ -438,10 +438,12 @@ Manages the full partner lifecycle across eight partnership types (technology in
 
 | Token | Contract | Role |
 |---|---|---|
-| **SINC** | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Governance, utility, and marketplace staking |
-| **AXIOM (AXM)** | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | A2A task settlement and payment rail |
- | All proceeds, liquidity, and sales route here first |
+| **AXIOM (AXM)** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | Primary A2A settlement and billing |
+| **SINC** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Residual / legacy holders (8 decimals) |
+| **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Fees and A2A routing |
 | **Base chain** | `8453` | Production network |
+
+Live pointers are compiled in `src/sincor2/onchain/constants.py` (human index: `CANONICAL_ADDRESSES.md`). Stale `0x9C8cd8…` / `0xfF7aF6…` are rejected at resolve and at boot.
 
 ### Smart Contracts (`onchain/src/`)
 

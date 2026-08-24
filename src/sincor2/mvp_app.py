@@ -2880,7 +2880,9 @@ def api_acceptance_status():
         return jsonify({'error': str(e)}), 500
 
 
-SINC_TOKEN = '0x9C8cd8d3961F445D653713dE65C6578bE11668e7'
+from sincor2.onchain.constants import SINC_TOKEN as _CANONICAL_SINC
+
+SINC_TOKEN = _CANONICAL_SINC
 SINC_LOGO_URL = 'https://raw.githubusercontent.com/OrderofChaos33/SINCOR2/main/static/tokenlists/assets/logo-256.png'
 SINC_LOGO_URL_MIRROR = 'https://getsincor.com/static/tokenlists/assets/logo-256.png'
 

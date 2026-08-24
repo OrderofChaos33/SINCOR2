@@ -30,8 +30,10 @@ pragma solidity ^0.8.20;
  * Deployment
  * ----------
  * Chain  : Base (chainId 8453)
- * Token  : 0x9C8cd8d3961F445D653713dE65C6578bE11668e7  (SINC v3, decimals=0)
+ * Token  : 0xe1D836087F6573b665d25CE088793E916D7892f8  (live SINC, 8 decimals)
+ *          Runtime pointer: src/sincor2/onchain/constants.py  (SINC_TOKEN)
  * Treasury: 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac
+ *          Retired SINC 0x9C8cd8… must not be used.
  */
 
 interface IERC20 {

@@ -37,24 +37,20 @@ from typing import Any, Callable, Dict, List, Optional
 
 from flask import current_app, jsonify, request
 
+from sincor2.onchain.constants import SINC_TOKEN, TREASURY, resolve_address
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-SINC_CONTRACT = os.getenv(
-    "SINC_CONTRACT_ADDRESS",
-    "0xe1D836087F6573b665d25CE088793E916D7892f8",
-)
+SINC_CONTRACT = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
 SINC_PLATFORM_ACCESS = os.getenv(
     "SINC_PLATFORM_ACCESS_ADDRESS",
     "",  # Empty until deployed; access checks degrade gracefully
 )
-TREASURY_ADDRESS = os.getenv(
-    "TREASURY_ADDRESS",
-    "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
-)
+TREASURY_ADDRESS = resolve_address("TREASURY_ADDRESS", TREASURY)
 DEFAULT_BASE_RPC = "https://mainnet.base.org"
 
 # ABI selectors (keccak256 first 4 bytes)

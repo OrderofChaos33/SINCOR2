@@ -19,8 +19,9 @@ import {ISincPriceOracle, ISincSwapRouter} from "../src/interfaces/ISincLoop.sol
 ///
 ///   Env vars:
 ///     PRIVATE_KEY        (required) deployer key — becomes default guardian/owner
-///     SINC_TOKEN         (required) SINC ERC-20 address (decimals auto-detected; canonical
-///                        SINC v3 on Base = 0x9C8cd8d3961F445D653713dE65C6578bE11668e7, 8 dp)
+///     SINC_TOKEN         (required) SINC ERC-20 address (decimals auto-detected; live
+///                        SINC on Base = 0xe1D836087F6573b665d25CE088793E916D7892f8, 8 dp.
+///                        Pointer: src/sincor2/onchain/constants.py. Retired 0x9C8cd8… is stale.)
 ///     USDC_TOKEN         (required) USDC ERC-20 address (6 dp)
 ///                        Base:    0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
 ///                        Polygon: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
