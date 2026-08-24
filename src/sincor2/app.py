@@ -1367,6 +1367,11 @@ def create_app():
     except Exception as e:
         print(f"Marketplace blueprint not available: {e}")
     try:
+        from sincor2.blueprints.contract_net import contract_net_bp
+        app.register_blueprint(contract_net_bp)
+    except Exception as e:
+        print(f"Contract-Net blueprint not available: {e}")
+    try:
         from sincor2.blueprints.payments import payments_bp
         app.register_blueprint(payments_bp)
     except Exception as e:

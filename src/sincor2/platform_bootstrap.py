@@ -74,6 +74,12 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
         "skill_vertical_map": dict(SKILL_VERTICAL_MAP),
         "registered_cards": registered,
     }
+    try:
+        from marketplace.contract_net import ContractNetEngine
+
+        platform_state["contract_net"] = ContractNetEngine()
+    except Exception as err:
+        logger.warning("Contract-Net engine not attached: %s", err)
     app.extensions["sincor_platform"] = platform_state
 
     _extend_a2a_skills_from_registry(registry)
