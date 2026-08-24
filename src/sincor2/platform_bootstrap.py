@@ -126,3 +126,9 @@ def _extend_a2a_skills_from_registry(registry: AgentCardRegistry) -> None:
                 )
             )
             existing_ids.add(skill_id)
+    try:
+        from sincor2.a2a_integration import refresh_skill_schemas
+
+        refresh_skill_schemas()
+    except Exception as err:
+        logger.warning("A2A schema cache refresh skipped: %s", err)

@@ -58,18 +58,29 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from sincor2.onchain.constants import (
+    AXIOM_TOKEN as _CANONICAL_AXIOM,
+    BASE_CHAIN_ID as _CANONICAL_CHAIN_ID,
+    DEAD_ADDRESS as _CANONICAL_DEAD,
+    SINC_TOKEN as _CANONICAL_SINC,
+    TREASURY as _CANONICAL_TREASURY,
+    resolve_address,
+)
+from sincor2.schema_gate import compile_skill_schemas, validate_skill_input
+
 logger = logging.getLogger("sincor.a2a")
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-# 2026-08-19: SINC updated to new 8-decimal live contract
-AXIOM_CONTRACT   = os.getenv("AXIOM_CONTRACT_ADDRESS", "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822")
-SINC_CONTRACT    = os.getenv("SINC_CONTRACT_ADDRESS",  "0xe1D836087F6573b665d25CE088793E916D7892f8")
-TREASURY_WALLET  = os.getenv("TREASURY_ADDRESS",       "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac")
-DEAD_ADDRESS     = "0x000000000000000000000000000000000000dEaD"
-CHAIN_ID         = int(os.getenv("BASE_CHAIN_ID", "8453"))  # Base mainnet
+# 2026-08-19: live pointers imported from sincor2.onchain.constants
+# Stale env overrides (retired SINC / dead AXM) are ignored.
+AXIOM_CONTRACT   = resolve_address("AXIOM_CONTRACT_ADDRESS", _CANONICAL_AXIOM)
+SINC_CONTRACT    = resolve_address("SINC_CONTRACT_ADDRESS",  _CANONICAL_SINC)
+TREASURY_WALLET  = resolve_address("TREASURY_ADDRESS",       _CANONICAL_TREASURY)
+DEAD_ADDRESS     = _CANONICAL_DEAD
+CHAIN_ID         = int(os.getenv("BASE_CHAIN_ID", str(_CANONICAL_CHAIN_ID)))  # Base mainnet
 
 # Primary token for A2A task payments. Default is SINC; set A2A_PRIMARY_TOKEN=AXIOM
 # for legacy AXIOM-based settlements.
@@ -998,6 +1009,16 @@ SINCOR_SKILLS: List[AgentSkill] = [
 ]
 
 
+# Compile input schemas once. Empty schemas stay freeform.
+_SCHEMA_CACHE = compile_skill_schemas(SINCOR_SKILLS)
+
+
+def refresh_skill_schemas() -> None:
+    """Recompile after vertical skills are appended to SINCOR_SKILLS."""
+    global _SCHEMA_CACHE
+    _SCHEMA_CACHE = compile_skill_schemas(SINCOR_SKILLS)
+
+
 # ---------------------------------------------------------------------------
 # Agent Card factory
 # ---------------------------------------------------------------------------
@@ -1776,11 +1797,14 @@ def _rpc_ok(result: Any, rpc_id: Any = None) -> Dict[str, Any]:
     return {"jsonrpc": "2.0", "id": rpc_id, "result": result}
 
 
-def _err(message: str, code: int = -32603, rpc_id: Any = None) -> Dict[str, Any]:
+def _err(message: str, code: int = -32603, rpc_id: Any = None, data: Any = None) -> Dict[str, Any]:
+    error: Dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        error["data"] = data
     return {
         "jsonrpc": "2.0",
         "id":      rpc_id,
-        "error":   {"code": code, "message": message},
+        "error":   error,
     }
 
 
@@ -1889,8 +1913,8 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     (rpc_id, skill_id, context_id, caller_id, input_text,
      tx_hash, axm_paid, history_length) = _extract_send_params(body)
 
-    if not input_text:
-        return _err("No input text found in message.parts", code=-32602, rpc_id=rpc_id)
+    params = body.get("params") or body
+    msg_obj = params.get("message") or {}
 
     # --- Validate skill --------------------------------------------------
     skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
@@ -1900,6 +1924,32 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
             f"Unknown skill '{skill_id}'. Valid skills: {valid}",
             code=-32602, rpc_id=rpc_id,
         )
+
+    gate = validate_skill_input(
+        skill_id=skill.id,
+        schema=skill.input_schema or None,
+        params=params if isinstance(params, dict) else {},
+        msg_obj=msg_obj,
+        input_text=input_text,
+    )
+    if skill.input_schema and not gate.ok:
+        return _err(
+            f"Invalid params: {len(gate.errors)} schema error(s) for skill '{skill_id}'",
+            code=-32602,
+            rpc_id=rpc_id,
+            data={
+                "skillId": skill_id,
+                "source": gate.source,
+                "errors": [err.to_dict() for err in gate.errors],
+            },
+        )
+    if not input_text:
+        if gate.payload is not None:
+            input_text = (
+                gate.payload if isinstance(gate.payload, str) else json.dumps(gate.payload)
+            )
+        else:
+            return _err("No input text found in message.parts", code=-32602, rpc_id=rpc_id)
 
     # --- Reputation score → priority flag --------------------------------
     caller_reputation = _reputation_ledger.score(caller_id)
@@ -2181,10 +2231,6 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
     (rpc_id, skill_id, context_id, caller_id, input_text,
      tx_hash, axm_paid, _) = _extract_send_params(body)
 
-    if not input_text:
-        yield _sse_event(_err("No input text in message.parts", -32602, rpc_id))
-        return
-
     skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
     if not skill:
         valid = [s.id for s in SINCOR_SKILLS]
@@ -2192,6 +2238,36 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
             f"Unknown skill '{skill_id}'. Valid: {valid}", -32602, rpc_id
         ))
         return
+
+    params = body.get("params") or body
+    msg_obj = params.get("message") or {}
+    gate = validate_skill_input(
+        skill_id=skill.id,
+        schema=skill.input_schema or None,
+        params=params if isinstance(params, dict) else {},
+        msg_obj=msg_obj,
+        input_text=input_text,
+    )
+    if skill.input_schema and not gate.ok:
+        yield _sse_event(_err(
+            f"Invalid params: {len(gate.errors)} schema error(s) for skill '{skill_id}'",
+            -32602,
+            rpc_id,
+            data={
+                "skillId": skill_id,
+                "source": gate.source,
+                "errors": [err.to_dict() for err in gate.errors],
+            },
+        ))
+        return
+    if not input_text:
+        if gate.payload is not None:
+            input_text = (
+                gate.payload if isinstance(gate.payload, str) else json.dumps(gate.payload)
+            )
+        else:
+            yield _sse_event(_err("No input text in message.parts", -32602, rpc_id))
+            return
 
     env = os.getenv("FLASK_ENV", "production").lower()
     skip_payment = env in _DEV_ENVS

@@ -7,8 +7,35 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.error
 import urllib.request
+from pathlib import Path
+
+_SRC = Path(__file__).resolve().parents[1] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+try:
+    from sincor2.onchain.constants import (
+        BONDING_CURVE,
+        LIMIT_ORDER_HOOK,
+        POOL_MANAGER,
+        SINC_TOKEN,
+        TREASURY,
+        resolve_address,
+    )
+
+    SINC = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
+    CURVE = resolve_address("SINC_BONDING_CURVE", BONDING_CURVE)
+    POOL_MANAGER = POOL_MANAGER
+    SAFE = resolve_address("TREASURY_ADDRESS", TREASURY)
+    HOOK = resolve_address("SINC_LIMIT_ORDER_HOOK", LIMIT_ORDER_HOOK)
+except Exception:  # pragma: no cover
+    SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
+    CURVE = "0x75dE341a2BC81806198364F125d4Cde36527619C"
+    POOL_MANAGER = "0x498581fF718922c3f8e6A244956aF099B2652b2b"
+    SAFE = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+    HOOK = "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0"
 
 RPC_CANDIDATES = [
     os.environ.get("BASE_RPC_URL", ""),
@@ -17,13 +44,8 @@ RPC_CANDIDATES = [
     "https://base-rpc.publicnode.com",
 ]
 RPC_CANDIDATES = [u for u in RPC_CANDIDATES if u]
-SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
-CURVE = "0x75dE341a2BC81806198364F125d4Cde36527619C"
 # Non-negotiable public floor — all official buys quote at or above this USD/SINC.
 SINC_FLOOR_USD = float(os.environ.get("SINC_FLOOR_USD", "1.50"))
-POOL_MANAGER = "0x498581fF718922c3f8e6A244956aF099B2652b2b"
-SAFE = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
-HOOK = "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0"
 ROUTER = "0x11b86E85cC5170F4165c89ccb11332133B29E283"
 
 

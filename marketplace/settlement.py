@@ -21,12 +21,20 @@ from decimal import Decimal, ROUND_DOWN, InvalidOperation
 from typing import Dict, List, Optional
 from uuid import uuid4
 
+from sincor2.onchain.constants import (
+    AXIOM_TOKEN as _CANONICAL_AXIOM,
+    BASE_CHAIN_ID as _CANONICAL_CHAIN_ID,
+    SINC_TOKEN as _CANONICAL_SINC,
+    TREASURY as _CANONICAL_TREASURY,
+    resolve_address,
+)
+
 logger = logging.getLogger(__name__)
 
-TREASURY_ADDRESS = os.getenv('TREASURY_ADDRESS', '0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac')
-AXIOM_TOKEN = os.getenv('AXIOM_CONTRACT_ADDRESS', '0x4c3fb66f14fbaa2088c9ae91017ba770da53715a')
-SINC_TOKEN = os.getenv('SINC_CONTRACT_ADDRESS', '0xe1D836087F6573b665d25CE088793E916D7892f8')
-BASE_CHAIN_ID = int(os.getenv('BASE_CHAIN_ID', '8453'))
+TREASURY_ADDRESS = resolve_address("TREASURY_ADDRESS", _CANONICAL_TREASURY)
+AXIOM_TOKEN = resolve_address("AXIOM_CONTRACT_ADDRESS", _CANONICAL_AXIOM)
+SINC_TOKEN = resolve_address("SINC_CONTRACT_ADDRESS", _CANONICAL_SINC)
+BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", str(_CANONICAL_CHAIN_ID)))
 
 # Primary token selection — DEFAULT IS NOW AXIOM per 2026-08-16 CEO directive.
 # Override with A2A_PRIMARY_TOKEN=SINC only for explicit legacy residual paths.

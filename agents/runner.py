@@ -36,13 +36,34 @@ RESULTS = ROOT / "results"
 LEDGER = ROOT / "ledger"
 STATE = ROOT / "state"
 
-TREASURY = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
-TOKENS = {
-    "SINC": ("0xe1D836087F6573b665d25CE088793E916D7892f8", 8),
-    # CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
-    "AXM": ("0x4c3fb66f14fbaa2088c9ae91017ba770da53715a", 18),
-    "USDC": ("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6),
-}
+_SRC = ROOT.parent / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+try:
+    from sincor2.onchain.constants import (
+        AXIOM_TOKEN as _AXM,
+        AXM_DECIMALS,
+        SINC_DECIMALS,
+        SINC_TOKEN as _SINC,
+        TREASURY as _TREASURY,
+        USDC_DECIMALS,
+        USDC_TOKEN as _USDC,
+        resolve_address,
+    )
+
+    TREASURY = resolve_address("TREASURY_ADDRESS", _TREASURY)
+    TOKENS = {
+        "SINC": (resolve_address("SINC_CONTRACT_ADDRESS", _SINC), SINC_DECIMALS),
+        "AXM": (resolve_address("AXIOM_CONTRACT_ADDRESS", _AXM), AXM_DECIMALS),
+        "USDC": (resolve_address("USDC_CONTRACT_ADDRESS", _USDC), USDC_DECIMALS),
+    }
+except Exception:  # pragma: no cover — stdlib cron fallback
+    TREASURY = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+    TOKENS = {
+        "SINC": ("0xe1D836087F6573b665d25CE088793E916D7892f8", 8),
+        "AXM": ("0x4c3fb66f14fbaa2088c9ae91017ba770da53715a", 18),
+        "USDC": ("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6),
+    }
 BALANCE_OF = "0x70a08231"  # balanceOf(address)
 
 for d in (OUTBOX, RESULTS, LEDGER, STATE):

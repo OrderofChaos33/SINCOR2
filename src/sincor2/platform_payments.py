@@ -20,15 +20,24 @@ from typing import Any
 _SPOT_CACHE_TTL_SEC = int(os.environ.get("PLATFORM_SPOT_CACHE_TTL_SEC", "60"))
 _spot_cache: dict[str, tuple[float, float | None]] = {}
 
-# Canonical Base mainnet (see CANONICAL_ADDRESSES.md)
-SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
-# CEO 2026-08-18 CORRECTION: live AXM is 0x4c3fb66f... — previous 0xfF7aF6... is dead
-AXM = "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
-TREASURY = os.environ.get("PLATFORM_TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac")
-CHAIN_ID = 8453
+from sincor2.onchain.constants import (
+    AXIOM_TOKEN,
+    AXM_DECIMALS as _AXM_DECIMALS,
+    BASE_CHAIN_ID,
+    SINC_DECIMALS as _SINC_DECIMALS,
+    SINC_TOKEN,
+    TREASURY,
+    resolve_address,
+)
 
-SINC_DECIMALS = 8
-AXM_DECIMALS = 18
+# Canonical Base mainnet (see sincor2.onchain.constants)
+SINC = SINC_TOKEN
+AXM = AXIOM_TOKEN
+TREASURY = resolve_address("PLATFORM_TREASURY_ADDRESS", TREASURY)
+CHAIN_ID = BASE_CHAIN_ID
+
+SINC_DECIMALS = _SINC_DECIMALS
+AXM_DECIMALS = _AXM_DECIMALS
 
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 AMOUNT_TOLERANCE_BPS = 150  # 1.5% underpayment slack for spot drift

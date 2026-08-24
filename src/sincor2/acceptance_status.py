@@ -14,7 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
-SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
+from sincor2.onchain.constants import SINC_TOKEN  # noqa: E402
+
+SINC = SINC_TOKEN
 TOKEN_LIST = "https://getsincor.com/tokenlists/sincor.tokenlist.json"
 
 

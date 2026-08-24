@@ -24,16 +24,15 @@ import threading
 import urllib.request as _urllib_request
 from typing import Any, Dict, List
 
+from sincor2.onchain.constants import SINC_DECIMALS as _CANONICAL_SINC_DECIMALS
+from sincor2.onchain.constants import SINC_TOKEN, TREASURY, resolve_address
+
 logger = logging.getLogger("sincor.sinc_verifier")
 
-SINC_CONTRACT = os.getenv(
-    "SINC_CONTRACT_ADDRESS", "0xe1D836087F6573b665d25CE088793E916D7892f8"
-)
-TREASURY_ADDRESS = os.getenv(
-    "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
-)
+SINC_CONTRACT = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
+TREASURY_ADDRESS = resolve_address("TREASURY_ADDRESS", TREASURY)
 BASE_RPC_TIMEOUT = int(os.getenv("BASE_RPC_TIMEOUT", "10"))
-SINC_DECIMALS = 8
+SINC_DECIMALS = _CANONICAL_SINC_DECIMALS
 
 _DEV_ENVS = frozenset({"development", "dev", "test", "testing", "local"})
 

@@ -16,6 +16,18 @@ _MIN_SECRET_LENGTH = 16
 logger = logging.getLogger(__name__)
 
 
+def _canonical_sinc() -> str:
+    try:
+        from sincor2.onchain.constants import SINC_TOKEN, resolve_address
+
+        return resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
+    except Exception:
+        return os.getenv(
+            "SINC_CONTRACT_ADDRESS",
+            "0xe1D836087F6573b665d25CE088793E916D7892f8",
+        )
+
+
 def _as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
@@ -108,10 +120,7 @@ class Settings:
             paypal_client_secret=os.getenv("PAYPAL_REST_API_SECRET"),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
             base_rpc_url=os.getenv("BASE_RPC_URL"),
-            sinc_contract_address=os.getenv(
-                "SINC_CONTRACT_ADDRESS",
-                "0xe1D836087F6573b665d25CE088793E916D7892f8",
-            ),
+            sinc_contract_address=_canonical_sinc(),
             sinc_platform_access_address=os.getenv("SINC_PLATFORM_ACCESS_ADDRESS", ""),
             platform_signer_key=os.getenv("PLATFORM_SIGNER_KEY"),
         )

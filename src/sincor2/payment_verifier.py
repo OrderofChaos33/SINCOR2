@@ -15,17 +15,13 @@ import time
 import urllib.request as _urllib_request
 from typing import Any, Dict, List, Optional
 
+from sincor2.onchain.constants import AXIOM_TOKEN, TREASURY, resolve_address
+
 logger = logging.getLogger("sincor.payment")
 
 # Defaults — overridden by a2a_integration env when imported from there
-AXIOM_CONTRACT = os.getenv(
-    "AXIOM_CONTRACT_ADDRESS",
-    "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822",
-)
-TREASURY_WALLET = os.getenv(
-    "TREASURY_ADDRESS",
-    "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
-)
+AXIOM_CONTRACT = resolve_address("AXIOM_CONTRACT_ADDRESS", AXIOM_TOKEN)
+TREASURY_WALLET = resolve_address("TREASURY_ADDRESS", TREASURY)
 BASE_RPC_TIMEOUT = int(os.getenv("BASE_RPC_TIMEOUT", "10"))
 _DEV_ENVS = {"development", "dev", "test", "testing", "local"}
 

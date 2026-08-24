@@ -1,6 +1,9 @@
 # CANONICAL ADDRESSES — SINCOR / AXIOM (Base mainnet, chain 8453)
 
-**Single source of truth. If any other file disagrees, this file wins.**
+**Runtime source of truth:** [`src/sincor2/onchain/constants.py`](src/sincor2/onchain/constants.py).
+This markdown is the human index. Settlement, A2A, billing, and startup `symbol()` / `decimals()`
+probes import the Python module. Ship both files in the same change; never copy token
+literals into other runtime modules.
 
 **2026-08-19 CEO UPDATE:** Live SINC token is now `0xe1D836087F6573b665d25CE088793E916D7892f8` (8 decimals). Previous address `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` is retired.
 

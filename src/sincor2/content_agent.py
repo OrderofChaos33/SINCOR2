@@ -60,6 +60,12 @@ CALENDAR_PATH = PROJECT_ROOT / "content" / "calendar.json"
 CONTENT_DIR.mkdir(parents=True, exist_ok=True)
 CALENDAR_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+import sys
+_SRC = PROJECT_ROOT / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+from sincor2.onchain.constants import BONDING_CURVE, SINC_TOKEN
+
 SINCOR_BRAND = {
     "name": "SINCOR",
     "url": "https://getsincor.com",
@@ -69,7 +75,7 @@ SINCOR_BRAND = {
     "tagline": "42 AI agents. Verified SINC on Base. Self-serve — no human sales.",
     "description": (
         "SINCOR is a 42-agent autonomous swarm on Base with verifiable on-chain inventory. "
-        "Canonical SINC (0x9C8cd8…68e7) sells via bonding curve and v4 hook limit orders — "
+        "Canonical SINC sells via bonding curve and v4 hook limit orders — "
         "agents draft proof-of-work content; contracts handle distribution. "
         "CRM automation and SalesOps remain part of the platform; SINC participation is "
         "wallet-native and referral-backed (3% on-chain per buy)."
@@ -84,8 +90,8 @@ SINCOR_BRAND = {
         "A2A agent card at /.well-known/agent.json for discovery",
     ],
     "pricing_note": "Platform from $297/mo; SINC buy is on-chain and self-serve.",
-    "sinc_token": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
-    "curve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
+    "sinc_token": SINC_TOKEN,
+    "curve": BONDING_CURVE,
 }
 
 # ─── SEO Keyword Bank ─────────────────────────────────────────────────────────

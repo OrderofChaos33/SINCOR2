@@ -9,7 +9,9 @@ pragma solidity ^0.8.20;
  *   Supply  : 1,000,000,000 (1 billion, fixed)
  *   Decimals: 18
  *   Chain   : Base (chainId 8453)
- *   Address : 0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822
+ *   Address : 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a
+ *             (live AXM 2026-08-18; previous 0xfF7aF6ff… is dead PumpClawToken)
+ *             Runtime pointer: src/sincor2/onchain/constants.py  (AXIOM_TOKEN)
  *
  * Design constraints (identical to SINC v3):
  *   - No owner / admin role
