@@ -14,12 +14,15 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-if "marketplace" not in sys.modules:
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+# Isolated checkouts may lack discovery.py. Do not stub marketplace when the
+# real package is present — that would break sibling tests that import it.
+if not (ROOT / "marketplace" / "discovery.py").exists() and "marketplace" not in sys.modules:
     pkg = types.ModuleType("marketplace")
     pkg.__path__ = [str(ROOT / "marketplace")]
     sys.modules["marketplace"] = pkg
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+
 
 from marketplace.contract_net.eip712 import (  # noqa: E402
     demo_signing_secret,
