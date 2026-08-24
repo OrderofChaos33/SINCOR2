@@ -136,3 +136,10 @@ out/
 *.backup
 *.old
 coverage.xml
+
+# ============================================================================
+# Foundry (root contracts/ + test/ profile)
+# ============================================================================
+cache/
+broadcast/
+indexer-health.json
