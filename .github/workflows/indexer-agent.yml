@@ -1,0 +1,43 @@
+name: Indexer Sync Agent
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping-indexers:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Indexer Sync Agent Sweep
+        env:
+          BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
+          SINC_TOKEN_ADDRESS: ${{ secrets.SINC_TOKEN_ADDRESS }}
+          AXM_TOKEN_ADDRESS: ${{ secrets.AXM_TOKEN_ADDRESS }}
+          RUN_ONCE: "true"
+        run: npm run indexer:ping
+
+      - name: Upload Health Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexer-health-report
+          path: indexer-health.json
+          retention-days: 7
+          if-no-files-found: warn
