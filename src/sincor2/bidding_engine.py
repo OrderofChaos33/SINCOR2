@@ -401,6 +401,48 @@ class BiddingEngine:
             return AuctionResult(task_id=task_id, ok=False, error="market_exception",
                                  )
 
+    def run_vickrey_auction(
+        self,
+        task: Dict[str, Any],
+        agents: List[Dict[str, Any]],
+        *,
+        seed: Optional[int] = None,
+        invite_k: int = 4,
+        epsilon: float = 0.12,
+        force_junior: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Additive Vickrey Contract-Net path.
+
+        Does **not** replace ``run_auction``. Failures return ``{"ok": False}``
+        so the first-price market loop is unaffected.
+        """
+        try:
+            from marketplace.contract_net.engine import (
+                ContractNetEngine,
+                profiles_from_dicts,
+                task_from_dict,
+            )
+            from marketplace.contract_net.types import ContractNetConfig, clamp_invite_k
+
+            k = clamp_invite_k(int(invite_k))
+            eps = min(0.15, max(0.10, float(epsilon)))
+            engine = ContractNetEngine(ContractNetConfig(invite_k=k, epsilon=eps))
+            spec = task_from_dict(task)
+            roster = profiles_from_dicts(agents)
+            award = engine.run(spec, roster, seed=seed, force_junior=force_junior)
+            payload = award.to_dict()
+            payload["ok"] = award.phase != "failed"
+            return payload
+        except Exception:
+            tb = traceback.format_exc()
+            logger.error("[BIDDING] run_vickrey_auction crashed\n%s", tb)
+            return {
+                "ok": False,
+                "error": "vickrey_exception",
+                "detail": tb[:200],
+                "task_id": str(task.get("task_id", "")),
+            }
+
 
 # ---------------------------------------------------------------------------
 # Module-level singleton (lazy, thread-safe)
