@@ -80,6 +80,16 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
         platform_state["contract_net"] = ContractNetEngine()
     except Exception as err:
         logger.warning("Contract-Net engine not attached: %s", err)
+    try:
+        from marketplace.memory_gate import MemoryGate
+        from marketplace.merit import MeritEngine
+        from marketplace.optimistic import OptimisticBatcher
+
+        platform_state["memory_gate"] = MemoryGate()
+        platform_state["optimistic"] = OptimisticBatcher()
+        platform_state["merit"] = MeritEngine()
+    except Exception as err:
+        logger.warning("Cortex engines not attached: %s", err)
     app.extensions["sincor_platform"] = platform_state
 
     _extend_a2a_skills_from_registry(registry)
