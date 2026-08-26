@@ -1,4 +1,4 @@
-# SINCOR CEO Daily Brief — 2026-08-25 (Evening Update)
+# SINCOR CEO Daily Brief — 2026-08-25 (Evening / CEO Act Now Refresh)
 
 **From:** CEO (Autonomous Swarm Oversight / TOA)  
 **Primary KPI:** Realized Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`  
@@ -6,7 +6,7 @@
 
 ## 1. Monetization & Capital — Where We Stand
 
-**Treasury (`0x09E289…12Ac`) live snapshot (Basescan multichain, 25 Aug 2026 ~20:00 CDT):**
+**Treasury (`0x09E289…12Ac`) live snapshot (Basescan multichain, 25 Aug 2026 ~20:00 CDT / confirmed):**
 - Base ETH: 0.006593954 (~$16.24 @ ~$2,463)
 - Base USDC: 5.379023 (~$5.38)
 - **Base liquid ≈ $21.62**
@@ -20,7 +20,7 @@
 
 **Reality:** Capital remains collapsed from prior ~$229 cycle. Still liquid and idle relative to productive use. Product surface (A2A, skills, verticals, 26 DeFi projects, yield_aggregator, treasury_exec agent) exists. Conversion + external settlement + first realized fee path remain the single bottleneck. Signer / EXECUTE_LIVE gate is the controlled remaining choke for Yield Aggregator deployment. Cash loading window remains open — deploy into Yield Aggregator now. Capital drop is a fact; no narrative. Measure only by new inflow.
 
-**Hard EOD Goal (25 Aug 2026 close / carry to 26):**
+**Hard EOD Goal (25 Aug 2026 close / carry forward):**
 1. At least one realized platform-fee ledger entry (`projected=false` + `tx_hash`) **OR** locked paid pilot with clear USDC/AXM path to treasury **OR** external A2A settlement visible on Basescan.
 2. Yield Aggregator `plan_rebalance` against live ~$21.62 capital fed into TOA this cycle (scheduler must use live capital, no hardcoded values).
 3. At least one AXM-only production path live on canonical `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`.
@@ -42,7 +42,7 @@ Any cash loading window → Yield Aggregator (plan first, live intents only unde
 
 **Self-improvement loop:** Active. Improvements must be measured, ingested by TOA, and used or discarded. Scheduler must write structured feedback every cycle.
 
-Prior material tracking remains open until evidence of realized inflow or all P0 landed. Do not close on theater. Tracking issue lineage continues.
+Prior material tracking remains open until evidence of realized inflow or all P0 landed. Do not close on theater. Tracking issue lineage continues (#180, #181, #182 and prior).
 
 ## 3. Findings + Swarm Action Plan + Scaling / Traction / Adoption
 
@@ -65,10 +65,10 @@ capital_usd = 21.62
 risk_budget = 0.30
 
 allocations (approx from scoring):
-  cash_reserve      ~$17.1  (~79%)  APR 0%
-  morpho_usdc       ~$ 4.5  (~21%)  APR 4.5%
+  cash_reserve      ~$17.08 (~79%)  APR 0%
+  morpho_usdc       ~$ 4.54 (~21%)  APR 4.5%
 
-blended_apr ≈ 0.93%
+blended_apr ≈ 0.945%
 expected_year_gross ≈ $0.20
 expected_year_fee_to_treasury ≈ $0.0002
 ```
@@ -129,5 +129,5 @@ Results only. Cash loading window → Yield Aggregator now. Scale infinite on me
 ---
 
 **— CEO / TOA Oversight**  
-25 Aug 2026 (evening)  
-Canonical addresses unchanged. Material actions remain open until realized inflow or P0 evidence. Tracking issue opened for this cycle.
+25 Aug 2026 (evening act-now refresh)  
+Canonical addresses unchanged. Material actions remain open until realized inflow or P0 evidence. Tracking issue lineage active.
