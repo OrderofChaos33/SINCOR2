@@ -1,26 +1,27 @@
-# SINCOR CEO Daily Brief — 2026-08-26
+# SINCOR CEO Daily Brief — 2026-08-26 (Live Capital Refresh)
 
 **From:** CEO (Autonomous Swarm Oversight / TOA)  
 **Primary KPI:** Realized Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`  
-**Mode:** Results only. No theater. Cash loading window remains open and must be used immediately for productive DeFi (Yield Aggregator first). 26 DeFi swarms building/testing 24/7. Self-improving loops must consume their own measured improvements. Overlapping accountability into TOA + treasury ledger.
+**Mode:** Results only. No theater. Cash loading window is OPEN and must be used immediately for productive DeFi (Yield Aggregator first). 26 DeFi swarms building/testing 24/7. Self-improving loops must consume their own measured improvements. Overlapping accountability into TOA + treasury ledger.
 
 ## 1. Monetization & Capital — Where We Stand
 
-**Treasury (`0x09E289…12Ac`) live snapshot (Basescan, 26 Aug 2026 ~01:12 UTC):**
-- Base ETH: 0.006593954 (~$16.24 @ ~$2,463)
+**Treasury (`0x09E289…12Ac`) live snapshot (Basescan, 26 Aug 2026 ~01:17 UTC / confirmed):**
+- Base ETH: **0.121593954 ETH** (~$298.61 @ ~$2,455.81)
 - Base USDC: 5.379023 (~$5.38)
-- **Base liquid ≈ $21.62**
-- Multichain residual (Polygon/L1) present; mark secondary
+- **Base liquid ≈ $304.00**
+- Recent inflows: +0.105 ETH (~3h ago), +0.01 ETH (~5h ago) — capital recovered from prior ~$21.62 collapse
+- Multichain residual (Polygon/L1) present; secondary
 - AXM holdings: 1,000,000,000 AXM (secondary mark $0)
 - SINC residual: present (official $1.50 floor; secondary mark $0)
 - Hundreds of dust/junk ERC-20s (mark $0)
 - **Zero** realized (`projected=false` + `tx_hash`) platform-fee ledger entries still recorded
 
-**Reality:** Capital remains collapsed from prior ~$229 cycle. Still liquid and idle relative to productive use. Product surface (A2A, skills, verticals, 26 DeFi projects, yield_aggregator, treasury_exec agent) exists. Conversion + external settlement + first realized fee path remain the single bottleneck. Signer / EXECUTE_LIVE gate is the controlled remaining choke for Yield Aggregator deployment. Cash loading window remains open — deploy into Yield Aggregator now. Capital drop is a fact; no narrative. Measure only by new inflow.
+**Reality:** Capital recovered to ~$304 via ETH inflows. Still liquid and under-deployed relative to productive use. Product surface (A2A, skills, verticals, 26 DeFi projects, yield_aggregator, treasury_exec agent) exists. Conversion + external settlement + first realized fee path remain the single bottleneck. Signer / EXECUTE_LIVE gate is the controlled remaining choke for Yield Aggregator deployment. Cash loading window is open — deploy into Yield Aggregator **now**. Measure only by new inflow.
 
 **Hard EOD Goal (26 Aug 2026 close):**
 1. At least one realized platform-fee ledger entry (`projected=false` + `tx_hash`) **OR** locked paid pilot with clear USDC/AXM path to treasury **OR** external A2A settlement visible on Basescan.
-2. Yield Aggregator `plan_rebalance` against live ~$21.62 capital fed into TOA this cycle (scheduler must use live capital, no hardcoded values).
+2. Yield Aggregator `plan_rebalance` against live ~$304 capital fed into TOA this cycle (scheduler must use live capital, no hardcoded values). SharedLiquidityVault now eligible (min=250).
 3. At least one AXM-only production path live on canonical `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`.
 
 Any cash loading window → Yield Aggregator (plan first, live intents only under explicit EXECUTE_LIVE=1 + signer + kill-switch clear). Scale only on measured inflow.
@@ -29,7 +30,7 @@ Any cash loading window → Yield Aggregator (plan first, live intents only unde
 
 | Department | Status | Directive this cycle |
 |------------|--------|----------------------|
-| 26 DeFi Swarms | Scheduler `scripts/defi_swarm_checkin_scheduler.py` 5-min loops | Feed live ~$21.62 plan + `simulate_year_pnl` into TOA every cycle; consume ranking mutations or reallocate resources |
+| 26 DeFi Swarms | Scheduler `scripts/defi_swarm_checkin_scheduler.py` 5-min loops | Feed live ~$304 plan + `simulate_year_pnl` into TOA every cycle; consume ranking mutations or reallocate resources |
 | TOA (E-toa-44) | 4-tier memory present | Collapse all revenue paths by 24h Treasury velocity; ingest yield plan; no idle cycles |
 | Treasury Exec (E-treasury-exec-47) | Shipped 19 Aug | Intent-queue default; daily cap $150 / single $110; run `--once` to queue; live only with key + EXECUTE_LIVE |
 | Builders | Open PRs #159 (A2A bootstrap), #139 (settlement fee), #166 (CI pause), #143 (profit loops), #140 (Sepolia hooks) | Register A2ARouter; settlement fee path with `record_platform_fee_inflow`; AXM-only enforcement |
@@ -40,41 +41,42 @@ Any cash loading window → Yield Aggregator (plan first, live intents only unde
 
 **Self-improvement loop:** Active. Improvements must be measured, ingested by TOA, and used or discarded. Scheduler must write structured feedback every cycle.
 
-Prior material tracking remains open until evidence of realized inflow or all P0 landed. Do not close on theater. Tracking issue lineage continues (#180 and prior).
+Prior material tracking remains open until evidence of realized inflow or all P0 landed. Do not close on theater. Tracking issue lineage continues (#180–#183 and prior).
 
 ## 3. Findings + Swarm Action Plan + Scaling / Traction / Adoption
 
 **Findings:**
-1. Liquid Base treasury ~$21.62 is real and still idle — cash loading window is open. Must deploy into Yield Aggregator immediately (DRY_RUN plan first). SharedLiquidityVault min_liquidity=250 gates that strategy out; Morpho + cash remain eligible.
+1. Liquid Base treasury ~$304 is real (ETH inflows recovered capital). Cash loading window is open. Must deploy into Yield Aggregator immediately (DRY_RUN plan first). SharedLiquidityVault min_liquidity=250 now **eligible**. Morpho + cash + shared_liq remain primary.
 2. Architecture, agent roster, yield_aggregator, treasury_inflow ledger, SharedLiquidityVault (`0xeA90a257e5Dae20a0472C4812775F28614459bb6`), treasury_exec agent are production-oriented.
 3. Zero realized platform fees. External A2A discovery → quote → settlement and B2B pilot conversion are the only paths that move the KPI.
 4. AXM is canonical sole settlement token for new flows. SINC residual only.
-5. 26 DeFi projects continue 24/7 under TOA ranking; top priority remains Yield Aggregator → Morpho USDC path (SharedLiquidityVault gated until capital ≥ $250).
+5. 26 DeFi projects continue 24/7 under TOA ranking; top priority remains Yield Aggregator → Morpho USDC + SharedLiquidityVault path.
 6. Overlapping accountability works only when every agent/task reports honest projected vs realized into TOA + ledger.
-7. Capital drop from ~$229 → ~$22 is material. No excuses. Focus exclusively on generating new inflow.
+7. Capital recovery from ~$21.62 → ~$304 is material positive. Focus exclusively on generating new inflow and locking capital into yield.
 8. Open critical PRs still unmerged: A2A discovery (#159), settlement fee recording (#139), agent profit loops (#143), Sepolia hooks (#140). CI billing locked (Actions paused).
 
-**Yield Aggregator — Plan against live $21.62 (risk_budget=0.30)**
+**Yield Aggregator — Plan against live $304 (risk_budget=0.30)**
 
-Eligible: cash_reserve, morpho_usdc (min_liquidity=0). shared_liq_vault (min=250) gated out. Aave gated at $1000. Univ4 CLMM over risk/capital.
+Eligible: cash_reserve, morpho_usdc (min=0), shared_liq_vault (min=250). Aave gated at $1000. Univ4 CLMM over risk/capital.
 
 ```
-capital_usd = 21.62
+capital_usd = 304.00
 risk_budget = 0.30
 
 allocations (approx from scoring):
-  cash_reserve      ~$17.08 (~79%)  APR 0%
-  morpho_usdc       ~$ 4.54 (~21%)  APR 4.5%
+  shared_liq_vault  ~$121.60 (~40%)  APR 8.0%   (capped)
+  morpho_usdc       ~$ 91.20 (~30%)  APR 4.5%
+  cash_reserve      ~$ 91.20 (~30%)  APR 0%
 
-blended_apr ≈ 0.945%
-expected_year_gross ≈ $0.20
-expected_year_fee_to_treasury ≈ $0.0002
+blended_apr ≈ 4.35%
+expected_year_gross ≈ $13.22
+expected_year_fee_to_treasury ≈ $0.013
 ```
 
 Live path (operator / E-treasury-exec-47):
 1. `python scripts/run_treasury_execution_agent.py --once` (safe: queues intents, no key)
 2. Live only: `EXECUTE_LIVE=1` + `ONCHAIN_EXECUTOR_PRIVATE_KEY` + kill switch clear
-3. Emit intents then sign/broadcast to Morpho USDC path
+3. Emit intents then sign/broadcast to Morpho USDC + SharedLiquidityVault paths
 4. On success: `record_platform_fee_inflow(..., projected=False, tx_hash=...)`
 
 Do **not** commit EXECUTE_LIVE. Module never holds keys.
@@ -86,13 +88,13 @@ Do **not** commit EXECUTE_LIVE. Module never holds keys.
 - Builders: Merge/land settlement fee path + A2ARouter registration + AXM-only enforcement. Parallel: external A2A caller example.
 - Auditors: Gate every merge. No exceptions.
 - DeFi Swarms: Keep Yield Aggregator dry-run plans flowing against live capital; wire toa_summary into TOA feedback. Sepolia hooks only until revenue proof.
-- Treasury Exec: Queue intents for $21.62 allocation (cash_reserve / morpho_usdc). Live broadcast only under explicit flags.
+- Treasury Exec: Queue intents for $304 allocation (shared_liq_vault / morpho_usdc / cash). Live broadcast only under explicit flags.
 
 **Scaling / Traction / Adoption:**
 - First external agent successful discovery→quote→pay→execute = traction signal.
 - List Agent Cards on external directories after A2A 200.
 - Homepage / dashboard must be payment-gated, zero fabricated metrics.
-- Cash → Yield Aggregator plan → Morpho (SharedLiquidityVault when capital recovers ≥$250).
+- Cash → Yield Aggregator plan → Morpho + SharedLiquidityVault (now unlocked).
 - Scale agent count and DeFi surface only after measured inflow compounds.
 
 ## 4. Itemized Detailed Action Plan — Handable to Code Builder
@@ -100,7 +102,7 @@ Do **not** commit EXECUTE_LIVE. Module never holds keys.
 **Priority order. Parallel where non-conflicting. Feature branches. Full unit tests. Auditor sign-off. DRY_RUN default. Fee-only to treasury. No live mainnet mutation without explicit checklist.**
 
 ### P0
-1. Re-run `YieldAggregator.plan_rebalance(~21.62, risk_budget=0.30)` (`src/sincor2/defi/yield_aggregator.py`). Wire plan + `simulate_year_pnl` into TOA ingest this cycle. Scheduler must pull live capital (no hardcoded values). Confirm shared_liq_vault correctly gated at current capital.
+1. Re-run `YieldAggregator.plan_rebalance(~304.00, risk_budget=0.30)` (`src/sincor2/defi/yield_aggregator.py`). Wire plan + `simulate_year_pnl` into TOA ingest this cycle. Scheduler must pull live capital (no hardcoded values). Confirm shared_liq_vault now eligible and allocated under risk caps.
 2. Settlement success path: `/api/a2a/quote` exposes `treasury_fee_split` / `platform_fee_*`. On success call `record_platform_fee_inflow(fee, asset="AXM"|"USDC", source="a2a_settlement", tx_hash=..., projected=False)`. Unit test: exactly one realized call on success, zero on failure/simulate. Land #139.
 3. Enforce AXM-only on canonical `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` for new quote/settlement/billing. Reject non-AXM. Evidence required.
 4. Register A2ARouter on mvp_app so `/.well-known/agent-card.json`, `/api/a2a/quote`, `/api/a2a/agents` return 200. Remove any incomplete static handlers once blueprint owns discovery. Land #159.
@@ -113,7 +115,7 @@ Do **not** commit EXECUTE_LIVE. Module never holds keys.
 9. Scheduler/TOA feedback hardener: 4-tier memory; mutations consumed next cycle; honest PnL.
 10. Close one B2B vertical pilot (Healthcare RCM / WebBuilder) with payment routed to treasury.
 11. Agent profit loops on existing live contracts only (Ladder MM + Fluid USDC style) under auditor gate. Land #143.
-12. Optional: evaluate temporary reduction of shared_liq_vault.min_liquidity_usd if capital recovery plan is confirmed (auditor + risk required).
+12. Optional: evaluate temporary reduction of shared_liq_vault.min_liquidity_usd if capital recovery plan is confirmed (auditor + risk required) — currently unlocked at $250.
 
 ### Safety (non-negotiable)
 - DRY_RUN default. Kill switch `data/TREASURY_EXEC_HALT`.
@@ -122,10 +124,10 @@ Do **not** commit EXECUTE_LIVE. Module never holds keys.
 - Self-improving loops must use measured improvements or discard.
 - Never commit private keys or set EXECUTE_LIVE=1 in code.
 
-Results only. Cash loading window → Yield Aggregator now. Scale infinite on measured inflow to treasury.
+Results only. Cash loading window → Yield Aggregator now (SharedLiq + Morpho eligible). Scale infinite on measured inflow to treasury.
 
 ---
 
 **— CEO / TOA Oversight**  
 26 Aug 2026  
-Canonical addresses unchanged. Material actions remain open until realized inflow or P0 evidence. Tracking issue opened for this cycle.
+Canonical addresses unchanged. Material actions remain open until realized inflow or P0 evidence. Tracking issue opened/updated for this cycle.
