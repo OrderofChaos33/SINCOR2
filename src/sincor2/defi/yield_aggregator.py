@@ -10,11 +10,12 @@ Safety rules (hard):
 - Live execution requires explicit env EXECUTE_LIVE=1 AND a non-empty
   EXECUTION_SIGNER_KEY. Even then, this module only emits intent payloads;
   actual signing/broadcast stays outside this module.
-- Every rebalance is risk-capped (max allocation %, min liquidity, max slippage).
+- Every rebalance is risk-capped (max allocation %, max slippage).
 - Fees route conceptually to the canonical treasury address.
 
-Strategies are adapters. Real protocol integrations plug in here without
-changing the agent YAML or swarm scheduler.
+CEO 2026-08-25: min_liquidity floors removed on Morpho / Aave / SharedLiquidity
+adapters. SharedLiquidityVault 0xeA90… is unverified + 0 txs on Base — do not
+send capital there. Live earn path is Morpho Gauntlet USDC (gtUSDCp) on Base.
 """
 
 from __future__ import annotations
@@ -37,11 +38,15 @@ SHARED_LIQUIDITY_VAULT = os.getenv(
 SHARED_LIQUIDITY_HOOK = os.getenv(
     "SHARED_LIQUIDITY_HOOK", "0x5A20BfEc6Caa3A94246eCCCb36F27F4980152dC0"
 )
+# Live Morpho Gauntlet USDC Prime vault (gtUSDCp) on Base — verified, deposit/redeem live
+MORPHO_USDC_VAULT = os.getenv(
+    "MORPHO_USDC_VAULT", "0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61"
+)
 
 EXECUTE_LIVE = os.getenv("EXECUTE_LIVE", "0").strip() == "1"
 MAX_SINGLE_STRATEGY_PCT = float(os.getenv("YIELD_MAX_SINGLE_STRATEGY_PCT", "0.40"))
 MAX_SLIPPAGE_BPS = int(os.getenv("YIELD_MAX_SLIPPAGE_BPS", "50"))
-MIN_CAPITAL_USD = float(os.getenv("YIELD_MIN_CAPITAL_USD", "10.0"))
+MIN_CAPITAL_USD = float(os.getenv("YIELD_MIN_CAPITAL_USD", "1.0"))
 
 
 class StrategyKind(str, Enum):
@@ -99,7 +104,7 @@ class RebalancePlan:
         return d
 
 
-# Default strategy universe — conservative, Base-native oriented
+# Default strategy universe — Base-native. CEO 2026-08-25: no $250/$500/$1000 floors.
 DEFAULT_STRATEGIES: List[YieldStrategy] = [
     YieldStrategy(
         id="cash_reserve",
@@ -109,26 +114,27 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         estimated_apr=0.0,
         risk_score=0.0,
         min_liquidity_usd=0.0,
-        notes="Always keep a liquid buffer",
+        notes="Gas + optionality buffer only",
     ),
     YieldStrategy(
         id="morpho_usdc",
-        name="Morpho-style USDC Lending",
+        name="Morpho Gauntlet USDC Prime (gtUSDCp)",
         kind=StrategyKind.STABLE_LENDING,
         protocol="morpho_blue",
         estimated_apr=0.045,
         risk_score=0.15,
-        min_liquidity_usd=0.0,  # CEO 2026-08-19: gate removed — no minimum; cash loading window (~$310) now eligible under risk_budget
-        notes="Isolated market lending; oracle + IRM constrained. Gate removed per CEO directive.",
+        min_liquidity_usd=0.0,  # CEO 2026-08-25: no minimum
+        notes=f"LIVE vault {MORPHO_USDC_VAULT} on Base. Deposit USDC. This is the actionize path.",
     ),
     YieldStrategy(
         id="aave_usdc",
-        name="Aave-style USDC Supply",
+        name="Aave v3 USDC Supply",
         kind=StrategyKind.STABLE_LENDING,
         protocol="aave_v3",
         estimated_apr=0.038,
         risk_score=0.12,
-        min_liquidity_usd=1000.0,
+        min_liquidity_usd=0.0,  # CEO 2026-08-25: gate deleted
+        notes="Aave v3 Pool on Base. Secondary to Morpho.",
     ),
     YieldStrategy(
         id="shared_liq_vault",
@@ -137,8 +143,13 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         protocol="sincor_shared_liquidity",
         estimated_apr=0.08,
         risk_score=0.25,
-        min_liquidity_usd=250.0,  # CEO 2026-08-17: lowered from 500 to unlock ~$295 treasury cash loading window under risk caps
-        notes=f"Vault {SHARED_LIQUIDITY_VAULT}; hook {SHARED_LIQUIDITY_HOOK}",
+        min_liquidity_usd=0.0,  # CEO 2026-08-25: $250 floor deleted per operator
+        enabled=False,  # unverified, 0 txs, 0 ETH — sending capital here is a loss
+        notes=(
+            f"DO NOT DEPOSIT. Vault {SHARED_LIQUIDITY_VAULT} is unverified and has "
+            f"zero on-chain activity. Hook {SHARED_LIQUIDITY_HOOK}. Re-enable only after "
+            f"verified deploy + first successful test deposit."
+        ),
     ),
     YieldStrategy(
         id="univ4_clmm_stable",
@@ -147,8 +158,9 @@ DEFAULT_STRATEGIES: List[YieldStrategy] = [
         protocol="uniswap_v4",
         estimated_apr=0.06,
         risk_score=0.35,
-        min_liquidity_usd=2000.0,
-        notes="Concentrated stable pair; IL risk managed by range",
+        min_liquidity_usd=0.0,
+        enabled=False,  # IL + hook not production-attached; do not send treasury here
+        notes="Disabled until V4 pool+hook is live and revenue-proven.",
     ),
 ]
 
@@ -178,11 +190,9 @@ class YieldAggregator:
             if s.risk_score > risk_budget + 1e-9:
                 continue
             if capital_usd < s.min_liquidity_usd and s.kind != StrategyKind.CASH:
-                # still allow tiny capital into cash
                 continue
             out.append(s)
         if not out:
-            # always fall back to cash
             cash = next((s for s in self.strategies if s.kind == StrategyKind.CASH), None)
             if cash:
                 out = [cash]
@@ -218,11 +228,10 @@ class YieldAggregator:
                 max_risk_score=0.0,
                 fee_to_treasury_bps=self.fee_to_treasury_bps,
                 treasury=TREASURY,
-                vault=SHARED_LIQUIDITY_VAULT,
+                vault=MORPHO_USDC_VAULT,
                 warnings=warnings,
             )
 
-        # Score: higher APR / (1 + risk) wins; cash always gets a floor weight
         scores: Dict[str, float] = {}
         for s in eligible:
             if s.kind == StrategyKind.CASH:
@@ -233,7 +242,6 @@ class YieldAggregator:
         total_score = sum(scores.values()) or 1.0
         raw_weights = {sid: sc / total_score for sid, sc in scores.items()}
 
-        # Cap single-strategy concentration
         capped: Dict[str, float] = {}
         overflow = 0.0
         for sid, w in raw_weights.items():
@@ -244,7 +252,6 @@ class YieldAggregator:
                 capped[sid] = w
 
         if overflow > 0:
-            # redistribute overflow to under-cap strategies proportional to remaining room
             room = {
                 sid: max(MAX_SINGLE_STRATEGY_PCT - w, 0.0) for sid, w in capped.items()
             }
@@ -252,7 +259,6 @@ class YieldAggregator:
             for sid in capped:
                 capped[sid] += overflow * (room[sid] / room_sum)
 
-        # Normalize
         wsum = sum(capped.values()) or 1.0
         weights = {sid: w / wsum for sid, w in capped.items()}
 
@@ -293,7 +299,7 @@ class YieldAggregator:
                         "max_slippage_bps": MAX_SLIPPAGE_BPS,
                         "fee_to": TREASURY,
                         "fee_bps": self.fee_to_treasury_bps if prefer_treasury_fee else 0,
-                        "vault": SHARED_LIQUIDITY_VAULT,
+                        "vault": MORPHO_USDC_VAULT if alloc.strategy_id == "morpho_usdc" else SHARED_LIQUIDITY_VAULT,
                     }
                 )
         else:
@@ -308,7 +314,7 @@ class YieldAggregator:
             max_risk_score=round(max_risk, 6),
             fee_to_treasury_bps=self.fee_to_treasury_bps,
             treasury=TREASURY,
-            vault=SHARED_LIQUIDITY_VAULT,
+            vault=MORPHO_USDC_VAULT,
             intents=intents,
             warnings=warnings,
             executed=executed,
