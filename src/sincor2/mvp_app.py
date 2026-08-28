@@ -109,6 +109,13 @@ except Exception as _a2a_exc:
     logger.warning('[A2A] Router not registered: %s', _a2a_exc)
 
 try:
+    from sincor2.a2a_inbound import register as register_a2a_inbound
+    register_a2a_inbound(app)
+    logger.info('[A2A] Inbound register + marketplace registered on mvp_app')
+except Exception as _a2a_in_exc:
+    logger.warning('[A2A] Inbound not registered: %s', _a2a_in_exc)
+
+try:
     from sincor2.task_queue import register_flask_routes as _register_queue_routes
     _register_queue_routes(app)
     logger.info('[QUEUE] /api/tasks poll routes registered')
@@ -899,6 +906,11 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
         }
     except Exception as qexc:
         checks['task_queue'] = {'ready': True, 'critical': False, 'detail': f'unavailable:{qexc}'}
+    try:
+        from sincor2.a2a_inbound import health_snapshot as _a2a_inbound_health
+        checks['a2a_inbound'] = _a2a_inbound_health()
+    except Exception as _a2a_h:
+        checks['a2a_inbound'] = {'ready': False, 'critical': False, 'detail': f'unavailable:{_a2a_h}'}
     if not include_optional:
         checks = {k: v for k, v in checks.items() if v.get('critical')}
 

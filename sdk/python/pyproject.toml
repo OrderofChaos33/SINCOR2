@@ -1,0 +1,17 @@
+[project]
+name = "sincor-a2a"
+version = "0.1.0"
+description = "Plug-and-play SINCOR A2A client for CrewAI, LangChain, AutoGen"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.urls]
+Homepage = "https://getsincor.com"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sincor_a2a*"]
