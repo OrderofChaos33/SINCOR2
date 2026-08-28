@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import time
 
 import pytest
 from flask import Flask
@@ -244,6 +243,14 @@ def test_docs_a2a(client):
     assert b"SINCOR inbound A2A" in response.data
 
 
+def test_seeded_tasks_stay_open_until_first_bid(client):
+    directory = client.get("/v1/a2a/directory").get_json()
+    assert directory["kpis"]["probation_open"] >= 16
+    open_tasks = [t for t in directory["tasks"] if t["state"] == "open"]
+    assert open_tasks
+    assert all(t.get("auction_closes_at") is None for t in open_tasks)
+
+
 def test_close_auction_assigns_lowest_composite(client):
     client.post("/v1/a2a/register", json={
         "agent_id": "fast",
@@ -267,9 +274,7 @@ def test_close_auction_assigns_lowest_composite(client):
     client.post("/v1/a2a/bids", json={
         "task_id": task["task_id"], "agent_id": "fast", "bid_axm": 1.1, "estimated_seconds": 30,
     })
-    # Force the 500ms window closed.
     assigned = close_auction(task["task_id"])
-    # Window may still be open — jump it.
     if assigned and assigned.get("state") != "assigned":
         from sincor2.a2a_inbound import get_fabric
 

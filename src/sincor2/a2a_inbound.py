@@ -418,7 +418,8 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
             "requires_merit": bounty >= MERIT_THRESHOLD_AXM,
             "state": "open",
             "created_at": ts,
-            "auction_closes_at": ts + AUCTION_WINDOW_MS,
+            # Stay open until the first bid, then a 500ms clearing window.
+            "auction_closes_at": None,
             "assigned_to": None,
             "winner_score": None,
             "winning_bid_axm": None,
@@ -439,9 +440,6 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
             "auction_closes_at": snapshot["auction_closes_at"],
         },
     )
-    timer = threading.Timer(AUCTION_WINDOW_MS / 1000.0, lambda: close_auction(task_id))
-    timer.daemon = True
-    timer.start()
     return snapshot
 
 
@@ -493,9 +491,18 @@ def place_bid(
         }
         fabric.bids[bid_id] = bid
         task["state"] = "auction"
+        if task.get("auction_closes_at") is None:
+            task["auction_closes_at"] = ts + AUCTION_WINDOW_MS
+            start_timer = True
+        else:
+            start_timer = False
         snapshot = dict(bid)
         tags = list(task.get("tags") or [])
     fabric.publish("bid.received", tags, snapshot)
+    if start_timer:
+        timer = threading.Timer(AUCTION_WINDOW_MS / 1000.0, lambda: close_auction(task_id))
+        timer.daemon = True
+        timer.start()
     return snapshot
 
 
@@ -508,7 +515,10 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
             return None
         if task["state"] not in ("open", "auction"):
             return dict(task)
-        if ts < int(task.get("auction_closes_at") or 0):
+        closes_at = task.get("auction_closes_at")
+        if closes_at is None:
+            return dict(task)
+        if ts < int(closes_at):
             return dict(task)
         candidates = [b for b in fabric.bids.values() if b.get("task_id") == task_id]
         if not candidates:
