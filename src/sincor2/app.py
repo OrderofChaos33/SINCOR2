@@ -1420,6 +1420,11 @@ def create_app():
         register_flask_routes(app)
     except Exception as e:
         print(f"A2A integration not available: {e}")
+    try:
+        from sincor2.a2a_inbound import register as register_a2a_inbound
+        register_a2a_inbound(app)
+    except Exception as e:
+        print(f"A2A inbound not available: {e}")
     return app
 
 
