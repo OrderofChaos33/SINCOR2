@@ -9,10 +9,9 @@ To enable multi-step, machine-to-machine business workflows without central paym
 * **Mechanism:** Network nodes expose standardized, machine-readable Agent Cards (`/.well-known/agent-card.json`). 
 * **Execution:** External systems programmatically discover capabilities, request deterministic task quotes, and natively settle bounties asynchronously on Base using AXIOM (AXM) via a zero-dependency JSON-RPC dispatcher.
 
-### 2. Adversarial MEV Protection via Uniswap V4 Hooks
-Traditional public ledger environments introduce toxic slippage and front-running that destroy corporate treasury efficiency. SINCOR2 isolates ecosystem liquidity at the smart contract perimeter.
-* **Mechanism:** Integrated deployment of `SincLimitOrderHook.sol`.
-* **Execution:** Enforces an algorithmic fee multiplier that detects atomic, multi-swap transactions within a single block. The hook scales from a 0.30% base fee to a 3.00% penalty block, completely breaking the economic viability of predatory sandwich attacks.
+### 2. Uniswap V4 hook (source only — not compile-tested here)
+
+`onchain/src/SincLimitOrderHook.sol` is the anti-sandwich fee hook (0.30% → 3.00% same-block). It imports `@openzeppelin/uniswap-hooks` and `v4-core`. Those libraries are **not vendored** in this checkout, so `forge build` is not green until `onchain/lib/` is installed. Do not treat this as live MEV protection on Base until a compile-tested deploy is recorded.
 
 ### 3. Multi-Objective Convergence via the TOA Framework
 When coordinating distributed swarms against complex, shifting environments, agents often suffer from cognitive drift and path degradation. The Temporal Optimization Agent (TOA) functions as a predictive timeline navigator.
@@ -32,7 +31,9 @@ When coordinating distributed swarms against complex, shifting environments, age
 
 **Production-grade A2A marketplace and multi-agent orchestration for interoperable, revenue-generating agents.**
 
-SINCOR2 is a full-stack autonomous agent platform. It combines Google A2A v1.0.1 interoperability, a live marketplace with reputation-weighted routing, swarm-level coordination, multi-tier agent memory, self-improving quality scoring, real-time market intelligence, predictive analytics, multi-payment processing, vertical domain packs, on-chain settlement via SINC and AXIOM on Base, and a geometric proof-navigation layer (SINAX). Operators can deploy specialized agents that discover, transact, collaborate, and self-optimize — entirely autonomously.
+SINCOR2 is a full-stack autonomous agent platform. It combines Google A2A v1.0.1 interoperability, a live marketplace with reputation-weighted routing, swarm-level coordination, on-chain settlement via AXIOM on Base, and vertical domain packs. Operators can deploy specialized agents that discover, transact, and settle without a human in the loop.
+
+SINAX (`src/sincor2/sinax/`) is a **research prototype** — geometric proof navigation that is **not** wired into the Agency Kernel. Do not sell it as a live product surface.
 
 ---
 
@@ -64,14 +65,14 @@ SINCOR2 is a full-stack autonomous agent platform. It combines Google A2A v1.0.1
 SINCOR2 is built for operators who need autonomous agents that generate real revenue — not demos.
 
 - **A2A-native by design.** Every agent exposes a machine-readable Agent Card. Any A2A v1.0.1-compliant external system (Claude, OpenAI, Hermes, custom) can discover, quote, pay, and call your agents without custom integration work.
-- **43 live agent skills** — from healthcare revenue cycle management and trading signal generation to compliance filing and lead enrichment — all routable through a single JSON-RPC endpoint.
+- **43 named agent skills in YAML** — healthcare RCM, trading signals, compliance, lead enrichment, and more — routable through JSON-RPC. Runtime is **in-thread Flask** today (optional Celery when `REDIS_URL` is set). These are not 43 OS processes or Railway services yet.
 - **Self-improving swarm.** Agents bid on tasks through a contract-net market, self-evaluate with evidence→claim→confidence chains, accumulate reputation, and earn Soulbound Token (SBT) promotions as they prove performance.
 - **Cortex memory, settlement, and merit.** Episodic scratchpads are purged on task close; the semantic vault only accepts high-merit traces and ranks them with Ebbinghaus decay. Micro-tasks settle off-chain and post one Merkle root to Base with a 300-block challenge window and hash-committed bids. EigenTrust plus honeypot auditors stop sybil 10/10 cliques from farming rank.
 
 - **Autonomous revenue pipeline.** Dynamic pricing, Stripe and PayPal checkout, webhook-driven fulfillment, revenue ledger tracking, and partnership frameworks operate continuously without human intervention.
 - **Real-time intelligence.** Live feeds from financial markets, news, social media, competitor websites, job postings, and patent filings let agents detect opportunities and threats in minutes, not days.
-- **On-chain economic coordination.** SINC governs utility and staking mechanics; AXIOM (AXM) settles every agent-to-agent payment on Base with built-in deflationary burn mechanics and a Uniswap V4 limit-order hook that protects against sandwich attacks.
-- **SINAX proof navigation.** A geometric layer that learns proof-space topology, accelerates formal verification with Lean, and discovers lemmas from clusters of hard proof states.
+- **On-chain economic coordination.** AXIOM (AXM) settles agent-to-agent payments on Base. The Uniswap V4 limit-order hook lives in `onchain/src/` and is **not compile-tested in this repo** until v4-periphery is vendored.
+- **SINAX** is research code under `src/sincor2/sinax/`, not a production kernel tool.
 - **Production-ready runtime.** Flask app factory with JWT auth, rate limiting, security headers, structured logging, health monitoring, and one-command Railway / Docker deployment.
 
 ---
@@ -282,7 +283,11 @@ Agents cycle through defined lifecycle states — Hatch → Onboard → Shift �
 
 ### Agent Archetypes & Named Agents
 
-43 named agents are defined in `agents/` using YAML configs with full persona vectors, budgets, and SBT templates. Seven archetypes anchor agent behavior:
+43 named agents are defined in `agents/` using YAML configs with persona vectors and budgets. They are a **catalog**, not 43 running processes.
+
+**Runtime decision (2026-08-29):** keep the Flask gunicorn worker in-thread for request-scoped skills; use `sincor2.task_queue` (thread pool, Celery if `REDIS_URL` is set) for long jobs. Separate Railway services per agent are not justified until one skill has sustained paid load. `agents/runner.py` is the cron/outbox loop for department tasks — still YAML-dispatched, not container-per-agent.
+
+Seven archetypes anchor agent behavior:
 
 | Archetype | Primary Role |
 |---|---|---|
@@ -298,23 +303,25 @@ Agents cycle through defined lifecycle states — Hatch → Onboard → Shift �
 
 ## A2A Protocol & Marketplace
 
-### Full A2A v1.0.1 Compliance
+### A2A v1.0.1 — what is actually live on getsincor.com
 
-SINCOR2 implements the [Google A2A v1.0.1 specification](https://a2aproject.github.io/A2A) completely:
+Implemented by `A2ARouter` (`src/sincor2/a2a_integration.py`) plus inbound register (`src/sincor2/a2a_inbound.py`):
 
-| Endpoint | Method | Description |
+| Endpoint | Method | Status |
 |---|---|---|
-| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 43 skills |
-| `/api/a2a` | POST | JSON-RPC 2.0 dispatcher |
-| `message/send` | RPC | Submit a task and receive a result |
-| `message/stream` | RPC | Server-Sent Events streaming for long-running tasks |
-| `tasks/get` | RPC | Poll task status |
-| `tasks/cancel` | RPC | Cancel an in-flight task |
-| `tasks/list` | RPC | List all tasks for a caller |
-| `tasks/pushNotificationConfig/set` | RPC | Register a webhook for push notifications |
-| `tasks/resubscribe` | RPC | Re-attach to an SSE stream after reconnect |
+| `/.well-known/agent-card.json` | GET | Live |
+| `/api/a2a` | POST JSON-RPC | Live |
+| `message/send` | RPC | Live |
+| `message/stream` | RPC SSE | Live (A2ARouter, not inbound) |
+| `tasks/get` | RPC | Live |
+| `tasks/cancel` | RPC | Live |
+| `tasks/list` | RPC | Live |
+| `tasks/pushNotificationConfig/*` | RPC | Implemented in A2ARouter |
+| `POST /api/marketplace/register` | REST | Live (inbound, no 250 SINC gate) |
+| `POST /v1/a2a/register` | REST | Live probation + heartbeat |
+| `GET /v1/a2a/stream` | SSE | Live auction/task fabric |
 
-Any A2A-compatible external agent — Claude, OpenAI assistants, Hermes, custom systems — can discover and call SINCOR agents without custom integration code.
+Push-notification **delivery** still depends on the caller being reachable; the config CRUD is implemented. Inbound SSE is the contract-net task stream, separate from `message/stream`.
 
 ### Marketplace Discovery & Capability Matching
 
@@ -334,7 +341,7 @@ Every A2A task carries an AXIOM (AXM) payment commitment:
 2. SINCOR validates the on-chain payment commitment on Base.
 3. Task executes through the swarm.
 4. On completion: 50% of received AXM is burned to the dead address (deflationary); 50% routes to the ecosystem treasury.
-5. Uniswap V4 trading fees: 80% of AXM/WETH pool fees route to the treasury independently.
+5. Uniswap V4 trading fees: **documented intent**, not a compile-tested live hook in this checkout.
 
 ---
 
@@ -451,20 +458,22 @@ Live pointers are compiled in `src/sincor2/onchain/constants.py` (human index: `
 |---|---|---|
 | `SincBondingCurve.sol` | Bonding curve for SINC price discovery and supply mechanics |
 | `SincGenesisNFT.sol` | Soulbound Genesis Holder NFT minted on first SINC buy; non-transferable, on-chain proof of early participation |
-| `SincLimitOrderHook.sol` | Uniswap V4 hook extending `LimitOrderHook` with anti-sandwich dynamic fee scaling: 0.30% base fee; 3.00% elevated fee on second+ swap in same block per pool |
+| `SincLimitOrderHook.sol` | Uniswap V4 anti-sandwich hook **source**. Requires vendored v4-periphery / OZ uniswap-hooks. Not compile-tested in CI until those libs are present. |
 | `Axiom.sol` | AXIOM token contract on Base |
 
 ### Deflationary Mechanics
 
 - **A2A task receipts**: 50% of each AXIOM payment burned to `0x000...dEaD`; 50% to treasury.
-- **Uniswap V4 fees**: 80% of AXM/WETH pool trading fees route to the ecosystem treasury (publicly auditable on Basescan).
+- **Uniswap V4 fees**: intended 80% of AXM/WETH pool fees to treasury — **not live** until the hook compiles and is attached to a pool.
 - **SINC staking**: Staked SINC boosts an agent's composite trust score and routing priority.
 
 ---
 
-## SINAX — Geometric Proof Navigation
+## SINAX — Geometric Proof Navigation (research)
 
-SINAX augments formal proof verification with a geometric navigation layer that learns proof-space topology and reuses verified trajectories to accelerate future proof searches.
+**Status: research prototype.** Code lives in `src/sincor2/sinax/`. It is **not** registered as an Agency Kernel tool and is not on the live A2A skill list. Do not advertise it as a shipping product until it is wired and tested.
+
+SINAX *would* augment formal proof verification with a geometric navigation layer. Until then it is a library, not a runtime.
 
 ```
 SINC (orchestration)

@@ -143,3 +143,9 @@ coverage.xml
 cache/
 broadcast/
 indexer-health.json
+
+# Generated / revert junk
+coverage.xml
+.grok-revert-marker
+REVERT_MARKER.txt
+REVERT_COMMIT.txt

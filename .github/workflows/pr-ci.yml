@@ -1,0 +1,58 @@
+name: PR checks
+
+# Cheap gate: ruff + inbound pytest + forge build when onchain/lib exists.
+# GitHub Actions billing was previously locked (see ci.yml workflow_dispatch).
+# This workflow is small enough to re-enable on pull_request.
+
+on:
+  pull_request:
+    paths:
+      - "src/sincor2/**"
+      - "tests/**"
+      - "onchain/**"
+      - ".github/workflows/pr-ci.yml"
+      - "requirements.txt"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff flask flask-jwt-extended flask-limiter python-dotenv
+      - name: Ruff
+        run: ruff check src/sincor2/mvp_app.py src/sincor2/mvp_blueprints src/sincor2/a2a_inbound.py src/sincor2/contract_net.py tests/pytest/test_a2a_inbound.py
+      - name: Pytest (inbound + contract-net)
+        env:
+          PYTHONPATH: src
+          FLASK_ENV: test
+          ENVIRONMENT: test
+          JWT_SECRET_KEY: test-jwt-secret-key-32-char-minimum-ok
+          ADMIN_USERNAME: admin
+          ADMIN_PASSWORD: admin-password-32-char-minimum-ok
+          SINCOR_TASK_QUEUE: eager
+        run: python -m pytest tests/pytest/test_a2a_inbound.py -q
+
+  forge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: forge build
+        working-directory: onchain
+        run: |
+          if [ -d lib/v4-core ]; then
+            forge build --sizes
+          else
+            echo "onchain/lib not vendored — skipping forge build (V4 hook is source-only until libs are installed)"
+          fi
