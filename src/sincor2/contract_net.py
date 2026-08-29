@@ -30,7 +30,7 @@ ESCROW_ADDRESS = os.environ.get(
     "ESCROW_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 )
 AXM_TOKEN = os.environ.get("AXM_TOKEN", "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a")
-DEFAULT_BASE_RPC = "https://mainnet.base.org"
+DEFAULT_BASE_RPC = "https://base-rpc.publicnode.com"
 _SIGNER_ENV = ("ESCROW_SIGNER_KEY", "PAYOUT_PRIVATE_KEY", "BASE_SIGNER_KEY")
 
 

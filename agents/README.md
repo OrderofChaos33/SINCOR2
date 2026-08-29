@@ -57,3 +57,16 @@ Migration path is clean because the contract is the envelope JSON, not the engin
 3. Canonical addresses only from `CANONICAL_ADDRESSES.md`.
 4. No destructive ops without human sign-off.
 5. Ledger is append-only; caretakers archive learnings weekly.
+
+## Runtime decision (2026-08-29)
+
+The 43 YAML files in this directory are **catalog entries**, not processes.
+
+| Mode | When | What runs |
+|---|---|---|
+| In-thread Flask | Default production (`mvp_app` gunicorn, 1 sync worker) | Skills execute inside the request or `sincor2.task_queue` thread pool |
+| Celery | `REDIS_URL` / `CELERY_BROKER_URL` set | Long jobs on the Procfile `worker` |
+| Cron/outbox | `agents/runner.py` | Department tasks as JSON envelopes — still not 43 containers |
+| Per-agent Railway service | **Not yet** | Only justified when a single skill has sustained paid load |
+
+Do not spawn 43 dynos. Sales sells skills on the live A2A card; the worker is the platform.
