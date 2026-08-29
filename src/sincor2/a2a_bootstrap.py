@@ -199,4 +199,26 @@ def install() -> None:
     logger.info("SINCOR production bootstrap complete")
 
 
+def register_a2a(app) -> bool:
+    """Idempotent: install runtime + register A2ARouter discovery on *app*.
+
+    Owns ``/.well-known/agent-card.json``, ``/.well-known/agent.json``,
+    ``/api/a2a/quote``, ``/api/a2a/agents``. Safe to call twice.
+    """
+    try:
+        install()
+        names = getattr(app, "blueprints", {}) or {}
+        if "a2a" in names:
+            logger.info("A2ARouter already registered")
+            return True
+        from sincor2.a2a_integration import A2ARouter
+
+        app.register_blueprint(A2ARouter().blueprint)
+        logger.info("A2ARouter registered — discovery surfaces live")
+        return True
+    except Exception as err:
+        logger.error("A2ARouter registration failed: %s", err)
+        return False
+
+
 install()

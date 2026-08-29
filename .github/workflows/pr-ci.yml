@@ -32,7 +32,7 @@ jobs:
           pip install ruff flask flask-jwt-extended flask-limiter python-dotenv
       - name: Ruff
         run: ruff check src/sincor2/mvp_app.py src/sincor2/mvp_blueprints src/sincor2/a2a_inbound.py src/sincor2/contract_net.py tests/pytest/test_a2a_inbound.py
-      - name: Pytest (inbound + contract-net)
+      - name: Pytest (inbound + contract-net + P0 4/5/6)
         env:
           PYTHONPATH: src
           FLASK_ENV: test
@@ -41,7 +41,7 @@ jobs:
           ADMIN_USERNAME: admin
           ADMIN_PASSWORD: admin-password-32-char-minimum-ok
           SINCOR_TASK_QUEUE: eager
-        run: python -m pytest tests/pytest/test_a2a_inbound.py -q
+        run: python -m pytest tests/pytest/test_a2a_inbound.py tests/pytest/test_mvp_p0_456.py -q
 
   forge:
     runs-on: ubuntu-latest

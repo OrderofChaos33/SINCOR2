@@ -228,7 +228,7 @@
     </a>
     <a class="nav-item" href="#agents">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-      Agents <span class="tag">{{ active_agents }}</span>
+      Agents <span class="tag">{{ agents|length }}</span>
     </a>
     <a class="nav-item" href="#activity">
       <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
@@ -280,7 +280,7 @@
         </div>
       </div>
       <div class="top-actions">
-        <span class="live"><span class="dot"></span>{{ active_agents }}/{{ agents|length }} LIVE</span>
+        <span class="live"><span class="dot"></span>{{ agents|length }} provisioned</span>
         <div class="seg" id="range">
           <button data-r="24h">24H</button>
           <button data-r="7d" class="on">7D</button>
@@ -293,10 +293,15 @@
       </div>
     </div>
 
-    {% if demo_mode %}
+    {% if telemetry_pending %}
     <div class="demo">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-      <span><b>Sample telemetry.</b> Live per-agent metrics stream in once your SINC subscription is active.</span>
+      <span><b>Live telemetry coming soon.</b> KPIs, utilisation, and activity stay blank until the swarm bus reports real numbers. Nothing here is sample data.</span>
+    </div>
+    {% elif demo_mode %}
+    <div class="demo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+      <span><b>No live telemetry.</b> Activate a paid SINC/AXM subscription to provision agents.</span>
     </div>
     {% endif %}
 
@@ -310,13 +315,17 @@
           <div class="kpi rv" style="animation-delay:{{ loop.index0 * 60 }}ms">
             <div class="kpi-top">
               <span class="kpi-ic">{{ s.icon }}</span>
+              {% if s.delta and s.trend %}
               <span class="kpi-delta {{ s.trend }}">
                 {% if s.trend == 'up' %}▲{% else %}▼{% endif %} {{ s.delta }}
               </span>
+              {% endif %}
             </div>
-            <div class="kpi-val">{{ s.value }}</div>
+            <div class="kpi-val">{% if s.value is not none %}{{ s.value }}{% else %}—{% endif %}</div>
             <div class="kpi-lab">{{ s.label }} <span class="kpi-unit">/ {{ s.unit }}</span></div>
+            {% if s.spark %}
             <svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none" data-spark="{{ s.spark|join(',') }}"></svg>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
@@ -332,7 +341,7 @@
             <div class="card">
               <div class="card-h">
                 <h3>Your Agent Team</h3>
-                <span class="meta">avg utilisation {{ avg_util }}%</span>
+                <span class="meta">{% if avg_util is not none %}avg utilisation {{ avg_util }}%{% else %}utilisation pending{% endif %}</span>
               </div>
               <div class="agent-list">
                 {% for a in agents %}
@@ -348,10 +357,14 @@
                   </div>
                   <div class="agent-right">
                     <div class="util">
+                      {% if a.util is not none %}
                       <div class="util-bar"><div class="util-fill" style="width:{{ a.util }}%"></div></div>
                       <div class="util-txt">{{ a.util }}% load</div>
+                      {% else %}
+                      <div class="util-txt">—</div>
+                      {% endif %}
                     </div>
-                    <span class="last">↻ {{ a.last }}</span>
+                    <span class="last">{% if a.last %}↻ {{ a.last }}{% else %}not started{% endif %}</span>
                   </div>
                 </div>
                 {% endfor %}
@@ -365,12 +378,16 @@
             <div class="card">
               <div class="card-h"><h3>Recent Agent Actions</h3><span class="meta">auto-refresh 30s</span></div>
               <div class="tl">
+                {% if timeline %}
                 {% for e in timeline %}
                 <div class="tl-row">
                   <span class="tl-dot tl-{{ e.kind }}"></span>
                   <div><div class="tl-txt">{{ e.text }}</div><div class="tl-t">{{ e.t }}</div></div>
                 </div>
                 {% endfor %}
+                {% else %}
+                <div class="tl-row"><div class="tl-txt">No recorded agent actions yet.</div></div>
+                {% endif %}
               </div>
             </div>
           </section>
@@ -381,6 +398,7 @@
           <div class="card">
             <div class="card-h"><h3>Resource Budget</h3><span class="meta">resets daily</span></div>
             <div class="use">
+              {% if usage and usage.sinc_cap and usage.axiom_cap and usage.tasks_cap %}
               <div class="use-item">
                 <div class="use-top"><b>SINC compute</b><span class="use-num">{{ '{:,}'.format(usage.sinc_used) }} / {{ '{:,}'.format(usage.sinc_cap) }}</span></div>
                 <div class="bar"><i class="fill-sinc" style="width:{{ (usage.sinc_used / usage.sinc_cap * 100)|round }}%"></i></div>
@@ -393,6 +411,9 @@
                 <div class="use-top"><b>Tasks today</b><span class="use-num">{{ usage.tasks_today }} / {{ usage.tasks_cap }}</span></div>
                 <div class="bar"><i class="fill-task" style="width:{{ (usage.tasks_today / usage.tasks_cap * 100)|round }}%"></i></div>
               </div>
+              {% else %}
+              <p class="kpi-lab">Resource meters are not wired to live telemetry yet. Caps and spend stay unshown rather than invented.</p>
+              {% endif %}
             </div>
           </div>
 
@@ -400,9 +421,10 @@
             <div class="card-h"><h3>Your Plan</h3><span class="plan-badge">{{ tier|upper }}</span></div>
             <div class="plan">
               <div class="plan-row"><span>Agents provisioned</span><b>{{ num_agents }}</b></div>
-              <div class="plan-row"><span>Active now</span><b style="color:var(--sig)">{{ active_agents }}</b></div>
+              <div class="plan-row"><span>Active now</span><b style="color:var(--sig)">{% if active_agents %}{{ active_agents }}{% else %}—{% endif %}</b></div>
               {% if member_since %}<div class="plan-row"><span>Member since</span><b>{{ member_since }}</b></div>{% endif %}
-              <div class="plan-row"><span>Renews</span><b>{{ renewal }}</b></div>
+              {% if renewal %}<div class="plan-row"><span>Renews</span><b>{{ renewal }}</b></div>{% endif %}
+              {% if order_count is not none %}<div class="plan-row"><span>Orders on file</span><b>{{ order_count }}</b></div>{% endif %}
             </div>
           </div>
 
@@ -466,14 +488,18 @@
   var sparks = [].slice.call(document.querySelectorAll('[data-spark]'));
   function renderAll(range){
     sparks.forEach(function(svg){
-      var pts = svg.getAttribute('data-spark').split(',').map(Number);
+      var raw = svg.getAttribute('data-spark') || '';
+      if (!raw) return;
+      var pts = raw.split(',').map(Number).filter(function(n){return !isNaN(n);});
+      if (!pts.length) return;
       draw(svg, pts, range);
     });
   }
-  renderAll('7d');
+  if (sparks.length) renderAll('7d');
 
   /* ---- range segmented control ---- */
-  document.getElementById('range').addEventListener('click', function(e){
+  var rangeEl = document.getElementById('range');
+  if (rangeEl) rangeEl.addEventListener('click', function(e){
     var b = e.target.closest('button'); if(!b) return;
     this.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});
     b.classList.add('on');

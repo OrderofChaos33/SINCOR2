@@ -93,104 +93,110 @@ def docs():
 
 @bp.route('/dashboard')
 def dashboard():
-    """Customer dashboard — shows agent activity, profile, and account status."""
+    """Customer dashboard — payment-gated. Real DB values or explicit None."""
+    if _is_admin_session():
+        email = _session_email() or (session.get('admin_username') or '')
+        return _render_honest_dashboard(email=email, order={'product_name': 'Operator', 'payment_status': 'verified', 'order_id': 'admin', 'created_at': ''}, profile={}, admin=True)
+
     email = _session_email()
+    if not email:
+        nxt = request.full_path if request.query_string else '/dashboard'
+        if nxt.endswith('?'):
+            nxt = nxt[:-1]
+        return redirect('/login?next=' + nxt)
 
-    # Load profile if email provided
+    order = _confirmed_paid_order(email)
+    if not order:
+        return redirect('/buy?reason=no_active_subscription')
+
     profile = {}
-    order = {}
-    if email:
-        db = get_db()
-        p = db.execute('SELECT * FROM customer_profiles WHERE email=?', (email,)).fetchone()
-        if p:
-            cols = [d[0] for d in db.execute('SELECT * FROM customer_profiles LIMIT 0').description]
-            profile = dict(zip(cols, p))
-        o = db.execute('SELECT * FROM orders WHERE customer_email=? ORDER BY created_at DESC LIMIT 1', (email,)).fetchone()
-        if o:
-            order = dict(o)
+    db = get_db()
+    p = db.execute('SELECT * FROM customer_profiles WHERE email=?', (email,)).fetchone()
+    if p:
+        profile = _row_to_dict(p)
+    return _render_honest_dashboard(email=email, order=order, profile=profile, admin=False)
 
-    # Agent activity feed — what the 6 autonomous agents have been doing
-    import random
-    random.seed(42)  # Consistent demo data
-    tier = order.get('product_name', 'Starter')
+
+def _render_honest_dashboard(*, email, order, profile, admin=False):
+    """Numbers from the paid order record only. Telemetry is None until the swarm bus is wired."""
+    tier = order.get('product_name') or 'Starter'
     try:
         from sincor2.platform_payments import PLATFORM_PLANS
         agent_counts = {
             p['product_name']: p.get('agents', 10)
             for p in PLATFORM_PLANS.values()
+            if p.get('agents')
         }
     except Exception:
         agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 42}
-    num_agents = agent_counts.get(tier, 10)
-    demo_mode = not bool(
-        order.get('order_id')
-        and order.get('payment_status') in ('completed', 'paid', 'verified')
-    )
+    num_agents = int(PRODUCT_CATALOG.get(tier, {}).get('agents') or agent_counts.get(tier) or 0)
 
-    use_case = profile.get('primary_use_case', 'Lead Generation & Outreach')
-    company  = profile.get('company_name', 'Your Company')
-    fname    = profile.get('first_name', '')
-    industry = profile.get('industry', 'your industry')
-
-    # Build agent roster with live telemetry (role, utilization %, last-active, task).
-    # Sample values until per-account agent telemetry is wired to the swarm bus.
+    roster_names = [
+        ('Scout Agent', 'Discovery', '🔍'),
+        ('Outreach Agent', 'Negotiator', '📧'),
+        ('Content Agent', 'Builder', '✍️'),
+        ('Social Agent', 'Negotiator', '📱'),
+        ('Analytics Agent', 'Auditor', '📊'),
+        ('Partnership Agent', 'Director', '🤝'),
+        ('Sales Agent', 'Negotiator', '💰'),
+        ('Research Agent', 'Synthesizer', '🧠'),
+    ]
+    n = min(num_agents, len(roster_names)) if num_agents else 0
     agents = [
-        {'name': 'Scout Agent',       'role': 'Discovery',   'icon': '🔍', 'status': 'active', 'util': 84, 'last': '2m ago',  'task': f'Identified 47 qualified leads in {industry} this week'},
-        {'name': 'Outreach Agent',    'role': 'Negotiator',  'icon': '📧', 'status': 'active', 'util': 71, 'last': '6m ago',  'task': 'Sent 23 personalized outreach sequences today — 4 replies received'},
-        {'name': 'Content Agent',     'role': 'Builder',     'icon': '✍️',  'status': 'active', 'util': 63, 'last': '18m ago', 'task': 'Published 2 SEO blog posts — targeting 3 high-volume keywords'},
-        {'name': 'Social Agent',      'role': 'Negotiator',  'icon': '📱', 'status': 'idle',   'util': 22, 'last': '41m ago', 'task': 'Scheduled 14 posts across LinkedIn and Twitter for this week'},
-        {'name': 'Analytics Agent',   'role': 'Auditor',     'icon': '📊', 'status': 'active', 'util': 78, 'last': '4m ago',  'task': 'Tracking 12 competitor signals — 2 pricing changes detected'},
-        {'name': 'Partnership Agent', 'role': 'Director',    'icon': '🤝', 'status': 'active', 'util': 55, 'last': '27m ago', 'task': 'Identified 8 partnership opportunities — 3 outreach drafts ready'},
+        {
+            'name': name, 'role': role, 'icon': icon,
+            'status': 'provisioning', 'util': None, 'last': None,
+            'task': 'Awaiting live swarm telemetry',
+        }
+        for name, role, icon in roster_names[:n]
     ]
-    if num_agents >= 24:
-        agents += [
-            {'name': 'Sales Agent',    'role': 'Negotiator',  'icon': '💰', 'status': 'active', 'util': 69, 'last': '9m ago',  'task': 'Followed up on 11 warm leads — 2 moved to proposal stage'},
-            {'name': 'Research Agent', 'role': 'Synthesizer', 'icon': '🧠', 'status': 'active', 'util': 91, 'last': '1m ago',  'task': 'Compiled market intelligence report — 34 data sources analyzed'},
-        ]
-    active_agents = sum(1 for a in agents if a['status'] == 'active')
-    avg_util = round(sum(a['util'] for a in agents) / len(agents)) if agents else 0
 
-    # KPI tiles with 12-point trend sparklines (most-recent last).
     stats = [
-        {'label': 'Leads Identified',  'value': '47',    'delta': '+12',  'trend': 'up',   'unit': 'this week', 'icon': '🎯', 'spark': [21,24,23,29,31,28,34,37,35,41,44,47]},
-        {'label': 'Outreach Sent',     'value': '156',   'delta': '+23',  'trend': 'up',   'unit': 'today',     'icon': '📨', 'spark': [90,98,110,104,121,130,127,138,142,149,151,156]},
-        {'label': 'Content Published', 'value': '8',     'delta': '+2',   'trend': 'up',   'unit': 'this week', 'icon': '✍️',  'spark': [2,2,3,3,4,4,5,6,6,7,7,8]},
-        {'label': 'Agent Tasks Run',   'value': '1,247', 'delta': '+186', 'trend': 'up',   'unit': 'this week', 'icon': '⚡', 'spark': [820,870,910,955,990,1030,1075,1110,1150,1190,1220,1247]},
+        {'label': 'Leads Identified',  'value': None, 'delta': None, 'trend': None, 'unit': 'this week', 'icon': '🎯', 'spark': None},
+        {'label': 'Outreach Sent',     'value': None, 'delta': None, 'trend': None, 'unit': 'today',     'icon': '📨', 'spark': None},
+        {'label': 'Content Published', 'value': None, 'delta': None, 'trend': None, 'unit': 'this week', 'icon': '✍️',  'spark': None},
+        {'label': 'Agent Tasks Run',   'value': None, 'delta': None, 'trend': None, 'unit': 'this week', 'icon': '⚡', 'spark': None},
     ]
 
-    # Live activity timeline (most recent first). kind → colour accent in template.
-    timeline = [
-        {'t': '2m ago',  'kind': 'lead',      'text': f'Scout Agent qualified 3 new leads in {industry}'},
-        {'t': '14m ago', 'kind': 'outreach',  'text': 'Outreach Agent sent 8 sequences — 2 opened within the hour'},
-        {'t': '38m ago', 'kind': 'content',   'text': 'Content Agent published "5 Ways to Automate Your Pipeline"'},
-        {'t': '1h ago',  'kind': 'analytics', 'text': 'Analytics Agent flagged a competitor price drop of 12%'},
-        {'t': '2h ago',  'kind': 'partner',   'text': 'Partnership Agent drafted 2 warm intro emails for review'},
-        {'t': '4h ago',  'kind': 'system',    'text': 'Daily agent budget replenished — full capacity available'},
-    ]
+    order_count = None
+    if email:
+        try:
+            row = get_db().execute(
+                'SELECT COUNT(*) AS n FROM orders WHERE customer_email=?',
+                (email,),
+            ).fetchone()
+            order_count = int(row['n'] if row and 'n' in row.keys() else (row[0] if row else 0))
+        except Exception:
+            order_count = None
 
-    # Resource usage — SINC / AXIOM daily budgets + task throughput.
-    usage = {
-        'sinc_used': 3420,  'sinc_cap': 5000,
-        'axiom_used': 128,  'axiom_cap': 500,
-        'tasks_today': 47,  'tasks_cap': 120,
-    }
-
-    member_since = order.get('created_at', '')[:10] if order.get('created_at') else ''
+    member_since = (order.get('created_at') or '')[:10]
+    renewal = None
     try:
-        base_dt = datetime.fromisoformat(order['created_at']) if order.get('created_at') else datetime.utcnow()
+        if order.get('created_at'):
+            base_dt = datetime.fromisoformat(str(order['created_at']))
+            renewal = (base_dt + timedelta(days=30)).strftime('%b %d, %Y')
     except Exception:
-        base_dt = datetime.utcnow()
-    renewal = (base_dt + timedelta(days=30)).strftime('%b %d, %Y')
+        renewal = None
+
+    timeline = []
+    if member_since:
+        timeline = [{'t': member_since, 'kind': 'system', 'text': 'Subscription activated'}]
+
+    usage = None
+    company = profile.get('company_name') or None
+    fname = profile.get('first_name') or None
+    use_case = profile.get('primary_use_case') or None
 
     return render_template(
         'dashboard.html',
         profile=profile, order=order, agents=agents, stats=stats,
         timeline=timeline, usage=usage,
-        tier=tier, num_agents=num_agents, active_agents=active_agents, avg_util=avg_util,
-        company=company, fname=fname, use_case=use_case,
+        tier=tier, num_agents=num_agents, active_agents=0, avg_util=None,
+        company=company, fname=fname, use_case=use_case or '—',
         member_since=member_since, renewal=renewal,
-        email=email, demo_mode=demo_mode,
+        email=email, demo_mode=False, telemetry_pending=True, admin_view=admin,
         order_id=order.get('order_id', ''),
+        order_count=order_count,
     )
 
 
