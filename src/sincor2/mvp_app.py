@@ -102,11 +102,13 @@ jwt = JWTManager(app)
 # A2A JSON-RPC + discovery. Production gunicorn entry is this module, so the
 # router must live here (app.py already registers it for the test client).
 try:
-    from sincor2.a2a_integration import A2ARouter
-    app.register_blueprint(A2ARouter().blueprint)
-    logger.info('[A2A] Router registered on mvp_app')
+    from sincor2.a2a_bootstrap import register_a2a
+    if register_a2a(app):
+        logger.info('[A2A] discovery surfaces registered')
+    else:
+        logger.error('[A2A] registration failed')
 except Exception as _a2a_exc:
-    logger.warning('[A2A] Router not registered: %s', _a2a_exc)
+    logger.error('[A2A] bootstrap error: %s', _a2a_exc)
 
 try:
     from sincor2.a2a_inbound import register as register_a2a_inbound
@@ -790,6 +792,65 @@ def init_db():
 
 # Initialize DB on import
 init_db()
+
+_PAID_STATUSES = frozenset({'completed', 'paid', 'verified'})
+
+
+def _row_to_dict(row):
+    if row is None:
+        return {}
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
+def _confirmed_paid_order(email: str):
+    """Latest order with a confirmed payment, or None. Never invents a row."""
+    email = (email or '').strip()
+    if not email:
+        return None
+    db = get_db()
+    placeholders = ','.join('?' * len(_PAID_STATUSES))
+    statuses = tuple(_PAID_STATUSES)
+    try:
+        row = db.execute(
+            f"""SELECT * FROM orders
+                WHERE customer_email=? AND lower(coalesce(payment_status,'')) IN ({placeholders})
+                ORDER BY created_at DESC LIMIT 1""",
+            (email, *statuses),
+        ).fetchone()
+        if row:
+            return _row_to_dict(row)
+    except Exception as exc:
+        logger.warning('[DASHBOARD] orders lookup failed: %s', exc)
+    try:
+        row = db.execute(
+            """SELECT email, plan_id, status, created_at, tx_hash
+               FROM platform_subscriptions
+               WHERE email=? AND lower(coalesce(status,'')) IN ('active','paid','verified','completed')
+               ORDER BY created_at DESC LIMIT 1""",
+            (email,),
+        ).fetchone()
+        if row:
+            rec = _row_to_dict(row)
+            plan_id = (rec.get('plan_id') or 'starter').lower()
+            try:
+                from sincor2.platform_payments import PLATFORM_PLANS
+                product = PLATFORM_PLANS.get(plan_id, {}).get('product_name') or plan_id.title()
+            except Exception:
+                product = plan_id.title()
+            return {
+                'order_id': rec.get('tx_hash') or rec.get('email'),
+                'customer_email': rec.get('email'),
+                'product_name': product,
+                'payment_status': rec.get('status') or 'completed',
+                'created_at': rec.get('created_at') or '',
+            }
+    except Exception as exc:
+        logger.debug('[DASHBOARD] platform_subscriptions lookup skipped: %s', exc)
+    return None
+
 
 # Product catalog - maps product names to types and deliverables
 PRODUCT_CATALOG = {
