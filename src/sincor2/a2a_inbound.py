@@ -41,6 +41,7 @@ from sincor2.contract_net import (
     BASE_CHAIN_ID,
     ESCROW_ADDRESS,
     calculate_bid_score,
+    probe_base_chain,
     stage_payout,
 )
 
@@ -209,6 +210,7 @@ def health_snapshot() -> Dict[str, Any]:
             "probation_open": probation_open,
             "heartbeat_ttl_s": HEARTBEAT_TTL_S,
             "merit_threshold_axm": MERIT_THRESHOLD_AXM,
+            "base_chain_id": BASE_CHAIN_ID,
         }
 
 
@@ -884,6 +886,10 @@ def register(app: Flask) -> None:
     @bp.get("/v1/a2a/directory")
     def v1_directory():
         return jsonify(directory_snapshot())
+
+    @bp.get("/v1/a2a/chain")
+    def v1_chain():
+        return jsonify(probe_base_chain())
 
     @bp.get("/docs/a2a")
     def docs_a2a():

@@ -879,10 +879,12 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
     now = datetime.utcnow().isoformat()
 
     db_ready, db_detail = _probe_database()
-    base_rpc_url = os.environ.get('BASE_RPC_URL', '').strip()
-    base_ready, base_detail = (True, 'not_configured')
-    if base_rpc_url:
-        base_ready, base_detail = _probe_jsonrpc(base_rpc_url)
+    # Public Base RPC is enough for reads (chainId, AXM code). Writes still
+    # stage until a signer key is set on Railway.
+    _default_base_rpc = 'https://mainnet.base.org'
+    _env_base_rpc = (os.environ.get('BASE_RPC_URL') or os.environ.get('BASE_RPC') or '').strip()
+    base_rpc_url = _env_base_rpc or _default_base_rpc
+    base_ready, base_detail = _probe_jsonrpc(base_rpc_url)
 
     stripe_configured = bool((os.environ.get('STRIPE_SECRET_KEY') or '').strip())
     paypal_configured = bool((os.environ.get('PAYPAL_REST_API_ID') or '').strip())
@@ -890,7 +892,12 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
 
     checks = {
         'database': {'ready': db_ready, 'critical': True, 'detail': db_detail},
-        'base_rpc': {'ready': base_ready, 'critical': bool(base_rpc_url), 'detail': base_detail},
+        'base_rpc': {
+            'ready': base_ready,
+            'critical': False,
+            'detail': base_detail,
+            'source': 'env' if _env_base_rpc else 'public_default',
+        },
         'stripe': {'ready': (not stripe_configured) or bool(STRIPE_AVAILABLE), 'critical': False, 'detail': 'configured' if stripe_configured else 'not_configured'},
         'paypal': {'ready': True, 'critical': False, 'detail': 'configured' if paypal_configured else 'not_configured'},
         'anthropic': {'ready': True, 'critical': False, 'detail': 'configured' if anthropic_configured else 'not_configured'},

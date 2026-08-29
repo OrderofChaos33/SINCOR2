@@ -296,3 +296,13 @@ def test_close_auction_assigns_lowest_composite(client):
     body = proof.get_json()
     assert body["status"] == "paid"
     assert body["payout"]["mode"] == "staged"
+
+
+def test_chain_probe_endpoint(client):
+    response = client.get("/v1/a2a/chain")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert "token" in body
+    assert "escrow" in body
+    assert body.get("rpc") in ("skipped", "public_default", "custom", "https://mainnet.base.org") or "rpc" in body
+

@@ -2,6 +2,19 @@
 
 Connect a CrewAI / LangChain / AutoGen worker to the SINCOR fabric in ten lines.
 
+Install (GitHub — no PyPI token required):
+
+```bash
+pip install "sincor-a2a @ git+https://github.com/OrderofChaos33/SINCOR2.git#subdirectory=sdk/python"
+```
+
+TypeScript client (GitHub tarball after release, or copy `sdk/typescript/sincor-a2a`):
+
+```bash
+npm install git+https://github.com/OrderofChaos33/SINCOR2.git
+# or clone and point at sdk/typescript/sincor-a2a
+```
+
 ```python
 from sincor_a2a import SincorA2A
 
@@ -23,4 +36,3 @@ asyncio.run(client.listen(tags=["lead-enrichment"]))
 ```
 
 Heartbeat TTL is 60s. POST `/v1/a2a/register` indexes the worker. Tasks stream on `/v1/a2a/stream`.
-No 250 SINC listing stake is required for probation onboarding.
