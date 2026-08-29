@@ -30,7 +30,70 @@ ESCROW_ADDRESS = os.environ.get(
     "ESCROW_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 )
 AXM_TOKEN = os.environ.get("AXM_TOKEN", "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a")
-BASE_RPC = os.environ.get("BASE_RPC") or os.environ.get("BASE_RPC_URL") or ""
+DEFAULT_BASE_RPC = "https://mainnet.base.org"
+_SIGNER_ENV = ("ESCROW_SIGNER_KEY", "PAYOUT_PRIVATE_KEY", "BASE_SIGNER_KEY")
+
+
+def resolve_base_rpc() -> str:
+    return (os.environ.get("BASE_RPC") or os.environ.get("BASE_RPC_URL") or DEFAULT_BASE_RPC).strip()
+
+
+def has_payout_signer() -> bool:
+    return any((os.environ.get(name) or "").strip() for name in _SIGNER_ENV)
+
+
+_PROBE_CACHE: Dict[str, Any] = {"ts": 0.0, "data": None}
+
+
+def probe_base_chain(timeout: int = 4) -> Dict[str, Any]:
+    """JSON-RPC read against Base. No web3 extra required."""
+    from urllib import error as urllib_error
+    from urllib import request as urllib_request
+
+    env = (os.environ.get("ENVIRONMENT") or os.environ.get("FLASK_ENV") or "").lower()
+    if env in ("test", "ci"):
+        return {
+            "ok": False,
+            "rpc": "skipped",
+            "chain_id": None,
+            "axm_code": False,
+            "token": AXM_TOKEN,
+            "escrow": ESCROW_ADDRESS,
+        }
+
+    now = time.time()
+    cached = _PROBE_CACHE.get("data")
+    if cached and now - float(_PROBE_CACHE.get("ts") or 0) < 30:
+        return cached
+
+    url = resolve_base_rpc()
+    result: Dict[str, Any] = {
+        "ok": False,
+        "rpc": DEFAULT_BASE_RPC if url == DEFAULT_BASE_RPC else "custom",
+        "chain_id": None,
+        "axm_code": False,
+        "token": AXM_TOKEN,
+        "escrow": ESCROW_ADDRESS,
+    }
+
+    def _call(method: str, params: list) -> Any:
+        payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
+        req = urllib_request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        with urllib_request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode())
+        return body.get("result")
+
+    try:
+        chain_id = _call("eth_chainId", [])
+        result["chain_id"] = chain_id
+        code = _call("eth_getCode", [AXM_TOKEN, "latest"]) or "0x"
+        result["axm_code"] = isinstance(code, str) and len(code) > 4
+        result["ok"] = str(chain_id).lower() in ("0x2105", "8453") and result["axm_code"]
+    except (urllib_error.URLError, TimeoutError, ValueError, OSError) as err:
+        result["error"] = str(err)
+    _PROBE_CACHE["ts"] = now
+    _PROBE_CACHE["data"] = result
+    return result
 
 
 def calculate_bid_score(bid_axm: float, time_est_sec: int, reputation: float) -> float:
@@ -49,7 +112,13 @@ def stage_payout(
     task_id: str,
     receipt_hash: str,
 ) -> Dict[str, Any]:
-    """Release AXM from Base escrow. Live RPC when BASE_RPC is set; else staged."""
+    """AXM escrow receipt.
+
+    Reads Base via the public RPC by default. Broadcast stays staged until a
+    signer key is present — we will not send a live tx from a hashed fake.
+    """
+    live_signer = has_payout_signer()
+    chain = probe_base_chain()
     staged: Dict[str, Any] = {
         "ok": True,
         "chain_id": BASE_CHAIN_ID,
@@ -60,23 +129,17 @@ def stage_payout(
         "amount_axm": amount_axm,
         "task_id": task_id,
         "receipt_hash": receipt_hash,
-        "mode": "live" if BASE_RPC else "staged",
+        "mode": "live" if live_signer else "staged",
+        "rpc_ok": bool(chain.get("ok")),
+        "rpc_chain_id": chain.get("chain_id"),
         "ts": int(time.time()),
     }
     digest = hashlib.sha256(
         f"{task_id}:{wallet}:{amount_axm}:{receipt_hash}".encode()
     ).hexdigest()
     staged["tx_hash"] = "0x" + digest
-    if BASE_RPC:
-        try:
-            from web3 import Web3  # type: ignore
-
-            w3 = Web3(Web3.HTTPProvider(BASE_RPC))
-            staged["rpc_ok"] = bool(w3.is_connected())
-        except Exception as err:  # pragma: no cover - optional live path
-            staged["ok"] = False
-            staged["error"] = str(err)
-            staged["tx_hash"] = None
+    if live_signer:
+        staged["note"] = "signer present — broadcast still requires Railway ESCROW_SIGNER_KEY wiring"
     return staged
 
 

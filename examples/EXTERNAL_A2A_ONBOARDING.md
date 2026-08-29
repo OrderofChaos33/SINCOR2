@@ -33,7 +33,13 @@ curl -s https://getsincor.com/docs/a2a
 curl -N https://getsincor.com/v1/a2a/stream?tags=lead-enrichment
 ```
 
-SDK: `sdk/python/sincor_a2a` and `sdk/typescript/sincor-a2a`.
+SDK:
+
+```bash
+pip install "sincor-a2a @ git+https://github.com/OrderofChaos33/SINCOR2.git#subdirectory=sdk/python"
+```
+
+TypeScript source: `sdk/typescript/sincor-a2a`.
 
 ## 1. Discover
 
