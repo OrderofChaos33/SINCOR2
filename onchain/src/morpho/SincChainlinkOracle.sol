@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.26;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
@@ -61,9 +61,10 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
                 : _manualPrice;
         }
 
-        (, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = feed.latestRoundData();
+        (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) =
+            feed.latestRoundData();
         if (answer <= 0) revert InvalidPrice();
-        if (answeredInRound == 0) revert InvalidRound();
+        if (startedAt == 0 || answeredInRound == 0 || answeredInRound < roundId) revert InvalidRound();
         if (block.timestamp - updatedAt > maxStaleness) revert StalePrice();
 
         uint256 raw = uint256(answer);
@@ -90,8 +91,8 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
     /// @notice Manual price update (Morpho-scaled). Only usable while useManual = true.
     /// @param newPrice Morpho-scaled value (e.g. 1.5e34 for $1.50)
     function updateManualPrice(uint256 newPrice) external onlyOwner whenNotPaused {
-        uint256 floorScaled = PRICE_FLOOR_8DEC * SCALE_FACTOR;
-        if (newPrice < floorScaled) revert PriceBelowFloor();
+        uint256 floorScaledValue = PRICE_FLOOR_8DEC * SCALE_FACTOR;
+        if (newPrice < floorScaledValue) revert PriceBelowFloor();
         _manualPrice = newPrice;
         _manualTimestamp = block.timestamp;
         emit PriceUpdated(newPrice, block.timestamp);

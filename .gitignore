@@ -99,9 +99,10 @@ Thumbs.db
 .next/
 out/
 
-# ============================================================================
-# Temporary Files
-# ============================================================================
+# Foundry 1.8 solar preprocessor (must never be committed)
+foundry-pp/
+onchain/foundry-pp/
+
 *.tmp
 *.temp
 *.bak

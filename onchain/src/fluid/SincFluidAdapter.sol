@@ -221,9 +221,12 @@ contract SincFluidAdapter is ReentrancyGuard, Pausable {
     {
         address v = smartVault;
         if (v == address(0)) revert VaultNotSet();
-        (nftIdOut,,) = IFluidVaultT1(v).operate(nftId, newCol, newDebt, to == address(0) ? treasury : to);
+        int256 colOut;
+        int256 debtOut;
+        (nftIdOut, colOut, debtOut) =
+            IFluidVaultT1(v).operate(nftId, newCol, newDebt, to == address(0) ? treasury : to);
         if (nftId == 0) lastNftId = nftIdOut;
-        emit VaultOperated(v, nftIdOut, newCol, newDebt, to);
+        emit VaultOperated(v, nftIdOut, colOut, debtOut, to);
     }
 
     /// @notice Forward a deployDex request. WILL REVERT until Fluid governance grants
