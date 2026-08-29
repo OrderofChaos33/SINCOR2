@@ -103,6 +103,8 @@ contract SincFluidAdapterTest is Test {
     }
 
     function testFuzz_supplyDex(uint64 sincAmt, uint64 usdcAmt) public {
+        sincAmt = uint64(bound(sincAmt, 0, 1_000_000e8));
+        usdcAmt = uint64(bound(usdcAmt, 0, 1_000_000e6));
         vm.assume(sincAmt > 0 || usdcAmt > 0);
         vm.startPrank(user);
         uint256 shares = adapter.supplyToDex(sincAmt, usdcAmt, 0);

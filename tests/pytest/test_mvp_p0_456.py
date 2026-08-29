@@ -116,6 +116,32 @@ def test_dashboard_paid_no_fabricated_metrics(mvp_client):
     assert "—" in html
 
 
+def test_legacy_mock_dashboards_not_on_mvp_app(mvp_client):
+    """gunicorn sincor2.mvp_app:app must not serve app.py mock telemetry dashboards."""
+    for path in ("/professional", "/executive", "/admin-dashboard", "/consciousness-transfer"):
+        r = mvp_client.get(path, follow_redirects=False)
+        assert r.status_code == 404, path
+
+
+def test_a2a_quote_canonical_axm(mvp_client):
+    r = mvp_client.get("/api/a2a/quote?skill_id=lead-enrichment")
+    assert r.status_code == 200
+    data = r.get_json()
+    axm = (data.get("axiom_contract") or data.get("axm_contract") or "").lower()
+    assert axm == "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
+
+
+def test_morpho_pragma_matches_pinned_solc():
+    """Morpho sources must compile under foundry.toml solc 0.8.26 (not ^0.8.28)."""
+    morpho = ROOT / "onchain" / "src" / "morpho"
+    bad = []
+    for path in morpho.glob("*.sol"):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if "pragma solidity ^0.8.28" in text or "pragma solidity 0.8.28" in text:
+            bad.append(path.name)
+    assert not bad, f"morpho pragma 0.8.28 (foundry pins 0.8.26): {bad}"
+
+
 def test_execute_live_not_hardcoded_true():
     """Committed Python must never force EXECUTE_LIVE on (env-gated only)."""
     assign = re.compile(r"""(?:^|\n)\s*EXECUTE_LIVE\s*=\s*(True|1)\s*(?:#|$)""")
