@@ -76,6 +76,17 @@ def inject_social_links():
 
 
 @app.context_processor
+def inject_onchain_addresses():
+    """Live SINC / AXM / treasury — templates must not hardcode retired contracts."""
+    from sincor2.onchain.constants import AXIOM_TOKEN, SINC_TOKEN, TREASURY
+    return {
+        'sinc_token': SINC_TOKEN,
+        'axiom_token': AXIOM_TOKEN,
+        'treasury_address': TREASURY,
+    }
+
+
+@app.context_processor
 def inject_auth_state():
     return {
         'is_admin': bool(session.get('is_admin')),

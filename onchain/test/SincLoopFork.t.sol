@@ -12,7 +12,7 @@ import {SincSwapRouter} from "../src/SincSwapRouter.sol";
 ///         All addresses below are the canonical Base deployments (CANONICAL_ADDRESSES.md).
 contract SincLoopForkTest is Test {
     // --- canonical Base addresses (verified onchain) ---
-    address constant SINC = 0x9C8cd8d3961F445D653713dE65C6578bE11668e7; // 8 dp
+    address constant SINC = 0xe1D836087F6573b665d25CE088793E916D7892f8; // 8 dp
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913; // 6 dp
     address constant WETH = 0x4200000000000000000000000000000000000006;
     address constant CURVE = 0x75dE341a2BC81806198364F125d4Cde36527619C; // live sale curve

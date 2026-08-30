@@ -8,7 +8,7 @@ network:
   # Prefer preconf for reads + submission when available
 
 addresses:
-  sinc: "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+  sinc: "0xe1D836087F6573b665d25CE088793E916D7892f8"
   usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
   sinc_limit_order_hook: "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0"
   shared_liquidity_vault: "0xeA90a257e5Dae20a0472C4812775F28614459bb6"

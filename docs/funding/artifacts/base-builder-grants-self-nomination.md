@@ -18,8 +18,8 @@ SINCOR2 is already shipped as a public product and codebase, not a concept deck.
 - Live platform: `https://getsincor.com`
 - Public docs describe 43 live agent skills and Base-native token settlement.
 - Canonical onchain docs list:
-  - SINC: `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`
-  - AXIOM: `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822`
+  - SINC: `0xe1D836087F6573b665d25CE088793E916D7892f8`
+  - AXIOM: `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`
   - SincBondingCurve: `0x75dE341a2BC81806198364F125d4Cde36527619C`
   - SincLimitOrderHook: `0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0`
 

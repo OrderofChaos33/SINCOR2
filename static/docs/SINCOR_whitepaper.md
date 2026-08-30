@@ -54,9 +54,9 @@ Healthcare (RCM + credentialing + HIPAA guardrails), Dental practice ops, Compli
 
 | Property | Value |
 |----------|-------|
-| Contract | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` |
+| Contract | `0xe1D836087F6573b665d25CE088793E916D7892f8` |
 | Decimals | 8 |
-| Supply | 100,000,000 (fixed, no mint) |
+| Supply | 1,000,000,000 (fixed, no mint) |
 | CertiK Skynet | 97/100 |
 | Verification | Sourcify full-match |
 
@@ -73,7 +73,7 @@ Healthcare (RCM + credentialing + HIPAA guardrails), Dental practice ops, Compli
 
 | Property | Value |
 |----------|-------|
-| Contract | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` |
+| Contract | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` |
 | Role | One-off reports, A2A task settlement |
 | Platform use | AXM-priced intel when configured |
 

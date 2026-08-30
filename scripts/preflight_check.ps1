@@ -41,11 +41,11 @@ if (-not $env) {
     Check ".env exists" "FAIL" "Missing $root\onchain\.env"
 } else {
     $hasKey = ($env | Where-Object { $_ -match "^DEPLOYER_PRIVATE_KEY=0x[a-fA-F0-9]{64}$" }).Count -gt 0
-    $hasSinc = ($env | Where-Object { $_ -match "^SINC_TOKEN=0x9C8cd8d3961F445D653713dE65C6578bE11668e7$" }).Count -gt 0
+    $hasSinc = ($env | Where-Object { $_ -match "^SINC_TOKEN=0xe1D836087F6573b665d25CE088793E916D7892f8$" }).Count -gt 0
     $hasMainnetPM = ($env | Where-Object { $_ -match "^POOL_MANAGER=0x498581fF718922c3f8e6A244956aF099B2652b2b$" }).Count -gt 0
     $hasSalt = ($env | Where-Object { $_ -match "^HOOK_SALT=0x[a-fA-F0-9]{64}$" }).Count -gt 0
     if ($hasKey) { Check ".env DEPLOYER_PRIVATE_KEY present" "OK" "" } else { Check ".env DEPLOYER_PRIVATE_KEY" "FAIL" "Missing or malformed" }
-    if ($hasSinc) { Check ".env SINC_TOKEN = canonical" "OK" "" } else { Check ".env SINC_TOKEN" "FAIL" "Not set to 0x9C8c…68e7" }
+    if ($hasSinc) { Check ".env SINC_TOKEN = canonical" "OK" "" } else { Check ".env SINC_TOKEN" "FAIL" "Not set to 0xe1D836087F6573b665d25CE088793E916D7892f8" }
     if ($hasMainnetPM) { Check ".env POOL_MANAGER = Base mainnet V4" "OK" "" } else { Check ".env POOL_MANAGER" "FAIL" "Not set to mainnet V4 0x498581ff…" }
     if ($hasSalt) { Check ".env HOOK_SALT mined" "OK" "" } else { Check ".env HOOK_SALT" "FAIL" "Not mined" }
 }

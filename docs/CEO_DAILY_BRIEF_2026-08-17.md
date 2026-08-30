@@ -15,7 +15,7 @@
 - SINC residual: legacy only. **No new SINC billing.**
 - Recent activity: USDC accumulation visible. **Still zero confirmed platform fee / A2A settlement / subscription inflow tagged in ledger as `projected=false` + tx_hash** in the window. Capital improved; source of USDC delta not yet instrumented as platform revenue.
 
-**AXIOM (AXM `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822`):** Sole platform utility + A2A settlement + billing + fees effective 16 Aug. All new flows must route AXM or USDC-equivalent to treasury. Issue #156 remains open until enforcement is verified on production paths.
+**AXIOM (AXM `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`):** Sole platform utility + A2A settlement + billing + fees effective 16 Aug. All new flows must route AXM or USDC-equivalent to treasury. Issue #156 remains open until enforcement is verified on production paths.
 
 **Platform state:**
 - 42 agents claimed 24/7. Agent YAML roster, runner, departments, TOA (E-toa-44), `yield_aggregator` (DRY_RUN default), `treasury_inflow` ledger, `defi_swarm_checkin_scheduler` (5-min loops) present and structured.

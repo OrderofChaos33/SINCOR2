@@ -44,7 +44,7 @@
 
 ## 4. Pre-mainnet checklist (must complete before value deployment)
 
-- [ ] **Chain decision**: canonical SINC v3 (`0x9C8cd8d3961F445D653713dE65C6578bE11668e7`, 8 dp) and the bonding curve live on **Base**; treasury USDC currently sits on **Polygon**. Deploy the stack where SINC liquidity actually is (Base), or bridge a SINC representation first. Uniswap V4 PoolManager is `0x498581fF718922c3f8e6A244956aF099B2652b2b` on both chains (deterministic CREATE2 deployment).
+- [ ] **Chain decision**: canonical SINC v3 (`0xe1D836087F6573b665d25CE088793E916D7892f8`, 8 dp) and the bonding curve live on **Base**; treasury USDC currently sits on **Polygon**. Deploy the stack where SINC liquidity actually is (Base), or bridge a SINC representation first. Uniswap V4 PoolManager is `0x498581fF718922c3f8e6A244956aF099B2652b2b` on both chains (deterministic CREATE2 deployment).
 - [ ] **Gas token on the deployer wallet** (POL on Polygon / ETH on Base) — deployment reverts without it.
 - [ ] Hook address mining (beforeSwap `1<<7` + afterSwap `1<<6` flags) via CREATE2/HookMiner — see `script/Deploy.s.sol` checklist.
 - [ ] Guardian key → hardware wallet or multisig (currently single-key in Deploy script).

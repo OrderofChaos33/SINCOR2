@@ -10,11 +10,12 @@
       "address": "0xeA90a257e5Dae20a0472C4812775F28614459bb6",
       "bytecodeBytes": 7811,
       "verified": {
-        "SINC": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+        "SINC": "0xe1D836087F6573b665d25CE088793E916D7892f8",
         "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
         "guardian": "0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a",
         "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
-      }
+      },
+      "note": "Live SINC is 0xe1D836087F6573b665d25CE088793E916D7892f8. Vault constructor calldata is immutable on-chain; this JSON is a live pointer, not a rewrite of historical constructor args."
     },
     "SharedLiquidityHook": {
       "address": "0x5A20BfEc6Caa3A94246eCCCb36F27F4980152dC0",

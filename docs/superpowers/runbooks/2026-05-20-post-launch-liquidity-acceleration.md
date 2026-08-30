@@ -200,5 +200,5 @@ If any of these tactics surface in agent drafts via the content engine, `check_c
 ## Connection to project
 
 - Replaces spec §11 items 1-2 (Morpho lending, Bunni LP) for short-horizon execution
-- Cross-refs [[project_sinc_axiom_relaunch]] for canonical contract address `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`
+- Cross-refs [[project_sinc_axiom_relaunch]] for canonical contract address `0xe1D836087F6573b665d25CE088793E916D7892f8`
 - Adheres to [[signing_authority]] — all on-chain actions signed by user, not me. Merkle generation scripts produce *proposals*; user signs the deploy and the weekly root-update txs.

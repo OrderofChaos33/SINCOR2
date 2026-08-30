@@ -7,7 +7,7 @@
 
 ## Tier 0 — Immutable Directive (never mutate without explicit Founder override)
 - AXIOM (`0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`) is the **sole** primary platform, A2A settlement, billing, and fee token (deployed 2026-08-18).
-- SINC (`0x9C8cd8d3961F445D653713dE65C6578bE11668e7`) is legacy only. No new billing, no new A2A quotes, no new subscriptions, no new access gates in SINC.
+- SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`) is legacy only. No new billing, no new A2A quotes, no new subscriptions, no new access gates in SINC.
 - Treasury remains `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`. All realized inflows must be AXM-denominated or USDC convertible to it.
 - CANONICAL_ADDRESSES.md is the single source of truth. Any file that disagrees is wrong and must be corrected.
 - Previous address `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` is permanently retired (stale/dead).
@@ -39,7 +39,7 @@
 
 ## Tier 3 — Self-Improvement Loop (TOA + Critic + Optimizer)
 Every PR / agent run that touches token logic must:
-1. Run a grep for `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` and `A2A_PRIMARY_TOKEN.*SINC` and report any new non-legacy occurrences.
+1. Run a grep for `0xe1D836087F6573b665d25CE088793E916D7892f8` and `A2A_PRIMARY_TOKEN.*SINC` and report any new non-legacy occurrences.
 2. Critic agent must reject any change that re-introduces SINC as default or removes the address validation guards.
 3. Critic must also reject any use of the retired address `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822`.
 4. Optimizer agent must propose the next highest-ROI remaining item from Tier 2 list after each successful merge.

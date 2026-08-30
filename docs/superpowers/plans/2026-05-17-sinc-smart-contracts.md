@@ -15,7 +15,7 @@
 - Quoter: `0x0d5e0f971ed27fbff6c2837bf31316121532048d`
 - StateView: `0xa3c0c9b65bad0b08107aa264b0f3db444b867a71`
 - Permit2: `0x000000000022D473030F116dDEE9F6B43aC78BA3`
-- SINC token (canonical, 8 decimals): `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`
+- SINC token (canonical, 8 decimals): `0xe1D836087F6573b665d25CE088793E916D7892f8`
 
 **Prerequisites (do NOT include in plan — user action required first):**
 1. User must have moved 100M SINC from `0x35cb…7D6f` to `0xAf9B…289e` (spec runbook step 1). Plan 4 covers mainnet execution; for Sepolia testing in this plan, user mints test SINC via a Sepolia-only mock token (Task 2).
@@ -236,7 +236,7 @@ git commit -m "onchain: add env template (do NOT commit .env)"
 
 ## Task 3: Write the MockSinc helper (Sepolia-only)
 
-A faithful 8-decimal mock of the canonical SINC contract for use in tests and Sepolia deployments. Mainnet deployments use the real `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`.
+A faithful 8-decimal mock of the canonical SINC contract for use in tests and Sepolia deployments. Mainnet deployments use the real `0xe1D836087F6573b665d25CE088793E916D7892f8`.
 
 **Files:**
 - Create: `sincor-clean/onchain/test/mocks/MockSinc.sol`

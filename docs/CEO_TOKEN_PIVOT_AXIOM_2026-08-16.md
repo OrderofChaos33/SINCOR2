@@ -12,8 +12,10 @@ Effective immediately, **AXIOM (AXM)** is the sole platform and settlement token
 
 | Token | Address (Base) | New Role |
 |-------|----------------|----------|
-| **AXIOM (AXM)** | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | **SOLE** platform utility + A2A settlement + billing + fees |
-| SINC | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Legacy only. No new billing, no new subscriptions, no new A2A quotes in SINC. Bonding curve remains for residual holders; do not expand. |
+| **AXIOM (AXM)** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | **SOLE** platform utility + A2A settlement + billing + fees |
+| SINC | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Legacy only. No new billing, no new subscriptions, no new A2A quotes in SINC. Bonding curve remains for residual holders; do not expand. |
+
+Live AXM pointer corrected 2026-08-18 (retired PumpClaw `0xfF7aF6…` is denylisted in `src/sincor2/onchain/constants.py`).
 
 Treasury remains `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`. All realized inflows (fees, settlements, pilot payments) must be denominated or convertible to AXM / USDC and recorded against this address.
 

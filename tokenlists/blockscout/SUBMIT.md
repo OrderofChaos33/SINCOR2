@@ -18,7 +18,7 @@ Contract is verified on-chain; you need **explorer certification** (steps below)
 2. Blockscout → My Account → Verified addresses → Add address → sign as deployer.
 3. Update token icon URL to https://getsincor.com/static/tokenlists/assets/logo-256.png
 4. Submit public tag: https://base.blockscout.com/public-tags/submit
-5. Register on TKN: https://tkn.xyz/token/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7
+5. Register on TKN: https://tkn.xyz/token/base/0xe1D836087F6573b665d25CE088793E916D7892f8
 6. Open Superchain PR: python scripts/whitelist_token.py launch (or submit_superchain_pr.ps1)
 
 ## Deployer wallet (verify ownership in Blockscout)

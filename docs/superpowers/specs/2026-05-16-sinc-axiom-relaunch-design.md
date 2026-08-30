@@ -29,7 +29,7 @@ Relaunch the SINC token in a way that:
 
 ## 3. Canonical SINC contract
 
-**Address:** `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` (Base mainnet)
+**Address:** `0xe1D836087F6573b665d25CE088793E916D7892f8` (Base mainnet)
 
 **Verified properties (on-chain, as of 2026-05-16):**
 - Source code verified on Basescan ("Exact Match")
@@ -569,7 +569,7 @@ Explicitly NOT in this spec; documented for future planning:
 | Decision | Choice | Date |
 |---|---|---|
 | Approach | A (cleanup + relaunch), then pivoted to Track B (use newer audited contract) | 2026-05-16 |
-| Canonical SINC contract | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` (Track B) | 2026-05-16 |
+| Canonical SINC contract | `0xe1D836087F6573b665d25CE088793E916D7892f8` (Track B) | 2026-05-16 |
 | Decimals | Keep 8 (preserves CertiK audit) | 2026-05-16 |
 | v2 migration | None (user owns all 37 v2 wallets) | 2026-05-16 |
 | LP lock method | Burn LP tokens to `0x...dEaD` via curve graduation | 2026-05-16 |
