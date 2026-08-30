@@ -1,4 +1,4 @@
-"""A2A inbound routes + agent/market operations. Imported by a2a_inbound.register."""
+"""A2A inbound routes + agent operations. Imported by a2a_inbound.register."""
 from __future__ import annotations
 
 import logging
@@ -8,14 +8,12 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, Response, jsonify, request, stream_with_context
+from flask import Blueprint, Flask, Response, jsonify, request
 
-from sincor2.contract_net import BASE_CHAIN_ID, calculate_bid_score, probe_base_chain, stage_payout
+from sincor2.contract_net import BASE_CHAIN_ID, probe_base_chain
 from sincor2.a2a_inbound import (
-    AUCTION_WINDOW_MS,
     HEARTBEAT_TTL_S,
     MAX_AGENTS,
-    MAX_OPEN_TASKS,
     MERIT_THRESHOLD_AXM,
     PROBATION_SEEDS,
     _AGENT_ID_RE,
@@ -28,7 +26,6 @@ from sincor2.a2a_inbound import (
     _save_agents,
     get_fabric,
     health_snapshot,
-    sign_payload,
 )
 
 logger = logging.getLogger("sincor.a2a.inbound")
@@ -91,19 +88,17 @@ def heartbeat_agent(agent_id: str, signature: str = "") -> Dict[str, Any]:
 
 def ensure_platform_agent() -> Dict[str, Any]:
     base = (os.environ.get("PUBLIC_BASE_URL") or os.environ.get("SITE_URL") or "https://getsincor.com").rstrip("/")
-    snapshot = register_agent_record(
-        {
-            "agent_id": _PLATFORM_AGENT_ID,
-            "name": "SINCOR Agent Swarm",
-            "description": "Native SINCOR execution surface on getsincor.com",
-            "version": "2.0.0",
-            "capability_tags": ["lead-enrichment", "outreach-sequence", "competitor-intel", "axiom-payment", "x402"],
-            "rpc_callback": f"{base}/api/a2a",
-            "wallet": os.environ.get("TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"),
-            "chain_id": BASE_CHAIN_ID,
-            "reputation": 1.0,
-        }
-    )
+    snapshot = register_agent_record({
+        "agent_id": _PLATFORM_AGENT_ID,
+        "name": "SINCOR Agent Swarm",
+        "description": "Native SINCOR execution surface on getsincor.com",
+        "version": "2.0.0",
+        "capability_tags": ["lead-enrichment", "outreach-sequence", "competitor-intel", "axiom-payment", "x402"],
+        "rpc_callback": f"{base}/api/a2a",
+        "wallet": os.environ.get("TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"),
+        "chain_id": BASE_CHAIN_ID,
+        "reputation": 1.0,
+    })
     _start_platform_heartbeat()
     logger.info("[A2A] Platform agent live id=%s status=%s", snapshot.get("agent_id"), snapshot.get("status"))
     return snapshot
@@ -146,3 +141,52 @@ def list_agents(live_only: bool = False) -> List[Dict[str, Any]]:
             row["heartbeat_age_ms"] = age
             out.append(row)
         return sorted(out, key=lambda a: a.get("registered_at") or 0, reverse=True)
+
+
+def mount(app: Flask) -> None:
+    bp = Blueprint("a2a_inbound", __name__)
+
+    @bp.post("/api/marketplace/register")
+    @bp.post("/v1/a2a/register")
+    @bp.post("/api/v1/a2a/register")
+    def v1_register():
+        body = request.get_json(silent=True) or {}
+        try:
+            agent = register_agent_record(body)
+        except ValueError as err:
+            return _http_error(str(err), 400)
+        except OverflowError as err:
+            return _http_error(str(err), 503)
+        return jsonify({"agent_id": agent["agent_id"], "status": "registered", "name": agent["name"], "probation": bool(agent.get("probation")), "heartbeat_ttl_s": HEARTBEAT_TTL_S, "stream_url": "/v1/a2a/stream"}), 201
+
+    @bp.post("/v1/a2a/heartbeat")
+    def v1_heartbeat():
+        body = request.get_json(silent=True) or {}
+        agent_id = str(body.get("agent_id") or request.args.get("agent_id") or "").strip()
+        if not agent_id:
+            return _http_error("agent_id is required", 400)
+        try:
+            return jsonify(heartbeat_agent(agent_id))
+        except KeyError:
+            return _http_error("unknown agent", 404)
+
+    @bp.get("/v1/a2a/agents")
+    @bp.get("/api/marketplace/agents")
+    def v1_agents():
+        agents = list_agents(live_only=request.args.get("live", "0") in ("1", "true", "yes"))
+        return jsonify({"agents": agents, "count": len(agents)})
+
+    @bp.get("/v1/a2a/directory")
+    def v1_directory():
+        return jsonify({"agents": list_agents(), "kpis": health_snapshot()})
+
+    @bp.get("/v1/a2a/chain")
+    def v1_chain():
+        return jsonify(probe_base_chain())
+
+    app.register_blueprint(bp)
+    try:
+        ensure_platform_agent()
+    except Exception as err:
+        logger.warning("[A2A] Platform agent seed skipped: %s", err)
+    logger.info("[A2A] Inbound register + heartbeat + directory mounted")
