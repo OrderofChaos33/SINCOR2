@@ -78,7 +78,15 @@ def probe_base_chain(timeout: int = 4) -> Dict[str, Any]:
 
     def _call(method: str, params: list) -> Any:
         payload = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-        req = urllib_request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        req = urllib_request.Request(
+            url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "SINCOR2-contract-net/1.0",
+            },
+        )
         with urllib_request.urlopen(req, timeout=timeout) as resp:
             body = json.loads(resp.read().decode())
         return body.get("result")
