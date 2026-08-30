@@ -27,8 +27,8 @@ def assert_production_safety() -> list[str]:
     """
     warnings: list[str] = []
 
-    if os.getenv("AGENT_BURN_AUTO", "false").lower() == "true" and not onchain_writes_allowed():
-        warnings.append("AGENT_BURN_AUTO=true blocked in production (set false in Railway)")
+    if os.getenv("EXECUTE_LIVE", "0").strip() == "1" and _IS_PROD and not _OVERRIDE:
+        warnings.append("EXECUTE_LIVE=1 is set in production — treasury agent will broadcast if a signer key is present")
 
     if os.getenv("POLYCLAW_AUTO_EXECUTE", "false").lower() == "true" and not onchain_writes_allowed():
         warnings.append("POLYCLAW_AUTO_EXECUTE=true blocked in production")

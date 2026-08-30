@@ -1,0 +1,100 @@
+{
+  "name": "SINCOR Agent Swarm",
+  "description": "Production autonomous AI workforce. 42 specialized agents across 7 archetypes. Core differentiator: Temporal Optimization Agent (TOA) — forecast → Monte Carlo → wave-function-collapse for ranked action plans. External agents pay in SINC or AXIOM on Base. Healthcare credentialing and compliance verticals live. 50% of AXM settlements burned on-chain.",
+  "version": "2.1.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "toa-decision",
+      "name": "TOA Strategic Decision & Outcome Collapse",
+      "description": "Submit multi-option decisions to the Temporal Optimization Agent. Kernel forecasts + Monte Carlo multi-criteria simulation + wave-function-collapse ranking. Returns top-k action plans optimized for long-term positive outcomes.",
+      "tags": ["toa", "strategy", "decision", "optimization", "monte-carlo", "wfc"],
+      "examples": ["Should I expand to the UK market in Q4 or double down on US mid-market under current liquidity constraints?"],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"],
+      "sincPrice": 6,
+      "estimatedLatencySeconds": 45,
+      "freeQuota": 0
+    },
+    {
+      "id": "lead-enrichment",
+      "name": "Lead Enrichment & Outbound Prospecting",
+      "description": "Enrich company + contact records, score lead fit, and draft personalised outbound messages.",
+      "tags": ["sales", "outbound", "leads", "crm"],
+      "examples": ["Enrich and score this list of 50 SaaS companies for enterprise fit."],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"],
+      "sincPrice": 3,
+      "estimatedLatencySeconds": 30,
+      "freeQuota": 5
+    },
+    {
+      "id": "competitor-intel",
+      "name": "Competitor Intelligence & SWOT",
+      "description": "Rapid competitor scans, positioning gap analysis, SWOT generation.",
+      "tags": ["market", "competitive-analysis", "research"],
+      "examples": ["Who are the top 5 competitors to a DeFi yield aggregator on Base?"],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"],
+      "sincPrice": 2,
+      "estimatedLatencySeconds": 25,
+      "freeQuota": 5
+    },
+    {
+      "id": "healthcare-credential-check",
+      "name": "Healthcare Credential Check",
+      "description": "NPI, licences, DEA, payer credentialing status for healthcare operators.",
+      "tags": ["healthcare", "credentialing", "compliance", "b2b"],
+      "examples": ["Verify credential status and license expiry for this provider NPI."],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["application/json"],
+      "sincPrice": 4,
+      "estimatedLatencySeconds": 45,
+      "freeQuota": 0
+    },
+    {
+      "id": "market-forecast",
+      "name": "Market Forecast & Scenario Planning",
+      "description": "Forward-looking forecasts with Monte Carlo simulations and what-if modelling.",
+      "tags": ["analytics", "forecasting", "monte-carlo"],
+      "examples": ["Model ARR growth under three expansion scenarios for Q3 2026."],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"],
+      "sincPrice": 4,
+      "estimatedLatencySeconds": 35,
+      "freeQuota": 5
+    },
+    {
+      "id": "outreach-sequence",
+      "name": "Outreach Sequence Builder",
+      "description": "Generate multi-touch outbound sequences tailored to a specific ICP.",
+      "tags": ["sales", "outreach", "email", "linkedin"],
+      "examples": ["Build a 5-touch email sequence for SMB dental practices in Texas."],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"],
+      "sincPrice": 3,
+      "estimatedLatencySeconds": 20,
+      "freeQuota": 5
+    }
+  ],
+  "documentationUrl": "https://getsincor.com/docs",
+  "securitySchemes": {},
+  "security": []
+}

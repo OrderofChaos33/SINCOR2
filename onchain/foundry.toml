@@ -11,6 +11,9 @@ via_ir = true
 evm_version = "cancun"
 gas_reports = ["SincBondingCurve", "SincLimitOrderHook", "SincGenesisNFT"]
 fs_permissions = [{ access = "read-write", path = "./deployments" }]
+# Foundry 1.8 solar preprocessor (dynamic test linking) emits virtual
+# foundry-pp/* sources that crytic-compile 0.4.2 / Slither 0.11.6 cannot parse.
+dynamic_test_linking = false
 
 [fuzz]
 runs = 1000

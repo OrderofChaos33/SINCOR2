@@ -1,0 +1,20 @@
+{
+  "name": "sincor2-onchain-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Indexer sync agent and Uniswap v4 pool deploy scripts for SINCOR2",
+  "scripts": {
+    "indexer:ping": "tsx scripts/indexerPingerAgent.ts",
+    "deploy:pools-v4": "tsx scripts/deployPoolsV4.ts"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

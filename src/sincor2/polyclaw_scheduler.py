@@ -37,6 +37,14 @@ _live_adapter: Optional[Any] = None
 _bootstrap_error: Optional[str] = None
 
 
+def _has_any_private_key() -> bool:
+    """True if any of the accepted private-key env aliases is set."""
+    for name in ("POLYMARKET_PRIVATE_KEY", "POLYCLAW_PRIVATE_KEY", "POLYMARKET_PK"):
+        if os.getenv(name, "").strip():
+            return True
+    return False
+
+
 def _bootstrap_live_client() -> None:
     """Warm CLOB client + on-chain allowances immediately in live mode.
 
@@ -47,8 +55,11 @@ def _bootstrap_live_client() -> None:
     global _live_adapter, _bootstrap_error
     if os.getenv("POLYCLAW_LIVE", "false").lower() != "true":
         return
-    if not os.getenv("POLYMARKET_PRIVATE_KEY", "").strip():
-        _bootstrap_error = "POLYMARKET_PRIVATE_KEY not set"
+    if not _has_any_private_key():
+        _bootstrap_error = (
+            "no private key in POLYMARKET_PRIVATE_KEY / "
+            "POLYCLAW_PRIVATE_KEY / POLYMARKET_PK"
+        )
         logger.error("[POLYCLAW] live mode on but %s", _bootstrap_error)
         return
     try:
@@ -83,19 +94,23 @@ def _status_view():
     live = os.getenv("POLYCLAW_LIVE", "false").lower() == "true"
     addr = None
     allowances_ready = False
+    key_error = None
     if _live_adapter is not None:
         try:
             addr = _live_adapter.trading_address()
             allowances_ready = bool(getattr(_live_adapter, "_allowances_ready", False))
-        except Exception:
-            pass
+            key_error = getattr(_live_adapter, "key_error", lambda: None)()
+        except Exception as exc:
+            key_error = str(exc)[:200]
     if addr is None:
         try:
             from sincor2.execution_adapter import PolymarketAdapter
 
-            addr = PolymarketAdapter().trading_address()
-        except Exception:
-            pass
+            adapter = PolymarketAdapter()
+            addr = adapter.trading_address()
+            key_error = adapter.key_error()
+        except Exception as exc:
+            key_error = str(exc)[:200]
 
     base = {
         "enabled": os.getenv("POLYCLAW_ENABLED", "true").lower() == "true",
@@ -105,6 +120,7 @@ def _status_view():
         "trading_address": addr,
         "allowances_ready": allowances_ready,
         "bootstrap_error": _bootstrap_error,
+        "key_error": key_error,
         "timestamp": datetime.utcnow().isoformat(),
     }
     # Admin-only financial detail (auth helpers live in mvp_app; by request

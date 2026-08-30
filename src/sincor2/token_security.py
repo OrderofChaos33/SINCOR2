@@ -1,4 +1,7 @@
-"""On-chain security signals and explorer certification status for SINC."""
+"""On-chain security signals and explorer certification status for SINC.
+
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
+"""
 
 from __future__ import annotations
 
@@ -7,10 +10,12 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
-CHAIN_ID = 8453
+from sincor2.onchain.constants import BASE_CHAIN_ID, BONDING_CURVE, SINC_TOKEN
+
+SINC = SINC_TOKEN
+CHAIN_ID = BASE_CHAIN_ID
 DEPLOYER = "0xC184EcEfFaf6392951e4C7b042d61774497B5dC5"
-BONDING_CURVE = "0x75dE341a2BC81806198364F125d4Cde36527619C"
+BONDING_CURVE = BONDING_CURVE
 ROGUE_V2_PAIR = "0x85372932f9b151a076815d92cf71a97980ffd667"
 
 

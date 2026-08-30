@@ -79,6 +79,18 @@ def run_startup_initializers(app: Flask, settings: Settings) -> None:
     _boot_log("startup", "begin", "initializing runtime settings")
     app.config["SINCOR_SETTINGS"] = settings
     _boot_log("startup", "ok", "settings bound to flask app")
+    try:
+        from sincor2.onchain.probe import validate_at_startup
+
+        report = validate_at_startup(rpc_url=settings.base_rpc_url)
+        app.config["SINCOR_ONCHAIN"] = report.to_dict()
+        _boot_log(
+            "onchain",
+            "ok" if report.ok else "mismatch",
+            report.summary(),
+        )
+    except Exception as exc:  # noqa: BLE001 — never block boot on RPC
+        _boot_log("onchain", "error", str(exc))
     if not settings.stripe_secret_key:
         _boot_log("stripe", "disabled", "STRIPE_SECRET_KEY not configured")
     else:

@@ -11,6 +11,8 @@ a state file.
 Zero new dependencies — plain JSON-RPC over ``requests`` (already in
 requirements.txt).  Read-only: never signs, never sends transactions.
 
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
+
 Run standalone::
 
     python -m verticals.trading.polyclaw.vault_event_listener            # loop
@@ -33,6 +35,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -41,16 +44,34 @@ import requests
 
 logger = logging.getLogger("vault_event_listener")
 
-VAULT_ADDRESS = os.environ.get(
-    "VAULT_ADDRESS", "0xeA90a257e5Dae20a0472C4812775F28614459bb6"
-)
-DEFAULT_RPC = os.environ.get(
-    "BASE_RPC_URL", os.environ.get("WEB3_PROVIDER", "https://mainnet.base.org")
-)
-SINC_ADDRESS = os.environ.get(
-    "SINC_ADDRESS", "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
-)
-BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+_SRC = Path(__file__).resolve().parents[3] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+try:
+    from sincor2.onchain.constants import SINC_TOKEN, TREASURY, USDC_TOKEN, resolve_address
+
+    VAULT_ADDRESS = os.environ.get(
+        "VAULT_ADDRESS", "0xeA90a257e5Dae20a0472C4812775F28614459bb6"
+    )
+    DEFAULT_RPC = os.environ.get(
+        "BASE_RPC_URL", os.environ.get("WEB3_PROVIDER", "https://mainnet.base.org")
+    )
+    SINC_ADDRESS = resolve_address(
+        "SINC_ADDRESS", resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
+    )
+    BASE_USDC = USDC_TOKEN
+    _ = TREASURY
+except Exception:  # pragma: no cover
+    VAULT_ADDRESS = os.environ.get(
+        "VAULT_ADDRESS", "0xeA90a257e5Dae20a0472C4812775F28614459bb6"
+    )
+    DEFAULT_RPC = os.environ.get(
+        "BASE_RPC_URL", os.environ.get("WEB3_PROVIDER", "https://mainnet.base.org")
+    )
+    SINC_ADDRESS = os.environ.get(
+        "SINC_ADDRESS", "0xe1D836087F6573b665d25CE088793E916D7892f8"
+    )
+    BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 
 # keccak256 event topics (verified against SharedLiquidityVault.sol)
 TOPICS: Dict[str, str] = {

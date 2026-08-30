@@ -13,6 +13,8 @@ On-chain calls use ``eth_call`` with the standard ERC-20 ``balanceOf(address)``
 selector and the custom ``SINCPlatformAccess`` contract ABI.  All RPC reads are
 cached for 15 seconds per wallet to avoid hammering the RPC endpoint.
 
+CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
+
 Environment variables
 ---------------------
 BASE_RPC_URL                  : Base mainnet JSON-RPC endpoint (default: Cloudflare)
@@ -35,24 +37,20 @@ from typing import Any, Callable, Dict, List, Optional
 
 from flask import current_app, jsonify, request
 
+from sincor2.onchain.constants import SINC_TOKEN, TREASURY, resolve_address
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-SINC_CONTRACT = os.getenv(
-    "SINC_CONTRACT_ADDRESS",
-    "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
-)
+SINC_CONTRACT = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
 SINC_PLATFORM_ACCESS = os.getenv(
     "SINC_PLATFORM_ACCESS_ADDRESS",
     "",  # Empty until deployed; access checks degrade gracefully
 )
-TREASURY_ADDRESS = os.getenv(
-    "TREASURY_ADDRESS",
-    "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
-)
+TREASURY_ADDRESS = resolve_address("TREASURY_ADDRESS", TREASURY)
 DEFAULT_BASE_RPC = "https://mainnet.base.org"
 
 # ABI selectors (keccak256 first 4 bytes)
@@ -63,7 +61,7 @@ _STAKED_SELECTOR = "0x0ffd28f3"     # staked(address)   — SINCPlatformAccess
 # Cache TTL in seconds
 _CACHE_TTL = 15
 
-# Minimum SINC tiers (whole tokens; decimals=0)
+# Minimum SINC tiers (whole tokens; note: live SINC is 8 decimals — thresholds are human units)
 TIER_ADVANCED_HOLD = int(os.getenv("SINC_TIER_ADVANCED_HOLD", "500"))
 TIER_LIST_STAKE = int(os.getenv("SINC_TIER_LIST_STAKE", "250"))
 TIER_PRIORITY_STAKE = int(os.getenv("SINC_TIER_PRIORITY_STAKE", "1000"))
@@ -199,7 +197,7 @@ class SINCAccessManager:
     # ------------------------------------------------------------------
 
     def get_balance(self, wallet: str) -> int:
-        """Return the on-chain SINC balance for *wallet* (whole tokens)."""
+        """Return the on-chain SINC balance for *wallet* (raw units; 8 decimals)."""
         try:
             wallet = _normalize_wallet(wallet)
         except ValueError:

@@ -139,10 +139,17 @@ app.template_folder = str(Path(__file__).resolve().parent.parent.parent / 'templ
 
 # Register A2A blueprint (agent-to-agent protocol endpoints)
 try:
-    from sincor2.a2a_integration import A2ARouter
-    _a2a_router = A2ARouter()
-    app.register_blueprint(_a2a_router.blueprint)
-    print("✓ A2A routes initialized")
+    from sincor2.a2a_bootstrap import register_a2a
+    if register_a2a(app):
+        print("✓ A2A routes initialized")
+    else:
+        print("✗ A2A registration failed")
+    try:
+        from sincor2.task_queue import register_flask_routes
+        register_flask_routes(app)
+        print("✓ Task queue poll routes initialized")
+    except Exception as _q_err:
+        print(f"WARNING: Task queue routes not available: {_q_err}")
 except Exception as _a2a_err:
     print(f"WARNING: A2A routes not available: {_a2a_err}")
 
@@ -860,16 +867,6 @@ def launch_review_action(draft_id):
     return jsonify({'ok': False, 'error': 'invalid_action'}), 400
 
 
-@app.route('/.well-known/agent.json')
-@limiter.exempt if limiter else lambda f: f
-def agent_card():
-    """A2A-style agent card for SINCOR swarm discovery."""
-    path = Path(__file__).resolve().parent.parent.parent / 'static' / '.well-known' / 'agent.json'
-    if not path.is_file():
-        return jsonify({'error': 'agent card not found'}), 404
-    return send_file(path, mimetype='application/json')
-
-
 @app.route('/why-no-dex')
 @limiter.exempt if limiter else lambda f: f
 def why_no_dex():
@@ -1361,6 +1358,21 @@ def create_app():
     except Exception as e:
         print(f"Marketplace blueprint not available: {e}")
     try:
+        from sincor2.blueprints.contract_net import contract_net_bp
+        app.register_blueprint(contract_net_bp)
+    except Exception as e:
+        print(f"Contract-Net blueprint not available: {e}")
+    try:
+        from sincor2.blueprints.cortex import cortex_bp
+        app.register_blueprint(cortex_bp)
+    except Exception as e:
+        print(f"Cortex blueprint not available: {e}")
+    try:
+        from sincor2.blueprints.registry import registry_bp
+        app.register_blueprint(registry_bp)
+    except Exception as e:
+        print(f"Registry blueprint not available: {e}")
+    try:
         from sincor2.blueprints.payments import payments_bp
         app.register_blueprint(payments_bp)
     except Exception as e:
@@ -1392,11 +1404,18 @@ def create_app():
     except Exception as e:
         print(f"Command center blueprint not available: {e}")
     try:
-        from sincor2.a2a_integration import A2ARouter
-        router = A2ARouter()
-        app.register_blueprint(router.blueprint)
+        from sincor2.a2a_bootstrap import register_a2a
+        if not register_a2a(app):
+            print("A2A integration not available: register_a2a returned False")
+        from sincor2.task_queue import register_flask_routes
+        register_flask_routes(app)
     except Exception as e:
         print(f"A2A integration not available: {e}")
+    try:
+        from sincor2.a2a_inbound import register as register_a2a_inbound
+        register_a2a_inbound(app)
+    except Exception as e:
+        print(f"A2A inbound not available: {e}")
     return app
 
 

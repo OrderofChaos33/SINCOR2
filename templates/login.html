@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Log in — SINCOR</title>
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
   <style>
     :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; }
     * { box-sizing:border-box; margin:0; padding:0; }
@@ -14,10 +14,14 @@
     .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
     .top a { color:var(--cyan); text-decoration:none; font-weight:600; font-size:14px; }
     h1 { font-family:'Sora',sans-serif; font-size:26px; margin-bottom:8px; }
-    p.sub { color:var(--muted); font-size:15px; margin-bottom:24px; line-height:1.5; }
+    p.sub { color:var(--muted); font-size:15px; margin-bottom:22px; line-height:1.5; }
     label { display:block; font-size:13px; font-weight:600; color:var(--muted); margin-bottom:8px; }
-    input[type=email] { width:100%; padding:14px 16px; border-radius:10px; border:1px solid rgba(255,255,255,.15); background:rgba(0,0,0,.2); color:var(--text); font-size:15px; margin-bottom:16px; }
-    .btn { width:100%; padding:14px; border:none; border-radius:10px; background:linear-gradient(135deg,var(--purple),#6d28d9); color:#fff; font-weight:700; font-size:15px; cursor:pointer; }
+    input[type=text], input[type=password] {
+      width:100%; padding:14px 16px; border-radius:10px; border:1px solid rgba(255,255,255,.15);
+      background:rgba(0,0,0,.2); color:var(--text); font-size:15px; margin-bottom:16px;
+    }
+    input:focus { outline:none; border-color:var(--cyan); }
+    .btn { width:100%; padding:14px; border:none; border-radius:10px; background:linear-gradient(135deg,var(--purple),#6d28d9); color:#fff; font-weight:700; font-size:15px; cursor:pointer; min-height:48px; }
     .btn:hover { filter:brightness(1.08); }
     .oauth { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
     .oauth a { display:flex; align-items:center; justify-content:center; gap:10px; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,.15); color:var(--text); text-decoration:none; font-weight:600; font-size:14px; }
@@ -28,6 +32,7 @@
     .msg.err { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.35); color:#fca5a5; }
     .foot { margin-top:24px; text-align:center; font-size:14px; color:var(--muted); }
     .foot a { color:var(--cyan); font-weight:600; text-decoration:none; }
+    .hint { font-size:12px; color:var(--muted); margin-top:-8px; margin-bottom:16px; line-height:1.45; }
   </style>
 </head>
 <body>
@@ -37,16 +42,20 @@
       <a href="/signup">Sign up</a>
     </div>
     <h1>Welcome back</h1>
-    <p class="sub">Enter the email you used to sign up. No password — wallet-native billing on Base.</p>
+    <p class="sub">Sign in with your email or username.</p>
 
     {% if error or oauth_error %}
     <div class="msg err">{{ oauth_error or error }}</div>
     {% endif %}
 
-    <form method="POST" action="/login">
-      <label for="email">Email address</label>
-      <input type="email" id="email" name="email" required placeholder="you@company.com" autocomplete="email">
-      <button type="submit" class="btn">Continue to dashboard →</button>
+    <form method="POST" action="/login" autocomplete="on">
+      <input type="hidden" name="next" value="{{ next_url or '' }}">
+      <label for="identifier">Email or username</label>
+      <input type="text" id="identifier" name="identifier" required placeholder="you@company.com or username" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ identifier or '' }}">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Password" autocomplete="current-password">
+      <p class="hint">Customer accounts can sign in with email or username. Add a password if your account uses one.</p>
+      <button type="submit" class="btn">Sign in</button>
     </form>
 
     {% if oauth_google or oauth_github %}
@@ -62,7 +71,7 @@
     {% endif %}
 
     <div class="foot">
-      New here? <a href="/signup">Deploy your team</a> · <a href="/contact">Contact sales</a>
+      New here? <a href="/signup">Create an account</a> · <a href="/contact">Contact sales</a>
     </div>
   </div>
 </body>

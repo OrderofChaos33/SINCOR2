@@ -22,6 +22,8 @@ Environment
 -----------
 POLYCLAW_LIVE                 "true" to allow real orders (default: false)
 POLYMARKET_PRIVATE_KEY        Polygon EOA key for the CLOB (hex, 0x-prefixed)
+POLYCLAW_PRIVATE_KEY          fallback alias for the same key
+POLYMARKET_PK                 second fallback alias
 POLYMARKET_FUNDER             Address funding the orders (defaults to key addr)
 POLYMARKET_SIGNATURE_TYPE     0=EOA (default), 1=Magic/email, 2=browser proxy
 POLYMARKET_API_KEY / _SECRET / _PASSPHRASE   CLOB API creds (derived if absent)
@@ -38,7 +40,7 @@ import time
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sincor2.bankroll import Bankroll, get_bankroll
 
@@ -108,11 +110,46 @@ _ERC1155_ABI = [
         "stateMutability": "nonpayable",
         "inputs": [
             {"name": "operator", "type": "address"},
-            {"name": "approved", "type": "bool"}],
+            {"name": "approved", "type": "bool"},
         ],
         "outputs": [],
     },
 ]
+
+
+def _resolve_private_key() -> Tuple[Optional[str], Optional[str]]:
+    """Return (normalized_0x_key, source_env_name) or (None, None).
+
+    Accepts any of the aliases the operator may have set in Railway.
+    Never logs the key material.
+    """
+    for env_name in (
+        "POLYMARKET_PRIVATE_KEY",
+        "POLYCLAW_PRIVATE_KEY",
+        "POLYMARKET_PK",
+    ):
+        raw = os.getenv(env_name, "").strip()
+        if not raw:
+            continue
+        # strip accidental surrounding quotes that Railway UI sometimes keeps
+        if (raw.startswith('"') and raw.endswith('"')) or (
+            raw.startswith("'") and raw.endswith("'")
+        ):
+            raw = raw[1:-1].strip()
+        if not raw:
+            continue
+        if not raw.startswith("0x"):
+            raw = "0x" + raw
+        # basic sanity: 0x + 64 hex chars
+        if len(raw) != 66:
+            logger.warning(
+                "[POLYCLAW] %s present but length=%d (expected 66). "
+                "Will still try Account.from_key.",
+                env_name,
+                len(raw),
+            )
+        return raw, env_name
+    return None, None
 
 
 @dataclass
@@ -219,6 +256,7 @@ class PolymarketAdapter:
         self._client_error: Optional[str] = None
         self._address: Optional[str] = None
         self._allowances_ready = False
+        self._key_error: Optional[str] = None
 
     # ------------------------------------------------------------------
     # Client lifecycle
@@ -232,25 +270,43 @@ class PolymarketAdapter:
 
     @staticmethod
     def _credentials_present() -> bool:
-        return bool(os.getenv("POLYMARKET_PRIVATE_KEY", "").strip())
+        pk, _ = _resolve_private_key()
+        return bool(pk)
 
     def trading_address(self) -> Optional[str]:
-        """EOA address derived from POLYMARKET_PRIVATE_KEY (no key material)."""
+        """EOA address derived from the resolved private key (no key material)."""
         if self._address:
             return self._address
-        pk = os.getenv("POLYMARKET_PRIVATE_KEY", "").strip()
+        pk, source = _resolve_private_key()
         if not pk:
+            self._key_error = (
+                "no private key found in POLYMARKET_PRIVATE_KEY / "
+                "POLYCLAW_PRIVATE_KEY / POLYMARKET_PK"
+            )
             return None
         try:
             from eth_account import Account
 
-            if not pk.startswith("0x"):
-                pk = "0x" + pk
             self._address = Account.from_key(pk).address
+            self._key_error = None
+            logger.info(
+                "[POLYCLAW] trading address derived from %s → %s",
+                source,
+                self._address,
+            )
             return self._address
         except Exception as exc:
-            logger.warning("could not derive trading address: %s", exc)
+            self._key_error = f"Account.from_key failed ({source}): {exc}"
+            logger.warning("could not derive trading address: %s", self._key_error)
             return None
+
+    def key_error(self) -> Optional[str]:
+        """Last key-resolution / derivation error (safe to expose in status)."""
+        if self._key_error:
+            return self._key_error
+        # force a resolve so the message is populated
+        self.trading_address()
+        return self._key_error
 
     def _get_client(self):
         """Lazily build the py_clob_client. Raises with a clear reason."""
@@ -259,12 +315,13 @@ class PolymarketAdapter:
         if self._client_error is not None:
             raise LiveTradingNotEnabled(self._client_error)
 
-        private_key = os.getenv("POLYMARKET_PRIVATE_KEY", "").strip()
+        private_key, source = _resolve_private_key()
         if not private_key:
-            self._client_error = "POLYMARKET_PRIVATE_KEY not set"
+            self._client_error = (
+                "no private key in POLYMARKET_PRIVATE_KEY / "
+                "POLYCLAW_PRIVATE_KEY / POLYMARKET_PK"
+            )
             raise LiveTradingNotEnabled(self._client_error)
-        if not private_key.startswith("0x"):
-            private_key = "0x" + private_key
 
         try:
             from py_clob_client.client import ClobClient
@@ -303,10 +360,12 @@ class PolymarketAdapter:
 
             addr = self.trading_address()
             logger.info(
-                "Polymarket CLOB client initialised (live) address=%s sig_type=%s funder=%s",
+                "Polymarket CLOB client initialised (live) address=%s "
+                "sig_type=%s funder=%s key_source=%s",
                 addr,
                 sig_type,
                 funder or addr,
+                source,
             )
 
             # One-time on-chain approvals + CLOB cache refresh.
@@ -514,7 +573,7 @@ class PolymarketAdapter:
         if not self.is_live():
             logger.info(
                 "[DRY RUN] market buy %.2f USD of token %s "
-                "(set POLYCLAW_LIVE=true + POLYMARKET_PRIVATE_KEY to go live)",
+                "(set POLYCLAW_LIVE=true + private key to go live)",
                 usd_amount,
                 token_id,
             )

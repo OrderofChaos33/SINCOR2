@@ -2,6 +2,7 @@
 # SINCOR2 Production Requirements
 # 2026-07-27: repaired invalid pins (pyaml==26.7.0, sqlite3-backup) that broke pip
 # WeasyPrint intentionally omitted — ReportLab only (Railway slim / no gobject)
+# 2026-08-20: redis added for A2A task store multi-worker persistence
 # ============================================================================
 
 # Core Framework
@@ -23,12 +24,14 @@ pydantic==2.9.2
 email-validator==2.2.0
 python-dateutil==2.9.0.post0
 pytz==2024.2
+jsonschema>=4.23.0
 
 # Database
 SQLAlchemy==2.0.36
 alembic==1.14.0
 Mako==1.3.6
 psycopg2-binary==2.9.10
+redis>=5.0.0
 
 # Cryptography & Security
 cryptography==43.0.3
@@ -50,6 +53,7 @@ eth-account>=0.10.0
 # Scheduling & Async
 APScheduler==3.10.4
 aiofiles==24.1.0
+celery[redis]>=5.4.0
 
 # Logging & Observability
 watchtower==3.3.1

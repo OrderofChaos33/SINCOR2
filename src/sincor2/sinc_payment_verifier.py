@@ -4,8 +4,9 @@ Closes a real revenue leak: SINC is the platform's primary settlement token,
 but the A2A ``PaymentVerifier`` only ever validated **AXM** transfer logs.
 Anything quoted in SINC was effectively unverified.
 
-SINC has ``decimals = 0`` on Base — the raw ERC-20 ``uint256`` transfer value
-IS the whole-token amount, so no decimal scaling is applied.
+CEO 2026-08-19: SINC is now `0xe1D836087F6573b665d25CE088793E916D7892f8` with
+**8 decimals**. Callers must pass expected amounts in whole tokens; the verifier
+scales by 10**8 when comparing against raw Transfer log values.
 
 Usage
 -----
@@ -23,15 +24,15 @@ import threading
 import urllib.request as _urllib_request
 from typing import Any, Dict, List
 
+from sincor2.onchain.constants import SINC_DECIMALS as _CANONICAL_SINC_DECIMALS
+from sincor2.onchain.constants import SINC_TOKEN, TREASURY, resolve_address
+
 logger = logging.getLogger("sincor.sinc_verifier")
 
-SINC_CONTRACT = os.getenv(
-    "SINC_CONTRACT_ADDRESS", "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
-)
-TREASURY_ADDRESS = os.getenv(
-    "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
-)
+SINC_CONTRACT = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
+TREASURY_ADDRESS = resolve_address("TREASURY_ADDRESS", TREASURY)
 BASE_RPC_TIMEOUT = int(os.getenv("BASE_RPC_TIMEOUT", "10"))
+SINC_DECIMALS = _CANONICAL_SINC_DECIMALS
 
 _DEV_ENVS = frozenset({"development", "dev", "test", "testing", "local"})
 
@@ -111,9 +112,13 @@ class SINCPaymentVerifier:
         expected_to: str,
         expected_amount_sinc: int,
     ) -> bool:
-        """Scan receipt logs for a qualifying SINC Transfer event."""
+        """Scan receipt logs for a qualifying SINC Transfer event.
+
+        expected_amount_sinc is in whole tokens; raw log value is scaled by 10**8.
+        """
         sinc_addr = SINC_CONTRACT.lower()
         expected_to_norm = expected_to.lower()
+        expected_raw = expected_amount_sinc * (10 ** SINC_DECIMALS)
         for log in logs:
             if log.get("address", "").lower() != sinc_addr:
                 continue
@@ -124,15 +129,15 @@ class SINCPaymentVerifier:
             if to_addr != expected_to_norm:
                 continue
             try:
-                value = int(log.get("data", "0x0"), 16)  # decimals=0 → whole SINC
+                value = int(log.get("data", "0x0"), 16)
             except ValueError:
                 continue
-            if value >= expected_amount_sinc:
+            if value >= expected_raw:
                 return True
         logger.warning(
             "SINCPaymentVerifier: no qualifying SINC Transfer log; expected "
-            ">=%d SINC to %s from %s",
-            expected_amount_sinc, expected_to, SINC_CONTRACT,
+            ">=%d SINC (raw >= %d) to %s from %s",
+            expected_amount_sinc, expected_raw, expected_to, SINC_CONTRACT,
         )
         return False
 

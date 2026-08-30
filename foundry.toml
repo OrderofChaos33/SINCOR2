@@ -1,0 +1,28 @@
+# Root Foundry profile for contracts/ + test/ (session validator, escrow, v4 hooks).
+# The existing Uniswap v4 stack still lives under onchain/foundry.toml.
+#
+# First-time setup:
+#   forge install foundry-rs/forge-std@v1.9.7
+#   forge install OpenZeppelin/openzeppelin-contracts@v5.5.0
+#   forge test -vvv
+
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+test = "test"
+solc = "0.8.27"
+optimizer = true
+optimizer_runs = 200
+evm_version = "cancun"
+via_ir = true
+fs_permissions = [{ access = "read", path = "./" }]
+
+[fuzz]
+runs = 256
+
+[rpc_endpoints]
+base = "${BASE_RPC_URL}"
+
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }

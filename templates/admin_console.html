@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Command console — SINCOR</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --surface:#0f1629; --elev:#161d33; --text:#f1f5f9; --muted:#94a3b8; --cyan:#06b6d4; --purple:#8b5cf6; --ok:#34d399; --warn:#fbbf24; --danger:#f87171; --border:rgba(139,92,246,.22); }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; }
+    a { color:var(--cyan); text-decoration:none; }
+    header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); background:rgba(10,14,39,.88); border-bottom:1px solid var(--border); }
+    .bar { max-width:1120px; margin:0 auto; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .brand { display:flex; align-items:center; gap:12px; color:var(--text); font-family:'Sora',sans-serif; font-weight:700; }
+    .brand img { width:36px; height:36px; border-radius:50%; border:2px solid rgba(139,92,246,.5); }
+    nav { display:flex; gap:8px; flex-wrap:wrap; }
+    nav a, nav button { min-height:44px; padding:10px 14px; border-radius:10px; border:1px solid transparent; background:transparent; color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; }
+    nav a:hover, nav button:hover { color:var(--text); background:rgba(255,255,255,.05); }
+    .wrap { max-width:1120px; margin:0 auto; padding:28px 20px 80px; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(1.8rem,4vw,2.6rem); letter-spacing:-.03em; }
+    .lede { color:var(--muted); margin:10px 0 28px; max-width:42rem; line-height:1.55; }
+    .grid { display:grid; gap:14px; }
+    @media (min-width:800px) { .kpis { grid-template-columns:repeat(4,1fr); } .main { grid-template-columns:1.2fr .8fr; } .links { grid-template-columns:repeat(3,1fr); } }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:18px; }
+    .k { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+    .v { font-family:'JetBrains Mono',monospace; font-size:22px; margin-top:8px; }
+    .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:8px; background:var(--ok); }
+    .dot.warn { background:var(--warn); }
+    .dot.off { background:var(--danger); }
+    ul.checks { list-style:none; display:flex; flex-direction:column; gap:8px; }
+    ul.checks li { display:flex; justify-content:space-between; gap:12px; background:var(--elev); border-radius:10px; padding:10px 12px; font-size:14px; }
+    .mono { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); }
+    .agents { display:flex; flex-direction:column; gap:8px; }
+    .agent { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+    .agent:last-child { border-bottom:none; }
+    .barline { height:6px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; width:88px; }
+    .barline span { display:block; height:100%; background:var(--cyan); }
+    .linkcard { display:block; color:var(--text); }
+    .linkcard h2 { font-size:16px; margin:8px 0 6px; }
+    .linkcard p { color:var(--muted); font-size:13px; line-height:1.45; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <a class="brand" href="/"><img src="/static/sincor_nav_icon.png" alt=""> SINCOR</a>
+      <nav>
+        <a href="/dashboard">Customer view</a>
+        <a href="/command-center">Swarm feed</a>
+        <a href="/admin">Console</a>
+        <a href="/auth/logout">Sign out</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <p class="k">Operator session</p>
+    <h1>Command console</h1>
+    <p class="lede">Signed in as <strong>{{ username }}</strong>. Runtime below is live from this service.</p>
+
+    <section class="grid kpis">
+      <article class="card"><p class="k">Service</p><p class="v" id="svc">…</p></article>
+      <article class="card"><p class="k">Readiness</p><p class="v" id="ready">…</p></article>
+      <article class="card"><p class="k">Agents</p><p class="v">42</p></article>
+      <article class="card"><p class="k">Billing</p><p class="v">SINC · AXM</p></article>
+    </section>
+
+    <section class="grid main" style="margin-top:14px">
+      <article class="card">
+        <p class="k">Runtime checks</p>
+        <ul class="checks" id="checks"><li>Loading health…</li></ul>
+      </article>
+      <article class="card">
+        <p class="k">Archetype roster</p>
+        <div class="agents">
+          <div class="agent"><div><strong>Scout</strong><div class="mono">Discovery</div></div><div class="barline"><span style="width:84%"></span></div></div>
+          <div class="agent"><div><strong>Builder</strong><div class="mono">Execution</div></div><div class="barline"><span style="width:71%"></span></div></div>
+          <div class="agent"><div><strong>Synthesizer</strong><div class="mono">Cor-tecs</div></div><div class="barline"><span style="width:90%"></span></div></div>
+          <div class="agent"><div><strong>Negotiator</strong><div class="mono">Outreach</div></div><div class="barline"><span style="width:66%"></span></div></div>
+          <div class="agent"><div><strong>Director</strong><div class="mono">TOA</div></div><div class="barline"><span style="width:58%"></span></div></div>
+          <div class="agent"><div><strong>Auditor</strong><div class="mono">Quality</div></div><div class="barline"><span style="width:77%"></span></div></div>
+          <div class="agent"><div><strong>Caretaker</strong><div class="mono">Lifecycle</div></div><div class="barline"><span style="width:41%"></span></div></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid links" style="margin-top:14px">
+      <a class="card linkcard" href="/command-center"><p class="k">01</p><h2>Swarm command center</h2><p>Live market feed, killswitch, and task grading.</p></a>
+      <a class="card linkcard" href="/dashboard"><p class="k">02</p><h2>A2A marketplace</h2><p>Dispatch skills, settlements, and treasury journal.</p></a>
+      <a class="card linkcard" href="/dashboard"><p class="k">03</p><h2>Customer operations</h2><p>The same console a deployed team sees after signup.</p></a>
+      <a class="card linkcard" href="/admin/training-vault"><p class="k">04</p><h2>Training vault</h2><p>Guides and onboarding for active subscriptions.</p></a>
+      <a class="card linkcard" href="/sinc"><p class="k">05</p><h2>SINC gateway</h2><p>Token, curve, and Base settlement path.</p></a>
+      <a class="card linkcard" href="/webbuilder"><p class="k">06</p><h2>WebBuilder swarm</h2><p>Site generation vertical — hatch to publish.</p></a>
+    </section>
+  </main>
+  <script>
+    async function loadHealth() {
+      try {
+        const res = await fetch('/health');
+        const data = await res.json();
+        document.getElementById('svc').textContent = data.service || 'SINCOR';
+        const ready = data.readiness && data.readiness.ready;
+        document.getElementById('ready').innerHTML = '<span class="dot ' + (ready ? '' : 'warn') + '"></span>' + (data.status || 'unknown');
+        const checks = data.checks || {};
+        const ul = document.getElementById('checks');
+        ul.innerHTML = Object.keys(checks).map(function (key) {
+          const c = checks[key];
+          const ok = c.ready;
+          return '<li><span><span class="dot ' + (ok ? '' : 'off') + '"></span>' + key + '</span><span class="mono">' + (c.detail || '') + '</span></li>';
+        }).join('') || '<li>No checks reported</li>';
+      } catch (err) {
+        document.getElementById('ready').textContent = 'unreachable';
+      }
+    }
+    loadHealth();
+  </script>
+</body>
+</html>

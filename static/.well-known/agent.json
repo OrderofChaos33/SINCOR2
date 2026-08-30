@@ -1,0 +1,18 @@
+{
+  "name": "SINCOR Agent Swarm",
+  "description": "Production autonomous AI workforce. 42 specialized agents. Pay in SINC/AXM on Base.",
+  "url": "https://getsincor.com/api/a2a",
+  "version": "2.0.0",
+  "skills": [
+    {"id": "lead-enrichment", "name": "Lead Enrichment", "sinc_price": 3},
+    {"id": "competitor-intel", "name": "Competitor Intelligence", "sinc_price": 2},
+    {"id": "outreach-sequence", "name": "Outreach Sequence", "sinc_price": 3},
+    {"id": "market-forecast", "name": "Market Forecast", "sinc_price": 4},
+    {"id": "toa-decision", "name": "TOA Decision", "sinc_price": 6}
+  ],
+  "provider": {"organization": "SINCOR", "url": "https://getsincor.com"},
+  "authentication": {
+    "schemes": [],
+    "description": "No API key required. Payment enforced on-chain via SINC/AXM transfer to treasury."
+  }
+}

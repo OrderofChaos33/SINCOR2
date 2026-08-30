@@ -58,23 +58,35 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from sincor2.onchain.constants import (
+    AXIOM_TOKEN as _CANONICAL_AXIOM,
+    BASE_CHAIN_ID as _CANONICAL_CHAIN_ID,
+    DEAD_ADDRESS as _CANONICAL_DEAD,
+    SINC_TOKEN as _CANONICAL_SINC,
+    TREASURY as _CANONICAL_TREASURY,
+    resolve_address,
+)
+from sincor2.schema_gate import compile_skill_schemas, validate_skill_input
+
 logger = logging.getLogger("sincor.a2a")
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-AXIOM_CONTRACT   = os.getenv("AXIOM_CONTRACT_ADDRESS", "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822")
-SINC_CONTRACT    = os.getenv("SINC_CONTRACT_ADDRESS",  "0x9C8cd8d3961F445D653713dE65C6578bE11668e7")
-TREASURY_WALLET  = os.getenv("TREASURY_ADDRESS",       "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac")
-DEAD_ADDRESS     = "0x000000000000000000000000000000000000dEaD"
-CHAIN_ID         = int(os.getenv("BASE_CHAIN_ID", "8453"))  # Base mainnet
+# 2026-08-19: live pointers imported from sincor2.onchain.constants
+# Stale env overrides (retired SINC / dead AXM) are ignored.
+AXIOM_CONTRACT   = resolve_address("AXIOM_CONTRACT_ADDRESS", _CANONICAL_AXIOM)
+SINC_CONTRACT    = resolve_address("SINC_CONTRACT_ADDRESS",  _CANONICAL_SINC)
+TREASURY_WALLET  = resolve_address("TREASURY_ADDRESS",       _CANONICAL_TREASURY)
+DEAD_ADDRESS     = _CANONICAL_DEAD
+CHAIN_ID         = int(os.getenv("BASE_CHAIN_ID", str(_CANONICAL_CHAIN_ID)))  # Base mainnet
 
 # Primary token for A2A task payments. Default is SINC; set A2A_PRIMARY_TOKEN=AXIOM
 # for legacy AXIOM-based settlements.
 A2A_PRIMARY_TOKEN = os.getenv("A2A_PRIMARY_TOKEN", "SINC").upper()
 
-# SINC price per A2A task call (whole tokens, decimals=0).
+# SINC price per A2A task call (whole tokens; contract is 8 decimals).
 SINC_PRICE_PER_TASK = int(os.getenv("SINC_PRICE_PER_TASK", "1"))  # 1 SINC default
 
 # Legacy AXIOM price per task (wei, 18 decimals) — kept for backward compatibility.
@@ -145,7 +157,7 @@ class AgentSkill:
     output_modes: List[str] = field(default_factory=list)
     # Pricing fields (set per-skill; fall back to global defaults if zero)
     axm_price_wei: int = 0          # AXM payment amount in wei (18 decimals)
-    sinc_price: int = 0             # SINC payment amount (whole tokens, decimals=0)
+    sinc_price: int = 0             # SINC payment amount (whole tokens)
     # Input/output JSON Schema (draft-07 subset; empty dict = freeform)
     input_schema: Dict[str, Any] = field(default_factory=dict)
     output_schema: Dict[str, Any] = field(default_factory=dict)
@@ -270,7 +282,6 @@ class AgentCard:
             },
             "capabilities":   self.capabilities,
         }
-
 
 
 @dataclass
@@ -998,6 +1009,16 @@ SINCOR_SKILLS: List[AgentSkill] = [
 ]
 
 
+# Compile input schemas once. Empty schemas stay freeform.
+_SCHEMA_CACHE = compile_skill_schemas(SINCOR_SKILLS)
+
+
+def refresh_skill_schemas() -> None:
+    """Recompile after vertical skills are appended to SINCOR_SKILLS."""
+    global _SCHEMA_CACHE
+    _SCHEMA_CACHE = compile_skill_schemas(SINCOR_SKILLS)
+
+
 # ---------------------------------------------------------------------------
 # Agent Card factory
 # ---------------------------------------------------------------------------
@@ -1571,7 +1592,17 @@ class A2ARouter:
         def tasks_send():
             from flask import jsonify, request
             body = request.get_json(force=True, silent=True) or {}
-            return jsonify(_handle_send(body))
+            payload = _handle_send(body)
+            if payload.get("error"):
+                return jsonify(payload), 400
+            task = payload.get("result") or {}
+            task_id = task.get("id")
+            return jsonify({
+                **payload,
+                "accepted": True,
+                "task_id": task_id,
+                "poll_url": f"/api/a2a/tasks/{task_id}" if task_id else None,
+            }), 202
 
         @bp.route("/api/a2a/tasks/<task_id>", methods=["GET"])
         def tasks_get_rest(task_id: str):
@@ -1766,18 +1797,20 @@ def _rpc_ok(result: Any, rpc_id: Any = None) -> Dict[str, Any]:
     return {"jsonrpc": "2.0", "id": rpc_id, "result": result}
 
 
-def _err(message: str, code: int = -32603, rpc_id: Any = None) -> Dict[str, Any]:
+def _err(message: str, code: int = -32603, rpc_id: Any = None, data: Any = None) -> Dict[str, Any]:
+    error: Dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        error["data"] = data
     return {
         "jsonrpc": "2.0",
         "id":      rpc_id,
-        "error":   {"code": code, "message": message},
+        "error":   error,
     }
 
 
 def _sse_event(data: Dict[str, Any]) -> str:
     """Format a dict as a single SSE data event."""
     return f"data: {json.dumps(data)}\n\n"
-
 
 def _task_to_rpc(task: A2ATask, history_length: Optional[int] = None) -> Dict[str, Any]:
     """Serialise a task to the A2A v1.0.1 Task JSON shape."""
@@ -1880,8 +1913,8 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     (rpc_id, skill_id, context_id, caller_id, input_text,
      tx_hash, axm_paid, history_length) = _extract_send_params(body)
 
-    if not input_text:
-        return _err("No input text found in message.parts", code=-32602, rpc_id=rpc_id)
+    params = body.get("params") or body
+    msg_obj = params.get("message") or {}
 
     # --- Validate skill --------------------------------------------------
     skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
@@ -1891,6 +1924,32 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
             f"Unknown skill '{skill_id}'. Valid skills: {valid}",
             code=-32602, rpc_id=rpc_id,
         )
+
+    gate = validate_skill_input(
+        skill_id=skill.id,
+        schema=skill.input_schema or None,
+        params=params if isinstance(params, dict) else {},
+        msg_obj=msg_obj,
+        input_text=input_text,
+    )
+    if skill.input_schema and not gate.ok:
+        return _err(
+            f"Invalid params: {len(gate.errors)} schema error(s) for skill '{skill_id}'",
+            code=-32602,
+            rpc_id=rpc_id,
+            data={
+                "skillId": skill_id,
+                "source": gate.source,
+                "errors": [err.to_dict() for err in gate.errors],
+            },
+        )
+    if not input_text:
+        if gate.payload is not None:
+            input_text = (
+                gate.payload if isinstance(gate.payload, str) else json.dumps(gate.payload)
+            )
+        else:
+            return _err("No input text found in message.parts", code=-32602, rpc_id=rpc_id)
 
     # --- Reputation score → priority flag --------------------------------
     caller_reputation = _reputation_ledger.score(caller_id)
@@ -1923,7 +1982,7 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     if free_call:
         _free_quota_tracker.consume(caller_id, skill_id)
 
-    # --- Create task & dispatch ------------------------------------------
+    # --- Create task & enqueue (never block the gunicorn worker) ----------
     task = _new_task(
         skill_id=skill_id,
         input_text=input_text,
@@ -1940,64 +1999,20 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         task.id, skill_id, caller_id, caller_reputation, is_high_rep, free_call,
     )
 
-    _update_task(task, state=TaskState.WORKING)
-    output, error = _dispatch_to_swarm(task)
-    if error:
-        _update_task(task, state=TaskState.FAILED, error=error)
-    else:
-        # Store output as an artifact
-        if output:
-            artifact = A2AArtifact(
-                artifact_id=str(uuid.uuid4()),
-                parts=[{"text": output}],
-                name="result",
-            )
-            task.artifacts.append(artifact)
-            # Also append the agent reply to history
-            agent_msg = A2AMessage(
-                message_id=str(uuid.uuid4()),
-                role="agent",
-                parts=[{"text": output}],
-                context_id=task.context_id,
-                task_id=task.id,
-            )
-            task.history.append(agent_msg)
+    try:
+        from sincor2.task_queue import enqueue
 
-        # Build proof of settlement
-        result_content = output or ""
-        result_hash = hashlib.sha256((task.id + result_content).encode()).hexdigest()
-        proof = {
-            "task_id":            task.id,
-            "skill_id":           skill_id,
-            "caller_id":          caller_id,
-            "tx_hash":            tx_hash or "",
-            "axm_paid_wei":       str(axm_paid),
-            "burn_amount_wei":    str(axm_paid // 2),
-            "burn_to":            DEAD_ADDRESS,
-            "treasury_amount_wei": str(axm_paid - axm_paid // 2),
-            "treasury":           TREASURY_WALLET,
-            "result_hash":        result_hash,
-            "settled_at":         _now(),
-            "chain_id":           CHAIN_ID,
-            "basescan_url":       (
-                f"https://basescan.org/tx/{tx_hash}" if tx_hash else ""
-            ),
-            "free_call":          free_call,
-        }
-        _update_task(task, state=TaskState.COMPLETED, output=output,
-                     metadata={**task.metadata, "proof_of_settlement": proof})
-
-        # Record settlement and update pricing fill count
-        if (axm_paid > 0 and tx_hash) or free_call:
-            _record_a2a_settlement(task, axm_paid, tx_hash or "")
-            _reputation_ledger.record(
-                caller_id=caller_id,
-                skill_id=skill_id,
-                task_id=task.id,
-                axm_paid_wei=axm_paid,
-            )
-            _price_engine.record_fill(skill_id)
-            _fire_toa_feedback(task, success=True)
+        job = enqueue("a2a.execute", {"task_id": task.id})
+        task.metadata["queue_job_id"] = job.id
+        _update_task(task)
+        # Eager (tests) already finalized the A2A task; reload.
+        task = _get_task(task.id) or task
+    except Exception as exc:
+        logger.exception("Queue enqueue failed for A2A task %s: %s", task.id, exc)
+        _update_task(task, state=TaskState.WORKING)
+        output, error = _dispatch_to_swarm(task)
+        _finalize_a2a_task(task, output, error)
+        task = _get_task(task.id) or task
 
     task_dict = _task_to_rpc(task, history_length=history_length)
     # Surface proof of settlement at top-level for convenience
@@ -2008,17 +2023,99 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     return _rpc_ok(task_dict, rpc_id=rpc_id)
 
 
+def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[str]) -> Dict[str, Any]:
+    """Persist swarm output, proof of settlement, and terminal task state.
+
+    Called from the async worker (and the eager test path). Safe to invoke
+    outside a Flask request context.
+    """
+    if error:
+        _update_task(task, state=TaskState.FAILED, error=error)
+        _fire_toa_feedback(task, success=False)
+        return {"task_id": task.id, "state": task.state.value, "error": error}
+
+    if output:
+        artifact = A2AArtifact(
+            artifact_id=str(uuid.uuid4()),
+            parts=[{"text": output}],
+            name="result",
+        )
+        task.artifacts.append(artifact)
+        agent_msg = A2AMessage(
+            message_id=str(uuid.uuid4()),
+            role="agent",
+            parts=[{"text": output}],
+            context_id=task.context_id,
+            task_id=task.id,
+        )
+        task.history.append(agent_msg)
+
+    result_content = output or ""
+    result_hash = hashlib.sha256((task.id + result_content).encode()).hexdigest()
+    skill_id = task.skill_id
+    caller_id = task.caller_id
+    tx_hash = task.tx_hash
+    axm_paid = task.axm_paid
+    free_call = bool(task.metadata.get("free_call"))
+    proof = {
+        "task_id":             task.id,
+        "skill_id":            skill_id,
+        "caller_id":           caller_id,
+        "tx_hash":             tx_hash or "",
+        "axm_paid_wei":        str(axm_paid),
+        "burn_amount_wei":     str(axm_paid // 2),
+        "burn_to":             DEAD_ADDRESS,
+        "treasury_amount_wei": str(axm_paid - axm_paid // 2),
+        "treasury":            TREASURY_WALLET,
+        "result_hash":         result_hash,
+        "settled_at":          _now(),
+        "chain_id":            CHAIN_ID,
+        "basescan_url":        (
+            f"https://basescan.org/tx/{tx_hash}" if tx_hash else ""
+        ),
+        "free_call":           free_call,
+    }
+    _update_task(task, state=TaskState.COMPLETED, output=output,
+                 metadata={**task.metadata, "proof_of_settlement": proof})
+
+    if (axm_paid > 0 and tx_hash) or free_call:
+        _record_a2a_settlement(task, axm_paid, tx_hash or "")
+        _reputation_ledger.record(
+            caller_id=caller_id,
+            skill_id=skill_id,
+            task_id=task.id,
+            axm_paid_wei=axm_paid,
+        )
+        _price_engine.record_fill(skill_id)
+        _fire_toa_feedback(task, success=True)
+
+    return {
+        "task_id": task.id,
+        "state": task.state.value,
+        "output": output,
+        "proof_of_settlement": proof,
+    }
+
+
 def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:
     """Create a settlement record in the platform coordinator for a paid A2A task."""
     try:
         from decimal import Decimal
 
-        from flask import current_app, has_request_context
+        from flask import current_app, has_app_context, has_request_context
 
-        if not has_request_context():
-            return
-
-        platform_state = current_app.extensions.get("sincor_platform")
+        platform_state = None
+        if has_request_context() or has_app_context():
+            platform_state = current_app.extensions.get("sincor_platform")
+        if not platform_state:
+            for _mod in ("sincor2.app", "sincor2.mvp_app"):
+                try:
+                    import importlib
+                    platform_state = getattr(importlib.import_module(_mod), "app").extensions.get("sincor_platform")
+                    if platform_state:
+                        break
+                except Exception:
+                    continue
         if not platform_state:
             return
 
@@ -2052,51 +2149,87 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
         logger.warning("Settlement record failed for task %s: %s", task.id, exc)
 
 
+def _sse_status(task: A2ATask, rpc_id: Any, final: bool = False,
+                msg_text: Optional[str] = None) -> str:
+    """A2A TaskStatusUpdateEvent (spec + legacy taskStatus envelope)."""
+    status: Dict[str, Any] = {
+        "state":     task.state.value,
+        "timestamp": task.updated_at,
+    }
+    if msg_text:
+        status["message"] = {
+            "messageId": str(uuid.uuid4()),
+            "role":      "agent",
+            "parts":     [{"kind": "text", "text": msg_text}],
+            "contextId": task.context_id,
+            "taskId":    task.id,
+        }
+    result: Dict[str, Any] = {
+        "kind":      "status-update",
+        "taskId":    task.id,
+        "contextId": task.context_id,
+        "status":    status,
+        "final":     final,
+        "taskStatus": {
+            "taskId":    task.id,
+            "contextId": task.context_id,
+            "status":    status,
+            "final":     final,
+        },
+    }
+    return _sse_event({"jsonrpc": "2.0", "id": rpc_id, "result": result})
+
+
+def _sse_artifact_chunk(
+    task: A2ATask,
+    rpc_id: Any,
+    artifact_id: str,
+    text: str,
+    *,
+    append: bool = True,
+    last_chunk: bool = False,
+) -> str:
+    """A2A TaskArtifactUpdateEvent with append / lastChunk for token streaming."""
+    artifact = {
+        "artifactId": artifact_id,
+        "name": "result",
+        "parts": [{"kind": "text", "text": text}],
+    }
+    result: Dict[str, Any] = {
+        "kind":      "artifact-update",
+        "taskId":    task.id,
+        "contextId": task.context_id,
+        "artifact":  artifact,
+        "append":    append,
+        "lastChunk": last_chunk,
+        "taskArtifact": {
+            "taskId":    task.id,
+            "contextId": task.context_id,
+            "artifact":  artifact,
+            "append":    append,
+            "lastChunk": last_chunk,
+            "final":     last_chunk,
+        },
+    }
+    return _sse_event({"jsonrpc": "2.0", "id": rpc_id, "result": result})
+
+
 def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
     """
-    Handle message/stream — yields SSE events for the A2A v1.0.1 streaming flow.
+    Handle message/stream — real SSE token streaming for A2A v1.0.1.
 
     Event sequence:
       1. TaskStatusUpdateEvent: state=submitted
       2. TaskStatusUpdateEvent: state=working
-      3. (dispatch to swarm)
-      4. TaskArtifactUpdateEvent: artifact with result
+      3. TaskArtifactUpdateEvent chunks (append=true) as tokens arrive
+      4. TaskArtifactUpdateEvent lastChunk=true
       5. TaskStatusUpdateEvent: state=completed (or failed), final=true
+
+    Stays on the HTTP connection (not Celery) so the client can consume
+    tokens live. Long non-stream jobs use message/send + the async queue.
     """
     (rpc_id, skill_id, context_id, caller_id, input_text,
      tx_hash, axm_paid, _) = _extract_send_params(body)
-
-    def _status_event(task: A2ATask, final: bool = False,
-                      msg_text: Optional[str] = None) -> str:
-        status: Dict[str, Any] = {
-            "state":     task.state.value,
-            "timestamp": task.updated_at,
-        }
-        if msg_text:
-            status["message"] = {
-                "messageId": str(uuid.uuid4()),
-                "role":      "agent",
-                "parts":     [{"text": msg_text}],
-                "contextId": task.context_id,
-                "taskId":    task.id,
-            }
-        event: Dict[str, Any] = {
-            "jsonrpc": "2.0",
-            "id":      rpc_id,
-            "result":  {
-                "taskStatus": {
-                    "taskId":    task.id,
-                    "contextId": task.context_id,
-                    "status":    status,
-                    "final":     final,
-                },
-            },
-        }
-        return _sse_event(event)
-
-    if not input_text:
-        yield _sse_event(_err("No input text in message.parts", -32602, rpc_id))
-        return
 
     skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
     if not skill:
@@ -2105,6 +2238,36 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
             f"Unknown skill '{skill_id}'. Valid: {valid}", -32602, rpc_id
         ))
         return
+
+    params = body.get("params") or body
+    msg_obj = params.get("message") or {}
+    gate = validate_skill_input(
+        skill_id=skill.id,
+        schema=skill.input_schema or None,
+        params=params if isinstance(params, dict) else {},
+        msg_obj=msg_obj,
+        input_text=input_text,
+    )
+    if skill.input_schema and not gate.ok:
+        yield _sse_event(_err(
+            f"Invalid params: {len(gate.errors)} schema error(s) for skill '{skill_id}'",
+            -32602,
+            rpc_id,
+            data={
+                "skillId": skill_id,
+                "source": gate.source,
+                "errors": [err.to_dict() for err in gate.errors],
+            },
+        ))
+        return
+    if not input_text:
+        if gate.payload is not None:
+            input_text = (
+                gate.payload if isinstance(gate.payload, str) else json.dumps(gate.payload)
+            )
+        else:
+            yield _sse_event(_err("No input text in message.parts", -32602, rpc_id))
+            return
 
     env = os.getenv("FLASK_ENV", "production").lower()
     skip_payment = env in _DEV_ENVS
@@ -2130,54 +2293,54 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
     )
     logger.info("A2A stream task %s  skill=%s caller=%s", task.id, skill_id, caller_id)
 
-    # Event 1: submitted
-    yield _status_event(task)
+    yield _sse_status(task, rpc_id)
 
-    # Event 2: working
     _update_task(task, state=TaskState.WORKING)
-    yield _status_event(task)
+    yield _sse_status(task, rpc_id)
 
-    # Dispatch
-    output, error = _dispatch_to_swarm(task)
+    artifact_id = str(uuid.uuid4())
+    chunks: List[str] = []
+    error: Optional[str] = None
+    try:
+        for token in _dispatch_to_swarm_stream(task):
+            if not token:
+                continue
+            chunks.append(token)
+            yield _sse_artifact_chunk(
+                task, rpc_id, artifact_id, token, append=True, last_chunk=False,
+            )
+    except Exception as exc:
+        logger.exception("A2A stream dispatch failed for %s", task.id)
+        error = str(exc)
+
+    output = "".join(chunks) if chunks else None
+    yield _sse_artifact_chunk(
+        task, rpc_id, artifact_id, "", append=True, last_chunk=True,
+    )
 
     if error:
         _update_task(task, state=TaskState.FAILED, error=error)
-        yield _status_event(task, final=True, msg_text=f"Error: {error}")
+        yield _sse_status(task, rpc_id, final=True, msg_text=f"Error: {error}")
         return
 
-    # Event 3: artifact
     if output:
         artifact = A2AArtifact(
-            artifact_id=str(uuid.uuid4()),
-            parts=[{"text": output}],
+            artifact_id=artifact_id,
+            parts=[{"kind": "text", "text": output}],
             name="result",
         )
         task.artifacts.append(artifact)
         agent_msg = A2AMessage(
             message_id=str(uuid.uuid4()),
             role="agent",
-            parts=[{"text": output}],
+            parts=[{"kind": "text", "text": output}],
             context_id=task.context_id,
             task_id=task.id,
         )
         task.history.append(agent_msg)
-        artifact_event: Dict[str, Any] = {
-            "jsonrpc": "2.0",
-            "id":      rpc_id,
-            "result":  {
-                "taskArtifact": {
-                    "taskId":    task.id,
-                    "contextId": task.context_id,
-                    "artifact":  artifact.to_dict(),
-                    "final":     False,
-                },
-            },
-        }
-        yield _sse_event(artifact_event)
 
-    # Event 4: completed
     _update_task(task, state=TaskState.COMPLETED, output=output)
-    yield _status_event(task, final=True)
+    yield _sse_status(task, rpc_id, final=True)
 
 
 def _handle_get(task_id: str) -> Dict[str, Any]:
@@ -2453,6 +2616,39 @@ def _dispatch_to_swarm(task: A2ATask):
     except Exception as exc:
         logger.exception("Swarm dispatch error for task %s", task.id)
         return None, str(exc)
+
+
+def _dispatch_to_swarm_stream(task: A2ATask) -> Generator[str, None, None]:
+    """
+    Yield tokens as they arrive.
+
+    Prefer Anthropic `messages.stream()` when ANTHROPIC_API_KEY is set so
+    A2A clients see real token-by-token SSE. Otherwise run the existing
+    (non-streaming) swarm dispatch and chunk the completed string so the
+    wire protocol still emits append/lastChunk events instead of one blob.
+    """
+    from sincor2.llm_stream import chunk_text, has_anthropic, skill_system_prompt, stream_claude
+
+    if has_anthropic():
+        try:
+            yielded = False
+            for token in stream_claude(
+                task.input_text,
+                system=skill_system_prompt(task.skill_id),
+                max_tokens=2048,
+            ):
+                yielded = True
+                yield token
+            if yielded:
+                return
+        except Exception as exc:
+            logger.warning("LLM stream failed for task %s (%s); falling back to dispatch", task.id, exc)
+
+    output, error = _dispatch_to_swarm(task)
+    if error:
+        raise RuntimeError(error)
+    delay = 0.0 if os.getenv("FLASK_ENV", "").lower() in ("test", "testing") else 0.015
+    yield from chunk_text(output or "", delay=delay)
 
 
 # ---------------------------------------------------------------------------

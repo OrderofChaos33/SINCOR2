@@ -32,6 +32,12 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
     Register vertical Agent Cards, initialize routing, and expose platform
     services on ``app.extensions['sincor_platform']``.
     """
+    # Production wire-up: PaymentVerifier, TaskStore, AgencyKernel real tools
+    try:
+        import sincor2.a2a_bootstrap  # noqa: F401 — runs install() on import
+    except Exception as err:
+        logger.warning("A2A production bootstrap skipped: %s", err)
+
     storage_path = _REPO_ROOT / "marketplace" / "agent_cards.json"
     registry = AgentCardRegistry(storage_path=storage_path)
 
@@ -46,8 +52,8 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
             platform_card = json.loads(platform_card_path.read_text(encoding="utf-8"))
             registry.register(platform_card)
             registered += 1
-        except (json.JSONDecodeError, OSError) as exc:
-            logger.warning("Could not load platform agent card: %s", exc)
+        except (json.JSONDecodeError, OSError) as err:
+            logger.warning("Could not load platform agent card: %s", err)
 
     reputation = ReputationEngine()
     router = TaskRouter(registry=registry, reputation=reputation)
@@ -61,7 +67,6 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
         "router": router,
         "vertical_agents": vertical_agents,
         "reputation": reputation,
-        # reputation_engine alias used by marketplace blueprint staking endpoints
         "reputation_engine": reputation,
         "settlement": settlement,
         "policy": policy,
@@ -69,6 +74,22 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
         "skill_vertical_map": dict(SKILL_VERTICAL_MAP),
         "registered_cards": registered,
     }
+    try:
+        from marketplace.contract_net import ContractNetEngine
+
+        platform_state["contract_net"] = ContractNetEngine()
+    except Exception as err:
+        logger.warning("Contract-Net engine not attached: %s", err)
+    try:
+        from marketplace.memory_gate import MemoryGate
+        from marketplace.merit import MeritEngine
+        from marketplace.optimistic import OptimisticBatcher
+
+        platform_state["memory_gate"] = MemoryGate()
+        platform_state["optimistic"] = OptimisticBatcher()
+        platform_state["merit"] = MeritEngine()
+    except Exception as err:
+        logger.warning("Cortex engines not attached: %s", err)
     app.extensions["sincor_platform"] = platform_state
 
     _extend_a2a_skills_from_registry(registry)
@@ -105,3 +126,9 @@ def _extend_a2a_skills_from_registry(registry: AgentCardRegistry) -> None:
                 )
             )
             existing_ids.add(skill_id)
+    try:
+        from sincor2.a2a_integration import refresh_skill_schemas
+
+        refresh_skill_schemas()
+    except Exception as err:
+        logger.warning("A2A schema cache refresh skipped: %s", err)

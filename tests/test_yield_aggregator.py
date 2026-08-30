@@ -69,3 +69,27 @@ def test_tiny_capital_still_returns_plan():
     assert plan.total_capital_usd == 1.0
     # Should warn about min capital
     assert any("MIN_CAPITAL" in w or "below" in w for w in plan.warnings)
+
+
+def test_cash_loading_window_allocates_shared_liq():
+    """CEO 2026-08-17: ~$295 treasury must be eligible for SharedLiquidityVault after min_liquidity lowered to 250."""
+    agg = YieldAggregator()
+    plan = agg.plan_rebalance(capital_usd=295.0, risk_budget=0.30)
+    assert plan.mode == "dry_run"
+    ids = {a.strategy_id for a in plan.allocations}
+    assert "shared_liq_vault" in ids, "SharedLiquidityVault must be eligible at $295 after min_liquidity=250"
+    shared = next(a for a in plan.allocations if a.strategy_id == "shared_liq_vault")
+    assert shared.capital_usd > 0
+    assert plan.expected_blended_apr > 0.0
+
+
+def test_morpho_gate_removed_cash_loading():
+    """CEO 2026-08-19: Morpho min_liquidity set to 0. ~$310 treasury must be eligible for morpho_usdc."""
+    agg = YieldAggregator()
+    plan = agg.plan_rebalance(capital_usd=310.0, risk_budget=0.30)
+    assert plan.mode == "dry_run"
+    ids = {a.strategy_id for a in plan.allocations}
+    assert "morpho_usdc" in ids, "morpho_usdc must be eligible after gate removal (min_liquidity=0)"
+    morpho = next(a for a in plan.allocations if a.strategy_id == "morpho_usdc")
+    assert morpho.capital_usd > 0
+    assert plan.expected_blended_apr > 0.0

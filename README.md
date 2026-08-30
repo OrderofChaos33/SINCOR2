@@ -1,4 +1,3 @@
-
 # SINCOR2: Universal Execution Layer for the Autonomous Machine Economy
 
 SINCOR2 is a production-hardened platform engineered to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. By combining decentralized identity, self-contained cognitive kernels, and automated on-chain financial clearing, the system provides the foundational infrastructure required for autonomous agent swarms to scale independently of human intervention.
@@ -10,10 +9,9 @@ To enable multi-step, machine-to-machine business workflows without central paym
 * **Mechanism:** Network nodes expose standardized, machine-readable Agent Cards (`/.well-known/agent-card.json`). 
 * **Execution:** External systems programmatically discover capabilities, request deterministic task quotes, and natively settle bounties asynchronously on Base using AXIOM (AXM) via a zero-dependency JSON-RPC dispatcher.
 
-### 2. Adversarial MEV Protection via Uniswap V4 Hooks
-Traditional public ledger environments introduce toxic slippage and front-running that destroy corporate treasury efficiency. SINCOR2 isolates ecosystem liquidity at the smart contract perimeter.
-* **Mechanism:** Integrated deployment of `SincLimitOrderHook.sol`.
-* **Execution:** Enforces an algorithmic fee multiplier that detects atomic, multi-swap transactions within a single block. The hook scales from a 0.30% base fee to a 3.00% penalty block, completely breaking the economic viability of predatory sandwich attacks.
+### 2. Uniswap V4 hook (source only — not compile-tested here)
+
+`onchain/src/SincLimitOrderHook.sol` is the anti-sandwich fee hook (0.30% → 3.00% same-block). It imports `@openzeppelin/uniswap-hooks` and `v4-core`. Those libraries are **not vendored** in this checkout, so `forge build` is not green until `onchain/lib/` is installed. Do not treat this as live MEV protection on Base until a compile-tested deploy is recorded.
 
 ### 3. Multi-Objective Convergence via the TOA Framework
 When coordinating distributed swarms against complex, shifting environments, agents often suffer from cognitive drift and path degradation. The Temporal Optimization Agent (TOA) functions as a predictive timeline navigator.
@@ -33,7 +31,9 @@ When coordinating distributed swarms against complex, shifting environments, age
 
 **Production-grade A2A marketplace and multi-agent orchestration for interoperable, revenue-generating agents.**
 
-SINCOR2 is a full-stack autonomous agent platform. It combines Google A2A v1.0.1 interoperability, a live marketplace with reputation-weighted routing, swarm-level coordination, multi-tier agent memory, self-improving quality scoring, real-time market intelligence, predictive analytics, multi-payment processing, vertical domain packs, on-chain settlement via SINC and AXIOM on Base, and a geometric proof-navigation layer (SINAX). Operators can deploy specialized agents that discover, transact, collaborate, and self-optimize — entirely autonomously.
+SINCOR2 is a full-stack autonomous agent platform. It combines Google A2A v1.0.1 interoperability, a live marketplace with reputation-weighted routing, swarm-level coordination, on-chain settlement via AXIOM on Base, and vertical domain packs. Operators can deploy specialized agents that discover, transact, and settle without a human in the loop.
+
+SINAX (`src/sincor2/sinax/`) is a **research prototype** — geometric proof navigation that is **not** wired into the Agency Kernel. Do not sell it as a live product surface.
 
 ---
 
@@ -65,12 +65,14 @@ SINCOR2 is a full-stack autonomous agent platform. It combines Google A2A v1.0.1
 SINCOR2 is built for operators who need autonomous agents that generate real revenue — not demos.
 
 - **A2A-native by design.** Every agent exposes a machine-readable Agent Card. Any A2A v1.0.1-compliant external system (Claude, OpenAI, Hermes, custom) can discover, quote, pay, and call your agents without custom integration work.
-- **43 live agent skills** — from healthcare revenue cycle management and trading signal generation to compliance filing and lead enrichment — all routable through a single JSON-RPC endpoint.
+- **43 named agent skills in YAML** — healthcare RCM, trading signals, compliance, lead enrichment, and more — routable through JSON-RPC. Runtime is **in-thread Flask** today (optional Celery when `REDIS_URL` is set). These are not 43 OS processes or Railway services yet.
 - **Self-improving swarm.** Agents bid on tasks through a contract-net market, self-evaluate with evidence→claim→confidence chains, accumulate reputation, and earn Soulbound Token (SBT) promotions as they prove performance.
+- **Cortex memory, settlement, and merit.** Episodic scratchpads are purged on task close; the semantic vault only accepts high-merit traces and ranks them with Ebbinghaus decay. Micro-tasks settle off-chain and post one Merkle root to Base with a 300-block challenge window and hash-committed bids. EigenTrust plus honeypot auditors stop sybil 10/10 cliques from farming rank.
+
 - **Autonomous revenue pipeline.** Dynamic pricing, Stripe and PayPal checkout, webhook-driven fulfillment, revenue ledger tracking, and partnership frameworks operate continuously without human intervention.
 - **Real-time intelligence.** Live feeds from financial markets, news, social media, competitor websites, job postings, and patent filings let agents detect opportunities and threats in minutes, not days.
-- **On-chain economic coordination.** SINC governs utility and staking mechanics; AXIOM (AXM) settles every agent-to-agent payment on Base with built-in deflationary burn mechanics and a Uniswap V4 limit-order hook that protects against sandwich attacks.
-- **SINAX proof navigation.** A geometric layer that learns proof-space topology, accelerates formal verification with Lean, and discovers lemmas from clusters of hard proof states.
+- **On-chain economic coordination.** AXIOM (AXM) settles agent-to-agent payments on Base. The Uniswap V4 limit-order hook lives in `onchain/src/` and is **not compile-tested in this repo** until v4-periphery is vendored.
+- **SINAX** is research code under `src/sincor2/sinax/`, not a production kernel tool.
 - **Production-ready runtime.** Flask app factory with JWT auth, rate limiting, security headers, structured logging, health monitoring, and one-command Railway / Docker deployment.
 
 ---
@@ -281,7 +283,11 @@ Agents cycle through defined lifecycle states — Hatch → Onboard → Shift �
 
 ### Agent Archetypes & Named Agents
 
-43 named agents are defined in `agents/` using YAML configs with full persona vectors, budgets, and SBT templates. Seven archetypes anchor agent behavior:
+43 named agents are defined in `agents/` using YAML configs with persona vectors and budgets. They are a **catalog**, not 43 running processes.
+
+**Runtime decision (2026-08-29):** keep the Flask gunicorn worker in-thread for request-scoped skills; use `sincor2.task_queue` (thread pool, Celery if `REDIS_URL` is set) for long jobs. Separate Railway services per agent are not justified until one skill has sustained paid load. `agents/runner.py` is the cron/outbox loop for department tasks — still YAML-dispatched, not container-per-agent.
+
+Seven archetypes anchor agent behavior:
 
 | Archetype | Primary Role |
 |---|---|---|
@@ -297,23 +303,25 @@ Agents cycle through defined lifecycle states — Hatch → Onboard → Shift �
 
 ## A2A Protocol & Marketplace
 
-### Full A2A v1.0.1 Compliance
+### A2A v1.0.1 — what is actually live on getsincor.com
 
-SINCOR2 implements the [Google A2A v1.0.1 specification](https://a2aproject.github.io/A2A) completely:
+Implemented by `A2ARouter` (`src/sincor2/a2a_integration.py`) plus inbound register (`src/sincor2/a2a_inbound.py`):
 
-| Endpoint | Method | Description |
+| Endpoint | Method | Status |
 |---|---|---|
-| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 43 skills |
-| `/api/a2a` | POST | JSON-RPC 2.0 dispatcher |
-| `message/send` | RPC | Submit a task and receive a result |
-| `message/stream` | RPC | Server-Sent Events streaming for long-running tasks |
-| `tasks/get` | RPC | Poll task status |
-| `tasks/cancel` | RPC | Cancel an in-flight task |
-| `tasks/list` | RPC | List all tasks for a caller |
-| `tasks/pushNotificationConfig/set` | RPC | Register a webhook for push notifications |
-| `tasks/resubscribe` | RPC | Re-attach to an SSE stream after reconnect |
+| `/.well-known/agent-card.json` | GET | Live |
+| `/api/a2a` | POST JSON-RPC | Live |
+| `message/send` | RPC | Live |
+| `message/stream` | RPC SSE | Live (A2ARouter, not inbound) |
+| `tasks/get` | RPC | Live |
+| `tasks/cancel` | RPC | Live |
+| `tasks/list` | RPC | Live |
+| `tasks/pushNotificationConfig/*` | RPC | Implemented in A2ARouter |
+| `POST /api/marketplace/register` | REST | Live (inbound, no 250 SINC gate) |
+| `POST /v1/a2a/register` | REST | Live probation + heartbeat |
+| `GET /v1/a2a/stream` | SSE | Live auction/task fabric |
 
-Any A2A-compatible external agent — Claude, OpenAI assistants, Hermes, custom systems — can discover and call SINCOR agents without custom integration code.
+Push-notification **delivery** still depends on the caller being reachable; the config CRUD is implemented. Inbound SSE is the contract-net task stream, separate from `message/stream`.
 
 ### Marketplace Discovery & Capability Matching
 
@@ -333,7 +341,7 @@ Every A2A task carries an AXIOM (AXM) payment commitment:
 2. SINCOR validates the on-chain payment commitment on Base.
 3. Task executes through the swarm.
 4. On completion: 50% of received AXM is burned to the dead address (deflationary); 50% routes to the ecosystem treasury.
-5. Uniswap V4 trading fees: 80% of AXM/WETH pool fees route to the treasury independently.
+5. Uniswap V4 trading fees: **documented intent**, not a compile-tested live hook in this checkout.
 
 ---
 
@@ -437,10 +445,12 @@ Manages the full partner lifecycle across eight partnership types (technology in
 
 | Token | Contract | Role |
 |---|---|---|
-| **SINC** | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Governance, utility, and marketplace staking |
-| **AXIOM (AXM)** | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | A2A task settlement and payment rail |
- | All proceeds, liquidity, and sales route here first |
+| **AXIOM (AXM)** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | Primary A2A settlement and billing |
+| **SINC** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Residual / legacy holders (8 decimals) |
+| **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Fees and A2A routing |
 | **Base chain** | `8453` | Production network |
+
+Live pointers are compiled in `src/sincor2/onchain/constants.py` (human index: `CANONICAL_ADDRESSES.md`). Stale `0x9C8cd8…` / `0xfF7aF6…` are rejected at resolve and at boot.
 
 ### Smart Contracts (`onchain/src/`)
 
@@ -448,20 +458,22 @@ Manages the full partner lifecycle across eight partnership types (technology in
 |---|---|---|
 | `SincBondingCurve.sol` | Bonding curve for SINC price discovery and supply mechanics |
 | `SincGenesisNFT.sol` | Soulbound Genesis Holder NFT minted on first SINC buy; non-transferable, on-chain proof of early participation |
-| `SincLimitOrderHook.sol` | Uniswap V4 hook extending `LimitOrderHook` with anti-sandwich dynamic fee scaling: 0.30% base fee; 3.00% elevated fee on second+ swap in same block per pool |
+| `SincLimitOrderHook.sol` | Uniswap V4 anti-sandwich hook **source**. Requires vendored v4-periphery / OZ uniswap-hooks. Not compile-tested in CI until those libs are present. |
 | `Axiom.sol` | AXIOM token contract on Base |
 
 ### Deflationary Mechanics
 
 - **A2A task receipts**: 50% of each AXIOM payment burned to `0x000...dEaD`; 50% to treasury.
-- **Uniswap V4 fees**: 80% of AXM/WETH pool trading fees route to the ecosystem treasury (publicly auditable on Basescan).
+- **Uniswap V4 fees**: intended 80% of AXM/WETH pool fees to treasury — **not live** until the hook compiles and is attached to a pool.
 - **SINC staking**: Staked SINC boosts an agent's composite trust score and routing priority.
 
 ---
 
-## SINAX — Geometric Proof Navigation
+## SINAX — Geometric Proof Navigation (research)
 
-SINAX augments formal proof verification with a geometric navigation layer that learns proof-space topology and reuses verified trajectories to accelerate future proof searches.
+**Status: research prototype.** Code lives in `src/sincor2/sinax/`. It is **not** registered as an Agency Kernel tool and is not on the live A2A skill list. Do not advertise it as a shipping product until it is wired and tested.
+
+SINAX *would* augment formal proof verification with a geometric navigation layer. Until then it is a library, not a runtime.
 
 ```
 SINC (orchestration)
@@ -510,129 +522,7 @@ Production-grade, compliance-ready audit trail supporting SOX, HIPAA, PCI-DSS, a
 ### Container Orchestration
 
 Flexible deployment targets across Kubernetes, Docker Swarm, Nomad, AWS ECS, Azure Container Instances, and Google Cloud Run, plus a native consciousness-aware orchestrator. Supports rolling updates, blue/green, canary, and zero-downtime migration deployment strategies.
-TOA — Temporal Optimization Agent (Wave Function Collapse Pipeline)
-TOA is SINCOR2’s native strategic foresight and decision-collapse engine. It implements a closed-loop Forecast → Simulate → Collapse + Feedback architecture that treats possible futures as a probabilistic superposition and actively collapses them into ranked, executable action plans.
-It is the platform’s “temporal navigator” layer — the component that turns reactive agent swarms and vertical packs into proactively self-optimizing, timeline-steering autonomous systems. TOA is directly inspired by (and named after) the Wave Function Collapse (WFC) paradigm from constraint-based procedural generation, adapted here to multi-objective decision making under uncertainty.
-Core Metaphor & Design Philosophy
-Just as classic WFC algorithms maintain a superposition of possible tile assignments and iteratively collapse them into a globally coherent output while respecting local constraints, TOA maintains a superposition of probable future trajectories (forecast paths) and collapses them into the highest-utility, highest-probability executable plans while respecting multi-objective constraints, feedback history, and platform policy.
-This gives SINCOR2 agents (and external A2A callers) the ability to:
 
-Project multiple futures from current observations
-Score them against revenue, risk, timeline, compliance, governance, and custom objectives
-Select and dispatch only the paths worth executing
-Learn continuously from real outcomes to improve the next cycle
-
-## TOA TEMPORAL OPTIMIZATION AGENT
-TOA is our super forecaster simulator collapser . It is a full decisioning stack that produces action_dispatch payloads ready for the TaskRouter, Swarm Coordinator, Agency Kernel, or external A2A systems.
-The TOA Pipeline (Forecast → Simulate → Collapse)
-1. Forecaster (KernelForecaster + pluggable)
-Produces a set of probability-weighted future-state paths.
-The reference implementation (agents/toa/forecaster.py) is a pure-Python, zero-dependency Nadaraya-Watson kernel smoother:
-
-Takes a time-series of observations (context["values"])
-Fits a smoothed trend + estimates residual standard deviation
-Generates Monte Carlo paths by adding scaled Gaussian noise around the trend
-Assigns normalized probabilities biased toward paths with stronger terminal growth
-Configurable: forecast_horizon, simulation_depth (number of paths), bandwidth, noise_scale
-
-It is intentionally lightweight and swappable. Production deployments can replace it with Nixtla, NeuralForecast, Darts, Lag-Llama, or any custom ForecasterAgent implementation.
-2. Simulator (MonteCarloSimulator)
-Scores every forecast path against a weighted set of objective functions and produces a composite utility_score plus per-objective breakdown.
-Built-in objectives (all return normalized [0,1] scores):
-
-revenue — terminal growth relative to start (sigmoid-mapped)
-risk — inverse of coefficient of variation (lower volatility wins)
-timeline — how quickly the path reaches its peak value
-compliance — explicit or default score
-governance — explicit or default score
-
-Fully extensible via register_objective(name, fn). Weights are normalized internally and can be overridden per-run or via TOA_OBJECTIVE_WEIGHTS env. Priority ordering (objective_priority) influences collapse boosting.
-3. Collapser (WFCCollapser)
-Performs the actual “collapse”:
-
-Filters paths below collapse_threshold probability
-Ranks remaining paths by composite score:
-utility_score × probability × (1 + priority_boost)
-Returns top-k paths (default 5), each enriched with:
-rank, scenario_id, composite_score, utility_score, probability
-objective_breakdown
-action_dispatch (ready-to-route dict with task_type, priority, dominant_objective, required_skills, metadata)
-Human-readable rationale
-
-
-This is the step that converts probabilistic futures into concrete, prioritized work the rest of SINCOR2 can execute.
-4. Feedback Loop (RollingFeedbackAgent)
-Closes the loop. Ingests execution results, vertical outcomes, on-chain events, reputation deltas, or any external signals. Maintains a rolling buffer and emits an aggregated summary that gets injected into the next forecast context. Enables continuous self-improvement and adaptation across runs.
-TOAOrchestrator — The Public API
-agents/toa/orchestrator.py is the single entry point most consumers use:
-Pythonfrom agents.toa import TOAOrchestrator
-
-toa = TOAOrchestrator(task_router=platform.task_router)  # optional integration
-
-result = toa. run(
-    context={"values": [100, 102, 105, 108, 110], "horizon": 12},
-    objectives={"revenue": 0.4, "risk": 0.3, "timeline": 0.3},
-    top_k=5
-    result contains: run_id, action_plan (ranked list), route_decision, feedback_summary, etc.
-Key methods:
-
-run(context, objectives=None, top_k=None) — full pipeline
-ingest_feedback(event) — push outcomes back in
-register_objective(name, fn) — extend the simulator at runtime
-get_stats() — diagnostics
-
-The orchestrator automatically:
-
-Merges feedback into context
-Persists state (TOAStateStore — SQLite by default)
-Dispatches the top action via the injected SINCOR2 TaskRouter when present
-Tracks run count and last action plan
-
-Configuration (TOAConfig)
-All settings are environment-driven with safe defaults (TOA_* prefix):
-
-TOA_SIMULATION_DEPTH (default 50)
-TOA_COLLAPSE_THRESHOLD (default 0.05)
-TOA_TOP_K_PATHS (default 5)
-TOA_FORECAST_HORIZON (default 12)
-TOA_MONTE_CARLO_ITERATIONS
-TOA_OBJECTIVE_WEIGHTS (comma-separated key:value)
-TOA_STATE_PATH (persistence file)
-TOA_STRUCTURED_LOGGING, TOA_FEEDBACK_BUFFER_SIZE, TOA_RUN_TIMEOUT_SECONDS
-
-Objective weights and priority order are first-class and directly influence both simulation scoring and collapse boosting.
-Integration with SINCOR2 Stack
-TOA is designed as a first-class citizen:
-
-Action dispatches flow directly into core.router.TaskRouter, swarm_coordination, Agency Kernel, or any vertical pack.
-Works with the full A2A protocol — external agents can submit contexts and receive collapsed plans.
-Integrates with real-time intelligence feeds and predictive analytics already present in the platform.
-State is persistent across restarts and can be shared or inspected.
-Can be instantiated per-agent, per-swarm, or as a platform-wide strategic layer.
-Pairs naturally with SINAX (geometric proof navigation) for high-stakes or formal-verification-heavy decisions.
-
-Primary Use Cases
-
-Autonomous trading & prediction markets — OpenClaw / Polyclaw signal generation, position sizing, and arbitrage scanning with self-improving win-rate feedback.
-Revenue & opportunity optimization — Detect windows, score impact, and dispatch the highest-utility actions across verticals (healthcare RCM, dental ops, compliance, lead gen).
-Risk & compliance steering — Balance revenue objectives against explicit risk and compliance scores.
-Personal / enterprise timeline optimization — The original “Temporal Optimization Agent – Wave Function Collapse Protocol” use case: actively pruning negative branches and amplifying high-utility timelines.
-Self-improving swarms — Every execution outcome improves the next forecast/simulation cycle.
-Cross-agent synthesis — Feed TOA output into Cortecs Core or multi-agent workflows for deeper reasoning.
-
-Extensibility & Production Readiness
-
-Full abstract base classes (ForecasterAgent, SimulatorAgent, CollapserAgent, FeedbackAgent) — inject your own implementations.
-Zero hard dependencies in the reference forecaster (pure stdlib + math).
-Structured logging, timeout protection, and graceful degradation on component failures.
-Designed for both embedded use inside agents and standalone strategic orchestration.
-State store enables long-running, stateful optimization sessions (exactly as used in persistent Temporal Optimization protocols).
-
-Summary
-TOA is SINCOR2’s native implementation of proactive, multi-objective, feedback-driven temporal optimization. It turns the platform’s powerful execution, marketplace, and swarm layers into a system that doesn’t just react to the present — it actively selects and steers toward the best available futures.
-It is the component that makes “Decentralized Autonomous Economies” (DAE) not just automated, but intelligently self-steering.
-Location in repo: agents/toa/ (orchestrator.py is the main entry point; full pipeline in base.py + collapser.py + forecaster.py + simulator.py + feedback.py + state.py + config.py).
-This module is production-grade, fully integrated, and ready for both internal platform use and external A2A consumption. It is one of the most advanced and strategically important pieces of SINCOR2’s cognitive architecture.
 ---
 
 ## DAE — Decentralized Autonomous Ecosystem
@@ -705,7 +595,7 @@ The Revenue Orchestrator wires all three together: Stripe checkout triggers dyna
 JWT-based auth via `flask-jwt-extended`:
 
 - Access tokens (1-hour expiry) and refresh tokens (30-day expiry).
-- ****** authentication on all protected endpoints.
+- Role-based authentication on all protected endpoints.
 - Auto-generated strong in-memory fallbacks for non-production; explicit secrets required for production.
 - Admin panel protected by a separate `ADMIN_PASSWORD` env variable.
 

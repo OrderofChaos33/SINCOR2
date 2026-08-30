@@ -42,11 +42,13 @@ from sincor2.execution_adapter import KillSwitchTripped, OrderResult, kill_switc
 
 logger = logging.getLogger("sincor.adapters.metamask_agent_wallet")
 
-# Canonical SINCOR addresses on Base (8453)
-SINC_TOKEN = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
-AXM_TOKEN = "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822"
-TREASURY = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
-BASE_CHAIN_ID = 8453
+from sincor2.onchain.constants import AXIOM_TOKEN, BASE_CHAIN_ID, SINC_TOKEN, TREASURY as _TREASURY
+
+# Canonical SINCOR addresses on Base (8453) — sincor2.onchain.constants
+SINC_TOKEN = SINC_TOKEN
+AXM_TOKEN = AXIOM_TOKEN
+TREASURY = _TREASURY
+BASE_CHAIN_ID = BASE_CHAIN_ID
 
 
 class MetaMaskAgentNotReady(RuntimeError):

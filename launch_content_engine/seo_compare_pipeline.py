@@ -13,7 +13,7 @@ COMPARISONS = [
             "1. Sourcify full-match source\n"
             "2. Ownership renounced (no hidden mint)\n"
             "3. Live contracts you can call today\n\n"
-            "SINC (`0x9C8cd8d3961F445D653713dE65C6578bE11668e7`) ships a 42-agent swarm "
+            "SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`) ships a 42-agent swarm "
             "plus bonding curve + audited v4 hook — verifiable in 30 seconds.\n"
             "Self-serve buy: https://getsincor.com/sinc"
         ),

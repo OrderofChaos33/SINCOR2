@@ -99,9 +99,10 @@ Thumbs.db
 .next/
 out/
 
-# ============================================================================
-# Temporary Files
-# ============================================================================
+# Foundry 1.8 solar preprocessor (must never be committed)
+foundry-pp/
+onchain/foundry-pp/
+
 *.tmp
 *.temp
 *.bak
@@ -136,3 +137,16 @@ out/
 *.backup
 *.old
 coverage.xml
+
+# ============================================================================
+# Foundry (root contracts/ + test/ profile)
+# ============================================================================
+cache/
+broadcast/
+indexer-health.json
+
+# Generated / revert junk
+coverage.xml
+.grok-revert-marker
+REVERT_MARKER.txt
+REVERT_COMMIT.txt

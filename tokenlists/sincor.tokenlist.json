@@ -7,16 +7,16 @@
     "base",
     "ai"
   ],
-  "timestamp": "2026-06-15T07:32:01.905412Z",
+  "timestamp": "2026-08-20T06:30:00.000000Z",
   "version": {
     "major": 1,
-    "minor": 0,
-    "patch": 3
+    "minor": 1,
+    "patch": 0
   },
   "tokens": [
     {
       "chainId": 8453,
-      "address": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+      "address": "0xe1D836087F6573b665d25CE088793E916D7892f8",
       "name": "SINC",
       "symbol": "SINC",
       "decimals": 8,

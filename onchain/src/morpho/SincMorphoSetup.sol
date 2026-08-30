@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.26;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -41,7 +41,7 @@ contract SincMorphoSetup is Ownable {
     }
 
     /// @notice Create a Morpho market with SINC as collateral
-    function createMarket(address loanToken, address irm, uint256 lltv) external onlyOwner returns (bytes32 marketId) {
+    function createMarket(address loanToken, address irm, uint256 lltv) public onlyOwner returns (bytes32 marketId) {
         IMorpho.MarketParams memory params = IMorpho.MarketParams({
             loanToken: loanToken,
             collateralToken: address(SINC),

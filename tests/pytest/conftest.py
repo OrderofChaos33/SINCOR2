@@ -3,6 +3,7 @@ import os
 # Set test env before any sincor2 modules import (app.py calls create_app at import time).
 os.environ.setdefault("FLASK_ENV", "test")
 os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("SINCOR_TASK_QUEUE", "eager")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-32-char-minimum-ok")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-char-minimum-ok")
 os.environ.setdefault("ADMIN_USERNAME", "admin")
@@ -27,6 +28,7 @@ class MockStripeCheckout:
 def env_defaults(monkeypatch):
     monkeypatch.setenv("FLASK_ENV", "test")
     monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("SINCOR_TASK_QUEUE", "eager")
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-with-32-char-minimum-ok")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-char-minimum-ok")
     monkeypatch.setenv("ADMIN_USERNAME", "admin")

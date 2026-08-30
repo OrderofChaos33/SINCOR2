@@ -46,7 +46,8 @@ def _run_content_cycle() -> None:
             len(ids),
             pending,
         )
-        if os.environ.get("LAUNCH_REVIEW_REMINDER_AFTER_CYCLE", "true").lower() == "true":
+        # Default OFF — operator requested no draft reminder emails.
+        if os.environ.get("LAUNCH_REVIEW_REMINDER_AFTER_CYCLE", "false").lower() == "true":
             from sincor2.launch_review_notify import send_launch_review_reminder
 
             send_launch_review_reminder()

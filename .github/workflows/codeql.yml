@@ -1,0 +1,27 @@
+name: CodeQL
+
+# Takes over GitHub default CodeQL setup. Jobs are skipped (if: false) because
+# Actions billing is locked — skipped runs do not send "Run failed" notifications.
+# Re-enable by removing `if: false` after billing is fixed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    if: false
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - uses: github/codeql-action/analyze@v3

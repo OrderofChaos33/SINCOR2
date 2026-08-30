@@ -1,0 +1,64 @@
+{
+  "name": "SINCOR TOA — Temporal Optimization Agent",
+  "description": "Forecast → Monte Carlo multi-criteria simulation → wave-function-collapse ranking. Submit goals, constraints, and options; receive ranked action plans optimized for long-term positive outcomes. The core differentiator of the SINCOR DAE. Settles in SINC or AXM on Base.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "toa-decision",
+      "name": "Outcome Collapse / Strategic Decision",
+      "description": "Submit context, objectives, and candidate actions. TOA runs kernel forecasts, Monte Carlo simulation, multi-criteria scoring, and WFC ranking. Returns top-k ranked plans with confidence.",
+      "tags": ["toa", "optimization", "decision", "forecast", "monte-carlo", "wfc"],
+      "examples": [
+        "Given current liquidity and three expansion options, which path maximizes 90-day treasury growth with downside protection?",
+        "Rank these three product launches by probability of positive net cashflow in 6 months under base and bear scenarios."
+      ],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["text/plain", "application/json"],
+      "sincPrice": 6,
+      "estimatedLatencySeconds": 45
+    },
+    {
+      "id": "toa-forecast",
+      "name": "Kernel Forecast Paths",
+      "description": "Generate N Monte Carlo forecast paths from time-series and signals for use in downstream collapse.",
+      "tags": ["forecast", "monte-carlo", "kernel"],
+      "examples": ["Produce 500 paths for SINC liquidity and agent utilization over the next 30 days."],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"],
+      "sincPrice": 4,
+      "estimatedLatencySeconds": 30
+    },
+    {
+      "id": "toa-feedback",
+      "name": "Ingest Execution Feedback",
+      "description": "Feed realized outcomes back into the TOA state store so future collapses improve.",
+      "tags": ["feedback", "learning", "toa"],
+      "examples": ["Record that the chosen liquidity action produced +12% realized inflow vs forecast."],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"],
+      "sincPrice": 1,
+      "estimatedLatencySeconds": 10
+    }
+  ],
+  "documentationUrl": "https://getsincor.com/docs",
+  "securitySchemes": {},
+  "security": []
+}

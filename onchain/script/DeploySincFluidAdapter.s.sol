@@ -12,8 +12,8 @@ import {SincFluidAdapter} from "../src/fluid/SincFluidAdapter.sol";
 ///           --etherscan-api-key $BASESCAN_API_KEY -vvvv
 ///         Env overrides: SINC_ADDRESS / USDC_ADDRESS / GUARDIAN_ADDRESS / TREASURY_ADDRESS
 contract DeploySincFluidAdapter is Script {
-    // Canonical Base addresses (CANONICAL_ADDRESSES.md wins if drift is ever found)
-    address constant SINC = 0x9C8cd8d3961F445D653713dE65C6578bE11668e7;      // 8 decimals
+    // Live Base addresses (src/sincor2/onchain/constants.py + CANONICAL_ADDRESSES.md)
+    address constant SINC = 0xe1D836087F6573b665d25CE088793E916D7892f8;      // 8 decimals
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;      // 6 decimals
     address constant TREASURY = 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac;
     address constant GUARDIAN = 0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a;   // TODO: rotate to multisig
