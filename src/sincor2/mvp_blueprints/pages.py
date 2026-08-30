@@ -88,7 +88,19 @@ def pricing():
 @bp.route('/docs')
 def docs():
     """Product documentation."""
-    return render_template('docs.html')
+    try:
+        return render_template('docs.html')
+    except Exception:
+        logger.exception('[DOCS] docs.html missing; falling back to whitepaper')
+        return render_template('whitepaper.html')
+
+
+@bp.route('/guides/<path:_slug>')
+@bp.route('/download/<path:_slug>')
+@bp.route('/view/<path:_slug>')
+def guides_alias(_slug):
+    """Legacy vault / email guide links land on docs instead of 404."""
+    return redirect('/docs')
 
 
 @bp.route('/dashboard')
@@ -96,7 +108,17 @@ def dashboard():
     """Customer dashboard — payment-gated. Real DB values or explicit None."""
     if _is_admin_session():
         email = _session_email() or (session.get('admin_username') or '')
-        return _render_honest_dashboard(email=email, order={'product_name': 'Operator', 'payment_status': 'verified', 'order_id': 'admin', 'created_at': ''}, profile={}, admin=True)
+        return _render_honest_dashboard(
+            email=email,
+            order={
+                'product_name': 'Operator',
+                'payment_status': 'verified',
+                'order_id': 'operator',
+                'created_at': datetime.utcnow().isoformat(),
+            },
+            profile={},
+            admin=True,
+        )
 
     email = _session_email()
     if not email:
@@ -128,8 +150,12 @@ def _render_honest_dashboard(*, email, order, profile, admin=False):
             if p.get('agents')
         }
     except Exception:
-        agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 42}
+        agent_counts = {'Starter': 10, 'Professional': 25, 'Enterprise': 42, 'Operator': 42}
+    agent_counts.setdefault('Operator', 42)
+    agent_counts.setdefault('Enterprise', 42)
     num_agents = int(PRODUCT_CATALOG.get(tier, {}).get('agents') or agent_counts.get(tier) or 0)
+    if admin and not num_agents:
+        num_agents = 42
 
     roster_names = [
         ('Scout Agent', 'Discovery', '🔍'),
@@ -234,6 +260,14 @@ def product_professional():
 def product_enterprise():
     """Enterprise plan landing page."""
     return render_template('product_enterprise.html')
+
+
+@bp.route('/products/operator')
+def product_operator():
+    """Operator is not a purchasable SKU — send staff to the swarm console."""
+    if _is_admin_session():
+        return redirect('/command-center')
+    return redirect('/login?next=/command-center')
 
 
 @bp.route('/media-packs')

@@ -866,6 +866,10 @@ PRODUCT_CATALOG = {
         'type': 'subscription', 'agents': 42,
         'features': ['All 42 AI Agents', 'Dedicated success manager', '24/7 priority support', 'White-label options', 'Custom integrations']
     },
+    'Operator': {
+        'type': 'internal', 'agents': 42,
+        'features': ['Full swarm', 'Command center', 'Training vault', 'Operator console']
+    },
     'Business Intelligence Report': {
         'type': 'bi_report', 'pages': 20, 'delivery_days': 2,
         'sections': ['Executive Summary', 'Revenue Analysis', 'Growth Opportunities', 'Competitive Positioning', 'Recommendations']

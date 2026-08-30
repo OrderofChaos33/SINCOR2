@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docs & API — SINCOR</title>
+  <meta name="description" content="SINCOR product documentation: dashboard, agents, billing, training vault, and A2A API.">
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --surface:#0f1629; --elev:#161d33; --text:#f1f5f9; --muted:#94a3b8; --cyan:#06b6d4; --purple:#8b5cf6; --ok:#34d399; --border:rgba(139,92,246,.22); }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; line-height:1.65; }
+    a { color:var(--cyan); text-decoration:none; }
+    header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); background:rgba(10,14,39,.9); border-bottom:1px solid var(--border); }
+    .bar { max-width:960px; margin:0 auto; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    .brand { color:var(--text); font-family:'Sora',sans-serif; font-weight:700; }
+    nav { display:flex; gap:8px; flex-wrap:wrap; }
+    nav a { min-height:40px; padding:8px 12px; border-radius:10px; color:var(--muted); font-weight:600; font-size:13px; }
+    nav a:hover { color:var(--text); background:rgba(255,255,255,.05); }
+    .wrap { max-width:960px; margin:0 auto; padding:36px 20px 80px; }
+    .kicker { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan); font-weight:700; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(1.8rem,4vw,2.6rem); letter-spacing:-.03em; margin:8px 0 12px; }
+    h2 { font-family:'Sora',sans-serif; font-size:1.25rem; margin:36px 0 12px; }
+    p, li { color:var(--muted); }
+    ul { margin:0 0 16px 20px; }
+    li { margin-bottom:8px; }
+    .lede { max-width:40rem; margin-bottom:28px; }
+    .grid { display:grid; gap:14px; }
+    @media (min-width:760px) { .grid { grid-template-columns:repeat(3,1fr); } }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:18px; color:var(--text); }
+    .card h3 { font-size:16px; margin-bottom:6px; }
+    .card p { font-size:13px; }
+    code, .mono { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan); }
+    .callout { background:rgba(6,182,212,.08); border:1px solid rgba(6,182,212,.28); border-radius:12px; padding:16px 18px; margin:20px 0; }
+    table { width:100%; border-collapse:collapse; margin:12px 0 20px; font-size:14px; }
+    th, td { border:1px solid var(--border); padding:10px 12px; text-align:left; }
+    th { background:rgba(139,92,246,.12); color:#c4b5fd; }
+    footer { text-align:center; padding:28px; color:var(--muted); font-size:13px; border-top:1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <a class="brand" href="/">SINCOR</a>
+      <nav>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/buy">Plans</a>
+        <a href="/sinc">SINC</a>
+        <a href="/contact">Support</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <p class="kicker">Product documentation</p>
+    <h1>Docs & API</h1>
+    <p class="lede">How to run the agent operations console, bill in SINC / AXM, and call the A2A surface. Nothing here is sample telemetry.</p>
+
+    <section class="grid">
+      <a class="card" href="#console"><h3>Operations console</h3><p>Dashboard, roster, activity, and operator tools.</p></a>
+      <a class="card" href="#billing"><h3>Billing</h3><p>SINC subscriptions and AXM intel on Base.</p></a>
+      <a class="card" href="#api"><h3>A2A API</h3><p>Agent cards, quotes, and inbound JSON-RPC.</p></a>
+    </section>
+
+    <h2 id="console">Operations console</h2>
+    <p>After a paid plan (or an operator session) the console lives at <a href="/dashboard">/dashboard</a>.</p>
+    <ul>
+      <li><strong>Overview</strong> — live KPIs stay blank until the swarm bus reports real numbers.</li>
+      <li><strong>Agents</strong> — roster sized to the plan: Starter 10, Professional 25, Enterprise / Operator 42.</li>
+      <li><strong>Activity</strong> — recorded agent actions. Empty until tasks actually run.</li>
+      <li><strong>Training Vault</strong> — guides for the active subscription. Operators open it without a customer order.</li>
+    </ul>
+    <div class="callout">Staff sign in at <a href="/login">/login</a>, then use <a href="/admin">/admin</a> and <a href="/command-center">/command-center</a> for the swarm feed. Deploy Agent on an operator session opens the command center, not a product SKU.</div>
+
+    <h2 id="plans">Plans</h2>
+    <table>
+      <thead><tr><th>Plan</th><th>Agents</th><th>Entry</th></tr></thead>
+      <tbody>
+        <tr><td>Starter</td><td>10</td><td><a href="/products/starter">/products/starter</a></td></tr>
+        <tr><td>Professional</td><td>25</td><td><a href="/products/professional">/products/professional</a></td></tr>
+        <tr><td>Enterprise</td><td>42</td><td><a href="/products/enterprise">/products/enterprise</a></td></tr>
+      </tbody>
+    </table>
+    <p>Checkout is wallet-native at <a href="/buy">/buy</a>. No Stripe or PayPal on the default path.</p>
+
+    <h2 id="billing">Billing</h2>
+    <ul>
+      <li><strong>SINC</strong> — monthly subscriptions. Curve and treasury at <a href="/sinc">/sinc</a>.</li>
+      <li><strong>AXM (AXIOM)</strong> — one-off intel and agent-to-agent settlement. See <a href="/axiom">/axiom</a>.</li>
+      <li><strong>Membership</strong> — <a href="/billing">/billing</a> for wallet-linked plan status.</li>
+    </ul>
+
+    <h2 id="api">A2A API</h2>
+    <p>Discovery and quotes are public. Execution still requires payment verification.</p>
+    <table>
+      <thead><tr><th>Path</th><th>What it returns</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">/.well-known/agent-card.json</td><td>Canonical agent card + skills</td></tr>
+        <tr><td class="mono">/.well-known/agent.json</td><td>Legacy agent card</td></tr>
+        <tr><td class="mono">/api/a2a/agents</td><td>Registered agents</td></tr>
+        <tr><td class="mono">/api/a2a/quote?skill_id=…</td><td>AXM quote for a skill</td></tr>
+        <tr><td class="mono">/health</td><td>Service + readiness checks</td></tr>
+      </tbody>
+    </table>
+    <p>Full protocol notes: <a href="/whitepaper">whitepaper</a> and <a href="/static/docs/SINCOR_whitepaper.md">markdown download</a>.</p>
+
+    <h2 id="support">Support</h2>
+    <p>Sales, incidents, or account questions: <a href="/contact">/contact</a> or <a href="mailto:support@getsincor.com">support@getsincor.com</a>.</p>
+  </main>
+  <footer>© 2026 SINCOR Business Solutions · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer>
+</body>
+</html>
