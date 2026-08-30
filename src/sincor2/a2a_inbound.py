@@ -218,3 +218,18 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
         "sinc_stake": int(body.get("sinc_stake") or 0),
         "skills": [{"id": t, "name": t} for t in tags],
     }
+
+
+def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
+    from sincor2.a2a_inbound_ext import register_agent_record as _impl
+    return _impl(body)
+
+
+def ensure_platform_agent() -> Dict[str, Any]:
+    from sincor2.a2a_inbound_ext import ensure_platform_agent as _impl
+    return _impl()
+
+
+def register(app: Flask) -> None:
+    from sincor2.a2a_inbound_ext import mount
+    mount(app)
