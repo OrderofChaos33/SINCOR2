@@ -23,9 +23,9 @@ def _bind_mvp():
 _bind_mvp()
 
 
-# ============================================================================
+# ==============================================================================
 # HEALTH & STATUS ENDPOINTS
-# ============================================================================
+# ==============================================================================
 
 # DEBUG ENDPOINT REMOVED - was leaking env var status to public
 
@@ -58,7 +58,15 @@ def _probe_database() -> tuple[bool, str]:
 def _probe_jsonrpc(url: str, method: str = 'eth_chainId', timeout: int = 3) -> tuple[bool, str]:
     """Probe JSON-RPC endpoint and return readiness result."""
     payload = json.dumps({'jsonrpc': '2.0', 'id': 'health', 'method': method, 'params': []}).encode('utf-8')
-    req = urllib_request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+    req = urllib_request.Request(
+        url,
+        data=payload,
+        headers={
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'SINCOR2-health/1.0',
+        },
+    )
     try:
         with urllib_request.urlopen(req, timeout=timeout) as response:
             body = json.loads(response.read().decode('utf-8'))
@@ -72,10 +80,13 @@ def _probe_jsonrpc(url: str, method: str = 'eth_chainId', timeout: int = 3) -> t
 
 
 _PUBLIC_BASE_RPCS = (
+    'https://mainnet.base.org',
     'https://base-rpc.publicnode.com',
+    'https://base.drpc.org',
+    'https://base.meowrpc.com',
+    'https://base.gateway.tenderly.co',
     'https://base.llamarpc.com',
     'https://1rpc.io/base',
-    'https://mainnet.base.org',
 )
 
 
@@ -176,4 +187,3 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
         ),
     )
     return payload
-
