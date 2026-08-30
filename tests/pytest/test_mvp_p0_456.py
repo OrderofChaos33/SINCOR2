@@ -116,6 +116,70 @@ def test_dashboard_paid_no_fabricated_metrics(mvp_client):
     assert "—" in html
 
 
+def test_docs_page_200(mvp_client):
+    r = mvp_client.get("/docs", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Docs" in html
+    assert "A2A" in html
+
+
+def test_guides_alias_redirects_docs(mvp_client):
+    r = mvp_client.get("/guides/enterprise-guide-online", follow_redirects=False)
+    assert r.status_code in (301, 302)
+    assert "/docs" in r.headers.get("Location", "")
+
+
+def test_products_operator_redirects_login_when_anon(mvp_client):
+    r = mvp_client.get("/products/operator", follow_redirects=False)
+    assert r.status_code in (301, 302)
+    loc = r.headers.get("Location", "")
+    assert "/login" in loc
+
+
+def test_products_operator_admin_goes_command_center(mvp_client):
+    with mvp_client.session_transaction() as sess:
+        sess["is_admin"] = True
+        sess["admin_username"] = "admin"
+    r = mvp_client.get("/products/operator", follow_redirects=False)
+    assert r.status_code in (301, 302)
+    assert "/command-center" in r.headers.get("Location", "")
+
+
+def test_admin_dashboard_quick_actions_do_not_404(mvp_client):
+    with mvp_client.session_transaction() as sess:
+        sess["is_admin"] = True
+        sess["admin_username"] = "admin"
+        sess["username"] = "admin"
+    r = mvp_client.get("/dashboard", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "/products/operator" not in html
+    assert "/command-center" in html
+    assert 'href="/admin/training-vault"' in html
+    assert "order_id=admin" not in html
+    assert "42" in html
+    assert "Command Center" in html
+    assert "Training Vault" in html
+    assert "Docs" in html
+
+
+def test_training_vault_admin_session_200(mvp_client):
+    with mvp_client.session_transaction() as sess:
+        sess["is_admin"] = True
+        sess["admin_username"] = "admin"
+    r = mvp_client.get("/admin/training-vault", follow_redirects=False)
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "No Active Subscription" not in html
+    assert "Enterprise" in html or "Training" in html or "vault" in html.lower()
+
+
+def test_training_vault_unauthed_401(mvp_client):
+    r = mvp_client.get("/admin/training-vault", follow_redirects=False)
+    assert r.status_code == 401
+
+
 def test_legacy_mock_dashboards_not_on_mvp_app(mvp_client):
     """gunicorn sincor2.mvp_app:app must not serve app.py mock telemetry dashboards."""
     for path in ("/professional", "/executive", "/admin-dashboard", "/consciousness-transfer"):

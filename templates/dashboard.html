@@ -228,7 +228,7 @@
     </a>
     <a class="nav-item" href="#agents">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-      Agents <span class="tag">{{ agents|length }}</span>
+      Agents <span class="tag">{{ num_agents }}</span>
     </a>
     <a class="nav-item" href="#activity">
       <svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
@@ -238,6 +238,22 @@
       <svg viewBox="0 0 24 24"><path d="M12 20V10M6 20v-6M18 20V6"/></svg>
       Usage
     </a>
+
+    {% if admin_view %}
+    <div class="nav-group">Operator</div>
+    <a class="nav-item" href="/admin">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Console
+    </a>
+    <a class="nav-item" href="/command-center">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+      Command Center
+    </a>
+    <a class="nav-item" href="/admin/training-vault">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+      Training Vault
+    </a>
+    {% endif %}
 
     <div class="nav-group">Account</div>
     <a class="nav-item" href="/billing">
@@ -280,15 +296,15 @@
         </div>
       </div>
       <div class="top-actions">
-        <span class="live"><span class="dot"></span>{{ agents|length }} provisioned</span>
+        <span class="live"><span class="dot"></span>{{ num_agents }} provisioned</span>
         <div class="seg" id="range">
           <button data-r="24h">24H</button>
           <button data-r="7d" class="on">7D</button>
           <button data-r="30d">30D</button>
         </div>
-        <a class="btn btn-primary" href="/products/{{ tier|lower }}">
+        <a class="btn btn-primary" href="{% if admin_view %}/command-center{% else %}/products/{{ tier|lower }}{% endif %}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Deploy Agent
+          {% if admin_view %}Open Swarm{% else %}Deploy Agent{% endif %}
         </a>
       </div>
     </div>
@@ -439,6 +455,18 @@
           <div class="card">
             <div class="card-h"><h3>Quick Actions</h3></div>
             <div class="qa">
+              {% if admin_view %}
+              <a href="/command-center">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Command Center
+              </a>
+              <a href="/admin/training-vault">
+                <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Training Vault
+              </a>
+              <a href="/docs"><svg viewBox="0 0 24 24"><path d="M4 4h11l5 5v11H4z"/><path d="M14 4v6h6"/></svg>Docs & API</a>
+              <a href="/contact"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>Support</a>
+              <a href="/sinc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg>SINC Token</a>
+              <a href="/admin"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Console</a>
+              {% else %}
               <a href="/admin/training-vault{% if email %}?email={{ email }}{% endif %}{% if order_id %}&order_id={{ order_id }}{% endif %}">
                 <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Training Vault
               </a>
@@ -447,6 +475,7 @@
               <a href="/contact"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>Support</a>
               <a href="/sinc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg>SINC Token</a>
               <a href="#" class="danger" id="deleteData"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Delete Data</a>
+              {% endif %}
             </div>
           </div>
         </aside>
@@ -512,6 +541,17 @@
   function toggle(open){ side.classList.toggle('open',open); scrim.classList.toggle('on',open); }
   if(mb) mb.addEventListener('click', function(){ toggle(!side.classList.contains('open')); });
   scrim.addEventListener('click', function(){ toggle(false); });
+
+  /* ---- hash tabs (overview / agents / activity / usage) ---- */
+  function markNav() {
+    var hash = (location.hash || '#overview');
+    document.querySelectorAll('.nav-item').forEach(function(el){
+      var href = el.getAttribute('href') || '';
+      if (href.charAt(0) === '#') el.classList.toggle('on', href === hash);
+    });
+  }
+  markNav();
+  window.addEventListener('hashchange', markNav);
 
   /* ---- GDPR delete ---- */
   var btn = document.getElementById('deleteData');

@@ -555,53 +555,55 @@ def admin_training_vault():
     """
     Render the training vault dashboard for logged-in customers.
     Shows tier-specific guides, videos, industry guides, and onboarding progress.
-    SECURITY: Requires a valid order token (order_id tied to email) or admin JWT.
-    Email alone is NOT sufficient � prevents trivial enumeration access.
+    SECURITY: Requires a valid order token (order_id tied to email) or an admin session.
+    Email alone is NOT sufficient — prevents trivial enumeration access.
     """
-    # Admin JWT bypass
-    if _check_admin_token(request):
-        customer_email = request.args.get('email') or request.args.get('customer_email')
-        if not customer_email or not validate_email(customer_email):
-            return render_template('error.html', code=400, title='Bad Request',
-                                 message="email parameter required for admin vault access."), 400
-    else:
-        # Customers must provide email + order_id (acts as an access token)
-        customer_email = request.args.get('email') or request.args.get('customer_email')
-        order_token = request.args.get('order_id', '').strip()
+    is_admin = _is_admin_session()
+    customer_email = request.args.get('email') or request.args.get('customer_email')
+    order_token = sanitize_string((request.args.get('order_id') or '').strip(), max_length=64)
 
+    if is_admin:
+        if customer_email and not validate_email(customer_email):
+            # Staff usernames are not customer emails — ignore them.
+            customer_email = None
+    else:
         if not customer_email or not validate_email(customer_email):
             return render_template('error.html', code=401, title='Authentication Required',
                                  message="Please log in to access your training vault."), 401
-
         if not order_token:
             return render_template('error.html', code=401, title='Authentication Required',
                                  message="Access token required. Check your confirmation email for your order link."), 401
 
-        # Sanitize order_token
-        order_token = sanitize_string(order_token, max_length=64)
-
-    # Fetch customer's orders from database
     db = get_db()
-
-    # If not admin, verify order_id belongs to this email (prevents email-only enumeration)
-    if not _check_admin_token(request):
-        rows = db.execute(
-            "SELECT * FROM orders WHERE customer_email=? AND order_id=? "
-            "AND product_name IN ('Starter', 'Professional', 'Enterprise') LIMIT 1",
-            (customer_email, order_token)
-        ).fetchone()
-    else:
+    rows = None
+    if is_admin and customer_email:
         rows = db.execute(
             "SELECT * FROM orders WHERE customer_email=? AND product_name IN ('Starter', 'Professional', 'Enterprise') "
             "ORDER BY created_at DESC LIMIT 1",
             (customer_email,)
         ).fetchone()
+    elif not is_admin:
+        rows = db.execute(
+            "SELECT * FROM orders WHERE customer_email=? AND order_id=? "
+            "AND product_name IN ('Starter', 'Professional', 'Enterprise') LIMIT 1",
+            (customer_email, order_token)
+        ).fetchone()
 
     if not rows:
-        return render_template('error.html', code=404, title='No Active Subscription',
-                             message="You don't have an active SINCOR subscription. Please purchase one to access training materials."), 404
+        if is_admin:
+            customer_email = customer_email or 'operator@getsincor.com'
+            order_data = {
+                'order_id': 'operator',
+                'customer_email': customer_email,
+                'product_name': 'Enterprise',
+                'created_at': datetime.utcnow().isoformat(),
+            }
+        else:
+            return render_template('error.html', code=404, title='No Active Subscription',
+                                 message="You don't have an active SINCOR subscription. Please purchase one to access training materials."), 404
+    else:
+        order_data = dict(rows)
 
-    order_data = dict(rows)
     product_name = order_data.get('product_name', 'Enterprise')
     tier_name = product_name if product_name in ['Starter', 'Professional', 'Enterprise'] else 'Enterprise'
     tier_slug = tier_name.lower()
@@ -626,7 +628,7 @@ def admin_training_vault():
         'TIER': tier_name,
         'TIER_SLUG': tier_slug,
         'CUSTOMER_EMAIL': customer_email,
-        'CUSTOMER_NAME': customer_email.split('@')[0].title(),
+        'CUSTOMER_NAME': (customer_email or 'operator').split('@')[0].title(),
         'AGENT_COUNT': agent_count,
         'PAGE_COUNT': {'Starter': 30, 'Professional': 60, 'Enterprise': 120}.get(tier_name, 30),
         'INTEGRATION_COUNT': {'Starter': 5, 'Professional': 15, 'Enterprise': 25}.get(tier_name, 5),
@@ -664,7 +666,7 @@ def download_guide(filename):
     req_email = validate_email(request.args.get('email', ''))
     req_order = sanitize_string(request.args.get('order_id', ''), max_length=64)
 
-    if not _check_admin_token(request):
+    if not _is_admin_session():
         if not req_email or not req_order:
             return jsonify({'error': 'Authentication required. Include email and order_id params.'}), 401
 
