@@ -266,4 +266,4 @@ When all of the following are true, Plan 1 is done and you're cleared to start P
 - **Never paste `DEPLOYER_PRIVATE_KEY` into a chat with me, ever.** If you do, that wallet becomes burnable. Same rule as we established with `0x6E36…` on 2026-05-16.
 - **Never put a wallet that has held any real ETH into `.env`.** Use the fresh Sepolia-only hot wallet for testnet, and a hardware wallet for mainnet deploys later.
 - **The Sepolia deployer wallet's only job is to deploy testnet contracts.** After Plan 1, abandon it.
-- **Mainnet is not in this runbook.** When you're ready for mainnet (Plan 4), it gets its own runbook with hardware-wallet-signed transactions, no `.env` keys, and the canonical SINC token at `0x9C8cd8d3961F445D653713dE65C6578bE11668e7`.
+- **Mainnet is not in this runbook.** When you're ready for mainnet (Plan 4), it gets its own runbook with hardware-wallet-signed transactions, no `.env` keys, and the canonical SINC token at `0xe1D836087F6573b665d25CE088793E916D7892f8`.

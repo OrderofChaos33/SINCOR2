@@ -29,7 +29,7 @@ import {IComplianceGuard} from "../ComplianceGuard.sol";
 ///           each user's debt position must be their own Fluid account.
 ///
 /// @dev    Pool token order: Fluid DEX T1 orders token0/token1 by token address.
-///         USDC 0x8335…fCD6… < SINC 0x9C8c…d396…, so for SINC-USDC:
+///         USDC 0x8335…fCD6… < SINC 0xe1D8…92f8, so for SINC-USDC:
 ///         token0 = USDC (6 decimals), token1 = SINC (8 decimals). All external
 ///         functions here take (sincAmt, usdcAmt) and re-order internally.
 ///         Token approvals target the Fluid Liquidity contract (the layer that

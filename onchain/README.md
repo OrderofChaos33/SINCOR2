@@ -8,8 +8,8 @@ Foundry project for all SINCOR ecosystem smart contracts, deployed on **Base** (
 
 | Token | Symbol | Contract (Base mainnet) | Supply | Decimals | Role |
 |-------|--------|------------------------|--------|----------|------|
-| SINC  | SINC   | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | 100 M | 8  | Platform utility token; burned via agent-billing loop |
-| AXIOM | AXM    | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | 1 B   | 18 | Autonomous intelligence token; A2A inter-agent settlement |
+| SINC  | SINC   | `0xe1D836087F6573b665d25CE088793E916D7892f8` | 1 B   | 8  | Platform utility token; burned via agent-billing loop |
+| AXIOM | AXM    | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | 1 B   | 18 | Autonomous intelligence token; A2A inter-agent settlement |
 
 Both tokens: fixed supply, no mint, no owner, no tax, no proxy. Verified on Basescan.
 

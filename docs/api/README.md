@@ -140,8 +140,8 @@ Returns the advertised SINCOR skill catalogue plus chain metadata.
   "agents": [
     {"id": "market-intelligence", "name": "Market & Competitive Intelligence", "tags": ["market"], "axm_price_per_task": "1000000000000000000"}
   ],
-  "axiom_contract": "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822",
-  "sinc_contract": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+  "axiom_contract": "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
+  "sinc_contract": "0xe1D836087F6573b665d25CE088793E916D7892f8",
   "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
   "chain_id": 8453
 }
@@ -166,7 +166,7 @@ Request a pricing quote for a skill.
   "axm_price_wei": "1000000000000000000",
   "axm_price_display": "1.0000 AXM",
   "pay_to": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
-  "axiom_contract": "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822",
+  "axiom_contract": "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
   "chain_id": 8453,
   "note": "Transfer the exact AXM amount ..."
 }

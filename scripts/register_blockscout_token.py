@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SINC = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
 BLOCKSCOUT_API = f"https://base.blockscout.com/api/v2/addresses/{SINC}"
 OUT = ROOT / "tokenlists" / "blockscout"
 

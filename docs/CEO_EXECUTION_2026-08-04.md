@@ -69,7 +69,7 @@
 
 ## 3. SINC Whitelisted Everywhere
 
-**Goal**: Maximize discoverability and usability of Base SINC (`0x9C8cd8d3961F445D653713dE65C6578bE11668e7`).
+**Goal**: Maximize discoverability and usability of Base SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`).
 
 ### Current Assets
 - `scripts/whitelist_token.py` (30k) — primary tool.  

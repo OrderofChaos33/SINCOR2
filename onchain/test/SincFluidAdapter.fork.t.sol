@@ -12,7 +12,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///                --fork-url $BASE_RPC_URL -vvv
 contract SincFluidAdapterForkTest is Test {
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-    address constant SINC = 0x9C8cd8d3961F445D653713dE65C6578bE11668e7;
+    address constant SINC = 0xe1D836087F6573b665d25CE088793E916D7892f8;
     address constant TREASURY = 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac;
     address constant GUARDIAN = 0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a;
     address constant F_USDC = 0xf42f5795D9ac7e9D757dB633D693cD548Cfd9169;

@@ -6,7 +6,7 @@ import {SINCLending} from "../src/SINCLending.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockOracle, MockSwapRouter} from "./mocks/MockLoop.sol";
 
-/// @notice Pins behavior against the REAL SINC v3 token spec: 8 decimals, 100M supply (Base).
+/// @notice Pins behavior against the REAL SINC v3 token spec: 8 decimals, 1B supply (Base).
 ///         The lending market must value collateral identically regardless of token decimals —
 ///         10_000 SINC at $1 is $10k whether the token is 8dp or 18dp.
 contract SINCLendingDecimalsTest is Test {

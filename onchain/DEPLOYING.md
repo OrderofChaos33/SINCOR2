@@ -29,7 +29,7 @@ the PoolOperation-era commit (v4.0.0 lacks `types/PoolOperation.sol`). v4-periph
 |-----|-------|
 | `PRIVATE_KEY` | deployer key (0x…) — use a dedicated deployer wallet, NOT the treasury key |
 | `BASE_RPC` | default `https://base-rpc.publicnode.com` |
-| `SINC_TOKEN` | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` (SINC v3, **8 decimals**) |
+| `SINC_TOKEN` | `0xe1D836087F6573b665d25CE088793E916D7892f8` (SINC v3, **8 decimals**) |
 | `USDC_TOKEN` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 | `POOL_MANAGER` | `0x498581fF718922c3f8e6A244956aF099B2652b2b` (canonical V4, same on all chains) |
 | `TREASURY` | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` (default) |

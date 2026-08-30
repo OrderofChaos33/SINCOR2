@@ -16,7 +16,7 @@ sources and Base deployment artifacts — not assumed.
 | fWETH | `0x9272D6153133175175Bc276512B2336BE3931CE9` |
 | DexResolver | `0x11D80CfF056Cef4F9E6d23da8672fE9873e5cC07` |
 | LendingResolver | `0x48D32f49aFeAEC7AE66ad7B9264f446fc11a1569` |
-| SINC (8 dec) | `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` |
+| SINC (8 dec) | `0xe1D836087F6573b665d25CE088793E916D7892f8` |
 | USDC (6 dec) | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
 
 Pool token order for SINC-USDC: **token0 = USDC, token1 = SINC** (Fluid orders by address).

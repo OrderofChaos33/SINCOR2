@@ -1,13 +1,13 @@
 {
   "name": "SINC",
   "symbol": "SINC",
-  "address": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+  "address": "0xe1D836087F6573b665d25CE088793E916D7892f8",
   "chainId": 8453,
   "chainName": "Base",
   "decimals": 8,
-  "totalSupply": "100000000",
+  "totalSupply": "1000000000",
   "website": "https://getsincor.com",
-  "explorer": "https://basescan.org/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+  "explorer": "https://basescan.org/token/0xe1D836087F6573b665d25CE088793E916D7892f8",
   "twitter": "https://x.com/getsincor",
   "x": "https://x.com/getsincor",
   "telegram": "https://t.me/getsincor",
@@ -16,7 +16,7 @@
   "farcaster": "https://warpcast.com/getsincor",
   "logoSource": "static/sinc_logo_planet.jpg",
   "descriptionShort": "SINC is the utility token of SINCOR — a swarm of 43 autonomous AI agents operating on Base.",
-  "descriptionLong": "SINC is the utility token of SINCOR, a production AI agent swarm on Base mainnet. Contracts are Sourcify-verified with CertiK Skynet 97/100. Fixed 100M supply, 8 decimals, no mint, no admin keys. SINC powers access to the agent network, curated sales, and on-chain coordination via Uniswap v4 limit-order infrastructure.",
+  "descriptionLong": "SINC is the utility token of SINCOR, a production AI agent swarm on Base mainnet. Contracts are Sourcify-verified with CertiK Skynet 97/100. Fixed 1B supply, 8 decimals, no mint, no admin keys. SINC powers access to the agent network, curated sales, and on-chain coordination via Uniswap v4 limit-order infrastructure.",
   "tags": ["defi", "ai"],
   "trustSignals": [
     "Sourcify full-match verified",
@@ -24,7 +24,7 @@
     "SolidityScan Low Risk 98.5/100",
     "No mint function",
     "No admin pause/withdraw",
-    "Fixed 100M supply"
+    "Fixed 1B supply"
   ],
   "relatedContracts": {
     "bondingCurve": "0x75dE341a2BC81806198364F125d4Cde36527619C",
@@ -49,6 +49,6 @@
     "doNotSwapVia": ["0x85372932f9b151a076815d92cf71a97980ffd667"],
     "securityApi": "https://getsincor.com/api/token/security",
     "certiK": "https://skynet.certik.com/projects/sincor",
-    "sourcify": "https://repo.sourcify.dev/contracts/full_match/8453/0x9C8cd8d3961F445D653713dE65C6578bE11668e7/"
+    "sourcify": "https://repo.sourcify.dev/contracts/full_match/8453/0xe1D836087F6573b665d25CE088793E916D7892f8/"
   }
 }

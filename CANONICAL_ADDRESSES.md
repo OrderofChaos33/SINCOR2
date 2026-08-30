@@ -17,7 +17,7 @@ literals into other runtime modules.
 |---|---|---|
 | **AXIOM (AXM) token** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | **PRIMARY** — sole platform utility + A2A settlement + billing (deployed 2026-08-18) |
 | **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Platform treasury (A2A routing, fees) |
-| **SINC token** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | **8 decimals.** Live SINC (updated 2026-08-19). |
+| **SINC token** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | **8 decimals, 1B supply.** Live SINC (updated 2026-08-19). |
 | **SincBondingCurve (legacy)** | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Residual SINC sale. Do not expand. |
 | **SincLimitOrderHook** | `0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0` | Legacy |
 | **SincGenesisNFT (soulbound)** | `0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09` | Legacy |

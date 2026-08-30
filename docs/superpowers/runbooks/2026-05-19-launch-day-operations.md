@@ -184,7 +184,7 @@ POOL_MANAGER=0x498581fF718922c3f8e6A244956aF099B2652b2b
 POSITION_MANAGER=0x7C5f5A4bBd8fD63184577525326123B519429bDc
 
 # The canonical SINC token already exists on mainnet:
-SINC_TOKEN=0x9C8cd8d3961F445D653713dE65C6578bE11668e7
+SINC_TOKEN=0xe1D836087F6573b665d25CE088793E916D7892f8
 
 # Leave these blank — populated by the deploys below:
 GENESIS_NFT=
@@ -204,7 +204,7 @@ For each script, replace `--broadcast` with `--ledger --broadcast` and Foundry w
 & $forge script script/02_DeployBondingCurve.s.sol --rpc-url base --ledger --broadcast --verify
 ```
 
-Note: **Skip `00_DeployMockSinc.s.sol`** — canonical SINC at `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` already exists.
+Note: **Skip `00_DeployMockSinc.s.sol`** — canonical SINC at `0xe1D836087F6573b665d25CE088793E916D7892f8` already exists.
 
 **7.3 — Fund the curve with 65M SINC (from your existing SINC holdings):**
 The original 100M canonical SINC supply is owned by `0x35cb3bf1b29F81d325EB9A7225a3E87fE7B37D6f`. Per [[signing_authority]] memory, that wallet is the original creator. You sign this transfer with whatever key controls `0x35cb…7D6f`. If you no longer control it, this step blocks — flag it now.

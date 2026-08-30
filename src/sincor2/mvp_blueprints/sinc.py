@@ -181,6 +181,18 @@ def sinc_token_metadata():
                 payload.update(json.load(f))
         except (json.JSONDecodeError, OSError):
             pass
+    # JSON extras may add copy. They cannot change the live contract identity
+    # or resurrect a retired address (that is how the old SINC leaked onto getsincor.com).
+    payload['address'] = SINC_TOKEN
+    payload['chainId'] = 8453
+    payload['decimals'] = 8
+    payload['explorer'] = f'https://basescan.org/token/{SINC_TOKEN}'
+    payload['blockscout'] = f'https://base.blockscout.com/token/{SINC_TOKEN}'
+    sec = payload.get('security')
+    if isinstance(sec, dict):
+        sec['sourcify'] = (
+            f'https://repo.sourcify.dev/contracts/full_match/8453/{SINC_TOKEN}/'
+        )
     try:
         from launch_content_engine.onchain_stats import build_official_price_payload
         payload['pricing'] = build_official_price_payload()

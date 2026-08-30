@@ -27,7 +27,7 @@ PR = OUT / "pr-packages"
 STAGING = OUT / "_staging"
 
 CHAIN_ID = 8453
-CHECKSUM = "0x9C8cd8d3961F445D653713dE65C6578bE11668e7"
+CHECKSUM = "0xe1D836087F6573b665d25CE088793E916D7892f8"
 LOWER = CHECKSUM.lower()
 
 TARGETS = [
@@ -90,7 +90,7 @@ TARGETS = [
         "id": "dexscreener",
         "name": "DexScreener enhanced token info",
         "type": "form",
-        "url": "https://dexscreener.com/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+        "url": "https://dexscreener.com/base/0xe1D836087F6573b665d25CE088793E916D7892f8",
         "docs": "https://docs.dexscreener.com/token-listing",
         "fee": True,
         "notes": "Enhanced Token Info is paid; basic indexing is free with liquidity+trades.",
@@ -123,7 +123,7 @@ TARGETS = [
         "id": "birdeye",
         "name": "Birdeye token info",
         "type": "form",
-        "url": "https://birdeye.so/token/0x9C8cd8d3961F445D653713dE65C6578bE11668e7?chain=base",
+        "url": "https://birdeye.so/token/0xe1D836087F6573b665d25CE088793E916D7892f8?chain=base",
         "fee": False,
     },
     {
@@ -164,7 +164,7 @@ TARGETS = [
         "id": "tkn",
         "name": "Token Name Service (TKN) — Blockscout icon source",
         "type": "form",
-        "url": "https://tkn.xyz/token/base/0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+        "url": "https://tkn.xyz/token/base/0xe1D836087F6573b665d25CE088793E916D7892f8",
         "docs": "https://docs.tkn.xyz/usage/organizations",
         "fee": False,
         "notes": "Blockscout pulls token metadata from TKN. Submit logo, website, description.",
@@ -687,7 +687,7 @@ def stage_repo(repo_url: str, repo_name: str, copy_fn, *, sparse: str | None = N
         print(f"  no changes needed in {repo_name}")
         return None
     subprocess.run(
-        ["git", "commit", "-m", "Add SINC token on Base (0x9C8cd8d3961F445D653713dE65C6578bE11668e7)"],
+        ["git", "commit", "-m", "Add SINC token on Base (0xe1D836087F6573b665d25CE088793E916D7892f8)"],
         cwd=dest,
         capture_output=True,
     )
