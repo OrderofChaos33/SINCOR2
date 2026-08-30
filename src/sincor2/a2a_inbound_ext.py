@@ -4,18 +4,15 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
-import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from flask import Blueprint, Flask, Response, jsonify, request
+from flask import Flask, jsonify, request
 
 from sincor2.contract_net import BASE_CHAIN_ID, probe_base_chain
 from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_AGENTS,
     MERIT_THRESHOLD_AXM,
-    PROBATION_SEEDS,
     _AGENT_ID_RE,
     _HEARTBEAT_STOP,
     _PLATFORM_AGENT_ID,
@@ -144,6 +141,9 @@ def list_agents(live_only: bool = False) -> List[Dict[str, Any]]:
 
 
 def mount(app: Flask) -> None:
+    from flask import Blueprint
+    from sincor2.a2a_inbound_market import attach_market_routes, seed_probation_tasks
+
     bp = Blueprint("a2a_inbound", __name__)
 
     @bp.post("/api/marketplace/register")
@@ -157,7 +157,14 @@ def mount(app: Flask) -> None:
             return _http_error(str(err), 400)
         except OverflowError as err:
             return _http_error(str(err), 503)
-        return jsonify({"agent_id": agent["agent_id"], "status": "registered", "name": agent["name"], "probation": bool(agent.get("probation")), "heartbeat_ttl_s": HEARTBEAT_TTL_S, "stream_url": "/v1/a2a/stream"}), 201
+        return jsonify({
+            "agent_id": agent["agent_id"],
+            "status": "registered",
+            "name": agent["name"],
+            "probation": bool(agent.get("probation")),
+            "heartbeat_ttl_s": HEARTBEAT_TTL_S,
+            "stream_url": "/v1/a2a/stream",
+        }), 201
 
     @bp.post("/v1/a2a/heartbeat")
     def v1_heartbeat():
@@ -184,9 +191,15 @@ def mount(app: Flask) -> None:
     def v1_chain():
         return jsonify(probe_base_chain())
 
+    attach_market_routes(bp)
     app.register_blueprint(bp)
     try:
         ensure_platform_agent()
     except Exception as err:
         logger.warning("[A2A] Platform agent seed skipped: %s", err)
-    logger.info("[A2A] Inbound register + heartbeat + directory mounted")
+    try:
+        seeded = seed_probation_tasks()
+        logger.info("[A2A] Seeded %s probation auctions", len(seeded))
+    except Exception as err:
+        logger.warning("[A2A] Probation seed skipped: %s", err)
+    logger.info("[A2A] Inbound register + market + heartbeat mounted")
