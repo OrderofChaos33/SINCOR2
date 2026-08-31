@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from datetime import datetime
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 _scheduler: Optional[Any] = None
 _live_adapter: Optional[Any] = None
 _bootstrap_error: Optional[str] = None
+_bootstrap_thread: Optional[threading.Thread] = None
 
 
 def _has_any_private_key() -> bool:
@@ -84,8 +86,16 @@ def _bootstrap_live_client() -> None:
 # Real status endpoint (registered ahead of the legacy one in mvp_app.py)
 # ---------------------------------------------------------------------------
 
+def _is_admin_request(req: Any) -> bool:
+    """Check admin auth without circular-importing mvp_app at request time."""
+    try:
+        from sincor2.mvp_app import _check_admin_key, _check_admin_token
+        return _check_admin_token(req) or _check_admin_key(req)
+    except Exception:
+        return False
+
+
 def _status_view():
-    from datetime import datetime
     from flask import jsonify, request
 
     scheduler_running = bool(
@@ -116,20 +126,15 @@ def _status_view():
         "enabled": os.getenv("POLYCLAW_ENABLED", "true").lower() == "true",
         "scheduler_running": scheduler_running,
         "live_mode": live,
-        "cycle_interval_sec": int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "90")),
+        "cycle_interval_sec": int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "120")),
         "trading_address": addr,
         "allowances_ready": allowances_ready,
         "bootstrap_error": _bootstrap_error,
         "key_error": key_error,
         "timestamp": datetime.utcnow().isoformat(),
     }
-    # Admin-only financial detail (auth helpers live in mvp_app; by request
-    # time the module is fully loaded, so the lazy import is safe).
-    try:
-        from sincor2.mvp_app import _check_admin_key, _check_admin_token
-        is_admin = _check_admin_token(request) or _check_admin_key(request)
-    except Exception:
-        is_admin = False
+    # Admin-only financial detail
+    is_admin = _is_admin_request(request)
     if not is_admin:
         return jsonify(base), 200
 
@@ -193,12 +198,13 @@ def start_polyclaw_scheduler(app: Any = None) -> Optional[Any]:
 
     from sincor2.polyclaw_mega_aggressive_live import run_cycle
 
-    interval = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "90"))
+    interval = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "120"))
+
     scheduler = BackgroundScheduler(daemon=True)
 
     def _job() -> None:
-        try:
-            # Re-attempt bootstrap if a previous start failed (e.g. RPC blip).
+        import concurrent.futures
+        def _run() -> None:
             if (
                 os.getenv("POLYCLAW_LIVE", "false").lower() == "true"
                 and (
@@ -210,6 +216,14 @@ def start_polyclaw_scheduler(app: Any = None) -> Optional[Any]:
             result = run_cycle(adapter=_live_adapter)
             if result.get("status") == "halted":
                 logger.warning("[POLYCLAW] cycle halted: kill switch")
+
+        try:
+            # Hard ceiling: entire cycle must finish in 80s (10s buffer before next trigger)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(_run)
+                future.result(timeout=80)
+        except concurrent.futures.TimeoutError:
+            logger.error("[POLYCLAW] ENTIRE CYCLE TIMED OUT after 80s — check network calls")
         except Exception:
             logger.exception("[POLYCLAW] cycle crashed")
 
@@ -226,12 +240,15 @@ def start_polyclaw_scheduler(app: Any = None) -> Optional[Any]:
     _scheduler = scheduler
 
     # Do not block gunicorn worker boot on Polygon RPC; run approvals async.
+    global _bootstrap_thread
     if os.getenv("POLYCLAW_LIVE", "false").lower() == "true":
-        threading.Thread(
-            target=_bootstrap_live_client,
-            name="polyclaw-live-bootstrap",
-            daemon=True,
-        ).start()
+        if _bootstrap_thread is None or not _bootstrap_thread.is_alive():
+            _bootstrap_thread = threading.Thread(
+                target=_bootstrap_live_client,
+                name="polyclaw-live-bootstrap",
+                daemon=True,
+            )
+            _bootstrap_thread.start()
 
     logger.info(
         "[POLYCLAW] live scheduler started (every %ds, mode=%s)",
