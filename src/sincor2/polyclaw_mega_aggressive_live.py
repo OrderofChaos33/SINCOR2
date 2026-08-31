@@ -141,9 +141,15 @@ def _toa_gate_opportunity(fc: Forecast, bankroll_snapshot: Dict[str, Any]) -> Di
         return {"allow": True, "decision": None, "reason": "toa_gate_disabled"}
 
     try:
-        from integration.polyclaw_toa_decision_router import _get_router
+        # Try relative first, then absolute
+        try:
+            from ..integration.polyclaw_toa_decision_router import _get_router
+        except ImportError:
+            from integration.polyclaw_toa_decision_router import _get_router
 
         router = _get_router()
+        if router is None:
+            return {"allow": True, "decision": None, "reason": "toa_router_none"}
         hours = _hours_to_resolution(fc)
         context = {
             "available_capital_usd": bankroll_snapshot.get("available", bankroll_snapshot.get("equity", 50.0)),
@@ -179,45 +185,68 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
     adapter = adapter or PolymarketAdapter(bankroll)
 
     if kill_switch_tripped():
-        logger.warning("kill switch tripped — cycle skipped")
-        return {"status": "halted", "reason": "kill_switch"}
+        logger.warning(
+            "[POLYCLAW] KILL SWITCH ACTIVE — cycle skipped, no orders placed | ts=%s",
+            datetime.now(timezone.utc).isoformat()
+        )
+        return {"status": "halted", "reason": "kill_switch", "timestamp": datetime.now(timezone.utc).isoformat()}
 
     snapshot = bankroll.snapshot()
+    _cycle_t0 = time.time()
     logger.info(
         "cycle start | equity=$%.2f exposure=$%.2f available=$%.2f "
         "max_pos=$%.2f today=$%.2f toa_gate=%s%s",
         snapshot["equity"], snapshot["exposure"], snapshot["available"],
         snapshot["max_position"], snapshot["realized_today"],
         TOA_GATE_ENABLED,
-        "" if adapter.is_live() else " [DRY RUN]",
+        "" if (adapter and adapter.is_live()) else " [DRY RUN]",
     )
 
     # Score resolved forecasts first — calibration data compounds.
+    import concurrent.futures
     try:
-        resolve_predictions()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(resolve_predictions)
+            future.result(timeout=25)
+    except concurrent.futures.TimeoutError:
+        logger.warning("[POLYCLAW] resolve_predictions timed out after 25s — skipping")
     except Exception as exc:
         logger.debug("resolve_predictions failed: %s", exc)
 
     # Resolve closed markets for BOTH portfolios (real settlement math).
     try:
-        resolved = shadow_portfolio.resolve_all(bankroll)
-        if resolved["live"] or resolved["shadow"]:
-            logger.info("resolved: %d live, %d shadow trades",
-                        resolved["live"], resolved["shadow"])
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(shadow_portfolio.resolve_all, bankroll)
+            resolved = future.result(timeout=20)
+            if resolved.get("live") or resolved.get("shadow"):
+                logger.info("resolved: %d live, %d shadow trades",
+                            resolved.get("live", 0), resolved.get("shadow", 0))
+    except concurrent.futures.TimeoutError:
+        logger.warning("[POLYCLAW] shadow resolve_all timed out after 20s — skipping")
     except Exception as exc:
         logger.debug("shadow resolve_all failed: %s", exc)
 
-    opportunities = scan_opportunities(min_edge=MIN_EDGE)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(scan_opportunities, MIN_EDGE)
+            opportunities = future.result(timeout=45)
+    except concurrent.futures.TimeoutError:
+        logger.warning("[POLYCLAW] scan_opportunities timed out after 45s — skipping cycle")
+        opportunities = []
     trades_taken: List[Dict[str, Any]] = []
     toa_blocked = 0
 
     # Shadow portfolio silently paper-trades the same scan at 25% TOA blend.
     try:
-        shadow_opened = shadow_portfolio.record_shadow_cycle(opportunities)
-        if shadow_opened:
-            logger.info("[SHADOW] opened %d paper trades", shadow_opened)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(shadow_portfolio.record_shadow_cycle, opportunities)
+            shadow_opened = future.result(timeout=10)
+            if shadow_opened:
+                logger.info("[SHADOW] opened %d paper trades", shadow_opened)
+    except concurrent.futures.TimeoutError:
+        logger.warning("[SHADOW] record_shadow_cycle timed out after 10s — skipping")
     except Exception as exc:
-        logger.debug("shadow record failed: %s", exp)
+        logger.debug("shadow record failed: %s", exc)
 
     for fc in opportunities[:MAX_TRADES_PER_CYCLE]:
         if fc.confidence < MIN_CONFIDENCE:
@@ -272,6 +301,11 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         )
 
     final = bankroll.snapshot()
+    _cycle_duration = time.time() - _cycle_t0
+    logger.info(
+        "[POLYCLAW] cycle complete in %.1fs | trades=%d opportunities=%d",
+        _cycle_duration, len(trades_taken), len(opportunities)
+    )
     return {
         "status": "ok",
         "live": adapter.is_live(),
