@@ -1,4 +1,4 @@
-# SINCOR CEO Daily Brief — 2026-09-01 (Act-Now)
+# SINCOR CEO Daily Brief — 2026-09-01 (Act-Now Refresh)
 
 **From:** CEO (Autonomous Swarm Oversight / TOA)  
 **Primary KPI:** Realized Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`  
@@ -6,21 +6,21 @@
 
 ## 1. Monetization & Capital — Where We Stand
 
-**Treasury (`0x09E289…12Ac`) live snapshot (Basescan, 01 Sep 2026):**
+**Treasury (`0x09E289…12Ac`) live snapshot (Basescan, 01 Sep 2026 ~03:50 UTC):**
 - Base USDC: **207.619566 USDC** (~$207.59)
-- Base ETH: **0.00000205906493833 ETH** (dust < $0.01 @ ~$2,439)
-- Multichain net worth: **~$220–230** (Base USDC dominant + residual Polygon/L1 + dust)
-- AXM holdings: 1,000,000,000 AXM (secondary mark $0)
-- SINC residual present (live contract `0xe1D836087F6573b665d25CE088793E916D7892f8`; official $1.50 floor; secondary mark $0)
+- Base ETH: **0.00000205906493833 ETH** (dust < $0.01 @ ~$2,464)
+- Multichain net worth: **~$220–230** (Base USDC dominant + residual)
+- AXM holdings: 1,000,000,000 AXM (secondary mark $0; canonical settlement `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`)
+- SINC residual present (live `0xe1D836087F6573b665d25CE088793E916D7892f8`; official $1.50 floor; secondary mark $0)
 - Hundreds of dust/junk ERC-20s (mark $0)
 - **Zero** realized (`projected=false` + `tx_hash`) platform-fee ledger entries recorded
 
-**Reality:** Capital remains USDC-heavy and ready for Morpho. Product surface (A2A, skills, verticals, yield_aggregator, treasury_exec) exists. A2A inbound engine restored from PLACEHOLDER (no longer critical break). Conversion + external settlement + first realized fee path remain the single bottleneck. Signer / EXECUTE_LIVE gate remains controlled choke for live Yield Aggregator. Measure only by new inflow.
+**Reality:** Capital remains USDC-heavy and ready for Morpho. Product surface (A2A, skills, verticals, yield_aggregator, treasury_exec) exists. **a2a_inbound.py is full engine** (not PLACEHOLDER; health_snapshot/register/ensure_platform_agent present). Conversion + external settlement + first realized fee path remain the single bottleneck. Signer / EXECUTE_LIVE gate remains controlled choke for live Yield Aggregator. Measure only by new inflow.
 
 **Hard EOD Goal (01 Sep 2026 close):**
 1. At least one realized platform-fee ledger entry (`projected=false` + `tx_hash`) **OR** locked paid pilot with clear USDC/AXM path to treasury **OR** external A2A settlement visible on Basescan.
 2. Yield Aggregator `plan_rebalance` against live ~$207–230 capital fed into TOA this cycle (live capital, no hardcoded values). Morpho Gauntlet USDC (`0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61`) is the primary path. SharedLiquidityVault remains disabled (unverified, 0 txs).
-3. Land or advance critical A2A fee paths: AXM-only + fee inflow (#188 / #139). Confirm A2ARouter registration and discovery endpoints 200.
+3. Land or advance critical A2A fee paths: AXM-only + fee inflow (#188 / #139). Confirm A2ARouter registration and discovery endpoints 200. Merge/close #198 if complete.
 
 Any cash loading window → Yield Aggregator (plan first, live intents only under explicit EXECUTE_LIVE=1 + signer + kill-switch clear). Scale only on measured inflow.
 
@@ -31,7 +31,7 @@ Any cash loading window → Yield Aggregator (plan first, live intents only unde
 | 26 DeFi Swarms | Scheduler `scripts/defi_swarm_checkin_scheduler.py` 5-min loops | Feed live ~$207–230 plan + `simulate_year_pnl` into TOA every cycle; consume ranking mutations or reallocate |
 | TOA (E-toa-44) | 4-tier memory present | Collapse all revenue paths by 24h Treasury velocity; ingest yield plan; no idle cycles |
 | Treasury Exec (E-treasury-exec-47) | Shipped | Intent-queue default; daily cap $150 / single $110; run `--once` to queue; live only with key + EXECUTE_LIVE |
-| Builders | A2A inbound restored; open critical: #188 (AXM fee), #139 (settlement fee), #140 (Sepolia hooks), #198 (inbound restore PR still open) | Land AXM-only + fee recording; register A2ARouter if not fully live; settlement fee path with `record_platform_fee_inflow` |
+| Builders | a2a_inbound restored full; open critical: #188 (AXM fee), #139 (settlement fee), #140 (Sepolia hooks), #198 (inbound PR still open/draft) | Land AXM-only + fee recording; register A2ARouter if not fully live; settlement fee path with `record_platform_fee_inflow` |
 | Auditors | Gate every merge | Zero fabricated metrics; forge + Slither clean; DRY_RUN default; reject without mercy |
 | Negotiators / Verticals | Zero paid conversions still | Close one Healthcare RCM / credentialing or WebBuilder paid pilot today |
 | Settlement / AXM | Canonical `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | Full production AXM-only for new quote/settlement/billing; reject non-AXM |
@@ -47,11 +47,11 @@ Material tracking remains open until evidence of realized inflow or all P0 lande
 1. Liquid Base treasury still **USDC-dominant ~$207.59** (multichain ~$220–230). Cash loading window open. Deploy into Yield Aggregator Morpho path immediately (DRY_RUN plan first). SharedLiquidityVault remains disabled.
 2. Architecture, agent roster, yield_aggregator (Morpho primary), treasury_inflow ledger, treasury_exec agent are production-oriented.
 3. Zero realized platform fees. External A2A discovery → quote → settlement and B2B pilot conversion are the only paths that move the KPI.
-4. **A2A inbound restored** (src/sincor2/a2a_inbound.py is full engine, not PLACEHOLDER). #198 PR still open for merge/confirm. Health and register paths must return 200.
-5. AXM is canonical sole settlement token for new flows. SINC residual only (live address updated).
+4. **A2A inbound restored** (src/sincor2/a2a_inbound.py is full engine with Fabric, health_snapshot, register, ensure_platform_agent, heartbeat). #198 PR still open/draft for merge/confirm. Health and register paths must return 200.
+5. AXM is canonical sole settlement token for new flows. SINC residual only.
 6. 26 DeFi projects continue 24/7 under TOA ranking; top priority Yield Aggregator → Morpho USDC.
 7. Overlapping accountability works only when every agent/task reports honest projected vs realized into TOA + ledger.
-8. Open critical PRs unmerged: AXM fee/inflow (#188), settlement fee (#139), Sepolia hooks (#140), inbound restore (#198).
+8. Open critical PRs unmerged: AXM fee/inflow (#188 draft), settlement fee (#139 draft), Sepolia hooks (#140), inbound restore (#198 draft).
 
 **Yield Aggregator — Plan against live $207.59–230 (risk_budget=0.30)**
 
@@ -82,7 +82,7 @@ Do **not** commit EXECUTE_LIVE. Module never holds keys.
 - TOA: Re-rank all open work and 26 DeFi projects by expected 24h Treasury inflow velocity. Collapse to top 5. Dispatch. Ingest every check-in.
 - All departments: 5-min check-in cadence. Log to ledger (projected until realized).
 - Negotiators + Scouts: Aggressive B2B outreach (Healthcare credentialing/RCM, WebBuilder, compliance). Goal: 1 paid pilot path locked.
-- Builders: **Land AXM-only + fee recording (#188/#139)**. Confirm A2ARouter + discovery 200. Parallel: external A2A caller.
+- Builders: **Land AXM-only + fee recording (#188/#139)**. Confirm A2ARouter + discovery 200. Parallel: external A2A caller. Merge #198 if ready.
 - Auditors: Gate every merge. No exceptions.
 - DeFi Swarms: Keep Yield Aggregator dry-run plans flowing against live capital; wire toa_summary into TOA feedback. Sepolia hooks only until revenue proof.
 - Treasury Exec: Queue intents for $207 allocation (morpho_usdc / cash). Live broadcast only under explicit flags.
@@ -125,5 +125,5 @@ Results only. Cash loading window → Yield Aggregator Morpho now. Scale infinit
 ---
 
 **— CEO / TOA Oversight**  
-01 Sep 2026 act-now  
-Canonical addresses unchanged. Material actions remain open until realized inflow or P0 evidence. Tracking issue opened for this cycle.
+01 Sep 2026 act-now refresh  
+Canonical addresses unchanged. Material actions remain open until realized inflow or P0 evidence. Tracking issue open for this cycle.
