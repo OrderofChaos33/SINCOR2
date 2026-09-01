@@ -516,7 +516,7 @@ def sitemap_xml():
         ('/signup', '0.9', 'weekly'),
         ('/login', '0.8', 'weekly'),
         ('/buy', '0.9', 'weekly'),
-        ('/sinc', '0.9', 'weekly'),
+        ('/buy', '0.9', 'weekly'),
         ('/pricing', '0.9', 'weekly'),
         ('/pitch', '0.8', 'monthly'),
         ('/whitepaper', '0.7', 'monthly'),

@@ -33,8 +33,8 @@ def buy_page():
 
 @bp.route('/buy-sinc', methods=['GET'])
 def buy_sinc_page():
-    """Redirect legacy buy-sinc URL to official curve gateway."""
-    return redirect('/sinc', code=302)
+    """Legacy curve URL — retired."""
+    return redirect('/buy', code=302)
 
 
 # ============================================================================
@@ -170,15 +170,8 @@ def platform_subscription_status():
 @bp.route('/api/sinc/curve', methods=['GET'])
 @limiter.limit("120 per minute")
 def api_sinc_curve():
-    """Cached curve state proxy (spec §5.2)."""
-    try:
-        import sys
-        if project_root not in sys.path:
-            sys.path.insert(0, project_root)
-        from launch_content_engine.onchain_stats import fetch_stats
-        return jsonify({'ok': True, 'curve': fetch_stats()}), 200
-    except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)}), 503
+    """Bonding curve API retired."""
+    return jsonify({'ok': False, 'error': 'bonding_curve_retired'}), 410
 
 
 @bp.route('/api/sinc/burn-stats', methods=['GET'])

@@ -876,7 +876,7 @@
     <li><a href="#faq">FAQ</a></li>
     <li><a href="/whitepaper">Whitepaper</a></li>
     <li><a href="/pitch">Pitch</a></li>
-    <li><a href="/sinc" class="nav-highlight">Buy SINC</a></li>
+    <li><a href="/buy" class="nav-highlight">Deploy</a></li>
   </ul>
   {% if is_admin %}
   <a href="/admin" style="color:var(--cyan);font-weight:600;font-size:14px;text-decoration:none;margin-right:12px;padding:8px 14px;border:1px solid var(--border-bright);border-radius:10px;">Console</a>
@@ -907,9 +907,9 @@
 
   <div class="live-panel" id="live-panel">
     <div class="live-card" id="live-curve">
-      <div class="live-label">SINC curve spot</div>
-      <div class="live-val" id="live-spot-val">—</div>
-      <div style="font-size:12px;color:var(--text-muted);">Official bonding curve</div>
+      <div class="live-label">SINC floor</div>
+      <div class="live-val" id="live-spot-val">$1.50</div>
+      <div style="font-size:12px;color:var(--text-muted);">Official minimum</div>
     </div>
     <div class="live-card" id="live-agents">
       <div class="live-label">Swarm status</div>
@@ -1139,14 +1139,14 @@
   <p style="font-size:16px;color:var(--text-muted);max-width:880px;line-height:1.8;margin-bottom:28px;">
     Two tokens, two roles: <strong style="color:var(--text);">SINC</strong> for governance and long-horizon ecosystem utility;
     <strong style="color:var(--text);">AXIOM (AXM)</strong> for agent-to-agent task settlement on chain <code>8453</code>.
-    Official SINC spot price is the <strong>bonding curve</strong> — not aggregator junk from the rogue V2 pool.
+    Official SINC price is the <strong>$1.50 floor</strong> — pay at <a href="/buy" style="color:var(--cyan);">/buy</a>.
   </p>
   <div class="token-grid">
     <div class="token-card">
       <h4>SINC — Governance & Utility</h4>
       <p>1B supply, 8 decimals. CertiK Skynet 97/100. Sourcify full-match.</p>
       <p class="addr" style="margin-top:12px;">{{ sinc_token }}</p>
-      <p style="margin-top:12px;"><a href="/sinc" style="color:var(--cyan);font-weight:600;">Buy on curve →</a></p>
+      <p style="margin-top:12px;"><a href="/buy" style="color:var(--cyan);font-weight:600;">Pay in SINC →</a></p>
     </div>
     <div class="token-card">
       <h4>AXIOM (AXM) — A2A Settlement</h4>
@@ -1156,7 +1156,7 @@
     </div>
     <div class="token-card">
       <h4>Official infrastructure</h4>
-      <p>Bonding curve (buy here): <span class="addr">0x75dE341a2BC81806198364F125d4Cde36527619C</span></p>
+      <p>SINC token: <span class="addr">0xe1D836087F6573b665d25CE088793E916D7892f8</span></p>
       <p style="margin-top:8px;">v4 Hook limit orders: <span class="addr">0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</span></p>
       <p style="margin-top:8px;">Treasury (rotated Jun 2026): <span class="addr">0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac</span></p>
     </div>
@@ -1185,12 +1185,12 @@
       <div class="faq-body">SINC: platform subscriptions and governance. AXM (AXIOM): one-off intel reports and agent-to-agent execution. Pay at <a href="/buy">/buy</a> on Base — no Stripe or PayPal.</div>
     </details>
     <details class="faq-item">
-      <summary>Where should I buy SINC?</summary>
-      <div class="faq-body">Only via the official bonding curve at <a href="/sinc">getsincor.com/sinc</a>. MetaMask swap, Blockscout, and Li.Fi may route to a rogue Uniswap V2 pool with fake quotes. The ticker above shows live curve spot.</div>
+      <summary>Where should I get SINC?</summary>
+      <div class="faq-body">Platform plans are paid in SINC at <a href="/buy">getsincor.com/buy</a>. Official price is the $1.50 floor. Do not buy from unofficial Uniswap V2 pools or aggregator routes.</div>
     </details>
     <details class="faq-item">
       <summary>Is this live or vaporware?</summary>
-      <div class="faq-body">Live on Railway with Gunicorn, SINC/AXM checkout, health checks, and verifiable on-chain contracts (Sourcify full-match on SINC, curve, hook). Agent swarm runs 24/7 for token-paying customers.</div>
+      <div class="faq-body">Live on Railway with Gunicorn, SINC/AXM checkout, health checks, and verifiable on-chain contracts (Sourcify full-match on SINC). Agent swarm runs 24/7 for token-paying customers.</div>
     </details>
     <details class="faq-item">
       <summary>How do agents coordinate without a central boss?</summary>
@@ -1345,7 +1345,7 @@
 <footer>
   <p>SINCOR — Deploy Autonomous Revenue-Generating Teams</p>
   <p style="margin-top: 12px;">
-    <a href="/sinc" style="color: var(--cyan); text-decoration: none; font-weight: 600;">⚡ SINC Token</a>
+    <a href="/buy" style="color: var(--cyan); text-decoration: none; font-weight: 600;">Pay in SINC</a>
     &nbsp;|&nbsp;
     <a href="https://basescan.org/token/0xe1D836087F6573b665d25CE088793E916D7892f8" target="_blank" style="color: var(--purple-light); text-decoration: none;">Basescan (SINC)</a>
     &nbsp;|&nbsp;

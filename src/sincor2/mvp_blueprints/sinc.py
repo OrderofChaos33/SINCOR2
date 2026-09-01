@@ -24,30 +24,12 @@ _bind_mvp()
 
 
 @bp.route('/sinc')
-def sinc_token():
-    """SINC token gateway page."""
-    return render_template(
-        'sinc_gateway.html',
-        walletconnect_project_id=os.environ.get('WALLETCONNECT_PROJECT_ID', '').strip(),
-    )
-
-
-@bp.route('/refer')
-def sinc_refer():
-    """SINC referral program — generate a ?ref= link that pays 3% on-chain."""
-    return render_template('refer.html')
-
-
-@bp.route('/sinc/vs-agent-tokens')
-def sinc_vs_agent_tokens():
-    """SEO comparison: verified agent tokens vs vaporware launches."""
-    return render_template('sinc_vs_agent_tokens.html')
-
-
 @bp.route('/sinc/acceptance')
-def sinc_acceptance():
-    """Wallet import, hook buy paths, whitelist listing status."""
-    return render_template('sinc_acceptance.html')
+@bp.route('/sinc/vs-agent-tokens')
+@bp.route('/refer')
+def sinc_token():
+    """Bonding-curve gateway is retired. Send traffic to platform checkout."""
+    return redirect('/buy', code=302)
 
 
 @bp.route('/sinc/recover-hook')
