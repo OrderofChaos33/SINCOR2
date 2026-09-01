@@ -2,116 +2,44 @@
 
 Foundry project for all SINCOR ecosystem smart contracts, deployed on **Base** (chainId 8453).
 
+Locked public spec: [`TOKEN_CANON.md`](../TOKEN_CANON.md).
+
 ---
 
 ## Token overview
 
 | Token | Symbol | Contract (Base mainnet) | Supply | Decimals | Role |
 |-------|--------|------------------------|--------|----------|------|
-| SINC  | SINC   | `0xe1D836087F6573b665d25CE088793E916D7892f8` | 1 B   | 8  | Platform utility token; burned via agent-billing loop |
-| AXIOM | AXM    | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | 1 B   | 18 | Autonomous intelligence token; A2A inter-agent settlement |
+| SINC  | SINC   | `0xe1D836087F6573b665d25CE088793E916D7892f8` | 1 B   | 8  | Platform utility token |
+| AXIOM | AXM    | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | 1 B   | 18 | A2A inter-agent settlement |
 
-Both tokens: fixed supply, no mint, no owner, no tax, no proxy. Verified on Basescan.
+Both tokens: fixed supply claimed. Verify source and holders on Basescan before repeating “verified / audited” claims. Live SINC explorer snapshot on lock date: 1 holder, 0 transfers.
 
-**Official price floor:** $0.15 USD per SINC ($150M FDV / 1B tokens).
+**Official price floor:** $0.15 USD per SINC ($150M FDV / 1B tokens). **$1.50 is a ceiling wall, not a floor.**
 
-**Treasury (owner for Morpho setup / oracle):** `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`
+**Treasury:** `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`
 
----
-
-## Contract directory
-
-```
-src/
-├── SincBondingCurve.sol   # Constant-product bonding curve for SINC Phase 1
-├── SincGenesisNFT.sol     # Soulbound ERC-721 minted to Phase 1 buyers
-├── SincLimitOrderHook.sol # Uniswap V4 hook: limit orders + anti-sandwich fee
-├── Axiom.sol              # AXIOM ERC-20 — A2A settlement token
-├── SincPriceOracle.sol    # Curve + ETH/USD style price helper
-├── interfaces/
-│   └── AggregatorV3Interface.sol  # Chainlink AggregatorV3
-└── morpho/
-    ├── SincChainlinkOracle.sol  # Morpho IOracle — hybrid manual+feed, hard $0.15 floor
-    ├── SincMorphoSetup.sol      # Morpho Blue market creation helper (AdaptiveCurveIRM)
-    └── SincStaking.sol          # Staking with pause + emergency withdraw
-
-script/
-├── 00_DeployMockSinc.s.sol … 06_DeployAxiom.s.sol
-└── Deploy.s.sol, DeployMoebius.s.sol, …
-```
+**DO NOT BUY:** retired SINC `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` or Uniswap V2 pool `0x85372932f9b151a076815d92cf71a97980ffd667`.
 
 ---
 
-## Morpho Blue — SINC/USDC oracle (July 2026)
+## Supply allocation
 
-`SincChainlinkOracle` implements Morpho’s `IOracle.price()` at **1e36 scale** for SINC (8 decimals) / USDC (6 decimals).
+**Live SINC is 1,000,000,000 tokens.** Live-token allocation proofs are unpublished. Do not copy the retired 100M table onto the 1B token.
 
-| Constant | Value | Meaning |
-|----------|-------|---------|
-| `PRICE_FLOOR_8DEC` | `15_000_000` | $0.15 with 8-dec Chainlink-style answer |
-| `SCALE_FACTOR` | `1e26` | Converts 8-dec feed → Morpho 1e36 for 8/6 pair |
-| Floor Morpho-scaled | `0.15e34` | Minimum `price()` return |
-
-Behavior:
-
-- Starts in **manual mode** at exact floor (treasury owner).
-- `setFeed(address)` switches to Chainlink-style `AggregatorV3Interface`.
-- Any feed answer below $0.15 is **clamped to floor**.
-- Staleness, invalid round, and zero-price reverts are enforced.
-
-`SincMorphoSetup` targets Morpho Blue on Base (`0xBBBB…`) with AdaptiveCurveIRM and a `createSincUsdcMarket` helper.
-
-`SincStaking` supports reward accounting and `emergencyWithdraw` when paused.
-
----
-
-## Setup
-
-```bash
-forge install
-forge build
-forge test
-```
-
-## Environment
-
-Copy `onchain/.env.example` to `onchain/.env` and fill in:
-
-| Variable | Description |
-|----------|-------------|
-| `BASE_RPC_URL` | Base mainnet RPC |
-| `BASE_SEPOLIA_RPC_URL` | Base Sepolia RPC |
-| `BASESCAN_API_KEY` | Contract verification |
-| `DEPLOYER_PRIVATE_KEY` | Hot wallet for scripts (never the treasury key) |
-| `TREASURY_ADDRESS` | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` |
-
-## Test
-
-```bash
-forge test -vvv
-forge test --match-contract SincBondingCurve -vvv
-```
-
-## Deploy notes
-
-Deploy scripts live under `script/`. Run in order against Sepolia first, then Base. Morpho oracle / setup contracts should be deployed with **treasury as `initialOwner`**.
-
----
-
-## Supply allocation (SINC — 100 M)
+### Historical only — retired SINC v1 (100 M at `0x9C8cd8…168e7`)
 
 | Bucket | Amount | Notes |
 |--------|--------|-------|
-| Bonding curve (Phase 1 + LP seed) | 65 M | Consumed by buyers; remainder paired into V4 LP and burned |
-| Concentrated $1.50 ceiling LP | 5 M | Single-tick V4 position |
-| Sell-side limit-order ladder | 20 M | Hook ladder |
-| Sablier 24-month linear vest | 10 M | Non-cancellable stream |
+| Bonding curve (Phase 1 + LP seed) | 65 M | Historical design for the retired token |
+| Concentrated $1.50 **ceiling** LP | 5 M | Sell wall. Not an official price |
+| Sell-side limit-order ladder | 20 M | Hook ladder design |
+| Sablier 24-month linear vest | 10 M | Publish stream id before citing |
 
-## Supply allocation (AXIOM — 1 B)
+## Supply allocation (AXIOM — 1 B) — design only until proofs land
 
 | Bucket | Amount | Notes |
 |--------|--------|-------|
 | Ecosystem / A2A treasury | 80 % | Agent-to-agent payment pool |
 | Team / development | 10 % | 24-month vest recommended |
 | Liquidity (Uniswap V4) | 10 % | Seeded at launch; LP burned |
-
