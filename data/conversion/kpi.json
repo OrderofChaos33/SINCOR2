@@ -1,5 +1,6 @@
 {
   "date": "2026-09-01",
+  "tick": "T3-exec",
   "sent": 0,
   "checkout_clicks": 0,
   "realized_tx_hash": null,
@@ -7,5 +8,8 @@
   "treasury_usdc_hold": 207.62,
   "founder_cash_hold": 800,
   "morpho": "OFF",
-  "blocker": "RESEND_API_KEY + AUTONOMOUS_AGENTS/OUTREACH flags + auditor pass missing. Gmail mail service not enabled."
+  "pr_208": "merged 0582882746744a6ce45736e10ed792aa5aa28db7",
+  "checkout_prod": "price_unavailable until Railway deploys USDC fallback",
+  "a2a_registry": "a62296dd-17f3-41da-914c-02269bf09f9b",
+  "blocker": "1) production deploy of #208 so Starter quotes 297 USDC. 2) RESEND_API_KEY + AUTONOMOUS_AGENTS/OUTREACH flags + auditor pass. Gmail mail service not enabled."
 }
