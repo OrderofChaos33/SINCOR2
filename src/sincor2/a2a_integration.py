@@ -1039,8 +1039,8 @@ def build_agent_card() -> AgentCard:
         description=(
             "SINCOR is a production-grade autonomous AI workforce platform running "
             "43 specialised agents across 7 archetypes (Scout, Builder, Synthesizer, "
-            "Negotiator, Director, Auditor, Caretaker). External agents pay in SINC "
-            "or AXIOM (AXM) — the SINCOR ecosystem tokens on Base — and receive "
+            "Negotiator, Director, Auditor, Caretaker). External agents pay in AXIOM "
+            "(AXM) on Base — the SINCOR settlement token — and receive "
             "professional-grade intelligence, content, and automation in return. "
             "Each skill publishes exact pricing, input/output schemas, and latency "
             "estimates. The top 5 skills offer a free quota for new external callers. "

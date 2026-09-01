@@ -3,6 +3,8 @@
 CEO 2026-08-18/19: AXM primary address corrected to 0x4c3fb66f14fbaa2088c9ae91017ba770da53715a.
 CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
 New flows prefer AXM. SINC is legacy for residual subscription renewals only.
+CEO 2026-09-01: USD-priced human checkout falls back to Base USDC when AXM has
+no DEX/CoinGecko spot. A2A skills stay AXM-only (fixed wei).
 """
 
 from __future__ import annotations
@@ -27,17 +29,21 @@ from sincor2.onchain.constants import (
     SINC_DECIMALS as _SINC_DECIMALS,
     SINC_TOKEN,
     TREASURY,
+    USDC_DECIMALS as _USDC_DECIMALS,
+    USDC_TOKEN,
     resolve_address,
 )
 
 # Canonical Base mainnet (see sincor2.onchain.constants)
 SINC = SINC_TOKEN
 AXM = AXIOM_TOKEN
+USDC = USDC_TOKEN
 TREASURY = resolve_address("PLATFORM_TREASURY_ADDRESS", TREASURY)
 CHAIN_ID = BASE_CHAIN_ID
 
 SINC_DECIMALS = _SINC_DECIMALS
 AXM_DECIMALS = _AXM_DECIMALS
+USDC_DECIMALS = _USDC_DECIMALS
 
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 AMOUNT_TOLERANCE_BPS = 150  # 1.5% underpayment slack for spot drift
@@ -160,11 +166,18 @@ def token_address(symbol: str) -> str:
         return SINC
     if s in ("AXM", "AXIOM"):
         return AXM
+    if s == "USDC":
+        return USDC
     raise ValueError(f"unknown token: {symbol}")
 
 
 def token_decimals(symbol: str) -> int:
-    return SINC_DECIMALS if symbol.upper() == "SINC" else AXM_DECIMALS
+    s = symbol.upper()
+    if s == "SINC":
+        return SINC_DECIMALS
+    if s == "USDC":
+        return USDC_DECIMALS
+    return AXM_DECIMALS
 
 
 def _http_json(url: str, timeout: int = 12) -> dict | list | None:
@@ -258,13 +271,16 @@ def fetch_axm_spot_usd() -> float | None:
 
 def usd_to_token_amount(usd: float, token: str) -> tuple[float, float | None]:
     """Return (display_amount, spot_usd)."""
-    if token.upper() == "SINC":
+    t = token.upper()
+    if t == "USDC":
+        return round(usd, 2), 1.0
+    if t == "SINC":
         spot = fetch_sinc_spot_usd()
     else:
         spot = fetch_axm_spot_usd() or float(os.environ.get("AXM_USD_FALLBACK", "0") or 0) or None
     if not spot or spot <= 0:
         return 0.0, None
-    return round(usd / spot, 8 if token.upper() == "SINC" else 4), spot
+    return round(usd / spot, 8 if t == "SINC" else 4), spot
 
 
 def display_to_atomic(amount: float, token: str) -> int:
@@ -303,16 +319,40 @@ def _plan_token_quote(
     return round(plan["usd_reference"] / spot, dec), spot, "spot"
 
 
+def settle_plan_quote(
+    plan: dict[str, Any],
+    *,
+    sinc_spot: float | None = None,
+    axm_spot: float | None = None,
+) -> tuple[str, float, float | None, str]:
+    """Return (token, display_amount, spot_usd, pricing_mode).
+
+    Reports / A2A-style fixed AXM amounts stay AXM. USD-priced human checkout
+    (Starter $297, Professional, Enterprise, intel) falls back to Base USDC
+    1:1 when AXM has no live DEX/CoinGecko spot. SINC is never a buy path.
+    """
+    preferred = plan["token"]
+    display, spot, mode = _plan_token_quote(
+        plan, sinc_spot=sinc_spot, axm_spot=axm_spot
+    )
+    if display > 0:
+        return preferred, display, spot, mode
+    usd = float(plan.get("usd_reference") or 0)
+    if usd > 0 and preferred.upper() != "SINC":
+        return "USDC", round(usd, 2), 1.0, "usdc_fallback"
+    return preferred, 0.0, None, mode
+
+
 def list_plans() -> list[dict[str, Any]]:
     sinc_spot = fetch_sinc_spot_usd()
     axm_spot = fetch_axm_spot_usd()
     out = []
     for plan_id, plan in PLATFORM_PLANS.items():
-        token = plan["token"]
-        display, spot, mode = _plan_token_quote(
+        preferred = plan["token"]
+        token, display, spot, mode = settle_plan_quote(
             plan,
-            sinc_spot=sinc_spot if token.upper() == "SINC" else None,
-            axm_spot=axm_spot if token.upper() != "SINC" else None,
+            sinc_spot=sinc_spot if preferred.upper() == "SINC" else None,
+            axm_spot=axm_spot if preferred.upper() != "SINC" else None,
         )
         out.append(
             {
@@ -322,7 +362,8 @@ def list_plans() -> list[dict[str, Any]]:
                 "usd_reference": plan["usd_reference"],
                 "billing": plan["billing"],
                 "token": token,
-                "token_address": token_address(token),
+                "preferred_token": preferred,
+                "token_address": token_address(token) if display > 0 else token_address(preferred),
                 "amount_display": display,
                 "amount_atomic": str(display_to_atomic(display, token)) if display > 0 else None,
                 "spot_usd": spot,
@@ -350,8 +391,7 @@ def create_checkout(
     if not plan:
         return {"ok": False, "error": "unknown_plan"}
 
-    token = plan["token"]
-    display, spot, mode = _plan_token_quote(plan)
+    token, display, spot, mode = settle_plan_quote(plan)
     if display <= 0:
         return {"ok": False, "error": "price_unavailable", "token": token}
 
@@ -380,7 +420,12 @@ def create_checkout(
                 customer_email,
                 now.isoformat(),
                 expires_at,
-                json.dumps({"billing": plan["billing"], "order_type": plan["order_type"]}),
+                json.dumps({
+                    "billing": plan["billing"],
+                    "order_type": plan["order_type"],
+                    "pricing_mode": mode,
+                    "preferred_token": plan["token"],
+                }),
             ),
         )
         conn.commit()

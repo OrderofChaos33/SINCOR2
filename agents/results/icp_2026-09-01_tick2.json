@@ -1,0 +1,97 @@
+{
+  "tick": "2026-09-01T12:30:00Z",
+  "checkout": "https://getsincor.com/products/starter",
+  "buy": "https://getsincor.com/buy",
+  "rule": "public sources only. no invented emails. no send this tick.",
+  "checkout_blocker_this_tick": "POST /api/platform/checkout plan=starter returned price_unavailable (AXM DexScreener pairs=null, CoinGecko empty). Report plan still quotes 500 AXM fixed. USDC fallback PR opened this tick.",
+  "icps": [
+    {
+      "name": "Cedar Rapids Smile Center, PLC",
+      "city": "Cedar Rapids, IA",
+      "site": "https://www.cedarrapidssmilecenter.com/",
+      "observable": "family/restorative/cosmetic dental practice, public site 200, contact path present",
+      "play": "dental-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Dental Health Partners",
+      "city": "Cedar Rapids, IA",
+      "site": "https://www.dentalhealthpartners.com/",
+      "observable": "family dentist, phone 319-365-4997, contact/appointment path",
+      "play": "dental-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "The Dental Center",
+      "city": "Cedar Rapids / Hiawatha, IA",
+      "site": "https://thedentalcenter.dental/",
+      "observable": "general dentistry + prosthodontics, phone 319.362.0043",
+      "play": "dental-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Quad Cities Periodontics",
+      "city": "Davenport, IA",
+      "site": "https://www.qcperio.com/",
+      "observable": "periodontics specialty, phone (563) 344-4867, appointment path",
+      "play": "dental-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Comfort Dental of Clinton",
+      "city": "Clinton, IA",
+      "site": "https://www.smileclinton.com/",
+      "observable": "public insurance/financial page; new vs prior Clinton cluster",
+      "play": "dental-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Great River OMS — Clinton office",
+      "city": "Clinton, IA",
+      "site": "https://greatriveroms.com/clinton-office-map/",
+      "observable": "oral surgery, 511 South 4th Street, phone (563) 259-4349",
+      "play": "dental-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Total Maintenance Inc.",
+      "city": "Davenport, IA",
+      "site": "https://www.tmiservices.net/",
+      "observable": "HVAC + plumbing since 1973, Quad Cities, phone (563) 316-6695, contact form",
+      "play": "trades-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Northwest Plumbing, Heating & AC",
+      "city": "Davenport, IA",
+      "site": "https://callnw.com/",
+      "observable": "5885 Tremont Ave, residential plumbing/HVAC, phone (563) 391-1344",
+      "play": "trades-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Triton Services",
+      "city": "Davenport, IA",
+      "site": "https://tritonservice.net/",
+      "observable": "plumbing/heating/AC, 2324 Hickory Grove Rd, phone 563.322.9500",
+      "play": "trades-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Hometown Mechanical",
+      "city": "Davenport, IA",
+      "site": "https://hometownmechanical.com/",
+      "observable": "commercial/industrial/residential mechanical contractor, Quad Cities",
+      "play": "trades-missed-calls",
+      "cta": "https://getsincor.com/products/starter"
+    },
+    {
+      "name": "Midwest Orthopedic Specialty Hospital",
+      "city": "Milwaukee, WI",
+      "site": "https://www.mymosh.com/",
+      "observable": "specialty hospital, phone 414-817-5800 — credentialing/RCM buyer, not a cold patient practice",
+      "play": "healthcare-rcm",
+      "cta": "https://getsincor.com/products/starter"
+    }
+  ]
+}
