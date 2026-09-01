@@ -1,9 +1,13 @@
 # CANONICAL ADDRESSES — SINCOR / AXIOM (Base mainnet, chain 8453)
 
-**Runtime source of truth:** [`src/sincor2/onchain/constants.py`](src/sincor2/onchain/constants.py).
-This markdown is the human index. Settlement, A2A, billing, and startup `symbol()` / `decimals()`
-probes import the Python module. Ship both files in the same change; never copy token
-literals into other runtime modules.
+> **LOCKED 2026-09-01:** Official SINC floor is **$0.15** ($150M FDV / 1B). **$1.50 is not a floor.**
+> Human spec: [`TOKEN_CANON.md`](TOKEN_CANON.md) · machine spec: [`TOKEN_CANON.json`](TOKEN_CANON.json).
+>
+> **DO NOT BUY** retired SINC `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` or Uniswap V2 pool `0x85372932f9b151a076815d92cf71a97980ffd667`.
+> Live SINC: `0xe1D836087F6573b665d25CE088793E916D7892f8`. Official buy: https://getsincor.com/buy
+
+**Runtime source of truth:** [`src/sincor2/onchain/constants.py`](src/sincor2/onchain/constants.py).  
+This markdown is the human index. Settlement, A2A, billing, and startup `symbol()` / `decimals()` probes import the Python module. Ship both files in the same change; never copy token literals into other runtime modules.
 
 **2026-08-19 CEO UPDATE:** Live SINC token is now `0xe1D836087F6573b665d25CE088793E916D7892f8` (8 decimals). Previous address `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` is retired.
 
@@ -15,7 +19,7 @@ literals into other runtime modules.
 
 | Role | Address | Notes |
 |---|---|---|
-| **AXIOM (AXM) token** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | **PRIMARY** — sole platform utility + A2A settlement + billing (deployed 2026-08-18) |
+| **AXIOM (AXM) token** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | **PRIMARY** — A2A settlement + billing (deployed 2026-08-18) |
 | **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Platform treasury (A2A routing, fees) |
 | **SINC token** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | **8 decimals, 1B supply, $0.15 floor ($150M FDV).** |
 | **SincLimitOrderHook** | `0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0` | Legacy |
@@ -44,6 +48,7 @@ BASE_CHAIN_ID=8453
 | `0x25cA41Dac29f892c72A53500853eC45a5FfF90aa` | Superseded bonding curve |
 | `0x49E392de962Fa835B862F59E78611c69E930b5C4` | Dead-liquidity v2 SINC |
 | `0xAf9B539D8043C634b7E611818518BA7E850F289e` | Legacy treasury |
+| `0x85372932f9b151a076815d92cf71a97980ffd667` | Rogue Uniswap V2 SINC/USDC pool — do not buy |
 
 ---
 
