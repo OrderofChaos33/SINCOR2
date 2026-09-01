@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SINC Token Canon — $0.15 floor, live contract only</title>
+  <meta name="description" content="Locked SINCOR token spec. Live SINC 0xe1D836087F6573b665d25CE088793E916D7892f8. Official floor $0.15. Do not buy the retired token or Uniswap V2 pool."/>
+  <style>
+    :root { --bg:#07070d; --fg:#e8e6ff; --dim:#9b97b8; --red:#ff5d73; --cyan:#22d3ee; --line:#2a2740; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, sans-serif; background:var(--bg); color:var(--fg); line-height:1.5; }
+    main { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
+    h1 { font-size: 1.8rem; margin: 0 0 8px; }
+    h2 { font-size: 1.15rem; margin: 28px 0 10px; }
+    .banner { background: #3b0d16; border: 1px solid var(--red); color: #ffd5db; padding: 14px 16px; border-radius: 10px; font-weight: 650; }
+    .ok { background: #06281f; border: 1px solid #14b8a6; color: #c7fff4; padding: 14px 16px; border-radius: 10px; margin-top: 12px; }
+    table { width:100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { border-bottom: 1px solid var(--line); text-align:left; padding: 8px 6px; vertical-align: top; }
+    th { color: var(--dim); font-weight: 600; }
+    code, .addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; word-break: break-all; }
+    a { color: var(--cyan); }
+    .dim { color: var(--dim); }
+  </style>
+</head>
+<body>
+<main>
+  <p class="dim">LOCKED 2026-09-01 · Base 8453 · TOKEN_CANON v2026-09-01.1</p>
+  <h1>SINC Token Canon</h1>
+  <p>If any other page disagrees with this one, this one wins.</p>
+  <div class="banner">
+    DO NOT BUY retired SINC <code>0x9C8cd8d3961F445D653713dE65C6578bE11668e7</code>
+    or Uniswap V2 pool <code>0x85372932f9b151a076815d92cf71a97980ffd667</code>.
+    Those quotes are junk (~$0.001, no liquidity).
+  </div>
+  <div class="ok">
+    Live SINC: <code>0xe1D836087F6573b665d25CE088793E916D7892f8</code><br/>
+    Official floor: <strong>$0.15</strong> ($150M FDV / 1B). $1.50 is a ceiling wall, not the floor.<br/>
+    Official buy: <a href="/buy">getsincor.com/buy</a>
+    · Spec: <a href="https://github.com/OrderofChaos33/SINCOR2/blob/main/TOKEN_CANON.md">TOKEN_CANON.md</a>
+  </div>
+  <h2>Live contracts</h2>
+  <table>
+    <tr><th>Role</th><th>Address</th></tr>
+    <tr><td>SINC v2 live</td><td class="addr">0xe1D836087F6573b665d25CE088793E916D7892f8</td></tr>
+    <tr><td>AXM live</td><td class="addr">0x4c3fb66f14fbaa2088c9ae91017ba770da53715a</td></tr>
+    <tr><td>Treasury</td><td class="addr">0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac</td></tr>
+  </table>
+  <h2>Price</h2>
+  <table>
+    <tr><th>Term</th><th>Value</th></tr>
+    <tr><td>Official floor</td><td>$0.15 / SINC</td></tr>
+    <tr><td>FDV at floor</td><td>$150,000,000</td></tr>
+    <tr><td>$1.50</td><td>Not the floor. Legacy ceiling / sell wall.</td></tr>
+  </table>
+  <h2>Supply</h2>
+  <p>Live SINC supply is <strong>1,000,000,000</strong> (8 decimals). The 100M figure belongs to the retired v1 token. Do not mix them.</p>
+  <h2>Allocation</h2>
+  <p>Live-token bucket proofs are unpublished as of lock date (explorer: 1 holder, 0 transfers). No lock or vest hashes will be invented. When they exist they go in <code>TOKEN_CANON.json</code>.</p>
+  <p class="dim">Also: /api/price/official · /whitepaper · /buy</p>
+</main>
+</body>
+</html>
