@@ -1,0 +1,57 @@
+{
+  "date": "2026-09-01",
+  "tick": "T4-demand",
+  "cta": "https://getsincor.com/products/starter",
+  "sent": false,
+  "rule": "public contact surfaces only; no invented emails",
+  "icps": [
+    {
+      "name": "panaHEALTH (Panacea Healthcare Solutions)",
+      "contact": "Public form / +1-920-663-2469 — no invented email",
+      "fit": "HQ Plymouth WI + ops Waukesha — local RCM + scribes",
+      "source": "https://www.panahealthcaresolutions.com/contact-us/"
+    },
+    {
+      "name": "Willow Dental",
+      "contact": "willowdental@willow-dental.com",
+      "fit": "New Berlin WI family dental — credential + CDT scrub buyer",
+      "source": "https://www.willow-dental.com/contact/"
+    },
+    {
+      "name": "Capline Dental Services",
+      "contact": "info@caplinedentalservices.com",
+      "fit": "Published WI dental billing / AR page",
+      "source": "https://www.caplinedentalservices.com/wisconsin/"
+    },
+    {
+      "name": "Shoreline Medical Billing",
+      "contact": "info@shorelinemb.com",
+      "fit": "Claims coverage across 72 Wisconsin counties",
+      "source": "https://www.shorelinemb.com/medical-billing-company-wisconsin.html"
+    },
+    {
+      "name": "ASP-RCM Solutions",
+      "contact": "sales@asprcmsolutions.com",
+      "fit": "Dallas senior-partner RCM; WI dental vertical page",
+      "source": "https://asprcmsolutions.com/contact/"
+    },
+    {
+      "name": "RCM Experts",
+      "contact": "info@rcmexperts.us",
+      "fit": "Denial / AR / out-of-network billing",
+      "source": "https://rcmexperts.us/contact-us/"
+    },
+    {
+      "name": "Summit RCM",
+      "contact": "info@summitrcm.com",
+      "fit": "Full-service medical billing; public dual inboxes",
+      "source": "https://summitrcm.com/contact-us"
+    },
+    {
+      "name": "XpertRCM",
+      "contact": "info@xpertrcm.com",
+      "fit": "Billing + credentialing — maps to live A2A skill",
+      "source": "https://xpertrcm.com/"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "date": "2026-09-01",
-  "tick": "T3-exec-deployed",
+  "tick": "T4-demand",
   "sent": 0,
   "checkout_clicks": 0,
   "realized_tx_hash": null,
@@ -11,5 +11,6 @@
   "pr_208": "merged 0582882746744a6ce45736e10ed792aa5aa28db7 and deployed",
   "checkout_prod": "297 USDC usdc_fallback to treasury",
   "a2a_registry": "a62296dd-17f3-41da-914c-02269bf09f9b",
-  "blocker": "RESEND_API_KEY + AUTONOMOUS_AGENTS/OUTREACH flags + auditor pass. Gmail mail service not enabled. Checkout leak is closed."
+  "a2a_skills_live": 16,
+  "blocker": "RESEND_API_KEY + AUTONOMOUS_AGENTS/OUTREACH flags + auditor pass. Gmail mail service not enabled. Checkout leak is closed. Demand is the remaining job."
 }
