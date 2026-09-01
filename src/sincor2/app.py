@@ -775,21 +775,10 @@ def api_hook_status():
 @app.route('/api/price/official')
 @limiter.exempt if limiter else lambda f: f
 def api_price_official():
-    """Canonical curve spot — use for tickers, OG tags, visitor messaging."""
+    """Canonical official SINC price — $0.15 floor."""
     try:
-        from launch_content_engine.onchain_stats import fetch_stats
-        s = fetch_stats()
-        return jsonify({
-            'source': 'bonding_curve',
-            'curve': s['curve'],
-            'spot_usd': s.get('curve_spot_usd'),
-            'spot_eth': s.get('curve_spot_eth'),
-            'hook_floor_usd': s.get('hook_floor_usd', 1.50),
-            'note': s.get('price_note'),
-            'sinc_sold_m': s.get('sinc_sold_m'),
-            'curve_eth_accumulated': s.get('curve_eth_accumulated'),
-            'buy_url': s.get('buy_url'),
-        })
+        from launch_content_engine.onchain_stats import build_official_price_payload
+        return jsonify(build_official_price_payload())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

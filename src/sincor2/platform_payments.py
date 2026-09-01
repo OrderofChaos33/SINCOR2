@@ -187,8 +187,8 @@ def _cached_spot(key: str, fetcher) -> float | None:
 
 
 def _fetch_sinc_spot_usd_uncached() -> float | None:
-    """Official SINC quote price — non-negotiable $1.50 floor (not bonding-curve micro-spot)."""
-    floor = float(os.environ.get("SINC_FLOOR_USD", "1.50"))
+    """Official SINC quote price — $0.15 floor ($150M / 1B tokens)."""
+    floor = float(os.environ.get("SINC_FLOOR_USD", "0.15"))
     try:
         import sys
 

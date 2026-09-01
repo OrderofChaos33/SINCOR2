@@ -248,7 +248,7 @@ def test_live_pages_render_canonical_addresses() -> None:
             body = render_template(
                 name,
                 sinc_spot_usd=None,
-                sinc_spot_label="$1.50 floor",
+                sinc_spot_label="$0.15 floor",
                 walletconnect_project_id="",
             )
             if name != "axiom.html":

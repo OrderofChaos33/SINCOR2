@@ -9,7 +9,7 @@
 
 SINCOR is a production autonomous workforce platform: 43+ specialized AI agents coordinated through a decentralized task market, formal quality gates, and wallet-native billing on Base. **SINC** funds platform subscriptions and long-horizon ecosystem utility; **AXIOM (AXM)** settles one-off intelligence work and agent-to-agent execution.
 
-Unlike single-chatbot wrappers, SINCOR agents have archetypes, lifecycles, memory tiers, daily budgets, and promotion paths. Revenue is verifiable on-chain: customers pay treasury directly. Official SINC price discovery is governed by a hard $1.50 USD floor enforced in the Morpho-compatible Chainlink oracle and USDC hook path.
+Unlike single-chatbot wrappers, SINCOR agents have archetypes, lifecycles, memory tiers, daily budgets, and promotion paths. Revenue is verifiable on-chain: customers pay treasury directly. Official SINC price is $0.15 USD ($150M FDV / 1 billion tokens).
 
 ---
 
@@ -60,12 +60,11 @@ Healthcare (RCM + credentialing + HIPAA guardrails), Dental practice ops, Compli
 | CertiK Skynet | 97/100 |
 | Verification | Sourcify full-match |
 
-**Official price floor:** $1.50 USD per SINC (non-negotiable). Enforced in:
+**Official price floor:** $0.15 USD per SINC ($150M valuation / 1B supply). Enforced in:
 
-- `SincChainlinkOracle` (Morpho Blue IOracle, scaled 1e36) — clamps any feed or manual update below 1.50
-- USDC hook buy path on getsincor.com/sinc
+- `SincChainlinkOracle` (Morpho Blue IOracle, scaled 1e36) — clamps any feed or manual update below 0.15
+- Platform checkout on getsincor.com/buy
 
-**Bonding curve (legacy inventory):** `0x75dE341a2BC81806198364F125d4Cde36527619C`  
 **Limit-order hook:** `0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0`  
 **Genesis NFT:** `0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09`
 
@@ -86,7 +85,7 @@ Platform billing verifies ERC-20 transfers to this address on Base. Oracle and M
 
 | Contract | Purpose |
 |----------|---------|
-| `SincChainlinkOracle.sol` | Hybrid manual + AggregatorV3 feed with hard $1.50 floor; Morpho `price()` returns 1e36-scaled value for SINC(8)/USDC(6) |
+| `SincChainlinkOracle.sol` | Hybrid manual + AggregatorV3 feed with hard $0.15 floor; Morpho `price()` returns 1e36-scaled value for SINC(8)/USDC(6) |
 | `SincMorphoSetup.sol` | Market creation helper against Morpho Blue + AdaptiveCurveIRM on Base |
 | `SincStaking.sol` | Staking with emergency withdraw when paused |
 
@@ -98,7 +97,7 @@ Platform billing verifies ERC-20 transfers to this address on Base. Oracle and M
 
 - **SINC** — monthly subscriptions (Starter, Professional, Enterprise, Intel)
 - **AXM** — one-off Business Intelligence Report where enabled
-- Spot conversion references the official floor and bonding-curve / hook paths
+- Spot conversion references the official $0.15 floor and checkout at /buy
 - Legacy card / PayPal paths only when explicitly enabled for an account
 
 ### 4.2 Referrals
@@ -158,7 +157,7 @@ Modes: `analytics` | `suggest` | `active` (with verifier fallback).
 
 **No income or performance guarantees.** AI agent outputs, forecasts, trading signals, and automation results are informational. Past or simulated performance does not predict future results. Users must perform independent due diligence and, where appropriate, consult licensed professionals before acting on any output.
 
-**Price floor is a protocol design choice, not a guarantee of market value.** The $1.50 hard floor is enforced in the official oracle and designated buy paths. Secondary markets, aggregators, or third-party pools may display different prices; those quotes are outside SINCOR control.
+**Price floor is a protocol design choice, not a guarantee of market value.** The $0.15 hard floor ($150M FDV / 1B tokens) is enforced in the official oracle and designated buy paths. Secondary markets, aggregators, or third-party pools may display different prices; those quotes are outside SINCOR control.
 
 **Regulated domains.** Healthcare, dental, compliance, and financial-adjacent features are decision-support tools only. They do not replace licensed clinical, legal, accounting, or fiduciary advice. HIPAA-related features implement technical safeguards; covered entities remain responsible for their own compliance programs.
 

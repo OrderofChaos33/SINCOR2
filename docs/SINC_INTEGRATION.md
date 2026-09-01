@@ -13,7 +13,6 @@ is integrated as the exclusive access and utility token across the SINCOR2 platf
 | Contract | Address | Network |
 |---|---|---|
 | SINC (live) | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Base |
-| SinCurve (bonding curve) | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Base |
 | SINCPlatformAccess | Set via `SINC_PLATFORM_ACCESS_ADDRESS` env var | Base |
 | Treasury | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Base |
 

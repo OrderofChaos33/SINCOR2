@@ -43,11 +43,10 @@ def draft_build_log() -> tuple[str, str]:
     body = (
         "This week the ops agents ran:\n"
         "• Hook fill keeper (withdraw USDC from filled limit orders)\n"
-        "• Buy watcher on the live bonding curve\n"
         "• Launch content engine → human review queue (you approve, agents draft)\n"
         "• A2A agent card for protocol discovery\n\n"
         "No price talk — just shipping.\n"
-        "https://getsincor.com/sinc"
+        "https://getsincor.com/buy"
     )
     return title, body
 
@@ -56,8 +55,7 @@ def draft_referral_cta() -> tuple[str, str]:
     title = "SINC referral — automated promoter payouts"
     body = (
         "You don't need to know the founder to earn on SINC buys.\n\n"
-        "Connect a wallet at https://getsincor.com/refer — your address becomes the referral ID.\n"
-        "When someone buys through your link, the bonding curve pays you **3% in the same transaction**.\n\n"
-        "Contracts enforce it. No invoice. No DMing a founder who hates sales."
+        "Connect a wallet at https://getsincor.com/buy.\n"
+        "SINC official price is $0.15 — $150M FDV / 1 billion tokens.\n"
     )
     return title, body

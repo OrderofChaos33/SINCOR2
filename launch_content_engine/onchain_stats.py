@@ -17,7 +17,6 @@ if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 try:
     from sincor2.onchain.constants import (
-        BONDING_CURVE,
         LIMIT_ORDER_HOOK,
         POOL_MANAGER,
         SINC_TOKEN,
@@ -26,13 +25,11 @@ try:
     )
 
     SINC = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
-    CURVE = resolve_address("SINC_BONDING_CURVE", BONDING_CURVE)
     POOL_MANAGER = POOL_MANAGER
     SAFE = resolve_address("TREASURY_ADDRESS", TREASURY)
     HOOK = resolve_address("SINC_LIMIT_ORDER_HOOK", LIMIT_ORDER_HOOK)
 except Exception:  # pragma: no cover
     SINC = "0xe1D836087F6573b665d25CE088793E916D7892f8"
-    CURVE = "0x75dE341a2BC81806198364F125d4Cde36527619C"
     POOL_MANAGER = "0x498581fF718922c3f8e6A244956aF099B2652b2b"
     SAFE = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
     HOOK = "0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0"
@@ -44,8 +41,8 @@ RPC_CANDIDATES = [
     "https://base-rpc.publicnode.com",
 ]
 RPC_CANDIDATES = [u for u in RPC_CANDIDATES if u]
-# Non-negotiable public floor — all official buys quote at or above this USD/SINC.
-SINC_FLOOR_USD = float(os.environ.get("SINC_FLOOR_USD", "1.50"))
+# Official floor: $150M FDV / 1B SINC = $0.15
+SINC_FLOOR_USD = float(os.environ.get("SINC_FLOOR_USD", "0.15"))
 ROUTER = "0x11b86E85cC5170F4165c89ccb11332133B29E283"
 
 
@@ -100,60 +97,34 @@ def _safe_call(sig: str, addr: str, *args: str, default: float = 0.0) -> float:
 
 
 def fetch_stats() -> dict:
-    sinc_curve = _safe_call("balanceOf", SINC, CURVE)
     sinc_pm = _safe_call("balanceOf", SINC, POOL_MANAGER)
     sinc_safe = _safe_call("balanceOf", SINC, SAFE)
-    try:
-        eth_acc = int(_call(CURVE, "ethAccumulated"), 16) / 1e18
-    except Exception:
-        eth_acc = 0.0
-    sinc_sold = _safe_call("sincSold", CURVE)
-    try:
-        price_wei = int(_call(CURVE, "currentPriceWei"), 16)
-        price_eth_per_sinc = price_wei / 1e18
-    except Exception:
-        price_eth_per_sinc = 0.0
     eth_usd = float(os.environ.get("ETH_USD", "3000"))
-    spot_usd = price_eth_per_sinc * eth_usd
-    try:
-        graduated = int(_call(CURVE, "graduated"), 16) != 0
-    except Exception:
-        graduated = False
-    rpc_ok = sinc_curve > 0 or sinc_pm > 0
     hook_floor_usd = SINC_FLOOR_USD
+    rpc_ok = sinc_pm > 0 or sinc_safe > 0
     return {
-        "sinc_in_curve_m": round(sinc_curve / 1e6, 2),
         "sinc_in_hook_pm_m": round(sinc_pm / 1e6, 2),
         "sinc_in_safe": round(sinc_safe, 0),
-        "sinc_sold_m": round(sinc_sold / 1e6, 2),
-        "curve_eth_accumulated": round(eth_acc, 4),
-        "curve_spot_eth": price_eth_per_sinc,
-        "curve_spot_usd": round(spot_usd, 8),
-        "graduated": graduated,
         "official_floor_usd": hook_floor_usd,
         "hook_floor_usd": hook_floor_usd,
-        "curve_buy_enabled": False,
         "eth_usd": eth_usd,
         "price_note": (
-            f"Official minimum buy price ${hook_floor_usd:.2f}/SINC (USDC hook floor). "
-            "ETH bonding curve and sub-floor discovery ramp are closed — not valid buy paths."
+            f"Official SINC price ${hook_floor_usd:.2f} ($150M FDV / 1B tokens). "
+            "Pay at https://getsincor.com/buy."
         ),
         "rpc_ok": rpc_ok,
         "sinc_token": SINC,
-        "curve": CURVE,
         "hook": HOOK,
         "router": ROUTER,
         "rogue_v2_pair": "0x85372932f9b151a076815d92cf71a97980ffd667",
-        "buy_url": "https://getsincor.com/sinc",
-        "refer_url": "https://getsincor.com/refer",
+        "buy_url": "https://getsincor.com/buy",
     }
 
 
 def build_official_price_payload(stats: dict | None = None) -> dict:
-    """Canonical pricing — $1.50 floor is the only official buy price."""
+    """Canonical pricing — $0.15 floor ($150M / 1B SINC)."""
     s = stats or fetch_stats()
     floor = float(s.get("official_floor_usd", SINC_FLOOR_USD))
-    curve_spot = s.get("curve_spot_usd")
     return {
         "source": "sincor_official",
         "updated": "live",
@@ -161,36 +132,20 @@ def build_official_price_payload(stats: dict | None = None) -> dict:
         "minimum_buy_usd_per_sinc": floor,
         "official_buy": {
             "price_usd": floor,
-            "buy_with": "USDC",
-            "router": s.get("router"),
-            "hook": s.get("hook"),
-            "buy_url": "https://getsincor.com/sinc#buy-usdc",
-            "note": f"All public buys execute at >= ${floor:.2f}/SINC via hook sell walls.",
-        },
-        "legacy_curve_eth": {
-            "address": s.get("curve"),
-            "spot_usd": curve_spot,
-            "buy_enabled": False,
-            "note": "DEPRECATED — do not use for pricing or buys. Sub-floor path closed.",
+            "buy_url": "https://getsincor.com/buy",
+            "note": f"Official SINC price ${floor:.2f} — $150M valuation / 1B supply.",
         },
         "aggregator_guidance": {
             "display_price_usd": floor,
-            "ignore_curve_spot": True,
             "ignore_rogue_v2_pair": s.get("rogue_v2_pair"),
-            "official_buy_url": "https://getsincor.com/sinc#buy-usdc",
+            "official_buy_url": "https://getsincor.com/buy",
             "price_api": "https://getsincor.com/api/price/official",
-            "message": f"SINC official price is ${floor:.2f} minimum. Never show bonding-curve micro-spot.",
+            "message": f"SINC official price is ${floor:.2f} ($150M / 1B tokens).",
         },
-        # Backwards-compatible flat fields (spot_usd = floor for wallets/Google)
-        "curve": s.get("curve"),
         "spot_usd": floor,
-        "spot_eth": s.get("curve_spot_eth"),
-        "curve_spot_usd": curve_spot,
         "hook_floor_usd": floor,
         "note": s.get("price_note"),
-        "sinc_sold_m": s.get("sinc_sold_m"),
-        "curve_eth_accumulated": s.get("curve_eth_accumulated"),
-        "buy_url": "https://getsincor.com/sinc#buy-usdc",
+        "buy_url": "https://getsincor.com/buy",
         "eth_usd": s.get("eth_usd"),
     }
 
@@ -199,11 +154,9 @@ def draft_post() -> str:
     s = fetch_stats()
     return (
         f"SINCOR on-chain snapshot (Base, agent-reported):\n"
-        f"• ~{s['sinc_in_curve_m']}M SINC in bonding curve\n"
+        f"• Official SINC price ${s['official_floor_usd']:.2f} ($150M FDV / 1B)\n"
         f"• ~{s['sinc_in_hook_pm_m']}M SINC in v4 hook limit orders\n"
         f"• Safe ops wallet: {s['sinc_in_safe']:,.0f} SINC\n"
-        f"• Curve ETH accumulated: {s['curve_eth_accumulated']} ETH · ~{s['sinc_sold_m']}M SINC sold\n"
         f"Verified token: {s['sinc_token'][:10]}…\n"
-        f"Buy (self-serve): {s['buy_url']}\n"
-        f"Earn 3% referring buyers: {s['refer_url']}"
+        f"Checkout: {s['buy_url']}\n"
     )

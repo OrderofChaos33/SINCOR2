@@ -46,7 +46,7 @@ loops:
   ladder_mm:
     enabled: true
     interval_sec: 30
-    target_price_usd: 1.50
+    target_price_usd: 0.15
     sell_ladder_ticks: 8
     buy_ladder_ticks: 6
     quote_size_sinc: 50          # per level, small while thin

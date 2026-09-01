@@ -6,7 +6,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AggregatorV3Interface} from "../interfaces/AggregatorV3Interface.sol";
 
 /// @title SincChainlinkOracle
-/// @notice Morpho-compatible oracle for SINC with hard $1.50 floor + any Chainlink-style feed.
+/// @notice Morpho-compatible oracle for SINC with hard $0.15 floor + any Chainlink-style feed.
 /// @dev Implements IOracle.price() scaled by 1e36.
 ///      Designed for SINC (8 decimals) / USDC (6 decimals) markets.
 interface IOracle {
@@ -23,8 +23,8 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
     event FeedUpdated(address indexed oldFeed, address indexed newFeed);
     event PriceUpdated(uint256 indexed price, uint256 timestamp);
 
-    // Hard floor: $1.50. Most Chainlink USD feeds use 8 decimals → 1.5e8
-    uint256 public constant PRICE_FLOOR_8DEC = 150_000_000; // 1.50 * 1e8
+    // Hard floor: $0.15 ($150M FDV / 1B tokens). Chainlink USD feeds use 8 decimals → 0.15e8
+    uint256 public constant PRICE_FLOOR_8DEC = 15_000_000; // 0.15 * 1e8
 
     // Morpho scale for SINC(8) / USDC(6):
     // price_full * 10^(36 + loanDec - collDec) = price_full * 10^(36 + 6 - 8) = price_full * 1e34
@@ -46,7 +46,7 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
             useManual = false;
         }
         // Start at exact floor (Morpho scale)
-        _manualPrice = PRICE_FLOOR_8DEC * SCALE_FACTOR; // 1.5e8 * 1e26 = 1.5e34
+        _manualPrice = PRICE_FLOOR_8DEC * SCALE_FACTOR; // 0.15e8 * 1e26 = 0.15e34
         _manualTimestamp = block.timestamp;
     }
 
@@ -89,7 +89,7 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
     }
 
     /// @notice Manual price update (Morpho-scaled). Only usable while useManual = true.
-    /// @param newPrice Morpho-scaled value (e.g. 1.5e34 for $1.50)
+    /// @param newPrice Morpho-scaled value (e.g. 0.15e34 for $0.15)
     function updateManualPrice(uint256 newPrice) external onlyOwner whenNotPaused {
         uint256 floorScaledValue = PRICE_FLOOR_8DEC * SCALE_FACTOR;
         if (newPrice < floorScaledValue) revert PriceBelowFloor();
@@ -116,7 +116,7 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
 
     // ==================== VIEWS ====================
 
-    /// @notice Human-readable price with 18 decimals (1.5e18 = $1.50)
+    /// @notice Human-readable price with 18 decimals (0.15e18 = $0.15)
     function getPrice() external view returns (uint256) {
         uint256 p = this.price();
         // Morpho scale → 18-dec: / 1e16
@@ -124,6 +124,6 @@ contract SincChainlinkOracle is Ownable, Pausable, IOracle {
     }
 
     function floorScaled() external pure returns (uint256) {
-        return PRICE_FLOOR_8DEC * SCALE_FACTOR; // 1.5e34
+        return PRICE_FLOOR_8DEC * SCALE_FACTOR; // 0.15e34
     }
 }

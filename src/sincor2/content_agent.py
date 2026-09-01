@@ -64,34 +64,29 @@ import sys
 _SRC = PROJECT_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
-from sincor2.onchain.constants import BONDING_CURVE, SINC_TOKEN
+from sincor2.onchain.constants import SINC_TOKEN
 
 SINCOR_BRAND = {
     "name": "SINCOR",
     "url": "https://getsincor.com",
     "free_trial_url": "https://getsincor.com/buy",
-    "sinc_buy_url": "https://getsincor.com/sinc",
-    "sinc_refer_url": "https://getsincor.com/refer",
+    "sinc_buy_url": "https://getsincor.com/buy",
     "tagline": "42 AI agents. Verified SINC on Base. Self-serve — no human sales.",
     "description": (
         "SINCOR is a 42-agent autonomous swarm on Base with verifiable on-chain inventory. "
-        "Canonical SINC sells via bonding curve and v4 hook limit orders — "
-        "agents draft proof-of-work content; contracts handle distribution. "
-        "CRM automation and SalesOps remain part of the platform; SINC participation is "
-        "wallet-native and referral-backed (3% on-chain per buy)."
+        "SINC is 1B supply at a $0.15 floor ($150M FDV). Pay at /buy. "
+        "Agents draft proof-of-work content; contracts handle distribution."
     ),
     "features": [
         "42 specialized AI agents — content, ops, on-chain stats, review queue",
-        "Self-serve SINC buy at /sinc (ETH curve + USDC router)",
-        "3% on-chain referral payouts at /refer",
-        "Verifiable Base contracts: bonding curve, v4 hook, Sourcify-matched source",
+        "Self-serve checkout at /buy — SINC $0.15 floor ($150M / 1B)",
+        "Verifiable Base contracts: SINC token, v4 hook, Sourcify-matched source",
         "Human-in-the-loop launch review (~5 min/day) — agents draft, you approve",
         "CRM sync, deduplication, lead enrichment (platform layer)",
         "A2A agent card at /.well-known/agent.json for discovery",
     ],
-    "pricing_note": "Platform from $297/mo; SINC buy is on-chain and self-serve.",
+    "pricing_note": "Platform from $297/mo; SINC official price $0.15 ($150M FDV / 1B tokens).",
     "sinc_token": SINC_TOKEN,
-    "curve": BONDING_CURVE,
 }
 
 # ─── SEO Keyword Bank ─────────────────────────────────────────────────────────
@@ -99,9 +94,7 @@ SINCOR_BRAND = {
 KEYWORD_BANK = [
     # SINC / agent-token launch (priority)
     ("verified AI agent token Base", 4, "comparison", 1),
-    ("bonding curve token launch Base", 5, "how-to", 1),
     ("SINCOR SINC token", 2, "comparison", 1),
-    ("on-chain referral crypto 3 percent", 3, "how-to", 1),
     ("Uniswap v4 hook limit orders explained", 6, "how-to", 1),
     ("agent token vs vaporware checklist", 3, "comparison", 1),
     ("self-serve crypto launch no VC", 4, "industry-trend", 1),

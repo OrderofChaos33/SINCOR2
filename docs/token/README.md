@@ -7,7 +7,7 @@ SINCOR2 uses two distinct token roles on Base to separate platform utility from 
 ### SINC
 - Governance and utility-oriented token for ecosystem participation.
 - Supports contribution incentives, policy alignment, and marketplace utility design.
-- Official **$1.50 USD hard floor** enforced in the Morpho-compatible Chainlink oracle and the USDC hook buy path.
+- Official **$0.15 USD hard floor** ($150M FDV / 1B tokens) enforced in the Morpho-compatible Chainlink oracle and platform checkout.
 - Useful for long-horizon coordination, staking-oriented mechanics, and promotion criteria inside the broader SINCOR2 economy.
 
 ### AXIOM (AXM)
@@ -28,7 +28,7 @@ Runtime: `src/sincor2/onchain/constants.py`. Human index: `CANONICAL_ADDRESSES.m
 ## Mechanics
 
 ### Official price floor
-- Protocol design enforces a **$1.50** minimum for SINC in official paths.
+- Protocol design enforces a **$0.15** minimum for SINC in official paths ($150M / 1B).
 - `SincChainlinkOracle.price()` (Morpho `IOracle`, 1e36 scale) never returns below floor.
 - Secondary markets or aggregators may show other quotes; those are outside platform control.
 

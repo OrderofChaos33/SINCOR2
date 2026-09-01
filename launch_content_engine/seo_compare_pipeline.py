@@ -14,17 +14,17 @@ COMPARISONS = [
             "2. Ownership renounced (no hidden mint)\n"
             "3. Live contracts you can call today\n\n"
             "SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`) ships a 42-agent swarm "
-            "plus bonding curve + audited v4 hook — verifiable in 30 seconds.\n"
-            "Self-serve buy: https://getsincor.com/sinc"
+            "with a $0.15 floor ($150M FDV / 1B tokens) — verifiable in 30 seconds.\n"
+            "Checkout: https://getsincor.com/buy"
         ),
     },
     {
-        "title": "Bonding curve vs empty LBP — where is the inventory?",
+        "title": "Where is the SINC inventory?",
         "body": (
             "An LBP with $0 seeded liquidity is a billboard, not a market.\n"
-            "SINC's live sale inventory sits in the bonding curve (~65M SINC) "
-            "and v4 hook limit orders (~20M SINC) — on-chain, not in a pitch deck.\n"
-            "https://getsincor.com/why-no-dex"
+            "SINC is 1B supply at a $0.15 official floor ($150M FDV), with v4 hook "
+            "limit orders on Base — on-chain, not in a pitch deck.\n"
+            "https://getsincor.com/buy"
         ),
     },
     {
@@ -32,7 +32,7 @@ COMPARISONS = [
         "body": (
             "SINC uses a SincLimitOrderHook for USDC-denominated sell walls "
             "and a SincHookRouter for gateway buys — no manual market maker required.\n"
-            "Gateway: https://getsincor.com/sinc"
+            "Gateway: https://getsincor.com/buy"
         ),
     },
 ]

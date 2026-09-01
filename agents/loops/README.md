@@ -20,7 +20,7 @@ No new on-chain state is introduced that can break current deployments.
 1. Monitor agent wallet USDC balance above reserve threshold.
 2. Deposit excess into SincFluidAdapter.depositUSDC (fUSDC).
 3. Periodically harvest / withdraw a portion of yield.
-4. Convert yield USDC → SINC (via SincSwapRouter or bonding curve path) or add to USDC side of ladder.
+4. Convert yield USDC → SINC (via SincSwapRouter) or add to USDC side of ladder.
 5. Rebalance ladder via SincLimitOrderHook.
 
 **Safety:**
@@ -39,7 +39,7 @@ No new on-chain state is introduced that can break current deployments.
 2. On threshold, call vault harvest / settle paths (existing).
 3. Route a configurable % of proceeds into:
    - Single-sided or proportional LP add (when pool exists)
-   - Limit-order ladder top-up at $1.50+ floor
+   - Limit-order ladder top-up at $0.15+ floor
    - Agent working inventory
 4. Remainder stays in vault for capital efficiency.
 
@@ -67,7 +67,7 @@ No new on-chain state is introduced that can break current deployments.
 
 ### Future (gated) — Morpho / Fluid Smart Collateral Loop
 
-Once SINC-USDC is listed on Fluid with oracle + LTV, or a Morpho market is live with the $1.50 floor oracle:
+Once SINC-USDC is listed on Fluid with oracle + LTV, or a Morpho market is live with the $0.15 floor oracle:
 
 - Agents can run controlled leverage loops under strict HF floors (e.g. never below 1.25).
 - Amplify LP size or inventory, then auto-deleverage on rate or price stress.
@@ -111,5 +111,5 @@ See `agents/loops/config.yaml` and `runner.py` for exact wiring.
 
 - Does not introduce new Solidity that changes live pool/hook behavior.
 - Does not rely on persistent flash-loan inventory (impossible).
-- Does not bypass the $1.50 floor or existing ComplianceGuard paths.
+- Does not bypass the $0.15 floor or existing ComplianceGuard paths.
 - Does not auto-deploy new Morpho/Fluid markets (governance gated).

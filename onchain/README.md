@@ -13,7 +13,7 @@ Foundry project for all SINCOR ecosystem smart contracts, deployed on **Base** (
 
 Both tokens: fixed supply, no mint, no owner, no tax, no proxy. Verified on Basescan.
 
-**Official price floor:** $1.50 USD per SINC (enforced in Morpho oracle + USDC hook path).
+**Official price floor:** $0.15 USD per SINC ($150M FDV / 1B tokens).
 
 **Treasury (owner for Morpho setup / oracle):** `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`
 
@@ -31,7 +31,7 @@ src/
 ├── interfaces/
 │   └── AggregatorV3Interface.sol  # Chainlink AggregatorV3
 └── morpho/
-    ├── SincChainlinkOracle.sol  # Morpho IOracle — hybrid manual+feed, hard $1.50 floor
+    ├── SincChainlinkOracle.sol  # Morpho IOracle — hybrid manual+feed, hard $0.15 floor
     ├── SincMorphoSetup.sol      # Morpho Blue market creation helper (AdaptiveCurveIRM)
     └── SincStaking.sol          # Staking with pause + emergency withdraw
 
@@ -48,15 +48,15 @@ script/
 
 | Constant | Value | Meaning |
 |----------|-------|---------|
-| `PRICE_FLOOR_8DEC` | `150_000_000` | $1.50 with 8-dec Chainlink-style answer |
+| `PRICE_FLOOR_8DEC` | `15_000_000` | $0.15 with 8-dec Chainlink-style answer |
 | `SCALE_FACTOR` | `1e26` | Converts 8-dec feed → Morpho 1e36 for 8/6 pair |
-| Floor Morpho-scaled | `1.5e34` | Minimum `price()` return |
+| Floor Morpho-scaled | `0.15e34` | Minimum `price()` return |
 
 Behavior:
 
 - Starts in **manual mode** at exact floor (treasury owner).
 - `setFeed(address)` switches to Chainlink-style `AggregatorV3Interface`.
-- Any feed answer below $1.50 is **clamped to floor**.
+- Any feed answer below $0.15 is **clamped to floor**.
 - Staleness, invalid round, and zero-price reverts are enforced.
 
 `SincMorphoSetup` targets Morpho Blue on Base (`0xBBBB…`) with AdaptiveCurveIRM and a `createSincUsdcMarket` helper.

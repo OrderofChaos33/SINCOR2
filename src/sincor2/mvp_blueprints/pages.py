@@ -56,7 +56,7 @@ def home():
             launch_at=GENESIS_LAUNCH_AT,
         )
 
-    price_ctx = {'sinc_spot_usd': None, 'sinc_spot_label': '$1.50 floor'}
+    price_ctx = {'sinc_spot_usd': None, 'sinc_spot_label': '$0.15 floor'}
     try:
         from launch_content_engine.onchain_stats import SINC_FLOOR_USD
         price_ctx['sinc_spot_usd'] = SINC_FLOOR_USD

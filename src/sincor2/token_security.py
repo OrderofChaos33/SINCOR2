@@ -10,12 +10,11 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-from sincor2.onchain.constants import BASE_CHAIN_ID, BONDING_CURVE, SINC_TOKEN
+from sincor2.onchain.constants import BASE_CHAIN_ID, SINC_TOKEN
 
 SINC = SINC_TOKEN
 CHAIN_ID = BASE_CHAIN_ID
 DEPLOYER = "0xC184EcEfFaf6392951e4C7b042d61774497B5dC5"
-BONDING_CURVE = BONDING_CURVE
 ROGUE_V2_PAIR = "0x85372932f9b151a076815d92cf71a97980ffd667"
 
 
@@ -151,8 +150,7 @@ def diagnose(addr: str = SINC) -> dict:
             "is_in_dex": goplus.get("is_in_dex"),
             "dex_pools": dex_pools,
             "rogue_pair_detected": rogue_listed,
-            "official_buy": f"https://getsincor.com/sinc",
-            "bonding_curve": BONDING_CURVE,
+            "official_buy": "https://getsincor.com/buy",
             "do_not_route_pool": ROGUE_V2_PAIR,
         },
         "blockscout": {
@@ -166,7 +164,6 @@ def diagnose(addr: str = SINC) -> dict:
         },
         "canonical": {
             "deployer": DEPLOYER,
-            "bonding_curve": BONDING_CURVE,
             "rogue_v2_pair": ROGUE_V2_PAIR,
             "token_list": "https://getsincor.com/tokenlists/sincor.tokenlist.json",
             "metadata": "https://getsincor.com/.well-known/sinc-token.json",

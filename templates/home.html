@@ -830,7 +830,7 @@
     </div>
     <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
       <span style="color: var(--purple-light); font-weight: 700;">SINC</span>
-      <span style="color: var(--text-dim);" id="sinc-ticker-price">$1.50 floor LIVE</span>
+      <span style="color: var(--text-dim);" id="sinc-ticker-price">$0.15 floor LIVE</span>
       <span style="color: var(--cyan);">LIVE</span>
     </div>
     <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'JetBrains Mono'; font-size: 12px;">
@@ -908,7 +908,7 @@
   <div class="live-panel" id="live-panel">
     <div class="live-card" id="live-curve">
       <div class="live-label">SINC floor</div>
-      <div class="live-val" id="live-spot-val">$1.50</div>
+      <div class="live-val" id="live-spot-val">$0.15</div>
       <div style="font-size:12px;color:var(--text-muted);">Official minimum</div>
     </div>
     <div class="live-card" id="live-agents">
@@ -1139,7 +1139,7 @@
   <p style="font-size:16px;color:var(--text-muted);max-width:880px;line-height:1.8;margin-bottom:28px;">
     Two tokens, two roles: <strong style="color:var(--text);">SINC</strong> for governance and long-horizon ecosystem utility;
     <strong style="color:var(--text);">AXIOM (AXM)</strong> for agent-to-agent task settlement on chain <code>8453</code>.
-    Official SINC price is the <strong>$1.50 floor</strong> — pay at <a href="/buy" style="color:var(--cyan);">/buy</a>.
+    Official SINC price is the <strong>$0.15 floor</strong> ($150M FDV / 1B tokens) — pay at <a href="/buy" style="color:var(--cyan);">/buy</a>.
   </p>
   <div class="token-grid">
     <div class="token-card">
@@ -1186,7 +1186,7 @@
     </details>
     <details class="faq-item">
       <summary>Where should I get SINC?</summary>
-      <div class="faq-body">Platform plans are paid in SINC at <a href="/buy">getsincor.com/buy</a>. Official price is the $1.50 floor. Do not buy from unofficial Uniswap V2 pools or aggregator routes.</div>
+      <div class="faq-body">Platform plans are paid in SINC at <a href="/buy">getsincor.com/buy</a>. Official price is $0.15 — $150M valuation / 1 billion tokens. Do not buy from unofficial Uniswap V2 pools or aggregator routes.</div>
     </details>
     <details class="faq-item">
       <summary>Is this live or vaporware?</summary>
@@ -1382,7 +1382,7 @@
       ]);
       const spot = price.spot_usd;
       const el = document.getElementById('sinc-ticker-price');
-      if (el && spot != null) el.textContent = fmtUsd(spot) + ' spot';
+      if (el && spot != null) el.textContent = fmtUsd(spot) + ' floor LIVE';
       const lv = document.getElementById('live-spot-val');
       if (lv && spot != null) lv.textContent = fmtUsd(spot);
       const list = (plans.plans || []);
