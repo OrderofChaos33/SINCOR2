@@ -1,0 +1,78 @@
+{
+  "lock_version": "2026-09-01.1",
+  "locked_at": "2026-09-01T23:00:00Z",
+  "chain": "base",
+  "chain_id": 8453,
+  "official_buy_url": "https://getsincor.com/buy",
+  "canon_url": "https://github.com/OrderofChaos33/SINCOR2/blob/main/TOKEN_CANON.md",
+  "price_api": "https://getsincor.com/api/price/official",
+  "decision": {
+    "official_floor_usd": 0.15,
+    "fdv_at_floor_usd": 150000000,
+    "ceiling_usd": 1.5,
+    "ceiling_is_floor": false,
+    "ceiling_meaning": "Legacy/planned concentrated-liquidity sell wall only. Never market as official price or floor."
+  },
+  "sinc": {
+    "symbol": "SINC",
+    "role": "platform subscriptions and governance",
+    "address": "0xe1D836087F6573b665d25CE088793E916D7892f8",
+    "decimals": 8,
+    "total_supply": 1000000000,
+    "generation": "v2-live",
+    "explorer": "https://basescan.org/token/0xe1D836087F6573b665d25CE088793E916D7892f8",
+    "onchain_as_of_lock": {
+      "holders": 1,
+      "transfers": 0,
+      "note": "Do not advertise circulating float or funded buckets until transfer proofs exist."
+    }
+  },
+  "axiom": {
+    "symbol": "AXM",
+    "role": "A2A settlement and one-off intel",
+    "address": "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
+    "decimals": 18,
+    "total_supply": 1000000000,
+    "explorer": "https://basescan.org/token/0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
+    "bi_report_axm": 500,
+    "source_verified_basescan": false
+  },
+  "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+  "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "plans_usd": { "starter": 297, "professional": 997, "enterprise": 2997 },
+  "do_not_buy": [
+    { "label": "retired_sinc_v1", "address": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7", "supply": 100000000 },
+    { "label": "rogue_uniswap_v2_sinc_usdc", "address": "0x85372932f9b151a076815d92cf71a97980ffd667" },
+    { "label": "retired_bonding_curve", "address": "0x75dE341a2BC81806198364F125d4Cde36527619C" },
+    { "label": "dead_axm_label", "address": "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822" }
+  ],
+  "allocation": {
+    "sinc_v2_1b": { "status": "UNPROVEN", "buckets": [], "proofs": [] },
+    "sinc_v1_100m_historical_only": {
+      "status": "RETIRED",
+      "address": "0x9C8cd8d3961F445D653713dE65C6578bE11668e7",
+      "buckets": [
+        { "name": "bonding_curve_and_lp_seed", "amount": 65000000 },
+        { "name": "concentrated_1_50_ceiling_lp", "amount": 5000000, "note": "ceiling wall, not floor" },
+        { "name": "sell_side_limit_order_ladder", "amount": 20000000 },
+        { "name": "sablier_24m_vest", "amount": 10000000 }
+      ]
+    },
+    "axm_1b": {
+      "status": "DESIGN_ONLY",
+      "buckets": [
+        { "name": "ecosystem_a2a_treasury", "pct": 80 },
+        { "name": "team_development", "pct": 10 },
+        { "name": "liquidity", "pct": 10 }
+      ],
+      "proofs": []
+    }
+  },
+  "forbidden_claims_until_proven": [
+    "CertiK Skynet 97/100 on live SINC address",
+    "Sourcify full-match on live SINC address",
+    "Buy on bonding curve 0x75dE341a2BC81806198364F125d4Cde36527619C",
+    "$1.50 floor",
+    "100M live SINC supply"
+  ]
+}
