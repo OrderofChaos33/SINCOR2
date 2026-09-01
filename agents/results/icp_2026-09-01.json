@@ -1,0 +1,16 @@
+{
+  "tick": "2026-09-01T08:20:16Z",
+  "checkout": "https://getsincor.com/products/starter",
+  "buy": "https://getsincor.com/buy",
+  "rule": "public sources only. no invented emails. no send this tick.",
+  "icps": [
+    {"name": "Clinton Dental Associates P.C.", "city": "Clinton, IA", "site": "https://clintondentalassociates.com/", "observable": "family dental, hours 8-5 M-F, phone 563-242-5041", "play": "dental-missed-calls", "cta": "https://getsincor.com/products/starter"},
+    {"name": "Today's Dental", "city": "Clinton, IA", "site": "https://www.todaysdentalclinton.com/", "observable": "1801 Manufacturing Drive, insurance/appointments page", "play": "dental-missed-calls", "cta": "https://getsincor.com/products/starter"},
+    {"name": "Clinton Family Dental", "city": "Clinton, IA", "site": "https://www.dentistinclinton.com/", "observable": "400 S 2nd St, hours listed, phone 563-243-6950", "play": "dental-missed-calls", "cta": "https://getsincor.com/products/starter"},
+    {"name": "Schmitt Family Dentistry", "city": "Clinton, IA", "site": "https://schmittfamilydentistry.com/", "observable": "300 N 2nd St, phone 563-243-2324", "play": "dental-missed-calls", "cta": "https://getsincor.com/products/starter"},
+    {"name": "Voss Brothers Plumbing & Heating", "city": "Clinton, IA", "site": "https://vossbrothersplumbingandheatinginc.com/", "observable": "plumbing/heating shop, peak-hour call leak", "play": "trades-missed-calls", "cta": "https://getsincor.com/products/starter"},
+    {"name": "Hugunin Sewer & Plumbing, LLC", "city": "Clinton, IA", "site": "https://www.huguninsewerandplumbing.com/", "observable": "after-hours emergency advertised, 563-242-2481", "play": "trades-missed-calls", "cta": "https://getsincor.com/products/starter"},
+    {"name": "Edwards Plumbing, Heating, Air Conditioning", "city": "Vinton, IA", "site": "https://www.edwardsplumbingandheating.com/", "observable": "since 1929, hours Mon-Fri 7:30-4:30, closed weekend", "play": "trades-missed-calls", "cta": "https://getsincor.com/products/starter"},
+    {"name": "Medwave — Milwaukee Medical Billing & Credentialing", "city": "Milwaukee, WI", "site": "https://medwave.io/milwaukee-medical-billing-credentialing/", "observable": "sells credentialing/RCM to Milwaukee providers — competitor/channel, not a cold patient practice", "play": "healthcare-rcm", "cta": "https://getsincor.com/products/starter"}
+  ]
+}
