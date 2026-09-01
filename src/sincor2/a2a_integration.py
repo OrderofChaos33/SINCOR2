@@ -67,6 +67,8 @@ from sincor2.onchain.constants import (
     resolve_address,
 )
 from sincor2.schema_gate import compile_skill_schemas, validate_skill_input
+from sincor2 import treasury_inflow as _treasury_inflow
+from sincor2.treasury_settlement import record_platform_fee_inflow
 
 logger = logging.getLogger("sincor.a2a")
 
@@ -82,15 +84,21 @@ TREASURY_WALLET  = resolve_address("TREASURY_ADDRESS",       _CANONICAL_TREASURY
 DEAD_ADDRESS     = _CANONICAL_DEAD
 CHAIN_ID         = int(os.getenv("BASE_CHAIN_ID", str(_CANONICAL_CHAIN_ID)))  # Base mainnet
 
-# Primary token for A2A task payments. Default is SINC; set A2A_PRIMARY_TOKEN=AXIOM
-# for legacy AXIOM-based settlements.
-A2A_PRIMARY_TOKEN = os.getenv("A2A_PRIMARY_TOKEN", "SINC").upper()
+# Primary token for A2A task payments. Canonical settlement is AXIOM (AXM).
+# If env is SINC/SIN, force AXIOM — SINC is residual/legacy only.
+_A2A_PRIMARY_RAW = os.getenv("A2A_PRIMARY_TOKEN", "AXIOM").upper()
+A2A_PRIMARY_TOKEN = "AXIOM" if _A2A_PRIMARY_RAW in ("SINC", "SIN", "", "AXM") else _A2A_PRIMARY_RAW
+if A2A_PRIMARY_TOKEN != "AXIOM":
+    A2A_PRIMARY_TOKEN = "AXIOM"
 
-# SINC price per A2A task call (whole tokens; contract is 8 decimals).
+# SINC price per A2A task call (whole tokens; contract is 8 decimals). Residual field only.
 SINC_PRICE_PER_TASK = int(os.getenv("SINC_PRICE_PER_TASK", "1"))  # 1 SINC default
 
 # Legacy AXIOM price per task (wei, 18 decimals) — kept for backward compatibility.
 AXM_PRICE_PER_TASK = int(os.getenv("AXM_PRICE_PER_TASK", str(1 * 10**18)))  # 1 AXM default
+A2A_PLATFORM_FEE_BPS = int(os.getenv("A2A_PLATFORM_FEE_BPS", "500"))
+_BPS_DENOM = 10_000
+ALLOWED_A2A_ASSETS = frozenset({"AXM", "AXIOM"})
 
 PLATFORM_URL     = os.getenv("PLATFORM_URL", "https://getsincor.com")
 PLATFORM_NAME    = "SINCOR Agent Swarm"
@@ -1340,6 +1348,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _compute_platform_fee_wei(amount_wei: int) -> int:
+    amount = amount_wei if amount_wei >= 0 else 0
+    return (amount * A2A_PLATFORM_FEE_BPS) // _BPS_DENOM
+
+
+def _reject_non_axm(token) -> Optional[str]:
+    if not token:
+        return None
+    if str(token).upper() not in ALLOWED_A2A_ASSETS:
+        return f"AXM-only settlement. Rejected token={token}."
+    return None
+
+
 def _new_task(skill_id: str, input_text: str, caller_id: str,
               session_id: str, axm_paid: int = 0,
               tx_hash: Optional[str] = None) -> A2ATask:
@@ -1669,20 +1690,32 @@ class A2ARouter:
                 "A2A quote  skill=%s  caller=%s  axm=%.4f AXM  free_remaining=%d",
                 skill_id, caller_id, current_axm_price / 10**18, free_remaining,
             )
+            platform_fee_wei = _compute_platform_fee_wei(current_axm_price) if not is_free_call else 0
 
             return jsonify({
                 "skill_id":                 skill_id,
                 "skill_name":               skill.name,
-                # SINC (primary)
-                "sinc_amount":              skill.sinc_price if not is_free_call else 0,
+                # SINC residual — paid A2A quotes are AXM-only
+                "sinc_amount":              0,
                 "sinc_contract":            SINC_CONTRACT,
                 # AXM (live price from pricing engine)
                 "axm_price_wei":            str(current_axm_price) if not is_free_call else "0",
                 "axm_price_display":        (
                     f"{current_axm_price / 10**18:.4f} AXM" if not is_free_call else "FREE"
                 ),
+                "platform_fee_bps":         A2A_PLATFORM_FEE_BPS,
+                "platform_fee_wei":         str(platform_fee_wei),
+                "treasury_fee_split": {
+                    "to": TREASURY_WALLET,
+                    "asset": "AXM",
+                    "platform_fee_bps": A2A_PLATFORM_FEE_BPS,
+                    "platform_fee_wei": str(platform_fee_wei),
+                    "platform_fee_display": (
+                        f"{platform_fee_wei / 10**18:.4f} AXM" if platform_fee_wei else "0.0000 AXM"
+                    ),
+                },
                 "axiom_contract":           AXIOM_CONTRACT,
-                "primary_token":            A2A_PRIMARY_TOKEN,
+                "primary_token":            "AXIOM",
                 "pay_to":                   TREASURY_WALLET,
                 "chain_id":                 CHAIN_ID,
                 "estimated_latency_seconds": skill.estimated_latency_seconds,
@@ -1694,8 +1727,9 @@ class A2ARouter:
                 "note": (
                     "FREE — include caller_id in your tasks/send request (no txHash needed)."
                     if is_free_call else
-                    f"Pay {skill.sinc_price} SINC (or {current_axm_price / 10**18:.4f} AXM) "
-                    f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request."
+                    f"AXM-only. Pay {current_axm_price / 10**18:.4f} AXM "
+                    f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request. "
+                    f"Platform fee {A2A_PLATFORM_FEE_BPS} bps routes to treasury {TREASURY_WALLET}."
                 ),
             })
 
@@ -1925,6 +1959,16 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
             code=-32602, rpc_id=rpc_id,
         )
 
+    offered_token = (
+        params.get("token") or params.get("asset") or params.get("primary_token")
+        or (msg_obj.get("metadata") or {}).get("token")
+        or (msg_obj.get("metadata") or {}).get("asset")
+        or (msg_obj.get("metadata") or {}).get("primary_token")
+    )
+    reject_msg = _reject_non_axm(offered_token)
+    if reject_msg:
+        return _err(reject_msg, code=-32002, rpc_id=rpc_id)
+
     gate = validate_skill_input(
         skill_id=skill.id,
         schema=skill.input_schema or None,
@@ -2100,7 +2144,7 @@ def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[s
 def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:
     """Create a settlement record in the platform coordinator for a paid A2A task."""
     try:
-        from decimal import Decimal
+        from decimal import Decimal, InvalidOperation
 
         from flask import current_app, has_app_context, has_request_context
 
@@ -2134,11 +2178,49 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
             token_symbol="AXIOM",
             expires_in_minutes=settlement_expiry,
         )
-        settlement.confirm_payment(
+        settlement_record = settlement.confirm_payment(
             quote_id=quote.quote_id,
             tx_hash=tx_hash,
             confirmed_amount=amount_display,
         )
+        try:
+            fee_amount = Decimal(str(getattr(settlement_record, "platform_fee", 0) or 0))
+        except (InvalidOperation, TypeError, ValueError):
+            logger.warning(
+                "Invalid platform_fee on settlement record task=%s fee=%r",
+                task.id,
+                getattr(settlement_record, "platform_fee", None),
+            )
+            fee_amount = Decimal("0")
+        simulated = bool(tx_hash) and str(tx_hash).startswith("0xSIMULATED")
+        free_call = bool(task.metadata.get("free_call"))
+        if fee_amount > 0 and tx_hash and not simulated and not free_call:
+            _treasury_inflow.record_inflow(
+                fee_amount,
+                asset=getattr(settlement_record, "token_symbol", "AXM") or "AXM",
+                source="a2a_settlement",
+                tx_hash=tx_hash,
+                note=f"a2a task {task.id} platform fee",
+                projected=False,
+            )
+        if axm_paid > 0 and tx_hash and not simulated and not free_call:
+            try:
+                computed_fee = (
+                    Decimal(axm_paid)
+                    * Decimal(A2A_PLATFORM_FEE_BPS)
+                    / Decimal(_BPS_DENOM)
+                    / Decimal(10**18)
+                )
+                if computed_fee > 0 and fee_amount <= 0:
+                    record_platform_fee_inflow(
+                        fee_amount=computed_fee,
+                        asset="AXM",
+                        source="a2a_settlement",
+                        tx_hash=tx_hash,
+                        task_id=task.id,
+                    )
+            except Exception as fee_exc:
+                logger.warning("record_platform_fee_inflow failed task=%s: %s", task.id, fee_exc)
         logger.info(
             "A2A settlement recorded task=%s axm=%.4f tx=%s",
             task.id,

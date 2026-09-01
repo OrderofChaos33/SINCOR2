@@ -262,6 +262,12 @@ to build off-chain analytics, leaderboards, and activity feeds.
 Every `create_quote()` returns a `sinc_amount` field. `confirm_payment()` automatically
 routes 5% of the SINC amount to the treasury and records `platform_fee` and `payee_amount`
 on the `SettlementRecord`.
+`/api/a2a/quote` also exposes `platform_fee_*` and `treasury_fee_split` fields so callers
+can see the fee amount and canonical treasury destination before submitting payment.
+New A2A quote/settlement/billing paths are AXM-only (canonical AXIOM
+`0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`). On successful settlement the platform
+fee portion is recorded as realized Treasury inflow (`projected=false` + `tx_hash`) to
+`0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`. Simulated and free-quota txs are never recorded.
 
 **Agent Cards:** `AgentCardRecord` now includes:
 - `sinc_price_per_call` (default 1)

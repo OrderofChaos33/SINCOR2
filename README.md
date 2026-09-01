@@ -40,6 +40,7 @@ SINAX (`src/sincor2/sinax/`) is a **research prototype** — geometric proof nav
 ## Table of Contents
 
 - [Why SINCOR2](#why-sincor2)
+- [What's new (2026-09)](#whats-new-2026-09)
 - [Quickstart](#quickstart)
 - [Platform Architecture](#platform-architecture)
 - [Agent Intelligence & Cognition](#agent-intelligence--cognition)
@@ -74,6 +75,34 @@ SINCOR2 is built for operators who need autonomous agents that generate real rev
 - **On-chain economic coordination.** AXIOM (AXM) settles agent-to-agent payments on Base. The Uniswap V4 limit-order hook lives in `onchain/src/` and is **not compile-tested in this repo** until v4-periphery is vendored.
 - **SINAX** is research code under `src/sincor2/sinax/`, not a production kernel tool.
 - **Production-ready runtime.** Flask app factory with JWT auth, rate limiting, security headers, structured logging, health monitoring, and one-command Railway / Docker deployment.
+
+---
+
+## What's new (2026-09)
+
+Additive status for operators landing on this repo now. Nothing above is retired by this section.
+
+### Live product & money path
+- **Live site:** [getsincor.com](https://getsincor.com) — Agent Cards, A2A JSON-RPC, wallet-native checkout at `/buy`.
+- **Primary KPI:** realized Treasury inflow to [`0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`](https://basescan.org/address/0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac) (`projected=false` + on-chain `tx_hash`). Projected scheduler numbers do not count.
+- **A2A settlement is AXM-only** for new quotes and `message/send`. Canonical AXIOM: `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`. `/api/a2a/quote` returns `platform_fee_bps` (default 500), `platform_fee_wei`, and `treasury_fee_split` routing the platform fee to Treasury. Simulated (`0xSIMULATED…`) and free-quota tasks are never recorded as realized inflow.
+- **Inbound A2A engine restored** (`src/sincor2/a2a_inbound.py`): `POST /v1/a2a/register`, heartbeat, directory, SSE task stream, platform agent `sincor-agent-swarm`.
+- **External onboarding:** `examples/a2a_external_caller.py` + `examples/EXTERNAL_A2A_ONBOARDING.md`.
+- **SINC live pointer:** `0xe1D836087F6573b665d25CE088793E916D7892f8` (8 decimals, 1B). Retired `0x9C8cd8…` is denylisted. Public bonding-curve sell path is retired; official buy surface is `/buy`.
+- **Genesis gate overlay** on the homepage for the September airdrop allocation claim window.
+
+### DeFi swarms (24/7)
+- **26 DeFi swarms** check in every 5 minutes via `scripts/defi_swarm_checkin_scheduler.py`. Feedback is ingested by TOA. Self-improving loops must consume measured ranking mutations.
+- **Yield Aggregator first** (`src/sincor2/defi/yield_aggregator.py`): plan against live Treasury capital (USDC-dominant on Base). Primary productive path is Morpho Gauntlet USDC (`0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61`). SharedLiquidityVault stays gated until capital and verification gates are met.
+- **Treasury exec agent** queues intents (`python scripts/run_treasury_execution_agent.py --once`). Live broadcast requires explicit `EXECUTE_LIVE=1` + signer + kill switch `data/TREASURY_EXEC_HALT` clear. Never commit keys.
+- **Base Sepolia hook path (testnet only):** `onchain/script/deploy-base-sepolia.sh`, `DeploySharedLiquidityHook.s.sol`, `DeployLiquidityAmplifierHook.s.sol`. Scheduler can ingest hook metrics (`HOOK_METRICS_CHAIN_ID`, default 84532). No mainnet hook graduation until revenue proof.
+- Uniswap V4 limit-order hook remains **source in-repo, not compile-tested** until v4-periphery is vendored (unchanged).
+
+### Operator docs
+- Daily CEO briefs: `docs/CEO_DAILY_BRIEF_YYYY-MM-DD.md` (latest: `docs/CEO_DAILY_BRIEF_2026-09-01.md`).
+- Tracking: GitHub issues labeled `ceo` / `treasury` / `a2a` (see [#203](https://github.com/OrderofChaos33/SINCOR2/issues/203)).
+- Production A2A checklist: `docs/A2A_PRODUCTION_CHECKLIST.md`.
+- Canonical addresses: `CANONICAL_ADDRESSES.md` and `src/sincor2/onchain/constants.py`.
 
 ---
 
@@ -640,6 +669,10 @@ See [SECURITY.md](SECURITY.md) for the full security policy.
 | [SINAX reference](docs/sinax/README.md) | Geometric proof navigation layer API and ops notes |
 | [Token overview](docs/token/README.md) | SINC and AXIOM roles, mechanics, and treasury routing |
 | [Canonical on-chain addresses](CANONICAL_ADDRESSES.md) | Contract and wallet address registry |
+| [CEO daily brief (latest)](docs/CEO_DAILY_BRIEF_2026-09-01.md) | Capital snapshot, swarm check-in, EOD goals, builder P0/P1 |
+| [A2A production checklist](docs/A2A_PRODUCTION_CHECKLIST.md) | Live discovery / quote / settlement gates |
+| [DeFi swarm expansion](docs/DEFI_SWARM_EXPANSION_PLAN.md) | 26-swarm 24/7 program |
+| [Yield aggregator / liquidity agents](docs/LIQUIDITY_AGENTS.md) | Agent YAML and yield surface |
 | [Deployment guide](DEPLOYMENT_GUIDE.md) | Railway, Docker, and production deployment |
 | [Examples](examples/README.md) | Reference Agent Cards and multi-agent workflow payloads |
 | [Roadmap](ROADMAP.md) | Completed milestones and upcoming priorities |
