@@ -14,6 +14,7 @@ import time
 import logging
 import sys
 import argparse
+import os
 from datetime import datetime
 
 # Real integrations
@@ -46,10 +47,19 @@ except ImportError:
     except ImportError:
         get_default_aggregator = None
 
+try:
+    from src.sincor2.hook_stats import fetch_hook_status
+except ImportError:
+    try:
+        from sincor2.hook_stats import fetch_hook_status
+    except ImportError:
+        fetch_hook_status = None
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("sincor.defi_scheduler")
 
 CHECK_INTERVAL_SECONDS = 300  # 5 minutes
+HOOK_METRICS_CHAIN_ID = int(os.getenv("HOOK_METRICS_CHAIN_ID", "84532"))
 
 # CEO 2026-08-19: live capital from Basescan (~$312.94). Override with env if needed.
 LIVE_TREASURY_USD = float(__import__("os").getenv("YIELD_CAPITAL_USD", "312.93"))
@@ -143,6 +153,28 @@ class DeFiSwarmScheduler:
                     )
             except Exception as e:
                 logger.warning("YieldAggregator plan failed: %s", e)
+
+        if fetch_hook_status:
+            try:
+                hook_status = fetch_hook_status(chain_id=HOOK_METRICS_CHAIN_ID)
+                if self.toa:
+                    self.toa.ingest_feedback({
+                        "source": "shared_liquidity_hook",
+                        "chain_id": hook_status.get("chain_id"),
+                        "hook_address": hook_status.get("hook_address"),
+                        "router_address": hook_status.get("router_address"),
+                        "sinc_in_hook_pm_m": hook_status.get("sinc_in_hook_pm_m", 0.0),
+                        "curve_eth_accumulated": hook_status.get("curve_eth_accumulated", 0.0),
+                        "graduation_pct": hook_status.get("graduation_pct", 0.0),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    })
+                logger.info(
+                    "Hook metrics chain=%s hook=%s",
+                    hook_status.get("chain_id"),
+                    hook_status.get("hook_address"),
+                )
+            except Exception as e:
+                logger.warning("hook metrics ingest failed: %s", e)
 
         # Additional projected only if real positive PnL appeared (none in dummy path)
         if record_inflow and total_inflow_projection > 0:
