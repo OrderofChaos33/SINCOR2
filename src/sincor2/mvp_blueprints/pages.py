@@ -22,10 +22,40 @@ def _bind_mvp():
 
 _bind_mvp()
 
+GENESIS_COOKIE = "sincor_genesis"
+GENESIS_LAUNCH_AT = "2026-09-26T16:00:00.000Z"
+
+
+def _genesis_unlocked() -> bool:
+    """True when the visitor already claimed, is signed in, or this is the inner site layer."""
+    if request.args.get("inner") == "1":
+        return True
+    if request.cookies.get(GENESIS_COOKIE):
+        return True
+    try:
+        if _session_email() or _is_admin_session():
+            return True
+    except Exception:
+        pass
+    return False
+
 
 @bp.route('/', methods=['GET'])
 def home():
-    """Home page."""
+    """Home page — genesis gate overlay until the visitor claims allocation."""
+    if not _genesis_unlocked():
+        count = 0
+        try:
+            from sincor2.genesis_cohort import genesis_count
+            count = genesis_count()
+        except Exception as e:
+            logger.debug('[GENESIS] count unavailable: %s', e)
+        return render_template(
+            'genesis_gate.html',
+            genesis_count=count,
+            launch_at=GENESIS_LAUNCH_AT,
+        )
+
     price_ctx = {'sinc_spot_usd': None, 'sinc_spot_label': '$1.50 floor'}
     try:
         from launch_content_engine.onchain_stats import SINC_FLOOR_USD
@@ -34,6 +64,36 @@ def home():
     except Exception as e:
         logger.debug('[HOME] floor price unavailable: %s', e)
     return render_template('home.html', **price_ctx)
+
+
+@bp.route('/api/genesis/claim', methods=['POST'])
+@limiter.limit("8 per minute")
+def genesis_claim():
+    """Claim a genesis airdrop allocation and unlock the site."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
+    wallet = (data.get('wallet') or '').strip()
+    try:
+        from sincor2.genesis_cohort import claim
+        result = claim(email, password, wallet)
+    except Exception as e:
+        logger.exception('[GENESIS] claim failed: %s', e)
+        return jsonify({'ok': False, 'error': 'Could not claim. Try again.'}), 500
+    if not result.get('ok'):
+        return jsonify(result), 400
+    resp = jsonify(result)
+    resp.set_cookie(
+        GENESIS_COOKIE,
+        result['allocation'],
+        max_age=365 * 24 * 3600,
+        httponly=True,
+        samesite='Lax',
+        secure=True,
+        path='/',
+    )
+    logger.info('[GENESIS] claimed %s allocation=%s existing=%s', email, result['allocation'], result.get('existing'))
+    return resp
 
 
 # ============================================================================

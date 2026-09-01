@@ -692,7 +692,7 @@ def apply_security_headers(response):
         "style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; "
         "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
         "img-src 'self' https: data:; "
-        "frame-src https://js.stripe.com; "
+        "frame-src 'self' https://js.stripe.com; "
         "connect-src 'self' https://api.stripe.com"
     )
 
