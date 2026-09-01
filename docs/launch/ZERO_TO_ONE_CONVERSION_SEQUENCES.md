@@ -1,9 +1,13 @@
-# Zero-to-One Conversion Sequences — Harvest / Phase 2
+# Zero-to-One Conversion Sequences — Pay-link close
 
-**Date**: 2026-08-04  
+**Date**: 2026-09-01  
 **Owner**: Conversion Swarm  
-**Status**: Production-ready  
-**Source**: Highest-converting 2026 patterns (pain callout + incomplete case-study fragment + soft CTA). All emails under 85 words. No hype language.
+**Rule**: Agents only. CTA is checkout, never a meeting.
+
+Checkout: https://getsincor.com/buy  · Starter $297: https://getsincor.com/products/starter  
+Treasury: `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`
+
+All emails under 85 words. No hype. STOP on reply. No “reply to Court.”
 
 ---
 
@@ -12,165 +16,112 @@
 **Target**: VP/Director of Revenue Cycle, Practice Administrator, COO
 
 ### Touch 1 – Day 1
-**Subject options (A/B)**:
-- A: denials at {{Company}}
-- B: {{Company}} first-pass denials
-- C: days in AR at {{Company}}
-- D: credentialing backlog at {{Company}}
-- E: quick question on {{Company}} denials
+**Subject options**: denials at {{Company}} | {{Company}} first-pass denials | days in AR at {{Company}}
 
-**Body**:
 ```
 Hi {{FirstName}},
 
-Most mid-size groups I talk to are watching first-pass denials creep past 12–15% this year.
+Most mid-size groups are watching first-pass denials creep past 12–15%.
 
-A similar practice cut days in AR from 52 to 28 by automating the exact credentialing + prior-auth loop that was leaking the most.
+SINCOR agents run credentialing + prior-auth chase 24/7. Starter is $297/mo, live tonight: https://getsincor.com/products/starter
 
-Worth comparing notes for 12 minutes?
+If denials are still leaking, that link is the whole ask.
 
-{{YourName}}
+SINCOR agents
 ```
 
 ### Touch 2 – Day 4
-**Subject**: Re: denials at {{Company}} | one more data point | the teams that fixed this
-
-**Body**:
 ```
 {{FirstName}},
 
-One more data point: the teams that fixed this didn’t add staff. They removed the manual chase on the 3 highest-volume payers.
+Teams that fixed this didn’t add staff. They removed the manual chase on the 3 highest-volume payers.
 
-Happy to show you the exact workflow if useful.
+Same setup, $297/mo: https://getsincor.com/buy
 
-{{YourName}}
+SINCOR agents
 ```
 
 ### Touch 3 – Day 8
-**Subject**: closing the loop | last note on denials | should I close the file?
-
-**Body**:
 ```
 {{FirstName}},
 
-I’ll close the file on this unless it’s still relevant.
+Closing the file unless denials still eat time. If yes, Starter is here: https://getsincor.com/products/starter
 
-If the denial or credentialing backlog is still eating time, just reply “yes” and I’ll send the one-page breakdown.
-
-{{YourName}}
+SINCOR agents
 ```
 
 ---
 
 ## Dental Practices
 
-**Target**: Practice Owner / Office Manager (independent) or Director of Ops (DSO)
+**Target**: Owner / Office Manager / DSO ops
 
-### Touch 1 – Day 1
-**Subject options**:
-- A: {{PracticeName}} + missed calls
-- B: missed calls at {{PracticeName}}
-- C: {{PracticeName}} after-hours calls
-- D: Dentrix + missed appointments
-- E: quick question for {{PracticeName}}
-
-**Body**:
+### Touch 1
 ```
 Hi {{FirstName}},
 
-Most practices on Dentrix / Open Dental are still losing 25–35% of after-hours and mid-day calls.
+Most Dentrix / Open Dental offices still lose 25–35% of after-hours and mid-day calls.
 
-Three offices in {{City/Metro}} stopped that leak and booked the appointments automatically — without replacing their PMS.
+Starter deploys agents that capture those leads 24/7 — $297/mo: https://getsincor.com/products/starter
 
-Open to a 10-minute look at how they did it?
-
-{{YourName}}
+SINCOR agents
 ```
 
-### Touch 2 – Day 3
-**Subject**: Re: {{PracticeName}} + missed calls | the biggest lift wasn’t marketing
-
-**Body**:
+### Touch 2
 ```
 {{FirstName}},
 
-Quick follow-up. The biggest lift wasn’t more marketing — it was capturing the calls that were already coming in.
+The lift isn’t more marketing. It’s capturing calls you already get.
 
-Happy to walk you through the exact setup if it’s useful.
+Checkout: https://getsincor.com/buy
 
-{{YourName}}
+SINCOR agents
 ```
 
-### Touch 3 – Day 7
-**Subject**: last note | closing the loop – {{PracticeName}}
-
-**Body**:
+### Touch 3
 ```
 {{FirstName}},
 
-I’ll stop here. If recovering those missed appointments is still on your list, just reply and I’ll send the short breakdown.
+Last note. If missed appointments still matter: https://getsincor.com/products/starter
 
-{{YourName}}
+SINCOR agents
 ```
 
 ---
 
-## Home Services / Trades (HVAC, Plumbing, Electrical)
+## Home Services / Trades
 
-**Target**: Owner-Operator or Ops Manager on ServiceTitan / Jobber / Housecall Pro
+**Target**: Owner on ServiceTitan / Jobber / Housecall Pro
 
-### Touch 1 – Day 1
-**Subject options**:
-- A: missed calls at {{Company}}
-- B: {{Company}} missed calls
-- C: 30–40% of calls still missed
-- D: after-hours calls at {{Company}}
-- E: ServiceTitan + missed calls
-
-**Body**:
+### Touch 1
 ```
 Hi {{FirstName}},
 
-Most shops your size are still missing 30–40% of inbound calls during peak hours and after 5 pm.
+Shops your size still miss 30–40% of inbound at peak and after 5pm.
 
-We set up a system for several {{City}} crews that books those calls straight into ServiceTitan / Jobber while the tech is still on the job.
+Starter agents book those jobs while the tech is on site. $297/mo: https://getsincor.com/products/starter
 
-Worth 10 minutes to see the exact flow?
-
-{{YourName}}
+SINCOR agents
 ```
 
-### Touch 2 – Day 3
-**Subject**: Re: missed calls at {{Company}} | recovered jobs in under 3 weeks
-
-**Body**:
+### Touch 2
 ```
 {{FirstName}},
 
-One number that keeps coming up: recovered jobs from previously missed calls paid for the whole system in under 3 weeks.
+Recovered jobs from missed calls is the whole pitch. Pay path: https://getsincor.com/buy
 
-Happy to show you the live booking path if useful.
-
-{{YourName}}
+SINCOR agents
 ```
 
-### Touch 3 – Day 7
-**Subject**: closing the loop | last note – missed calls
-
-**Body**:
+### Touch 3
 ```
 {{FirstName}},
 
-I’ll close this out. If capturing those missed calls is still a priority, just reply “yes” and I’ll send the one-page version.
+Closing out. If capturing missed calls is still a priority: https://getsincor.com/products/starter
 
-{{YourName}}
+SINCOR agents
 ```
 
 ---
 
-## A/B Testing Protocol
-- Split lists 50/50 on Touch 1 subjects.
-- Primary metric: open rate. Secondary: positive reply rate.
-- Minimum 200–300 sends per variant before declaring a winner.
-- Kill any subject under 35% open rate.
-- Keep body identical during subject tests.
+KPI: sent, checkout_clicks, realized_tx_hash. Meetings = 0.
