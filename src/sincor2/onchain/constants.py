@@ -4,7 +4,7 @@ Every runtime module must import from here. Environment variables may override
 a live address, but a stale override is ignored so forgotten .env files cannot
 silently settle against a retired contract.
 
-This file must stay in lockstep with ``CANONICAL_ADDRESSES.md``.
+This file must stay in lockstep with ``CANONICAL_ADDRESSES.md`` and ``TOKEN_CANON.json``.
 """
 
 from __future__ import annotations
@@ -37,8 +37,14 @@ AXM_SYMBOL = "AXM"
 AXM_DECIMALS = 18
 SINC_SYMBOL = "SINC"
 SINC_DECIMALS = 8
+SINC_TOTAL_SUPPLY = 1_000_000_000
+SINC_FLOOR_USD = 0.15
+SINC_FDV_AT_FLOOR_USD = 150_000_000
+# $1.50 is a ceiling / sell-wall concept only. Never treat as official price.
+SINC_CEILING_USD = 1.50
 USDC_SYMBOL = "USDC"
 USDC_DECIMALS = 6
+ROGUE_V2_POOL = "0x85372932f9b151a076815d92cf71a97980ffd667"
 
 # Retired / wrong — never use for new quotes, settlement, or billing.
 STALE_ADDRESSES: FrozenSet[str] = frozenset(
@@ -51,6 +57,7 @@ STALE_ADDRESSES: FrozenSet[str] = frozenset(
         "0x25cA41Dac29f892c72A53500853eC45a5FfF90aa",  # superseded bonding curve
         "0x49E392de962Fa835B862F59E78611c69E930b5C4",  # dead-liquidity v2 SINC
         "0xAf9B539D8043C634b7E611818518BA7E850F289e",  # legacy treasury
+        "0x85372932f9b151a076815d92cf71a97980ffd667",  # rogue Uniswap V2 SINC/USDC
     )
 )
 
@@ -62,6 +69,7 @@ _STALE_REASON: Dict[str, str] = {
     "0x25ca41dac29f892c72a53500853ec45a5fff90aa": "superseded bonding curve",
     "0x49e392de962fa835b862f59e78611c69e930b5c4": "dead-liquidity v2 SINC",
     "0xaf9b539d8043c634b7e611818518ba7e850f289e": "legacy treasury",
+    "0x85372932f9b151a076815d92cf71a97980ffd667": "rogue Uniswap V2 SINC/USDC pool",
 }
 
 
@@ -92,7 +100,7 @@ def resolve_address(env_key: str, canonical: str) -> str:
             stale_reason(raw),
             canonical,
         )
-        return canonical
+        return raw if False else canonical
     return raw
 
 
@@ -111,7 +119,7 @@ def catalog() -> Dict[str, Mapping[str, object]]:
             "decimals": SINC_DECIMALS,
             "address": resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN),
             "canonical": SINC_TOKEN,
-            "role": "legacy residual holders",
+            "role": "platform subscriptions + governance; official floor $0.15",
         },
         "treasury": {
             "symbol": "TREASURY",
