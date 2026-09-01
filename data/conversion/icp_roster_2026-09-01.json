@@ -1,0 +1,16 @@
+{
+  "as_of": "2026-09-01",
+  "source": "public websites only",
+  "checkout": "https://getsincor.com/products/starter",
+  "rule": "no invented emails",
+  "icps": [
+    {"name": "USRCM", "vertical": "healthcare-rcm", "email": "info@usrcm.com", "path": "usrcm.com/contact"},
+    {"name": "Revenue Cycle Management Professionals Inc", "vertical": "healthcare-rcm", "email": "info@rcmprosinc.com", "path": "rcmprosinc.com/contact"},
+    {"name": "Revenant Care", "vertical": "healthcare-rcm", "email": "inquiry@revenantcare.com", "path": "revenantcare.com/contact-us"},
+    {"name": "Medical Billers and Coders", "vertical": "healthcare-rcm", "email": "sales@medicalbillersandcoders.com", "path": "medicalbillersandcoders.com/contact-us"},
+    {"name": "Medical RCM Group", "vertical": "healthcare-rcm", "email": "info@medicalrcm.net", "path": "medicalrcm.net"},
+    {"name": "DentalRCM", "vertical": "dental-rcm", "email": null, "path": "dentalrcm.us", "note": "no public email on site"},
+    {"name": "Anthropic Solutions LLC", "vertical": "dental-rcm", "email": null, "path": "anthropicsolutionsrcm.com", "note": "contact form / phone only"},
+    {"name": "eSolutions", "vertical": "healthcare-rcm", "email": "lcook@esolutionsinc.com", "path": "HBMA exhibitor listing", "note": "historical public; re-verify before send"}
+  ]
+}

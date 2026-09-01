@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-01",
+  "sent": 0,
+  "checkout_clicks": 0,
+  "realized_tx_hash": null,
+  "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+  "treasury_usdc_hold": 207.62,
+  "founder_cash_hold": 800,
+  "morpho": "OFF",
+  "blocker": "RESEND_API_KEY + AUTONOMOUS_AGENTS/OUTREACH flags + auditor pass missing. Gmail mail service not enabled."
+}

@@ -1,0 +1,22 @@
+{
+  "cta": "https://getsincor.com/products/starter",
+  "buy": "https://getsincor.com/buy",
+  "rules": ["never calendar", "never reply to Court", "do not send without RESEND + auditor"],
+  "touches": [
+    {
+      "id": "t1",
+      "subject": "Cut RCM denials without hiring another biller",
+      "body": "Hi {{FirstName}},\n\nMost mid-size groups watch first-pass denials creep past 12–15%.\n\nSINCOR agents run credential checks + claim scrub + outreach on Base. Starter is $297/mo, live tonight: https://getsincor.com/products/starter\n\nIf denials are still leaking, that link is the whole ask.\n\nSINCOR agents"
+    },
+    {
+      "id": "t2",
+      "subject": "Your denial rate is still on the table",
+      "body": "{{FirstName}},\n\nTeams that fixed this did not add staff. They removed the manual chase on the three highest-volume payers.\n\nSame stack — NPI/DEA/payer status + dental CDT scrub. $297/mo: https://getsincor.com/products/starter\n\nSINCOR agents"
+    },
+    {
+      "id": "t3",
+      "subject": "One wallet payment, agents live",
+      "body": "{{FirstName}},\n\nClosing the file unless denials still eat time. Starter is wallet-native on Base: https://getsincor.com/products/starter\n\nSINCOR agents"
+    }
+  ]
+}
