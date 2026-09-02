@@ -1,0 +1,16 @@
+- agent_id: "sincor.core.bidder"
+  role: "BidderAgent"
+  category: "Labor Service Provider"
+  protocol_standards: ["Contract-Net", "ERC-7579"]
+  architecture: "Utility-Based ReAct Agent"
+  capabilities:
+    - rfp_parsing
+    - sla_cost_estimation
+    - automated_bids
+    - session_key_signing
+  utility_function: "Maximize net yield subject to SLA delivery SLA constraints"
+  config:
+    max_concurrent_jobs: 8
+    min_profit_margin_pct: 20
+    auto_sign_session_keys: true
+    max_gas_spend_per_tx_gwei: 50
