@@ -13,7 +13,6 @@ from sincor2.a2a_adoption_metrics import record_agent_registered
 from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_AGENTS,
-    MERIT_THRESHOLD_AXM,
     _AGENT_ID_RE,
     _HEARTBEAT_STOP,
     _PLATFORM_AGENT_ID,
