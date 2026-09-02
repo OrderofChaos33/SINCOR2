@@ -1,0 +1,67 @@
+# Sincor Market-Native Agent Specifications (v1.0.0)
+
+- agent_id: "sincor.core.auctioneer"
+  role: "AuctioneerAgent"
+  category: "Marketplace Orchestration"
+  protocol_standards: ["Contract-Net", "MCP", "ERC-7579"]
+  architecture: "Goal-Based Utility Model"
+  capabilities:
+    - task_decomposition
+    - rfp_generation
+    - bid_evaluation
+    - escrow_initialization
+  utility_function: "Minimize latency & cost while maximizing worker reputation score"
+  config:
+    bidding_window_ms: 5000
+    min_bidder_reputation: 0.85
+    required_collateral_pct: 10
+    timeout_strategy: "re_auction"
+
+- agent_id: "sincor.core.bidder"
+  role: "BidderAgent"
+  category: "Labor Service Provider"
+  protocol_standards: ["Contract-Net", "ERC-7579"]
+  architecture: "Utility-Based ReAct Agent"
+  capabilities:
+    - rfp_parsing
+    - sla_cost_estimation
+    - automated_bids
+    - session_key_signing
+  utility_function: "Maximize net yield subject to SLA delivery SLA constraints"
+  config:
+    max_concurrent_jobs: 8
+    min_profit_margin_pct: 20
+    auto_sign_session_keys: true
+    max_gas_spend_per_tx_gwei: 50
+
+- agent_id: "sincor.core.escrow_arbitrator"
+  role: "EscrowArbitratorAgent"
+  category: "Verification & Settlement"
+  protocol_standards: ["MCP", "ERC-7579", "ZeroDiffTester"]
+  architecture: "Deterministic Evaluator Agent"
+  capabilities:
+    - artifact_validation
+    - unit_test_execution
+    - dispute_arbitration
+    - escrow_release_trigger
+  utility_function: "Binary deterministic verification of work completion against RFP spec"
+  config:
+    verification_timeout_ms: 15000
+    slash_on_failure: true
+    dispute_voting_threshold: 0.66
+
+- agent_id: "sincor.core.reputation_auditor"
+  role: "ReputationAuditorAgent"
+  category: "Security & Governance"
+  protocol_standards: ["BaseIndexer", "MCP"]
+  architecture: "Learning Agent"
+  capabilities:
+    - sla_telemetry_logging
+    - peer_rating_aggregation
+    - dynamic_trust_indexing
+    - slashing_recommendations
+  utility_function: "Minimize default rate and mitigate sybil collusion across the labor graph"
+  config:
+    decay_factor_alpha: 0.95
+    trust_score_floor: 0.10
+    slashing_penalty_base_pct: 25
