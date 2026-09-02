@@ -40,6 +40,7 @@ pip install "sincor-a2a @ git+https://github.com/OrderofChaos33/SINCOR2.git#subd
 ```
 
 TypeScript source: `sdk/typescript/sincor-a2a`.
+TypeScript quickstart: `sdk/typescript/sincor-a2a/README.md`.
 
 ## 1. Discover
 
@@ -118,3 +119,11 @@ python examples/a2a_external_caller.py --base https://YOUR_HOST --skill lead-gen
 ## Compliance
 
 Matches Google A2A v1.0.1 discovery + JSON-RPC methods used by SINCOR (`message/send`, `tasks/get`, …).
+
+## Adoption KPI (operator-facing)
+
+```bash
+curl -s https://getsincor.com/api/ops/a2a/adoption-kpi | jq .
+```
+
+North-star metric returned: `weekly_active_external_agents_settling_paid_axm_tasks`.

@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 from flask import Flask, jsonify, request
 
 from sincor2.contract_net import BASE_CHAIN_ID, probe_base_chain
+from sincor2.a2a_adoption_metrics import record_agent_registered
 from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_AGENTS,
@@ -67,6 +68,15 @@ def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
         snapshot = dict(agent)
     _save_agents(fabric)
     fabric.publish("agent.registered", snapshot["capability_tags"], {"agent_id": agent_id, "tags": snapshot["capability_tags"], "wallet": snapshot["wallet"]})
+    try:
+        record_agent_registered(
+            agent_id=agent_id,
+            wallet=snapshot.get("wallet", ""),
+            tags=list(snapshot.get("capability_tags") or []),
+            probation=bool(snapshot.get("probation")),
+        )
+    except Exception as exc:
+        logger.warning("[A2A] adoption metric register event failed: %s", exc)
     return snapshot
 
 

@@ -23,6 +23,29 @@ def _bind_mvp():
 _bind_mvp()
 
 
+@bp.route('/api/ops/a2a/adoption-kpi', methods=['GET'])
+def a2a_adoption_kpi():
+    """North-star A2A adoption metric + launch-surface contract snapshot."""
+    try:
+        from sincor2.a2a_adoption_metrics import launch_surface_contract, weekly_adoption_kpi
+    except Exception as exc:
+        return jsonify({'status': 'error', 'error': f'adoption_metrics_unavailable:{exc}'}), 503
+
+    window_days = request.args.get('window_days', '7')
+    try:
+        parsed_window = max(1, min(90, int(window_days)))
+    except (TypeError, ValueError):
+        parsed_window = 7
+
+    payload = {
+        'status': 'ok',
+        'a2a_adoption': weekly_adoption_kpi(window_days=parsed_window),
+        'launch_surface': launch_surface_contract(),
+        'timestamp': datetime.utcnow().isoformat(),
+    }
+    return jsonify(payload), 200
+
+
 @bp.route('/api/ops/schedulers', methods=['GET'])
 def ops_schedulers_status():
     """Overview of background schedulers and env gates."""
@@ -216,4 +239,3 @@ def outreach_run_now():
         return jsonify({'status': 'started', 'message': 'Outreach cycle triggered in background'}), 202
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-

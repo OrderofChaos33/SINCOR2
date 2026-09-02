@@ -34,6 +34,7 @@ SINCOR2 uses two primary authentication patterns:
 | POST | `/api/payment/paypal/create-order` | PayPal order creation |
 | POST | `/api/waitlist` | Waitlist registration |
 | POST | `/api/waitlist/join` | Alternate waitlist registration path |
+| GET | `/api/ops/a2a/adoption-kpi` | Weekly A2A adoption north-star metric + launch-surface contract snapshot |
 | GET | `/health` | Service health probe |
 | GET | `/api/monitoring/dashboard` | Dashboard metrics summary |
 
@@ -276,6 +277,15 @@ Returns service, environment, timestamp, and health status.
 
 ### `GET /api/monitoring/dashboard`
 Returns a small metrics summary describing payment and waitlist subsystem availability.
+
+### `GET /api/ops/a2a/adoption-kpi`
+Returns A2A adoption and monetization telemetry:
+
+- `weekly_active_external_agents` (north-star KPI)
+- `paid_a2a_tasks`
+- `paid_a2a_volume_axm`
+- `platform_fee_axm`
+- 24h treasury realized + A2A-settlement USD totals
 
 ## Standard error format
 

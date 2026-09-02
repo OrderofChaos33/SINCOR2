@@ -68,6 +68,7 @@ from sincor2.onchain.constants import (
 )
 from sincor2.schema_gate import compile_skill_schemas, validate_skill_input
 from sincor2 import treasury_inflow as _treasury_inflow
+from sincor2.a2a_adoption_metrics import record_paid_settlement
 from sincor2.treasury_settlement import record_platform_fee_inflow
 
 logger = logging.getLogger("sincor.a2a")
@@ -2227,6 +2228,19 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
             float(amount_display),
             tx_hash,
         )
+        if axm_paid > 0 and tx_hash and not simulated and not free_call:
+            try:
+                fee_axm = float(fee_amount) if fee_amount > 0 else 0.0
+                record_paid_settlement(
+                    task_id=task.id,
+                    caller_id=task.caller_id,
+                    skill_id=task.skill_id,
+                    tx_hash=tx_hash,
+                    axm_paid_wei=axm_paid,
+                    platform_fee_axm=fee_axm,
+                )
+            except Exception as metric_exc:
+                logger.warning("A2A adoption metric settlement event failed task=%s: %s", task.id, metric_exc)
     except Exception as exc:
         logger.warning("Settlement record failed for task %s: %s", task.id, exc)
 
