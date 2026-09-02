@@ -1,0 +1,16 @@
+agent_id: "sincor.core.auctioneer"
+  role: "AuctioneerAgent"
+  category: "Marketplace Orchestration"
+  protocol_standards: ["Contract-Net", "MCP", "ERC-7579"]
+  architecture: "Goal-Based Utility Model"
+  capabilities:
+    - task_decomposition
+    - rfp_generation
+    - bid_evaluation
+    - escrow_initialization
+  utility_function: "Minimize latency & cost while maximizing worker reputation score"
+  config:
+    bidding_window_ms: 5000
+    min_bidder_reputation: 0.85
+    required_collateral_pct: 10
+    timeout_strategy: "re_auction"
