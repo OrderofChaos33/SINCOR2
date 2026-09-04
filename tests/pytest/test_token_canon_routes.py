@@ -41,3 +41,19 @@ def test_token_canon_json_rejects_invalid_payload(client, monkeypatch):
 
     assert resp.status_code == 500
     assert resp.get_json()["error"] == "invalid token canon payload"
+
+
+def test_token_canon_json_not_found(client, monkeypatch):
+    monkeypatch.setenv("TOKEN_CANON_JSON_PATH", "TOKEN_CANON.json")
+    real_read_bytes = Path.read_bytes
+
+    def missing_read(self):
+        if self.name == "TOKEN_CANON.json":
+            raise FileNotFoundError
+        return real_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", missing_read)
+    resp = client.get("/token.json")
+
+    assert resp.status_code == 404
+    assert resp.get_json()["error"] == "not found"

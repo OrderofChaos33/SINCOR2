@@ -758,6 +758,8 @@ def token_canon_json():
         parsed_payload = json.loads(payload.decode('utf-8'))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return jsonify({'error': 'invalid token canon payload'}), 500
+    if not isinstance(parsed_payload, dict) or 'token' not in parsed_payload:
+        return jsonify({'error': 'invalid token canon payload'}), 500
     return jsonify(parsed_payload)
 
 
