@@ -723,11 +723,14 @@ def token_canon_page():
 @limiter.exempt if limiter else lambda f: f
 def token_canon_json():
     """Canonical token policy JSON payload."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
     configured = (os.getenv('TOKEN_CANON_JSON_PATH') or '').strip()
     if configured:
         path = Path(configured).expanduser().resolve()
+        if path.name != 'TOKEN_CANON.json':
+            return jsonify({'error': 'invalid token canon path'}), 500
     else:
-        path = Path(__file__).resolve().parent.parent.parent / 'TOKEN_CANON.json'
+        path = repo_root / 'TOKEN_CANON.json'
     if not path.is_file():
         return jsonify({'error': 'not found'}), 404
     return make_response(send_file(path, mimetype='application/json'))
