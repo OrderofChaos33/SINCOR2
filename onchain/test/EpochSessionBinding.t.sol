@@ -51,4 +51,14 @@ contract EpochSessionBindingTest is Test {
         assertEq(stake.stakeOf(agent), 40e18);
         assertEq(token.balanceOf(treasury), 10e18);
     }
+
+    function test_settleTask_revertsWhenAgentStakeBelowMinimum() external {
+        bytes32 epochId = keccak256("E2");
+        bytes32 root = keccak256("ROOT2");
+        validator.publishEpochRoot(epochId, root);
+
+        address unstakedAgent = address(0xB0B);
+        vm.expectRevert(MemoryBoundSettlement.AgentNotEligible.selector);
+        settlement.settleTask(keccak256("task-3"), unstakedAgent, 1e18, epochId, root);
+    }
 }

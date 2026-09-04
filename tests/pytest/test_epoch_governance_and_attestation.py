@@ -47,6 +47,7 @@ def test_epoch_manifest_and_attestation_pipeline():
     pipeline = EpochStateCommitmentPipeline(engine)
     env = pipeline.build_envelope({"task": "settle", "amount": 1})
     assert env.epoch_id == proof.epoch_id
+    assert env.node_signature.startswith("0x")
     assert pipeline.verify_envelope(env)
 
     with tempfile.TemporaryDirectory() as td:

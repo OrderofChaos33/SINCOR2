@@ -27,6 +27,7 @@ except Exception:  # pragma: no cover
     VectorRecord = None  # type: ignore[assignment]
 
 from .types import AgentProfile, TaskSpec
+from .compliance_filter import ComplianceAttestationFilter
 from .vectors import embed_tokens
 
 
@@ -52,11 +53,18 @@ class RoutedAgent:
 class TaskAuctionMemoryRouter:
     """Hard-pre-filter + hybrid rank for Contract-Net agent selection."""
 
-    def __init__(self, engine: Optional[ThreeTierVectorEngine] = None, *, bid_state_ttl_seconds: int = 300) -> None:
+    def __init__(
+        self,
+        engine: Optional[ThreeTierVectorEngine] = None,
+        *,
+        bid_state_ttl_seconds: int = 300,
+        compliance_filter: Optional[ComplianceAttestationFilter] = None,
+    ) -> None:
         if np is None or ThreeTierVectorEngine is None or QuerySpec is None or VectorRecord is None:
             raise RuntimeError("TaskAuctionMemoryRouter requires numpy and sinax.vector_retrieval_engine")
         self.engine = engine or ThreeTierVectorEngine(model_version="cn-v1", decay_lambda=2e-4, epsilon=0.01)
         self.bid_state_ttl_seconds = int(max(1, bid_state_ttl_seconds))
+        self.compliance_filter = compliance_filter or ComplianceAttestationFilter()
 
     # ------------------------------ Epoch lifecycle ------------------------------
 
@@ -147,9 +155,10 @@ class TaskAuctionMemoryRouter:
         active = self.ensure_epoch()
         bound_epoch = epoch_id or active.epoch_id
 
+        compliant_agents = self.compliance_filter.prefilter(task, agents)
         prequalified = {
             agent.agent_id: agent
-            for agent in agents
+            for agent in compliant_agents
             if self._agent_budget(agent) >= int(execution_budget)
             and _norm_token(required_schema) in self._agent_schemas(agent)
             and set(_norm_token(cap) for cap in runtime_capabilities).issubset({_norm_token(s) for s in agent.skills})

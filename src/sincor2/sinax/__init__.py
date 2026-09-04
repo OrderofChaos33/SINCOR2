@@ -201,6 +201,13 @@ from .production_telemetry import (
     collect_graph_entropy_telemetry,
     telemetry_dict,
 )
+from .self_healing import (
+    ActiveRoutingTable,
+    NodeHealthState,
+    SelfHealingCoordinator,
+    SelfHealingReport,
+)
+from .dispute_resolution import ConsensusDisputeResolver, DisputeOutcome, ValidatorVote
 
 __all__ = [
     # Config
@@ -318,4 +325,11 @@ __all__ = [
     "GraphEntropyTelemetry",
     "collect_graph_entropy_telemetry",
     "telemetry_dict",
+    "NodeHealthState",
+    "ActiveRoutingTable",
+    "SelfHealingReport",
+    "SelfHealingCoordinator",
+    "ValidatorVote",
+    "DisputeOutcome",
+    "ConsensusDisputeResolver",
 ]

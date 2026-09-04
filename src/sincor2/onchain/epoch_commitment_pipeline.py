@@ -17,26 +17,40 @@ class EpochCommitmentEnvelope:
     epoch_id: str
     epoch_merkle_root: str
     state_commitment: str
+    node_id: str
+    node_signature: str
 
 
 class EpochStateCommitmentPipeline:
     """Attaches active epoch commitments to task settlement/payout transitions."""
 
-    def __init__(self, engine: ThreeTierVectorEngine) -> None:
+    def __init__(self, engine: ThreeTierVectorEngine, *, node_id: str = "node-0", signing_key: str = "sincor-node-key") -> None:
         self.engine = engine
         self.validator = ERC7579EpochSessionValidator(engine.swap)
+        self.node_id = node_id
+        self.signing_key = signing_key
 
     def build_envelope(self, payload: Mapping[str, Any], *, epoch_id: Optional[str] = None) -> EpochCommitmentEnvelope:
         proof = self.validator.attest_payload(payload, epoch_id=epoch_id)
         if not proof.epoch_id:
-            return EpochCommitmentEnvelope(payload=dict(payload), epoch_id="", epoch_merkle_root="", state_commitment="")
+            return EpochCommitmentEnvelope(
+                payload=dict(payload),
+                epoch_id="",
+                epoch_merkle_root="",
+                state_commitment="",
+                node_id=self.node_id,
+                node_signature="",
+            )
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         digest = hashlib.sha256(f"{proof.epoch_id}|{proof.epoch_merkle_root}|{canonical}".encode("utf-8")).hexdigest()
+        state_commitment = "0x" + digest
         return EpochCommitmentEnvelope(
             payload=dict(payload),
             epoch_id=proof.epoch_id,
             epoch_merkle_root=proof.epoch_merkle_root,
-            state_commitment="0x" + digest,
+            state_commitment=state_commitment,
+            node_id=self.node_id,
+            node_signature=self._sign(state_commitment, proof.epoch_id, proof.epoch_merkle_root),
         )
 
     def verify_envelope(self, envelope: EpochCommitmentEnvelope) -> bool:
@@ -47,4 +61,10 @@ class EpochStateCommitmentPipeline:
             return False
         canonical = json.dumps(envelope.payload, sort_keys=True, separators=(",", ":"))
         expected = hashlib.sha256(f"{envelope.epoch_id}|{envelope.epoch_merkle_root}|{canonical}".encode("utf-8")).hexdigest()
-        return envelope.state_commitment == ("0x" + expected)
+        if envelope.state_commitment != ("0x" + expected):
+            return False
+        return envelope.node_signature == self._sign(envelope.state_commitment, envelope.epoch_id, envelope.epoch_merkle_root)
+
+    def _sign(self, state_commitment: str, epoch_id: str, epoch_root: str) -> str:
+        msg = f"{self.node_id}|{epoch_id}|{epoch_root}|{state_commitment}|{self.signing_key}"
+        return "0x" + hashlib.sha256(msg.encode("utf-8")).hexdigest()

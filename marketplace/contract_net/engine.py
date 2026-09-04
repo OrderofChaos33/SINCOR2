@@ -19,6 +19,7 @@ from .eip712 import (
     typed_data_payload,
     verify_digest,
 )
+from .compliance_filter import ComplianceAttestationFilter
 from .filter import filter_swarm
 from .keccak import keccak256
 from .types import (
@@ -54,11 +55,13 @@ class ContractNetEngine:
         self,
         config: Optional[ContractNetConfig] = None,
         memory_router: Optional[Any] = None,
+        compliance_filter: Optional[ComplianceAttestationFilter] = None,
     ) -> None:
         self.config = config or ContractNetConfig()
         self._history: List[AuctionRecord] = []
         self._nonces: Dict[str, int] = {}
         self.memory_router = memory_router
+        self.compliance_filter = compliance_filter or ComplianceAttestationFilter()
         self._epoch_id: str = ""
         self._epoch_merkle_root: str = EMPTY_EPOCH_ROOT
 
@@ -235,7 +238,7 @@ class ContractNetEngine:
         now = int(now if now is not None else time.time())
         auction_id = make_auction_id(task.task_id, salt=f"{seed}-{now}")
         shortlisted = self._prefilter_and_rank_agents(task, agents)
-        candidate_agents = shortlisted or list(agents)
+        candidate_agents = shortlisted or self._apply_compliance_prefilter(task, agents)
         filtered = filter_swarm(
             task, candidate_agents, self.config, rng=rng, force_junior=force_junior
         )
@@ -321,11 +324,12 @@ class ContractNetEngine:
         return award
 
     def _prefilter_and_rank_agents(self, task: TaskSpec, agents: Sequence[AgentProfile]) -> List[AgentProfile]:
-        if self.memory_router is None:
-            return list(agents)
-        if not agents:
+        compliant_agents = self._apply_compliance_prefilter(task, agents)
+        if not compliant_agents:
             return []
-        binding = self.memory_router.index_agents(agents)
+        if self.memory_router is None:
+            return list(compliant_agents)
+        binding = self.memory_router.index_agents(compliant_agents)
         if binding.epoch_id:
             self.set_epoch_binding(epoch_id=binding.epoch_id, merkle_root=binding.merkle_root)
         required_schema = (task.required_schema or "default").strip().lower()
@@ -333,7 +337,7 @@ class ContractNetEngine:
         exec_budget = int(task.execution_budget or task.budget_tokens or 0)
         routed = self.memory_router.route_agents(
             task,
-            agents,
+            compliant_agents,
             required_schema=required_schema,
             runtime_capabilities=runtime_caps,
             execution_budget=exec_budget,
@@ -341,8 +345,11 @@ class ContractNetEngine:
             epoch_id=self._epoch_id or None,
         )
         if not routed:
-            return list(agents)
+            return list(compliant_agents)
         return [row.agent for row in routed]
+
+    def _apply_compliance_prefilter(self, task: TaskSpec, agents: Sequence[AgentProfile]) -> List[AgentProfile]:
+        return list(self.compliance_filter.prefilter(task, list(agents)))
 
     def run_many(
         self,
@@ -394,6 +401,8 @@ def profiles_from_dicts(rows: Iterable[Dict]) -> List[AgentProfile]:
                 estimated_tokens=int(row.get("estimated_tokens") or row.get("estimated_cost_tokens") or 400),
                 supported_schemas=schemas or ("default",),
                 execution_budget=exec_budget,
+                region=str(row.get("region") or "global"),
+                zk_identity_proof=str(row.get("zk_identity_proof") or row.get("zk_proof") or ""),
                 is_junior=bool(row.get("is_junior", False)),
                 signing_secret=str(row.get("signing_secret") or demo_signing_secret(agent_id)),
                 private_key=str(row.get("private_key") or ""),
@@ -413,6 +422,11 @@ def task_from_dict(row: Dict) -> TaskSpec:
         runtime_caps = tuple(part.strip() for part in rc_raw.split(",") if part.strip())
     else:
         runtime_caps = tuple(str(item).strip() for item in rc_raw if str(item).strip())
+    allowed_regions_raw = row.get("allowed_regions") or row.get("regions") or ("global",)
+    if isinstance(allowed_regions_raw, str):
+        allowed_regions = tuple(part.strip() for part in allowed_regions_raw.split(",") if part.strip())
+    else:
+        allowed_regions = tuple(str(item).strip() for item in allowed_regions_raw if str(item).strip())
     return TaskSpec(
         task_id=str(row.get("task_id") or row.get("id") or "task"),
         goal=str(row.get("goal") or row.get("description") or ""),
@@ -424,4 +438,6 @@ def task_from_dict(row: Dict) -> TaskSpec:
         required_schema=str(row.get("required_schema") or row.get("schema") or "default"),
         runtime_capabilities=runtime_caps,
         execution_budget=int(row.get("execution_budget") or row.get("budget_tokens") or 0),
+        allowed_regions=allowed_regions or ("global",),
+        require_zk_identity=bool(row.get("require_zk_identity") or row.get("zk_required") or False),
     )

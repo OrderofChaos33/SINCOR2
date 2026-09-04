@@ -26,6 +26,7 @@ contract MemoryBoundSettlement is AccessControl {
 
     error InvalidConfig();
     error AlreadySettled();
+    error AgentNotEligible();
 
     constructor(address admin, EpochSessionKeyValidator validator_, AgentStakeSlash stakeSlash_, IERC20 payoutToken_) {
         if (admin == address(0) || address(validator_) == address(0) || address(stakeSlash_) == address(0) || address(payoutToken_) == address(0)) {
@@ -46,6 +47,7 @@ contract MemoryBoundSettlement is AccessControl {
         bytes32 epochRoot
     ) external onlyRole(SETTLER_ROLE) {
         if (settled[taskId]) revert AlreadySettled();
+        if (!stakeSlash.canParticipate(agent)) revert AgentNotEligible();
         validator.validateExecutionProof(epochId, epochRoot);
         settled[taskId] = true;
         payoutToken.safeTransfer(agent, amount);

@@ -1,6 +1,7 @@
 """Contract-Net task market: cosine invite, Vickrey sealed bids, ε-greedy juniors."""
 
 from .engine import ContractNetEngine, make_auction_id, profiles_from_dicts, task_from_dict
+from .compliance_filter import ComplianceAttestationFilter, ComplianceDecision
 from .filter import filter_swarm, score_agents
 from .keccak import keccak256, keccak256_hex
 from .roster import demo_roster, demo_tasks
@@ -28,6 +29,8 @@ __all__ = [
     "Award",
     "ContractNetConfig",
     "ContractNetEngine",
+    "ComplianceAttestationFilter",
+    "ComplianceDecision",
     "FilterResult",
     "Invite",
     "SealedBid",
