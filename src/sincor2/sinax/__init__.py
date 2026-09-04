@@ -154,6 +154,60 @@ from .homology_detector import HomologyDetector, HomologyReport, HomologyClass
 from .morse_filter import MorseFilter, MorseDecomposition, CriticalPoint
 from .axiom_solver import AxiomSolver, ProofResult
 from .ptn import ProofTopologyNavigator
+from .vector_retrieval_engine import (
+    AtomicSwapController,
+    EpochBuilder,
+    EpochSegment,
+    QueryRouter,
+    QuerySpec,
+    RankedResult,
+    SnapshotDeltaBuffer,
+    ThreeTierVectorEngine,
+    VectorRecord,
+    WarmCompactionWorker,
+    WarmSegment,
+)
+from .operational_validation import (
+    ValidationResult,
+    ValidationThresholds,
+    alignment_precision_test,
+    entropy_recall_decay_test,
+    run_all_validations,
+    swap_headroom_test,
+)
+from .swarm_protocol_lock import (
+    MEMORY_ENGINE_INTERFACE_LOCK_V1,
+    SwarmDeterminismReport,
+    assert_memory_engine_interface_lock,
+    memory_engine_interface_digest,
+    simulate_swarm_determinism,
+)
+from .node_package import NodePackageManifest, build_node_package_manifest
+from .memory_engine_contracts import (
+    CompactWarmSegment,
+    InsertSnapshotDelta,
+    MemoryContracts,
+    QueryPreFilter,
+    SwapColdEpoch,
+)
+from .epoch_attestation import (
+    ERC7579EpochSessionValidator,
+    ExecutionProof,
+    publish_epoch_manifest,
+)
+from .epoch_governor import AutomatedEpochGovernor, EpochGovernanceConfig
+from .production_telemetry import (
+    GraphEntropyTelemetry,
+    collect_graph_entropy_telemetry,
+    telemetry_dict,
+)
+from .self_healing import (
+    ActiveRoutingTable,
+    NodeHealthState,
+    SelfHealingCoordinator,
+    SelfHealingReport,
+)
+from .dispute_resolution import ConsensusDisputeResolver, DisputeOutcome, ValidatorVote
 
 __all__ = [
     # Config
@@ -231,4 +285,51 @@ __all__ = [
     "MorseFilter",
     "MorseDecomposition",
     "CriticalPoint",
+    # Three-tier vector retrieval
+    "VectorRecord",
+    "QuerySpec",
+    "RankedResult",
+    "SnapshotDeltaBuffer",
+    "WarmSegment",
+    "WarmCompactionWorker",
+    "EpochSegment",
+    "EpochBuilder",
+    "AtomicSwapController",
+    "QueryRouter",
+    "ThreeTierVectorEngine",
+    # Operational validation
+    "ValidationThresholds",
+    "ValidationResult",
+    "swap_headroom_test",
+    "entropy_recall_decay_test",
+    "alignment_precision_test",
+    "run_all_validations",
+    # Swarm + protocol lock
+    "SwarmDeterminismReport",
+    "simulate_swarm_determinism",
+    "memory_engine_interface_digest",
+    "MEMORY_ENGINE_INTERFACE_LOCK_V1",
+    "assert_memory_engine_interface_lock",
+    "NodePackageManifest",
+    "build_node_package_manifest",
+    "QueryPreFilter",
+    "InsertSnapshotDelta",
+    "CompactWarmSegment",
+    "SwapColdEpoch",
+    "MemoryContracts",
+    "ExecutionProof",
+    "ERC7579EpochSessionValidator",
+    "publish_epoch_manifest",
+    "EpochGovernanceConfig",
+    "AutomatedEpochGovernor",
+    "GraphEntropyTelemetry",
+    "collect_graph_entropy_telemetry",
+    "telemetry_dict",
+    "NodeHealthState",
+    "ActiveRoutingTable",
+    "SelfHealingReport",
+    "SelfHealingCoordinator",
+    "ValidatorVote",
+    "DisputeOutcome",
+    "ConsensusDisputeResolver",
 ]

@@ -28,6 +28,7 @@ from .constants import (
     resolve_address,
 )
 from .probe import TokenProbe, TokenProbeReport, validate_at_startup
+from .epoch_commitment_pipeline import EpochCommitmentEnvelope, EpochStateCommitmentPipeline
 
 __all__ = [
     "AXIOM_TOKEN",
@@ -54,4 +55,6 @@ __all__ = [
     "is_stale",
     "resolve_address",
     "validate_at_startup",
+    "EpochCommitmentEnvelope",
+    "EpochStateCommitmentPipeline",
 ]

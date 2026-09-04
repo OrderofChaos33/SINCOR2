@@ -87,6 +87,10 @@ class AgentProfile:
     estimated_tokens: int = 400
     is_junior: bool = False
     spawned_at: str = ""
+    supported_schemas: Tuple[str, ...] = ("default",)
+    execution_budget: int = 0
+    region: str = "global"
+    zk_identity_proof: str = ""
     signing_secret: str = ""  # hex; HMAC path / deterministic demo key
     private_key: str = ""  # hex secp256k1; optional
 
@@ -103,6 +107,11 @@ class TaskSpec:
     max_price: int
     created_at: int = 0
     payer: str = DEFAULT_VERIFYING_CONTRACT
+    required_schema: str = "default"
+    runtime_capabilities: Tuple[str, ...] = ()
+    execution_budget: int = 0
+    allowed_regions: Tuple[str, ...] = ("global",)
+    require_zk_identity: bool = False
 
     def requirement_tokens(self) -> Tuple[str, ...]:
         tokens = [token.lower() for token in self.requirements if token]
@@ -152,6 +161,9 @@ class SealedBid:
     sig_type: str
     typed_data: Dict[str, Any] = field(default_factory=dict)
     submitted_at: int = 0
+    epoch_id: str = ""
+    epoch_merkle_root: str = ""
+    epoch_binding_hash: str = ""
     valid: bool = True
     reject_reason: str = ""
 
@@ -174,6 +186,8 @@ class Award:
     tokens_saved: int
     valid_bid_count: int
     rejected_bid_count: int
+    epoch_id: str = ""
+    epoch_merkle_root: str = ""
     phase: str = AuctionPhase.CLEARED.value
     error: str = ""
 
