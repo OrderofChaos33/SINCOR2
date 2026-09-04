@@ -183,6 +183,24 @@ from .swarm_protocol_lock import (
     simulate_swarm_determinism,
 )
 from .node_package import NodePackageManifest, build_node_package_manifest
+from .memory_engine_contracts import (
+    CompactWarmSegment,
+    InsertSnapshotDelta,
+    MemoryContracts,
+    QueryPreFilter,
+    SwapColdEpoch,
+)
+from .epoch_attestation import (
+    ERC7579EpochSessionValidator,
+    ExecutionProof,
+    publish_epoch_manifest,
+)
+from .epoch_governor import AutomatedEpochGovernor, EpochGovernanceConfig
+from .production_telemetry import (
+    GraphEntropyTelemetry,
+    collect_graph_entropy_telemetry,
+    telemetry_dict,
+)
 
 __all__ = [
     # Config
@@ -287,4 +305,17 @@ __all__ = [
     "assert_memory_engine_interface_lock",
     "NodePackageManifest",
     "build_node_package_manifest",
+    "QueryPreFilter",
+    "InsertSnapshotDelta",
+    "CompactWarmSegment",
+    "SwapColdEpoch",
+    "MemoryContracts",
+    "ExecutionProof",
+    "ERC7579EpochSessionValidator",
+    "publish_epoch_manifest",
+    "EpochGovernanceConfig",
+    "AutomatedEpochGovernor",
+    "GraphEntropyTelemetry",
+    "collect_graph_entropy_telemetry",
+    "telemetry_dict",
 ]

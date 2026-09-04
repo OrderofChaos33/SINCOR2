@@ -103,15 +103,23 @@ class SnapshotDeltaBuffer:
         self._delta: Dict[str, VectorRecord] = {}
         self._tombstones: Set[str] = set()
         self._rewire_one_hop: Dict[str, Set[str]] = defaultdict(set)
+        self._write_ops = 0
+        self._tombstone_ops = 0
+        self._write_latency_ns = 0
+        self._tombstone_latency_ns = 0
 
     def upsert(self, rec: VectorRecord) -> None:
+        start_ns = time.perf_counter_ns()
         with self._lock:
             while self._writes_paused:
                 self._write_gate.wait(timeout=0.001)
             self._delta[rec.node_id] = rec
             self._tombstones.discard(rec.node_id)
+            self._write_ops += 1
+            self._write_latency_ns += time.perf_counter_ns() - start_ns
 
     def tombstone(self, node_id: str, rewire_targets: Optional[Iterable[str]] = None) -> None:
+        start_ns = time.perf_counter_ns()
         with self._lock:
             while self._writes_paused:
                 self._write_gate.wait(timeout=0.001)
@@ -119,6 +127,8 @@ class SnapshotDeltaBuffer:
             self._tombstones.add(node_id)
             if rewire_targets:
                 self._rewire_one_hop[node_id].update(set(rewire_targets))
+            self._tombstone_ops += 1
+            self._tombstone_latency_ns += time.perf_counter_ns() - start_ns
 
     def pause_writes(self) -> None:
         with self._lock:
@@ -142,6 +152,19 @@ class SnapshotDeltaBuffer:
     def read_delta(self) -> Tuple[Dict[str, VectorRecord], Set[str]]:
         with self._lock:
             return dict(self._delta), set(self._tombstones)
+
+    def metrics(self) -> Dict[str, float]:
+        with self._lock:
+            avg_write_ms = (self._write_latency_ns / max(1, self._write_ops)) / 1e6
+            avg_tombstone_ms = (self._tombstone_latency_ns / max(1, self._tombstone_ops)) / 1e6
+            return {
+                "delta_count": float(len(self._delta)),
+                "tombstone_count": float(len(self._tombstones)),
+                "write_ops": float(self._write_ops),
+                "tombstone_ops": float(self._tombstone_ops),
+                "avg_write_latency_ms": float(avg_write_ms),
+                "avg_tombstone_latency_ms": float(avg_tombstone_ms),
+            }
 
 
 @dataclass(frozen=True)
@@ -670,6 +693,31 @@ class ThreeTierVectorEngine:
 
     def query(self, spec: QuerySpec) -> List[RankedResult]:
         return self.router.route(spec)
+
+    def telemetry_snapshot(self) -> Dict[str, float]:
+        active = self.swap.active_epoch()
+        active_nodes = len(active.records) if active is not None else 0
+        delta_records, tombstones = self.delta.read_delta()
+        active_total = max(1, active_nodes + len(delta_records))
+        tombstone_density = len(tombstones) / active_total
+        memory_headroom = 1.0
+        if active is not None:
+            base_bytes = max(1, self.swap._estimate_bytes(active))  # noqa: SLF001
+            staged = self.swap._staged_epoch  # noqa: SLF001
+            staged_bytes = self.swap._estimate_bytes(staged) if staged is not None else 0  # noqa: SLF001
+            memory_headroom = (base_bytes + staged_bytes) / base_bytes
+        m = self.delta.metrics()
+        m.update(
+            {
+                "active_nodes": float(active_nodes),
+                "tombstone_density": float(tombstone_density),
+                "memory_headroom_factor": float(memory_headroom),
+                "last_swap_pause_ms": float(self.swap.last_pause_ms),
+                "total_swap_pause_ms": float(self.swap.total_pause_ms),
+                "swap_events": float(self.swap.pause_events),
+            }
+        )
+        return m
 
     # Frozen contract aliases
     def QueryPreFilter(self, spec: QuerySpec) -> List[RankedResult]:  # noqa: N802

@@ -93,6 +93,7 @@ class TaskAuctionMemoryRouter:
                             "agent_id": agent.agent_id,
                             "schema": schema,
                             "budget": str(budget),
+                            "budget_bucket": self._budget_bucket(budget),
                         },
                         capabilities=capabilities,
                         created_at=now,
@@ -158,6 +159,7 @@ class TaskAuctionMemoryRouter:
 
         query_tokens = tuple(_norm_token(token) for token in task.requirement_tokens()) or (task.task_id,)
         query_vector = np.array(embed_tokens(query_tokens), dtype=np.float64)
+        allowed_budget_buckets = self._allowed_budget_buckets(agents, int(execution_budget))
 
         ranked = self.engine.query(
             QuerySpec(
@@ -166,6 +168,7 @@ class TaskAuctionMemoryRouter:
                 required_attributes={
                     "entity": "agent",
                     "schema": _norm_token(required_schema),
+                    "budget_bucket": allowed_budget_buckets,
                 },
                 required_capabilities={_norm_token(cap) for cap in runtime_capabilities},
                 k=max(top_k * 3, top_k),
@@ -232,3 +235,15 @@ class TaskAuctionMemoryRouter:
         if budget > 0:
             return int(budget)
         return int(max(1, getattr(agent, "estimated_tokens", 1)))
+
+    def _budget_bucket(self, budget: int) -> str:
+        unit = 250
+        bucket = int(max(0, budget) // unit)
+        return f"b{bucket}"
+
+    def _allowed_budget_buckets(self, agents: Sequence[AgentProfile], minimum_budget: int) -> List[str]:
+        max_budget = max([self._agent_budget(a) for a in agents] + [minimum_budget])
+        unit = 250
+        start = int(max(0, minimum_budget) // unit)
+        end = int(max_budget // unit)
+        return [f"b{i}" for i in range(start, end + 1)]
