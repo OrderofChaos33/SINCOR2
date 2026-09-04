@@ -727,12 +727,7 @@ def token_canon_json():
     repo_root = Path(__file__).resolve().parent.parent.parent
     configured = (os.getenv('TOKEN_CANON_JSON_PATH') or '').strip()
     if configured:
-        base_raw = Path(
-            (os.getenv('TOKEN_CANON_JSON_BASE_DIR') or str(repo_root)).strip()
-        ).expanduser()
-        if base_raw.is_symlink():
-            return jsonify({'error': 'invalid token canon path'}), 500
-        allowed_base = base_raw.resolve()
+        allowed_base = repo_root.resolve()
         raw_path = Path(configured).expanduser()
         candidate = raw_path if raw_path.is_absolute() else (allowed_base / raw_path)
         candidate = Path(os.path.abspath(str(candidate)))
