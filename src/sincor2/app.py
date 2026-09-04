@@ -7,6 +7,7 @@ ADDED: Rate Limiting for DDoS protection
 """
 
 import os
+import json
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file, make_response
@@ -735,8 +736,9 @@ def token_canon_json():
         raw_path = Path(configured).expanduser()
         candidate = raw_path if raw_path.is_absolute() else (allowed_base / raw_path)
         candidate = Path(os.path.abspath(str(candidate)))
+        candidate_resolved = candidate.resolve()
         try:
-            candidate.relative_to(allowed_base)
+            candidate_resolved.relative_to(allowed_base)
         except ValueError:
             return jsonify({'error': 'invalid token canon path'}), 500
         check = candidate
@@ -748,7 +750,7 @@ def token_canon_json():
             check = check.parent
         if candidate.suffix.lower() != '.json' or candidate.name != 'TOKEN_CANON.json':
             return jsonify({'error': 'invalid token canon path'}), 500
-        path = candidate
+        path = candidate_resolved
     else:
         path = repo_root / 'TOKEN_CANON.json'
     try:
@@ -757,6 +759,10 @@ def token_canon_json():
         return jsonify({'error': 'not found'}), 404
     except OSError:
         return jsonify({'error': 'not found'}), 404
+    try:
+        json.loads(payload.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return jsonify({'error': 'invalid token canon payload'}), 500
     resp = make_response(payload)
     resp.mimetype = 'application/json'
     return resp
