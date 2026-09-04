@@ -727,8 +727,15 @@ def token_canon_json():
     configured = (os.getenv('TOKEN_CANON_JSON_PATH') or '').strip()
     if configured:
         path = Path(configured).expanduser().resolve()
-        if path.name != 'TOKEN_CANON.json':
-            return jsonify({'error': 'invalid token canon path'}), 500
+        allowed_base = Path(
+            (os.getenv('TOKEN_CANON_JSON_BASE_DIR') or str(repo_root)).strip()
+        ).expanduser().resolve()
+        try:
+            path.relative_to(allowed_base)
+        except ValueError:
+            return jsonify(
+                {'error': 'invalid token canon path: must be under TOKEN_CANON_JSON_BASE_DIR'}
+            ), 500
     else:
         path = repo_root / 'TOKEN_CANON.json'
     if not path.is_file():
