@@ -726,23 +726,24 @@ def token_canon_json():
     repo_root = Path(__file__).resolve().parent.parent.parent
     configured = (os.getenv('TOKEN_CANON_JSON_PATH') or '').strip()
     if configured:
-        raw_path = Path(configured).expanduser()
-        path = raw_path.resolve()
         allowed_base = Path(
             (os.getenv('TOKEN_CANON_JSON_BASE_DIR') or str(repo_root)).strip()
         ).expanduser().resolve()
+        raw_path = Path(configured).expanduser()
+        candidate = raw_path if raw_path.is_absolute() else (allowed_base / raw_path)
+        candidate = Path(os.path.abspath(str(candidate)))
         try:
-            path.relative_to(allowed_base)
+            candidate.relative_to(allowed_base)
         except ValueError:
-            return jsonify(
-                {'error': 'invalid token canon path: must be under TOKEN_CANON_JSON_BASE_DIR'}
-            ), 500
-        if path.suffix.lower() != '.json':
-            return jsonify({'error': 'invalid token canon path: must point to a .json file'}), 500
-        if path.name != 'TOKEN_CANON.json':
-            return jsonify(
-                {'error': 'invalid token canon path: filename must be TOKEN_CANON.json'}
-            ), 500
+            return jsonify({'error': 'invalid token canon path'}), 500
+        check = candidate
+        while check != allowed_base:
+            if check.is_symlink():
+                return jsonify({'error': 'invalid token canon path'}), 500
+            check = check.parent
+        if candidate.suffix.lower() != '.json' or candidate.name != 'TOKEN_CANON.json':
+            return jsonify({'error': 'invalid token canon path'}), 500
+        path = candidate
     else:
         path = repo_root / 'TOKEN_CANON.json'
     if not path.is_file():
