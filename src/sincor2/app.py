@@ -730,9 +730,7 @@ def token_canon_json():
         path = Path(__file__).resolve().parent.parent.parent / 'TOKEN_CANON.json'
     if not path.is_file():
         return jsonify({'error': 'not found'}), 404
-    resp = make_response(send_file(path, mimetype='application/json'))
-    resp.headers['Access-Control-Allow-Origin'] = '*'
-    return resp
+    return make_response(send_file(path, mimetype='application/json'))
 
 
 @app.route('/refer')
