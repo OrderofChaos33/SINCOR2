@@ -8,9 +8,10 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from .eip712 import (
+    EMPTY_EPOCH_ROOT,
     demo_signing_secret,
     sign_digest,
     to_hex,
@@ -49,10 +50,21 @@ class AuctionRecord:
 class ContractNetEngine:
     """In-process sealed-bid market. Thread-hostile on purpose — one process loop."""
 
-    def __init__(self, config: Optional[ContractNetConfig] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[ContractNetConfig] = None,
+        memory_router: Optional[Any] = None,
+    ) -> None:
         self.config = config or ContractNetConfig()
         self._history: List[AuctionRecord] = []
         self._nonces: Dict[str, int] = {}
+        self.memory_router = memory_router
+        self._epoch_id: str = ""
+        self._epoch_merkle_root: str = EMPTY_EPOCH_ROOT
+
+    def set_epoch_binding(self, *, epoch_id: str, merkle_root: str) -> None:
+        self._epoch_id = str(epoch_id or "")
+        self._epoch_merkle_root = str(merkle_root or EMPTY_EPOCH_ROOT)
 
     def next_nonce(self, agent_id: str) -> int:
         value = self._nonces.get(agent_id, 0) + 1
@@ -95,6 +107,9 @@ class ContractNetEngine:
         agent: AgentProfile,
         now: Optional[int] = None,
         price: Optional[int] = None,
+        epoch_id: str = "",
+        epoch_merkle_root: str = EMPTY_EPOCH_ROOT,
+        epoch_binding_hash: str = "",
     ) -> SealedBid:
         now = int(now if now is not None else time.time())
         nonce = self.next_nonce(agent.agent_id)
@@ -109,6 +124,8 @@ class ContractNetEngine:
             estimated_tokens=agent.estimated_tokens,
             nonce=nonce,
             deadline=deadline,
+            epoch_id=epoch_id,
+            epoch_root=epoch_merkle_root,
         )
         secret = agent.signing_secret or demo_signing_secret(agent.agent_id)
         signature, sig_type = sign_digest(
@@ -135,8 +152,13 @@ class ContractNetEngine:
                 estimated_tokens=agent.estimated_tokens,
                 nonce=nonce,
                 deadline=deadline,
+                epoch_id=epoch_id,
+                epoch_root=epoch_merkle_root,
             ),
             submitted_at=now,
+            epoch_id=epoch_id,
+            epoch_merkle_root=epoch_merkle_root,
+            epoch_binding_hash=epoch_binding_hash,
         )
         self._validate_bid(bid, task, agent, now=now, signing_secret=secret)
         return bid
@@ -175,6 +197,8 @@ class ContractNetEngine:
             estimated_tokens=bid.estimated_tokens,
             nonce=bid.nonce,
             deadline=bid.deadline,
+            epoch_id=bid.epoch_id,
+            epoch_root=bid.epoch_merkle_root or EMPTY_EPOCH_ROOT,
         )
         if digest != expected:
             bid.valid = False
@@ -210,16 +234,35 @@ class ContractNetEngine:
         rng = random.Random(seed)
         now = int(now if now is not None else time.time())
         auction_id = make_auction_id(task.task_id, salt=f"{seed}-{now}")
+        shortlisted = self._prefilter_and_rank_agents(task, agents)
+        candidate_agents = shortlisted or list(agents)
         filtered = filter_swarm(
-            task, agents, self.config, rng=rng, force_junior=force_junior
+            task, candidate_agents, self.config, rng=rng, force_junior=force_junior
         )
         by_id = {agent.agent_id: agent for agent in agents}
+        epoch_id = self._epoch_id
+        epoch_merkle_root = self._epoch_merkle_root
         bids: List[SealedBid] = []
         shade = shade or {}
         for invite in filtered.invited:
             agent = by_id[invite.agent_id]
             multiplier = float(shade.get(agent.agent_id, 1.0))
             price = int(round(agent.true_min_price * multiplier))
+            epoch_binding_hash = ""
+            if self.memory_router is not None:
+                payload = self.memory_router.bind_execution_payload(
+                    {
+                        "auction_id": auction_id,
+                        "task_id": task.task_id,
+                        "agent_id": agent.agent_id,
+                        "price": price,
+                    },
+                    epoch_id=epoch_id or None,
+                )
+                if payload.get("epoch_id"):
+                    epoch_id = payload["epoch_id"]
+                    epoch_merkle_root = payload["epoch_merkle_root"]
+                    epoch_binding_hash = payload["epoch_binding_hash"]
             bids.append(
                 self.draft_bid(
                     auction_id=auction_id,
@@ -227,8 +270,19 @@ class ContractNetEngine:
                     agent=agent,
                     now=now,
                     price=price,
+                    epoch_id=epoch_id,
+                    epoch_merkle_root=epoch_merkle_root,
+                    epoch_binding_hash=epoch_binding_hash,
                 )
             )
+            if self.memory_router is not None:
+                self.memory_router.ingest_bid_state(
+                    bid_id=bids[-1].digest,
+                    task_id=task.task_id,
+                    agent=agent,
+                    state="submitted",
+                    confidence=max(0.01, invite.cosine),
+                )
         award = clear_vickrey(
             auction_id=auction_id,
             task_id=task.task_id,
@@ -240,6 +294,21 @@ class ContractNetEngine:
         )
         if award.phase == AuctionPhase.FAILED.value:
             award.phase = AuctionPhase.FAILED.value
+        award.epoch_id = epoch_id
+        award.epoch_merkle_root = epoch_merkle_root
+
+        if self.memory_router is not None:
+            winning = {award.winner_id} if award.winner_id else set()
+            for bid in bids:
+                state = "awarded" if bid.agent_id in winning and bid.valid else ("rejected" if not bid.valid else "opened")
+                self.memory_router.ingest_bid_state(
+                    bid_id=bid.digest,
+                    task_id=task.task_id,
+                    agent=by_id.get(bid.agent_id, AgentProfile(agent_id=bid.agent_id, name=bid.agent_id, skills=(), wallet=bid.agent_wallet)),
+                    state=state,
+                    confidence=1.0 if state == "awarded" else 0.2,
+                )
+            self.memory_router.engine.compact_warm()
         self._history.append(
             AuctionRecord(
                 auction_id=auction_id,
@@ -250,6 +319,30 @@ class ContractNetEngine:
             )
         )
         return award
+
+    def _prefilter_and_rank_agents(self, task: TaskSpec, agents: Sequence[AgentProfile]) -> List[AgentProfile]:
+        if self.memory_router is None:
+            return list(agents)
+        if not agents:
+            return []
+        binding = self.memory_router.index_agents(agents)
+        if binding.epoch_id:
+            self.set_epoch_binding(epoch_id=binding.epoch_id, merkle_root=binding.merkle_root)
+        required_schema = (task.required_schema or "default").strip().lower()
+        runtime_caps = task.runtime_capabilities or task.requirements
+        exec_budget = int(task.execution_budget or task.budget_tokens or 0)
+        routed = self.memory_router.route_agents(
+            task,
+            agents,
+            required_schema=required_schema,
+            runtime_capabilities=runtime_caps,
+            execution_budget=exec_budget,
+            top_k=max(self.config.invite_k_max, self.config.invite_k * 2),
+            epoch_id=self._epoch_id or None,
+        )
+        if not routed:
+            return list(agents)
+        return [row.agent for row in routed]
 
     def run_many(
         self,
@@ -283,6 +376,12 @@ def profiles_from_dicts(rows: Iterable[Dict]) -> List[AgentProfile]:
             from .eip712 import demo_wallet
 
             wallet = demo_wallet(agent_id)
+        schemas_raw = row.get("supported_schemas") or row.get("schemas") or ("default",)
+        if isinstance(schemas_raw, str):
+            schemas = tuple(part.strip() for part in schemas_raw.split(",") if part.strip())
+        else:
+            schemas = tuple(str(item).strip() for item in schemas_raw if str(item).strip())
+        exec_budget = int(row.get("execution_budget") or 0)
         agents.append(
             AgentProfile(
                 agent_id=agent_id,
@@ -293,6 +392,8 @@ def profiles_from_dicts(rows: Iterable[Dict]) -> List[AgentProfile]:
                 success_rate=float(row.get("success_rate") or 0.5),
                 true_min_price=int(row.get("true_min_price") or row.get("price") or 1_000_000),
                 estimated_tokens=int(row.get("estimated_tokens") or row.get("estimated_cost_tokens") or 400),
+                supported_schemas=schemas or ("default",),
+                execution_budget=exec_budget,
                 is_junior=bool(row.get("is_junior", False)),
                 signing_secret=str(row.get("signing_secret") or demo_signing_secret(agent_id)),
                 private_key=str(row.get("private_key") or ""),
@@ -307,6 +408,11 @@ def task_from_dict(row: Dict) -> TaskSpec:
         requirements = tuple(part.strip() for part in req.split(",") if part.strip())
     else:
         requirements = tuple(str(item) for item in req)
+    rc_raw = row.get("runtime_capabilities") or row.get("required_capabilities") or ()
+    if isinstance(rc_raw, str):
+        runtime_caps = tuple(part.strip() for part in rc_raw.split(",") if part.strip())
+    else:
+        runtime_caps = tuple(str(item).strip() for item in rc_raw if str(item).strip())
     return TaskSpec(
         task_id=str(row.get("task_id") or row.get("id") or "task"),
         goal=str(row.get("goal") or row.get("description") or ""),
@@ -315,4 +421,7 @@ def task_from_dict(row: Dict) -> TaskSpec:
         max_price=int(row.get("max_price") or 2_000_000),
         created_at=int(row.get("created_at") or 0),
         payer=str(row.get("payer") or TaskSpec.__dataclass_fields__["payer"].default),
+        required_schema=str(row.get("required_schema") or row.get("schema") or "default"),
+        runtime_capabilities=runtime_caps,
+        execution_budget=int(row.get("execution_budget") or row.get("budget_tokens") or 0),
     )

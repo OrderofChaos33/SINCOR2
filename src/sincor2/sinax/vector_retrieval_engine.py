@@ -16,7 +16,7 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 
@@ -72,7 +72,7 @@ class VectorRecord:
 class QuerySpec:
     query_vector: np.ndarray
     query_text: str
-    required_attributes: Mapping[str, str] = field(default_factory=dict)
+    required_attributes: Mapping[str, Union[str, Sequence[str]]] = field(default_factory=dict)
     required_capabilities: Set[str] = field(default_factory=set)
     k: int = 10
     epoch_id: Optional[str] = None
@@ -336,6 +336,7 @@ class AtomicSwapController:
 
         self._active_epoch: Optional[EpochSegment] = None
         self._staged_epoch: Optional[EpochSegment] = None
+        self._epochs_by_id: Dict[str, EpochSegment] = {}
 
     def stage_shadow_epoch(self, epoch: EpochSegment) -> None:
         with self._lock:
@@ -372,6 +373,7 @@ class AtomicSwapController:
                     parent_epoch=self._active_epoch.epoch_id if self._active_epoch else None,
                 )
                 self._active_epoch = next_epoch
+                self._epochs_by_id[next_epoch.epoch_id] = next_epoch
                 self._staged_epoch = None
 
                 while self._active_readers > 0:
@@ -391,11 +393,11 @@ class AtomicSwapController:
 
     def get_epoch(self, epoch_id: Optional[str]) -> Optional[EpochSegment]:
         with self._lock:
+            if epoch_id:
+                return self._epochs_by_id.get(epoch_id)
             if self._active_epoch is None:
                 return None
-            if epoch_id is None or self._active_epoch.epoch_id == epoch_id:
-                return self._active_epoch
-            return None
+            return self._active_epoch
 
     def begin_read(self) -> None:
         with self._lock:
@@ -441,7 +443,7 @@ class QueryRouter:
     def _prefilter(
         self,
         epoch: EpochSegment,
-        attrs: Mapping[str, str],
+        attrs: Mapping[str, Union[str, Sequence[str]]],
         caps: Set[str],
     ) -> Set[str]:
         universe = set(epoch.records.keys())
@@ -450,7 +452,13 @@ class QueryRouter:
             key_map = epoch.attr_bitmap.get(key)
             if not key_map:
                 return set()
-            attr_ids = key_map.get(val)
+            if isinstance(val, str):
+                vals = [val]
+            else:
+                vals = [str(v) for v in val]
+            attr_ids: Set[str] = set()
+            for vv in vals:
+                attr_ids |= key_map.get(vv, set())
             if not attr_ids:
                 return set()
             universe &= attr_ids

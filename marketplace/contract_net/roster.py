@@ -22,6 +22,7 @@ def _agent(
     axm: float,
     estimated_tokens: int,
     is_junior: bool = False,
+    supported_schemas: tuple[str, ...] = ("default", "a2a-v1"),
 ) -> AgentProfile:
     return AgentProfile(
         agent_id=agent_id,
@@ -32,6 +33,8 @@ def _agent(
         success_rate=success_rate,
         true_min_price=int(round(axm * MICRO_AXM)),
         estimated_tokens=estimated_tokens,
+        execution_budget=estimated_tokens * 2,
+        supported_schemas=supported_schemas,
         is_junior=is_junior or tasks_completed < 3,
         signing_secret=demo_signing_secret(agent_id),
     )
@@ -173,6 +176,9 @@ def demo_tasks() -> List[TaskSpec]:
             requirements=("research", "scrape", "analyze"),
             budget_tokens=1800,
             max_price=2_000_000,
+            required_schema="a2a-v1",
+            runtime_capabilities=("research", "scrape"),
+            execution_budget=1200,
         ),
         TaskSpec(
             task_id="cn-ship-webhook",
@@ -180,6 +186,9 @@ def demo_tasks() -> List[TaskSpec]:
             requirements=("develop", "test", "deploy"),
             budget_tokens=2400,
             max_price=2_200_000,
+            required_schema="a2a-v1",
+            runtime_capabilities=("develop", "test"),
+            execution_budget=1800,
         ),
         TaskSpec(
             task_id="cn-outreach-sequence",
@@ -187,6 +196,9 @@ def demo_tasks() -> List[TaskSpec]:
             requirements=("outreach", "persuade", "present"),
             budget_tokens=1200,
             max_price=1_800_000,
+            required_schema="default",
+            runtime_capabilities=("outreach", "present"),
+            execution_budget=900,
         ),
         TaskSpec(
             task_id="cn-memory-backup",
@@ -194,6 +206,9 @@ def demo_tasks() -> List[TaskSpec]:
             requirements=("backup", "label", "maintain"),
             budget_tokens=900,
             max_price=1_200_000,
+            required_schema="default",
+            runtime_capabilities=("backup", "maintain"),
+            execution_budget=500,
         ),
         TaskSpec(
             task_id="cn-eip712-certify",
@@ -201,6 +216,9 @@ def demo_tasks() -> List[TaskSpec]:
             requirements=("evaluate", "verify", "certify"),
             budget_tokens=1100,
             max_price=1_600_000,
+            required_schema="a2a-v1",
+            runtime_capabilities=("verify", "certify"),
+            execution_budget=700,
         ),
         TaskSpec(
             task_id="cn-route-plan",
@@ -208,6 +226,9 @@ def demo_tasks() -> List[TaskSpec]:
             requirements=("prioritize", "allocate", "coordinate"),
             budget_tokens=800,
             max_price=2_000_000,
+            required_schema="default",
+            runtime_capabilities=("allocate", "coordinate"),
+            execution_budget=450,
         ),
     ]
 

@@ -167,6 +167,22 @@ from .vector_retrieval_engine import (
     WarmCompactionWorker,
     WarmSegment,
 )
+from .operational_validation import (
+    ValidationResult,
+    ValidationThresholds,
+    alignment_precision_test,
+    entropy_recall_decay_test,
+    run_all_validations,
+    swap_headroom_test,
+)
+from .swarm_protocol_lock import (
+    MEMORY_ENGINE_INTERFACE_LOCK_V1,
+    SwarmDeterminismReport,
+    assert_memory_engine_interface_lock,
+    memory_engine_interface_digest,
+    simulate_swarm_determinism,
+)
+from .node_package import NodePackageManifest, build_node_package_manifest
 
 __all__ = [
     # Config
@@ -256,4 +272,19 @@ __all__ = [
     "AtomicSwapController",
     "QueryRouter",
     "ThreeTierVectorEngine",
+    # Operational validation
+    "ValidationThresholds",
+    "ValidationResult",
+    "swap_headroom_test",
+    "entropy_recall_decay_test",
+    "alignment_precision_test",
+    "run_all_validations",
+    # Swarm + protocol lock
+    "SwarmDeterminismReport",
+    "simulate_swarm_determinism",
+    "memory_engine_interface_digest",
+    "MEMORY_ENGINE_INTERFACE_LOCK_V1",
+    "assert_memory_engine_interface_lock",
+    "NodePackageManifest",
+    "build_node_package_manifest",
 ]

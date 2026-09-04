@@ -24,8 +24,10 @@ EIP712_DOMAIN_TYPE = (
 )
 BID_TYPE = (
     "Bid(bytes32 auctionId,string taskId,address agent,"
-    "uint256 price,uint256 estimatedTokens,uint256 nonce,uint256 deadline)"
+    "uint256 price,uint256 estimatedTokens,uint256 nonce,uint256 deadline,"
+    "string epochId,bytes32 epochRoot)"
 )
+EMPTY_EPOCH_ROOT = "0x" + "00" * 32
 
 EIP712_DOMAIN_TYPEHASH = keccak256(EIP712_DOMAIN_TYPE.encode("ascii"))
 BID_TYPEHASH = keccak256(BID_TYPE.encode("ascii"))
@@ -113,6 +115,8 @@ def struct_hash(
     estimated_tokens: int,
     nonce: int,
     deadline: int,
+    epoch_id: str = "",
+    epoch_root: str = EMPTY_EPOCH_ROOT,
 ) -> bytes:
     return keccak256(
         BID_TYPEHASH
@@ -123,6 +127,8 @@ def struct_hash(
         + encode_uint256(estimated_tokens)
         + encode_uint256(nonce)
         + encode_uint256(deadline)
+        + keccak256(epoch_id.encode("utf-8"))
+        + encode_bytes32(epoch_root)
     )
 
 
@@ -136,6 +142,8 @@ def typed_data_digest(
     estimated_tokens: int,
     nonce: int,
     deadline: int,
+    epoch_id: str = "",
+    epoch_root: str = EMPTY_EPOCH_ROOT,
 ) -> bytes:
     return keccak256(
         b"\x19\x01"
@@ -148,6 +156,8 @@ def typed_data_digest(
             estimated_tokens=estimated_tokens,
             nonce=nonce,
             deadline=deadline,
+            epoch_id=epoch_id,
+            epoch_root=epoch_root,
         )
     )
 
@@ -162,6 +172,8 @@ def typed_data_payload(
     estimated_tokens: int,
     nonce: int,
     deadline: int,
+    epoch_id: str = "",
+    epoch_root: str = EMPTY_EPOCH_ROOT,
 ) -> Dict[str, Any]:
     return {
         "types": {
@@ -179,6 +191,8 @@ def typed_data_payload(
                 {"name": "estimatedTokens", "type": "uint256"},
                 {"name": "nonce", "type": "uint256"},
                 {"name": "deadline", "type": "uint256"},
+                {"name": "epochId", "type": "string"},
+                {"name": "epochRoot", "type": "bytes32"},
             ],
         },
         "primaryType": "Bid",
@@ -196,6 +210,8 @@ def typed_data_payload(
             "estimatedTokens": str(estimated_tokens),
             "nonce": str(nonce),
             "deadline": str(deadline),
+            "epochId": epoch_id,
+            "epochRoot": epoch_root,
         },
     }
 
