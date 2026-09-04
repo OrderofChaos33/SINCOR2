@@ -12,7 +12,7 @@
 - **Base liquid ≈ $309.36**
 - Multichain residuals (Polygon USDC.e ~$11 + L1 residual ~0.0035 ETH + dust): estimate **~$325–330**
 - AXM holdings: 1,000,000,000 AXM (secondary mark $0)
-- SINC residual: present (official $1.50 floor; secondary mark $0)
+- SINC residual: present (official $0.15 floor; secondary mark $0)
 - Hundreds of dust/junk ERC-20s (mark $0)
 - **Zero** realized (`projected=false` + `tx_hash`) platform-fee ledger entries still recorded
 

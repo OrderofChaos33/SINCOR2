@@ -80,7 +80,7 @@
 ### Builder / Ops Actions
 1. Run `python scripts/whitelist_token.py` end-to-end; log every success/failure.  
 2. Submit/verify on: Basescan, Blockscout, CoinGecko request, CoinMarketCap request, DexScreener, GeckoTerminal, Uniswap Token Lists, Coinbase Wallet list (PR if open), MetaMask token detection, 1inch, Kyber, Paraswap token lists where applicable.  
-3. Keep official buy path only via bonding curve + USDC hook ($1.50 floor). Document rogue V2 pool warning on every surface.  
+3. Keep official buy path only via bonding curve + USDC hook ($0.15 floor). Document rogue V2 pool warning on every surface.  
 4. Update `docs/SINC_INTEGRATION.md` and `docs/TOKEN_ADOPTION_PLAN.md` with current status table.
 
 **Success criteria**: SINC appears in at least 5 major indexes/explorers with correct metadata and official curve link.

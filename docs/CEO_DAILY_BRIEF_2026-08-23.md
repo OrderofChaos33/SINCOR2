@@ -13,7 +13,7 @@
 - L1 ETH residual ~$5.20
 - **Net liquid ≈ $229.14**
 - AXM holdings on treasury: platform settlement token (mark $0 secondary)
-- SINC residual: present, official $1.50 floor; secondary mark $0
+- SINC residual: present, official $0.15 floor; secondary mark $0
 - **Zero** realized (`projected=false` + `tx_hash`) platform-fee ledger entries still recorded
 
 **Reality:** Capital declined from prior ~$315 cycle (USDC moved). Still liquid and idle. Product surface (A2A, 43 skills, verticals, 26 DeFi projects, yield_aggregator, treasury_exec agent) exists. Conversion + external settlement + first realized fee path remain the single bottleneck. Signer / EXECUTE_LIVE gate is the controlled remaining choke for Yield Aggregator deployment. Cash loading window remains open — deploy into Yield Aggregator now.

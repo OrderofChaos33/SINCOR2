@@ -13,7 +13,7 @@
 - L1 residual: ~$10.5
 - **Multichain net liquid ≈ $328**
 - AXM holdings: large (secondary mark $0)
-- SINC residual: present (official $1.50 floor; secondary mark $0)
+- SINC residual: present (official $0.15 floor; secondary mark $0)
 - Recent inbound includes ~0.105 ETH (~3 hrs prior)
 - **Zero** realized (`projected=false` + `tx_hash`) platform-fee ledger entries still recorded
 

@@ -11,7 +11,7 @@
 - Base ETH: dust (~0.000002 ETH)
 - Multichain net worth: **~$227.34** (Base USDC dominant + Polygon USDC.e ~$11 + residual ETH/POL)
 - AXM holdings: 1,000,000,000 AXM (secondary mark $0)
-- SINC residual present (official $1.50 floor; secondary mark $0)
+- SINC residual present (official $0.15 floor; secondary mark $0)
 - Hundreds of dust/junk ERC-20s (mark $0)
 - **Zero** realized (`projected=false` + `tx_hash`) platform-fee ledger entries recorded
 

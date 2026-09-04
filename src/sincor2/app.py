@@ -712,6 +712,25 @@ def sinc_token():
     return render_template('sinc_gateway.html')
 
 
+@app.route('/token')
+@limiter.exempt if limiter else lambda f: f
+def token_canon_page():
+    """Canonical token policy page."""
+    return render_template('token_canon.html')
+
+
+@app.route('/token.json')
+@limiter.exempt if limiter else lambda f: f
+def token_canon_json():
+    """Canonical token policy JSON payload."""
+    path = Path(__file__).resolve().parent.parent.parent / 'TOKEN_CANON.json'
+    if not path.is_file():
+        return jsonify({'error': 'not found'}), 404
+    resp = make_response(send_file(path, mimetype='application/json'))
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
 @app.route('/refer')
 @limiter.exempt if limiter else lambda f: f
 def sinc_refer():

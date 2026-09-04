@@ -14,7 +14,7 @@
 - Recent activity: approvals, minor multicalls, curve residual. **Zero meaningful fee or sales inflows in last 7+ days.**
 
 **SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`):**
-- Official buy path only: bonding curve + USDC hook at $1.50 floor (`0x75dE…619C`)
+- Official buy path only: bonding curve + USDC hook at $0.15 floor (`0x75dE…619C`)
 - Liquidity: depth-limited; no real secondary market depth yet
 - Holders ~2.6k; volume extremely low
 
