@@ -50,6 +50,7 @@ class VectorRecord:
     capabilities: Set[str] = field(default_factory=set)
     created_at: float = field(default_factory=_now)
     weight: float = 1.0
+    adjacency: Tuple[str, ...] = ()
     session_key_expires_at: Optional[float] = None
     task_state_expires_at: Optional[float] = None
 
@@ -62,6 +63,7 @@ class VectorRecord:
             "capabilities": sorted(self.capabilities or set()),
             "created_at": float(self.created_at),
             "weight": float(self.weight),
+            "adjacency": sorted(str(x) for x in self.adjacency),
             "session_key_expires_at": self.session_key_expires_at,
             "task_state_expires_at": self.task_state_expires_at,
         }
@@ -205,6 +207,7 @@ class WarmCompactionWorker:
                     capabilities=set(rec.capabilities),
                     created_at=rec.created_at,
                     weight=decayed_weight,
+                    adjacency=tuple(sorted(rec.adjacency)),
                     session_key_expires_at=rec.session_key_expires_at,
                     task_state_expires_at=rec.task_state_expires_at,
                 )
@@ -236,6 +239,10 @@ class EpochSegment:
     doc_len: Mapping[str, int]
     attr_bitmap: Mapping[str, Mapping[str, Set[str]]]
     cap_bitmap: Mapping[str, Set[str]]
+    attr_bitsets: Mapping[str, Mapping[str, int]]
+    cap_bitsets: Mapping[str, int]
+    id_position: Mapping[str, int]
+    adjacency_manifest: Mapping[str, Tuple[str, ...]]
 
 
 class EpochBuilder:
@@ -255,7 +262,20 @@ class EpochBuilder:
         ordered_ids = tuple(sorted(records.keys()))
         ordered_records = {node_id: records[node_id] for node_id in ordered_ids}
 
-        leaves = [ordered_records[node_id].payload_hash() for node_id in ordered_ids]
+        adjacency_manifest: Dict[str, Tuple[str, ...]] = {
+            node_id: tuple(sorted(str(x) for x in ordered_records[node_id].adjacency))
+            for node_id in ordered_ids
+        }
+        leaves = [
+            hashlib.sha256(
+                (
+                    ordered_records[node_id].payload_hash()
+                    + "|"
+                    + hashlib.sha256(",".join(adjacency_manifest[node_id]).encode("utf-8")).hexdigest()
+                ).encode("utf-8")
+            ).hexdigest()
+            for node_id in ordered_ids
+        ]
         merkle_root = self._merkle_root(leaves)
         manifest = {
             "ordered_ids": ordered_ids,
@@ -263,6 +283,9 @@ class EpochBuilder:
             "parent_epoch": parent_epoch,
             "record_count": len(ordered_ids),
             "merkle_root": merkle_root,
+            "adjacency_manifest_sha256": hashlib.sha256(
+                json.dumps(adjacency_manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest(),
         }
         manifest_json = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
         manifest_hash = hashlib.sha256(manifest_json.encode("utf-8")).hexdigest()
@@ -278,6 +301,9 @@ class EpochBuilder:
         doc_len: Dict[str, int] = {}
         attr_bitmap: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
         cap_bitmap: Dict[str, Set[str]] = defaultdict(set)
+        id_position: Dict[str, int] = {node_id: idx for idx, node_id in enumerate(ordered_ids)}
+        attr_bitsets: Dict[str, Dict[str, int]] = defaultdict(dict)
+        cap_bitsets: Dict[str, int] = {}
 
         for node_id in ordered_ids:
             rec = ordered_records[node_id]
@@ -293,6 +319,17 @@ class EpochBuilder:
         immutable_postings = {k: tuple(sorted(v)) for k, v in lexical_postings.items()}
         immutable_attr = {k: {vv: set(ids) for vv, ids in vm.items()} for k, vm in attr_bitmap.items()}
         immutable_cap = {k: set(v) for k, v in cap_bitmap.items()}
+        for key, value_map in immutable_attr.items():
+            for val, ids in value_map.items():
+                mask = 0
+                for node_id in ids:
+                    mask |= 1 << id_position[node_id]
+                attr_bitsets[key][val] = mask
+        for cap, ids in immutable_cap.items():
+            mask = 0
+            for node_id in ids:
+                mask |= 1 << id_position[node_id]
+            cap_bitsets[cap] = mask
 
         return EpochSegment(
             epoch_id=epoch_id,
@@ -308,6 +345,10 @@ class EpochBuilder:
             doc_len=doc_len,
             attr_bitmap=immutable_attr,
             cap_bitmap=immutable_cap,
+            attr_bitsets={k: dict(v) for k, v in attr_bitsets.items()},
+            cap_bitsets=cap_bitsets,
+            id_position=id_position,
+            adjacency_manifest=adjacency_manifest,
         )
 
     def _merkle_root(self, leaves: Sequence[str]) -> str:
@@ -337,6 +378,9 @@ class AtomicSwapController:
         self._active_epoch: Optional[EpochSegment] = None
         self._staged_epoch: Optional[EpochSegment] = None
         self._epochs_by_id: Dict[str, EpochSegment] = {}
+        self.last_pause_ms: float = 0.0
+        self.total_pause_ms: float = 0.0
+        self.pause_events: int = 0
 
     def stage_shadow_epoch(self, epoch: EpochSegment) -> None:
         with self._lock:
@@ -380,6 +424,9 @@ class AtomicSwapController:
                     self._reader_cond.wait(timeout=0.001)
 
             elapsed_ms = (_now() - start) * 1000.0
+            self.last_pause_ms = elapsed_ms
+            self.total_pause_ms += elapsed_ms
+            self.pause_events += 1
             if elapsed_ms > max_pause_ms:
                 # non-fatal: exposed as runtime observability signal
                 pass
@@ -435,7 +482,7 @@ class QueryRouter:
 
             vector_scores = self._ann_search(epoch, spec.query_vector, candidates, spec.k)
             lexical_scores = self._bm25(epoch, spec.query_text, candidates)
-            merged = self._hybrid_merge(epoch.epoch_id, vector_scores, lexical_scores, spec.k)
+            merged = self._hybrid_merge(epoch, vector_scores, lexical_scores, spec.k)
             return merged
         finally:
             self._controller.end_read()
@@ -446,34 +493,40 @@ class QueryRouter:
         attrs: Mapping[str, Union[str, Sequence[str]]],
         caps: Set[str],
     ) -> Set[str]:
-        universe = set(epoch.records.keys())
+        universe_mask = (1 << len(epoch.row_ids)) - 1 if epoch.row_ids else 0
 
         for key, val in attrs.items():
-            key_map = epoch.attr_bitmap.get(key)
+            key_map = epoch.attr_bitsets.get(key)
             if not key_map:
                 return set()
             if isinstance(val, str):
                 vals = [val]
             else:
                 vals = [str(v) for v in val]
-            attr_ids: Set[str] = set()
+            attr_mask = 0
             for vv in vals:
-                attr_ids |= key_map.get(vv, set())
-            if not attr_ids:
+                attr_mask |= int(key_map.get(vv, 0))
+            if attr_mask == 0:
                 return set()
-            universe &= attr_ids
-            if not universe:
+            universe_mask &= attr_mask
+            if universe_mask == 0:
                 return set()
 
         for cap in caps:
-            cap_ids = epoch.cap_bitmap.get(cap)
-            if not cap_ids:
+            cap_mask = int(epoch.cap_bitsets.get(cap, 0))
+            if cap_mask == 0:
                 return set()
-            universe &= cap_ids
-            if not universe:
+            universe_mask &= cap_mask
+            if universe_mask == 0:
                 return set()
 
-        return universe
+        if universe_mask == 0:
+            return set()
+        candidates: Set[str] = set()
+        for idx, node_id in enumerate(epoch.row_ids):
+            if (universe_mask >> idx) & 1:
+                candidates.add(node_id)
+        return candidates
 
     def _ann_search(self, epoch: EpochSegment, query_vector: np.ndarray, candidates: Set[str], k: int) -> Dict[str, float]:
         if epoch.norm_matrix.size == 0:
@@ -531,7 +584,7 @@ class QueryRouter:
 
     def _hybrid_merge(
         self,
-        epoch_id: str,
+        epoch: EpochSegment,
         vector_scores: Dict[str, float],
         lexical_scores: Dict[str, float],
         k: int,
@@ -560,14 +613,15 @@ class QueryRouter:
             l = lexical_scores.get(node_id, 0.0)
             v_norm = 0.0 if not np.isfinite(v) else norm(v, v_min, v_max)
             l_norm = norm(l, l_min, l_max)
-            combined = 0.7 * v_norm + 0.3 * l_norm
+            weight_norm = max(0.0, min(1.0, float(epoch.records[node_id].weight)))
+            combined = 0.6 * v_norm + 0.2 * l_norm + 0.2 * weight_norm
             results.append(
                 RankedResult(
                     node_id=node_id,
                     score=combined,
                     vector_score=0.0 if not np.isfinite(v) else v,
                     lexical_score=l,
-                    epoch_id=epoch_id,
+                    epoch_id=epoch.epoch_id,
                 )
             )
 
@@ -616,3 +670,16 @@ class ThreeTierVectorEngine:
 
     def query(self, spec: QuerySpec) -> List[RankedResult]:
         return self.router.route(spec)
+
+    # Frozen contract aliases
+    def QueryPreFilter(self, spec: QuerySpec) -> List[RankedResult]:  # noqa: N802
+        return self.query(spec)
+
+    def InsertSnapshotDelta(self, rec: VectorRecord) -> None:  # noqa: N802
+        self.write(rec)
+
+    def CompactWarmSegment(self) -> WarmSegment:  # noqa: N802
+        return self.compact_warm()
+
+    def SwapColdEpoch(self, max_pause_ms: float = 5.0) -> str:  # noqa: N802
+        return self.cutover(max_pause_ms=max_pause_ms)

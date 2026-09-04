@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import random
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
 import numpy as np
 
+from .memory_engine_contracts import MemoryContracts
 from .vector_retrieval_engine import QuerySpec, ThreeTierVectorEngine, VectorRecord
 
 
@@ -25,8 +28,17 @@ def _route_digest(routes: Sequence[Sequence[str]]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def simulate_swarm_determinism(*, nodes: int = 4, queries: int = 128, dim: int = 16) -> SwarmDeterminismReport:
+def simulate_swarm_determinism(
+    *,
+    nodes: int = 5,
+    queries: int = 128,
+    dim: int = 16,
+    latency_ms_min: float = 0.0,
+    latency_ms_max: float = 12.0,
+    seed: int = 17,
+) -> SwarmDeterminismReport:
     engines: List[ThreeTierVectorEngine] = [ThreeTierVectorEngine(model_version="swarm-v1", decay_lambda=0.0, epsilon=0.0) for _ in range(nodes)]
+    rng = random.Random(seed)
 
     records = []
     for i in range(64):
@@ -54,6 +66,7 @@ def simulate_swarm_determinism(*, nodes: int = 4, queries: int = 128, dim: int =
     for engine in engines:
         node_routes: List[List[str]] = []
         for q in range(queries):
+            time.sleep(rng.uniform(latency_ms_min, latency_ms_max) / 1000.0)
             vec = np.zeros(dim, dtype=np.float64)
             vec[q % dim] = 1.0
             out = engine.query(
@@ -75,9 +88,7 @@ def simulate_swarm_determinism(*, nodes: int = 4, queries: int = 128, dim: int =
 
 
 def memory_engine_interface_digest() -> str:
-    classes = [
-        ThreeTierVectorEngine,
-    ]
+    classes = [ThreeTierVectorEngine]
     symbols: List[str] = []
     for cls in classes:
         for name, member in sorted(inspect.getmembers(cls)):
@@ -89,6 +100,15 @@ def memory_engine_interface_digest() -> str:
                 except (TypeError, ValueError):
                     sig = "()"
                 symbols.append(f"{cls.__name__}.{name}{sig}")
+    contracts = MemoryContracts()
+    symbols.extend(
+        [
+            contracts.query_pre_filter,
+            contracts.insert_snapshot_delta,
+            contracts.compact_warm_segment,
+            contracts.swap_cold_epoch,
+        ]
+    )
     raw = "\n".join(symbols)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 

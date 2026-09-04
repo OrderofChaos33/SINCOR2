@@ -55,7 +55,7 @@ class TaskAuctionMemoryRouter:
     def __init__(self, engine: Optional[ThreeTierVectorEngine] = None, *, bid_state_ttl_seconds: int = 300) -> None:
         if np is None or ThreeTierVectorEngine is None or QuerySpec is None or VectorRecord is None:
             raise RuntimeError("TaskAuctionMemoryRouter requires numpy and sinax.vector_retrieval_engine")
-        self.engine = engine or ThreeTierVectorEngine(model_version="cn-v1", decay_lambda=2e-4, epsilon=0.05)
+        self.engine = engine or ThreeTierVectorEngine(model_version="cn-v1", decay_lambda=2e-4, epsilon=0.01)
         self.bid_state_ttl_seconds = int(max(1, bid_state_ttl_seconds))
 
     # ------------------------------ Epoch lifecycle ------------------------------
