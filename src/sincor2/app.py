@@ -731,7 +731,6 @@ def token_canon_json():
         allowed_base = Path(
             (os.getenv('TOKEN_CANON_JSON_BASE_DIR') or str(repo_root)).strip()
         ).expanduser().resolve()
-        dedicated_dir = (allowed_base / 'token-canon').resolve()
         try:
             path.relative_to(allowed_base)
         except ValueError:
@@ -741,17 +740,9 @@ def token_canon_json():
         if path.suffix.lower() != '.json':
             return jsonify({'error': 'invalid token canon path: must point to a .json file'}), 500
         if path.name != 'TOKEN_CANON.json':
-            try:
-                path.relative_to(dedicated_dir)
-            except ValueError:
-                return jsonify(
-                    {
-                        'error': (
-                            'invalid token canon path: must be TOKEN_CANON.json '
-                            'or live under TOKEN_CANON_JSON_BASE_DIR/token-canon'
-                        )
-                    }
-                ), 500
+            return jsonify(
+                {'error': 'invalid token canon path: filename must be TOKEN_CANON.json'}
+            ), 500
     else:
         path = repo_root / 'TOKEN_CANON.json'
     if not path.is_file():
