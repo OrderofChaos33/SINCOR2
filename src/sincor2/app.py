@@ -726,9 +726,12 @@ def token_canon_json():
     repo_root = Path(__file__).resolve().parent.parent.parent
     configured = (os.getenv('TOKEN_CANON_JSON_PATH') or '').strip()
     if configured:
-        allowed_base = Path(
+        base_raw = Path(
             (os.getenv('TOKEN_CANON_JSON_BASE_DIR') or str(repo_root)).strip()
-        ).expanduser().resolve()
+        ).expanduser()
+        if base_raw.is_symlink():
+            return jsonify({'error': 'invalid token canon path'}), 500
+        allowed_base = base_raw.resolve()
         raw_path = Path(configured).expanduser()
         candidate = raw_path if raw_path.is_absolute() else (allowed_base / raw_path)
         candidate = Path(os.path.abspath(str(candidate)))
@@ -737,18 +740,26 @@ def token_canon_json():
         except ValueError:
             return jsonify({'error': 'invalid token canon path'}), 500
         check = candidate
-        while check != allowed_base:
+        while True:
             if check.is_symlink():
                 return jsonify({'error': 'invalid token canon path'}), 500
+            if check == allowed_base:
+                break
             check = check.parent
         if candidate.suffix.lower() != '.json' or candidate.name != 'TOKEN_CANON.json':
             return jsonify({'error': 'invalid token canon path'}), 500
         path = candidate
     else:
         path = repo_root / 'TOKEN_CANON.json'
-    if not path.is_file():
+    try:
+        payload = path.read_bytes()
+    except FileNotFoundError:
         return jsonify({'error': 'not found'}), 404
-    return make_response(send_file(path, mimetype='application/json'))
+    except OSError:
+        return jsonify({'error': 'not found'}), 404
+    resp = make_response(payload)
+    resp.mimetype = 'application/json'
+    return resp
 
 
 @app.route('/refer')
