@@ -743,7 +743,7 @@ def token_canon_json():
             if check == allowed_base:
                 break
             check = check.parent
-        if candidate_resolved.suffix.lower() != '.json' or candidate_resolved.name != 'TOKEN_CANON.json':
+        if candidate_resolved.name != 'TOKEN_CANON.json':
             return jsonify({'error': 'invalid token canon path'}), 500
         path = candidate_resolved
     else:
