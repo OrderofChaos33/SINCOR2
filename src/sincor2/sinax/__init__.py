@@ -154,6 +154,19 @@ from .homology_detector import HomologyDetector, HomologyReport, HomologyClass
 from .morse_filter import MorseFilter, MorseDecomposition, CriticalPoint
 from .axiom_solver import AxiomSolver, ProofResult
 from .ptn import ProofTopologyNavigator
+from .vector_retrieval_engine import (
+    AtomicSwapController,
+    EpochBuilder,
+    EpochSegment,
+    QueryRouter,
+    QuerySpec,
+    RankedResult,
+    SnapshotDeltaBuffer,
+    ThreeTierVectorEngine,
+    VectorRecord,
+    WarmCompactionWorker,
+    WarmSegment,
+)
 
 __all__ = [
     # Config
@@ -231,4 +244,16 @@ __all__ = [
     "MorseFilter",
     "MorseDecomposition",
     "CriticalPoint",
+    # Three-tier vector retrieval
+    "VectorRecord",
+    "QuerySpec",
+    "RankedResult",
+    "SnapshotDeltaBuffer",
+    "WarmSegment",
+    "WarmCompactionWorker",
+    "EpochSegment",
+    "EpochBuilder",
+    "AtomicSwapController",
+    "QueryRouter",
+    "ThreeTierVectorEngine",
 ]
