@@ -727,8 +727,6 @@ def token_canon_json():
     configured = (os.getenv('TOKEN_CANON_JSON_PATH') or '').strip()
     if configured:
         raw_path = Path(configured).expanduser()
-        if raw_path.is_symlink():
-            return jsonify({'error': 'invalid token canon path: symlinks are not allowed'}), 500
         path = raw_path.resolve()
         allowed_base = Path(
             (os.getenv('TOKEN_CANON_JSON_BASE_DIR') or str(repo_root)).strip()
