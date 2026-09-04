@@ -743,7 +743,7 @@ def token_canon_json():
             if check == allowed_base:
                 break
             check = check.parent
-        if candidate.suffix.lower() != '.json' or candidate.name != 'TOKEN_CANON.json':
+        if candidate_resolved.suffix.lower() != '.json' or candidate_resolved.name != 'TOKEN_CANON.json':
             return jsonify({'error': 'invalid token canon path'}), 500
         path = candidate_resolved
     else:
@@ -755,12 +755,10 @@ def token_canon_json():
     except OSError:
         return jsonify({'error': 'not found'}), 404
     try:
-        json.loads(payload.decode('utf-8'))
+        parsed_payload = json.loads(payload.decode('utf-8'))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return jsonify({'error': 'invalid token canon payload'}), 500
-    resp = make_response(payload)
-    resp.mimetype = 'application/json'
-    return resp
+    return jsonify(parsed_payload)
 
 
 @app.route('/refer')
