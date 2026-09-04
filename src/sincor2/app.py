@@ -736,6 +736,8 @@ def token_canon_json():
             return jsonify(
                 {'error': 'invalid token canon path: must be under TOKEN_CANON_JSON_BASE_DIR'}
             ), 500
+        if path.suffix.lower() != '.json':
+            return jsonify({'error': 'invalid token canon path: must point to a .json file'}), 500
     else:
         path = repo_root / 'TOKEN_CANON.json'
     if not path.is_file():
