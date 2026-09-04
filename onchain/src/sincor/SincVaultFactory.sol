@@ -65,18 +65,19 @@ contract SincVaultFactory is ISincVaultFactory, AccessControl {
         if (
             cfg.admin == address(0) || cfg.aeroToken == address(0) || cfg.aeroAdapter == address(0)
                 || cfg.assetPriceFeed == address(0) || cfg.aeroPriceFeed == address(0) || cfg.scPriceFeed == address(0)
-                || cfg.targetPriceFeed == address(0) || cfg.performanceFeeBps > SincConstants.BPS_DENOM
+                || cfg.targetPriceFeed == address(0) || cfg.gaugePrimary == address(0)
+                || cfg.performanceFeeBps > SincConstants.BPS_DENOM
                 || cfg.idleBufferBps > SincConstants.BPS_DENOM || cfg.maxStrategyCount == 0 || cfg.oracleHeartbeat == 0
         ) revert InvalidConfig();
 
-        SincRiskModule risk = new SincRiskModule(cfg.admin, cfg.maxOracleDeviationBps);
+        SincRiskModule risk = new SincRiskModule(address(this), cfg.maxOracleDeviationBps);
         risk.setOracle(asset, cfg.assetPriceFeed, cfg.oracleHeartbeat);
         risk.setOracle(cfg.aeroToken, cfg.aeroPriceFeed, cfg.oracleHeartbeat);
 
-        SincStrategyRouter router = new SincStrategyRouter(asset, cfg.admin, cfg.maxStrategyCount);
+        SincStrategyRouter router = new SincStrategyRouter(asset, address(this), cfg.maxStrategyCount);
 
         SincFeeFlywheel flywheel = new SincFeeFlywheel(
-            cfg.admin,
+            address(this),
             cfg.aeroToken,
             cfg.aeroAdapter,
             address(risk),
@@ -96,7 +97,7 @@ contract SincVaultFactory is ISincVaultFactory, AccessControl {
             asset,
             name,
             symbol,
-            cfg.admin,
+            address(this),
             address(router),
             address(flywheel),
             cfg.idleBufferBps,
@@ -108,7 +109,7 @@ contract SincVaultFactory is ISincVaultFactory, AccessControl {
         flywheel.grantRole(flywheel.KEEPER_ROLE(), address(deployedVault));
 
         SincPSM psm = new SincPSM(
-            cfg.admin,
+            address(this),
             address(deployedVault),
             SincConstants.TREASURY_SEED_ADDRESS,
             cfg.scPriceFeed,
@@ -116,6 +117,8 @@ contract SincVaultFactory is ISincVaultFactory, AccessControl {
             cfg.psmBand0,
             cfg.psmBand1
         );
+
+        _handoffRoles(cfg.admin, risk, router, flywheel, deployedVault, psm);
 
         stackByAsset[asset] = VaultStack({
             vault: address(deployedVault),
@@ -127,5 +130,41 @@ contract SincVaultFactory is ISincVaultFactory, AccessControl {
 
         vault = address(deployedVault);
         emit VaultDeployed(asset, vault, address(router), address(flywheel), address(psm), address(risk));
+    }
+
+    function _handoffRoles(
+        address newAdmin,
+        SincRiskModule risk,
+        SincStrategyRouter router,
+        SincFeeFlywheel flywheel,
+        Sinc4626Vault vault,
+        SincPSM psm
+    ) internal {
+        risk.grantRole(risk.DEFAULT_ADMIN_ROLE(), newAdmin);
+        risk.grantRole(risk.RISK_ADMIN_ROLE(), newAdmin);
+        risk.renounceRole(risk.RISK_ADMIN_ROLE(), address(this));
+        risk.renounceRole(risk.DEFAULT_ADMIN_ROLE(), address(this));
+
+        router.grantRole(router.DEFAULT_ADMIN_ROLE(), newAdmin);
+        router.grantRole(router.STRATEGIST_ROLE(), newAdmin);
+        router.renounceRole(router.STRATEGIST_ROLE(), address(this));
+        router.renounceRole(router.DEFAULT_ADMIN_ROLE(), address(this));
+
+        flywheel.grantRole(flywheel.DEFAULT_ADMIN_ROLE(), newAdmin);
+        flywheel.grantRole(flywheel.KEEPER_ROLE(), newAdmin);
+        flywheel.renounceRole(flywheel.KEEPER_ROLE(), address(this));
+        flywheel.renounceRole(flywheel.DEFAULT_ADMIN_ROLE(), address(this));
+
+        vault.grantRole(vault.DEFAULT_ADMIN_ROLE(), newAdmin);
+        vault.grantRole(vault.KEEPER_ROLE(), newAdmin);
+        vault.grantRole(vault.STRATEGIST_ROLE(), newAdmin);
+        vault.renounceRole(vault.STRATEGIST_ROLE(), address(this));
+        vault.renounceRole(vault.KEEPER_ROLE(), address(this));
+        vault.renounceRole(vault.DEFAULT_ADMIN_ROLE(), address(this));
+
+        psm.grantRole(psm.DEFAULT_ADMIN_ROLE(), newAdmin);
+        psm.grantRole(psm.RISK_ADMIN_ROLE(), newAdmin);
+        psm.renounceRole(psm.RISK_ADMIN_ROLE(), address(this));
+        psm.renounceRole(psm.DEFAULT_ADMIN_ROLE(), address(this));
     }
 }
