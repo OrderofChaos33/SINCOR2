@@ -71,4 +71,11 @@ Plain-text input is also accepted; the dispatcher wraps it as `{ "task_type": "<
 | `trading-signals` | TradingAgent |
 | `compliance-sbom` | ComplianceAgent |
 
+| `detailing-lead-ingest` | AutoDetailingAgent |
+| `detailing-booking` | AutoDetailingAgent |
+| `detailing-presence` | AutoDetailingAgent |
+| `detailing-social` | AutoDetailingAgent |
+| `detailing-copy` | AutoDetailingAgent |
+| `detailing-engage` | AutoDetailingAgent |
+
 See each pack's `agent_card.json` for the full skill catalogue.

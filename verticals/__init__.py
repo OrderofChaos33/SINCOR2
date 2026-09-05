@@ -1,9 +1,10 @@
 """Revenue-focused vertical agent packs for SINCOR2."""
 
 __all__ = [
-    'healthcare',
-    'dental',
-    'compliance',
-    'trading',
-    'lead_gen',
+    "healthcare",
+    "dental",
+    "compliance",
+    "trading",
+    "lead_gen",
+    "auto_detailing",
 ]

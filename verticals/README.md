@@ -8,4 +8,6 @@ All verticals follow the same high-standard structure:
 - Detailed capability definitions
 - Clear A2A Agent Card output
 
+Current packs: `healthcare`, `dental`, `compliance`, `trading`, `lead_gen`, `auto_detailing` (CHROMA).
+
 Current status: Wired to the live runtime via `platform_bootstrap.py`. Vertical agents dispatch through A2A for registered skill ids. External API integrations remain the next implementation step per vertical.

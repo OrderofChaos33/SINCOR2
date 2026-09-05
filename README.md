@@ -234,7 +234,7 @@ flowchart TD
 | Orchestration core | `core/` | Task routing, execution policy, reliability controls |
 | Marketplace services | `marketplace/` | Card registration, discovery, capability matching, reputation |
 | Infrastructure | `infrastructure/` | Deployment config, observability, liquidity, treasury |
-| Vertical packs | `verticals/` | Domain agent packs: healthcare, dental, compliance, trading, lead_gen |
+| Vertical packs | `verticals/` | Domain agent packs: healthcare, dental, compliance, trading, lead_gen, auto_detailing |
 | DAE layer | `dae/` | Governance, incentives, decentralized identity |
 | Enterprise infra | `enterprise_infrastructure/` | Audit logging, container orchestration |
 | Agents | `agents/` | 43 named agent YAML configs with archetypes and persona vectors |
@@ -432,6 +432,19 @@ Full outbound revenue pipeline:
 - **ICP matcher** — Scores inbound leads against Ideal Customer Profile definitions using firmographic and behavioral data.
 - **Outbound agent** — Multi-step enrichment, sequencing, and engagement tracking.
 - **Autonomous outreach engine** — Fetches local business leads from Yelp Fusion and enriches with Google Places, then sends cold outreach via Resend with configurable daily limits and ICP targeting (med spas, gyms, real estate agents, and more).
+
+### Auto Detailing — CHROMA
+
+Autonomous growth OS for detailing, ceramic, PPF, and tint shops. Built for speed-to-lead: comparison shoppers book the first shop that answers.
+
+- **Lead aggregation** — Google, GBP, website, Instagram, Facebook Marketplace, ads, referrals, missed-call text-back. Intent scoring with vehicle-value, photo-quote, and recency weights.
+- **Quote → Calendly** — Package × vehicle-size pricing, coating deposits, weather holds on exterior work, prefilled self-serve booking URLs.
+- **Presence agents** — Metadata, local SEO + AEO FAQ JSON-LD, gallery alt-text, review showcase, GBP categories. Runs 24/7 against the live site.
+- **Landing engagement** — Popup qualifies visitors, prices the job, and hands them the calendar. No human in the loop after hours.
+- **Social + email autopilot** — Scheduled before/after, education, offer, bay-life, and review posts. Comment/DM replies steer to self-booking. Quote follow-ups, 30/60/90-day membership nudges, post-job review asks.
+- **Protocols** — Sub-90s first response, photo-quote intake, T-24h/T-2h reminders, seasonal salt/pollen/UV/PPF campaigns, wash → interior → ceramic → PPF upsell graph.
+
+Skill ids: `detailing-lead-ingest`, `detailing-booking`, `detailing-presence`, `detailing-social`, `detailing-copy`, `detailing-engage`.
 
 ---
 

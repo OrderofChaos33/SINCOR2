@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Type
 
 from verticals.agent import VerticalAgent
+from verticals.auto_detailing.agent import AutoDetailingAgent
 from verticals.compliance.agent import ComplianceAgent
 from verticals.dental.agent import DentalAgent
 from verticals.healthcare.agent import HealthcareAgent
@@ -26,6 +27,7 @@ VERTICAL_AGENT_CLASSES: Tuple[Type[VerticalAgent], ...] = (
     TradingAgent,
     LeadGenAgent,
     YieldOptimizerAgent,
+    AutoDetailingAgent,
 )
 
 # Maps A2A skill ids (from Agent Cards or SINCOR catalogue) to vertical agents.
@@ -50,6 +52,12 @@ SKILL_VERTICAL_MAP: Dict[str, str] = {
     "icp-matching": "lead_generation_agent",
     "lead-enrichment": "lead_generation_agent",
     "lead-outreach": "lead_generation_agent",
+    "detailing-lead-ingest": "auto_detailing_agent",
+    "detailing-booking": "auto_detailing_agent",
+    "detailing-presence": "auto_detailing_agent",
+    "detailing-social": "auto_detailing_agent",
+    "detailing-copy": "auto_detailing_agent",
+    "detailing-engage": "auto_detailing_agent",
 }
 
 
