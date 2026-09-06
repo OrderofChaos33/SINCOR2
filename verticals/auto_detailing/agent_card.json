@@ -1,0 +1,106 @@
+{
+  "name": "SINCOR2 Auto Detailing Pack — CHROMA",
+  "description": "Autonomous growth OS for auto detailing, ceramic coating, PPF, and tint shops. Aggregates leads, scores intent, quotes by vehicle size, hands off to Calendly, keeps the website/reviews/gallery compounding, and runs social + email outreach that steers to self-booking.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://getsincor.com/api/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0.1"
+    }
+  ],
+  "provider": {
+    "organization": "SINCOR2",
+    "url": "https://getsincor.com"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": true,
+    "stateTransitionHistory": true
+  },
+  "defaultInputModes": ["application/json"],
+  "defaultOutputModes": ["application/json"],
+  "skills": [
+    {
+      "id": "detailing-lead-ingest",
+      "name": "Detailing Lead Ingest & Score",
+      "description": "Ingests Google, GBP, website, Instagram, Marketplace, ads, referral, and missed-call leads. Scores intent, vehicle value, and photo-quote completeness.",
+      "tags": ["detailing", "leads", "scoring", "marketplace"],
+      "examples": [
+        "Ingest a Facebook Marketplace ceramic lead with photos.",
+        "Score a batch of weekend wash inquiries."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "detailing-booking",
+      "name": "Quote & Calendly Handoff",
+      "description": "Prices packages by vehicle size, applies coating deposits, weather-holds exterior work, and returns a prefilled Calendly URL.",
+      "tags": ["detailing", "booking", "calendly", "quote"],
+      "examples": [
+        "Quote a ceramic coating for a 2022 BMW X5.",
+        "Hand a qualified interior lead to Calendly."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "detailing-presence",
+      "name": "Website, SEO, Gallery & Reviews",
+      "description": "Writes metadata, LocalBusiness + AEO FAQ JSON-LD, gallery alt text, and review showcase widgets. Replies to Google reviews.",
+      "tags": ["seo", "aeo", "reviews", "gallery", "gbp"],
+      "examples": [
+        "Optimize title and JSON-LD for a Dubuque detailing shop.",
+        "Draft a reply to a 5-star ceramic review."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "detailing-social",
+      "name": "Social Autopilot",
+      "description": "Builds a weekly content calendar (before/after, education, offer, bay life, reviews) and replies to comments/DMs by steering to self-booking.",
+      "tags": ["social", "instagram", "gbp", "marketplace"],
+      "examples": [
+        "Schedule five posts for this week.",
+        "Reply to a comment asking how much ceramic costs."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "detailing-copy",
+      "name": "Detailing Ad Copy",
+      "description": "Generates Google RSA, Meta, GBP, SMS, email, and landing copy for detailing offers.",
+      "tags": ["copy", "ads", "google", "meta"],
+      "examples": [
+        "Write Google RSAs for ceramic coating in Dubuque.",
+        "Draft an SMS for a quote follow-up."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    },
+    {
+      "id": "detailing-engage",
+      "name": "Landing Engagement Agent",
+      "description": "24/7 site popup that qualifies visitors, prices the job, and hands them a booking link. Also runs missed-call text-back.",
+      "tags": ["chat", "popup", "booking", "after-hours"],
+      "examples": [
+        "Greet a visitor on the ceramic page.",
+        "Text back a missed call asking about PPF."
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "security": [{ "apiKey": [] }],
+  "documentationUrl": "https://getsincor.com/docs/api"
+}

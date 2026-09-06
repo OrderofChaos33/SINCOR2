@@ -28,8 +28,9 @@ def test_vertical_agent_cards_load():
 
 def test_vertical_agents_instantiate():
     agents = instantiate_vertical_agents()
-    assert len(agents) >= 5
+    assert len(agents) >= 6
     assert "healthcare_rcm_agent" in agents
+    assert "auto_detailing_agent" in agents
 
 
 def test_skill_resolution():

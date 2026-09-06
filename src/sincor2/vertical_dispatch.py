@@ -58,8 +58,12 @@ _SKILL_TASK_TYPE_MAP: Dict[str, str] = {
     "competitor-intel": "market_analysis",
     "content-blog": "content_generation",
     "toa-decision": "toa_decision",
-    "healthcare-credential-check": "credentialing_workflow",
-    "dental-billing-scrub": "dental_billing_scrub",
+    "detailing-lead-ingest": "lead_ingest",
+    "detailing-booking": "calendly_handoff",
+    "detailing-presence": "seo_optimize",
+    "detailing-social": "social_schedule",
+    "detailing-copy": "ad_copy",
+    "detailing-engage": "landing_engage",
 }
 
 
@@ -175,6 +179,14 @@ def _normalize_demo_payload(
         normalized.setdefault("target", "SINCOR")
         normalized.setdefault("market", "AI SaaS")
         normalized.setdefault("horizon", "90d")
+
+    elif skill_id in {"detailing-lead-ingest", "detailing-booking", "detailing-presence", "detailing-social", "detailing-copy", "detailing-engage"}:
+        normalized.setdefault("source", "website")
+        normalized.setdefault("package_id", "full_detail")
+        normalized.setdefault("city", "Dubuque")
+        normalized.setdefault("visitor_message", normalized.get("input", "I need a full detail"))
+        normalized.setdefault("channel", "google_rsa")
+        normalized.setdefault("vehicle", {"year": 2022, "make": "BMW", "model": "X5", "body_style": "suv"})
 
     return normalized
 
