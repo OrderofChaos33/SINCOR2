@@ -1,0 +1,5 @@
+{
+  "$id": "sincor.intent_mandate.v1",
+  "type": "object",
+  "required": ["mandate_id", "operator_id", "agent_id", "max_notional_usd", "max_single_tx_usd", "expires_at"]
+}

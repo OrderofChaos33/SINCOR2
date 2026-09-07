@@ -1,0 +1,5 @@
+{
+  "$id": "sincor.spend_envelope.v1",
+  "type": "object",
+  "required": ["envelope_id", "mandate_id", "agent_id", "amount_usd", "remaining_usd", "status", "expires_at"]
+}
