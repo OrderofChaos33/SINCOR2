@@ -29,6 +29,27 @@ logger = logging.getLogger("sincor.a2a.inbound")
 _HEARTBEAT_THREAD = None
 
 
+def _kya_listed(agent: Dict[str, Any]) -> None:
+    try:
+        from sincor2.kya_registry import hook_listed
+
+        rec = hook_listed(agent)
+        if rec:
+            agent["kya_id"] = rec.get("kya_id")
+            agent["kya_status"] = rec.get("status")
+    except Exception as err:
+        logger.warning("[KYA] list hook skipped: %s", err)
+
+
+def _kya_heartbeat(agent_id: str) -> None:
+    try:
+        from sincor2.kya_registry import hook_heartbeat
+
+        hook_heartbeat(agent_id, ok=True)
+    except Exception as err:
+        logger.debug("[KYA] heartbeat hook skipped: %s", err)
+
+
 def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
     parsed = _normalize_registration(body)
     agent_id = parsed["agent_id"]
@@ -67,6 +88,14 @@ def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
         snapshot = dict(agent)
     _save_agents(fabric)
     fabric.publish("agent.registered", snapshot["capability_tags"], {"agent_id": agent_id, "tags": snapshot["capability_tags"], "wallet": snapshot["wallet"]})
+    _kya_listed(snapshot)
+    if snapshot.get("kya_id"):
+        with fabric.lock:
+            live = fabric.agents.get(agent_id)
+            if live is not None:
+                live["kya_id"] = snapshot["kya_id"]
+                live["kya_status"] = snapshot.get("kya_status")
+        _save_agents(fabric)
     return snapshot
 
 
@@ -80,6 +109,7 @@ def heartbeat_agent(agent_id: str, signature: str = "") -> Dict[str, Any]:
         agent["last_heartbeat"] = ts
         tags = list(agent.get("capability_tags") or [])
     fabric.publish("agent.heartbeat", tags, {"agent_id": agent_id, "ttl_s": HEARTBEAT_TTL_S})
+    _kya_heartbeat(agent_id)
     return {"ok": True, "agent_id": agent_id, "expires_at": ts + HEARTBEAT_TTL_S * 1000}
 
 
@@ -164,6 +194,8 @@ def mount(app: Flask) -> None:
             "probation": bool(agent.get("probation")),
             "heartbeat_ttl_s": HEARTBEAT_TTL_S,
             "stream_url": "/v1/a2a/stream",
+            "kya_id": agent.get("kya_id"),
+            "kya_status": agent.get("kya_status"),
         }), 201
 
     @bp.post("/v1/a2a/heartbeat")
@@ -185,7 +217,14 @@ def mount(app: Flask) -> None:
 
     @bp.get("/v1/a2a/directory")
     def v1_directory():
-        return jsonify({"agents": list_agents(), "kpis": health_snapshot()})
+        kpis = health_snapshot()
+        try:
+            from sincor2.kya_registry import snapshot as kya_snapshot
+
+            kpis["kya"] = kya_snapshot()
+        except Exception:
+            pass
+        return jsonify({"agents": list_agents(), "kpis": kpis})
 
     @bp.get("/v1/a2a/chain")
     def v1_chain():
@@ -193,6 +232,14 @@ def mount(app: Flask) -> None:
 
     attach_market_routes(bp)
     app.register_blueprint(bp)
+    try:
+        from sincor2.kya_blueprint import kya_bp
+
+        if "kya" not in (getattr(app, "blueprints", {}) or {}):
+            app.register_blueprint(kya_bp)
+            logger.info("[KYA] /v1/kya mounted")
+    except Exception as err:
+        logger.warning("[KYA] blueprint skipped: %s", err)
     try:
         ensure_platform_agent()
     except Exception as err:
