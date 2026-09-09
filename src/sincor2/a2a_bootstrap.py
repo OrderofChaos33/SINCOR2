@@ -6,6 +6,7 @@ Imported at app startup. Idempotent.
   - Binds resilient PaymentVerifier (multi-RPC, backoff, 24h cache)
   - Wraps task helpers with persistent TaskStore when possible
   - Installs AgencyKernel real-tool runtime
+  - Mounts KYA / SLA / SADAS / Polyclaw receipts / airdrop quest
 """
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ _INSTALLED = False
 
 def _install_agency_runtime() -> None:
     try:
-        import sincor2.agency_kernel_runtime  # noqa: F401  — auto-installs on import
+        import sincor2.agency_kernel_runtime  # noqa: F401
         logger.info("AgencyKernel production runtime installed")
     except Exception as err:
         logger.warning("AgencyKernel runtime install failed: %s", err)
@@ -42,7 +43,6 @@ def _install_payment_verifier() -> None:
 
 
 def _ensure_task_serialization() -> None:
-    """Add to_dict/from_dict on A2A models if missing (older deployments)."""
     try:
         import sincor2.a2a_integration as a2a
         from sincor2.a2a_integration import A2ATask, A2AMessage, A2AArtifact, TaskState
@@ -200,21 +200,19 @@ def install() -> None:
 
 
 def register_a2a(app) -> bool:
-    """Idempotent: install runtime + register A2ARouter discovery on *app*.
-
-    Owns ``/.well-known/agent-card.json``, ``/.well-known/agent.json``,
-    ``/api/a2a/quote``, ``/api/a2a/agents``. Safe to call twice.
-    """
+    """Idempotent: install runtime + register A2ARouter discovery on *app*."""
     try:
         install()
         names = getattr(app, "blueprints", {}) or {}
-        if "a2a" in names:
-            logger.info("A2ARouter already registered")
-            return True
-        from sincor2.a2a_integration import A2ARouter
-
-        app.register_blueprint(A2ARouter().blueprint)
-        logger.info("A2ARouter registered — discovery surfaces live")
+        if "a2a" not in names:
+            from sincor2.a2a_integration import A2ARouter
+            app.register_blueprint(A2ARouter().blueprint)
+            logger.info("A2ARouter registered — discovery surfaces live")
+        try:
+            from sincor2.kya_bootstrap import mount_kya_stack
+            mount_kya_stack(app)
+        except Exception as kya_err:
+            logger.warning("KYA mount skipped: %s", kya_err)
         return True
     except Exception as err:
         logger.error("A2ARouter registration failed: %s", err)
