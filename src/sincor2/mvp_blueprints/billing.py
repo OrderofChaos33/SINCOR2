@@ -60,7 +60,13 @@ def platform_checkout():
     plan_id = sanitize_string(data.get('plan_id', 'intel'), max_length=32)
     email = validate_email(data.get('customer_email', '')) or ''
     wallet = validate_wallet(data.get('payer_wallet', '')) or ''
-    result = platform_create_checkout(plan_id, payer_wallet=wallet or '', customer_email=email)
+    idem = sanitize_string(data.get('idempotency_key', ''), max_length=128)
+    result = platform_create_checkout(
+        plan_id,
+        payer_wallet=wallet or '',
+        customer_email=email,
+        idempotency_key=idem,
+    )
     if not result.get('ok'):
         code = 400 if result.get('error') != 'spot_price_unavailable' else 503
         return jsonify(result), code

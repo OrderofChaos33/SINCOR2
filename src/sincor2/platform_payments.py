@@ -149,6 +149,18 @@ def init_platform_payments_db() -> None:
             metadata TEXT
         )"""
     )
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(platform_checkouts)").fetchall()}
+    if "idempotency_key" not in cols:
+        conn.execute("ALTER TABLE platform_checkouts ADD COLUMN idempotency_key TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_platform_checkouts_idem "
+        "ON platform_checkouts(idempotency_key, status)"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_checkouts_tx_hash "
+        "ON platform_checkouts(tx_hash) WHERE tx_hash IS NOT NULL AND tx_hash != '' "
+        "AND status = 'completed'"
+    )
     conn.commit()
     conn.close()
 
@@ -386,6 +398,7 @@ def create_checkout(
     *,
     payer_wallet: str = "",
     customer_email: str = "",
+    idempotency_key: str = "",
 ) -> dict[str, Any]:
     plan = get_plan(plan_id)
     if not plan:
@@ -397,8 +410,36 @@ def create_checkout(
 
     atomic = display_to_atomic(display, token)
     now = datetime.now(timezone.utc)
-    payment_id = f"PLAT-{now.strftime('%Y%m%d%H%M%S')}-{plan_id[:4].upper()}"
+    wallet = payer_wallet.lower() if payer_wallet else ""
+    key = (idempotency_key or "").strip()
+    if not key and wallet:
+        window = now.strftime("%Y%m%d%H")
+        key = f"{wallet}:{plan_id}:{window}"
 
+    if key:
+        with _conn() as conn:
+            existing = conn.execute(
+                """SELECT * FROM platform_checkouts
+                   WHERE idempotency_key=? AND status IN ('pending', 'verifying', 'completed')
+                   ORDER BY created_at DESC LIMIT 1""",
+                (key,),
+            ).fetchone()
+        if existing:
+            expires = existing["expires_at"]
+            still_open = True
+            if expires:
+                try:
+                    still_open = datetime.fromisoformat(
+                        expires.replace("Z", "+00:00")
+                    ) >= now
+                except ValueError:
+                    still_open = True
+            if existing["status"] == "completed" or still_open:
+                return _checkout_payload(dict(existing), reused=True, spot=spot, mode=mode)
+
+    expire_stale_checkouts()
+
+    payment_id = f"PLAT-{now.strftime('%Y%m%d%H%M%S')}-{plan_id[:4].upper()}"
     expires = now.timestamp() + 3600
     expires_at = datetime.fromtimestamp(expires, tz=timezone.utc).isoformat()
 
@@ -406,8 +447,9 @@ def create_checkout(
         conn.execute(
             """INSERT INTO platform_checkouts
                (payment_id, plan_id, product_name, token, amount_atomic, amount_display,
-                usd_reference, payer_wallet, customer_email, status, created_at, expires_at, metadata)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)""",
+                usd_reference, payer_wallet, customer_email, status, created_at, expires_at,
+                metadata, idempotency_key)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)""",
             (
                 payment_id,
                 plan_id,
@@ -416,7 +458,7 @@ def create_checkout(
                 str(atomic),
                 display,
                 plan["usd_reference"],
-                payer_wallet.lower() if payer_wallet else "",
+                wallet,
                 customer_email,
                 now.isoformat(),
                 expires_at,
@@ -426,12 +468,14 @@ def create_checkout(
                     "pricing_mode": mode,
                     "preferred_token": plan["token"],
                 }),
+                key,
             ),
         )
         conn.commit()
 
     return {
         "ok": True,
+        "reused": False,
         "payment_id": payment_id,
         "plan_id": plan_id,
         "plan_label": plan["label"],
@@ -448,23 +492,80 @@ def create_checkout(
         "chain_id": CHAIN_ID,
         "billing": plan["billing"],
         "expires_at": expires_at,
+        "idempotency_key": key,
         "message": f"Send {display} {token} on Base to {TREASURY}",
     }
 
 
-def _rpc_call(method: str, params: list) -> Any:
-    rpc = os.environ.get("BASE_RPC_URL", "https://mainnet.base.org")
+def _checkout_payload(row: dict[str, Any], *, reused: bool, spot: float | None, mode: str) -> dict[str, Any]:
+    token = row["token"]
+    display = row["amount_display"]
+    return {
+        "ok": True,
+        "reused": reused,
+        "payment_id": row["payment_id"],
+        "plan_id": row["plan_id"],
+        "product_name": row["product_name"],
+        "token": token,
+        "token_address": token_address(token),
+        "token_decimals": token_decimals(token),
+        "amount_display": display,
+        "amount_atomic": str(row["amount_atomic"]),
+        "usd_reference": row["usd_reference"],
+        "spot_usd": spot,
+        "pricing_mode": mode,
+        "treasury": TREASURY,
+        "chain_id": CHAIN_ID,
+        "status": row["status"],
+        "expires_at": row["expires_at"],
+        "idempotency_key": row.get("idempotency_key") or "",
+        "message": f"Send {display} {token} on Base to {TREASURY}",
+    }
+
+
+def _rpc_urls() -> list[str]:
+    urls: list[str] = []
+    primary = (os.environ.get("BASE_RPC_URL") or "").strip()
+    if primary:
+        urls.append(primary)
+    extra = (os.environ.get("BASE_RPC_URLS") or "").strip()
+    if extra:
+        urls.extend(u.strip() for u in extra.split(",") if u.strip())
+    for fallback in ("https://mainnet.base.org", "https://base.llamarpc.com"):
+        if fallback not in urls:
+            urls.append(fallback)
+    seen: set[str] = set()
+    out: list[str] = []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
+def _rpc_call(method: str, params: list, attempts: int = 3) -> Any:
+    last_err: Exception | None = None
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
-    req = urllib.request.Request(
-        rpc,
-        data=body,
-        headers={"Content-Type": "application/json", "User-Agent": "SINCOR-platform-payments/1.0"},
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        data = json.loads(resp.read().decode())
-    if "error" in data:
-        raise RuntimeError(data["error"])
-    return data.get("result")
+    for url in _rpc_urls():
+        for i in range(max(1, attempts)):
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "User-Agent": "SINCOR-platform-payments/1.0",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=12) as resp:
+                    data = json.loads(resp.read().decode())
+                if "error" in data:
+                    raise RuntimeError(data["error"])
+                return data.get("result")
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError, RuntimeError) as err:
+                last_err = err
+                time.sleep(0.25 * (2 ** i))
+    raise last_err or RuntimeError("rpc_failed")
 
 
 def _parse_transfer_logs(receipt: dict, token_addr: str, treasury: str) -> list[dict[str, Any]]:
@@ -660,6 +761,23 @@ def subscriptions_needing_renewal(within_days: int = 7) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def expire_stale_checkouts(now: datetime | None = None) -> int:
+    """Mark pending/verifying checkouts past expires_at as expired."""
+    now = now or datetime.now(timezone.utc)
+    stamp = now.isoformat()
+    with _conn() as conn:
+        cur = conn.execute(
+            """UPDATE platform_checkouts
+               SET status='expired'
+               WHERE status IN ('pending', 'verifying')
+                 AND expires_at IS NOT NULL
+                 AND expires_at < ?""",
+            (stamp,),
+        )
+        conn.commit()
+        return cur.rowcount
+
+
 def verify_checkout(
     payment_id: str,
     tx_hash: str,
@@ -672,17 +790,35 @@ def verify_checkout(
     if not tx_hash.startswith("0x") or len(tx_hash) != 66:
         return {"ok": False, "error": "invalid_tx_hash"}
 
-    with _conn() as conn:
+    expire_stale_checkouts()
+    now = datetime.now(timezone.utc)
+
+    conn = _conn()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT * FROM platform_checkouts WHERE payment_id=?", (payment_id,)
         ).fetchone()
         if not row:
+            conn.rollback()
             return {"ok": False, "error": "checkout_not_found"}
         if row["status"] == "completed":
+            conn.rollback()
             return {"ok": True, "status": "already_completed", "tx_hash": row["tx_hash"]}
+        if row["status"] == "expired":
+            conn.rollback()
+            return {"ok": False, "error": "checkout_expired"}
+        if row["status"] == "verifying":
+            conn.rollback()
+            return {"ok": False, "error": "verify_in_progress"}
 
         expires = row["expires_at"]
-        if expires and datetime.fromisoformat(expires.replace("Z", "+00:00")) < datetime.now(timezone.utc):
+        if expires and datetime.fromisoformat(expires.replace("Z", "+00:00")) < now:
+            conn.execute(
+                "UPDATE platform_checkouts SET status='expired' WHERE payment_id=?",
+                (payment_id,),
+            )
+            conn.commit()
             return {"ok": False, "error": "checkout_expired"}
 
         dup = conn.execute(
@@ -690,7 +826,20 @@ def verify_checkout(
             (tx_hash,),
         ).fetchone()
         if dup:
+            conn.rollback()
             return {"ok": False, "error": "tx_already_used"}
+
+        claimed = conn.execute(
+            "UPDATE platform_checkouts SET status='verifying' WHERE payment_id=? AND status='pending'",
+            (payment_id,),
+        )
+        if claimed.rowcount != 1:
+            conn.rollback()
+            return {"ok": False, "error": "verify_in_progress"}
+        conn.commit()
+        row = dict(row)
+    finally:
+        conn.close()
 
     token = row["token"]
     expected = int(row["amount_atomic"])
@@ -698,20 +847,52 @@ def verify_checkout(
         tx_hash, token=token, expected_atomic=expected, payer_wallet=payer_wallet
     )
     if not vr.get("ok"):
+        with _conn() as conn:
+            conn.execute(
+                "UPDATE platform_checkouts SET status='pending' WHERE payment_id=? AND status='verifying'",
+                (payment_id,),
+            )
+            conn.commit()
         return vr
+
     payer = vr["payer_wallet"]
     paid = vr["amount_atomic"]
-
     meta = json.loads(row["metadata"] or "{}")
     order_id = f"TOKEN-ORD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
 
-    with _conn() as conn:
-        conn.execute(
-            """UPDATE platform_checkouts SET status='completed', tx_hash=?, payer_wallet=?,
-               customer_email=COALESCE(NULLIF(?, ''), customer_email) WHERE payment_id=?""",
-            (tx_hash, payer, customer_email, payment_id),
-        )
-        conn.commit()
+    try:
+        with _conn() as conn:
+            conn.execute(
+                """UPDATE platform_checkouts SET status='completed', tx_hash=?, payer_wallet=?,
+                   customer_email=COALESCE(NULLIF(?, ''), customer_email) WHERE payment_id=?""",
+                (tx_hash, payer, customer_email, payment_id),
+            )
+            conn.commit()
+    except sqlite3.IntegrityError:
+        with _conn() as conn:
+            conn.execute(
+                "UPDATE platform_checkouts SET status='pending' WHERE payment_id=? AND status='verifying'",
+                (payment_id,),
+            )
+            conn.commit()
+        return {"ok": False, "error": "tx_already_used"}
+
+    try:
+        from sincor2.treasury_settlement import record_platform_fee_inflow
+
+        usd = float(row["usd_reference"] or 0)
+        fee = usd * 0.05 if usd > 0 else 0.0
+        if fee > 0:
+            record_platform_fee_inflow(
+                fee_amount=fee,
+                asset=token,
+                source="human_checkout",
+                tx_hash=tx_hash,
+                task_id=payment_id,
+                note=f"checkout {row['plan_id']} {row['product_name']}",
+            )
+    except Exception:
+        pass
 
     return {
         "ok": True,

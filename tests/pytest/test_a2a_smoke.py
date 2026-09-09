@@ -10,6 +10,9 @@ def test_agent_card_endpoint(client):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload.get("name")
+    assert payload.get("protocolVersion") == "1.0.1"
+    assert payload.get("preferredTransport") == "JSONRPC"
+    assert str(payload.get("url") or "").endswith("/api/a2a")
 
 
 def test_agent_card_has_12_required_skills(client):
@@ -68,6 +71,21 @@ def test_a2a_quote_post_known_skill(client):
     assert "input_schema" in data
     assert "output_schema" in data
     assert "estimated_latency_seconds" in data
+
+
+def test_a2a_quote_skill_alias(client):
+    response = client.post("/api/a2a/quote", json={"skill": "lead-enrichment"})
+    assert response.status_code == 200
+    assert response.get_json()["skill_id"] == "lead-enrichment"
+
+
+def test_docs_a2a_is_not_404(client):
+    response = client.get("/docs/a2a")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data.get("protocolVersion") == "1.0.1"
+    assert data.get("preferredTransport") == "JSONRPC"
+    assert "lead-enrichment" in data.get("skills", [])
 
 
 def test_a2a_quote_get_known_skill(client):

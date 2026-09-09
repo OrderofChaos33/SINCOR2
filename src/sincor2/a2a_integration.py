@@ -248,16 +248,23 @@ class AgentCard:
     icon_url:              Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        url = (self.supported_interfaces[0].url
+               if self.supported_interfaces else PLATFORM_URL)
+        binding = (self.supported_interfaces[0].protocol_binding
+                   if self.supported_interfaces else "JSONRPC")
         d: Dict[str, Any] = {
-            "name":               self.name,
-            "description":        self.description,
-            "version":            self.version,
+            "protocolVersion":     A2A_PROTOCOL_VERSION,
+            "name":                self.name,
+            "description":         self.description,
+            "url":                 url,
+            "preferredTransport":  binding,
+            "version":             self.version,
             "supportedInterfaces": [i.to_dict() for i in self.supported_interfaces],
-            "provider":           self.provider,
-            "capabilities":       self.capabilities,
-            "defaultInputModes":  self.default_input_modes,
-            "defaultOutputModes": self.default_output_modes,
-            "skills":             [s.to_dict() for s in self.skills],
+            "provider":            self.provider,
+            "capabilities":        self.capabilities,
+            "defaultInputModes":   self.default_input_modes,
+            "defaultOutputModes":  self.default_output_modes,
+            "skills":              [s.to_dict() for s in self.skills],
         }
         if self.security_schemes:
             d["securitySchemes"] = self.security_schemes
@@ -1353,6 +1360,62 @@ def _compute_platform_fee_wei(amount_wei: int) -> int:
     return (amount * A2A_PLATFORM_FEE_BPS) // _BPS_DENOM
 
 
+def _resolve_skill_id(*sources: Any) -> str:
+    """Accept skill_id / skillId / skill from query args or JSON bodies."""
+    for src in sources:
+        if src is None:
+            continue
+        getter = src.get if hasattr(src, "get") else None
+        if getter is None:
+            continue
+        for key in ("skill_id", "skillId", "skill"):
+            val = getter(key)
+            if val:
+                return str(val).strip()
+    return ""
+
+
+def maybe_record_a2a_platform_fee(
+    *,
+    axm_paid_wei: int,
+    tx_hash: Optional[str],
+    task_id: Optional[str] = None,
+    free_call: bool = False,
+    existing_fee: Any = 0,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Record realized AXM platform fee. Skip free, simulated, and zero fees.
+
+    Safe to call without Flask / platform coordinator. Exactly one ledger
+    write when a paid, non-simulated task settles (settle + finalize).
+    """
+    if metadata and metadata.get("fee_recorded"):
+        return None
+    simulated = bool(tx_hash) and str(tx_hash).startswith("0xSIMULATED")
+    if free_call or simulated or not tx_hash or axm_paid_wei <= 0:
+        return None
+    fee = 0.0
+    try:
+        if existing_fee not in (None, "", 0, "0"):
+            fee = float(existing_fee)
+    except (TypeError, ValueError):
+        fee = 0.0
+    if fee <= 0:
+        fee = float(axm_paid_wei) * A2A_PLATFORM_FEE_BPS / _BPS_DENOM / (10 ** 18)
+    if fee <= 0:
+        return None
+    recorded = record_platform_fee_inflow(
+        fee_amount=fee,
+        asset="AXM",
+        source="a2a_settlement",
+        tx_hash=tx_hash,
+        task_id=task_id,
+    )
+    if recorded is not None and metadata is not None:
+        metadata["fee_recorded"] = True
+    return recorded
+
+
 def _reject_non_axm(token) -> Optional[str]:
     if not token:
         return None
@@ -1566,6 +1629,37 @@ class A2ARouter:
             from flask import jsonify
             return jsonify(build_agent_card().to_legacy_dict())
 
+        @bp.route("/docs/a2a", methods=["GET"])
+        def a2a_docs():
+            """Machine-readable A2A surface so Agent Card documentationUrl is not 404."""
+            from flask import jsonify
+            card = build_agent_card()
+            return jsonify({
+                "protocolVersion": A2A_PROTOCOL_VERSION,
+                "url": f"{PLATFORM_URL}/api/a2a",
+                "preferredTransport": "JSONRPC",
+                "discovery": {
+                    "agentCard": f"{PLATFORM_URL}/.well-known/agent-card.json",
+                    "legacyCard": f"{PLATFORM_URL}/.well-known/agent.json",
+                    "agents": f"{PLATFORM_URL}/api/a2a/agents",
+                },
+                "methods": [
+                    "message/send", "message/stream", "tasks/get", "tasks/cancel",
+                    "tasks/list", "tasks/resubscribe",
+                ],
+                "quote": f"{PLATFORM_URL}/api/a2a/quote",
+                "settle": f"{PLATFORM_URL}/api/a2a/settle",
+                "skillAliases": ["skill_id", "skillId", "skill"],
+                "settlement": {
+                    "asset": "AXM",
+                    "axiom": AXIOM_CONTRACT,
+                    "treasury": TREASURY_WALLET,
+                    "chainId": CHAIN_ID,
+                    "platformFeeBps": A2A_PLATFORM_FEE_BPS,
+                },
+                "skills": [s.id for s in card.skills],
+            })
+
         # ── Unified JSON-RPC dispatcher (A2A v1.0.1) ─────────────────────────
         @bp.route("/api/a2a", methods=["POST"])
         def rpc_dispatch():
@@ -1670,12 +1764,12 @@ class A2ARouter:
         def quote():
             from flask import jsonify, request
             if request.method == "GET":
-                skill_id = request.args.get("skill_id", "")
-                caller_id = request.args.get("caller_id", "anonymous")
+                skill_id = _resolve_skill_id(request.args)
+                caller_id = request.args.get("caller_id") or request.args.get("callerId") or "anonymous"
             else:
                 body = request.get_json(force=True, silent=True) or {}
-                skill_id = body.get("skill_id", "")
-                caller_id = body.get("caller_id", "anonymous")
+                skill_id = _resolve_skill_id(body)
+                caller_id = body.get("caller_id") or body.get("callerId") or "anonymous"
 
             skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
             if not skill:
@@ -1789,6 +1883,13 @@ class A2ARouter:
                 skill_id=task.skill_id,
                 task_id=task.id,
                 axm_paid_wei=task.axm_paid,
+            )
+            maybe_record_a2a_platform_fee(
+                axm_paid_wei=task.axm_paid,
+                tx_hash=tx_hash or task.tx_hash,
+                task_id=task.id,
+                free_call=bool(task.metadata.get("free_call")),
+                metadata=task.metadata,
             )
             logger.info(
                 "Proof of settlement issued  task=%s  caller=%s  axm=%.4f AXM  tx=%s",
@@ -1916,8 +2017,10 @@ def _extract_send_params(body: Dict[str, Any]):
     msg_obj      = params.get("message") or {}
     configuration = params.get("configuration") or {}
 
-    skill_id   = (params.get("skillId") or params.get("skill_id") or
-                  (msg_obj.get("metadata") or {}).get("skillId", ""))
+    skill_id   = (params.get("skillId") or params.get("skill_id") or params.get("skill") or
+                  (msg_obj.get("metadata") or {}).get("skillId") or
+                  (msg_obj.get("metadata") or {}).get("skill") or
+                  (msg_obj.get("metadata") or {}).get("skill_id") or "")
     context_id = (params.get("contextId") or params.get("sessionId") or
                   params.get("session_id") or msg_obj.get("contextId") or
                   str(uuid.uuid4()))
@@ -2142,9 +2245,21 @@ def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[s
 
 
 def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:
-    """Create a settlement record in the platform coordinator for a paid A2A task."""
+    """Create a settlement record in the platform coordinator for a paid A2A task.
+
+    Platform coordinator is best-effort. Realized fee inflow is recorded even
+    when the coordinator is missing (worker threads, no Flask context).
+    """
+    free_call = bool(task.metadata.get("free_call"))
+    maybe_record_a2a_platform_fee(
+        axm_paid_wei=axm_paid,
+        tx_hash=tx_hash,
+        task_id=task.id,
+        free_call=free_call,
+        metadata=task.metadata,
+    )
     try:
-        from decimal import Decimal, InvalidOperation
+        from decimal import Decimal
 
         from flask import current_app, has_app_context, has_request_context
 
@@ -2168,7 +2283,6 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
             return
 
         amount_display = Decimal(axm_paid) / Decimal(10 ** 18)
-        # Use 15-minute expiry — enough time for on-chain confirmation + retries.
         settlement_expiry = int(os.getenv("A2A_SETTLEMENT_EXPIRY_MINUTES", "15"))
         quote = settlement.create_quote(
             task_reference=task.id,
@@ -2178,49 +2292,11 @@ def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None
             token_symbol="AXIOM",
             expires_in_minutes=settlement_expiry,
         )
-        settlement_record = settlement.confirm_payment(
+        settlement.confirm_payment(
             quote_id=quote.quote_id,
             tx_hash=tx_hash,
             confirmed_amount=amount_display,
         )
-        try:
-            fee_amount = Decimal(str(getattr(settlement_record, "platform_fee", 0) or 0))
-        except (InvalidOperation, TypeError, ValueError):
-            logger.warning(
-                "Invalid platform_fee on settlement record task=%s fee=%r",
-                task.id,
-                getattr(settlement_record, "platform_fee", None),
-            )
-            fee_amount = Decimal("0")
-        simulated = bool(tx_hash) and str(tx_hash).startswith("0xSIMULATED")
-        free_call = bool(task.metadata.get("free_call"))
-        if fee_amount > 0 and tx_hash and not simulated and not free_call:
-            _treasury_inflow.record_inflow(
-                fee_amount,
-                asset=getattr(settlement_record, "token_symbol", "AXM") or "AXM",
-                source="a2a_settlement",
-                tx_hash=tx_hash,
-                note=f"a2a task {task.id} platform fee",
-                projected=False,
-            )
-        if axm_paid > 0 and tx_hash and not simulated and not free_call:
-            try:
-                computed_fee = (
-                    Decimal(axm_paid)
-                    * Decimal(A2A_PLATFORM_FEE_BPS)
-                    / Decimal(_BPS_DENOM)
-                    / Decimal(10**18)
-                )
-                if computed_fee > 0 and fee_amount <= 0:
-                    record_platform_fee_inflow(
-                        fee_amount=computed_fee,
-                        asset="AXM",
-                        source="a2a_settlement",
-                        tx_hash=tx_hash,
-                        task_id=task.id,
-                    )
-            except Exception as fee_exc:
-                logger.warning("record_platform_fee_inflow failed task=%s: %s", task.id, fee_exc)
         logger.info(
             "A2A settlement recorded task=%s axm=%.4f tx=%s",
             task.id,

@@ -110,6 +110,12 @@ def heartbeat_agent(agent_id: str, signature: str = "") -> Dict[str, Any]:
         tags = list(agent.get("capability_tags") or [])
     fabric.publish("agent.heartbeat", tags, {"agent_id": agent_id, "ttl_s": HEARTBEAT_TTL_S})
     _kya_heartbeat(agent_id)
+    try:
+        from sincor2.a2a_inbound_market import expire_stale_assignments
+
+        expire_stale_assignments()
+    except Exception as err:
+        logger.debug("expire_stale_assignments skipped: %s", err)
     return {"ok": True, "agent_id": agent_id, "expires_at": ts + HEARTBEAT_TTL_S * 1000}
 
 
