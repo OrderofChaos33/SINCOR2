@@ -1,7 +1,7 @@
 """SINCOR KYA v0 — in-process registry.
 
-Persist: Redis (REDIS_URL / REDIS_PRIVATE_URL) first.
-Disk is a last-resort fallback and will not survive Railway deploys.
+Persist: PersistentStore.kv (same SQLite DB /health already uses).
+Redis only if a URL exists. File is last-resort and dies on Railway.
 """
 from __future__ import annotations
 
@@ -22,11 +22,12 @@ MIN_STAKE_WEI = 10 * 10**18
 VERIFY_FEE_WEI = 2 * 10**18
 HEARTBEAT_TTL_MS = 60_000
 LIVE_GRACE = 3
+STORE_KEY = "sincor:kya:records"
+REDIS_KEY = STORE_KEY
 
 _LOCK = threading.Lock()
 _STORE: Dict[str, Dict[str, Any]] = {}
 _BY_AGENT: Dict[str, str] = {}
-REDIS_KEY = "sincor:kya:records"
 
 
 def _now_ms() -> int:
@@ -60,6 +61,14 @@ def _redis():
         return None
 
 
+def _sqlite():
+    try:
+        from sincor2.persistent_store import get_store
+        return get_store()
+    except Exception:
+        return None
+
+
 def _ingest(records) -> None:
     if not isinstance(records, list):
         return
@@ -82,14 +91,29 @@ def _persist_path() -> Optional[Path]:
         return Path("/tmp/kya_records.json")
 
 
+def _parse_blob(raw) -> None:
+    if not raw:
+        return
+    parsed = json.loads(raw) if isinstance(raw, str) else raw
+    _ingest(parsed.get("records") if isinstance(parsed, dict) else parsed)
+
+
 def load() -> None:
+    store = _sqlite()
+    if store is not None:
+        try:
+            raw = store.kv_get(STORE_KEY)
+            if raw:
+                _parse_blob(raw)
+                return
+        except Exception:
+            pass
     client = _redis()
     if client is not None:
         try:
             raw = client.get(REDIS_KEY)
             if raw:
-                parsed = json.loads(raw)
-                _ingest(parsed.get("records") if isinstance(parsed, dict) else parsed)
+                _parse_blob(raw)
                 return
         except Exception:
             pass
@@ -97,8 +121,7 @@ def load() -> None:
     if path is None or not path.is_file():
         return
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        _ingest(raw.get("records") if isinstance(raw, dict) else raw)
+        _parse_blob(path.read_text(encoding="utf-8"))
     except Exception:
         pass
 
@@ -106,6 +129,13 @@ def load() -> None:
 def save() -> None:
     with _LOCK:
         payload = json.dumps({"records": list(_STORE.values()), "saved_at": _now_ms()})
+    store = _sqlite()
+    if store is not None:
+        try:
+            store.kv_set(STORE_KEY, payload)
+            return
+        except Exception:
+            pass
     client = _redis()
     if client is not None:
         try:
@@ -364,7 +394,11 @@ def lookup_wallet(wallet: str) -> List[Dict[str, Any]]:
 
 
 def backend_name() -> str:
-    return "redis" if _redis() is not None else "ephemeral-file"
+    if _sqlite() is not None:
+        return "sqlite"
+    if _redis() is not None:
+        return "redis"
+    return "ephemeral-file"
 
 
 def snapshot() -> Dict[str, Any]:
@@ -374,7 +408,7 @@ def snapshot() -> Dict[str, Any]:
         "token": AXM,
         "chain_id": CHAIN_ID,
         "backend": backend_name(),
-        "redis_key": REDIS_KEY,
+        "store_key": STORE_KEY,
         "min_stake_wei": str(MIN_STAKE_WEI),
         "verify_fee_wei": str(VERIFY_FEE_WEI),
         "listed": len(recs),
