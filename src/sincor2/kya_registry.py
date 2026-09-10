@@ -1,7 +1,7 @@
 """SINCOR KYA v0 — in-process registry.
 
-Hooks the existing inbound fabric without replacing it.
-Persist path: data_dir()/kya_records.json
+Persist: PersistentStore.kv (same SQLite DB /health already uses).
+Redis only if a URL exists. File is last-resort and dies on Railway.
 """
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ MIN_STAKE_WEI = 10 * 10**18
 VERIFY_FEE_WEI = 2 * 10**18
 HEARTBEAT_TTL_MS = 60_000
 LIVE_GRACE = 3
+STORE_KEY = "sincor:kya:records"
+REDIS_KEY = STORE_KEY
 
 _LOCK = threading.Lock()
 _STORE: Dict[str, Dict[str, Any]] = {}
@@ -33,51 +35,122 @@ def _now_ms() -> int:
 
 
 def reset() -> None:
-    """Test-only: wipe in-memory index. Does not delete disk until next save."""
     with _LOCK:
         _STORE.clear()
         _BY_AGENT.clear()
 
 
+def _redis_url() -> str:
+    import os
+    return (
+        os.environ.get("KYA_REDIS_URL")
+        or os.environ.get("REDIS_PRIVATE_URL")
+        or os.environ.get("REDIS_URL")
+        or ""
+    ).strip()
+
+
+def _redis():
+    url = _redis_url()
+    if not url:
+        return None
+    try:
+        import redis  # type: ignore
+        return redis.Redis.from_url(url, decode_responses=True, socket_timeout=3)
+    except Exception:
+        return None
+
+
+def _sqlite():
+    try:
+        from sincor2.persistent_store import get_store
+        return get_store()
+    except Exception:
+        return None
+
+
+def _ingest(records) -> None:
+    if not isinstance(records, list):
+        return
+    with _LOCK:
+        for rec in records:
+            if isinstance(rec, dict) and rec.get("kya_id") and rec.get("agent_id"):
+                _STORE[rec["kya_id"]] = rec
+                _BY_AGENT[rec["agent_id"]] = rec["kya_id"]
+
+
 def _persist_path() -> Optional[Path]:
     import os
-
     override = os.environ.get("KYA_STORE_PATH")
     if override:
         return Path(override)
     try:
         from sincor2.data_paths import data_dir
-
         return data_dir() / "kya_records.json"
     except Exception:
         return Path("/tmp/kya_records.json")
 
 
+def _parse_blob(raw) -> None:
+    if not raw:
+        return
+    parsed = json.loads(raw) if isinstance(raw, str) else raw
+    _ingest(parsed.get("records") if isinstance(parsed, dict) else parsed)
+
+
 def load() -> None:
+    store = _sqlite()
+    if store is not None:
+        try:
+            raw = store.kv_get(STORE_KEY)
+            if raw:
+                _parse_blob(raw)
+                return
+        except Exception:
+            pass
+    client = _redis()
+    if client is not None:
+        try:
+            raw = client.get(REDIS_KEY)
+            if raw:
+                _parse_blob(raw)
+                return
+        except Exception:
+            pass
     path = _persist_path()
     if path is None or not path.is_file():
         return
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        records = raw.get("records") if isinstance(raw, dict) else raw
-        if isinstance(records, list):
-            with _LOCK:
-                for rec in records:
-                    if isinstance(rec, dict) and rec.get("kya_id"):
-                        _STORE[rec["kya_id"]] = rec
-                        _BY_AGENT[rec["agent_id"]] = rec["kya_id"]
+        _parse_blob(path.read_text(encoding="utf-8"))
     except Exception:
         pass
 
 
 def save() -> None:
+    with _LOCK:
+        payload = json.dumps({"records": list(_STORE.values()), "saved_at": _now_ms()})
+    store = _sqlite()
+    if store is not None:
+        try:
+            store.kv_set(STORE_KEY, payload)
+            return
+        except Exception:
+            pass
+    client = _redis()
+    if client is not None:
+        try:
+            client.set(REDIS_KEY, payload)
+            return
+        except Exception:
+            pass
     path = _persist_path()
     if path is None:
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with _LOCK:
-        payload = {"records": list(_STORE.values()), "saved_at": _now_ms()}
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(payload, encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _canonical(obj: Any) -> str:
@@ -85,8 +158,7 @@ def _canonical(obj: Any) -> str:
 
 
 def card_hash(card: Dict[str, Any]) -> str:
-    digest = hashlib.sha256(_canonical(card).encode()).hexdigest()
-    return "0x" + digest
+    return "0x" + hashlib.sha256(_canonical(card).encode()).hexdigest()
 
 
 def make_kya_id(agent_id: str, principal: str, c_hash: str) -> str:
@@ -113,15 +185,7 @@ def score(rec: Dict[str, Any]) -> int:
     completion = (completed / total) if total else 0.0
     slashed = int(jobs.get("slashed") or 0)
     disputed = int(jobs.get("disputed") or 0)
-    raw = (
-        200 * live
-        + 200 * bound
-        + 200 * staked
-        + 200 * uptime
-        + 200 * completion
-        - 50 * slashed
-        - 100 * disputed
-    )
+    raw = 200 * live + 200 * bound + 200 * staked + 200 * uptime + 200 * completion - 50 * slashed - 100 * disputed
     return max(0, min(1000, int(raw)))
 
 
@@ -139,8 +203,7 @@ def refresh_status(rec: Dict[str, Any]) -> Dict[str, Any]:
     expired = False
     if valid_until:
         try:
-            from datetime import datetime, timezone
-
+            from datetime import datetime
             dt = datetime.fromisoformat(valid_until.replace("Z", "+00:00"))
             expired = dt.timestamp() * 1000 < _now_ms()
         except Exception:
@@ -225,12 +288,7 @@ def bind(agent_id: str, principal: str, signature: str, message: str, recovered:
     if signer != principal.lower():
         raise ValueError("signer mismatch")
     rec["principal"] = principal
-    rec["attestation"] = {
-        "scheme": "eip191",
-        "message": message,
-        "signature": signature,
-        "recovered": principal,
-    }
+    rec["attestation"] = {"scheme": "eip191", "message": message, "signature": signature, "recovered": principal}
     rec["status"] = "bound"
     refresh_status(rec)
     save()
@@ -322,8 +380,7 @@ def get(kya_id: str) -> Optional[Dict[str, Any]]:
 def get_by_agent(agent_id: str) -> Optional[Dict[str, Any]]:
     with _LOCK:
         kid = _BY_AGENT.get(agent_id)
-        rec = _STORE.get(kid) if kid else None
-        return rec
+        return _STORE.get(kid) if kid else None
 
 
 def lookup_wallet(wallet: str) -> List[Dict[str, Any]]:
@@ -336,12 +393,22 @@ def lookup_wallet(wallet: str) -> List[Dict[str, Any]]:
         ]
 
 
+def backend_name() -> str:
+    if _sqlite() is not None:
+        return "sqlite"
+    if _redis() is not None:
+        return "redis"
+    return "ephemeral-file"
+
+
 def snapshot() -> Dict[str, Any]:
     with _LOCK:
         recs = list(_STORE.values())
     return {
         "token": AXM,
         "chain_id": CHAIN_ID,
+        "backend": backend_name(),
+        "store_key": STORE_KEY,
         "min_stake_wei": str(MIN_STAKE_WEI),
         "verify_fee_wei": str(VERIFY_FEE_WEI),
         "listed": len(recs),
@@ -351,7 +418,6 @@ def snapshot() -> Dict[str, Any]:
 
 
 def hook_listed(agent: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Best-effort list after inbound register. Never raises into A2A."""
     try:
         if not agent or not agent.get("agent_id"):
             return None
@@ -361,7 +427,6 @@ def hook_listed(agent: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def hook_heartbeat(agent_id: str, ok: bool = True) -> Optional[Dict[str, Any]]:
-    """Best-effort liveness copy. Never raises into A2A."""
     try:
         return heartbeat(agent_id, ok=ok)
     except Exception:
