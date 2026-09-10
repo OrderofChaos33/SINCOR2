@@ -21,6 +21,12 @@ def health():
     return jsonify({"ok": True, **kya.snapshot()})
 
 
+@kya_bp.get("/directory")
+def directory():
+    """Static path must sit above /<kya_id> or Flask treats 'directory' as an id."""
+    return jsonify(kya.snapshot())
+
+
 @kya_bp.post("/list")
 def list_agent():
     body = request.get_json(silent=True) or {}
