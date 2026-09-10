@@ -5,15 +5,15 @@
       "id": "builders-ci-watch",
       "title": "Watch SINCOR2 CI and open PRs",
       "interval_minutes": 60,
-      "prompt": "Check OrderofChaos33/SINCOR2: failing CI runs, open PRs awaiting review, new issues. Summarize blockers and propose the next highest-ROI code action. Never merge without auditor validation.",
-      "kpis": ["ci_green", "prs_reviewed"],
+      "prompt": "Check OrderofChaos33/SINCOR2: failing CI runs, open PRs awaiting review, and new issues. Prioritize PRs #116, #102, and #81. Confirm AXM-only A2A settlement and record_platform_fee_inflow fee-path behavior stay green. Summarize blockers and propose the next highest-ROI code action tied to realized treasury inflow. Yield Aggregator work is product/demo DRY_RUN only (no treasury/founder cash farming). Never merge without auditor validation.",
+      "kpis": ["ci_green", "prs_reviewed", "material_prs_status"],
       "requires": []
     },
     {
       "id": "builders-module-next",
       "title": "Propose next DeFi module per TOA priority",
       "interval_minutes": 720,
-      "prompt": "Given the current repo state (v4 hooks, SharedLiquidityVault, SincFluidAdapter, ComplianceGuard), propose the next module by projected fee capture / risk. Include: spec sketch, test plan (unit+fuzz+invariant), deploy path via `cd onchain && make ship`.",
+      "prompt": "Given the current repo state (v4 hooks, SharedLiquidityVault, SincFluidAdapter, ComplianceGuard), propose the next module by projected fee capture / risk with conversion-first sequencing. Keep Yield Aggregator as a sellable product module in DRY_RUN demo mode until first realized conversion; do not route treasury/founder cash into Morpho/Aave/SharedLiquidity. Include: spec sketch, test plan (unit+fuzz+invariant), deploy path via `cd onchain && make ship`.",
       "kpis": ["module_specs"],
       "requires": ["builders-ci-watch"]
     }

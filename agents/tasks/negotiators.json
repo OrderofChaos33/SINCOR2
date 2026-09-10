@@ -5,7 +5,7 @@
       "id": "negotiators-paylink-seq",
       "title": "Advance 3-touch sequences to /buy only",
       "interval_minutes": 60,
-      "prompt": "For each qualified scout lead: draft Touch-1/2/3 under 85 words from docs/launch/ZERO_TO_ONE_CONVERSION_SEQUENCES.md. CTA is pay link https://getsincor.com/buy or /products/starter — never a calendar, never 'reply to Court'. Queue for auditor. Do not send without RESEND_API_KEY + auditor pass. STOP on reply. KPI: checkout_clicks + realized_tx_hash to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac.",
+      "prompt": "For each qualified scout lead: draft Touch-1/2/3 under 85 words from docs/launch/ZERO_TO_ONE_CONVERSION_SEQUENCES.md. Conversion P0 is to lock one paid pilot (Healthcare RCM / Starter / $49 intel). CTA is pay link https://getsincor.com/buy or /products/starter — never a calendar, never 'reply to Court'. Queue for auditor. Do not send without RESEND_API_KEY + auditor pass. STOP on reply. KPI: checkout_clicks + realized_tx_hash to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac.",
       "kpis": ["sequences_advanced", "checkout_clicks"],
       "requires": ["scouts-icp-healthcare-rcm"]
     },
@@ -13,7 +13,7 @@
       "id": "negotiators-a2a-external",
       "title": "External A2A callers pay AXM",
       "interval_minutes": 120,
-      "prompt": "Push Agent Card https://getsincor.com/.well-known/agent-card.json to one discovery surface (itinai, agentpeering, Base directories). Quote path AXM-only. Success = external discovery→quote→pay with tx_hash.",
+      "prompt": "Push Agent Card https://getsincor.com/.well-known/agent-card.json to one discovery surface (itinai, agentpeering, Base directories). Quote path AXM-only and fee path must record to treasury. Success = external discovery→quote→pay with tx_hash; run broader discovery 200 only after fee-path-live confirmation.",
       "kpis": ["external_a2a_settlements"],
       "requires": []
     }
