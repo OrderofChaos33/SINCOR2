@@ -3,7 +3,7 @@
 {% block body %}
 <p class="kicker">Calendar handoff</p>
 <h2 class="page">Bays</h2>
-<p class="lede">Website self-booking is down. Until Calendly is live, the real path is text {{ shop.phone }}. CHROMA still builds a prefilled link for when you turn it back on.</p>
+<p class="lede">Online book is Square on clintondetail.com. If that page is down, they text {{ shop.phone }}.</p>
 
 <article class="card">
   <p class="k">Text to book</p>
@@ -13,9 +13,14 @@
 </article>
 
 <article class="card" style="margin-top:16px">
-  <p class="k">Calendly (optional)</p>
-  <p class="v" style="font-size:1rem">{{ shop.calendly_url or 'not set — paste it on Shop' }}</p>
-  <p class="meta">Handle: {{ shop.calendly_handle }}</p>
+  <p class="k">Website</p>
+  <p class="v" style="font-size:1rem"><a href="{{ shop.url }}" target="_blank" rel="noopener">{{ shop.url }}</a></p>
+  {% if shop.booking_url %}
+    <p style="margin-top:8px"><a class="btn" href="{{ shop.booking_url }}" target="_blank" rel="noopener">Open Square booking</a></p>
+  {% endif %}
+  {% if shop.menu_url %}
+    <p class="meta" style="margin-top:8px"><a href="{{ shop.menu_url }}" target="_blank" rel="noopener">Service menu</a>{% if shop.gift_url %} · <a href="{{ shop.gift_url }}" target="_blank" rel="noopener">Gift cards</a>{% endif %}</p>
+  {% endif %}
 </article>
 
 <div class="card" style="margin-top:16px">

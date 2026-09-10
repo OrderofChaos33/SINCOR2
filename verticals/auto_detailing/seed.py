@@ -286,6 +286,7 @@ def ensure_demo(store: Optional[ChromaStore] = None) -> Dict[str, Any]:
     store = store or get_store()
     counts = store.counts()
     name = store.get_settings().get("shop_name")
-    if counts["leads"] == 0 or name in {"Northline Detail", None, ""}:
+    url = str(store.get_settings().get("url") or "")
+    if counts["leads"] == 0 or name in {"Northline Detail", None, ""} or "clintondetailing.com" in url:
         return seed(store=store, reset=True)
     return counts

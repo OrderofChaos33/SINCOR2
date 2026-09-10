@@ -14,5 +14,7 @@ def test_seed_from_empty(store):
     assert settings["shop_name"] == "Clinton Auto Detailing"
     assert settings["city"] == "Clinton"
     assert settings["phone"] == DEFAULT_SHOP["phone"]
+    assert "clintondetail.com" in settings["url"]
+    assert "squareup.com" in (settings.get("booking_url") or "")
     again = ensure_demo(store)
     assert again["leads"] == 10
