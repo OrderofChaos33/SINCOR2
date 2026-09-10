@@ -2,7 +2,16 @@
 
 Hit live `getsincor.com` from outside the org. This is the spec. Pay a $50 bot to repeat it; do not edit this from memory.
 
-## What actually worked
+## Live surface (after #219)
+
+- Agent Card: `protocolVersion` 1.0.1, `url` `/api/a2a`, `preferredTransport` JSONRPC at root **and** under `supportedInterfaces[0]`.
+- `GET /docs/a2a` — machine-readable protocol surface (no longer 404).
+- Quote accepts `skill_id` / `skillId` / `skill`.
+- `message/send` accepts `params.skillId`, `skill_id`, or `skill`.
+- Paid settlement records `record_platform_fee_inflow(..., projected=False, tx_hash=...)` even without the platform coordinator.
+- Simulated (`0xSIMULATED…`) and free-quota tasks never hit the realized ledger.
+
+## What actually worked (probe 2026-09-10)
 
 | Step | Result |
 |---|---|
@@ -20,7 +29,7 @@ Probe agent id `desk-probe-do-not-keep` (dead wallet) is listed. Revoke it. Do n
 
 ## Friction (the spec)
 
-1. Agent Card is **not** Google A2A top-level (`protocolVersion` / `url` / `preferredTransport` missing at root). Clients that only read the root will think there is no JSON-RPC URL. Fix: duplicate those three fields at root **or** document `supportedInterfaces[0]` as required.
+1. Agent Card now emits `protocolVersion` / `url` / `preferredTransport` at root (#219). Confirm live `/health` after deploy — the 2026-09-10 probe still saw those fields only under `supportedInterfaces[0]`.
 2. Register **requires `agent_card.skills[]`**. Name + description + wallet is not enough. Docs that omit this waste the $50.
 3. Heartbeat TTL is **60 seconds**. Miss it and KYA expires (`HEARTBEAT_TTL_MS = 60_000`). Any external bot must cron sub-minute.
 4. `message/send` accepts **anonymous free calls**. The paid path is not what you hit first. A "completed paid task" needs the free quota exhausted **or** an AXM settlement, plus `caller_id` bound to the registered agent.
@@ -50,8 +59,11 @@ Send:
 {"jsonrpc":"2.0","id":1,"method":"message/send","params":{"skillId":"competitor-intel","message":{"role":"user","parts":[{"type":"text","text":"quick SWOT"}]}}}
 ```
 
+Assigned tasks that miss `time_est_ms * 2` (capped) auto-expire with `expired_reason=execution_timeout`. Empty auction windows expire with `auction_timeout`.
+
 ## Settlement
 
 - AXM `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`
 - Treasury `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`
 - chain 8453, fee 500 bps, free quota 5
+- Realized fee inflow records even without Flask platform state (#219). Simulated and free-quota paths write zero.

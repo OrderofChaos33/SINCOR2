@@ -50,17 +50,25 @@ def _handle_a2a(payload: Dict[str, Any], job_id: str) -> Any:
         _get_task,
         _update_task,
     )
+    from sincor2.a2a_task_store import get_task_store
 
     task_id = payload.get("task_id") or ""
-    task = _get_task(task_id)
-    if not task:
-        raise RuntimeError(f"A2A task {task_id} not found (shared TaskStore required for Celery)")
-    _update_task(task, state=TaskState.WORKING)
-    update_job(job_id, progress=20)
-    output, error = _dispatch_to_swarm(task)
-    update_job(job_id, progress=85)
-    finalized = _finalize_a2a_task(task, output, error)
-    return finalized
+    store = get_task_store()
+    ttl = int(os.getenv("A2A_EXEC_LOCK_TTL", "180"))
+    if not store.acquire_exec_lock(task_id, ttl_seconds=ttl):
+        logger.info("skip a2a.execute task=%s lock held", task_id)
+        return {"task_id": task_id, "skipped": True, "reason": "exec_lock"}
+    try:
+        task = _get_task(task_id)
+        if not task:
+            raise RuntimeError(f"A2A task {task_id} not found (shared TaskStore required for Celery)")
+        _update_task(task, state=TaskState.WORKING)
+        update_job(job_id, progress=20)
+        output, error = _dispatch_to_swarm(task)
+        update_job(job_id, progress=85)
+        return _finalize_a2a_task(task, output, error)
+    finally:
+        store.release_exec_lock(task_id)
 
 
 def _handle_content(payload: Dict[str, Any], job_id: str) -> Any:

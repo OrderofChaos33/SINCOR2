@@ -21,6 +21,7 @@ from sincor2.a2a_inbound import (
     _save_agents,
     get_fabric,
 )
+from sincor2.a2a_timeouts import assignment_deadline_ms
 from sincor2.contract_net import calculate_bid_score, stage_payout
 
 logger = logging.getLogger("sincor.a2a.inbound")
@@ -64,6 +65,7 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
 
 
 def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
+    expire_stale_assignments()
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:
@@ -76,6 +78,7 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
         cands = [b for b in fabric.bids.values() if b.get("task_id") == task_id]
         if not cands:
             task["state"] = "expired"
+            task["expired_reason"] = "auction_timeout"
             return dict(task)
         winner = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))[0]
         task.update({
@@ -90,6 +93,32 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
         tags = list(task.get("tags") or [])
     fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
     return snap
+
+
+def expire_stale_assignments() -> List[Dict[str, Any]]:
+    """Auto-cancel assigned tasks whose execution window has elapsed."""
+    fabric = get_fabric()
+    ts = _now_ms()
+    expired: List[Dict[str, Any]] = []
+    with fabric.lock:
+        for task in fabric.tasks.values():
+            if task.get("state") != "assigned":
+                continue
+            assigned_at = int(task.get("assigned_at") or 0)
+            estimate = int(task.get("time_est_ms") or 0)
+            deadline = assignment_deadline_ms(assigned_at, estimate)
+            if assigned_at and ts > deadline:
+                task["state"] = "expired"
+                task["expired_reason"] = "execution_timeout"
+                task["expired_at"] = ts
+                expired.append(dict(task))
+    for snap in expired:
+        fabric.publish(
+            "task.expired",
+            list(snap.get("tags") or []),
+            {"task_id": snap["task_id"], "reason": "execution_timeout"},
+        )
+    return expired
 
 
 def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) -> Dict[str, Any]:
