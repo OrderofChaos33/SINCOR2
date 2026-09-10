@@ -8,16 +8,28 @@ Grep of current tree for `sk_live_`, `sk_test_`, `AKIA`, `ghp_`, `xai-`, `sk-ant
 
 `.gitleaks.toml` allowlists four historical files. Allowlisting is not rotation.
 
-## Actions (do these on a machine with full history)
+## GitHub secret scanning — ON
 
-1. Turn on GitHub secret scanning + push protection for `OrderofChaos33/SINCOR2`.
-2. `gitleaks detect --source . --log-opts=--all`. Rotate anything that ever sat in a commit, even if later deleted.
-3. Confirm keys that touched the allowlisted files were rotated, not just hidden.
-4. Stripe / PayPal live: `getsincor.com/health` reports both `not_configured`. Set `STRIPE_SECRET_KEY` and PayPal secrets **only** on Railway. Never paste `sk_live` into the repo, a PR, or a chat.
-5. Anthropic is marked configured on live. Confirm the key lives in Railway, never disk.
-6. `CANONICAL_ADDRESSES.md` still lists deployer `0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a` as temporary. Rotate to a multisig before any vault deposit.
-7. `KYA_ADMIN_KEY` gates `POST /v1/quest/seed`, `POST /v1/sadas/publish`, `POST /v1/polyclaw/day`. Header: `X-KYA-Admin`. Fail closed if unset.
-8. `sinc_lbp_salt.json` is a CREATE2 salt, not a key. Fine in-repo. Do not add private keys next to it.
+Four historical alerts, all **resolved as revoked** 2026-06-15:
+
+| # | Type | Path | Publicly leaked |
+|---|---|---|
+| 1 | Google API key | `docs/CLINTON_AUTO_DETAILING_SETUP.md` | yes |
+| 2 | Google API key | `docs/CLINTON_AUTO_DETAILING_SETUP.md` | yes |
+| 3 | Google API key | `code_pkg/start_syndicator.py` | yes |
+| 4 | Twilio Account SID | `buy_watcher.js` | yes |
+
+Push protection recorded no bypasses. Rotate anything that ever sat in those files, even if later deleted. Re-run `gitleaks detect --source . --full-history` on a machine with the full clone.
+
+## Actions still open
+
+1. Confirm keys that touched the allowlisted files were rotated, not just hidden.
+2. Stripe / PayPal live: `getsincor.com/health` reports both `not_configured`. Set `STRIPE_SECRET_KEY` and PayPal secrets **only** on Railway. Never paste `sk_live` into the repo, a PR, or a chat.
+3. Anthropic is marked configured on live. Confirm the key lives in Railway, never disk.
+4. `CANONICAL_ADDRESSES.md` still lists deployer `0xdba7180cdd90D12B9Bc2F15080ddFD9B14fEf31a` as temporary. Rotate to a multisig before any vault deposit.
+5. `KYA_ADMIN_KEY` gates `POST /v1/quest/seed`, `POST /v1/sadas/publish`, `POST /v1/polyclaw/day`. Header: `X-KYA-Admin`. Fail closed if unset. Rotate if it ever touched history or a paste.
+6. `KYA_PRODUCTION_ROOT` is the committed disperse merkle root. Set on Railway after `kya_build_merkle.py`. Never the 48-leaf replica.
+7. `sinc_lbp_salt.json` is a CREATE2 salt, not a key. Fine in-repo. Do not add private keys next to it.
 
 ## Halt
 

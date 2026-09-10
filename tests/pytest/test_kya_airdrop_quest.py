@@ -58,6 +58,45 @@ class MerkleQuestTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             q.claim("0x3333333333333333333333333333333333333333", "bot-1")
 
+    def test_replica_source_cannot_claim(self):
+        q = AirdropQuest()
+        wallets = [
+            "0x1111111111111111111111111111111111111111",
+            "0x2222222222222222222222222222222222222222",
+        ]
+        q.seed(wallets, source="desk-replica")
+        reg = regmod.KYARegistry()
+        regmod._REG = reg
+        listed = reg.list_agent({"agent_id": "bot-replica", "wallet": wallets[0]})
+        reg.bind("bot-replica", wallets[0])
+        reg.apply_stake(listed["kya_id"], str(10 * 10**18), "0xstake")
+        reg.verify(listed["kya_id"])
+        with self.assertRaises(PermissionError) as ctx:
+            q.claim(wallets[0], "bot-replica")
+        self.assertIn("REPLICA_ROOT_FORBIDDEN", str(ctx.exception))
+
+    def test_bound_production_root_rejects_foreign_tree(self):
+        production = MerkleTree(
+            [
+                "0x1111111111111111111111111111111111111111",
+                "0x2222222222222222222222222222222222222222",
+            ]
+        )
+        q = AirdropQuest()
+        os.environ["KYA_PRODUCTION_ROOT"] = production.hex_root()
+        try:
+            with self.assertRaises(PermissionError) as ctx:
+                q.seed(
+                    [
+                        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    ],
+                    source="axm-disperse",
+                )
+            self.assertIn("ROOT_MISMATCH", str(ctx.exception))
+        finally:
+            os.environ.pop("KYA_PRODUCTION_ROOT", None)
+
     def test_hold_numbers(self):
         order = standing_order()
         self.assertEqual(order["H2_morpho_pct"], 0)

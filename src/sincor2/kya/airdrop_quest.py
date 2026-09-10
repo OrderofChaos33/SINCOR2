@@ -8,6 +8,9 @@ module is a test/fallback only.
 
 Production root lives in data/kya/airdrop_merkle.json (gitignored /data/).
 Seed the leaves with `python scripts/kya_build_merkle.py --from-file path`.
+
+Verify binds to KYA_PRODUCTION_ROOT (if set) by address. Replica sources
+are refused — a 48-leaf desk tree must never be the drop root.
 """
 from __future__ import annotations
 
@@ -24,6 +27,7 @@ from sincor2.kya.store import JsonStore
 
 AXM = "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
 CHAIN_ID = 8453
+REPLICA_SOURCES = {"replica", "desk-replica", "stub", "desk"}
 
 
 def _now() -> int:
@@ -77,6 +81,10 @@ def _bound_wallet(rec: Dict[str, Any]) -> str:
     ).lower()
 
 
+def _committed_root() -> str:
+    return os.environ.get("KYA_PRODUCTION_ROOT", "").strip().lower()
+
+
 class AirdropQuest:
     def __init__(self) -> None:
         self.store = JsonStore("airdrop_quest")
@@ -116,8 +124,27 @@ class AirdropQuest:
         self.count = int(data.get("count") or self.count)
         self.source = str(data.get("source") or self.source)
 
+    def _is_replica(self) -> bool:
+        src = (self.source or "").lower()
+        return "replica" in src or src in REPLICA_SOURCES
+
+    def _assert_production_root(self) -> None:
+        if self._is_replica():
+            raise PermissionError("REPLICA_ROOT_FORBIDDEN")
+        bound = _committed_root()
+        if bound:
+            got = (self.root or "").lower()
+            if got != bound:
+                raise PermissionError("ROOT_MISMATCH")
+
     def seed(self, wallets: List[str], source: str = "seed", persist_manifest: bool = True) -> int:
+        src_l = (source or "").lower()
+        if ("replica" in src_l or src_l in REPLICA_SOURCES) and _committed_root():
+            raise PermissionError("REPLICA_ROOT_FORBIDDEN")
         tree = MerkleTree(wallets)
+        bound = _committed_root()
+        if bound and tree.hex_root().lower() != bound:
+            raise PermissionError("ROOT_MISMATCH")
         with self.lock:
             self.tree = tree
             self.root = tree.hex_root()
@@ -143,22 +170,25 @@ class AirdropQuest:
 
     def eligibility(self, wallet: str, proof: Optional[Sequence[str]] = None) -> Dict[str, Any]:
         wallet = (wallet or "").strip().lower()
+        bound = _committed_root()
         tree = self.tree
+        root = bound or (tree.hex_root() if tree is not None else self.root)
         if tree is None:
-            if proof and self.root:
-                ok = verify_proof(wallet, proof, self.root)
-                return {"wallet": wallet, "eligible": ok, "root": self.root, "count": self.count}
-            return {"wallet": wallet, "eligible": False, "reason": "tree unloaded", "root": self.root}
+            if proof and root:
+                ok = verify_proof(wallet, proof, root)
+                return {"wallet": wallet, "eligible": ok, "root": root, "count": self.count, "bound": bool(bound)}
+            return {"wallet": wallet, "eligible": False, "reason": "tree unloaded", "root": root}
         p = list(proof) if proof is not None else tree.proof(wallet)
         if p is None:
-            return {"wallet": wallet, "eligible": False, "root": tree.hex_root(), "count": self.count}
-        ok = verify_proof(wallet, p, tree.hex_root())
+            return {"wallet": wallet, "eligible": False, "root": root, "count": self.count, "bound": bool(bound)}
+        ok = verify_proof(wallet, p, root)
         return {
             "wallet": wallet,
             "eligible": ok,
             "proof": p,
-            "root": tree.hex_root(),
+            "root": root,
             "count": self.count,
+            "bound": bool(bound),
         }
 
     def claim(
@@ -177,6 +207,8 @@ class AirdropQuest:
         if bound and bound != wallet:
             raise PermissionError("wallet does not match KYA record")
 
+        self._assert_production_root()
+
         elig = self.eligibility(wallet, proof)
         if not elig.get("eligible"):
             raise PermissionError("wallet not in merkle list")
@@ -192,7 +224,7 @@ class AirdropQuest:
                 "reward_axm": PRICE_BOOK["quest_reward_axm"],
                 "status": "credited_ledger",
                 "note": "treasury must settle; this is not an auto-transfer",
-                "root": self.root,
+                "root": elig.get("root") or self.root,
                 "proof": elig.get("proof") or list(proof or []),
                 "ts": _now(),
                 "chain_id": CHAIN_ID,
@@ -215,6 +247,8 @@ class AirdropQuest:
                 "loaded": self.tree is not None,
                 "token": AXM,
                 "chain_id": CHAIN_ID,
+                "replica": self._is_replica(),
+                "bound_root": _committed_root() or None,
             }
 
 
