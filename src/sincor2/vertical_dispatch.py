@@ -183,7 +183,7 @@ def _normalize_demo_payload(
     elif skill_id in {"detailing-lead-ingest", "detailing-booking", "detailing-presence", "detailing-social", "detailing-copy", "detailing-engage"}:
         normalized.setdefault("source", "website")
         normalized.setdefault("package_id", "full_detail")
-        normalized.setdefault("city", "Dubuque")
+        normalized.setdefault("city", "Clinton")
         normalized.setdefault("visitor_message", normalized.get("input", "I need a full detail"))
         normalized.setdefault("channel", "google_rsa")
         normalized.setdefault("vehicle", {"year": 2022, "make": "BMW", "model": "X5", "body_style": "suv"})

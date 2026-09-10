@@ -11,10 +11,10 @@
 <body>
   <header class="top">
     <a class="brand" href="{{ url_for('chroma.leads') }}">
-      <span class="mark">CH</span>
+      <span class="mark">CA</span>
       <div>
         <h1>{{ shop_name }}</h1>
-        <small>CHROMA books the bay</small>
+        <small>{{ shop.tagline if shop and shop.tagline else 'Correct. Reflect. Protect.' }}</small>
       </div>
     </a>
     <nav class="desk-nav">

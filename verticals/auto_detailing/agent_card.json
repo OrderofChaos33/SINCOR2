@@ -51,7 +51,7 @@
       "description": "Writes metadata, LocalBusiness + AEO FAQ JSON-LD, gallery alt text, and review showcase widgets. Replies to Google reviews.",
       "tags": ["seo", "aeo", "reviews", "gallery", "gbp"],
       "examples": [
-        "Optimize title and JSON-LD for a Dubuque detailing shop.",
+        "Optimize title and JSON-LD for a Clinton, Iowa detailing shop.",
         "Draft a reply to a 5-star ceramic review."
       ],
       "inputModes": ["application/json"],
@@ -75,7 +75,7 @@
       "description": "Generates Google RSA, Meta, GBP, SMS, email, and landing copy for detailing offers.",
       "tags": ["copy", "ads", "google", "meta"],
       "examples": [
-        "Write Google RSAs for ceramic coating in Dubuque.",
+        "Write Google RSAs for ceramic coating in Clinton, Iowa.",
         "Draft an SMS for a quote follow-up."
       ],
       "inputModes": ["application/json"],

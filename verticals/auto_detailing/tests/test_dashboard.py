@@ -43,6 +43,8 @@ def test_five_pages_render(chroma_client):
         assert r.status_code == 200, path
         html = r.get_data(as_text=True)
         assert len(html) > 400
+        assert "Clinton Auto Detailing" in html
+
 
 
 def test_login_uses_chroma_template_not_platform(tmp_path, monkeypatch):

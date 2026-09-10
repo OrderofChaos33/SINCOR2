@@ -18,7 +18,7 @@ python scripts/chroma_seed_demo.py
 CHROMA_DEMO=true python -m gunicorn sincor2.chroma_app:app --bind 0.0.0.0:8080
 ```
 
-Open `/chroma/`. Demo mode skips login and loads 10 fake jobs.
+Open `/chroma/`. Demo mode skips login and loads 10 fake jobs for **Clinton Auto Detailing** (Clinton, IA).
 
 Staff login (when `CHROMA_DEMO` is off) is the same Sept 9 operator pair: `ADMIN_USERNAME` or `ADMIN_EMAIL` + `ADMIN_PASSWORD`.
 
@@ -41,7 +41,7 @@ CHROMA_DEMO=true python scripts/chroma_seed_demo.py
 
 Reproduces from empty:
 
-- 10 leads at mixed stages (hot ceramic, missed-call PPF, nurture wash, booked wedding detail…)
+- 10 leads at mixed stages (hot ceramic Tesla, missed-call PPF from Fulton, pet-hair interior, booked Mustang…)
 - ≥3 quotes (one marked sent)
 - ≥2 bookings (one booked slot, one link-ready)
 - Outreach queue waiting on Approve / Edit / Kill
@@ -81,12 +81,12 @@ Covers ingest→score, quote matrix (unknown size, zero deposit), sequence order
 
 ## Loom script (≈3 min)
 
-1. Open `/chroma/` in demo. “This is the bay board. Hot leads are orange.”
-2. Tap **Ava Chen** — ceramic Porsche, score in the 80s. Timeline: ingested → quoted → booking link → outreach queued.
+1. Open `/chroma/` in demo. “This is the bay board for Clinton Auto Detailing. Hot leads are orange.”
+2. Tap **Miles Brennan** — ceramic Tesla Model X. Timeline: ingested → quoted → booking link → outreach queued.
 3. **Quotes** — show the matrix. Ceramic SUV has a 50% deposit. Express wash is $0 hold. Preview an unknown size: it prices as sedan.
-4. **Bays** — open the prefilled Calendly URL (vehicle + package in the query string).
-5. **Send** — Approve Ava’s email. Banner: dry-run, nothing left the building. Kill the hype one. Edit a text.
-6. Inbox: paste a new lead (“need PPF on an F-150”), hit **Score it**. Watch it land hot with a quote and a queued SMS.
+4. **Bays** — live path is text (815) 718-8936. Open the prefilled Calendly URL (vehicle + package in the query string) for when self-booking is back.
+5. **Send** — Approve Miles’s email. Banner: dry-run, nothing left the building. Kill the hype one. Edit a text.
+6. Inbox: paste a new lead (“need PPF on an F-150, I’m in Fulton”), hit **Score it**. Watch it land hot with a quote and a queued SMS.
 7. Close: “The owner never writes a follow-up. They tap Approve. That’s $500/mo.”
 
 **Core capabilities**

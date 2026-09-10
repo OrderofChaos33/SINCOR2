@@ -2,6 +2,8 @@
 
 Outbound is dry-run unless CHROMA_LIVE_SEND=true. Demo mode preloads the
 shop dashboard for Loom recordings.
+
+Default shop is Clinton Auto Detailing (Clinton, IA) — Court's live bay.
 """
 
 from __future__ import annotations
@@ -13,14 +15,22 @@ from typing import Any, Dict
 from .protocols import PACKAGES
 
 DEFAULT_SHOP: Dict[str, Any] = {
-    "shop_name": "Northline Detail",
-    "city": "Dubuque",
+    "shop_name": "Clinton Auto Detailing",
+    "city": "Clinton",
     "region": "IA",
-    "phone": "(563) 555-0148",
-    "url": "https://northlinedetail.com",
-    "calendly_handle": "northline-detail",
-    "calendly_url": "https://calendly.com/northline-detail",
-    "email": "bays@northlinedetail.com",
+    "zip": "52732",
+    "address": "715 Park Pl",
+    "phone": "(815) 718-8936",
+    "url": "https://www.clintondetailing.com",
+    "gbp_url": "https://share.google/9XSiKOKfhFPwivAU0",
+    "calendly_handle": "clinton-auto-detailing",
+    "calendly_url": "https://calendly.com/clinton-auto-detailing",
+    "email": "court@clintondetailing.com",
+    "hours": "Mon–Fri 8:00–4:30 · Sat 9:00–1:00 · Sun closed",
+    "appointment_only": True,
+    "service_area": "Clinton, Fulton, Camanche & Morrison",
+    "since": 2014,
+    "tagline": "Correct. Reflect. Protect.",
 }
 
 

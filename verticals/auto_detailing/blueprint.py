@@ -320,10 +320,17 @@ def settings():
         calendly_url = request.form.get("calendly_url") or shop.get("calendly_url")
         updated = {
             "shop_name": request.form.get("shop_name") or shop.get("shop_name"),
+            "address": request.form.get("address") or shop.get("address"),
             "city": request.form.get("city") or shop.get("city"),
             "region": request.form.get("region") or shop.get("region"),
+            "zip": request.form.get("zip") or shop.get("zip"),
             "phone": request.form.get("phone") or shop.get("phone"),
             "email": request.form.get("email") or shop.get("email"),
+            "url": request.form.get("url") or shop.get("url"),
+            "gbp_url": request.form.get("gbp_url") or shop.get("gbp_url"),
+            "hours": request.form.get("hours") or shop.get("hours"),
+            "service_area": request.form.get("service_area") or shop.get("service_area"),
+            "tagline": request.form.get("tagline") or shop.get("tagline"),
             "calendly_url": calendly_url,
             "calendly_handle": calendly_handle_from_url(calendly_url or ""),
             "packages": packages,

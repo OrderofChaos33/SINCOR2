@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from .config import DEFAULT_SHOP
 from .protocols import MEMBERSHIP_NUDGE_DAYS, MEMBERSHIPS, PACKAGES, UPSELL_GRAPH
 from .schemas import OutreachRequest
 
@@ -31,7 +32,7 @@ def build_sequence(req: OutreachRequest) -> List[Dict[str, Any]]:
             {
                 "day": 2,
                 "channel": "sms",
-                "body": f"Northline: 2-day follow-up on {pkg_label}. Booking link in the last email.",
+                "body": f"{DEFAULT_SHOP['shop_name']}: 2-day follow-up on {pkg_label}. Booking link in the last email.",
             },
             {
                 "day": 5,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from verticals.auto_detailing.config import DEFAULT_SHOP
 from verticals.auto_detailing.seed import ensure_demo, seed
 
 
@@ -9,5 +10,9 @@ def test_seed_from_empty(store):
     assert result["quotes"] >= 3
     assert result["bookings"] >= 2
     assert result["pending_sends"] >= 3
+    settings = store.get_settings()
+    assert settings["shop_name"] == "Clinton Auto Detailing"
+    assert settings["city"] == "Clinton"
+    assert settings["phone"] == DEFAULT_SHOP["phone"]
     again = ensure_demo(store)
     assert again["leads"] == 10

@@ -1,4 +1,4 @@
-"""Demo seed — 10 leads, 3 quotes, 2 bookings, a loaded outreach queue."""
+"""Demo seed — Clinton Auto Detailing, Clinton IA. 10 leads, 3 quotes, 2 bookings."""
 
 from __future__ import annotations
 
@@ -10,36 +10,37 @@ from .lead_agent import DetailingLeadAgent
 from .send_gate import enqueue
 from .store import ChromaStore, get_store
 
+# Fictional locals in Court's real service area. Not real customers.
 LEADS = [
     {
         "lead_id": "LD-AVA001",
         "source": "google",
-        "name": "Ava Chen",
-        "email": "ava.chen@example.com",
-        "phone": "563-555-0141",
-        "message": "Need ceramic coating and paint correction on my Porsche 911",
+        "name": "Miles Brennan",
+        "email": "miles.brennan@example.com",
+        "phone": "563-555-2101",
+        "message": "Need ceramic coating and paint correction on my Tesla Model X",
         "vehicle": {
             "year": 2023,
-            "make": "Porsche",
-            "model": "911",
+            "make": "Tesla",
+            "model": "Model X",
             "condition": "daily",
-            "size": "coupe",
+            "body_style": "suv",
         },
-        "photo_urls": ["https://cdn.example/911-hood.jpg"],
+        "photo_urls": ["https://cdn.example/modelx-hood.jpg"],
         "stage_hint": "ready_to_book",
     },
     {
         "lead_id": "LD-MAR002",
         "source": "website",
-        "name": "Marcus Hale",
-        "email": "marcus.hale@example.com",
-        "phone": "563-555-0142",
-        "message": "Interior revival, pet hair, 2019 Tundra",
+        "name": "Dana Briggs",
+        "email": "dana.briggs@example.com",
+        "phone": "563-555-2102",
+        "message": "Interior revival, English bulldog hair all over the seats",
         "vehicle": {
             "year": 2019,
             "make": "Toyota",
-            "model": "Tundra",
-            "body_style": "truck",
+            "model": "Highlander",
+            "body_style": "suv",
             "condition": "dirty",
         },
         "stage_hint": "quoted",
@@ -57,8 +58,8 @@ LEADS = [
         "lead_id": "LD-RAY004",
         "source": "missed_call",
         "name": "Ray Dietrich",
-        "phone": "563-555-0144",
-        "message": "PPF consult for a new F-150",
+        "phone": "815-555-2104",
+        "message": "PPF consult for a new F-150 — I'm in Fulton",
         "vehicle": {"year": 2025, "make": "Ford", "model": "F-150", "body_style": "truck"},
         "photo_urls": ["https://cdn.example/f150-front.jpg"],
         "stage_hint": "quoted",
@@ -66,14 +67,14 @@ LEADS = [
     {
         "lead_id": "LD-SAM005",
         "source": "facebook_marketplace",
-        "name": "Sam Okonkwo",
-        "email": "sam.ok@example.com",
-        "message": "Full detail before a wedding next month",
+        "name": "Wes Harlan",
+        "email": "wes.harlan@example.com",
+        "message": "Full detail on a Mustang GT before a show",
         "vehicle": {
-            "year": 2021,
-            "make": "Audi",
-            "model": "A6",
-            "size": "sedan",
+            "year": 2018,
+            "make": "Ford",
+            "model": "Mustang GT",
+            "size": "coupe",
             "condition": "clean",
         },
         "stage_hint": "booked",
@@ -83,9 +84,9 @@ LEADS = [
         "source": "gbp",
         "name": "Pat Nguyen",
         "email": "pat.nguyen@example.com",
-        "phone": "563-555-0146",
-        "message": "Maintenance wash membership?",
-        "vehicle": {"year": 2020, "make": "Tesla", "model": "Model Y", "body_style": "suv"},
+        "phone": "563-555-2106",
+        "message": "Maintenance wash membership? Camanche, salt is already on it",
+        "vehicle": {"year": 2020, "make": "Chevy", "model": "Equinox", "body_style": "suv"},
         "stage_hint": "nurture",
     },
     {
@@ -116,10 +117,10 @@ LEADS = [
     {
         "lead_id": "LD-TOM009",
         "source": "yelp",
-        "name": "Tom Reilly",
-        "phone": "563-555-0149",
-        "message": "Express wash, in and out",
-        "vehicle": {"year": 2012, "make": "Toyota", "model": "Camry", "size": "sedan"},
+        "name": "Mara Ellison",
+        "phone": "563-555-2109",
+        "message": "Interior only — kids wrecked the back seats",
+        "vehicle": {"year": 2017, "make": "Chrysler", "model": "Pacifica", "body_style": "van"},
         "stage_hint": "new",
     },
     {
@@ -159,7 +160,10 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
 
     q1 = store.save_quote(
         booking.quote(
-            {"package_id": "ceramic", "vehicle": {"year": 2023, "make": "Porsche", "size": "coupe"}}
+            {
+                "package_id": "ceramic",
+                "vehicle": {"year": 2023, "make": "Tesla", "body_style": "suv"},
+            }
         ),
         lead_id="LD-AVA001",
     )
@@ -170,7 +174,7 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
         booking.quote(
             {
                 "package_id": "interior",
-                "vehicle": {"year": 2019, "make": "Toyota", "body_style": "truck"},
+                "vehicle": {"year": 2019, "make": "Toyota", "body_style": "suv"},
                 "addons": ["pet_hair"],
             }
         ),
@@ -182,17 +186,18 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
         booking.quote(
             {"package_id": "express_wash", "vehicle": {"size": "compact"}}
         ),
-        lead_id="LD-TOM009",
+        lead_id="LD-JEN003",
     )
-    store.add_event("LD-TOM009", "quoted", f"Express wash · ${q3['total']:.0f} · $0 deposit")
+    store.add_event("LD-JEN003", "quoted", f"Express wash · ${q3['total']:.0f} · $0 deposit")
 
     booked = booking.calendly_handoff(
         {
             "lead_id": "LD-SAM005",
             "package_id": "full_detail",
-            "name": "Sam Okonkwo",
-            "email": "sam.ok@example.com",
-            "vehicle": {"year": 2021, "make": "Audi", "model": "A6"},
+            "name": "Wes Harlan",
+            "email": "wes.harlan@example.com",
+            "vehicle": {"year": 2018, "make": "Ford", "model": "Mustang GT", "size": "coupe"},
+            "calendly_handle": DEFAULT_SHOP["calendly_handle"],
         }
     )
     booked["status"] = "booked"
@@ -204,9 +209,10 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
         {
             "lead_id": "LD-AVA001",
             "package_id": "ceramic",
-            "name": "Ava Chen",
-            "email": "ava.chen@example.com",
-            "vehicle": {"year": 2023, "make": "Porsche", "model": "911", "size": "coupe"},
+            "name": "Miles Brennan",
+            "email": "miles.brennan@example.com",
+            "vehicle": {"year": 2023, "make": "Tesla", "model": "Model X", "body_style": "suv"},
+            "calendly_handle": DEFAULT_SHOP["calendly_handle"],
         }
     )
     link["status"] = "link_ready"
@@ -217,9 +223,12 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
     enqueue(
         channel="email",
         kind="quote_followup",
-        body="Ava — ceramic on the 911 is $1,499. $750 holds Thursday. Link is in the bay board.",
-        to="ava.chen@example.com",
-        subject="Your ceramic quote is live",
+        body=(
+            "Miles — ceramic on the Model X is quoted. Half holds Thursday at 715 Park Pl. "
+            "Text (815) 718-8936 if you want the bay."
+        ),
+        to="miles.brennan@example.com",
+        subject="Your ceramic quote is live — Clinton Auto Detailing",
         lead_id="LD-AVA001",
         band="hot",
         store=store,
@@ -227,8 +236,8 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
     enqueue(
         channel="sms",
         kind="missed_call",
-        body="Northline Detail — we missed you Ray. Reply PPF and we'll send the film quote.",
-        to="563-555-0144",
+        body="Clinton Auto Detailing — we missed you Ray. Reply PPF and we'll send the film quote. Text (815) 718-8936.",
+        to="815-555-2104",
         lead_id="LD-RAY004",
         band="hot",
         store=store,
@@ -236,9 +245,9 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
     enqueue(
         channel="email",
         kind="quote_followup",
-        body="Marcus, interior + pet hair on the Tundra is quoted. Deposit 20%. Grab a bay this week.",
-        to="marcus.hale@example.com",
-        subject="Tundra interior quote",
+        body="Dana, interior + pet hair on the Highlander is quoted. Deposit 20%. We can get the bulldog out of those seats this week.",
+        to="dana.briggs@example.com",
+        subject="Highlander interior quote",
         lead_id="LD-MAR002",
         band="warm",
         store=store,
@@ -246,8 +255,8 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
     enqueue(
         channel="sms",
         kind="review_ask",
-        body="Sam — if the wedding A6 looks like the photos, a Google review takes 20 seconds.",
-        to="sam.ok@example.com",
+        body="Wes — if the Mustang looks like the photos, a Google review takes 20 seconds. Thank you from Clinton Auto Detailing.",
+        to="wes.harlan@example.com",
         lead_id="LD-SAM005",
         band="hot",
         store=store,
@@ -255,14 +264,14 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
     enqueue(
         channel="social",
         kind="social_before_after",
-        body="Same Dubuque car. Same sun. Different clear coat. Book the bay from the link in bio.",
+        body="Same Clinton car. Same river sun. Different clear coat. Clinton, Fulton, Camanche, Morrison — text (815) 718-8936.",
         subject="instagram,facebook",
         store=store,
     )
     enqueue(
         channel="email",
         kind="winback",
-        body="Chris, ceramic isn't immortal. Inspection wash and we'll tell you if it still beads.",
+        body="Chris, ceramic isn't immortal. Inspection wash and we'll tell you if it still beads. 715 Park Pl, Clinton.",
         to="chris.vale@example.com",
         subject="Your ceramic isn't immortal",
         lead_id="LD-WIN010",
@@ -275,6 +284,8 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
 
 def ensure_demo(store: Optional[ChromaStore] = None) -> Dict[str, Any]:
     store = store or get_store()
-    if store.counts()["leads"] == 0:
+    counts = store.counts()
+    name = store.get_settings().get("shop_name")
+    if counts["leads"] == 0 or name in {"Northline Detail", None, ""}:
         return seed(store=store, reset=True)
-    return store.counts()
+    return counts

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
+from .config import DEFAULT_SHOP
 from .protocols import PACKAGES, SEASONAL_CAMPAIGNS
 
 
@@ -15,7 +16,7 @@ class DetailingSocialAgent:
     def schedule(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         platforms = list(payload.get("platforms") or ["instagram", "facebook", "gbp"])
         cadence = int(payload.get("cadence_per_week") or 5)
-        city = payload.get("city", "Dubuque")
+        city = payload.get("city") or DEFAULT_SHOP["city"]
         start = datetime.now(timezone.utc).replace(hour=15, minute=0, second=0, microsecond=0)
         posts: List[Dict[str, Any]] = []
         for i in range(cadence):

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from .booking_agent import DetailingBookingAgent
+from .config import DEFAULT_SHOP
 from .protocols import FIRST_RESPONSE_SECONDS, PACKAGES
 
 
@@ -73,7 +74,7 @@ class DetailingEngagementAgent:
                     "name": payload.get("known_name"),
                     "email": payload.get("email"),
                     "phone": payload.get("phone"),
-                    "calendly_handle": payload.get("calendly_handle", "northline-detail"),
+                    "calendly_handle": payload.get("calendly_handle") or DEFAULT_SHOP["calendly_handle"],
                     "packages": payload.get("packages"),
                 }
             )
@@ -108,7 +109,7 @@ class DetailingEngagementAgent:
     def missed_call(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         phone = payload.get("phone") or "unknown"
         body = (
-            "Northline Detail — we missed you. Reply WASH, INTERIOR, CERAMIC, or PPF "
+            f"{DEFAULT_SHOP['shop_name']} — we missed you. Reply WASH, INTERIOR, CERAMIC, or PPF "
             "and we'll send a quote plus a booking link. Usually faster than a callback."
         )
         queued_id = None

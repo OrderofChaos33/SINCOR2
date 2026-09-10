@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from .config import DEFAULT_SHOP
 from .protocols import AEO_FAQS, GBP_CATEGORIES, LOCAL_SEO_KEYWORDS, PACKAGES
 from .schemas import PresenceRequest
 
@@ -60,11 +61,11 @@ def _aggregate(reviews: List[Dict[str, Any]]) -> Dict[str, Any] | None:
 class DetailingPresenceAgent:
     def optimize(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         req = PresenceRequest(
-            shop_name=payload.get("shop_name", "Northline Detail"),
-            city=payload.get("city", "Dubuque"),
-            region=payload.get("region", "IA"),
-            phone=payload.get("phone", "(563) 555-0148"),
-            url=payload.get("url", "https://northlinedetail.com"),
+            shop_name=payload.get("shop_name") or DEFAULT_SHOP["shop_name"],
+            city=payload.get("city") or DEFAULT_SHOP["city"],
+            region=payload.get("region") or DEFAULT_SHOP["region"],
+            phone=payload.get("phone") or DEFAULT_SHOP["phone"],
+            url=payload.get("url") or DEFAULT_SHOP["url"],
             services=list(payload.get("services") or list(PACKAGES.keys())),
             reviews=list(payload.get("reviews") or []),
             gallery=list(payload.get("gallery") or []),

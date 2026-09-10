@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 from uuid import uuid4
 
+from .config import DEFAULT_SHOP
 from .protocols import (
     PACKAGES,
     PHOTO_QUOTE_FAMILIES,
@@ -160,7 +161,7 @@ class DetailingBookingAgent:
             name=payload.get("name"),
             email=payload.get("email"),
             phone=payload.get("phone"),
-            calendly_handle=payload.get("calendly_handle", "northline-detail"),
+            calendly_handle=payload.get("calendly_handle") or DEFAULT_SHOP["calendly_handle"],
             preferred_slot=payload.get("preferred_slot"),
             weather_precip_pct=payload.get("weather_precip_pct"),
         )
