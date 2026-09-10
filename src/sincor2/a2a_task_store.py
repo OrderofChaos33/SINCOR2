@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import threading
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
@@ -56,11 +57,19 @@ class TaskStore(ABC):
     def list_push(self) -> List[Dict[str, Any]]:
         ...
 
+    def acquire_exec_lock(self, task_id: str, ttl_seconds: int = 120) -> bool:
+        """SET NX lock so two workers cannot execute the same task."""
+        ...
+
+    def release_exec_lock(self, task_id: str) -> None:
+        ...
+
 
 class MemoryTaskStore(TaskStore):
     def __init__(self) -> None:
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._push: Dict[str, Dict[str, Any]] = {}
+        self._locks: Dict[str, float] = {}
         self._lock = threading.Lock()
 
     def get(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -95,6 +104,19 @@ class MemoryTaskStore(TaskStore):
         with self._lock:
             return list(self._push.values())
 
+    def acquire_exec_lock(self, task_id: str, ttl_seconds: int = 120) -> bool:
+        now = time.time()
+        with self._lock:
+            exp = self._locks.get(task_id)
+            if exp is not None and exp > now:
+                return False
+            self._locks[task_id] = now + max(1, ttl_seconds)
+            return True
+
+    def release_exec_lock(self, task_id: str) -> None:
+        with self._lock:
+            self._locks.pop(task_id, None)
+
 
 class SqliteTaskStore(TaskStore):
     """Durable store backed by PersistentStore.a2a_tasks table."""
@@ -104,6 +126,7 @@ class SqliteTaskStore(TaskStore):
         self._store = get_store()
         self._push: Dict[str, Dict[str, Any]] = {}
         self._push_lock = threading.Lock()
+        self._locks: Dict[str, float] = {}
 
     def get(self, task_id: str) -> Optional[Dict[str, Any]]:
         return self._store.get_task(task_id)
@@ -137,6 +160,19 @@ class SqliteTaskStore(TaskStore):
     def list_push(self) -> List[Dict[str, Any]]:
         with self._push_lock:
             return list(self._push.values())
+
+    def acquire_exec_lock(self, task_id: str, ttl_seconds: int = 120) -> bool:
+        now = time.time()
+        with self._push_lock:
+            exp = self._locks.get(task_id)
+            if exp is not None and exp > now:
+                return False
+            self._locks[task_id] = now + max(1, ttl_seconds)
+            return True
+
+    def release_exec_lock(self, task_id: str) -> None:
+        with self._push_lock:
+            self._locks.pop(task_id, None)
 
 
 class RedisTaskStore(TaskStore):
@@ -211,6 +247,17 @@ class RedisTaskStore(TaskStore):
             if raw:
                 out.append(json.loads(raw))
         return out
+
+    def acquire_exec_lock(self, task_id: str, ttl_seconds: int = 120) -> bool:
+        return bool(self._r.set(
+            f"{self._prefix}:exec:{task_id}",
+            "1",
+            nx=True,
+            ex=max(1, ttl_seconds),
+        ))
+
+    def release_exec_lock(self, task_id: str) -> None:
+        self._r.delete(f"{self._prefix}:exec:{task_id}")
 
 
 _store_instance: Optional[TaskStore] = None

@@ -21,11 +21,10 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://getsincor.com/.well-known/agen
 curl -sS -o /dev/null -w '%{http_code}\n' https://getsincor.com/.well-known/agent.json
 curl -sS -o /dev/null -w '%{http_code}\n' https://getsincor.com/api/a2a/agents
 curl -sS https://getsincor.com/api/a2a/quote?skill_id=lead-enrichment
+curl -sS -o /dev/null -w '%{http_code}\n' https://getsincor.com/docs/a2a
 ```
 
-Verified 2026-08-29 ~13:05 UTC: all four **200**. Quote `axiom_contract` = canonical AXM.
-
-Unknown skill: `/api/a2a/quote` without `skill_id` must not 404 (JSON-RPC / 400 is acceptable).
+Agent Card must include top-level `protocolVersion`, `url`, `preferredTransport=JSONRPC`.
 
 ## Railway env (required)
 
@@ -41,12 +40,13 @@ REDIS_URL=
 
 Never set `EXECUTE_LIVE=1` in committed files.
 
-## Do not list on external A2A directories until
+## Checkout + settlement (closed in this cycle)
 
-1. Discovery 200 (done).
-2. Quote exposes `treasury_fee_split` / `platform_fee_*` (P0-2, still open — #188 / #139).
-3. Settlement success records `record_platform_fee_inflow(..., projected=False, tx_hash=...)`.
+1. Discovery 200.
+2. Quote exposes `treasury_fee_split` / `platform_fee_*`.
+3. Settlement success records `record_platform_fee_inflow(..., projected=False, tx_hash=...)` even without Flask platform state. Simulated and free-quota paths write zero realized events.
 4. Non-AXM quotes rejected on the canonical contract.
+5. Human checkout (`/api/platform/checkout`) is idempotent by `idempotency_key` (or wallet+plan+hour), claims a verifying lock before RPC, retries Base RPC with public fallbacks, auto-expires past `expires_at`, and records a 5% platform fee on verified fills.
 
 ## External caller
 
