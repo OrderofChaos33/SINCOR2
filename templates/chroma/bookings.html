@@ -1,0 +1,28 @@
+{% extends "chroma/base.html" %}
+{% block title %}Bookings{% endblock %}
+{% block body %}
+<p class="kicker">Calendar handoff</p>
+<h2 class="page">Bays</h2>
+<p class="lede">CHROMA does not guess Calendly’s API. It builds the link with the vehicle and package filled in. You (or the customer) tap it.</p>
+
+<article class="card">
+  <p class="k">Shop Calendly</p>
+  <p class="v" style="font-size:1rem">{{ shop.calendly_url or 'not set' }}</p>
+  <p class="meta">Handle: {{ shop.calendly_handle }}</p>
+</article>
+
+<div class="card" style="margin-top:16px">
+  {% for b in bookings %}
+    <div class="row">
+      <div class="who">
+        <strong>{{ b.event }} · {{ b.status }}</strong>
+        <span>{{ b.lead_id }} {% if b.slot %}· {{ b.slot }}{% endif %}</span>
+        {% if b.calendly_url %}<div><a href="{{ b.calendly_url }}">Open prefilled link</a></div>{% endif %}
+      </div>
+      <span class="status {{ b.status }}">{{ b.status.replace('_',' ') }}</span>
+    </div>
+  {% else %}
+    <p class="empty">No handoffs yet. Score a hot lead.</p>
+  {% endfor %}
+</div>
+{% endblock %}

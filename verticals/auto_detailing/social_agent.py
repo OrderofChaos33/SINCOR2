@@ -56,10 +56,27 @@ class DetailingSocialAgent:
                     "package_id": pkg_id,
                 }
             )
+        queued_ids: List[str] = []
+        if payload.get("enqueue"):
+            from .send_gate import enqueue
+
+            store = payload.get("store")
+            for post in posts:
+                item = enqueue(
+                    channel="social",
+                    kind=f"social_{post['pillar']}",
+                    body=post["caption"],
+                    subject=",".join(post["platforms"]),
+                    lead_id=payload.get("lead_id"),
+                    metadata=post,
+                    store=store,
+                )
+                queued_ids.append(item["id"])
         return {
             "cadence_per_week": cadence,
             "platforms": platforms,
             "posts": posts,
+            "queued_ids": queued_ids,
             "engagement_policy": {
                 "reply_to_every_comment": True,
                 "steer_to_booking": True,
@@ -92,11 +109,25 @@ class DetailingSocialAgent:
                 "we don't make people DM for a time."
             )
             intent = "nurture"
+        queued_id = None
+        if payload.get("enqueue"):
+            from .send_gate import enqueue
+
+            item = enqueue(
+                channel="social",
+                kind="comment_reply",
+                body=reply,
+                to=platform,
+                lead_id=payload.get("lead_id"),
+                store=payload.get("store"),
+            )
+            queued_id = item["id"]
         return {
             "platform": platform,
             "intent": intent,
             "reply": reply,
             "cta_url_hint": "/book",
+            "queued_id": queued_id,
             "escalate_to_human": intent == "book" and "fleet" in inbound,
         }
 

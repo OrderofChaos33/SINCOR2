@@ -2,10 +2,89 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .protocols import MEMBERSHIP_NUDGE_DAYS, MEMBERSHIPS, PACKAGES, UPSELL_GRAPH
 from .schemas import OutreachRequest
+
+
+def build_sequence(req: OutreachRequest) -> List[Dict[str, Any]]:
+    pkg_label = (
+        str(PACKAGES[req.package_id]["label"])
+        if req.package_id in PACKAGES
+        else "detailing"
+    )
+    next_up = UPSELL_GRAPH.get(req.package_id or "", "ceramic")
+    next_label = str(PACKAGES.get(next_up, {}).get("label", "ceramic coating"))
+
+    if req.kind == "quote_followup":
+        return [
+            {
+                "day": 0,
+                "channel": req.channel,
+                "subject": f"{req.name}, your {pkg_label} quote is still live",
+                "body": (
+                    f"Still holding the math for your {pkg_label}. "
+                    "Bays move — grab the slot if you want this week."
+                ),
+            },
+            {
+                "day": 2,
+                "channel": "sms",
+                "body": f"Northline: 2-day follow-up on {pkg_label}. Booking link in the last email.",
+            },
+            {
+                "day": 5,
+                "channel": "email",
+                "subject": "We'll release the hold",
+                "body": "If timing was the issue, the membership wash is the easier on-ramp.",
+            },
+        ]
+    if req.kind == "membership_nudge":
+        days = req.last_service_days or MEMBERSHIP_NUDGE_DAYS[0]
+        plan = MEMBERSHIPS["monthly_gloss"]
+        return [
+            {
+                "day": 0,
+                "channel": req.channel,
+                "subject": f"{days} days since the last wash",
+                "body": (
+                    f"{req.name}, clear coat doesn't wait. "
+                    f"{plan['label']} is ${plan['price']}/mo — same bay, no re-booking tax."
+                ),
+            }
+        ]
+    if req.kind == "review_ask":
+        return [
+            {
+                "day": 0,
+                "channel": "sms",
+                "body": (
+                    f"Thanks {req.name}. If the {pkg_label} looks like the photos, "
+                    "a Google review takes 20 seconds and actually moves our rank."
+                ),
+            }
+        ]
+    if req.kind == "winback":
+        return [
+            {
+                "day": 0,
+                "channel": "email",
+                "subject": "Your ceramic isn't immortal",
+                "body": (
+                    f"It's been a while. The honest next step is a {next_label} "
+                    "inspection wash — we'll tell you if the coating still beads."
+                ),
+            }
+        ]
+    return [
+        {
+            "day": 0,
+            "channel": req.channel,
+            "subject": f"Next up: {next_label}",
+            "body": f"Most {pkg_label} clients add {next_label} within 90 days. Photo quote is open.",
+        }
+    ]
 
 
 class DetailingOutreachAgent:
@@ -17,88 +96,32 @@ class DetailingOutreachAgent:
             last_service_days=payload.get("last_service_days"),
             channel=payload.get("channel", "email"),
         )
-        pkg_label = (
-            str(PACKAGES[req.package_id]["label"])
-            if req.package_id in PACKAGES
-            else "detailing"
-        )
-        next_up = UPSELL_GRAPH.get(req.package_id or "", "ceramic")
-        next_label = str(PACKAGES.get(next_up, {}).get("label", "ceramic coating"))
+        steps = build_sequence(req)
+        queued: List[Dict[str, Any]] = []
+        if payload.get("enqueue"):
+            from .send_gate import enqueue
 
-        if req.kind == "quote_followup":
-            steps: List[Dict[str, Any]] = [
-                {
-                    "day": 0,
-                    "channel": req.channel,
-                    "subject": f"{req.name}, your {pkg_label} quote is still live",
-                    "body": (
-                        f"Still holding the math for your {pkg_label}. "
-                        "Bays move — grab the slot if you want this week."
-                    ),
-                },
-                {
-                    "day": 2,
-                    "channel": "sms",
-                    "body": f"Northline: 2-day follow-up on {pkg_label}. Booking link in the last email.",
-                },
-                {
-                    "day": 5,
-                    "channel": "email",
-                    "subject": "We'll release the hold",
-                    "body": "If timing was the issue, the membership wash is the easier on-ramp.",
-                },
-            ]
-        elif req.kind == "membership_nudge":
-            days = req.last_service_days or MEMBERSHIP_NUDGE_DAYS[0]
-            plan = MEMBERSHIPS["monthly_gloss"]
-            steps = [
-                {
-                    "day": 0,
-                    "channel": req.channel,
-                    "subject": f"{days} days since the last wash",
-                    "body": (
-                        f"{req.name}, clear coat doesn't wait. "
-                        f"{plan['label']} is ${plan['price']}/mo — same bay, no re-booking tax."
-                    ),
-                }
-            ]
-        elif req.kind == "review_ask":
-            steps = [
-                {
-                    "day": 0,
-                    "channel": "sms",
-                    "body": (
-                        f"Thanks {req.name}. If the {pkg_label} looks like the photos, "
-                        "a Google review takes 20 seconds and actually moves our rank."
-                    ),
-                }
-            ]
-        elif req.kind == "winback":
-            steps = [
-                {
-                    "day": 0,
-                    "channel": "email",
-                    "subject": "Your ceramic isn't immortal",
-                    "body": (
-                        f"It's been a while. The honest next step is a {next_label} "
-                        "inspection wash — we'll tell you if the coating still beads."
-                    ),
-                }
-            ]
-        else:
-            steps = [
-                {
-                    "day": 0,
-                    "channel": req.channel,
-                    "subject": f"Next up: {next_label}",
-                    "body": f"Most {pkg_label} clients add {next_label} within 90 days. Photo quote is open.",
-                }
-            ]
+            store = payload.get("store")
+            for step in steps:
+                queued.append(
+                    enqueue(
+                        channel=step.get("channel") or req.channel,
+                        kind=req.kind,
+                        body=step.get("body") or "",
+                        to=payload.get("email") or payload.get("phone"),
+                        subject=step.get("subject"),
+                        lead_id=payload.get("lead_id"),
+                        band=payload.get("band"),
+                        metadata={"day": step.get("day")},
+                        store=store,
+                    )
+                )
         return {
             "kind": req.kind,
             "contact": req.name,
             "channel": req.channel,
             "steps": steps,
+            "queued_ids": [q["id"] for q in queued],
             "stop_on_book": True,
             "compliance": {"opt_out": True, "quiet_hours": True},
         }

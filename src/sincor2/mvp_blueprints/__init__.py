@@ -27,3 +27,10 @@ def register_mvp_blueprints(app: Flask) -> None:
         admin_bp,
     ):
         app.register_blueprint(bp)
+
+    try:
+        from verticals.auto_detailing.blueprint import register_chroma
+
+        register_chroma(app)
+    except Exception as exc:  # pragma: no cover - platform still boots without CHROMA
+        print(f"CHROMA blueprint not available: {exc}")

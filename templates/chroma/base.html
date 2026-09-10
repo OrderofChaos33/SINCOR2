@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}CHROMA{% endblock %} · {{ shop_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Oswald:wght@500;600;700&family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='chroma/chroma.css') }}">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="{{ url_for('chroma.leads') }}">
+      <span class="mark">CH</span>
+      <div>
+        <h1>{{ shop_name }}</h1>
+        <small>CHROMA books the bay</small>
+      </div>
+    </a>
+    <nav class="desk-nav">
+      <a href="{{ url_for('chroma.leads') }}" class="{{ 'on' if 'lead' in nav }}">Leads {% if counts.leads %}<span class="badge">{{ counts.leads }}</span>{% endif %}</a>
+      <a href="{{ url_for('chroma.quotes') }}" class="{{ 'on' if 'quotes' in nav }}">Quotes</a>
+      <a href="{{ url_for('chroma.bookings') }}" class="{{ 'on' if 'bookings' in nav }}">Bookings</a>
+      <a href="{{ url_for('chroma.outreach') }}" class="{{ 'on' if 'outreach' in nav }}">Send {% if counts.pending_sends %}<span class="badge">{{ counts.pending_sends }}</span>{% endif %}</a>
+      <a href="{{ url_for('chroma.settings') }}" class="{{ 'on' if 'settings' in nav }}">Shop</a>
+    </nav>
+    <div class="pills">
+      {% if demo %}<span class="pill demo">Demo</span>{% endif %}
+      {% if live_send %}<span class="pill live">Live send ON</span>{% else %}<span class="pill safe">Dry run</span>{% endif %}
+    </div>
+  </header>
+  <main class="wrap">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash {{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block body %}{% endblock %}
+  </main>
+  <nav class="bottom" aria-label="Shop">
+    <a href="{{ url_for('chroma.leads') }}" class="{{ 'on' if 'lead' in nav }}">Leads</a>
+    <a href="{{ url_for('chroma.quotes') }}" class="{{ 'on' if 'quotes' in nav }}">Quotes</a>
+    <a href="{{ url_for('chroma.bookings') }}" class="{{ 'on' if 'bookings' in nav }}">Bays</a>
+    <a href="{{ url_for('chroma.outreach') }}" class="{{ 'on' if 'outreach' in nav }}">Send{% if counts.pending_sends %} · {{ counts.pending_sends }}{% endif %}</a>
+    <a href="{{ url_for('chroma.settings') }}" class="{{ 'on' if 'settings' in nav }}">Shop</a>
+  </nav>
+</body>
+</html>

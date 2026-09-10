@@ -1377,6 +1377,11 @@ def create_app():
     except Exception as e:
         print(f"Waitlist blueprint not available: {e}")
     try:
+        from verticals.auto_detailing.blueprint import register_chroma
+        register_chroma(app)
+    except Exception as e:
+        print(f"CHROMA blueprint not available: {e}")
+    try:
         from sincor2.blueprints.command_center import command_center_bp
         app.register_blueprint(command_center_bp)
         # Bootstrap token budget controller from agent YAML definitions

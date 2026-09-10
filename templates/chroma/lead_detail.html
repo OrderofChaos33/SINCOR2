@@ -1,0 +1,56 @@
+{% extends "chroma/base.html" %}
+{% block title %}{{ lead.name }}{% endblock %}
+{% block body %}
+<p class="kicker"><a href="{{ url_for('chroma.leads') }}">← Inbox</a></p>
+<h2 class="page">{{ lead.name or 'No name' }}</h2>
+<p class="lede">{{ lead.source }} · {{ lead.email or lead.phone or 'no contact' }}</p>
+
+<section class="kpis">
+  <article class="card"><p class="k">Intent</p><p class="v">{{ lead.intent_score }}</p></article>
+  <article class="card"><p class="k">Band</p><p class="v">{{ lead.band }}</p></article>
+  <article class="card"><p class="k">Status</p><p class="v">{{ lead.status.replace('_',' ') }}</p></article>
+  <article class="card"><p class="k">Next</p><p class="v">{{ (lead.ranking or {}).get('next_action', '—') }}</p></article>
+</section>
+
+<article class="card">
+  <p class="k">What they said</p>
+  <p>{{ lead.message or '—' }}</p>
+  {% if lead.vehicle %}
+    <p class="meta">{{ lead.vehicle.get('year') }} {{ lead.vehicle.get('make') }} {{ lead.vehicle.get('model') }} · {{ lead.vehicle.get('size') or lead.vehicle.get('body_style') or 'size unknown' }}</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('chroma.rerun_lead', lead_id=lead.lead_id) }}" style="margin-top:12px">
+    <button class="btn" type="submit">Run the pipeline again</button>
+  </form>
+</article>
+
+{% if quotes %}
+  <h3 class="kicker" style="margin-top:22px">Quotes</h3>
+  {% for q in quotes %}
+    <article class="card" style="margin-top:8px">
+      <p class="quote-preview">${{ '%.0f'|format(q.total or (q.payload.total if q.payload else 0)) }} · {{ q.package_id }}</p>
+      <p class="meta">Deposit ${{ '%.0f'|format(q.deposit or 0) }} · {{ 'sent' if q.sent else 'not sent' }} · {{ q.vehicle_size }}</p>
+    </article>
+  {% endfor %}
+{% endif %}
+
+{% if bookings %}
+  <h3 class="kicker" style="margin-top:22px">Booking links</h3>
+  {% for b in bookings %}
+    <article class="card" style="margin-top:8px">
+      <p><strong>{{ b.status }}</strong> {% if b.slot %}· {{ b.slot }}{% endif %}</p>
+      {% if b.calendly_url %}<p><a href="{{ b.calendly_url }}">Open Calendly handoff</a></p>{% endif %}
+    </article>
+  {% endfor %}
+{% endif %}
+
+<h3 class="kicker" style="margin-top:22px">Timeline</h3>
+<ul class="timeline">
+  {% for ev in timeline %}
+    <li>
+      <div class="when">{{ ev.created_at }}</div>
+      <strong>{{ ev.kind }}</strong>
+      <div class="meta">{{ ev.detail }}</div>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}

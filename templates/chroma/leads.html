@@ -1,0 +1,59 @@
+{% extends "chroma/base.html" %}
+{% block title %}Leads{% endblock %}
+{% block body %}
+<p class="kicker">Inbox</p>
+<h2 class="page">Who wants in the bay</h2>
+<p class="lede">Hot is orange. Warm is gold. Green can wait. Tap a name — that’s the whole job.</p>
+
+<section class="kpis">
+  <article class="card"><p class="k">Leads</p><p class="v">{{ counts.leads }}</p></article>
+  <article class="card"><p class="k">Waiting to send</p><p class="v">{{ counts.pending_sends }}</p></article>
+  <article class="card"><p class="k">Quotes</p><p class="v">{{ counts.quotes }}</p></article>
+  <article class="card"><p class="k">Bookings</p><p class="v">{{ counts.bookings }}</p></article>
+</section>
+
+{% if not leads %}
+  <p class="empty">No leads yet. Paste one below or boot demo mode.</p>
+{% endif %}
+
+<div class="card">
+  {% for lead in leads %}
+    <a class="row" href="{{ url_for('chroma.lead_detail', lead_id=lead.lead_id) }}">
+      <div class="score {{ lead.band }}">{{ lead.intent_score|int }}</div>
+      <div class="who">
+        <strong>{{ lead.name or 'No name' }}</strong>
+        <span>{{ lead.source }} · {{ lead.message[:80] if lead.message else '—' }}</span>
+      </div>
+      <span class="status {{ lead.status }}">{{ lead.status.replace('_',' ') }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<section class="card" style="margin-top:16px">
+  <p class="k">Drop a lead in. CHROMA scores it, prices it, and queues the text.</p>
+  <form class="stack" method="post" action="{{ url_for('chroma.ingest_lead') }}" style="margin-top:12px">
+    <label>Name <input name="name" placeholder="Ava Chen" required></label>
+    <label>Source
+      <select name="source">
+        <option>google</option><option>website</option><option>missed_call</option>
+        <option>instagram</option><option>gbp</option><option>referral</option>
+      </select>
+    </label>
+    <label>Phone <input name="phone" inputmode="tel" placeholder="555-0148"></label>
+    <label>Email <input name="email" type="email" placeholder="ava@…"></label>
+    <label>What they said <textarea name="message" placeholder="Need ceramic on a 2022 X5"></textarea></label>
+    <div class="actions">
+      <label>Year <input name="year" inputmode="numeric" placeholder="2022"></label>
+      <label>Make <input name="make" placeholder="BMW"></label>
+      <label>Size
+        <select name="size">
+          <option value="">guess</option>
+          <option>sedan</option><option>suv</option><option>truck</option>
+          <option>coupe</option><option>compact</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn rowbtn" type="submit">Score it and queue the bay</button>
+  </form>
+</section>
+{% endblock %}

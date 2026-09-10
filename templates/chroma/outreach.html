@@ -1,0 +1,37 @@
+{% extends "chroma/base.html" %}
+{% block title %}Send queue{% endblock %}
+{% block body %}
+<p class="kicker">TOA hold</p>
+<h2 class="page">Nothing leaves without you</h2>
+<p class="lede">
+  Approve, edit, or kill. Live send is {% if live_send %}<strong>ON</strong>{% else %}<strong>OFF</strong> — even Approve only logs it{% endif %}.
+</p>
+
+{% for item in items %}
+  <article class="draft">
+    <p class="k">{{ item.channel }} · {{ item.kind }} · {{ item.status.replace('_',' ') }}</p>
+    {% if item.subject %}<p><strong>{{ item.subject }}</strong></p>{% endif %}
+    <p class="meta">To {{ item.to or item.to_addr or '—' }} · TOA {{ item.toa_score }} · {{ item.toa_note }}</p>
+    <pre>{{ item.body }}</pre>
+    {% if item.status == 'pending_approval' %}
+      <div class="actions">
+        <form method="post" action="{{ url_for('chroma.outreach_approve', item_id=item.id) }}">
+          <button class="btn" type="submit">Approve</button>
+        </form>
+        <form method="post" action="{{ url_for('chroma.outreach_kill', item_id=item.id) }}">
+          <button class="btn kill" type="submit">Kill</button>
+        </form>
+      </div>
+      <form class="stack" method="post" action="{{ url_for('chroma.outreach_edit', item_id=item.id) }}" style="margin-top:10px">
+        <label>Edit copy
+          <textarea name="body">{{ item.body }}</textarea>
+        </label>
+        <input type="hidden" name="subject" value="{{ item.subject or '' }}">
+        <button class="btn edit" type="submit">Save edit</button>
+      </form>
+    {% endif %}
+  </article>
+{% else %}
+  <p class="empty">Queue is empty. Ingest a lead.</p>
+{% endfor %}
+{% endblock %}

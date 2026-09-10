@@ -1,0 +1,24 @@
+{% extends "chroma/base.html" %}
+{% block title %}Shop{% endblock %}
+{% block body %}
+<p class="kicker">Settings</p>
+<h2 class="page">Your shop</h2>
+<p class="lede">Name, Calendly, prices. That’s the whole setup.</p>
+
+<form class="stack" method="post">
+  <label>Shop name <input name="shop_name" value="{{ shop.shop_name or '' }}"></label>
+  <label>City <input name="city" value="{{ shop.city or '' }}"></label>
+  <label>State <input name="region" value="{{ shop.region or '' }}"></label>
+  <label>Phone <input name="phone" value="{{ shop.phone or '' }}"></label>
+  <label>Email <input name="email" value="{{ shop.email or '' }}"></label>
+  <label>Calendly URL <input name="calendly_url" value="{{ shop.calendly_url or '' }}" placeholder="https://calendly.com/your-shop"></label>
+
+  <p class="kicker">Package prices (base sedan)</p>
+  {% for pid, pkg in (shop.packages or {}).items() %}
+    <label>{{ pkg.label }}
+      <input name="price_{{ pid }}" inputmode="decimal" value="{{ pkg.price }}">
+    </label>
+  {% endfor %}
+  <button class="btn rowbtn" type="submit">Save shop</button>
+</form>
+{% endblock %}
