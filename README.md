@@ -41,6 +41,7 @@ SINAX (`src/sincor2/sinax/`) is a **research prototype** — geometric proof nav
 
 - [Why SINCOR2](#why-sincor2)
 - [What's new (2026-09)](#whats-new-2026-09)
+- [Treasury HOLD](#treasury-hold-locked-2026-09-10)
 - [Quickstart](#quickstart)
 - [Platform Architecture](#platform-architecture)
 - [Agent Intelligence & Cognition](#agent-intelligence--cognition)
@@ -103,6 +104,20 @@ Additive status for operators landing on this repo now. Nothing above is retired
 - Tracking: GitHub issues labeled `ceo` / `treasury` / `a2a` (see [#203](https://github.com/OrderofChaos33/SINCOR2/issues/203)).
 - Production A2A checklist: `docs/A2A_PRODUCTION_CHECKLIST.md`.
 - Canonical addresses: `CANONICAL_ADDRESSES.md` and `src/sincor2/onchain/constants.py`.
+- **HOLD standing order:** [`HOLD.md`](HOLD.md).
+
+
+## Treasury HOLD (locked 2026-09-10)
+
+Standing order. Full: [`HOLD.md`](HOLD.md). Code: `src/sincor2/treasury_hold.py`. Destination: `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`.
+
+1. **100%** of realized platform fees (`projected=false` + `tx_hash`) → Treasury. Take is **500 bps**.
+2. **100% HOLD** on-chain USDC (~$192). **0%** Morpho / Aave / LP / SharedLiquidity.
+3. **100% HOLD** founder cash off-chain (~$800). **0%** load-to-chain.
+4. Vault **0%** until first conversion; then 80/20 only if cash ≥ **$10,000 USDC**.
+5. Underwriting go-live: **$10,000 USDC** backing + conversion proof + founder signer. Halt file `data/TREASURY_EXEC_HALT` is ON. `EXECUTE_LIVE` default off.
+
+Mover: founder signer broadcasts. Treasury exec queues. Auditor gates. Nobody else.
 
 ---
 
