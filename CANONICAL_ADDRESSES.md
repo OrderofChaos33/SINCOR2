@@ -1,20 +1,17 @@
 # CANONICAL ADDRESSES — SINCOR / AXIOM (Base mainnet, chain 8453)
 
-> **LOCKED 2026-09-01:** Official SINC floor is **$0.15** ($150M FDV / 1B). **$1.50 is not a floor.**
+> **LOCKED 2026-09-01:** Official SINC floor is **$0.15** ($150M FDV / 1B).
 > Human spec: [`TOKEN_CANON.md`](TOKEN_CANON.md) · machine spec: [`TOKEN_CANON.json`](TOKEN_CANON.json).
 >
-> **DO NOT BUY** retired SINC `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` or Uniswap V2 pool `0x85372932f9b151a076815d92cf71a97980ffd667`.
 > Live SINC: `0xe1D836087F6573b665d25CE088793E916D7892f8`. Official buy: https://getsincor.com/buy
 
 **Runtime source of truth:** [`src/sincor2/onchain/constants.py`](src/sincor2/onchain/constants.py).  
 This markdown is the human index. Settlement, A2A, billing, and startup `symbol()` / `decimals()` probes import the Python module. Ship both files in the same change; never copy token literals into other runtime modules.
 
-**2026-08-19 CEO UPDATE:** Live SINC token is now `0xe1D836087F6573b665d25CE088793E916D7892f8` (8 decimals). Previous address `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` is retired.
+**2026-08-19 UPDATE:** Live SINC token is now `0xe1D836087F6573b665d25CE088793E916D7892f8` (8 decimals)
 
-**2026-08-18 CEO CORRECTION:** The live AXIOM (AXM) A2A Settlement token is `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` (deployed 2026-08-18). Previous address `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` is stale/dead and must not be used.
-
-**2026-08-16 CEO DIRECTIVE (still active):** AXIOM (AXM) is the **sole** platform and A2A settlement token for new flows. SINC remains for residual / legacy holders.
-
+**2026-08-18** The live AXIOM (AXM) A2A Settlement token is `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`
+**2026-08-16 DIRECTIVE (still active):** AXIOM (AXM) is platform A2A settlement token 
 ## Live, verified contracts
 
 | Role | Address | Notes |
@@ -24,8 +21,6 @@ This markdown is the human index. Settlement, A2A, billing, and startup `symbol(
 | **SINC token** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | **8 decimals, 1B supply, $0.15 floor ($150M FDV).** |
 | **SincLimitOrderHook** | `0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0` | Legacy |
 | **SincGenesisNFT (soulbound)** | `0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09` | Legacy |
-| **Uniswap v4 PoolManager** | `0x498581fF718922c3f8e6A244956aF099B2652b2b` | Infra |
-| **Uniswap v4 PositionManager** | `0x7C5f5A4bBd8fD63184577525326123B519429bDc` | Infra |
 
 ## Environment overrides
 
@@ -41,7 +36,7 @@ BASE_CHAIN_ID=8453
 
 | Address | Why wrong |
 |---|---|
-| `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Previous SINC address (retired 2026-08-19) |
+| `|
 | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | Previous incorrect AXM entry (dead PumpClawToken) |
 | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Retired bonding curve |
 | `0xb627F53E08AD7d455e787d052C18D6877020E2BF` | Old bonding curve |
