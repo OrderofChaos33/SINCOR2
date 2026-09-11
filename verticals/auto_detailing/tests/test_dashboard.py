@@ -48,6 +48,40 @@ def test_five_pages_render(chroma_client):
 
 
 
+def test_logout_clears_chroma_and_admin_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("CHROMA_DEMO", "false")
+    monkeypatch.setenv("CHROMA_DB_PATH", str(tmp_path / "chroma.db"))
+    monkeypatch.setenv("ADMIN_USERNAME", "shopowner")
+    monkeypatch.setenv("ADMIN_PASSWORD", "correct-horse")
+    monkeypatch.delenv("CHROMA_LIVE_SEND", raising=False)
+    from verticals.auto_detailing.store import reset_store
+    from sincor2.chroma_app import create_chroma_app
+
+    reset_store(tmp_path / "chroma.db")
+    app = create_chroma_app()
+    app.config["TESTING"] = True
+    app.config["SECRET_KEY"] = "test-secret-not-shared"
+    client = app.test_client()
+    login = client.post(
+        "/chroma/login",
+        data={"identifier": "shopowner", "password": "correct-horse"},
+        follow_redirects=False,
+    )
+    assert login.status_code in (302, 303)
+    with client.session_transaction() as sess:
+        assert sess.get("chroma_shop") == "shopowner"
+        assert sess.get("admin_username") == "shopowner"
+    out = client.get("/chroma/logout", follow_redirects=False)
+    assert out.status_code in (302, 303)
+    with client.session_transaction() as sess:
+        assert "chroma_shop" not in sess
+        assert "admin_username" not in sess
+        assert "is_admin" not in sess
+    blocked = client.get("/chroma/leads", follow_redirects=False)
+    assert blocked.status_code in (302, 303)
+    assert "/chroma/login" in (blocked.headers.get("Location") or "")
+
+
 def test_login_uses_chroma_template_not_platform(tmp_path, monkeypatch):
     monkeypatch.setenv("CHROMA_DEMO", "false")
     monkeypatch.setenv("CHROMA_DB_PATH", str(tmp_path / "chroma.db"))
