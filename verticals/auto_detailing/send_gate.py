@@ -99,6 +99,8 @@ def approve(item_id: str, store: Optional[ChromaStore] = None) -> Dict[str, Any]
         raise ValueError(f"Unknown outbound item: {item_id}")
     if item.get("status") == KILLED:
         raise ValueError("Killed items cannot be approved")
+    if item.get("status") == SENT:
+        raise ValueError("Already sent items cannot be approved again")
 
     if not live_send_enabled():
         updated = store.update_outbound(
