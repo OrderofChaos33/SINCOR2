@@ -1,13 +1,17 @@
-# Treasury HOLD — 2am standing order
+# Treasury HOLD — LIFTED
 
-Locked 2026-09-10. Destination: `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`. Code: `src/sincor2/treasury_hold.py`. Full: `docs/TREASURY_HOLD.md`.
+Lifted by founder 2026-09-10 20:54 CDT. Prior lock 2026-09-10 is revoked.
+Code: `src/sincor2/treasury_hold.py`. Full: `docs/TREASURY_HOLD.md`.
+Treasury: `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`.
 
-1. **100%** of realized platform fees (projected=false + tx_hash) → Treasury. Take is **500 bps**.
-2. **100% HOLD** on-chain USDC (~$192). **0%** Morpho / Aave / LP / SharedLiquidity.
-3. **100% HOLD** founder cash off-chain (~$800). **0%** load-to-chain.
-4. Vault **0%** until first conversion; then 80/20 only if cash ≥ **$10,000 USDC**.
-5. Underwriting go-live: **$10,000 USDC** backing + conversion proof + founder signer. Halt file `data/TREASURY_EXEC_HALT` is ON. `EXECUTE_LIVE` default off.
+## Live now
+1. **AXM A2A paid lane is LIVE.** Realized fees (`projected=false` + `tx_hash`) still take **500 bps** to treasury. Simulated / `free_call` / `0xSIMULATED` stay off the realized ledger.
+2. **Polyclaw is LIVE 24/7** on its own Polygon wallet (`POLYCLAW_LIVE=true` + `POLYMARKET_PRIVATE_KEY`). Not the Base treasury key.
+3. **HOLD is OFF.** On-chain USDC / USDC.e / ETH / POL in the trading + ops wallets may be used by authorized live agents.
+4. Treasury exec broadcast still requires Railway `EXECUTE_LIVE=1` and no halt file. Default in source stays `false` so a clone cannot spend.
+5. Founder signer is still the only treasury broadcaster. Auditor still gates vault/LP size-ups.
 
-Mover: founder signer broadcasts. Treasury exec queues. Auditor gates. Nobody else.
-
-Paste this block under README “What’s new (2026-09)” on merge if the README hunk is not already in.
+## Still not automatic
+- Do not point Polymarket at the treasury EOA.
+- Do not treat `EXECUTE_LIVE` default in git as on.
+- Kill switch in `bankroll` can still halt Polyclaw mid-cycle.
