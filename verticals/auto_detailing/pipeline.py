@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from .booking_agent import DetailingBookingAgent
-from .config import DEFAULT_SHOP
+from .config import DEFAULT_SHOP, live_send_enabled
 from .engagement_agent import DetailingEngagementAgent, infer_package
 from .lead_agent import DetailingLeadAgent
 from .outreach_agent import DetailingOutreachAgent
@@ -160,7 +160,7 @@ def run_pipeline(
         "outreach": sequence,
         "engagement": engagement,
         "timeline": store.timeline(lead["lead_id"]),
-        "live_send": False,
+        "live_send": live_send_enabled(),
     }
 
 

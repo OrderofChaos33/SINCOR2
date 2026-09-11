@@ -50,6 +50,10 @@ def live_send_enabled() -> bool:
 
 
 def demo_mode() -> bool:
+    # Never skip shop auth on Railway / production, even if someone left the Loom flag on.
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENVIRONMENT") or "").strip().lower()
+    if os.environ.get("RAILWAY_ENVIRONMENT") or env in {"production", "prod"}:
+        return False
     return env_flag("CHROMA_DEMO", False)
 
 
