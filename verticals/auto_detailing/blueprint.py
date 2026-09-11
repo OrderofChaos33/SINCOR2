@@ -90,6 +90,7 @@ def _ctx(**extra: Any) -> Dict[str, Any]:
         "shop": shop,
         "shop_name": shop.get("shop_name") or "CHROMA",
         "counts": counts,
+        "money": _store().books_totals(),
         "demo": demo_mode(),
         "live_send": live_send_enabled(),
         "nav": request.endpoint or "",
@@ -253,6 +254,43 @@ def bookings():
         "chroma/bookings.html",
         **_ctx(bookings=_store().list_bookings(), shop=_shop()),
     )
+
+
+@bp.route("/books", methods=["GET", "POST"])
+@shop_required
+def books():
+    store = _store()
+    if request.method == "POST":
+        try:
+            amount = float(request.form.get("amount") or 0)
+        except ValueError:
+            amount = 0
+        if amount > 0:
+            store.add_book(
+                {
+                    "direction": request.form.get("direction") or "in",
+                    "amount": amount,
+                    "method": request.form.get("method") or "cash",
+                    "note": request.form.get("note") or "",
+                    "lead_id": request.form.get("lead_id") or None,
+                }
+            )
+            flash("Logged.", "ok")
+        else:
+            flash("Need a dollar amount.", "error")
+        return redirect(url_for("chroma.books"))
+    return render_template(
+        "chroma/books.html",
+        **_ctx(entries=store.list_books()),
+    )
+
+
+@bp.route("/books/<item_id>/delete", methods=["POST"])
+@shop_required
+def books_delete(item_id: str):
+    _store().delete_book(item_id)
+    flash("Pulled that line.", "ok")
+    return redirect(url_for("chroma.books"))
 
 
 @bp.route("/outreach")

@@ -38,6 +38,7 @@ def test_five_pages_render(chroma_client):
         "/chroma/bookings",
         "/chroma/outreach",
         "/chroma/settings",
+        "/chroma/books",
     ):
         r = chroma_client.get(path)
         assert r.status_code == 200, path
@@ -76,3 +77,18 @@ def test_approve_stays_dry_run(chroma_client):
     updated = store.get_outbound(item_id)
     assert updated["status"] == "approved_dry_run"
     assert updated["live"] is False
+
+
+def test_books_logs_money_in(chroma_client):
+    from verticals.auto_detailing.store import get_store
+
+    r = chroma_client.post(
+        "/chroma/books",
+        data={"direction": "in", "amount": "125", "method": "cash", "note": "Walk-in wash"},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Walk-in wash" in html
+    totals = get_store().books_totals()
+    assert totals["money_in"] >= 125

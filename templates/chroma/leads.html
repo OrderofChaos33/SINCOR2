@@ -8,8 +8,8 @@
 <section class="kpis">
   <article class="card"><p class="k">Leads</p><p class="v">{{ counts.leads }}</p></article>
   <article class="card"><p class="k">Waiting to send</p><p class="v">{{ counts.pending_sends }}</p></article>
-  <article class="card"><p class="k">Quotes</p><p class="v">{{ counts.quotes }}</p></article>
-  <article class="card"><p class="k">Bookings</p><p class="v">{{ counts.bookings }}</p></article>
+  <article class="card"><p class="k">Money in</p><p class="v money-in">${{ '%.0f'|format(money.money_in) }}</p></article>
+  <article class="card"><p class="k">Net</p><p class="v">${{ '%.0f'|format(money.net) }}</p></article>
 </section>
 
 {% if not leads %}

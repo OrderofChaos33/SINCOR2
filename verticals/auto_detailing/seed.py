@@ -279,7 +279,55 @@ def seed(store: Optional[ChromaStore] = None, reset: bool = True) -> Dict[str, A
         store=store,
     )
 
+    seed_books(store)
     return store.counts()
+
+
+def seed_books(store: ChromaStore) -> None:
+    if store.counts().get("books", 0):
+        return
+    store.add_book(
+        {
+            "direction": "in",
+            "amount": 1799,
+            "method": "square",
+            "note": "Miles Brennan · ceramic Model X (deposit + balance)",
+            "lead_id": "LD-AVA001",
+        }
+    )
+    store.add_book(
+        {
+            "direction": "in",
+            "amount": 449,
+            "method": "square",
+            "note": "Wes Harlan · Mustang GT signature detail",
+            "lead_id": "LD-SAM005",
+        }
+    )
+    store.add_book(
+        {
+            "direction": "in",
+            "amount": 80,
+            "method": "cash",
+            "note": "Walk-in express wash · Civic",
+        }
+    )
+    store.add_book(
+        {
+            "direction": "out",
+            "amount": 64.20,
+            "method": "card",
+            "note": "Chemicals + microfibers (AutoZone)",
+        }
+    )
+    store.add_book(
+        {
+            "direction": "out",
+            "amount": 38.00,
+            "method": "cash",
+            "note": "Gas · Fulton pickup",
+        }
+    )
 
 
 def ensure_demo(store: Optional[ChromaStore] = None) -> Dict[str, Any]:
@@ -289,4 +337,5 @@ def ensure_demo(store: Optional[ChromaStore] = None) -> Dict[str, Any]:
     url = str(store.get_settings().get("url") or "")
     if counts["leads"] == 0 or name in {"Northline Detail", None, ""} or "clintondetailing.com" in url:
         return seed(store=store, reset=True)
-    return counts
+    seed_books(store)
+    return store.counts()

@@ -164,19 +164,17 @@ td { padding: 10px 8px; border-top: 1px solid rgba(246,248,252,.1); color: var(-
 .bottom {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   height: var(--nav);
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  background:
-    var(--stars),
-    var(--navy-deep);
-  background-size: 28px 28px, auto;
-  border-top: 3px solid var(--red);
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  background: var(--red);
+  border-top: 2px solid var(--white);
 }
 .bottom a {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; color: var(--mute); font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  gap: 2px; color: var(--white); font-size: 11px; font-weight: 800; letter-spacing: .03em;
   text-transform: uppercase; min-height: var(--nav);
+  text-shadow: 0 1px 0 rgba(0,0,0,.25);
 }
-.bottom a.on, .bottom a:hover { color: var(--white); }
+.bottom a.on, .bottom a:hover { color: var(--white); background: rgba(0,0,0,.22); }
 .badge {
   background: var(--red); color: var(--white); border-radius: 999px;
   min-width: 18px; height: 18px; font-size: 11px; display: inline-grid; place-items: center;
@@ -204,4 +202,6 @@ td { padding: 10px 8px; border-top: 1px solid rgba(246,248,252,.1); color: var(-
 .login-wrap { max-width: 420px; margin: 12vh auto; padding: 16px; }
 .login-wrap h2 { font-family: var(--display); text-transform: uppercase; color: var(--white); }
 .money { font-family: var(--mono); }
+.money-in { color: #9ec1ff; }
+.money-out { color: #ffb3c1; }
 .empty { color: var(--mute); padding: 24px 8px; }

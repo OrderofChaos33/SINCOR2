@@ -10,6 +10,9 @@ def test_seed_from_empty(store):
     assert result["quotes"] >= 3
     assert result["bookings"] >= 2
     assert result["pending_sends"] >= 3
+    assert result["books"] >= 3
+    money = store.books_totals()
+    assert money["money_in"] > money["money_out"]
     settings = store.get_settings()
     assert settings["shop_name"] == "Clinton Auto Detailing"
     assert settings["city"] == "Clinton"

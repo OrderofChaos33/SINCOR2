@@ -140,6 +140,15 @@ class ChromaStore:
                     key TEXT PRIMARY KEY,
                     value TEXT
                 );
+                CREATE TABLE IF NOT EXISTS books (
+                    id TEXT PRIMARY KEY,
+                    direction TEXT,
+                    amount REAL,
+                    method TEXT,
+                    note TEXT,
+                    lead_id TEXT,
+                    created_at TEXT
+                );
                 """
             )
             conn.commit()
@@ -155,7 +164,7 @@ class ChromaStore:
 
     def wipe(self) -> None:
         with self._lock, self._connect() as conn:
-            for table in ("events", "outbound", "bookings", "quotes", "leads", "settings"):
+            for table in ("events", "outbound", "bookings", "quotes", "leads", "settings", "books"):
                 conn.execute(f"DELETE FROM {table}")
             conn.commit()
         self._ensure_default_settings()
@@ -450,6 +459,56 @@ class ChromaStore:
             conn.commit()
         return self.get_settings()
 
+    # ----------------------------------------------------------------- books
+    def add_book(self, entry: Dict[str, Any]) -> Dict[str, Any]:
+        item_id = entry.get("id") or f"LG-{uuid4().hex[:8].upper()}"
+        direction = "out" if str(entry.get("direction") or "in").lower() in {"out", "expense", "spent"} else "in"
+        record = {
+            "id": item_id,
+            "direction": direction,
+            "amount": abs(float(entry.get("amount") or 0)),
+            "method": entry.get("method") or "cash",
+            "note": entry.get("note") or "",
+            "lead_id": entry.get("lead_id"),
+            "created_at": entry.get("created_at") or _now(),
+        }
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO books (id, direction, amount, method, note, lead_id, created_at)
+                VALUES (:id, :direction, :amount, :method, :note, :lead_id, :created_at)
+                """,
+                record,
+            )
+            conn.commit()
+        return record
+
+    def list_books(self) -> List[Dict[str, Any]]:
+        with self._lock, self._connect() as conn:
+            rows = conn.execute("SELECT * FROM books ORDER BY created_at DESC, id DESC").fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    def delete_book(self, item_id: str) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute("DELETE FROM books WHERE id=?", (item_id,))
+            conn.commit()
+
+    def books_totals(self) -> Dict[str, float]:
+        with self._lock, self._connect() as conn:
+            incoming = conn.execute(
+                "SELECT COALESCE(SUM(amount),0) FROM books WHERE direction='in'"
+            ).fetchone()[0]
+            outgoing = conn.execute(
+                "SELECT COALESCE(SUM(amount),0) FROM books WHERE direction='out'"
+            ).fetchone()[0]
+        incoming = float(incoming or 0)
+        outgoing = float(outgoing or 0)
+        return {
+            "money_in": round(incoming, 2),
+            "money_out": round(outgoing, 2),
+            "net": round(incoming - outgoing, 2),
+        }
+
     def counts(self) -> Dict[str, int]:
         with self._lock, self._connect() as conn:
             leads = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
@@ -458,11 +517,13 @@ class ChromaStore:
             pending = conn.execute(
                 "SELECT COUNT(*) FROM outbound WHERE status='pending_approval'"
             ).fetchone()[0]
+            books = conn.execute("SELECT COUNT(*) FROM books").fetchone()[0]
         return {
             "leads": int(leads),
             "quotes": int(quotes),
             "bookings": int(bookings),
             "pending_sends": int(pending),
+            "books": int(books),
         }
 
 

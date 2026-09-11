@@ -20,7 +20,8 @@
     <nav class="desk-nav">
       <a href="{{ url_for('chroma.leads') }}" class="{{ 'on' if 'lead' in nav }}">Leads {% if counts.leads %}<span class="badge">{{ counts.leads }}</span>{% endif %}</a>
       <a href="{{ url_for('chroma.quotes') }}" class="{{ 'on' if 'quotes' in nav }}">Quotes</a>
-      <a href="{{ url_for('chroma.bookings') }}" class="{{ 'on' if 'bookings' in nav }}">Bookings</a>
+      <a href="{{ url_for('chroma.bookings') }}" class="{{ 'on' if 'chroma.bookings' in nav }}">Bays</a>
+      <a href="{{ url_for('chroma.books') }}" class="{{ 'on' if nav.startswith('chroma.books') }}">Books</a>
       <a href="{{ url_for('chroma.outreach') }}" class="{{ 'on' if 'outreach' in nav }}">Send {% if counts.pending_sends %}<span class="badge">{{ counts.pending_sends }}</span>{% endif %}</a>
       <a href="{{ url_for('chroma.settings') }}" class="{{ 'on' if 'settings' in nav }}">Shop</a>
     </nav>
@@ -41,8 +42,9 @@
   <nav class="bottom" aria-label="Shop">
     <a href="{{ url_for('chroma.leads') }}" class="{{ 'on' if 'lead' in nav }}">Leads</a>
     <a href="{{ url_for('chroma.quotes') }}" class="{{ 'on' if 'quotes' in nav }}">Quotes</a>
-    <a href="{{ url_for('chroma.bookings') }}" class="{{ 'on' if 'bookings' in nav }}">Bays</a>
-    <a href="{{ url_for('chroma.outreach') }}" class="{{ 'on' if 'outreach' in nav }}">Send{% if counts.pending_sends %} · {{ counts.pending_sends }}{% endif %}</a>
+    <a href="{{ url_for('chroma.bookings') }}" class="{{ 'on' if 'chroma.bookings' in nav }}">Bays</a>
+    <a href="{{ url_for('chroma.books') }}" class="{{ 'on' if nav.startswith('chroma.books') }}">Books</a>
+    <a href="{{ url_for('chroma.outreach') }}" class="{{ 'on' if 'outreach' in nav }}">Send</a>
     <a href="{{ url_for('chroma.settings') }}" class="{{ 'on' if 'settings' in nav }}">Shop</a>
   </nav>
 </body>

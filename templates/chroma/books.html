@@ -1,0 +1,59 @@
+{% extends "chroma/base.html" %}
+{% block title %}Books{% endblock %}
+{% block body %}
+<p class="kicker">Till</p>
+<h2 class="page">Money in, money out</h2>
+<p class="lede">Job paid, chemicals bought, gas to Fulton. Log it here so you know what the week actually made.</p>
+
+<section class="kpis">
+  <article class="card"><p class="k">In</p><p class="v money-in">${{ '%.0f'|format(money.money_in) }}</p></article>
+  <article class="card"><p class="k">Out</p><p class="v money-out">${{ '%.0f'|format(money.money_out) }}</p></article>
+  <article class="card"><p class="k">Net</p><p class="v">${{ '%.0f'|format(money.net) }}</p></article>
+  <article class="card"><p class="k">Lines</p><p class="v">{{ entries|length }}</p></article>
+</section>
+
+<section class="card">
+  <p class="k">Add a line</p>
+  <form class="stack" method="post" style="margin-top:12px">
+    <div class="actions">
+      <label>In or out
+        <select name="direction">
+          <option value="in">Money in</option>
+          <option value="out">Money out</option>
+        </select>
+      </label>
+      <label>Amount <input name="amount" inputmode="decimal" placeholder="449" required></label>
+    </div>
+    <label>How
+      <select name="method">
+        <option value="square">Square</option>
+        <option value="cash">Cash</option>
+        <option value="card">Card</option>
+        <option value="check">Check</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <label>What for <input name="note" placeholder="Mustang GT signature detail"></label>
+    <button class="btn rowbtn" type="submit">Log it</button>
+  </form>
+</section>
+
+<div class="card" style="margin-top:16px">
+  {% for e in entries %}
+    <div class="row">
+      <div class="who">
+        <strong class="{{ 'money-in' if e.direction == 'in' else 'money-out' }}">
+          {{ '+' if e.direction == 'in' else '−' }}${{ '%.2f'|format(e.amount) }}
+        </strong>
+        <span>{{ e.method }} · {{ e.note or '—' }}</span>
+        <span class="meta">{{ e.created_at }}</span>
+      </div>
+      <form method="post" action="{{ url_for('chroma.books_delete', item_id=e.id) }}">
+        <button class="btn ghost" type="submit">Undo</button>
+      </form>
+    </div>
+  {% else %}
+    <p class="empty">Nothing logged. First job of the week goes here.</p>
+  {% endfor %}
+</div>
+{% endblock %}
