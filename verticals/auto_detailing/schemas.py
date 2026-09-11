@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from .config import DEFAULT_SHOP
+
 
 class TaskInput(BaseModel):
     task_type: str
@@ -65,7 +67,7 @@ class BookingHandoffRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    calendly_handle: str = "northline-detail"
+    calendly_handle: str = str(DEFAULT_SHOP["calendly_handle"])
     preferred_slot: Optional[str] = None
     weather_precip_pct: Optional[int] = None
 
@@ -73,17 +75,17 @@ class BookingHandoffRequest(BaseModel):
 class CopyRequest(BaseModel):
     channel: str = Field(..., description="google_rsa | meta | gbp | sms | email | landing")
     package_id: Optional[str] = None
-    city: str = "Dubuque"
+    city: str = str(DEFAULT_SHOP["city"])
     offer: Optional[str] = None
     tone: str = "direct"
 
 
 class PresenceRequest(BaseModel):
-    shop_name: str = "Northline Detail"
-    city: str = "Dubuque"
-    region: str = "IA"
-    phone: str = "(563) 555-0148"
-    url: str = "https://northlinedetail.com"
+    shop_name: str = str(DEFAULT_SHOP["shop_name"])
+    city: str = str(DEFAULT_SHOP["city"])
+    region: str = str(DEFAULT_SHOP["region"])
+    phone: str = str(DEFAULT_SHOP["phone"])
+    url: str = str(DEFAULT_SHOP["url"])
     services: List[str] = Field(default_factory=list)
     reviews: List[Dict[str, Any]] = Field(default_factory=list)
     gallery: List[Dict[str, Any]] = Field(default_factory=list)
@@ -92,7 +94,7 @@ class PresenceRequest(BaseModel):
 class SocialScheduleRequest(BaseModel):
     platforms: List[str] = Field(default_factory=lambda: ["instagram", "facebook", "gbp"])
     cadence_per_week: int = Field(5, ge=1, le=21)
-    city: str = "Dubuque"
+    city: str = str(DEFAULT_SHOP["city"])
     season: Optional[str] = None
 
 

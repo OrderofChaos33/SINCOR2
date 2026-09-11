@@ -1,0 +1,78 @@
+{% extends "chroma/base.html" %}
+{% block title %}Quotes{% endblock %}
+{% block body %}
+<p class="kicker">Price board</p>
+<h2 class="page">Package × size</h2>
+<p class="lede">Coatings take a deposit. Washes don’t. Unknown size prices as a sedan.</p>
+
+<div class="card scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Package</th>
+        {% for size in (matrix[0].cells.keys() if matrix else []) %}
+          <th>{{ size }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in matrix %}
+        <tr>
+          <td><strong>{{ row.label }}</strong><div class="meta">{{ (row.deposit_rate * 100)|int }}% deposit</div></td>
+          {% for size, cell in row.cells.items() %}
+            <td class="money">${{ '%.0f'|format(cell.total) }}{% if cell.deposit %}<div class="meta">${{ '%.0f'|format(cell.deposit) }} hold</div>{% endif %}</td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<section class="card" style="margin-top:16px">
+  <p class="k">Build a quote</p>
+  <form class="stack" method="post" style="margin-top:12px">
+    <label>Package
+      <select name="package_id">
+        {% for pid, pkg in (packages or {}).items() %}
+          <option value="{{ pid }}">{{ pkg.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Size
+      <select name="size">
+        <option>sedan</option><option>suv</option><option>truck</option>
+        <option>coupe</option><option>compact</option><option>van</option>
+        <option>exotic</option><option value="spaceship">unknown / other</option>
+      </select>
+    </label>
+    <label class="meta"><input type="checkbox" name="mobile"> Mobile (adds $45)</label>
+    <div class="actions">
+      <button class="btn" name="preview" value="1">Preview</button>
+      <button class="btn ghost" name="save" value="1">Save quote</button>
+    </div>
+  </form>
+  {% if preview %}
+    <p class="quote-preview" style="margin-top:14px">${{ '%.0f'|format(preview.total) }}</p>
+    <p class="meta">{{ preview.label }} · {{ preview.vehicle_size }}{% if preview.size_assumed %} (assumed){% endif %} · deposit ${{ '%.0f'|format(preview.deposit) }} · due at bay ${{ '%.0f'|format(preview.balance_due_at_bay) }}</p>
+  {% endif %}
+</section>
+
+<h3 class="kicker" style="margin-top:22px">Generated quotes</h3>
+<div class="card">
+  {% for q in quotes %}
+    <div class="row">
+      <div class="who">
+        <strong>{{ q.package_id }} · ${{ '%.0f'|format(q.total or 0) }}</strong>
+        <span>{{ q.vehicle_size }} · {{ q.lead_id or 'no lead' }} · {{ 'SENT' if q.sent else 'NOT SENT' }}</span>
+      </div>
+      {% if not q.sent %}
+        <form method="post" action="{{ url_for('chroma.mark_quote_sent', quote_id=q.quote_id) }}">
+          <button class="btn" type="submit">Mark sent</button>
+        </form>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="empty">No quotes yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

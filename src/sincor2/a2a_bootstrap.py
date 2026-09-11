@@ -213,6 +213,11 @@ def register_a2a(app) -> bool:
             mount_kya_stack(app)
         except Exception as kya_err:
             logger.warning("KYA mount skipped: %s", kya_err)
+        try:
+            from verticals.auto_detailing.blueprint import register_chroma
+            register_chroma(app)
+        except Exception as chroma_err:
+            logger.warning("CHROMA mount skipped: %s", chroma_err)
         return True
     except Exception as err:
         logger.error("A2ARouter registration failed: %s", err)

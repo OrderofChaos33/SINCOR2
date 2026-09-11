@@ -2,37 +2,83 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 from uuid import uuid4
 
+from .config import DEFAULT_SHOP
 from .protocols import (
     PACKAGES,
     PHOTO_QUOTE_FAMILIES,
+    REMINDER_OFFSETS_HOURS,
+    VEHICLE_SIZE_MULTIPLIER,
     WEATHER_HOLD_PRECIP_PCT,
     deposit_for,
     vehicle_size_from_body,
 )
 from .schemas import BookingHandoffRequest, QuoteRequest, Vehicle
 
+KNOWN_SIZES = frozenset(VEHICLE_SIZE_MULTIPLIER.keys())
 
-def _quote(req: QuoteRequest) -> Dict[str, Any]:
-    pkg = PACKAGES.get(req.package_id)
+
+def resolve_size(vehicle: Vehicle) -> Dict[str, Any]:
+    """Return vehicle size plus whether we had to assume sedan."""
+    raw = (vehicle.size or "").strip().lower() or None
+    if raw and raw in KNOWN_SIZES:
+        return {"size": raw, "size_assumed": False, "size_requested": raw}
+    inferred = vehicle_size_from_body(vehicle.body_style, vehicle.make)
+    if raw and raw not in KNOWN_SIZES:
+        return {
+            "size": "sedan",
+            "size_assumed": True,
+            "size_requested": raw,
+            "size_note": f"Unknown size '{raw}' — priced as sedan (1.00x).",
+        }
+    return {"size": inferred, "size_assumed": raw is None, "size_requested": raw}
+
+
+def quote_matrix(
+    packages: Optional[Dict[str, Dict[str, Any]]] = None,
+    sizes: Optional[Dict[str, float]] = None,
+) -> List[Dict[str, Any]]:
+    """Full package × size price grid with coating deposit math."""
+    packages = packages or PACKAGES
+    sizes = sizes or VEHICLE_SIZE_MULTIPLIER
+    rows: List[Dict[str, Any]] = []
+    for pkg_id, pkg in packages.items():
+        rate = deposit_for(pkg_id)
+        cells: Dict[str, Any] = {}
+        for size, multiplier in sizes.items():
+            total = round(float(pkg["price"]) * float(multiplier), 2)
+            deposit = round(total * rate, 2)
+            cells[size] = {
+                "multiplier": multiplier,
+                "total": total,
+                "deposit": deposit,
+                "balance_due_at_bay": round(total - deposit, 2),
+            }
+        rows.append(
+            {
+                "package_id": pkg_id,
+                "label": pkg["label"],
+                "base_price": float(pkg["price"]),
+                "duration_min": pkg["duration_min"],
+                "deposit_rate": rate,
+                "family": pkg["family"],
+                "cells": cells,
+            }
+        )
+    return rows
+
+
+def _quote(req: QuoteRequest, packages: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:
+    catalog = packages or PACKAGES
+    pkg = catalog.get(req.package_id)
     if not pkg:
         raise ValueError(f"Unknown package: {req.package_id}")
-    size = req.vehicle.size or vehicle_size_from_body(req.vehicle.body_style, req.vehicle.make)
-    multiplier = {
-        "compact": 0.90,
-        "sedan": 1.00,
-        "coupe": 1.00,
-        "suv": 1.20,
-        "crossover": 1.12,
-        "truck": 1.25,
-        "van": 1.28,
-        "exotic": 1.45,
-        "oversized": 1.35,
-    }.get(size, 1.0)
+    size_info = resolve_size(req.vehicle)
+    size = size_info["size"]
+    multiplier = float(VEHICLE_SIZE_MULTIPLIER.get(size, 1.0))
     mobile_fee = 45 if req.mobile else 0
     addon_fees = {"engine_bay": 65, "pet_hair": 85, "headlight": 90, "ozone": 70}
     addons_total = sum(addon_fees.get(a, 40) for a in req.addons)
@@ -45,6 +91,9 @@ def _quote(req: QuoteRequest) -> Dict[str, Any]:
         "package_id": req.package_id,
         "label": pkg["label"],
         "vehicle_size": size,
+        "size_assumed": bool(size_info.get("size_assumed")),
+        "size_requested": size_info.get("size_requested"),
+        "size_note": size_info.get("size_note"),
         "duration_min": pkg["duration_min"],
         "base_price": float(pkg["price"]),
         "size_multiplier": multiplier,
@@ -59,6 +108,36 @@ def _quote(req: QuoteRequest) -> Dict[str, Any]:
     }
 
 
+def build_calendly_url(
+    *,
+    handle: str,
+    event: str,
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    vehicle: Optional[Vehicle] = None,
+    package_label: Optional[str] = None,
+    package_id: Optional[str] = None,
+) -> str:
+    params = {
+        "name": name or "",
+        "email": email or "",
+        "a1": " ".join(
+            str(p)
+            for p in (
+                (vehicle.year if vehicle else None),
+                (vehicle.make if vehicle else None),
+                (vehicle.model if vehicle else None),
+            )
+            if p
+        ),
+        "a2": package_label or "",
+        "utm_source": "chroma",
+        "utm_medium": "agent",
+        "utm_campaign": package_id or "",
+    }
+    return f"https://calendly.com/{handle}/{event}?{urlencode(params)}"
+
+
 class DetailingBookingAgent:
     def quote(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         vehicle = Vehicle.model_validate(payload.get("vehicle") or {})
@@ -68,9 +147,10 @@ class DetailingBookingAgent:
             addons=list(payload.get("addons") or []),
             mobile=bool(payload.get("mobile", False)),
         )
-        if req.package_id not in PACKAGES:
+        catalog = payload.get("packages") or PACKAGES
+        if req.package_id not in catalog:
             req = req.model_copy(update={"package_id": "full_detail"})
-        return _quote(req)
+        return _quote(req, packages=catalog)
 
     def calendly_handoff(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         vehicle = Vehicle.model_validate(payload.get("vehicle") or {})
@@ -81,37 +161,38 @@ class DetailingBookingAgent:
             name=payload.get("name"),
             email=payload.get("email"),
             phone=payload.get("phone"),
-            calendly_handle=payload.get("calendly_handle", "northline-detail"),
+            calendly_handle=payload.get("calendly_handle") or DEFAULT_SHOP["calendly_handle"],
             preferred_slot=payload.get("preferred_slot"),
             weather_precip_pct=payload.get("weather_precip_pct"),
         )
-        if req.package_id not in PACKAGES:
+        catalog = payload.get("packages") or PACKAGES
+        if req.package_id not in catalog:
             req = req.model_copy(update={"package_id": "full_detail"})
         quote = _quote(
-            QuoteRequest(package_id=req.package_id, vehicle=req.vehicle, mobile=bool(payload.get("mobile")))
-        )
-        pkg = PACKAGES[req.package_id]
-        event = str(pkg["calendly_event"])
-        params = {
-            "name": req.name or "",
-            "email": req.email or "",
-            "a1": " ".join(
-                str(p)
-                for p in (req.vehicle.year, req.vehicle.make, req.vehicle.model)
-                if p
+            QuoteRequest(
+                package_id=req.package_id,
+                vehicle=req.vehicle,
+                mobile=bool(payload.get("mobile")),
             ),
-            "a2": str(pkg["label"]),
-            "utm_source": "chroma",
-            "utm_medium": "agent",
-            "utm_campaign": req.package_id,
-        }
-        url = f"https://calendly.com/{req.calendly_handle}/{event}?{urlencode(params)}"
+            packages=catalog,
+        )
+        pkg = catalog[req.package_id]
+        event = str(pkg["calendly_event"])
+        url = build_calendly_url(
+            handle=req.calendly_handle,
+            event=event,
+            name=req.name,
+            email=req.email,
+            vehicle=req.vehicle,
+            package_label=str(pkg["label"]),
+            package_id=req.package_id,
+        )
         precip = req.weather_precip_pct if req.weather_precip_pct is not None else 0
         weather_hold = bool(pkg["exterior"]) and precip >= WEATHER_HOLD_PRECIP_PCT
         booking_id = f"BK-{uuid4().hex[:8].upper()}"
         reminders = [
-            (datetime.now(timezone.utc) + timedelta(hours=-24)).isoformat(),
-            (datetime.now(timezone.utc) + timedelta(hours=-2)).isoformat(),
+            {"offset_hours": hours, "label": f"T-{hours}h"}
+            for hours in REMINDER_OFFSETS_HOURS
         ]
         return {
             "booking_id": booking_id,
@@ -125,7 +206,9 @@ class DetailingBookingAgent:
                 if weather_hold
                 else None
             ),
-            "reminders": ["T-24h", "T-2h"],
+            "reminders": reminders,
             "deposit_required": quote["deposit"] > 0,
             "self_serve": True,
+            "preferred_slot": req.preferred_slot,
+            "status": "weather_hold" if weather_hold else "link_ready",
         }

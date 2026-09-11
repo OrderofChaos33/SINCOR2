@@ -1,0 +1,40 @@
+{% extends "chroma/base.html" %}
+{% block title %}Bookings{% endblock %}
+{% block body %}
+<p class="kicker">Calendar handoff</p>
+<h2 class="page">Bays</h2>
+<p class="lede">Online book is Square on clintondetail.com. If that page is down, they text {{ shop.phone }}.</p>
+
+<article class="card">
+  <p class="k">Text to book</p>
+  <p class="v" style="font-size:1.2rem"><a href="sms:{{ shop.phone }}">{{ shop.phone }}</a></p>
+  <p class="meta">{{ shop.address }}, {{ shop.city }}, {{ shop.region }} {{ shop.zip }} · {{ shop.hours }}</p>
+  <p class="meta">{{ shop.service_area }} · by appointment</p>
+</article>
+
+<article class="card" style="margin-top:16px">
+  <p class="k">Website</p>
+  <p class="v" style="font-size:1rem"><a href="{{ shop.url }}" target="_blank" rel="noopener">{{ shop.url }}</a></p>
+  {% if shop.booking_url %}
+    <p style="margin-top:8px"><a class="btn" href="{{ shop.booking_url }}" target="_blank" rel="noopener">Open Square booking</a></p>
+  {% endif %}
+  {% if shop.menu_url %}
+    <p class="meta" style="margin-top:8px"><a href="{{ shop.menu_url }}" target="_blank" rel="noopener">Service menu</a>{% if shop.gift_url %} · <a href="{{ shop.gift_url }}" target="_blank" rel="noopener">Gift cards</a>{% endif %}</p>
+  {% endif %}
+</article>
+
+<div class="card" style="margin-top:16px">
+  {% for b in bookings %}
+    <div class="row">
+      <div class="who">
+        <strong>{{ b.event }} · {{ b.status }}</strong>
+        <span>{{ b.lead_id }} {% if b.slot %}· {{ b.slot }}{% endif %}</span>
+        {% if b.calendly_url %}<div><a href="{{ b.calendly_url }}">Open prefilled link</a></div>{% endif %}
+      </div>
+      <span class="status {{ b.status }}">{{ b.status.replace('_',' ') }}</span>
+    </div>
+  {% else %}
+    <p class="empty">No handoffs yet. Score a hot lead.</p>
+  {% endfor %}
+</div>
+{% endblock %}

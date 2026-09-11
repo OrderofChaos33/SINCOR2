@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from .config import DEFAULT_SHOP
 from .protocols import PACKAGES, SEASONAL_CAMPAIGNS
 from .schemas import CopyRequest
 
@@ -19,10 +20,11 @@ class DetailingCopyAgent:
         req = CopyRequest(
             channel=payload.get("channel") or payload.get("input") or "google_rsa",
             package_id=payload.get("package_id"),
-            city=payload.get("city", "Dubuque"),
+            city=payload.get("city", DEFAULT_SHOP["city"]),
             offer=payload.get("offer"),
             tone=payload.get("tone", "direct"),
         )
+        shop = payload.get("shop_name") or DEFAULT_SHOP["shop_name"]
         service = _package_label(req.package_id)
         city = req.city
         offer = req.offer or "Same-week bays. Deposit locks ceramic dates."
@@ -47,7 +49,7 @@ class DetailingCopyAgent:
                 "Membership Washes, 30-Day",
             ]
             descriptions = [
-                f"Northline Detail — {city}. {offer} Choose a package, add your vehicle, book the next open bay.",
+                f"{shop} — {city}. {offer} Choose a package, add your vehicle, book the next open bay.",
                 "Ceramic, PPF, paint correction, interiors. Instant quote. Review-backed. Open late for drop-offs.",
             ]
             return {
@@ -93,7 +95,7 @@ class DetailingCopyAgent:
             return {
                 "channel": "sms",
                 "body": (
-                    f"Northline: your {service} quote is ready. "
+                    f"{shop}: your {service} quote is ready. "
                     f"{offer} Book here — it takes about a minute."
                 )[:160],
             }

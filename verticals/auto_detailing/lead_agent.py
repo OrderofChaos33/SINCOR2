@@ -1,4 +1,21 @@
-"""Lead aggregation, scoring, and qualification for detailing shops."""
+"""Lead aggregation, scoring, and qualification for detailing shops.
+
+Intent scoring rubric (0–100, clamped 5–99)
+==========================================
+raw = (source_weight * 0.42) + (intent * 0.32) + vehicle_lift + photo_lift + identity_lift
+
+source_weight  0–1 from SOURCE_WEIGHT (missed_call 0.96 … tiktok 0.55)
+intent         starts at 0.08, plus keyword lifts from INTENT_KEYWORDS, capped at 1.0
+vehicle_lift   +0.18 luxury make, +0.10 dirty/neglected, +0.04 known year
+photo_lift     +0.12 if photo_urls present (photo-quote)
+identity_lift  +0.06 if email or phone
+
+Bands
+-----
+>= 78  hot      next_action = book_now
+>= 58  warm     next_action = qualify
+else   nurture  next_action = sequence
+"""
 
 from __future__ import annotations
 
@@ -59,6 +76,13 @@ def score_lead(req: LeadIngestRequest) -> Dict[str, Any]:
         "source_weight": source,
         "photo_quote": bool(req.photo_urls),
         "sla_seconds": 90,
+        "rubric": {
+            "source": round(source * 0.42, 4),
+            "intent": round(intent * 0.32, 4),
+            "vehicle_lift": vehicle_lift,
+            "photo_lift": photo_lift,
+            "identity_lift": identity_lift,
+        },
     }
 
 
@@ -81,7 +105,7 @@ class DetailingLeadAgent:
             utm=dict(payload.get("utm") or {}),
         )
         ranking = score_lead(req)
-        lead_id = f"LD-{uuid4().hex[:8].upper()}"
+        lead_id = payload.get("lead_id") or f"LD-{uuid4().hex[:8].upper()}"
         return {
             "lead_id": lead_id,
             "ingested_at": _now(),

@@ -1,0 +1,105 @@
+{% extends "chroma/base.html" %}
+{% block title %}{{ lead.name }}{% endblock %}
+{% block body %}
+<p class="kicker"><a href="{{ url_for('chroma.leads') }}">← Inbox</a></p>
+<h2 class="page">{{ lead.name or 'No name' }}</h2>
+<p class="lede">{{ lead.source }} · {{ contact.phone or contact.email or 'no number' }}</p>
+
+<section class="kpis">
+  <article class="card"><p class="k">Score</p><p class="v">{{ lead.intent_score|int }}</p></article>
+  <article class="card"><p class="k">Heat</p><p class="v">{{ lead.band }}</p></article>
+  <article class="card"><p class="k">Status</p><p class="v">{{ lead.status.replace('_',' ') }}</p></article>
+  <article class="card"><p class="k">Do next</p><p class="v" style="font-size:1rem">{{ next_label }}</p></article>
+</section>
+
+<article class="card">
+  <p class="k">What they said</p>
+  <p>{{ lead.message or '—' }}</p>
+  {% if lead.vehicle %}
+    <p class="meta">{{ lead.vehicle.get('year') }} {{ lead.vehicle.get('make') }} {{ lead.vehicle.get('model') }} · {{ lead.vehicle.get('size') or lead.vehicle.get('body_style') or 'size unknown' }}</p>
+  {% endif %}
+</article>
+
+<section class="card" style="margin-top:16px">
+  <p class="k">Do this job</p>
+  <form class="stack" method="post" action="{{ url_for('chroma.quote_lead', lead_id=lead.lead_id) }}" style="margin-top:12px">
+    <label>Package
+      <select name="package_id">
+        {% for pid, pkg in packages.items() %}
+          <option value="{{ pid }}">{{ pkg.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn rowbtn" type="submit">Price this job</button>
+  </form>
+  <div class="job-actions">
+    <form method="post" action="{{ url_for('chroma.text_lead', lead_id=lead.lead_id) }}">
+      <button class="btn rowbtn" type="submit">Queue a text</button>
+    </form>
+    <form method="post" action="{{ url_for('chroma.book_lead', lead_id=lead.lead_id) }}">
+      <button class="btn ghost rowbtn" type="submit">Send booking link</button>
+    </form>
+    <form class="stack" method="post" action="{{ url_for('chroma.paid_lead', lead_id=lead.lead_id) }}">
+      <div class="actions">
+        <label>They paid
+          <input name="amount" inputmode="decimal" placeholder="{{ '%.0f'|format((quotes[0].total if quotes else 0) or 0) }}">
+        </label>
+        <label>How
+          <select name="method">
+            <option value="square">Square</option>
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn rowbtn" type="submit">Put it on the books</button>
+    </form>
+    {% if contact.phone %}
+      <a class="btn ghost rowbtn" href="tel:{{ contact.phone }}">Call {{ contact.phone }}</a>
+    {% endif %}
+  </div>
+  <p class="meta" style="margin-top:10px">Queue a text puts a draft in Send. You still Approve before anything leaves.</p>
+</section>
+
+{% if quotes %}
+  <h3 class="kicker" style="margin-top:22px">Quotes</h3>
+  {% for q in quotes %}
+    <article class="card" style="margin-top:8px">
+      <p class="quote-preview">${{ '%.0f'|format(q.total or (q.payload.total if q.payload else 0)) }} · {{ (q.payload.label if q.payload else q.package_id) }}</p>
+      <p class="meta">Deposit ${{ '%.0f'|format(q.deposit or 0) }} · {{ 'sent' if q.sent else 'not sent' }} · {{ q.vehicle_size }}</p>
+    </article>
+  {% endfor %}
+{% endif %}
+
+{% if bookings %}
+  <h3 class="kicker" style="margin-top:22px">Booking</h3>
+  {% for b in bookings %}
+    <article class="card" style="margin-top:8px">
+      <p><strong>{{ b.status.replace('_',' ') }}</strong> {% if b.slot %}· {{ b.slot }}{% endif %}</p>
+      {% if b.calendly_url %}<p><a href="{{ b.calendly_url }}">Open Square booking</a></p>{% endif %}
+    </article>
+  {% endfor %}
+{% endif %}
+
+{% if outbound %}
+  <h3 class="kicker" style="margin-top:22px">Drafts for this job</h3>
+  <p class="meta"><a href="{{ url_for('chroma.outreach') }}">Approve them in Send</a></p>
+  {% for o in outbound %}
+    <article class="card" style="margin-top:8px">
+      <p><strong>{{ o.channel }}</strong> · {{ o.status.replace('_',' ') }}</p>
+      <p class="meta">{{ o.body[:140] }}{% if o.body and o.body|length > 140 %}…{% endif %}</p>
+    </article>
+  {% endfor %}
+{% endif %}
+
+<h3 class="kicker" style="margin-top:22px">What happened</h3>
+<ul class="timeline">
+  {% for ev in timeline %}
+    <li>
+      <div class="when">{{ ev.created_at }}</div>
+      <strong>{{ ev.kind.replace('_',' ') }}</strong>
+      <div class="meta">{{ ev.detail }}</div>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CHROMA login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=Source+Sans+3:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='chroma/chroma.css') }}">
+</head>
+<body>
+  <div class="login-wrap">
+    <p class="kicker">Shop OS</p>
+    <h2>CHROMA</h2>
+    <p class="lede">Clinton Auto Detailing · 715 Park Pl. Same staff login as SINCOR. Demo mode skips this.</p>
+    {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+    <form class="stack" method="post">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <label>Username or email <input name="identifier" required autofocus></label>
+      <label>Password <input name="password" type="password" required></label>
+      <button class="btn rowbtn" type="submit">Open the bay board</button>
+    </form>
+  </div>
+</body>
+</html>
