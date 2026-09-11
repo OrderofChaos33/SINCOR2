@@ -11,7 +11,7 @@
 <body>
   <header class="top">
     <a class="brand" href="{{ url_for('chroma.leads') }}">
-      <span class="mark">CA</span>
+      <span class="mark" aria-hidden="true">★</span>
       <div>
         <h1>{{ shop_name }}</h1>
         <small>{{ shop.tagline if shop and shop.tagline else 'Correct. Reflect. Protect.' }}</small>
@@ -29,6 +29,7 @@
       {% if live_send %}<span class="pill live">Live send ON</span>{% else %}<span class="pill safe">Dry run</span>{% endif %}
     </div>
   </header>
+  <div class="star-row" aria-hidden="true">★ ★ ★ ★ ★ ★ ★</div>
   <main class="wrap">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}
