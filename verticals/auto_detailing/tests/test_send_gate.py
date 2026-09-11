@@ -74,3 +74,13 @@ def test_edit_resets_to_pending(store):
     edited = edit(item["id"], body="v2 cleaner copy that books the bay", store=store)
     assert edited["body"] == "v2 cleaner copy that books the bay"
     assert edited["status"] == PENDING
+
+
+def test_approve_rejects_already_sent(store, monkeypatch):
+    monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    item = enqueue(channel="email", kind="quote_followup", body="Book the bay.", store=store)
+    first = approve(item["id"], store=store)
+    assert first["status"] == SENT
+    with pytest.raises(ValueError, match="Already sent"):
+        approve(item["id"], store=store)
+    assert store.get_outbound(item["id"])["status"] == SENT
