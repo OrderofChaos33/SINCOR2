@@ -30,8 +30,9 @@ from .config import (
     live_send_enabled,
 )
 from .pipeline import health_payload, run_pipeline
+from .protocols import PACKAGES
 from .seed import ensure_demo
-from .send_gate import approve, edit, kill
+from .send_gate import approve, edit, enqueue, kill
 from .store import get_store
 
 bp = Blueprint(
@@ -48,6 +49,37 @@ def _store():
 
 def _shop() -> Dict[str, Any]:
     return _store().get_settings()
+
+
+def _packages(shop: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    shop = shop or _shop()
+    pkgs = shop.get("packages")
+    return pkgs if isinstance(pkgs, dict) else PACKAGES
+
+
+def _contact(lead: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    nested = lead.get("contact") if isinstance(lead.get("contact"), dict) else {}
+    payload = lead.get("payload") if isinstance(lead.get("payload"), dict) else {}
+    pcontact = payload.get("contact") if isinstance(payload.get("contact"), dict) else {}
+    return {
+        "email": lead.get("email") or nested.get("email") or payload.get("email") or pcontact.get("email"),
+        "phone": lead.get("phone") or nested.get("phone") or payload.get("phone") or pcontact.get("phone"),
+    }
+
+
+def _latest_quote(lead_id: str) -> Optional[Dict[str, Any]]:
+    for quote in _store().list_quotes():
+        if quote.get("lead_id") == lead_id:
+            return quote
+    return None
+
+
+NEXT_ACTION = {
+    "book_now": "Price it and book",
+    "qualify": "Ask the car",
+    "sequence": "Follow up",
+    "winback": "Win them back",
+}
 
 
 def _is_authed() -> bool:
@@ -153,6 +185,7 @@ def lead_detail(lead_id: str):
     quotes = [q for q in _store().list_quotes() if q.get("lead_id") == lead_id]
     bookings = [b for b in _store().list_bookings() if b.get("lead_id") == lead_id]
     outbound = [o for o in _store().list_outbound() if o.get("lead_id") == lead_id]
+    ranking = lead.get("ranking") or {}
     return render_template(
         "chroma/lead_detail.html",
         **_ctx(
@@ -161,6 +194,10 @@ def lead_detail(lead_id: str):
             quotes=quotes,
             bookings=bookings,
             outbound=outbound,
+            packages=_packages(),
+            contact=_contact(lead),
+            next_label=NEXT_ACTION.get(ranking.get("next_action"), "Price it"),
+            booking_url=_shop().get("booking_url") or "",
         ),
     )
 
@@ -195,6 +232,134 @@ def rerun_lead(lead_id: str):
     payload = lead.get("payload") or {}
     payload["lead_id"] = lead_id
     run_pipeline(payload, store=_store())
+    flash("Scored again.", "ok")
+    return redirect(url_for("chroma.lead_detail", lead_id=lead_id))
+
+
+@bp.route("/leads/<lead_id>/quote", methods=["POST"])
+@shop_required
+def quote_lead(lead_id: str):
+    store = _store()
+    lead = store.get_lead(lead_id)
+    if not lead:
+        flash("Lead not found.", "error")
+        return redirect(url_for("chroma.leads"))
+    agent = DetailingBookingAgent()
+    quote = agent.quote(
+        {
+            "package_id": request.form.get("package_id") or "full_detail",
+            "vehicle": lead.get("vehicle") or {},
+            "packages": _packages(),
+        }
+    )
+    saved = store.save_quote(quote, lead_id=lead_id)
+    store.set_lead_status(lead_id, "quoted")
+    store.add_event(
+        lead_id,
+        "quoted",
+        f"{quote.get('label')} · ${float(quote.get('total') or 0):.0f}",
+    )
+    flash(f"Priced at ${float(saved['total']):.0f}. Queue a text when you're ready.", "ok")
+    return redirect(url_for("chroma.lead_detail", lead_id=lead_id))
+
+
+@bp.route("/leads/<lead_id>/text", methods=["POST"])
+@shop_required
+def text_lead(lead_id: str):
+    store = _store()
+    lead = store.get_lead(lead_id)
+    if not lead:
+        return redirect(url_for("chroma.leads"))
+    shop = _shop()
+    contact = _contact(lead)
+    quote = _latest_quote(lead_id)
+    if not quote:
+        flash("Price the job first, then queue the text.", "error")
+        return redirect(url_for("chroma.lead_detail", lead_id=lead_id))
+    label = (quote.get("payload") or {}).get("label") or quote.get("package_id") or "detail"
+    total = float(quote.get("total") or 0)
+    booking = shop.get("booking_url") or shop.get("url") or ""
+    vehicle = lead.get("vehicle") or {}
+    car = " ".join(
+        str(p) for p in (vehicle.get("year"), vehicle.get("make"), vehicle.get("model")) if p
+    ) or "your car"
+    body = (
+        f"{lead.get('name') or 'Hey'}, {shop.get('shop_name')}. "
+        f"{label} on the {car} is ${total:.0f}. "
+        f"Grab a slot: {booking} or call {shop.get('phone')}."
+    )
+    to = contact.get("phone") or contact.get("email")
+    channel = "sms" if contact.get("phone") else "email"
+    enqueue(
+        channel=channel,
+        kind="quote_followup",
+        body=body,
+        to=to,
+        subject=f"{label} quote · ${total:.0f}",
+        lead_id=lead_id,
+        band=lead.get("band"),
+        store=store,
+    )
+    store.add_event(lead_id, "outreach_queued", channel)
+    flash("Draft is in Send. Nothing leaves until you Approve.", "ok")
+    return redirect(url_for("chroma.lead_detail", lead_id=lead_id))
+
+
+@bp.route("/leads/<lead_id>/book", methods=["POST"])
+@shop_required
+def book_lead(lead_id: str):
+    store = _store()
+    lead = store.get_lead(lead_id)
+    if not lead:
+        return redirect(url_for("chroma.leads"))
+    shop = _shop()
+    quote = _latest_quote(lead_id)
+    url = shop.get("booking_url") or shop.get("calendly_url") or shop.get("url")
+    store.save_booking(
+        {
+            "lead_id": lead_id,
+            "quote_id": (quote or {}).get("quote_id"),
+            "calendly_url": url,
+            "event": "square",
+            "status": "link_ready",
+        }
+    )
+    store.set_lead_status(lead_id, "ready_to_book")
+    store.add_event(lead_id, "booking_link", url or "")
+    flash("Booking link is on the card. Send it from Send or text it yourself.", "ok")
+    return redirect(url_for("chroma.lead_detail", lead_id=lead_id))
+
+
+@bp.route("/leads/<lead_id>/paid", methods=["POST"])
+@shop_required
+def paid_lead(lead_id: str):
+    store = _store()
+    lead = store.get_lead(lead_id)
+    if not lead:
+        return redirect(url_for("chroma.leads"))
+    quote = _latest_quote(lead_id)
+    try:
+        amount = float(request.form.get("amount") or (quote or {}).get("total") or 0)
+    except ValueError:
+        amount = 0
+    if amount <= 0:
+        flash("Need a dollar amount. Price the job first or type what they paid.", "error")
+        return redirect(url_for("chroma.lead_detail", lead_id=lead_id))
+    label = (quote or {}).get("package_id") or "job"
+    if quote and isinstance(quote.get("payload"), dict):
+        label = quote["payload"].get("label") or label
+    store.add_book(
+        {
+            "direction": "in",
+            "amount": amount,
+            "method": request.form.get("method") or "square",
+            "note": f"{lead.get('name')} · {label}",
+            "lead_id": lead_id,
+        }
+    )
+    store.set_lead_status(lead_id, "paid")
+    store.add_event(lead_id, "paid", f"${amount:.0f}")
+    flash(f"${amount:.0f} on the books.", "ok")
     return redirect(url_for("chroma.lead_detail", lead_id=lead_id))
 
 

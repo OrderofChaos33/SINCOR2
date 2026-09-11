@@ -92,3 +92,42 @@ def test_books_logs_money_in(chroma_client):
     assert "Walk-in wash" in html
     totals = get_store().books_totals()
     assert totals["money_in"] >= 125
+
+
+def test_lead_has_shop_actions_not_pipeline(chroma_client):
+    r = chroma_client.get("/chroma/leads/LD-AVA001")
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Run the pipeline" not in html
+    assert "Price this job" in html
+    assert "Queue a text" in html
+    assert "Put it on the books" in html
+
+
+def test_quote_then_paid_on_lead(chroma_client):
+    from verticals.auto_detailing.store import get_store
+
+    r = chroma_client.post(
+        "/chroma/leads/LD-JEN003/quote",
+        data={"package_id": "express_wash"},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert "Priced at" in html
+    before = get_store().books_totals()["money_in"]
+    r = chroma_client.post(
+        "/chroma/leads/LD-JEN003/paid",
+        data={"amount": "79", "method": "cash"},
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    assert get_store().books_totals()["money_in"] >= before + 79
+    lead = get_store().get_lead("LD-JEN003")
+    assert lead["status"] == "paid"
+
+
+def test_queue_text_needs_quote_first(chroma_client):
+    r = chroma_client.post("/chroma/leads/LD-PAT006/text", follow_redirects=True)
+    assert r.status_code == 200
+    assert "Price the job first" in r.get_data(as_text=True)
