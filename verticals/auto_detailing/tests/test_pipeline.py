@@ -35,6 +35,20 @@ def test_pipeline_hot_lead_quotes_and_queues(store, monkeypatch):
         "ready_to_book",
         "weather_hold",
     }
+    assert result["live_send"] is False
+
+
+def test_pipeline_reports_live_send_flag(store, monkeypatch):
+    monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    result = run_pipeline(
+        {
+            "source": "tiktok",
+            "name": "Sam",
+            "message": "cool cars",
+        },
+        store=store,
+    )
+    assert result["live_send"] is True
 
 
 def test_pipeline_nurture_does_not_book(store):
