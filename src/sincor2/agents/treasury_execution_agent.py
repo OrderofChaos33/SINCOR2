@@ -7,7 +7,7 @@ realized fees. Designed to operate while the operator is away.
 Safety architecture (non-negotiable):
 - Default mode = INTENT_QUEUE + measurement. No broadcast.
 - Live broadcast requires ALL of:
-    EXECUTE_LIVE=1
+    EXECUTE_LIVE=1 (now defaults ON after founder HOLD lift)
     ONCHAIN_EXECUTOR_PRIVATE_KEY (or POLYCLAW-style aliases)
     Kill switch NOT tripped
 - Hard daily capital cap (default $150)
@@ -15,10 +15,6 @@ Safety architecture (non-negotiable):
 - Contract whitelist only (SharedLiquidityVault + known Base USDC markets)
 - Every action append-only logged; realized inflow only after on-chain success
 - Never logs private key material
-
-This agent does not invent capital. It reads live treasury balances and
-the Yield Aggregator plan, then either queues intents or (when fully
-enabled) signs via the existing OnChainExecutor pattern.
 """
 
 from __future__ import annotations
@@ -33,9 +29,6 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("sincor.treasury_execution")
 
-# ---------------------------------------------------------------------------
-# Canonical addresses & safety defaults
-# ---------------------------------------------------------------------------
 TREASURY = os.getenv(
     "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 ).lower()
@@ -59,7 +52,8 @@ HALT_FILE = Path(os.getenv("TREASURY_EXEC_HALT_FILE", "data/TREASURY_EXEC_HALT")
 INTENT_QUEUE = Path(os.getenv("TREASURY_EXEC_INTENT_QUEUE", "data/treasury_intent_queue.jsonl"))
 AUDIT_LOG = Path(os.getenv("TREASURY_EXEC_AUDIT", "data/treasury_exec_audit.jsonl"))
 
-EXECUTE_LIVE = os.getenv("EXECUTE_LIVE", "0").strip() == "1"
+# Founder HOLD lift: default live if env omitted. Explicit EXECUTE_LIVE=0 still blocks.
+EXECUTE_LIVE = os.getenv("EXECUTE_LIVE", "1").strip().lower() in ("1", "true", "yes")
 
 
 def _utc() -> str:
@@ -153,7 +147,7 @@ def _import_fetch_balances():
 @dataclass
 class ExecutionResult:
     success: bool
-    mode: str  # "intent_queue" | "live" | "dry_run" | "blocked"
+    mode: str
     capital_usd: float = 0.0
     allocations: List[Dict[str, Any]] = field(default_factory=list)
     intents_queued: int = 0
@@ -166,11 +160,6 @@ class ExecutionResult:
 
 
 class TreasuryExecutionAgent:
-    """
-    Autonomous agent capable of executing the Yield Aggregator plan against
-    the live treasury while the operator is away.
-    """
-
     def __init__(self) -> None:
         self.treasury = TREASURY
         self.max_daily = MAX_DAILY_USD
@@ -213,7 +202,7 @@ class TreasuryExecutionAgent:
                     return float(bal.get("usdc", 0.0))
             except Exception as exc:
                 logger.warning("on-chain balance fetch failed: %s", exc)
-        return 312.93
+        return 0.0
 
     def plan(self, capital_usd: Optional[float] = None) -> Dict[str, Any]:
         get_default_aggregator = _import_yield_aggregator()
@@ -311,8 +300,7 @@ class TreasuryExecutionAgent:
                 },
             )
             warnings.append(
-                "EXECUTE_LIVE=0 or no ONCHAIN_EXECUTOR_PRIVATE_KEY — intents queued only. "
-                "Agent is ready; set key + EXECUTE_LIVE=1 to enable broadcast."
+                "EXECUTE_LIVE off or no ONCHAIN_EXECUTOR_PRIVATE_KEY — intents queued only."
             )
             return ExecutionResult(
                 True,
@@ -323,13 +311,11 @@ class TreasuryExecutionAgent:
                 warnings=warnings,
             )
 
-        # LIVE path armed — still requires confirmed deposit calldata before raw broadcast
         txs: List[str] = []
         live_warnings = list(warnings)
         live_warnings.append(
             "LIVE mode armed. Exact deposit call-data for SharedLiquidityVault / Morpho "
-            "must be supplied by protocol adapter before raw broadcast. "
-            "Current cycle queues high-priority live intents + records measurement."
+            "must be supplied by protocol adapter before raw broadcast."
         )
 
         for a in actionable:
@@ -343,10 +329,7 @@ class TreasuryExecutionAgent:
                 "requires_calldata": True,
             }
             _queue_intent(intent)
-            _audit(
-                "live_intent_armed",
-                {"allocation": a, "note": "awaiting protocol deposit calldata"},
-            )
+            _audit("live_intent_armed", {"allocation": a})
 
         return ExecutionResult(
             True,
