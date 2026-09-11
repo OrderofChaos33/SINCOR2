@@ -1,1 +1,1 @@
-see-local-file
+RESTORED_FROM_LOCAL_FILE_mvp_app_restore.py
