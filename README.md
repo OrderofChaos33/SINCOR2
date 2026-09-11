@@ -5,8 +5,8 @@ SINCOR2 is a production-hardened platform engineered to orchestrate, secure, and
 The platform is architected around three core infrastructure pillars:
 
 ### 1. Sovereign Asynchronous Billing via x402 Compliance
-To enable multi-step, machine-to-machine business workflows without central payment bottlenecks, SINCOR2 embeds the open internet-native x402 financial standard.
-* **Mechanism:** Network nodes expose standardized, machine-readable Agent Cards (`/.well-known/agent-card.json`).
+To enable multi-step, machine-to-machine business workflows without central payment bottlenecks, SINCOR2 embeds the open internet-native x402 financial standard. 
+* **Mechanism:** Network nodes expose standardized, machine-readable Agent Cards (`/.well-known/agent-card.json`). 
 * **Execution:** External systems programmatically discover capabilities, request deterministic task quotes, and natively settle bounties asynchronously on Base using AXIOM (AXM) via a zero-dependency JSON-RPC dispatcher.
 
 ### 2. Adversarial MEV Protection via Uniswap V4 Hooks
@@ -18,6 +18,7 @@ Traditional public ledger environments introduce toxic slippage and front-runnin
 When coordinating distributed swarms against complex, shifting environments, agents often suffer from cognitive drift and path degradation. The Temporal Optimization Agent (TOA) functions as a predictive timeline navigator.
 * **Mechanism:** Pure-Python Nadaraya-Watson kernel smoothing engine paired with Monte Carlo iteration matrices.
 * **Execution:** Evaluates incoming market volatility, tokenomic feedback loops, and multi-variable risk metrics to simulate probabilistic future-state paths, instantly collapsing the superposition into a single, high-utility execution route.
+
 
 # SINCOR2
 <a href="https://ibb.co/qLrvc39h"><img src="https://i.ibb.co/nqLFYNf4/695876102-122100606429310235-8728031194218827085-n.jpg" alt="SINCOR2 banner" border="0"></a>
@@ -133,4 +134,346 @@ See [docs/api/README.md](docs/api/README.md) for the full JSON-RPC reference.
 
 ## Platform Architecture
 
-See the mermaid diagram and component directory in commit b886599. Full restored body continues through Agent Intelligence, A2A, Swarm, Verticals, Revenue, On-Chain, SINAX, Enterprise, DAE, Payments, Observability, Security, Documentation Map, Contributing, and License as in the Aug 24 production README.
+```mermaid
+flowchart TD
+    subgraph Discovery
+        AC[Agent Cards] --> MKT[A2A Marketplace]
+        MKT --> REG[Registry]
+        REG --> REP[Reputation Engine]
+    end
+
+    subgraph Orchestration
+        MKT --> RT[Task Router]
+        RT --> POL[Execution Policy]
+        POL --> RLY[Reliability Controls]
+        RLY --> SW[Swarm Coordinator]
+    end
+
+    subgraph Cognition
+        SW --> AK[Agency Kernel\nPlanner/Executor/Critic/Archivist]
+        AK --> MEM[Multi-Tier Memory]
+        AK --> PER[Persona Engine]
+        AK --> QS[Quality Scorer]
+        AK --> RTI[Real-Time Intelligence]
+        AK --> PAE[Predictive Analytics]
+    end
+
+    subgraph Domain Execution
+        SW --> VRT[Vertical Agents]
+        SW --> PAY[Payment & Settlement]
+        SW --> OBS[Observability]
+    end
+
+    subgraph Economy
+        PAY --> SINC[SINC Utility & Staking]
+        PAY --> AXM[AXIOM Settlement]
+        AXM --> TREAS[Treasury Routing]
+        AXM --> BURN[Burn Mechanics]
+    end
+
+    subgraph Proof Layer
+        AK --> SINAX[SINAX Geometric\nProof Navigation]
+    end
+```
+
+### Component Directory
+
+| Component | Location | Responsibility |
+|---|---|---|
+| Flask runtime | `src/sincor2/` | App factory, blueprints, auth, payments, A2A protocol, monitoring |
+| Agency kernel | `src/sincor2/agency_kernel.py` | Planner/Executor/Critic/Archivist reasoning engine |
+| Swarm coordination | `src/sincor2/swarm_coordination.py` | Contract-net task market, bidding, credit assignment |
+| Multi-tier memory | `src/sincor2/memory_system.py` | Episodic, semantic, procedural, autobiographical stores |
+| Persona engine | `src/sincor2/persona_engine.py` | Big-Five OCEAN traits, style sculpting, drift prevention |
+| Monetization | `src/sincor2/monetization_engine.py` | Revenue stream orchestration and fulfillment |
+| Dynamic pricing | `src/sincor2/dynamic_pricing_engine.py` | Complexity/demand-aware pricing with LRU caching |
+| Revenue orchestrator | `src/sincor2/revenue_orchestrator.py` | Stripe + fulfillment + revenue ledger pipeline |
+| Real-time intelligence | `src/sincor2/real_time_intelligence.py` | Live market, news, social, competitor data feeds |
+| Predictive analytics | `src/sincor2/predictive_analytics_engine.py` | Trend forecasting, risk scoring, multi-scenario planning |
+| Quality scoring | `src/sincor2/quality_scoring_engine.py` | Multi-dimensional self-improving quality assessment |
+| Cortecs core | `src/sincor2/cortecs_core.py` | Claude API integration for complex reasoning tasks |
+| Lifecycle system | `src/sincor2/lifecycle_system.py` | Agent health rhythms, shift budgets, off-duty cycles |
+| Vertical dispatch | `src/sincor2/vertical_dispatch.py` | Skill-id routing to vertical packs and kernel tasks |
+| Polyclaw scheduler | `src/sincor2/polyclaw_scheduler.py` | Autonomous Polymarket arbitrage scanning via APScheduler |
+| Outreach engine | `src/sincor2/outreach_engine.py` | Yelp/Google Places lead fetch + Resend cold outreach |
+| Content agent | `src/sincor2/content_agent.py` | Autonomous 2 000+ word blog posts via Claude, WordPress auto-publish, 12-week rolling calendar |
+| Infinite scaling | `src/sincor2/infinite_scaling_engine.py` | Agent ROI tracking and exponential spawning algorithms |
+| Partnership framework | `src/sincor2/partnership_framework.py` | Revenue-sharing, strategic alliance, and reseller network management |
+| SINAX | `src/sincor2/sinax/` | Geometric proof navigation augmentation layer |
+| Orchestration core | `core/` | Task routing, execution policy, reliability controls |
+| Marketplace services | `marketplace/` | Card registration, discovery, capability matching, reputation |
+| Infrastructure | `infrastructure/` | Deployment config, observability, liquidity, treasury |
+| Vertical packs | `verticals/` | Domain agent packs: healthcare, dental, compliance, trading, lead_gen |
+| DAE layer | `dae/` | Governance, incentives, decentralized identity |
+| Enterprise infra | `enterprise_infrastructure/` | Audit logging, container orchestration |
+| Agents | `agents/` | 43 named agent YAML configs with archetypes and persona vectors |
+| On-chain | `onchain/` | Solidity contracts: bonding curve, limit-order hook, genesis NFT, AXIOM |
+| Examples | `examples/` | Reference Agent Cards and multi-agent workflow payloads |
+
+---
+
+## Agent Intelligence & Cognition
+
+### Agency Kernel — Planner/Executor/Critic/Archivist
+
+Every agent runs on the Agency Kernel, a four-stage reasoning loop that prevents shallow responses and catches errors before they propagate:
+
+- **Planner** — Decomposes a goal into typed, prioritized `PlanStep` objects with success criteria and deadlines.
+- **Executor** — Selects tools, runs actions, and emits structured outputs for each step.
+- **Critic** — Validates each result using evidence→claim→confidence chains and flags low-confidence outputs for re-planning.
+- **Archivist** — Consolidates knowledge to the multi-tier memory system and maintains a `ContinuityIndex` to detect and correct persona or quality drift.
+
+### Multi-Tier Memory
+
+Agents maintain four distinct memory stores backed by SQLite and hybrid RAG retrieval (vector + graph + KV cache):
+
+| Tier | Description | Retention |
+|---|---|---|
+| **Episodic** | Time-stamped events with content hashes (append-only) | Configurable per agent (e.g. 21 days) |
+| **Semantic** | Facts, profiles, rules — graph/relational store | Up to 15 000–30 000 items |
+| **Procedural** | Versioned tools, routines, and prompt templates | Persistent |
+| **Autobiographical** | Self-story, goals, and curated personality narrative | Persistent |
+
+### Persona Engine
+
+Agents carry a fully sculpted personality vector based on the Big-Five (OCEAN) model:
+
+- **Trait axes**: Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism — each on a 0–1 scale.
+- **Style preferences**: risk tolerance, humor level, directness.
+- **Modality preferences**: code, tables, story — so agents naturally choose the most effective output format.
+- **Archetype anchoring**: constitutional constraints keep agents aligned to their role (Scout, Director, Builder, Synthesizer, Auditor, Caretaker, Negotiator).
+- **Continuity tracking**: drift detection compares live vectors against the baseline and re-anchors before output quality degrades.
+
+### Self-Improving Quality Scoring
+
+Quality is assessed across nine dimensions — Accuracy, Completeness, Relevance, Timeliness, Clarity, Actionability, Innovation, Depth, and Credibility — and continuously recalibrated from six feedback sources: direct client feedback, usage patterns, peer agent assessments, outcome tracking, automated checks, and expert review. Thresholds adjust autonomously over time.
+
+### Real-Time Market Intelligence
+
+Agents subscribe to live data streams that refresh continuously:
+
+- Financial market prices, volume, and volatility
+- News feeds and social media sentiment
+- Competitor website changes and pricing updates
+- Job postings and patent filings
+- Regulatory filing alerts
+- Search trend detection
+
+Threshold-based alerting triggers strategy adjustments the moment conditions shift — giving SINCOR agents knowledge that is minutes old rather than days old.
+
+### Predictive Analytics Engine
+
+Seven forecast types with confidence intervals and multi-scenario planning:
+
+| Prediction | Description |
+|---|---|---|
+| Market trend | Momentum, inflection, and reversal detection |
+| Competitor move | Expansion, pricing change, and product launch forecasting |
+| Revenue impact | Opportunity impact projections with probability ranges |
+| Risk probability | Threat likelihood scoring and early-warning triggers |
+| Opportunity window | Timing recommendations for entry and exit decisions |
+| Demand forecast | Volume and churn prediction for capacity planning |
+| Price movement | DeFi and traditional market price path estimation |
+
+### Lifecycle & Rhythm Management
+
+Agents cycle through defined lifecycle states — Hatch → Onboard → Shift → Off-duty → Review → Promote/Clone/Retire — with enforced shift budgets (daily token and tool-call limits), mandatory off-duty periods (Dream for memory consolidation, Play for creative exploration), and a freshness boost on return to work. This prevents mode collapse and ensures sustained output quality.
+
+### Agent Archetypes & Named Agents
+
+43 named agents are defined in `agents/` using YAML configs with full persona vectors, budgets, and SBT templates. Seven archetypes anchor agent behavior:
+
+| Archetype | Primary Role |
+|---|---|---|
+| **Scout** | Market intelligence, discovery, prospecting, enrichment |
+| **Director** | Strategic coordination, prioritization, resource allocation |
+| **Builder** | Technical execution, development, system construction |
+| **Synthesizer** | Cross-domain knowledge synthesis and analysis |
+| **Auditor** | Standards enforcement, quality assurance, conflict resolution |
+| **Caretaker** | Relationship management, maintenance, and continuity |
+| **Negotiator** | Deal structuring, partnerships, and contract workflows |
+
+---
+
+## A2A Protocol & Marketplace
+
+### Full A2A v1.0.1 Compliance
+
+SINCOR2 implements the Google A2A v1.0.1 specification completely.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 43 skills |
+| `/api/a2a` | POST | JSON-RPC 2.0 dispatcher |
+| `message/send` | RPC | Submit a task and receive a result |
+| `message/stream` | RPC | Server-Sent Events streaming for long-running tasks |
+| `tasks/get` | RPC | Poll task status |
+| `tasks/cancel` | RPC | Cancel an in-flight task |
+| `tasks/list` | RPC | List all tasks for a caller |
+| `tasks/pushNotificationConfig/set` | RPC | Register a webhook for push notifications |
+| `tasks/resubscribe` | RPC | Re-attach to an SSE stream after reconnect |
+
+Any A2A-compatible external agent — Claude, OpenAI assistants, Hermes, custom systems — can discover and call SINCOR agents without custom integration code.
+
+### Marketplace Discovery & Capability Matching
+
+- **Agent Card registry** — versioned records with skill tags, capability definitions, and trust metadata.
+- **Capability matching** — semantic skill-tag overlap scoring to route tasks to the most qualified agent.
+- **Reputation-weighted routing** — the Task Router blends capability score (75%) with trust score (25%). Trust scores use exponential moving averages over task outcomes (success rate + quality rating + latency).
+- **SINC staking boosts** — agents who stake SINC receive a composite score multiplier: `trust * (1 + log(sinc_staked + 1))`, raising their routing priority proportionally.
+- **Load balancing** — agent load is tracked and tasks are redistributed away from overloaded agents.
+
+### AXIOM Payment Flow
+
+1. External agent submits a task with a signed payment intent.
+2. SINCOR validates the on-chain payment commitment on Base.
+3. Task executes through the swarm.
+4. On completion: 50% of received AXM is burned to the dead address (deflationary); 50% routes to the ecosystem treasury.
+5. Uniswap V4 trading fees: 80% of AXM/WETH pool fees route to the treasury independently.
+
+---
+
+## Swarm Coordination
+
+The swarm operates on a contract-net protocol — distributed task allocation without central micromanagement:
+
+1. **Task Market broadcast** — Tasks are posted with a bounty (merit points), required skill tags, deadline, and budget (tokens + tool calls).
+2. **Agent bidding** — Qualified agents submit bids with an intent statement, execution plan, and cost estimate.
+3. **Award** — The coordinator selects the best bid based on skill fit, cost, and plan quality.
+4. **Execution** — The winning agent executes with enforced budgets.
+5. **Credit assignment** — Merit points are assigned based on outcome; accumulated points unlock SBT promotions.
+6. **Conflict resolution** — Auditor entities enforce quality standards and resolve disputes.
+
+The Cortecs Core provides Claude-backed reasoning for tasks requiring multi-agent synthesis, complex strategy, or cross-domain knowledge integration.
+
+---
+
+## Vertical Domain Packs
+
+Each vertical implements purpose-built agents with strongly typed Pydantic schemas, circuit-breaker protection, and native A2A Agent Card output. All verticals are live in the runtime via `platform_bootstrap.py`.
+
+### Healthcare
+Revenue cycle and clinical operations automation: RCM (claims, denials, payment posting, AR follow-up), eligibility verification, credentialing, HIPAA guardrails.
+
+### Dental
+Practice operations (scheduling, recall, retention), dental billing (CDT validation, insurance, claim scrubbing), compliance (HIPAA, OSHA, infection control).
+
+### Trading
+OpenClaw directional signals with Kelly sizing; Polymarket agent for implied vs model probability; Polyclaw scheduler scans every 60 seconds and auto-executes when `POLYCLAW_AUTO_EXECUTE=true`.
+
+### Compliance
+SBOM generation, ASC 842 lease accounting, regulated filings; n8n bridge for workflow nodes.
+
+### Lead Generation
+ICP matcher, outbound enrichment and sequencing, Yelp/Google Places outreach via Resend.
+
+---
+
+## Revenue & Monetization Engine
+
+Eight streams: Instant BI, Agent services, Predictive analytics, Partnerships, Recursive products, Consulting, Subscriptions, Licensing.
+
+Dynamic pricing uses complexity, demand, agent count, expertise, success rate, and client tier, cached with `lru_cache`.
+
+Infinite scaling tracks spawn cost, opex, revenue, ROI, payback and spawns agents when demand exceeds capacity.
+
+Partnership framework covers eight partnership types and five tiers with automated scoring.
+
+---
+
+## On-Chain Economy
+
+| Token | Contract | Role |
+|---|---|---|
+| **AXIOM (AXM)** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | Primary A2A settlement and billing |
+| **SINC** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Residual / legacy holders (8 decimals) |
+| **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Fees and A2A routing |
+| **Base chain** | `8453` | Production network |
+
+Live pointers: `src/sincor2/onchain/constants.py`, `CANONICAL_ADDRESSES.md`.
+
+Contracts in `onchain/src/`: `SincBondingCurve.sol`, `SincGenesisNFT.sol`, `SincLimitOrderHook.sol` (0.30% base / 3.00% same-block penalty), `Axiom.sol`.
+
+Deflation: 50% of A2A AXM burned, 50% to treasury; 80% of AXM/WETH pool fees to treasury; SINC stake boosts routing priority.
+
+---
+
+## SINAX — Geometric Proof Navigation
+
+SINAX proposes; the Lean verifier certifies. Modules in `src/sincor2/sinax/`: axiom_solver, ptn, encoder, graph_store, retrieval, search, curvature, lemma_discovery, proof_manifold, geodesic_flow, homology_detector, morse_filter, integration, visualization. Modes: analytics, suggest, active.
+
+---
+
+## Enterprise Infrastructure
+
+Immutable audit trail with hash chaining, Ed25519 signatures, SQLite/Elasticsearch/Kafka/Redis backends, anomaly detection, forensic archive. Orchestration targets: Kubernetes, Docker Swarm, Nomad, ECS, ACI, Cloud Run.
+
+---
+
+## DAE — Decentralized Autonomous Ecosystem
+
+Governance: proposals, weighted votes, 60% default threshold, execution notes. Incentives: SINC rewards, SBT promotions, staking multipliers. Constitution: `constitution/global.md`. Agents carry `did:key:` identifiers in YAML.
+
+---
+
+## Payments & Billing
+
+Stripe (`stripe_checkout.py`, `stripe_routes.py`), PayPal (`paypal_integration.py`), AXIOM on-chain (`a2a_integration.py`). Revenue Orchestrator wires checkout, webhooks, and the SQLite ledger.
+
+---
+
+## Observability & Production Operations
+
+`GET /health`, monitoring_dashboard, observability, production_logger, check_status. Rate limiting, security headers, lockdown, compliance guardrails. JWT access/refresh. Railway `sincor2.mvp_app:app`, Docker, deploy scripts.
+
+See DEPLOYMENT_GUIDE.md and docs/deployment/production.md.
+
+---
+
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/api/README.md](docs/api/README.md).
+
+---
+
+## Security
+
+Never commit keys or production secrets. Treat healthcare, financial, marketplace, and on-chain data as sensitive. HIPAA paths go through compliance guardrails. Disclose via GitHub Security Advisories. See [SECURITY.md](SECURITY.md).
+
+---
+
+## Documentation Map
+
+| Document | Description |
+|---|---|
+| [API reference](docs/api/README.md) | JSON-RPC methods |
+| [Architecture overview](docs/architecture/overview.md) | System diagrams |
+| [Runtime & configuration](docs/runtime-and-configuration.md) | Env vars |
+| [Guides](docs/guides/README.md) | Operator runbooks |
+| [Funding](docs/funding/README.md) | Funding artifacts |
+| [Vertical integration](docs/guides/vertical-integration.md) | Adding a pack |
+| [SINAX](docs/sinax/README.md) | Proof navigation |
+| [Token overview](docs/token/README.md) | SINC and AXIOM |
+| [Canonical addresses](CANONICAL_ADDRESSES.md) | Address registry |
+| [Deployment](DEPLOYMENT_GUIDE.md) | Railway / Docker |
+| [Examples](examples/README.md) | Cards and workflows |
+| [Roadmap](ROADMAP.md) | Milestones |
+| [Changelog](CHANGELOG.md) | Release history |
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+```bash
+PYTHONPATH=src:src/sincor2 python tests/run_all_tests.py
+ruff check src/sincor2
+pytest --cov=src/sincor2
+```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
