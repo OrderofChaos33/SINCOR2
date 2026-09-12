@@ -1,0 +1,82 @@
+{
+  "code": "OBS-03",
+  "slug": "drift-quality-watch",
+  "name": "Drift & Quality Watch",
+  "family": "OBS",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "margin",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 399,
+    "interval": "month",
+    "unit": "per_workspace",
+    "unit_label": "per workspace",
+    "setup_usd": 0,
+    "display": "$399/mo per workspace"
+  },
+  "tagline": "Catch the agent that degraded silently.",
+  "summary": "Persona and vector drift detection, 9-dimension quality scoring trends, and anomaly detection on agent behavior. Sold to teams whose agents have already gone quiet-wrong in production — which is all of them, eventually.",
+  "description": "Agents do not usually fail loudly. They drift. Persona slips, retrieval vectors wander, tool use gets sloppy, cost creeps, and the operator notices weeks later. Drift & Quality Watch is the watch on that slope: persona/vector drift, a nine-dimension quality trend, and anomaly flags on behavior that left the baseline. It is not a one-shot eval. It is a production watch.",
+  "buyer": "A team with agents in production that have, or will, degrade without a page. Especially anyone who has already had a silent quality incident.",
+  "features": [
+    {
+      "name": "Persona drift",
+      "detail": "Detect when the agent's voice, policy stance, or role adherence leaves its enrolled baseline."
+    },
+    {
+      "name": "Vector drift",
+      "detail": "Watch embedding/retrieval drift so the agent is not answering from the wrong neighborhood."
+    },
+    {
+      "name": "9-dimension quality scoring",
+      "detail": "Trend, not a trophy score. See quality_dimensions."
+    },
+    {
+      "name": "Anomaly detection",
+      "detail": "Behavior that left the agent's own baseline — tool mix, latency, refusal rate, spend."
+    },
+    {
+      "name": "Degradation alerts",
+      "detail": "Page when a dimension or drift metric crosses a watch threshold, not after a customer complaint."
+    }
+  ],
+  "quality_dimensions": [
+    "Task completion",
+    "Factual accuracy",
+    "Persona fidelity",
+    "Tool-call correctness",
+    "Latency",
+    "Cost efficiency",
+    "Safety / policy",
+    "Hallucination rate",
+    "Instruction adherence"
+  ],
+  "includes": [],
+  "source_components": [
+    {
+      "id": "quality_scoring",
+      "maps_to": "Nine-dimension quality trend pipeline."
+    },
+    {
+      "id": "drift_detection",
+      "maps_to": "Persona and vector drift watches."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": null,
+    "next_action": "Sell to any account that has had a silent quality incident. Convert from AUD-01 drift reports."
+  },
+  "conversion": {
+    "from": ["AUD-01", "OBS-01"],
+    "to": ["OBS-ENT", "AUD-02"],
+    "feeds": ["underwriting_engine"]
+  },
+  "positioning": {
+    "friction": "medium",
+    "sale_difficulty": "margin_sku",
+    "impulse": false
+  }
+}

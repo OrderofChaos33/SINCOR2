@@ -1,0 +1,77 @@
+{
+  "code": "AUD-01",
+  "slug": "agent-forensic-audit",
+  "name": "Agent Forensic Audit",
+  "family": "AUD",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "wedge",
+  "this_week_play": true,
+  "pricing": {
+    "model": "one_time",
+    "amount_usd": 499,
+    "interval": null,
+    "unit": "per_engagement",
+    "unit_label": "per engagement",
+    "setup_usd": 0,
+    "display": "$499 one-time"
+  },
+  "tagline": "A paid reconstruction of what the agent actually did.",
+  "summary": "Deep-dive on a deployed agent: full audit-trail reconstruction, failure-mode analysis, drift report, remediation list. The wedge product. Converts into OBS subscriptions and feeds underwriting data for product line 01. This week's play.",
+  "description": "Agent Forensic Audit is a single paid engagement against one deployed agent. The work is reconstruction, not a dashboard login. The trail is rebuilt, failure modes are named, drift is scored, and the buyer leaves with a remediation list they can act on. It is priced to be a yes. It is scoped to convert: the last page of the report is the OBS subscription that would have caught this. Telemetry from the engagement is underwriting fuel.",
+  "buyer": "Anyone with a deployed agent they no longer fully trust — after an incident, before a board review, or as a condition of putting the agent in front of customers.",
+  "features": [
+    {
+      "name": "Audit trail reconstruction",
+      "detail": "Rebuild the hash-chained execution log. Say what happened, in order, with attribution."
+    },
+    {
+      "name": "Failure-mode analysis",
+      "detail": "Name the ways this agent actually fails, not the ways the prompt said it would not."
+    },
+    {
+      "name": "Drift report",
+      "detail": "Persona and vector drift against the enrolled baseline, with the nine quality dimensions trended where data exists."
+    },
+    {
+      "name": "Remediation list",
+      "detail": "Ordered actions. The last items are the OBS SKUs that keep this from being a one-time firefight."
+    }
+  ],
+  "deliverables": [
+    "Reconstructed execution timeline",
+    "Failure-mode brief",
+    "Drift and quality report",
+    "Remediation list with OBS conversion path"
+  ],
+  "includes": [],
+  "source_components": [
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "Trail reconstruction from the signed, hash-chained log."
+    },
+    {
+      "id": "drift_detection",
+      "maps_to": "Drift report section."
+    },
+    {
+      "id": "quality_scoring",
+      "maps_to": "Nine-dimension quality section of the report."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": null,
+    "next_action": "This week's play. Sell the engagement. Convert the report into OBS-02 / OBS-03. File the telemetry into underwriting."
+  },
+  "conversion": {
+    "from": [],
+    "to": ["OBS-02", "OBS-03", "AUD-02", "OBS-ENT"],
+    "feeds": ["underwriting_engine"]
+  },
+  "positioning": {
+    "friction": "low",
+    "sale_difficulty": "wedge",
+    "impulse": true
+  }
+}

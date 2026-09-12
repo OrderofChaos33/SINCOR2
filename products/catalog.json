@@ -1,0 +1,38 @@
+{
+  "line_id": "02",
+  "line_name": "Observability & Audit",
+  "line_code": "OBS-AUD",
+  "company": "SINCOR",
+  "version": "2026-09-12",
+  "this_week_play": "AUD-01",
+  "underwriting_line": "01",
+  "sku_order": ["OBS-01", "OBS-02", "OBS-03", "AUD-01", "AUD-02", "OBS-ENT"],
+  "packaging": {
+    "note": "Not new infrastructure. Packaging of enterprise_infrastructure, monitoring_dashboard, quality scoring, and drift detection.",
+    "components": [
+      "enterprise_infrastructure",
+      "monitoring_dashboard",
+      "quality_scoring",
+      "drift_detection"
+    ]
+  },
+  "caveat": {
+    "sku": "OBS-01",
+    "body": "SKUs 02 and 03 are sellable today because the components exist. OBS-01 still needs the dashboard polished into a customer-facing view before it sits in front of a paying client. The wedge play this week is AUD-01."
+  },
+  "pricing_logic": {
+    "funnel_entry": "OBS-01",
+    "wedge": "AUD-01",
+    "margin": ["OBS-02", "OBS-03"],
+    "revenue": ["AUD-02", "OBS-ENT"],
+    "note": "OBS-01 is the impulse-buy entry. AUD-01 is the one-time wedge that converts. OBS-02/03 are the margin. AUD-02 and OBS-ENT are where real revenue lives."
+  },
+  "compounding": {
+    "feeds": "underwriting_engine",
+    "note": "Every OBS customer generates behavioral data that makes the underwriting engine (product line 01) smarter. These two product lines compound each other."
+  },
+  "bundle_rules": [
+    "OBS-ENT subsumes OBS-01, OBS-02, OBS-03, and AUD-02. Do not double-charge.",
+    "AUD-01 remains a one-time engagement even on ENT accounts."
+  ]
+}

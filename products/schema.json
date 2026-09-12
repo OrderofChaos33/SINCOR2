@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getsincor.com/products/sku.schema.json",
+  "title": "SINCOR SKU",
+  "type": "object",
+  "required": [
+    "code",
+    "slug",
+    "name",
+    "family",
+    "status",
+    "sellable_today",
+    "funnel_role",
+    "this_week_play",
+    "pricing",
+    "tagline",
+    "summary",
+    "buyer",
+    "features",
+    "source_components"
+  ],
+  "properties": {
+    "code": { "type": "string", "pattern": "^(OBS|AUD)-[A-Z0-9]+$" },
+    "slug": { "type": "string" },
+    "name": { "type": "string" },
+    "family": { "type": "string", "enum": ["OBS", "AUD"] },
+    "status": { "type": "string", "enum": ["sellable", "needs_polish"] },
+    "sellable_today": { "type": "boolean" },
+    "funnel_role": {
+      "type": "string",
+      "enum": ["funnel_entry", "wedge", "margin", "revenue"]
+    },
+    "this_week_play": { "type": "boolean" },
+    "pricing": {
+      "type": "object",
+      "required": ["model", "amount_usd", "unit", "display"],
+      "properties": {
+        "model": { "type": "string", "enum": ["subscription", "one_time"] },
+        "amount_usd": { "type": "number" },
+        "interval": { "type": ["string", "null"], "enum": ["month", null] },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "per_agent",
+            "per_deployment",
+            "per_workspace",
+            "per_organization",
+            "per_engagement"
+          ]
+        },
+        "unit_label": { "type": "string" },
+        "setup_usd": { "type": "number" },
+        "display": { "type": "string" }
+      }
+    },
+    "tagline": { "type": "string" },
+    "summary": { "type": "string" },
+    "description": { "type": "string" },
+    "buyer": { "type": "string" },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "detail"],
+        "properties": {
+          "name": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "includes": { "type": "array", "items": { "type": "string" } },
+    "source_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "maps_to"],
+        "properties": {
+          "id": { "type": "string" },
+          "maps_to": { "type": "string" }
+        }
+      }
+    },
+    "readiness": { "type": "object" },
+    "conversion": { "type": "object" },
+    "positioning": { "type": "object" },
+    "quality_dimensions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

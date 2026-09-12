@@ -1,0 +1,71 @@
+{
+  "code": "OBS-01",
+  "slug": "agent-vitals",
+  "name": "Agent Vitals",
+  "family": "OBS",
+  "status": "needs_polish",
+  "sellable_today": false,
+  "funnel_role": "funnel_entry",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 49,
+    "interval": "month",
+    "unit": "per_agent",
+    "unit_label": "per agent",
+    "setup_usd": 0,
+    "display": "$49/mo per agent"
+  },
+  "tagline": "Is my agent alive, and what is it costing me.",
+  "summary": "Uptime, health-endpoint monitoring, cost-per-task, token and tool-call budgets, alert webhooks. The lowest-friction SKU and the easiest first sale — after the dashboard is a customer-facing view.",
+  "description": "Agent Vitals is the impulse-buy observability tier. It answers two questions a buyer already has: is the agent up, and what is each task costing. Heartbeats, health endpoints, spend, and budget ceilings land in one view with webhook alerts when any of them break. It is not the forensic product. It is the card-on-file product.",
+  "buyer": "An operator running one or a handful of agents who needs a pulse and a cost number, not a compliance archive.",
+  "features": [
+    {
+      "name": "Uptime & heartbeat",
+      "detail": "Alive/dead state, last-seen, missed-beat windows."
+    },
+    {
+      "name": "Health endpoint monitoring",
+      "detail": "Probe the agent's health route on an interval. Failures page out."
+    },
+    {
+      "name": "Cost-per-task",
+      "detail": "Attributed spend per run so the buyer can see which work is expensive."
+    },
+    {
+      "name": "Token budgets",
+      "detail": "Hard and soft ceilings on token burn, with webhook alerts on approach and breach."
+    },
+    {
+      "name": "Tool-call budgets",
+      "detail": "Cap tool invocations per agent, per window. Same alert path as tokens."
+    },
+    {
+      "name": "Alert webhooks",
+      "detail": "POST downtime, budget, and health events to the buyer's existing channel."
+    }
+  ],
+  "includes": [],
+  "source_components": [
+    {
+      "id": "monitoring_dashboard",
+      "maps_to": "Must be polished into a customer-facing view before this SKU is sold."
+    }
+  ],
+  "readiness": {
+    "sellable_today": false,
+    "blocker": "Dashboard is internal. It is not yet a customer-facing view.",
+    "next_action": "Polish monitoring_dashboard into a buyer-ready vitals surface. Do not lead with this SKU until that ships."
+  },
+  "conversion": {
+    "from": [],
+    "to": ["OBS-02", "OBS-03", "OBS-ENT"],
+    "feeds": ["underwriting_engine"]
+  },
+  "positioning": {
+    "friction": "lowest",
+    "sale_difficulty": "easiest_first_sale",
+    "impulse": true
+  }
+}

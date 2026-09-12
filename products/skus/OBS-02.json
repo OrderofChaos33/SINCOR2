@@ -1,0 +1,71 @@
+{
+  "code": "OBS-02",
+  "slug": "agent-audit-trail",
+  "name": "Agent Audit Trail",
+  "family": "OBS",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "margin",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 199,
+    "interval": "month",
+    "unit": "per_deployment",
+    "unit_label": "per deployment",
+    "setup_usd": 0,
+    "display": "$199/mo per deployment"
+  },
+  "tagline": "Every action attributable. Tamper-evident. Exportable.",
+  "summary": "Immutable, hash-chained, Ed25519-signed execution logs with a forensic archive. The existing enterprise_infrastructure stack is the product.",
+  "description": "Agent Audit Trail sells the hash chain and the signature, not a new logger. Each execution event is hashed to its predecessor, signed with Ed25519, and archived for forensic replay. Every action is attributable to an actor, a session, and a tool call. The chain is tamper-evident: break a link and verification fails. Exports are formatted for compliance review, not for a dashboard screenshot.",
+  "buyer": "A team that has to prove what an agent did — to themselves, to counsel, or to an auditor — and cannot accept mutable application logs.",
+  "features": [
+    {
+      "name": "Hash-chained log",
+      "detail": "Each event carries the hash of the previous event. The chain is the integrity proof."
+    },
+    {
+      "name": "Ed25519 signing",
+      "detail": "Events are signed at write time. Verification is a library call, not a promise."
+    },
+    {
+      "name": "Attributable actions",
+      "detail": "Actor, session, tool, resource, and outcome on every record."
+    },
+    {
+      "name": "Tamper evidence",
+      "detail": "A rewritten or dropped event breaks the chain. The break is the finding."
+    },
+    {
+      "name": "Forensic archive",
+      "detail": "Retention suited to investigation, not log-rotation convenience."
+    },
+    {
+      "name": "Compliance export",
+      "detail": "Reviewer-ready dump: chain, signatures, timestamps, attribution."
+    }
+  ],
+  "includes": [],
+  "source_components": [
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "comprehensive_audit_logging.py — immutable trail, Ed25519, forensic context, chain of custody."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": null,
+    "next_action": "Sell. Pair with AUD-01 as the paid reconstruction of this trail."
+  },
+  "conversion": {
+    "from": ["OBS-01", "AUD-01"],
+    "to": ["AUD-02", "OBS-ENT"],
+    "feeds": ["underwriting_engine"]
+  },
+  "positioning": {
+    "friction": "medium",
+    "sale_difficulty": "margin_sku",
+    "impulse": false
+  }
+}
