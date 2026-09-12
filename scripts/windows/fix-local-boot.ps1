@@ -1,5 +1,8 @@
 # SINCOR2 Windows local boot fixer
-# Run from repo root:  powershell -ExecutionPolicy Bypass -File .\scripts\windows\fix-local-boot.ps1
+# NEVER replaces .env. Never touches API keys, admin passwords, or wallet keys.
+# Only rewrites Unix /data paths and Redis store mode when those values are still the example defaults.
+#
+#   powershell -ExecutionPolicy Bypass -File .\scripts\windows\fix-local-boot.ps1
 
 $ErrorActionPreference = "Continue"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -9,45 +12,62 @@ Write-Host "SINCOR2 local fix — $Root" -ForegroundColor Cyan
 
 $envFile = Join-Path $Root ".env"
 $example = Join-Path $Root ".env.example"
-if (-not (Test-Path $envFile)) {
+
+if (Test-Path $envFile) {
+    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $bak = Join-Path $Root ".env.bak-$stamp"
+    Copy-Item $envFile $bak
+    Write-Host "Master .env kept. Backup: $bak" -ForegroundColor Green
+} else {
     if (Test-Path $example) {
         Copy-Item $example $envFile
-        Write-Host "Created .env from .env.example" -ForegroundColor Yellow
+        Write-Host "No .env found — copied .env.example (fill secrets yourself)" -ForegroundColor Yellow
     } else {
-        Write-Host "No .env.example found" -ForegroundColor Red
+        Write-Host "No .env and no .env.example" -ForegroundColor Red
         exit 1
     }
 }
 
-function Set-DotEnv {
-    param([string]$Key, [string]$Value)
-    $lines = Get-Content $envFile
-    $found = $false
-    $out = foreach ($line in $lines) {
-        if ($line -match "^\s*#?\s*$Key=") {
-            $found = $true
-            "$Key=$Value"
-        } else {
-            $line
-        }
-    }
-    if (-not $found) { $out += "$Key=$Value" }
-    $out | Set-Content -Path $envFile -Encoding utf8
+function Get-DotEnvValue {
+    param([string]$Key)
+    $line = Get-Content $envFile | Where-Object { $_ -match "^\s*$Key=" } | Select-Object -First 1
+    if (-not $line) { return $null }
+    return ($line -replace "^\s*$Key=", "")
 }
 
-# Point data at the repo, not C:\data
-Set-DotEnv "SINCOR_DATA_DIR" "./data"
-Set-DotEnv "ORDERS_DB_PATH" "./data/orders.db"
-Set-DotEnv "DATABASE_URL" "sqlite:///./data/orders.db"
-Set-DotEnv "SINCOR_STORE_DB_PATH" "./data/polyclaw.db"
-Set-DotEnv "POLYCLAW_DB_PATH" "./data/polyclaw.db"
-Set-DotEnv "POLYCLAW_HALT_FILE" "./data/POLYCLAW_HALT"
-Set-DotEnv "VAULT_LISTENER_STATE_PATH" "./data/vault_listener_state.json"
-Set-DotEnv "WEBBUILDER_DATA_DIR" "./data/webbuilder"
+function Set-DotEnvIfDefault {
+    param([string]$Key, [string]$Value, [string[]]$OnlyIf)
+    $current = Get-DotEnvValue $Key
+    if ($null -eq $current) {
+        Add-Content $envFile "$Key=$Value"
+        Write-Host "Added $Key=$Value" -ForegroundColor DarkGray
+        return
+    }
+    $trim = $current.Trim()
+    if ($OnlyIf -and ($OnlyIf -notcontains $trim)) {
+        Write-Host "Left $Key alone (not an example default)" -ForegroundColor DarkGray
+        return
+    }
+    $lines = Get-Content $envFile | ForEach-Object {
+        if ($_ -match "^\s*$Key=") { "$Key=$Value" } else { $_ }
+    }
+    $lines | Set-Content -Path $envFile -Encoding utf8
+    Write-Host "Set $Key=$Value" -ForegroundColor DarkGray
+}
+
+# Only rewrite if still Railway/example Unix paths. Leave a custom data dir alone.
+$unixData = @("/data", "\data", "C:\data")
+Set-DotEnvIfDefault "SINCOR_DATA_DIR" "./data" $unixData
+Set-DotEnvIfDefault "ORDERS_DB_PATH" "./data/orders.db" @("/data/orders.db", "\data\orders.db")
+Set-DotEnvIfDefault "DATABASE_URL" "sqlite:///./data/orders.db" @("sqlite:////data/orders.db")
+Set-DotEnvIfDefault "SINCOR_STORE_DB_PATH" "./data/polyclaw.db" @("/data/polyclaw.db")
+Set-DotEnvIfDefault "POLYCLAW_DB_PATH" "./data/polyclaw.db" @("/data/polyclaw.db")
+Set-DotEnvIfDefault "POLYCLAW_HALT_FILE" "./data/POLYCLAW_HALT" @("/data/POLYCLAW_HALT")
+Set-DotEnvIfDefault "VAULT_LISTENER_STATE_PATH" "./data/vault_listener_state.json" @("/data/vault_listener_state.json")
+Set-DotEnvIfDefault "WEBBUILDER_DATA_DIR" "./data/webbuilder" @("/data/webbuilder")
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "data") | Out-Null
 
-# Redis: use it if Docker can start it, otherwise sqlite + thread queue
 $redisUp = $false
 try {
     $tcp = New-Object System.Net.Sockets.TcpClient
@@ -58,52 +78,21 @@ try {
 } catch {}
 
 if (-not $redisUp) {
-    $docker = Get-Command docker -ErrorAction SilentlyContinue
-    if ($docker) {
-        Write-Host "Starting redis:7 on 6379 via Docker..." -ForegroundColor Yellow
-        docker rm -f sincor2-redis 2>$null | Out-Null
-        docker run -d --name sincor2-redis -p 6379:6379 redis:7-alpine | Out-Null
-        Start-Sleep -Seconds 2
-        try {
-            $tcp = New-Object System.Net.Sockets.TcpClient
-            $tcp.Connect("127.0.0.1", 6379)
-            $redisUp = $tcp.Connected
-            $tcp.Close()
-        } catch { $redisUp = $false }
+    $store = Get-DotEnvValue "A2A_TASK_STORE"
+    if ($store -eq "redis") {
+        Set-DotEnvIfDefault "A2A_TASK_STORE" "sqlite" @("redis")
+        Write-Host "No local Redis — A2A_TASK_STORE set to sqlite (keys untouched)" -ForegroundColor Yellow
+    } else {
+        Write-Host "No local Redis — store already $($store)" -ForegroundColor DarkGray
     }
-}
-
-if ($redisUp) {
-    Set-DotEnv "REDIS_URL" "redis://localhost:6379/0"
-    Set-DotEnv "A2A_TASK_STORE" "redis"
-    Set-DotEnv "SINCOR_TASK_QUEUE" "auto"
-    Write-Host "Redis is up — A2A_TASK_STORE=redis" -ForegroundColor Green
 } else {
-    Set-DotEnv "A2A_TASK_STORE" "sqlite"
-    Set-DotEnv "SINCOR_TASK_QUEUE" "thread"
-    # Comment REDIS_URL so the app does not try localhost:6379
-    $lines = Get-Content $envFile | ForEach-Object {
-        if ($_ -match "^\s*REDIS_URL=") { "# REDIS_URL=redis://localhost:6379/0  # no local redis" } else { $_ }
-    }
-    $lines | Set-Content -Path $envFile -Encoding utf8
-    Write-Host "No Redis — A2A_TASK_STORE=sqlite, SINCOR_TASK_QUEUE=thread" -ForegroundColor Yellow
-    Write-Host "Optional: docker run -d --name sincor2-redis -p 6379:6379 redis:7-alpine" -ForegroundColor DarkGray
+    Write-Host "Redis is listening on 6379 — left REDIS_URL / A2A_TASK_STORE as-is" -ForegroundColor Green
 }
-
-# Keep live-money paths locked on a laptop
-Set-DotEnv "POLYCLAW_LIVE" "false"
-Set-DotEnv "ALLOW_ONCHAIN_WRITES" "false"
-Set-DotEnv "LEGACY_FIAT_PAYMENTS_ENABLED" "false"
-
-$venv = Join-Path $Root ".venv"
-if (-not (Test-Path (Join-Path $venv "Scripts\python.exe"))) {
-    Write-Host "Creating .venv..." -ForegroundColor Yellow
-    python -m venv .venv
-}
-& ".\.venv\Scripts\python.exe" -m pip install -q -r requirements.txt
 
 Write-Host ""
-Write-Host "Fixed. Restart with:" -ForegroundColor Green
+Write-Host "Secrets in .env were not replaced." -ForegroundColor Green
+Write-Host "Create venv if missing, then:"
+Write-Host "  python -m venv .venv"
 Write-Host "  .\.venv\Scripts\Activate.ps1"
+Write-Host "  pip install -r requirements.txt"
 Write-Host "  python run.py"
-Write-Host "UI: http://127.0.0.1:8080"
