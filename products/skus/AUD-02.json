@@ -1,0 +1,72 @@
+{
+  "code": "AUD-02",
+  "slug": "compliance-pack",
+  "name": "Compliance Pack",
+  "family": "AUD",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "revenue",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 999,
+    "interval": "month",
+    "unit": "per_organization",
+    "unit_label": "per organization",
+    "setup_usd": 2500,
+    "display": "$999/mo + $2,500 setup"
+  },
+  "tagline": "Logging an auditor can sit with.",
+  "summary": "HIPAA-guardrailed logging, ASC 842 / regulated-filing alignment, and audit exports formatted for external review. Credible because the healthcare and compliance verticals already exist — not because the SKU is speculative.",
+  "description": "Compliance Pack is the regulated overlay on the audit trail. Healthcare gets HIPAA-guardrailed logging. Finance gets ASC 842 and regulated-filing alignment. Both get exports a third-party reviewer can open without a SINCOR login. The setup fee covers guardrail configuration, retention, and the first export path. This is not a generic 'we take security seriously' add-on. It sits on verticals that already run.",
+  "buyer": "Healthcare RCM, clinic ops, or a finance team whose agents touch PHI, filings, or lease/contract data that an external reviewer will ask about.",
+  "features": [
+    {
+      "name": "HIPAA-guardrailed logging",
+      "detail": "Minimum necessary, access attribution, and retention suited to PHI-adjacent agent work."
+    },
+    {
+      "name": "ASC 842 / regulated-filing alignment",
+      "detail": "Trail and export shape that maps to lease and regulated-filing review, not a generic CSV."
+    },
+    {
+      "name": "External-review exports",
+      "detail": "Packages a reviewer can take. Chain, signatures, access log, retention statement."
+    },
+    {
+      "name": "Setup & guardrail configuration",
+      "detail": "The $2,500 setup is real work: scopes, retention, export path, named reviewers."
+    }
+  ],
+  "verticals": ["healthcare", "finance", "compliance"],
+  "includes": ["OBS-02 capabilities under the compliance overlay"],
+  "source_components": [
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "Signed trail, forensic context, HIPAA/SOX/PCI-DSS/GDPR tags already on the logger."
+    },
+    {
+      "id": "verticals/healthcare",
+      "maps_to": "Existing healthcare vertical — this SKU is packaging, not invention."
+    },
+    {
+      "id": "verticals/compliance",
+      "maps_to": "Existing compliance vertical — same."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": null,
+    "next_action": "Lead with healthcare RCM and finance filing buyers. Do not sell this as a hypothetical GRC product."
+  },
+  "conversion": {
+    "from": ["AUD-01", "OBS-02"],
+    "to": ["OBS-ENT"],
+    "feeds": ["underwriting_engine"]
+  },
+  "positioning": {
+    "friction": "high",
+    "sale_difficulty": "revenue_sku",
+    "impulse": false
+  }
+}

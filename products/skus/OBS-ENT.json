@@ -1,0 +1,93 @@
+{
+  "code": "OBS-ENT",
+  "slug": "enterprise-mesh",
+  "name": "Enterprise Mesh",
+  "family": "OBS",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "revenue",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 2500,
+    "interval": "month",
+    "unit": "per_organization",
+    "unit_label": "per organization",
+    "setup_usd": 0,
+    "display": "$2,500/mo"
+  },
+  "tagline": "The fleet view. Not the single-agent view.",
+  "summary": "Everything in OBS-01, OBS-02, OBS-03, and AUD-02. Multi-agent swarm view, Sentry and healthchecks.io integration, dedicated support, SLA. For teams running agent fleets, not single agents.",
+  "description": "Enterprise Mesh is the fleet contract. One price, the full observability and compliance overlay, a swarm view across agents, and an SLA with a named support path. Sentry and healthchecks.io are first-class, not a webhook afterthought. This is not OBS-01 with a bigger number. It is the SKU you sell when the buyer already thinks in fleets.",
+  "buyer": "A team running many agents — a swarm, a vertical fleet, or a set of production workers — that needs one picture, one SLA, and one invoice.",
+  "features": [
+    {
+      "name": "Everything above",
+      "detail": "OBS-01 vitals, OBS-02 signed trail, OBS-03 drift and quality, AUD-02 compliance overlay."
+    },
+    {
+      "name": "Multi-agent swarm view",
+      "detail": "Fleet health, spend, drift, and trail across agents — not a tab per agent."
+    },
+    {
+      "name": "Sentry integration",
+      "detail": "Agent exceptions and failed runs land next to the rest of the stack."
+    },
+    {
+      "name": "healthchecks.io integration",
+      "detail": "External heartbeat as a second opinion on alive/dead."
+    },
+    {
+      "name": "Dedicated support",
+      "detail": "Named path. Not a shared inbox."
+    },
+    {
+      "name": "SLA",
+      "detail": "Uptime and response commitments written into the contract."
+    }
+  ],
+  "includes": ["OBS-01", "OBS-02", "OBS-03", "AUD-02"],
+  "excludes": ["AUD-01"],
+  "integrations": ["Sentry", "healthchecks.io"],
+  "source_components": [
+    {
+      "id": "monitoring_dashboard",
+      "maps_to": "Fleet vitals surface."
+    },
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "Signed, hash-chained trail at fleet scale."
+    },
+    {
+      "id": "quality_scoring",
+      "maps_to": "Fleet quality trends."
+    },
+    {
+      "id": "drift_detection",
+      "maps_to": "Fleet drift watches."
+    },
+    {
+      "id": "verticals/healthcare",
+      "maps_to": "Compliance overlay via AUD-02."
+    },
+    {
+      "id": "verticals/compliance",
+      "maps_to": "Compliance overlay via AUD-02."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": "OBS-01 surface inside the mesh still needs the same dashboard polish. Trail, drift, quality, and compliance do not.",
+    "next_action": "Sell to fleet buyers. Do not wait on OBS-01 polish to open ENT conversations — lead on trail, drift, SLA."
+  },
+  "conversion": {
+    "from": ["AUD-01", "OBS-02", "OBS-03", "AUD-02"],
+    "to": [],
+    "feeds": ["underwriting_engine"]
+  },
+  "positioning": {
+    "friction": "high",
+    "sale_difficulty": "revenue_sku",
+    "impulse": false
+  }
+}
