@@ -399,10 +399,10 @@
         ]
       },
       "then": {
-        "properties": {
-          "includes": {
-            "maxItems": 0
-          }
+        "not": {
+          "required": [
+            "includes"
+          ]
         }
       }
     }
