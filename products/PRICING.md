@@ -15,7 +15,7 @@ OBS-01 is the funnel entry once the dashboard is customer-facing. AUD-01 is the 
 
 ## Bundle
 
-When OBS-ENT is sellable, its current foundation is OBS-02 and AUD-02. Do not double-charge bundled SKUs on that contract. OBS-01 and OBS-03 stay opt-in only after their own readiness blockers clear.
+When OBS-ENT is sellable, its current foundation is OBS-02 and AUD-02. The **$2,500/mo OBS-ENT price is the all-in bundle price for that foundation**, so do not add separate OBS-02 recurring or AUD-02 recurring/setup line items on the same contract. OBS-01 and OBS-03 stay opt-in only after their own readiness blockers clear.
 
 AUD-01 stays a one-time engagement. Enterprise accounts still buy forensic audits when they want a deep-dive on a specific agent.
 
@@ -27,7 +27,7 @@ setup = 0
 one_time = 0
 
 if OBS_ENT and OBS_ENT_ready:
-  monthly += 2500
+  monthly += 2500                        # all-in OBS-02 + AUD-02 foundation bundle
 else:
   if OBS_01 and OBS_01_ready:
     monthly += 49 * agent_count          # OBS-01
@@ -45,7 +45,7 @@ if AUD_01:
 year_one = monthly * 12 + setup + one_time
 ```
 
-OBS-01 and OBS-03 should not appear in a live quote until their readiness blockers clear. OBS-ENT should not be quoted until the bundled fleet surface is productized.
+OBS-01 and OBS-03 should not appear in a live quote until their readiness blockers clear. OBS-ENT should not be quoted until the bundled fleet surface is productized; when it is, the bundle price already covers the current OBS-02 + AUD-02 foundation.
 
 ## Compounding
 

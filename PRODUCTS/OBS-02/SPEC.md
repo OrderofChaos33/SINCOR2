@@ -3,7 +3,7 @@
 - Status: Sellable today
 - Price: $199/mo per deployment
 - Source implementation: `enterprise_infrastructure/comprehensive_audit_logging.py`
-- Readiness: Ready to sell; the key-loading syntax bug was fixed in this PR.
+- Readiness: Sellable today; no blocker in the canonical SKU.
 
 ## What it is
 

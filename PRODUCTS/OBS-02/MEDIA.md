@@ -15,7 +15,7 @@
 ## Proof points
 
 - Source path: `enterprise_infrastructure/comprehensive_audit_logging.py`
-- Readiness fact: Ready to sell; the key-loading syntax bug was fixed in this PR.
+- Readiness fact: Sellable today; no blocker in the canonical SKU.
 
 ## Avoid
 
