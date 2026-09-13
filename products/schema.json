@@ -126,6 +126,11 @@
             ]
           },
           "then": {
+            "required": [
+              "interval",
+              "unit",
+              "unit_label"
+            ],
             "properties": {
               "interval": {
                 "const": "month"
@@ -153,6 +158,11 @@
             ]
           },
           "then": {
+            "required": [
+              "interval",
+              "unit",
+              "unit_label"
+            ],
             "properties": {
               "unit": {
                 "const": "per_engagement"
@@ -295,6 +305,9 @@
       "items": {
         "type": "string"
       }
+    },
+    "bundle_pricing": {
+      "type": "object"
     },
     "source_components": {
       "type": "array",

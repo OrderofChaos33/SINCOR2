@@ -42,6 +42,18 @@
     "OBS-02",
     "AUD-02"
   ],
+  "bundle_pricing": {
+    "pricing_model": "all_in",
+    "bundled_skus": [
+      "OBS-02",
+      "AUD-02"
+    ],
+    "separate_charges_excluded": [
+      "OBS-02 recurring",
+      "AUD-02 recurring",
+      "AUD-02 setup"
+    ]
+  },
   "excludes": [
     "AUD-01",
     "OBS-01",

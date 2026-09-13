@@ -48,5 +48,19 @@
   "bundle_rules": [
     "When OBS-ENT becomes sellable, do not double-charge bundled SKUs.",
     "AUD-01 remains a one-time engagement even on enterprise accounts."
-  ]
+  ],
+  "bundle_pricing": {
+    "OBS-ENT": {
+      "pricing_model": "all_in",
+      "bundled_skus": [
+        "OBS-02",
+        "AUD-02"
+      ],
+      "separate_charges_excluded": [
+        "OBS-02 recurring",
+        "AUD-02 recurring",
+        "AUD-02 setup"
+      ]
+    }
+  }
 }
