@@ -52,10 +52,11 @@ products/
     AUD-02.json / .md
     OBS-ENT.json / .md
 PRODUCTS/
-  <SKU>/SPEC.md          detailed product spec sheet
-  <SKU>/MEDIA.md         marketing and messaging guardrails
-  <SKU>/COMPLIANCE.md    claims, evidence, and constraints
-  <SKU>/SALES.md         pricing, qualification, and sales notes
+  <SKU>/
+    SPEC.md              detailed product spec sheet
+    MEDIA.md             marketing and messaging guardrails
+    COMPLIANCE.md        claims, evidence, and constraints
+    SALES.md             pricing, qualification, and sales notes
 ```
 
 JSON is canonical. Markdown is the sales one-pager.
