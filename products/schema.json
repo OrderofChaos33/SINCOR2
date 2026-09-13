@@ -307,7 +307,32 @@
       }
     },
     "bundle_pricing": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "pricing_model",
+        "bundled_skus",
+        "separate_charges_excluded"
+      ],
+      "properties": {
+        "pricing_model": {
+          "type": "string",
+          "enum": [
+            "all_in"
+          ]
+        },
+        "bundled_skus": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "separate_charges_excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     "source_components": {
       "type": "array",
