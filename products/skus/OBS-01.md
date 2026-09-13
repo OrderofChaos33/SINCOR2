@@ -2,29 +2,29 @@
 
 **$49/mo per agent** · Funnel entry · Not sellable until the dashboard is customer-facing
 
-> Is my agent alive, and what is it costing me.
+> Is the service up, and what shape is it in.
 
-The impulse-buy tier. Uptime, health-endpoint monitoring, cost-per-task, token and tool-call budgets, alert webhooks. Lowest friction, easiest first sale — after `monitoring_dashboard` is a view a buyer can sit in.
+The impulse-buy tier packages the existing `monitoring_dashboard` status, metrics, security, and log-summary endpoints. Lowest friction once that internal surface becomes a buyer-facing dashboard.
 
-## Do not lead with this SKU this week
+## What exists today
 
-The components exist. The customer-facing surface does not. Polish the dashboard first. Until then, the wedge is **AUD-01**.
+- Service status and uptime
+- CPU, memory, disk, process, and platform metrics
+- Security feature snapshot
+- Log summary when logging is available
 
-## Features
+## What does **not** exist today
 
-- Uptime and heartbeat
-- Health endpoint monitoring
-- Cost-per-task
-- Token budgets
-- Tool-call budgets
-- Alert webhooks
+- Buyer-ready per-agent cost attribution
+- Token or tool-call budget controls in this surface
+- Customer alert webhooks
 
 ## Source
 
-`monitoring_dashboard`
+`src/sincor2/monitoring_dashboard.py`
 
 ## Converts to
 
-OBS-02 · OBS-03 · OBS-ENT
+OBS-02 · AUD-01
 
 Feeds the underwriting engine.

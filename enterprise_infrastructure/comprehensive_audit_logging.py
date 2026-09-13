@@ -554,7 +554,8 @@ class ComprehensiveAuditLogging:
                 with open(private_key_file, 'rb') as f:
                     private_key_data = f.read()
                     self.signing_key = serialization.load_pem_private_key(
-                        private_key_data, password=None
+                        private_key_data,
+                        password=None
                     )
                 
                 with open(public_key_file, 'rb') as f:

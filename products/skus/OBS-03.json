@@ -3,8 +3,8 @@
   "slug": "drift-quality-watch",
   "name": "Drift & Quality Watch",
   "family": "OBS",
-  "status": "sellable",
-  "sellable_today": true,
+  "status": "needs_polish",
+  "sellable_today": false,
   "funnel_role": "margin",
   "this_week_play": false,
   "pricing": {
@@ -16,63 +16,67 @@
     "setup_usd": 0,
     "display": "$399/mo per workspace"
   },
-  "tagline": "Catch the agent that degraded silently.",
-  "summary": "Persona and vector drift detection, 9-dimension quality scoring trends, and anomaly detection on agent behavior. Sold to teams whose agents have already gone quiet-wrong in production — which is all of them, eventually.",
-  "description": "Agents do not usually fail loudly. They drift. Persona slips, retrieval vectors wander, tool use gets sloppy, cost creeps, and the operator notices weeks later. Drift & Quality Watch is the watch on that slope: persona/vector drift, a nine-dimension quality trend, and anomaly flags on behavior that left the baseline. It is not a one-shot eval. It is a production watch.",
-  "buyer": "A team with agents in production that have, or will, degrade without a page. Especially anyone who has already had a silent quality incident.",
+  "tagline": "Quality trends exist; automated drift watch does not yet.",
+  "summary": "Nine-dimension quality scoring, benchmark comparison, and agent quality profiling are implemented today. A production drift-watch surface is still missing, so this SKU is not sellable yet.",
+  "description": "The repository already contains a self-improving quality engine with nine scoring dimensions, feedback-source weighting, benchmark comparison, and agent quality profiles. It does not currently contain a production `drift_detection` module for vector baselines, behavior anomaly detection, or automated degradation alerting. OBS-03 therefore documents the intended package, but it remains a not-yet-sellable SKU until the drift-watch half exists in production code.",
+  "buyer": "A team with agents in production that wants ongoing quality visibility and, eventually, production drift alerts before silent degradation reaches customers.",
   "features": [
     {
-      "name": "Persona drift",
-      "detail": "Detect when the agent's voice, policy stance, or role adherence leaves its enrolled baseline."
+      "name": "Nine-dimension quality scoring",
+      "detail": "Accuracy, Completeness, Relevance, Timeliness, Clarity, Actionability, Innovation, Depth, and Credibility are already modeled in code."
     },
     {
-      "name": "Vector drift",
-      "detail": "Watch embedding/retrieval drift so the agent is not answering from the wrong neighborhood."
+      "name": "Feedback-source weighting",
+      "detail": "Client, peer, expert, automated, and outcome feedback sources are separately tracked and scored."
     },
     {
-      "name": "9-dimension quality scoring",
-      "detail": "Trend, not a trophy score. See quality_dimensions."
+      "name": "Benchmark comparison",
+      "detail": "Quality benchmarks compare deliverables against thresholds and segment expectations."
     },
     {
-      "name": "Anomaly detection",
-      "detail": "Behavior that left the agent's own baseline — tool mix, latency, refusal rate, spend."
+      "name": "Agent quality profiles",
+      "detail": "Per-agent strengths, weaknesses, trajectories, and consistency metrics are recorded."
     },
     {
-      "name": "Degradation alerts",
-      "detail": "Page when a dimension or drift metric crosses a watch threshold, not after a customer complaint."
+      "name": "Drift-watch blocker",
+      "detail": "Vector baselines, behavior anomaly watches, and degradation alerts still need a production implementation."
     }
   ],
   "quality_dimensions": [
-    "Task completion",
-    "Factual accuracy",
-    "Persona fidelity",
-    "Tool-call correctness",
-    "Latency",
-    "Cost efficiency",
-    "Safety / policy",
-    "Hallucination rate",
-    "Instruction adherence"
+    "Accuracy",
+    "Completeness",
+    "Relevance",
+    "Timeliness",
+    "Clarity",
+    "Actionability",
+    "Innovation",
+    "Depth",
+    "Credibility"
   ],
   "includes": [],
   "source_components": [
     {
       "id": "quality_scoring",
-      "maps_to": "Nine-dimension quality trend pipeline."
-    },
-    {
-      "id": "drift_detection",
-      "maps_to": "Persona and vector drift watches."
+      "maps_to": "src/sincor2/quality_scoring_engine.py \u2014 current quality scoring, benchmarking, and profile engine. No production drift_detection module is present yet."
     }
   ],
   "readiness": {
-    "sellable_today": true,
-    "blocker": null,
-    "next_action": "Sell to any account that has had a silent quality incident. Convert from AUD-01 drift reports."
+    "sellable_today": false,
+    "blocker": "No production drift_detection implementation exists for vector baselines, behavior anomaly detection, or degradation alerts.",
+    "next_action": "Ship a real drift-watch module and alert path, then re-open OBS-03 for quoting."
   },
   "conversion": {
-    "from": ["AUD-01", "OBS-01"],
-    "to": ["OBS-ENT", "AUD-02"],
-    "feeds": ["underwriting_engine"]
+    "from": [
+      "AUD-01",
+      "OBS-01"
+    ],
+    "to": [
+      "AUD-02",
+      "OBS-ENT"
+    ],
+    "feeds": [
+      "underwriting_engine"
+    ]
   },
   "positioning": {
     "friction": "medium",

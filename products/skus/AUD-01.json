@@ -17,57 +17,58 @@
     "display": "$499 one-time"
   },
   "tagline": "A paid reconstruction of what the agent actually did.",
-  "summary": "Deep-dive on a deployed agent: full audit-trail reconstruction, failure-mode analysis, drift report, remediation list. The wedge product. Converts into OBS subscriptions and feeds underwriting data for product line 01. This week's play.",
-  "description": "Agent Forensic Audit is a single paid engagement against one deployed agent. The work is reconstruction, not a dashboard login. The trail is rebuilt, failure modes are named, drift is scored, and the buyer leaves with a remediation list they can act on. It is priced to be a yes. It is scoped to convert: the last page of the report is the OBS subscription that would have caught this. Telemetry from the engagement is underwriting fuel.",
-  "buyer": "Anyone with a deployed agent they no longer fully trust — after an incident, before a board review, or as a condition of putting the agent in front of customers.",
+  "summary": "Deep-dive on one deployed agent: audit-trail reconstruction, failure-mode analysis, quality review, and remediation list. The wedge product. Converts into recurring audit/compliance follow-on work.",
+  "description": "Agent Forensic Audit is a manual engagement against one deployed agent. The work is reconstruction, not a dashboard login: review the signed audit evidence, trace what happened, name failure modes, pull quality-scoring outputs where data exists, and leave the buyer with a remediation list they can act on. It is priced to get a yes and scoped to convert the next conversation into recurring audit or compliance coverage.",
+  "buyer": "Anyone with a deployed agent they no longer fully trust \u2014 after an incident, before a board review, or as a condition of putting the agent in front of customers.",
   "features": [
     {
       "name": "Audit trail reconstruction",
-      "detail": "Rebuild the hash-chained execution log. Say what happened, in order, with attribution."
+      "detail": "Rebuild the event timeline from the signed, tamper-evident audit records and surrounding context."
     },
     {
       "name": "Failure-mode analysis",
-      "detail": "Name the ways this agent actually fails, not the ways the prompt said it would not."
+      "detail": "Name the ways this agent actually failed or nearly failed in the observed deployment."
     },
     {
-      "name": "Drift report",
-      "detail": "Persona and vector drift against the enrolled baseline, with the nine quality dimensions trended where data exists."
+      "name": "Quality review",
+      "detail": "Use existing quality scores and supporting evidence where that telemetry exists; this is not yet an automated drift-watch product."
     },
     {
       "name": "Remediation list",
-      "detail": "Ordered actions. The last items are the OBS SKUs that keep this from being a one-time firefight."
+      "detail": "Ordered fixes, process changes, and the recurring SKU that would have reduced the incident surface."
     }
   ],
   "deliverables": [
     "Reconstructed execution timeline",
     "Failure-mode brief",
-    "Drift and quality report",
-    "Remediation list with OBS conversion path"
+    "Quality findings summary",
+    "Remediation list with conversion path"
   ],
   "includes": [],
   "source_components": [
     {
       "id": "enterprise_infrastructure",
-      "maps_to": "Trail reconstruction from the signed, hash-chained log."
-    },
-    {
-      "id": "drift_detection",
-      "maps_to": "Drift report section."
+      "maps_to": "Signed audit evidence, attribution, compliance tags, and stored events for reconstruction."
     },
     {
       "id": "quality_scoring",
-      "maps_to": "Nine-dimension quality section of the report."
+      "maps_to": "Existing quality score outputs where relevant data is available."
     }
   ],
   "readiness": {
     "sellable_today": true,
     "blocker": null,
-    "next_action": "This week's play. Sell the engagement. Convert the report into OBS-02 / OBS-03. File the telemetry into underwriting."
+    "next_action": "This week's play. Sell the engagement, then convert the findings into OBS-02 or AUD-02 follow-on work."
   },
   "conversion": {
     "from": [],
-    "to": ["OBS-02", "OBS-03", "AUD-02", "OBS-ENT"],
-    "feeds": ["underwriting_engine"]
+    "to": [
+      "OBS-02",
+      "AUD-02"
+    ],
+    "feeds": [
+      "underwriting_engine"
+    ]
   },
   "positioning": {
     "friction": "low",

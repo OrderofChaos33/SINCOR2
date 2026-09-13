@@ -3,8 +3,8 @@
   "slug": "enterprise-mesh",
   "name": "Enterprise Mesh",
   "family": "OBS",
-  "status": "sellable",
-  "sellable_today": true,
+  "status": "needs_polish",
+  "sellable_today": false,
   "funnel_role": "revenue",
   "this_week_play": false,
   "pricing": {
@@ -16,74 +16,74 @@
     "setup_usd": 0,
     "display": "$2,500/mo"
   },
-  "tagline": "The fleet view. Not the single-agent view.",
-  "summary": "Everything in OBS-01, OBS-02, OBS-03, and AUD-02. Multi-agent swarm view, Sentry and healthchecks.io integration, dedicated support, SLA. For teams running agent fleets, not single agents.",
-  "description": "Enterprise Mesh is the fleet contract. One price, the full observability and compliance overlay, a swarm view across agents, and an SLA with a named support path. Sentry and healthchecks.io are first-class, not a webhook afterthought. This is not OBS-01 with a bigger number. It is the SKU you sell when the buyer already thinks in fleets.",
-  "buyer": "A team running many agents — a swarm, a vertical fleet, or a set of production workers — that needs one picture, one SLA, and one invoice.",
+  "tagline": "Planned enterprise bundle built on the audit/compliance foundation.",
+  "summary": "Enterprise bundle concept around OBS-02 and AUD-02, with internal monitoring and quality surfaces as future fleet inputs. Not sellable yet because the bundled vitals/drift surfaces and named third-party integrations are not productized in-repo.",
+  "description": "Enterprise Mesh is the fleet-contract concept, not a fully ready bundle today. The repository already contains the signed audit evidence needed for OBS-02 and the regulated workflow overlays behind AUD-02. It does not currently contain a buyer-ready fleet dashboard, a production drift-watch module, or first-class Sentry/healthchecks.io integration code. Until those blockers clear, OBS-ENT stays a planned package rather than a sellable contract.",
+  "buyer": "A team running many agents that wants one enterprise contract once fleet dashboards, quality watch, and support commitments are all packaged together.",
   "features": [
     {
-      "name": "Everything above",
-      "detail": "OBS-01 vitals, OBS-02 signed trail, OBS-03 drift and quality, AUD-02 compliance overlay."
+      "name": "OBS-02 foundation",
+      "detail": "Enterprise audit evidence, signatures, attribution, and retention come from the current audit logger."
     },
     {
-      "name": "Multi-agent swarm view",
-      "detail": "Fleet health, spend, drift, and trail across agents — not a tab per agent."
-    },
-    {
-      "name": "Sentry integration",
-      "detail": "Agent exceptions and failed runs land next to the rest of the stack."
-    },
-    {
-      "name": "healthchecks.io integration",
-      "detail": "External heartbeat as a second opinion on alive/dead."
+      "name": "AUD-02 foundation",
+      "detail": "Regulated workflow and reviewer-facing export work come from the current compliance package components."
     },
     {
       "name": "Dedicated support",
-      "detail": "Named path. Not a shared inbox."
+      "detail": "Commercial support can be attached to the bundle once the bundled product surfaces are ready."
     },
     {
       "name": "SLA",
-      "detail": "Uptime and response commitments written into the contract."
+      "detail": "Contracted response and uptime terms belong on the enterprise offer once the technical bundle is productized."
     }
   ],
-  "includes": ["OBS-01", "OBS-02", "OBS-03", "AUD-02"],
-  "excludes": ["AUD-01"],
-  "integrations": ["Sentry", "healthchecks.io"],
+  "includes": [
+    "OBS-02",
+    "AUD-02"
+  ],
+  "excludes": [
+    "AUD-01",
+    "OBS-01",
+    "OBS-03"
+  ],
   "source_components": [
     {
-      "id": "monitoring_dashboard",
-      "maps_to": "Fleet vitals surface."
+      "id": "enterprise_infrastructure",
+      "maps_to": "Signed audit evidence and compliance-reporting foundation."
     },
     {
-      "id": "enterprise_infrastructure",
-      "maps_to": "Signed, hash-chained trail at fleet scale."
+      "id": "monitoring_dashboard",
+      "maps_to": "Internal monitoring surface that still needs buyer-facing fleet packaging."
     },
     {
       "id": "quality_scoring",
-      "maps_to": "Fleet quality trends."
-    },
-    {
-      "id": "drift_detection",
-      "maps_to": "Fleet drift watches."
+      "maps_to": "Quality-scoring foundation; no production drift-watch module yet."
     },
     {
       "id": "verticals/healthcare",
-      "maps_to": "Compliance overlay via AUD-02."
+      "maps_to": "Healthcare compliance overlay via AUD-02 foundation."
     },
     {
       "id": "verticals/compliance",
-      "maps_to": "Compliance overlay via AUD-02."
+      "maps_to": "Compliance workflow overlay via AUD-02 foundation."
     }
   ],
   "readiness": {
-    "sellable_today": true,
-    "blocker": "OBS-01 surface inside the mesh still needs the same dashboard polish. Trail, drift, quality, and compliance do not.",
-    "next_action": "Sell to fleet buyers. Do not wait on OBS-01 polish to open ENT conversations — lead on trail, drift, SLA."
+    "sellable_today": false,
+    "blocker": "OBS-01 and OBS-03 are not sellable bundled surfaces yet, and the repository has no first-class Sentry or healthchecks.io integration code.",
+    "next_action": "Wait for buyer-ready fleet dashboards and drift-watch implementation before quoting OBS-ENT as a real bundle."
   },
   "conversion": {
-    "from": ["AUD-01", "OBS-02", "OBS-03", "AUD-02"],
+    "from": [
+      "AUD-01",
+      "OBS-02",
+      "AUD-02"
+    ],
     "to": [],
-    "feeds": ["underwriting_engine"]
+    "feeds": [
+      "underwriting_engine"
+    ]
   },
   "positioning": {
     "friction": "high",

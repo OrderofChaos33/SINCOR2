@@ -1,35 +1,39 @@
 # OBS-03 — Drift & Quality Watch
 
-**$399/mo per workspace** · Margin · Sellable today
+**$399/mo per workspace** · Margin · Not sellable until drift-watch code exists
 
-> Catch the agent that degraded silently.
+> Quality trends exist; automated drift watch does not yet.
 
-Persona and vector drift, 9-dimension quality scoring trends, anomaly detection on agent behavior. Sold to teams whose agents have gone quiet-wrong in production — which is all of them, eventually.
+The repository already ships nine-dimension quality scoring, feedback-source weighting, benchmark comparison, and agent quality profiles. It does **not** yet ship a production drift-watch module for vector baselines, behavior anomaly detection, or degradation alerts.
 
 ## Nine dimensions
 
-1. Task completion
-2. Factual accuracy
-3. Persona fidelity
-4. Tool-call correctness
-5. Latency
-6. Cost efficiency
-7. Safety / policy
-8. Hallucination rate
-9. Instruction adherence
+1. Accuracy
+2. Completeness
+3. Relevance
+4. Timeliness
+5. Clarity
+6. Actionability
+7. Innovation
+8. Depth
+9. Credibility
 
-## Features
+## Current foundation
 
-- Persona drift
-- Vector drift
-- Quality trends (not a trophy score)
-- Anomaly detection
-- Degradation alerts
+- Nine-dimension quality scoring
+- Feedback-source weighting
+- Benchmark comparison
+- Agent quality profiles
+- Improvement recommendations
+
+## Blocker
+
+A production `drift_detection` implementation is not present in-repo yet.
 
 ## Source
 
-Quality scoring pipeline · drift detection
+`src/sincor2/quality_scoring_engine.py`
 
 ## Converts from / to
 
-From AUD-01, OBS-01 → to OBS-ENT, AUD-02
+From AUD-01, OBS-01 → to AUD-02, OBS-ENT

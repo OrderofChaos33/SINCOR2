@@ -17,52 +17,65 @@
     "display": "$999/mo + $2,500 setup"
   },
   "tagline": "Logging an auditor can sit with.",
-  "summary": "HIPAA-guardrailed logging, ASC 842 / regulated-filing alignment, and audit exports formatted for external review. Credible because the healthcare and compliance verticals already exist — not because the SKU is speculative.",
-  "description": "Compliance Pack is the regulated overlay on the audit trail. Healthcare gets HIPAA-guardrailed logging. Finance gets ASC 842 and regulated-filing alignment. Both get exports a third-party reviewer can open without a SINCOR login. The setup fee covers guardrail configuration, retention, and the first export path. This is not a generic 'we take security seriously' add-on. It sits on verticals that already run.",
-  "buyer": "Healthcare RCM, clinic ops, or a finance team whose agents touch PHI, filings, or lease/contract data that an external reviewer will ask about.",
+  "summary": "HIPAA-guardrailed logging, ASC 842 / regulated-filing alignment, and audit exports formatted for external review. Credible because the healthcare and compliance verticals already exist.",
+  "description": "Compliance Pack is the regulated overlay on the audit trail. Healthcare gets HIPAA-oriented logging and workflow guardrails. Finance/compliance gets ASC 842 and regulated-filing support from the existing compliance vertical. Both get reviewer-ready evidence packages built on the existing audit logger and vertical-specific workflows. The setup fee covers guardrail configuration, retention, and the first export path.",
+  "buyer": "Healthcare RCM, clinic ops, or a finance/compliance team whose agents touch PHI, filings, leases, or other externally reviewable workflows.",
   "features": [
     {
       "name": "HIPAA-guardrailed logging",
-      "detail": "Minimum necessary, access attribution, and retention suited to PHI-adjacent agent work."
+      "detail": "Healthcare workflows already ship PHI-aware guardrails and audit helpers."
     },
     {
       "name": "ASC 842 / regulated-filing alignment",
-      "detail": "Trail and export shape that maps to lease and regulated-filing review, not a generic CSV."
+      "detail": "Compliance vertical workflows already include lease-accounting and regulatory automation surfaces."
     },
     {
       "name": "External-review exports",
-      "detail": "Packages a reviewer can take. Chain, signatures, access log, retention statement."
+      "detail": "Reviewer packages can include event hashes, signatures, access attribution, and retention statements."
     },
     {
       "name": "Setup & guardrail configuration",
-      "detail": "The $2,500 setup is real work: scopes, retention, export path, named reviewers."
+      "detail": "The setup fee covers scope, retention, export path, and reviewer-specific guardrail setup."
     }
   ],
-  "verticals": ["healthcare", "finance", "compliance"],
-  "includes": ["OBS-02 capabilities under the compliance overlay"],
+  "verticals": [
+    "healthcare",
+    "finance",
+    "compliance"
+  ],
+  "includes": [
+    "OBS-02 capabilities under the compliance overlay"
+  ],
   "source_components": [
     {
       "id": "enterprise_infrastructure",
-      "maps_to": "Signed trail, forensic context, HIPAA/SOX/PCI-DSS/GDPR tags already on the logger."
+      "maps_to": "Signed audit evidence, compliance tags, reporting, and export foundation."
     },
     {
       "id": "verticals/healthcare",
-      "maps_to": "Existing healthcare vertical — this SKU is packaging, not invention."
+      "maps_to": "Existing healthcare vertical and HIPAA guardrail code."
     },
     {
       "id": "verticals/compliance",
-      "maps_to": "Existing compliance vertical — same."
+      "maps_to": "Existing compliance vertical and ASC 842/regulatory workflow code."
     }
   ],
   "readiness": {
     "sellable_today": true,
     "blocker": null,
-    "next_action": "Lead with healthcare RCM and finance filing buyers. Do not sell this as a hypothetical GRC product."
+    "next_action": "Lead with healthcare RCM and finance/compliance buyers who already need reviewer-facing evidence."
   },
   "conversion": {
-    "from": ["AUD-01", "OBS-02"],
-    "to": ["OBS-ENT"],
-    "feeds": ["underwriting_engine"]
+    "from": [
+      "AUD-01",
+      "OBS-02"
+    ],
+    "to": [
+      "OBS-ENT"
+    ],
+    "feeds": [
+      "underwriting_engine"
+    ]
   },
   "positioning": {
     "friction": "high",

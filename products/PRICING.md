@@ -1,6 +1,6 @@
 # Pricing logic
 
-OBS-01 is the funnel entry at impulse-buy price. AUD-01 is the one-time wedge that converts. OBS-02 and OBS-03 are the margin. AUD-02 and OBS-ENT are where real revenue lives.
+OBS-01 is the funnel entry once the dashboard is customer-facing. AUD-01 is the one-time wedge that converts. OBS-02 is the sellable recurring margin today. AUD-02 is current revenue. OBS-03 and OBS-ENT remain gated until their blockers clear.
 
 ## Units
 
@@ -15,9 +15,9 @@ OBS-01 is the funnel entry at impulse-buy price. AUD-01 is the one-time wedge th
 
 ## Bundle
 
-OBS-ENT includes OBS-01, OBS-02, OBS-03, and AUD-02. Do not double-charge those SKUs on an ENT contract.
+When OBS-ENT is sellable, its current foundation is OBS-02 and AUD-02. Do not double-charge bundled SKUs on that contract. OBS-01 and OBS-03 stay opt-in only after their own readiness blockers clear.
 
-AUD-01 stays a one-time engagement. ENT accounts still buy forensic audits when they want a deep-dive on a specific agent.
+AUD-01 stays a one-time engagement. Enterprise accounts still buy forensic audits when they want a deep-dive on a specific agent.
 
 ## Quote formula
 
@@ -26,23 +26,26 @@ monthly = 0
 setup = 0
 one_time = 0
 
-if ENT:
+if OBS_ENT and OBS_ENT_ready:
   monthly += 2500
 else:
-  monthly += 49 * agent_count            # OBS-01
+  if OBS_01 and OBS_01_ready:
+    monthly += 49 * agent_count          # OBS-01
   monthly += 199 * deployment_count      # OBS-02
-  if OBS-03: monthly += 399
-  if AUD-02:
+  if OBS_03 and OBS_03_ready:
+    monthly += 399                       # OBS-03
+  if AUD_02:
     monthly += 999
     setup += 2500
 
-if AUD-01: one_time += 499 * engagement_count
+if AUD_01:
+  one_time += 499 * engagement_count
 
 year_one = monthly * 12 + setup + one_time
 ```
 
-OBS-01 is listed in quotes today with a `needs_polish` flag. Do not put it in front of a paying client until the dashboard is a customer-facing view.
+OBS-01 and OBS-03 should not appear in a live quote until their readiness blockers clear. OBS-ENT should not be quoted until the bundled fleet surface is productized.
 
 ## Compounding
 
-Every OBS customer generates behavioral data — cost curves, drift, quality scores, failure modes — that trains the underwriting engine (product line 01). Observability revenue is cash. Observability telemetry is underwriting edge.
+Every OBS/AUD customer generates behavioral data — quality signals, failure evidence, operator needs — that trains the underwriting engine (product line 01). Observability revenue is cash. Observability telemetry is underwriting edge.
