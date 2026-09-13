@@ -15,7 +15,7 @@
 ## Proof points
 
 - Source path: `enterprise_infrastructure/comprehensive_audit_logging.py`
-- Readiness fact: Ready to sell after fixing the key-loading syntax bug.
+- Readiness fact: Ready to sell; the key-loading syntax bug was fixed in this PR.
 
 ## Avoid
 

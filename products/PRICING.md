@@ -31,7 +31,8 @@ if OBS_ENT and OBS_ENT_ready:
 else:
   if OBS_01 and OBS_01_ready:
     monthly += 49 * agent_count          # OBS-01
-  monthly += 199 * deployment_count      # OBS-02
+  if OBS_02 and OBS_02_ready:
+    monthly += 199 * deployment_count    # OBS-02
   if OBS_03 and OBS_03_ready:
     monthly += 399                       # OBS-03
   if AUD_02 and AUD_02_ready:

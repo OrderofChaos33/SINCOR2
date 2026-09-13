@@ -129,6 +129,14 @@
             "properties": {
               "interval": {
                 "const": "month"
+              },
+              "unit": {
+                "enum": [
+                  "per_agent",
+                  "per_deployment",
+                  "per_workspace",
+                  "per_organization"
+                ]
               }
             }
           }
@@ -146,6 +154,12 @@
           },
           "then": {
             "properties": {
+              "setup_usd": {
+                "const": 0
+              },
+              "unit": {
+                "const": "per_engagement"
+              },
               "interval": {
                 "type": "null"
               }
