@@ -38,10 +38,6 @@
       "detail": "Contracted response and uptime terms belong on the enterprise offer once the technical bundle is productized."
     }
   ],
-  "includes": [
-    "OBS-02",
-    "AUD-02"
-  ],
   "bundle_pricing": {
     "pricing_model": "all_in",
     "bundled_skus": [

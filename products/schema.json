@@ -129,7 +129,8 @@
             "required": [
               "interval",
               "unit",
-              "unit_label"
+              "unit_label",
+              "setup_usd"
             ],
             "properties": {
               "interval": {
@@ -142,6 +143,9 @@
                   "per_workspace",
                   "per_organization"
                 ]
+              },
+              "setup_usd": {
+                "minimum": 0
               }
             }
           }
@@ -161,14 +165,18 @@
             "required": [
               "interval",
               "unit",
-              "unit_label"
+              "unit_label",
+              "setup_usd"
             ],
             "properties": {
+              "interval": {
+                "type": "null"
+              },
               "unit": {
                 "const": "per_engagement"
               },
-              "interval": {
-                "type": "null"
+              "setup_usd": {
+                "const": 0
               }
             }
           }
@@ -185,6 +193,9 @@
             ]
           },
           "then": {
+            "required": [
+              "unit_label"
+            ],
             "properties": {
               "unit_label": {
                 "const": "per agent"
@@ -204,6 +215,9 @@
             ]
           },
           "then": {
+            "required": [
+              "unit_label"
+            ],
             "properties": {
               "unit_label": {
                 "const": "per deployment"
@@ -223,6 +237,9 @@
             ]
           },
           "then": {
+            "required": [
+              "unit_label"
+            ],
             "properties": {
               "unit_label": {
                 "const": "per workspace"
@@ -242,6 +259,9 @@
             ]
           },
           "then": {
+            "required": [
+              "unit_label"
+            ],
             "properties": {
               "unit_label": {
                 "const": "per organization"
@@ -261,6 +281,9 @@
             ]
           },
           "then": {
+            "required": [
+              "unit_label"
+            ],
             "properties": {
               "unit_label": {
                 "const": "per engagement"
@@ -367,5 +390,21 @@
         "type": "string"
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "bundle_pricing"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "includes"
+          ]
+        }
+      }
+    }
+  ]
 }
