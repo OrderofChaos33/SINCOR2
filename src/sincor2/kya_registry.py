@@ -22,12 +22,14 @@ MIN_STAKE_WEI = 10 * 10**18
 VERIFY_FEE_WEI = 2 * 10**18
 HEARTBEAT_TTL_MS = 60_000
 LIVE_GRACE = 3
+HEARTBEAT_SAVE_MIN_INTERVAL_MS = 5_000
 STORE_KEY = "sincor:kya:records"
 REDIS_KEY = STORE_KEY
 
 _LOCK = threading.Lock()
 _STORE: Dict[str, Dict[str, Any]] = {}
 _BY_AGENT: Dict[str, str] = {}
+_LAST_HEARTBEAT_SAVE_MS = 0
 
 
 def _now_ms() -> int:
@@ -38,6 +40,8 @@ def reset() -> None:
     with _LOCK:
         _STORE.clear()
         _BY_AGENT.clear()
+    global _LAST_HEARTBEAT_SAVE_MS
+    _LAST_HEARTBEAT_SAVE_MS = 0
 
 
 def _redis_url() -> str:
@@ -172,6 +176,27 @@ def _safe_url(value: Any) -> str:
     return url if url and parsed.scheme in ("http", "https") and parsed.netloc else ""
 
 
+def _recover_eip191(message: str, signature: str) -> str:
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
+
+
+def _save_heartbeat_debounced() -> None:
+    global _LAST_HEARTBEAT_SAVE_MS
+    now_ms = _now_ms()
+    if (now_ms - _LAST_HEARTBEAT_SAVE_MS) < HEARTBEAT_SAVE_MIN_INTERVAL_MS:
+        return
+    save()
+    _LAST_HEARTBEAT_SAVE_MS = now_ms
+
+
 def score(rec: Dict[str, Any]) -> int:
     sla = rec.get("sla") or {}
     jobs = rec.get("jobs") or {}
@@ -284,11 +309,22 @@ def bind(agent_id: str, principal: str, signature: str, message: str, recovered:
         raise KeyError("unknown agent")
     if rec.get("revoked"):
         raise ValueError("revoked")
-    signer = (recovered or principal).lower()
+    if recovered is None:
+        recovered_addr = _recover_eip191(message=message, signature=signature)
+    else:
+        recovered_addr = str(recovered)
+        try:
+            verified_addr = _recover_eip191(message=message, signature=signature)
+            if verified_addr.lower() != recovered_addr.lower():
+                raise ValueError("signer mismatch")
+        except ValueError as exc:
+            if str(exc) != "signature verification unavailable":
+                raise
+    signer = recovered_addr.lower()
     if signer != principal.lower():
         raise ValueError("signer mismatch")
     rec["principal"] = principal
-    rec["attestation"] = {"scheme": "eip191", "message": message, "signature": signature, "recovered": principal}
+    rec["attestation"] = {"scheme": "eip191", "message": message, "signature": signature, "recovered": recovered_addr}
     rec["status"] = "bound"
     refresh_status(rec)
     save()
@@ -335,11 +371,14 @@ def heartbeat(agent_id: str, ok: bool = True, latency_ms: Optional[int] = None) 
     sla["last_heartbeat_ms"] = _now_ms()
     sla["last_ok"] = bool(ok)
     if latency_ms is not None:
-        sla["latency_ms"] = int(latency_ms)
+        try:
+            sla["latency_ms"] = int(latency_ms)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("bad latency_ms") from exc
     if rec.get("status") == "expired" and rec.get("attestation") and int(rec.get("stake_axm_wei") or 0) >= MIN_STAKE_WEI:
         rec["status"] = "verified"
     refresh_status(rec)
-    save()
+    _save_heartbeat_debounced()
     return rec
 
 

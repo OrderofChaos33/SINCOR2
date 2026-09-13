@@ -40,7 +40,6 @@ def bind():
             principal=str(body.get("principal") or ""),
             signature=str(body.get("signature") or ""),
             message=str(body.get("message") or ""),
-            recovered=body.get("recovered"),
         )
     except KeyError:
         return _err("unknown agent", 404)
@@ -70,7 +69,10 @@ def verify():
 @kya_bp.post("/heartbeat")
 def heartbeat():
     body = request.get_json(silent=True) or {}
-    rec = kya.heartbeat(str(body.get("agent_id") or ""), ok=bool(body.get("ok", True)), latency_ms=body.get("latency_ms"))
+    try:
+        rec = kya.heartbeat(str(body.get("agent_id") or ""), ok=bool(body.get("ok", True)), latency_ms=body.get("latency_ms"))
+    except ValueError as exc:
+        return _err(str(exc))
     if rec is None:
         return _err("unknown agent", 404)
     return jsonify(rec)
@@ -80,10 +82,14 @@ def heartbeat():
 def sla():
     body = request.get_json(silent=True) or {}
     try:
+        latency_ms = int(body.get("latency_ms") or 0)
+    except (TypeError, ValueError):
+        return _err("bad latency_ms")
+    try:
         rec = kya.post_sla(
             kya_id=str(body.get("kya_id") or ""),
             ok=bool(body.get("ok", True)),
-            latency_ms=int(body.get("latency_ms") or 0),
+            latency_ms=latency_ms,
             proof_tx=body.get("proof_tx"),
         )
     except KeyError:
