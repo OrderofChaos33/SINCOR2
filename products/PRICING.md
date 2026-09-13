@@ -34,7 +34,7 @@ else:
   monthly += 199 * deployment_count      # OBS-02
   if OBS_03 and OBS_03_ready:
     monthly += 399                       # OBS-03
-  if AUD_02:
+  if AUD_02 and AUD_02_ready:
     monthly += 999
     setup += 2500
 
