@@ -26,8 +26,8 @@ def list_agent():
     body = request.get_json(silent=True) or {}
     try:
         rec = kya.list_from_inbound(body, card=body.get("agent_card") if isinstance(body.get("agent_card"), dict) else None)
-    except ValueError as exc:
-        return _err(str(exc))
+    except ValueError:
+        return _err("bad request")
     return jsonify(rec), 201
 
 
@@ -43,8 +43,8 @@ def bind():
         )
     except KeyError:
         return _err("unknown agent", 404)
-    except ValueError as exc:
-        return _err(str(exc))
+    except ValueError:
+        return _err("bad request")
     return jsonify(rec)
 
 
@@ -56,13 +56,13 @@ def verify():
         try:
             kya.apply_stake(kya_id, str(body["stake_wei"]), str(body["stake_tx"]))
         except (KeyError, ValueError) as exc:
-            return _err(str(exc), 404 if isinstance(exc, KeyError) else 400)
+            return _err("unknown kya" if isinstance(exc, KeyError) else "bad request", 404 if isinstance(exc, KeyError) else 400)
     try:
         rec = kya.verify(kya_id)
     except KeyError:
         return _err("unknown kya", 404)
-    except ValueError as exc:
-        return _err(str(exc))
+    except ValueError:
+        return _err("bad request")
     return jsonify(rec)
 
 
@@ -71,8 +71,8 @@ def heartbeat():
     body = request.get_json(silent=True) or {}
     try:
         rec = kya.heartbeat(str(body.get("agent_id") or ""), ok=bool(body.get("ok", True)), latency_ms=body.get("latency_ms"))
-    except ValueError as exc:
-        return _err(str(exc))
+    except ValueError:
+        return _err("bad request")
     if rec is None:
         return _err("unknown agent", 404)
     return jsonify(rec)
