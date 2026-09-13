@@ -35,7 +35,7 @@
     },
     {
       "name": "Tamper evidence",
-      "detail": "Changed event contents or missing signature material are detectable during verification/export review."
+      "detail": "Changed hashed identity fields or missing signature material are detectable during verification/export review."
     },
     {
       "name": "Forensic archive",
