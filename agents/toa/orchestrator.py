@@ -152,7 +152,7 @@ class TOAOrchestrator:
         # Step 5 — Optional task routing
         route_decision = None
         if self.task_router is not None and action_plan:
-            route_decision = self._dispatch_top_action(action_plan[0])
+            route_decision = self._dispatch_action_plan(action_plan)
 
         # Step 6 — Persist state
         self._run_count += 1
@@ -291,9 +291,21 @@ class TOAOrchestrator:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _dispatch_top_action(self, action: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Route the top action via the SINCOR2 task router."""
-        dispatch = action.get("action_dispatch", {})
+    def _dispatch_action_plan(self, action_plan: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Route the first actionable collapsed path; reject and skip unroutable ones."""
+        last_rejection = None
+        for action in action_plan:
+            decision = self._dispatch_action(action)
+            if decision is None:
+                continue
+            if decision.get("status") == "accepted":
+                return decision
+            last_rejection = decision
+        return last_rejection
+
+    def _dispatch_action(self, action: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Route one collapsed action via the SINCOR2 task router."""
+        dispatch = action.setdefault("action_dispatch", {})
         task_id = f"toa-{action.get('scenario_id', uuid.uuid4())}"
         required_skills: List[str] = dispatch.get("required_skills", ["execution"])
         try:
@@ -302,6 +314,12 @@ class TOAOrchestrator:
                 required_skills=required_skills,
             )
             if decision is not None:
+                dispatch.update({
+                    "status": "accepted",
+                    "agent_id": decision.agent_id,
+                    "score": decision.score,
+                    "reason": decision.reason,
+                })
                 logger.debug(
                     {
                         "event": "toa_route",
@@ -317,7 +335,22 @@ class TOAOrchestrator:
                     "agent_id": decision.agent_id,
                     "score": decision.score,
                     "reason": decision.reason,
+                    "status": "accepted",
+                    "required_skills": required_skills,
                 }
         except Exception as exc:
             logger.error("toa_dispatch: router raised: %s", exc)
-        return None
+            rejection_reason = f"router_error:{exc}"
+        else:
+            rejection_reason = "no_eligible_agent"
+
+        dispatch.update({
+            "status": "rejected",
+            "rejection_reason": rejection_reason,
+        })
+        return {
+            "task_id": task_id,
+            "status": "rejected",
+            "reason": rejection_reason,
+            "required_skills": required_skills,
+        }

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -351,6 +352,62 @@ class TestTOAOrchestrator:
         toa2 = TOAOrchestrator(config=cfg)
         assert toa2._run_count == 1
 
+    def test_unroutable_skill_is_marked_rejected_and_next_path_dispatches(self, config):
+        class DummyForecaster:
+            def forecast(self, context, horizon=None):
+                return [{"scenario_id": "seed", "probability": 1.0, "horizon": 1, "values": [1.0, 1.1]}]
+
+        class DummySimulator:
+            def evaluate(self, paths, objectives=None):
+                return paths
+
+        class DummyCollapser:
+            def collapse(self, evaluated_paths, top_k=None):
+                return [
+                    {
+                        "rank": 1,
+                        "scenario_id": "reject-me",
+                        "composite_score": 0.9,
+                        "utility_score": 0.9,
+                        "probability": 0.9,
+                        "objective_breakdown": {"revenue": 0.9},
+                        "action_dispatch": {"required_skills": ["missing-skill"]},
+                        "rationale": "first path",
+                    },
+                    {
+                        "rank": 2,
+                        "scenario_id": "accept-me",
+                        "composite_score": 0.8,
+                        "utility_score": 0.8,
+                        "probability": 0.8,
+                        "objective_breakdown": {"revenue": 0.8},
+                        "action_dispatch": {"required_skills": ["execution"]},
+                        "rationale": "second path",
+                    },
+                ]
+
+        class StubRouter:
+            def route(self, task_id, required_skills, preferred_tags=None):
+                if required_skills == ["missing-skill"]:
+                    return None
+                return SimpleNamespace(agent_id="exec-agent-01", score=0.91, reason="capability_match")
+
+        toa = TOAOrchestrator(
+            config=config,
+            forecaster=DummyForecaster(),
+            simulator=DummySimulator(),
+            collapser=DummyCollapser(),
+            task_router=StubRouter(),
+        )
+
+        result = toa.run(context={"values": [1.0, 1.1]})
+
+        assert result["route_decision"]["status"] == "accepted"
+        assert result["route_decision"]["task_id"] == "toa-accept-me"
+        assert result["action_plan"][0]["action_dispatch"]["status"] == "rejected"
+        assert result["action_plan"][0]["action_dispatch"]["rejection_reason"] == "no_eligible_agent"
+        assert result["action_plan"][1]["action_dispatch"]["status"] == "accepted"
+
 
 # ---------------------------------------------------------------------------
 # End-to-end: full pipeline with task router integration
@@ -393,7 +450,11 @@ class TestTOAEndToEnd:
 
         result = toa.run(context=simple_context)
         assert len(result["action_plan"]) >= 1
-        # Route decision may be None if no skill match — just verify shape
+        # Route decision may be accepted or explicitly rejected if no agent is eligible.
         if result["route_decision"] is not None:
-            assert "agent_id" in result["route_decision"]
             assert "task_id" in result["route_decision"]
+            assert "status" in result["route_decision"]
+            if result["route_decision"]["status"] == "accepted":
+                assert "agent_id" in result["route_decision"]
+            else:
+                assert result["route_decision"]["reason"] == "no_eligible_agent"

@@ -720,14 +720,14 @@
           <div class="info-icon">🧪</div>
           <div>
             <div class="info-text-label">Smart contracts</div>
-            <div class="info-text-value">Retired sale path, OZ LimitOrderHook, Soulbound Genesis NFT — DEPLOYED. <a href='https://basescan.org/address/0x75dE341a2BC81806198364F125d4Cde36527619C' target='_blank' style='color:var(--cyan);'>Curve</a> / <a href='https://basescan.org/address/0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09' target='_blank' style='color:var(--cyan);'>NFT</a> / <a href='https://basescan.org/address/0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0' target='_blank' style='color:var(--cyan);'>Hook</a></div>
+            <div class="info-text-value">OZ LimitOrderHook and Soulbound Genesis NFT remain verifiable on Base. Historical sale-path contracts are retired and not shown on getsincor.com.</div>
           </div>
         </li>
         <li>
           <div class="info-icon">🔥</div>
           <div>
             <div class="info-text-label">Liquidity</div>
-            <div class="info-text-value">Phase 1 funded by buyers via retired sale path. At graduation: V4 LP minted, LP token burned to 0x…dEaD. Atomic, no admin.</div>
+            <div class="info-text-value">Phase 1 liquidity is tracked through canonical live surfaces only. At graduation: V4 LP minted, LP token burned to 0x…dEaD. Atomic, no admin.</div>
           </div>
         </li>
         <li>
@@ -747,7 +747,7 @@
       </ul>
 
       <div style="margin-top:20px; padding:14px 16px; background:rgba(6,182,212,0.07); border:1px solid rgba(6,182,212,0.25); border-radius:10px; font-size:13px; color:var(--text-dim);">
-        <strong style='color:var(--cyan);'>Status:</strong> Phase 1 LIVE on Base mainnet. Retired sale path at <span class='mono'>0x75dE341a2BC81806198364F125d4Cde36527619C</span>. Audited hook at <span class='mono'>0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</span>. Genesis NFT at <span class='mono'>0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09</span>. Every claim verifiable on Basescan.
+        <strong style='color:var(--cyan);'>Status:</strong> Phase 1 LIVE on Base mainnet. Audited hook at <span class='mono'>0x8e0eE51dCa5249c9e84dbec539fDD46b375110C0</span>. Genesis NFT at <span class='mono'>0xF3Bd56788b5E56DE638AF5dDffFA478838A68d09</span>. Historical sale-path addresses are retired and omitted from this live surface.
       </div>
     </div>
 
@@ -922,60 +922,29 @@
     });
   }
 
-  const RPC = 'https://mainnet.base.org';
-  const CURVE_ADDR = '0x75dE341a2BC81806198364F125d4Cde36527619C';
-  const GRADUATION_WEI = 500000000000000000n;
-
-  async function rpcCall(to, data) {
-    const r = await fetch(RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{ to, data }, 'latest'] })
-    });
-    const j = await r.json();
-    return j.result;
-  }
-
   async function refreshStats() {
     try {
-      const [priceHex, ethHex, soldHex, gradHex] = await Promise.all([
-        rpcCall(CURVE_ADDR, '0xf5191c4d'),
-        rpcCall(CURVE_ADDR, '0xa5cb6825'),
-        rpcCall(CURVE_ADDR, '0x9899fccf'),
-        rpcCall(CURVE_ADDR, '0xe7c2b772')
-      ]);
-
-      const priceWei = BigInt(priceHex || '0x0');
-      const ethAcc = BigInt(ethHex || '0x0');
-      const sincSold = BigInt(soldHex || '0x0');
-      const isGraduated = gradHex && gradHex !== '0x' && BigInt(gradHex) !== 0n;
-
-      const priceEth = Number(priceWei) / 1e18;
-      const priceUsd = priceEth * 2100;
-      const ethAccEth = Number(ethAcc) / 1e18;
-      const sincSoldM = Number(sincSold) / 1e8 / 1e6;
-      const gradPct = Math.min(100, Number(ethAcc * 10000n / GRADUATION_WEI) / 100);
+      const p = await fetch('/api/price/official').then(r => r.json());
+      const floor = Number(p.official_floor_usd ?? p.spot_usd ?? p.minimum_buy_usd_per_sinc ?? SINC_FLOOR_USD);
 
       const priceEl = document.getElementById('sinc-price');
       const liqEl = document.getElementById('sinc-liq');
-      if (priceEl) priceEl.textContent = isGraduated ? 'on V4' : ('$' + priceUsd.toPrecision(3));
-      if (liqEl) liqEl.textContent = ethAccEth.toFixed(5) + ' ETH';
+      if (priceEl) priceEl.textContent = '$' + floor.toFixed(2);
+      if (liqEl) liqEl.textContent = 'canonical live surface';
 
       const gradEl = document.getElementById('grad-progress');
       const gradPctEl = document.getElementById('grad-pct');
       const gradBarEl = document.getElementById('grad-bar');
-      if (gradEl) gradEl.textContent = isGraduated
-        ? '🎉 GRADUATED — V4 pool live'
-        : `${ethAccEth.toFixed(5)} / 0.5 ETH to graduation (${sincSoldM.toFixed(2)}M SINC sold)`;
-      if (gradPctEl) gradPctEl.textContent = isGraduated ? '100%' : gradPct.toFixed(1) + '%';
-      if (gradBarEl) gradBarEl.style.width = (isGraduated ? 100 : gradPct) + '%';
+      if (gradEl) gradEl.textContent = 'Live routing follows canonical token and official pricing surfaces.';
+      if (gradPctEl) gradPctEl.textContent = 'live';
+      if (gradBarEl) gradBarEl.style.width = '100%';
 
       const soldEl = document.getElementById('chk-curve-sold');
-      if (soldEl) soldEl.textContent = sincSoldM.toFixed(2) + 'M';
+      if (soldEl) soldEl.textContent = 'retired';
       const gradValEl = document.getElementById('chk-grad-val');
-      if (gradValEl) gradValEl.textContent = ethAccEth.toFixed(5);
+      if (gradValEl) gradValEl.textContent = 'live';
       const gradChk = document.getElementById('chk-grad');
-      if (gradChk && isGraduated) gradChk.innerHTML = '✅ Graduated — V4 SINC/WETH pool live';
+      if (gradChk) gradChk.innerHTML = '✅ Canonical live token surface active';
     } catch (e) {
       console.log('stats refresh failed:', e);
     }
@@ -1012,7 +981,6 @@
   setInterval(refreshOfficialSpot, 15000);
   setInterval(refreshAcceptanceChecklist, 300000);
 
-  const CURVE = '0x75dE341a2BC81806198364F125d4Cde36527619C';
   const BASE_CHAIN_ID = SincWallet.BASE_CHAIN_ID;
 
   function walletProvider() {

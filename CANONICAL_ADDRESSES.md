@@ -36,7 +36,7 @@ BASE_CHAIN_ID=8453
 
 | Address | Why wrong |
 |---|---|
-| `|
+| `0x9C8cd8d3961F445D653713dE65C6578bE11668e7` | Previous SINC v1 (retired 2026-08-19) |
 | `0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822` | Previous incorrect AXM entry (dead PumpClawToken) |
 | `0x75dE341a2BC81806198364F125d4Cde36527619C` | Retired bonding curve |
 | `0xb627F53E08AD7d455e787d052C18D6877020E2BF` | Old bonding curve |
