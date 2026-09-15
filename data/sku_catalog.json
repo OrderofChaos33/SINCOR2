@@ -1,0 +1,62 @@
+{
+  "source": "src/sincor2/platform_payments.py::PLATFORM_PLANS",
+  "updated": "2026-09-15",
+  "checkout": "https://getsincor.com/buy",
+  "skus": [
+    {
+      "id": "report",
+      "product_name": "Business Intelligence Report",
+      "label": "One-Time Report",
+      "usd_reference": 49,
+      "billing": "once",
+      "token": "AXM",
+      "agents": null,
+      "path": "/products/report",
+      "buy": "/buy?plan=report"
+    },
+    {
+      "id": "intel",
+      "product_name": "Monthly Intelligence",
+      "label": "Monthly Intelligence",
+      "usd_reference": 149,
+      "billing": "month",
+      "token": "AXM",
+      "agents": null,
+      "path": "/products/intel",
+      "buy": "/buy?plan=intel"
+    },
+    {
+      "id": "starter",
+      "product_name": "Starter",
+      "label": "Starter Agents",
+      "usd_reference": 297,
+      "billing": "month",
+      "token": "AXM",
+      "agents": 10,
+      "path": "/products/starter",
+      "buy": "/buy?plan=starter"
+    },
+    {
+      "id": "professional",
+      "product_name": "Professional",
+      "label": "Professional Agents",
+      "usd_reference": 997,
+      "billing": "month",
+      "token": "AXM",
+      "agents": 25,
+      "path": "/products/professional",
+      "buy": "/buy?plan=professional"
+    },
+    {
+      "id": "enterprise",
+      "product_name": "Enterprise",
+      "label": "Enterprise Agents",
+      "usd_reference": 2997,
+      "billing": "month",
+      "token": "AXM",
+      "agents": 45,
+      "path": "/products/enterprise",
+      "buy": "/buy?plan=enterprise"
+    }
+  ]
+}
