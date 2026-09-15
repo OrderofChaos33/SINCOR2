@@ -1,0 +1,72 @@
+{
+  "code": "OBS-01",
+  "slug": "agent-vitals",
+  "name": "Agent Vitals",
+  "family": "OBS",
+  "status": "needs_polish",
+  "sellable_today": false,
+  "funnel_role": "funnel_entry",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 49,
+    "interval": "month",
+    "unit": "per_agent",
+    "unit_label": "per agent",
+    "setup_usd": 0,
+    "display": "$49/mo per agent"
+  },
+  "tagline": "Is the service up, and what shape is it in.",
+  "summary": "Internal status, uptime, host metrics, security posture, and log-summary endpoints packaged as a future customer-facing vitals view. Lowest friction once the dashboard is polished.",
+  "description": "Agent Vitals is the entry-tier packaging of the existing monitoring dashboard. Today the repository exposes internal Flask routes for service status, uptime, CPU/memory/disk metrics, a security-feature snapshot, and log summaries. It does not currently expose buyer-ready per-agent cost attribution, token/tool-call budget controls, or outbound alert webhooks, so the SKU is not sellable until the surface is rebuilt around what exists.",
+  "buyer": "An operator who wants a quick pulse on deployment health before they need forensic audit or compliance workflow depth.",
+  "features": [
+    {
+      "name": "Service status",
+      "detail": "Healthy/unhealthy status with timestamp and uptime seconds from `/api/monitoring/status`."
+    },
+    {
+      "name": "System metrics",
+      "detail": "CPU, memory, disk, process, platform, and uptime metrics from `/api/monitoring/metrics`."
+    },
+    {
+      "name": "Security snapshot",
+      "detail": "Current authentication, rate-limit, security-header, logging, and validation flags from `/api/monitoring/security`."
+    },
+    {
+      "name": "Log summary",
+      "detail": "Existing logger statistics surfaced through `/api/monitoring/logs` when logging is available."
+    },
+    {
+      "name": "Customer-facing polish blocker",
+      "detail": "The current dashboard is an internal operational surface, not a packaged buyer view."
+    }
+  ],
+  "includes": [],
+  "source_components": [
+    {
+      "id": "monitoring_dashboard",
+      "maps_to": "src/sincor2/monitoring_dashboard.py \u2014 internal Flask routes for status, metrics, security, and log summaries; not yet a buyer-ready dashboard."
+    }
+  ],
+  "readiness": {
+    "sellable_today": false,
+    "blocker": "The existing monitoring_dashboard surface is internal and does not yet support a customer-facing vitals workflow.",
+    "next_action": "Productize the current status/metrics/security/log endpoints into a buyer-facing dashboard before quoting OBS-01."
+  },
+  "conversion": {
+    "from": [],
+    "to": [
+      "OBS-02",
+      "AUD-01"
+    ],
+    "feeds": [
+      "underwriting_engine"
+    ]
+  },
+  "positioning": {
+    "friction": "lowest",
+    "sale_difficulty": "easiest_first_sale",
+    "impulse": true
+  }
+}

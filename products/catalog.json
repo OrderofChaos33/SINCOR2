@@ -1,0 +1,66 @@
+{
+  "line_id": "02",
+  "line_name": "Observability & Audit",
+  "line_code": "OBS-AUD",
+  "company": "SINCOR",
+  "version": "2026-09-13",
+  "this_week_play": "AUD-01",
+  "underwriting_line": "01",
+  "sku_order": [
+    "OBS-01",
+    "OBS-02",
+    "OBS-03",
+    "AUD-01",
+    "AUD-02",
+    "OBS-ENT"
+  ],
+  "packaging": {
+    "note": "Packages existing audit, monitoring, quality-scoring, and compliance surfaces as SKUs; readiness flags call out where customer-facing productization is still missing.",
+    "components": [
+      "enterprise_infrastructure",
+      "monitoring_dashboard",
+      "quality_scoring",
+      "verticals/healthcare",
+      "verticals/compliance"
+    ]
+  },
+  "caveat": {
+    "sku": "AUD-01",
+    "body": "OBS-02, AUD-01, and AUD-02 are sellable today. OBS-01 still needs dashboard polish, OBS-03 still needs a production drift-watch implementation, and OBS-ENT should wait until those bundled surfaces are customer-ready. The wedge play this week is AUD-01."
+  },
+  "pricing_logic": {
+    "funnel_entry": "OBS-01",
+    "wedge": "AUD-01",
+    "margin": [
+      "OBS-02",
+      "OBS-03"
+    ],
+    "revenue": [
+      "AUD-02",
+      "OBS-ENT"
+    ],
+    "note": "OBS-01 is the impulse-buy entry once customer-facing. AUD-01 is the one-time wedge that converts. OBS-02 is sellable recurring margin today; OBS-03 and OBS-ENT stay gated until their blockers clear. AUD-02 is current revenue."
+  },
+  "compounding": {
+    "feeds": "underwriting_engine",
+    "note": "Every OBS/AUD customer generates behavioral data that makes the underwriting engine (product line 01) smarter. These two product lines compound each other."
+  },
+  "bundle_rules": [
+    "When OBS-ENT becomes sellable, do not double-charge bundled SKUs.",
+    "AUD-01 remains a one-time engagement even on enterprise accounts."
+  ],
+  "bundle_pricing": {
+    "OBS-ENT": {
+      "pricing_model": "all_in",
+      "bundled_skus": [
+        "OBS-02",
+        "AUD-02"
+      ],
+      "separate_charges_excluded": [
+        "OBS-02 recurring",
+        "AUD-02 recurring",
+        "AUD-02 setup"
+      ]
+    }
+  }
+}

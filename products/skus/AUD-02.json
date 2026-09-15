@@ -1,0 +1,85 @@
+{
+  "code": "AUD-02",
+  "slug": "compliance-pack",
+  "name": "Compliance Pack",
+  "family": "AUD",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "revenue",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 999,
+    "interval": "month",
+    "unit": "per_organization",
+    "unit_label": "per organization",
+    "setup_usd": 2500,
+    "display": "$999/mo + $2,500 setup"
+  },
+  "tagline": "Logging an auditor can sit with.",
+  "summary": "HIPAA-guardrailed logging, ASC 842 / regulated-filing alignment, and audit exports formatted for external review. Credible because the healthcare and compliance verticals already exist.",
+  "description": "Compliance Pack is the regulated overlay on the audit trail. Healthcare gets HIPAA-oriented logging and workflow guardrails. Finance/compliance gets ASC 842 and regulated-filing support from the existing compliance vertical. Both get reviewer-ready evidence packages built on the existing audit logger and vertical-specific workflows. The setup fee covers guardrail configuration, retention, and the first export path.",
+  "buyer": "Healthcare RCM, clinic ops, or a finance/compliance team whose agents touch PHI, filings, leases, or other externally reviewable workflows.",
+  "features": [
+    {
+      "name": "HIPAA-guardrailed logging",
+      "detail": "Healthcare workflows already ship PHI-aware guardrails and audit helpers."
+    },
+    {
+      "name": "ASC 842 / regulated-filing alignment",
+      "detail": "Compliance vertical workflows already include lease-accounting and regulatory automation surfaces."
+    },
+    {
+      "name": "External-review exports",
+      "detail": "Reviewer packages can include event hashes, signatures, access attribution, and retention statements."
+    },
+    {
+      "name": "Setup & guardrail configuration",
+      "detail": "The setup fee covers scope, retention, export path, and reviewer-specific guardrail setup."
+    }
+  ],
+  "verticals": [
+    "healthcare",
+    "finance",
+    "compliance"
+  ],
+  "includes": [
+    "OBS-02 capabilities under the compliance overlay"
+  ],
+  "source_components": [
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "Signed audit evidence, compliance tags, reporting, and export foundation."
+    },
+    {
+      "id": "verticals/healthcare",
+      "maps_to": "Existing healthcare vertical and HIPAA guardrail code."
+    },
+    {
+      "id": "verticals/compliance",
+      "maps_to": "Existing compliance vertical and ASC 842/regulatory workflow code."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": null,
+    "next_action": "Lead with healthcare RCM and finance/compliance buyers who already need reviewer-facing evidence."
+  },
+  "conversion": {
+    "from": [
+      "AUD-01",
+      "OBS-02"
+    ],
+    "to": [
+      "OBS-ENT"
+    ],
+    "feeds": [
+      "underwriting_engine"
+    ]
+  },
+  "positioning": {
+    "friction": "high",
+    "sale_difficulty": "revenue_sku",
+    "impulse": false
+  }
+}

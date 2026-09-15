@@ -1,0 +1,79 @@
+{
+  "code": "OBS-02",
+  "slug": "agent-audit-trail",
+  "name": "Agent Audit Trail",
+  "family": "OBS",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "margin",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 199,
+    "interval": "month",
+    "unit": "per_deployment",
+    "unit_label": "per deployment",
+    "setup_usd": 0,
+    "display": "$199/mo per deployment"
+  },
+  "tagline": "Every action attributable. Signed. Tamper-evident.",
+  "summary": "Ed25519-signed execution logs with per-event SHA-512 integrity hashes, attribution fields, and a forensic archive. The existing enterprise_infrastructure logger is the product.",
+  "description": "Agent Audit Trail sells the signed audit evidence already implemented in `enterprise_infrastructure/comprehensive_audit_logging.py`. Each event gets its own SHA-512 integrity hash and, when signing is enabled, an Ed25519 signature over the event identifier, timestamp, and hash. That is tamper-evident audit evidence, not a blockchain-style predecessor-linked chain. The value is attributable records, signature verification, and exportable audit context.",
+  "buyer": "A team that has to prove what an agent did \u2014 to itself, to counsel, or to an auditor \u2014 and cannot rely on mutable application logs alone.",
+  "features": [
+    {
+      "name": "Per-event integrity hash",
+      "detail": "Each record stores an `immutable_hash` derived from core event fields."
+    },
+    {
+      "name": "Ed25519 signing",
+      "detail": "When signing is enabled, the logger signs event identity and integrity material at write time."
+    },
+    {
+      "name": "Attributable actions",
+      "detail": "Actor, session, tool, source component, and outcome metadata travel with each record."
+    },
+    {
+      "name": "Tamper evidence",
+      "detail": "Changed hashed identity fields or missing signature material are detectable during verification/export review."
+    },
+    {
+      "name": "Forensic archive",
+      "detail": "SQLite-backed event storage and alert storage support investigation and retention workflows."
+    },
+    {
+      "name": "Compliance export foundation",
+      "detail": "Compliance tags and generated compliance reports provide the reviewer-facing export surface."
+    }
+  ],
+  "includes": [],
+  "source_components": [
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "comprehensive_audit_logging.py \u2014 event hashing, Ed25519 signatures, attribution, storage, and compliance reporting."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": null,
+    "next_action": "Sell as the signed, tamper-evident audit layer and pair with AUD-01 for manual reconstruction engagements."
+  },
+  "conversion": {
+    "from": [
+      "OBS-01",
+      "AUD-01"
+    ],
+    "to": [
+      "AUD-02",
+      "OBS-ENT"
+    ],
+    "feeds": [
+      "underwriting_engine"
+    ]
+  },
+  "positioning": {
+    "friction": "medium",
+    "sale_difficulty": "margin_sku",
+    "impulse": false
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "code": "AUD-01",
+  "slug": "agent-forensic-audit",
+  "name": "Agent Forensic Audit",
+  "family": "AUD",
+  "status": "sellable",
+  "sellable_today": true,
+  "funnel_role": "wedge",
+  "this_week_play": true,
+  "pricing": {
+    "model": "one_time",
+    "amount_usd": 499,
+    "interval": null,
+    "unit": "per_engagement",
+    "unit_label": "per engagement",
+    "setup_usd": 0,
+    "display": "$499 one-time"
+  },
+  "tagline": "A paid reconstruction of what the agent actually did.",
+  "summary": "Deep-dive on one deployed agent: audit-trail reconstruction, failure-mode analysis, quality review, and remediation list. The wedge product. Converts into recurring audit/compliance follow-on work.",
+  "description": "Agent Forensic Audit is a manual engagement against one deployed agent. The work is reconstruction, not a dashboard login: review the signed audit evidence, trace what happened, name failure modes, pull quality-scoring outputs where data exists, and leave the buyer with a remediation list they can act on. It is priced to get a yes and scoped to convert the next conversation into recurring audit or compliance coverage.",
+  "buyer": "Anyone with a deployed agent they no longer fully trust \u2014 after an incident, before a board review, or as a condition of putting the agent in front of customers.",
+  "features": [
+    {
+      "name": "Audit trail reconstruction",
+      "detail": "Rebuild the event timeline from the signed, tamper-evident audit records and surrounding context."
+    },
+    {
+      "name": "Failure-mode analysis",
+      "detail": "Name the ways this agent actually failed or nearly failed in the observed deployment."
+    },
+    {
+      "name": "Quality review",
+      "detail": "Use existing quality scores and supporting evidence where that telemetry exists; this is not yet an automated drift-watch product."
+    },
+    {
+      "name": "Remediation list",
+      "detail": "Ordered fixes, process changes, and the recurring SKU that would have reduced the incident surface."
+    }
+  ],
+  "deliverables": [
+    "Reconstructed execution timeline",
+    "Failure-mode brief",
+    "Quality findings summary",
+    "Remediation list with conversion path"
+  ],
+  "includes": [],
+  "source_components": [
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "Signed audit evidence, attribution, compliance tags, and stored events for reconstruction."
+    },
+    {
+      "id": "quality_scoring",
+      "maps_to": "Existing quality score outputs where relevant data is available."
+    }
+  ],
+  "readiness": {
+    "sellable_today": true,
+    "blocker": null,
+    "next_action": "This week's play. Sell the engagement, then convert the findings into OBS-02 or AUD-02 follow-on work."
+  },
+  "conversion": {
+    "from": [],
+    "to": [
+      "OBS-02",
+      "AUD-02"
+    ],
+    "feeds": [
+      "underwriting_engine"
+    ]
+  },
+  "positioning": {
+    "friction": "low",
+    "sale_difficulty": "wedge",
+    "impulse": true
+  }
+}

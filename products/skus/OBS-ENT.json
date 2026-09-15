@@ -1,0 +1,101 @@
+{
+  "code": "OBS-ENT",
+  "slug": "enterprise-mesh",
+  "name": "Enterprise Mesh",
+  "family": "OBS",
+  "status": "needs_polish",
+  "sellable_today": false,
+  "funnel_role": "revenue",
+  "this_week_play": false,
+  "pricing": {
+    "model": "subscription",
+    "amount_usd": 2500,
+    "interval": "month",
+    "unit": "per_organization",
+    "unit_label": "per organization",
+    "setup_usd": 0,
+    "display": "$2,500/mo"
+  },
+  "tagline": "Planned enterprise bundle built on the audit/compliance foundation.",
+  "summary": "Enterprise bundle concept around OBS-02 and AUD-02, with internal monitoring and quality surfaces as future fleet inputs. Not sellable yet because the bundled vitals/drift surfaces and named third-party integrations are not productized in-repo.",
+  "description": "Enterprise Mesh is the fleet-contract concept, not a fully ready bundle today. The repository already contains the signed audit evidence needed for OBS-02 and the regulated workflow overlays behind AUD-02. It does not currently contain a buyer-ready fleet dashboard, a production drift-watch module, or first-class Sentry/healthchecks.io integration code. Until those blockers clear, OBS-ENT stays a planned package rather than a sellable contract.",
+  "buyer": "A team running many agents that wants one enterprise contract once fleet dashboards, quality watch, and support commitments are all packaged together.",
+  "features": [
+    {
+      "name": "OBS-02 foundation",
+      "detail": "Enterprise audit evidence, signatures, attribution, and retention come from the current audit logger."
+    },
+    {
+      "name": "AUD-02 foundation",
+      "detail": "Regulated workflow and reviewer-facing export work come from the current compliance package components."
+    },
+    {
+      "name": "Dedicated support",
+      "detail": "Commercial support can be attached to the bundle once the bundled product surfaces are ready."
+    },
+    {
+      "name": "SLA",
+      "detail": "Contracted response and uptime terms belong on the enterprise offer once the technical bundle is productized."
+    }
+  ],
+  "bundle_pricing": {
+    "pricing_model": "all_in",
+    "bundled_skus": [
+      "OBS-02",
+      "AUD-02"
+    ],
+    "separate_charges_excluded": [
+      "OBS-02 recurring",
+      "AUD-02 recurring",
+      "AUD-02 setup"
+    ]
+  },
+  "excludes": [
+    "AUD-01",
+    "OBS-01",
+    "OBS-03"
+  ],
+  "source_components": [
+    {
+      "id": "enterprise_infrastructure",
+      "maps_to": "Signed audit evidence and compliance-reporting foundation."
+    },
+    {
+      "id": "monitoring_dashboard",
+      "maps_to": "Internal monitoring surface that still needs buyer-facing fleet packaging."
+    },
+    {
+      "id": "quality_scoring",
+      "maps_to": "Quality-scoring foundation; no production drift-watch module yet."
+    },
+    {
+      "id": "verticals/healthcare",
+      "maps_to": "Healthcare compliance overlay via AUD-02 foundation."
+    },
+    {
+      "id": "verticals/compliance",
+      "maps_to": "Compliance workflow overlay via AUD-02 foundation."
+    }
+  ],
+  "readiness": {
+    "sellable_today": false,
+    "blocker": "OBS-01 and OBS-03 are not sellable bundled surfaces yet, and the repository has no first-class Sentry or healthchecks.io integration code.",
+    "next_action": "Wait for buyer-ready fleet dashboards and drift-watch implementation before quoting OBS-ENT as a real bundle."
+  },
+  "conversion": {
+    "from": [
+      "AUD-01",
+      "OBS-02",
+      "AUD-02"
+    ],
+    "to": [],
+    "feeds": [
+      "underwriting_engine"
+    ]
+  },
+  "positioning": {
+    "friction": "high",
+    "sale_difficulty": "revenue_sku",
+    "impulse": false
+  }
+}
