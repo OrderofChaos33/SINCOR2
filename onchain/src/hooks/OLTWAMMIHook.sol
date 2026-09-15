@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {BaseHook} from "@uniswap/v4-periphery/src/utils/BaseHook.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {SwapParams, ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -33,7 +34,7 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 /// storage only for registered intents and fee accrual.
 ///
 /// Fee routing: 100 % of protocolFeeBps → treasury. No owner skim on fees.
-contract OLTWAMMIHook is IHooks, ReentrancyGuardTransient {
+contract OLTWAMMIHook is BaseHook, ReentrancyGuardTransient {
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
 
@@ -80,25 +81,37 @@ contract OLTWAMMIHook is IHooks, ReentrancyGuardTransient {
     error ZeroAmount();
     error ZeroParts();
     error PoolNotEnabled();
-    error HookNotImplemented();
-
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
         _;
     }
 
-    modifier onlyPoolManager() {
-        if (msg.sender != address(poolManager)) revert Unauthorized();
-        _;
-    }
-
-    constructor(IPoolManager _poolManager, address _treasury, uint256 _feeBps) {
+    constructor(IPoolManager _poolManager, address _treasury, uint256 _feeBps) BaseHook(_poolManager) {
         if (_treasury == address(0)) revert InvalidTreasury();
         if (_feeBps > MAX_FEE_BPS) revert FeeTooHigh();
         poolManager = _poolManager;
         treasury = _treasury;
         owner = msg.sender;
         protocolFeeBps = _feeBps;
+    }
+
+    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: false,
+            afterInitialize: false,
+            beforeAddLiquidity: false,
+            afterAddLiquidity: false,
+            beforeRemoveLiquidity: false,
+            afterRemoveLiquidity: false,
+            beforeSwap: true,
+            afterSwap: true,
+            beforeDonate: false,
+            afterDonate: false,
+            beforeSwapReturnDelta: false,
+            afterSwapReturnDelta: false,
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
     }
 
     function registerIntent(PoolId poolId, uint128 totalAmount, uint32 totalParts, uint64 durationBlocks) external returns (bytes32 intentId) {
@@ -136,27 +149,26 @@ contract OLTWAMMIHook is IHooks, ReentrancyGuardTransient {
         isActive = intent.active && block.number <= intent.expiryBlock;
     }
 
-    function beforeSwap(address, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData)
-        external override onlyPoolManager nonReentrant returns (bytes4, BeforeSwapDelta, uint24)
+    function _beforeSwap(address, PoolKey calldata key, SwapParams calldata, bytes calldata hookData)
+        internal override nonReentrant returns (bytes4, BeforeSwapDelta, uint24)
     {
         PoolId poolId = key.toId();
-        if (!poolEnabled[poolId] || hookData.length < 32) {
-            return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+        (bool ok, bytes32 intentId) = _decodeIntentId(hookData);
+        if (!poolEnabled[poolId] || !ok) {
+            return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
         }
-
-        bytes32 intentId = abi.decode(hookData, (bytes32));
         TWAMMIntent storage intent = intents[intentId];
 
         if (!intent.active) {
-            return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+            return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
         }
         if (block.number > intent.expiryBlock) {
             intent.active = false;
-            return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+            return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
         }
         if (intent.partsExecuted >= intent.totalParts) {
             intent.active = false;
-            return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+            return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
         }
 
         uint128 amountLeft = intent.totalAmount - intent.amountExecuted;
@@ -169,15 +181,15 @@ contract OLTWAMMIHook is IHooks, ReentrancyGuardTransient {
         uint256 fee = protocolFeeBps == 0 ? 0 : FullMath.mulDiv(uint256(subAmount), protocolFeeBps, 10_000);
         _tstore(T_FEE, fee);
 
-        return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+        return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function afterSwap(address, PoolKey calldata key, SwapParams calldata, BalanceDelta, bytes calldata)
-        external override onlyPoolManager nonReentrant returns (bytes4, int128)
+    function _afterSwap(address, PoolKey calldata key, SwapParams calldata, BalanceDelta, bytes calldata)
+        internal override nonReentrant returns (bytes4, int128)
     {
         uint256 intentIdRaw = _tload(T_INTENT_ID);
         if (intentIdRaw == 0) {
-            return (IHooks.afterSwap.selector, 0);
+            return (BaseHook.afterSwap.selector, 0);
         }
 
         bytes32 intentId = bytes32(intentIdRaw);
@@ -190,7 +202,7 @@ contract OLTWAMMIHook is IHooks, ReentrancyGuardTransient {
 
         TWAMMIntent storage intent = intents[intentId];
         if (!intent.active) {
-            return (IHooks.afterSwap.selector, 0);
+            return (BaseHook.afterSwap.selector, 0);
         }
 
         intent.partsExecuted += 1;
@@ -207,17 +219,8 @@ contract OLTWAMMIHook is IHooks, ReentrancyGuardTransient {
             emit IntentCompleted(intentId, intent.amountExecuted);
         }
 
-        return (IHooks.afterSwap.selector, 0);
+        return (BaseHook.afterSwap.selector, 0);
     }
-
-    function beforeInitialize(address, PoolKey calldata, uint160) external pure override returns (bytes4) { revert HookNotImplemented(); }
-    function afterInitialize(address, PoolKey calldata, uint160, int24) external pure override returns (bytes4) { revert HookNotImplemented(); }
-    function beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata) external pure override returns (bytes4) { revert HookNotImplemented(); }
-    function afterAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata) external pure override returns (bytes4, BalanceDelta) { revert HookNotImplemented(); }
-    function beforeRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata) external pure override returns (bytes4) { revert HookNotImplemented(); }
-    function afterRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata) external pure override returns (bytes4, BalanceDelta) { revert HookNotImplemented(); }
-    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure override returns (bytes4) { revert HookNotImplemented(); }
-    function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure override returns (bytes4) { revert HookNotImplemented(); }
 
     function sweepFees(Currency currency) external nonReentrant {
         uint256 amount = accruedFees[currency];
@@ -259,6 +262,16 @@ contract OLTWAMMIHook is IHooks, ReentrancyGuardTransient {
 
     function _tload(uint256 slot) private view returns (uint256 value) {
         assembly { value := tload(slot) }
+    }
+
+    function _decodeIntentId(bytes calldata hookData) private pure returns (bool ok, bytes32 intentId) {
+        if (hookData.length != 32) {
+            return (false, bytes32(0));
+        }
+        assembly {
+            intentId := calldataload(hookData.offset)
+        }
+        return (true, intentId);
     }
 
     receive() external payable {}

@@ -1,6 +1,6 @@
 """A2A quote response builder — explicit Treasury / burn fee split.
 
-Production contract for POST /api/a2a/quote.
+Helper for wiring the existing POST /api/a2a/quote route.
 
 Fee rules (canonical, do not diverge):
   • Platform fee on settlement: 5 % (500 bps) → Treasury
@@ -9,8 +9,6 @@ Fee rules (canonical, do not diverge):
     (see a2a_integration.record_axm_receipt)
   • SINC is primary task payment token; AXM retained for legacy
 """
-
-from __future__ import annotations
 
 import os
 from typing import Any, Dict, Optional
