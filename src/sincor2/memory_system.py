@@ -34,7 +34,13 @@ class EpisodicEvent:
     
     def __post_init__(self):
         if not self.hash:
-            content_str = json.dumps(self.content, sort_keys=True)
+            content_str = json.dumps({
+                "timestamp": self.timestamp,
+                "agent_id": self.agent_id,
+                "event_type": self.event_type,
+                "content": self.content,
+                "context": self.context,
+            }, sort_keys=True)
             self.hash = hashlib.sha256(content_str.encode()).hexdigest()[:16]
 
 @dataclass  
@@ -177,10 +183,25 @@ class MemorySystem:
             citations=citations or []
         )
         
-        # Append to log
-        with open(self.episodic_log, 'a') as f:
+        # Append to log and capture file position for indexed retrieval
+        with open(self.episodic_log, 'a+', encoding='utf-8') as f:
+            f.seek(0, os.SEEK_END)
+            file_position = f.tell()
             f.write(json.dumps(asdict(event)) + '\n')
-            
+
+        # Update episodic index so production lookups stay efficient
+        try:
+            conn = sqlite3.connect(self.episodic_index_db, timeout=10)
+            conn.execute("""
+                INSERT OR REPLACE INTO episodic_index
+                (timestamp, event_type, agent_id, file_position, hash)
+                VALUES (?, ?, ?, ?, ?)
+            """, (event.timestamp, event.event_type, event.agent_id, file_position, event.hash))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[WARNING] Episodic index write failed: {e}")
+             
         # Add to hot cache
         self.hot_cache.append(event)
         
@@ -211,23 +232,28 @@ class MemorySystem:
             query += " ORDER BY timestamp DESC LIMIT ?"
             params.append(limit)
 
-            cursor = conn.execute(query, params)
-            hashes = [row[0] for row in cursor.fetchall()]
+            cursor = conn.execute(query.replace("SELECT hash", "SELECT hash, file_position"), params)
+            indexed_rows = cursor.fetchall()
             conn.close()
 
-            # Retrieve full records from JSONL using hashes (direct lookup)
-            if hashes:
-                hash_set = set(hashes)
-                with open(self.episodic_log, 'r') as f:
-                    for line in f:
+            # Retrieve full records from JSONL using indexed file positions.
+            if indexed_rows:
+                with open(self.episodic_log, 'r', encoding='utf-8') as f:
+                    for event_hash, file_position in indexed_rows:
+                        if file_position is None:
+                            continue
+                        f.seek(int(file_position))
+                        line = f.readline()
                         if not line.strip():
                             continue
                         data = json.loads(line)
                         event = EpisodicEvent(**data)
-                        if event.hash in hash_set:
+                        if event.hash == event_hash:
                             episodes.append(event)
 
-                return episodes
+                if len(episodes) == len(indexed_rows):
+                    episodes.sort(key=lambda ev: ev.timestamp, reverse=True)
+                    return episodes[:limit]
 
         except Exception as e:
             # Fallback to full file scan if index is unavailable

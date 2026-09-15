@@ -20,6 +20,20 @@ from dataclasses import dataclass, asdict
 import yaml
 import math
 
+_PERSONA_TRAITS = (
+    "openness",
+    "conscientiousness",
+    "extraversion",
+    "agreeableness",
+    "neuroticism",
+    "risk_tolerance",
+    "humor_level",
+    "directness",
+    "code_preference",
+    "table_preference",
+    "story_preference",
+)
+
 @dataclass
 class PersonaVector:
     """Complete personality vector for an agent"""
@@ -356,6 +370,13 @@ class PersonaEngine:
         
         continuity_index = self._cosine_similarity(current_vector, reference_vector)
         return continuity_index
+
+    def calculate_constitutional_drift(self) -> float:
+        """Return drift from the archetype constitution anchor (0 = aligned)."""
+        anchor = self._constitution_anchor_persona()
+        current_vector = self._persona_to_vector(self.current_persona)
+        anchor_vector = self._persona_to_vector(anchor)
+        return max(0.0, min(1.0, 1.0 - self._cosine_similarity(current_vector, anchor_vector)))
     
     def _persona_to_vector(self, persona: PersonaVector) -> np.ndarray:
         """Convert persona to numerical vector for similarity calculation"""
@@ -429,10 +450,36 @@ class PersonaEngine:
         with open(self.checkpoint_history, 'w') as f:
             json.dump(checkpoints, f, indent=2)
         
-        # Option: Implement recovery strategies here
-        # - Revert to last stable checkpoint
-        # - Reduce learning rate
-        # - Increase constitutional constraint weights
+        self._recursive_blend_toward_constitution()
+
+    def _constitution_anchor_persona(self) -> PersonaVector:
+        """Return the archetype baseline used as the constitutional anchor."""
+        return self._create_from_archetype()
+
+    def _recursive_blend_toward_constitution(self, depth: int = 0, max_depth: int = 3) -> int:
+        """Blend the current persona back toward its constitution until drift is bounded."""
+        if depth >= max_depth:
+            return depth
+
+        drift = self.calculate_constitutional_drift()
+        if drift <= 0.2:
+            return depth
+
+        anchor = self._constitution_anchor_persona()
+        blended = PersonaVector(**asdict(self.current_persona))
+        blend_ratio = min(0.75, 0.45 + drift)
+
+        for trait in _PERSONA_TRAITS:
+            current_value = getattr(self.current_persona, trait)
+            anchor_value = getattr(anchor, trait)
+            repaired = current_value * (1.0 - blend_ratio) + anchor_value * blend_ratio
+            setattr(blended, trait, max(0.0, min(1.0, repaired)))
+
+        blended.last_updated = datetime.now().isoformat()
+        blended.version = self.current_persona.version + 1
+        self._save_persona(blended)
+        self.current_persona = blended
+        return self._recursive_blend_toward_constitution(depth + 1, max_depth=max_depth)
         
     def get_behavioral_preferences(self) -> Dict[str, Any]:
         """Get current behavioral preferences for agent execution"""
