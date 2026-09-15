@@ -81,6 +81,13 @@ def test_railway_counts_as_production(monkeypatch):
     assert is_production_runtime() is True
 
 
+def test_environment_production_not_masked_by_flask_env(monkeypatch):
+    monkeypatch.delenv("RAILWAY_ENVIRONMENT", raising=False)
+    monkeypatch.setenv("FLASK_ENV", "development")
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    assert is_production_runtime() is True
+
+
 def test_banned_detects_historical_fallbacks():
     assert is_banned_secret("chroma-demo-secret-change-me")
     assert is_banned_secret("dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars")

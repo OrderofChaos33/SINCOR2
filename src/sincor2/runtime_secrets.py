@@ -40,12 +40,15 @@ BANNED_SECRETS = frozenset(
 def is_production_runtime() -> bool:
     if os.environ.get("RAILWAY_ENVIRONMENT"):
         return True
-    env = (
-        os.environ.get("FLASK_ENV")
-        or os.environ.get("ENVIRONMENT")
-        or ""
-    ).strip().lower()
-    return env in _PROD_MARKERS
+    env_values = (
+        os.environ.get("FLASK_ENV", ""),
+        os.environ.get("ENVIRONMENT", ""),
+    )
+    return any(
+        value.strip().lower() in _PROD_MARKERS
+        for value in env_values
+        if value and value.strip()
+    )
 
 
 def is_banned_secret(value: str | None) -> bool:

@@ -420,6 +420,27 @@ class ChromaStore:
         item["updated_at"] = _now()
         return self.save_outbound(item)
 
+    def claim_outbound_for_send(self, item_id: str) -> Optional[Dict[str, Any]]:
+        """Atomically mark an outbound item as in-flight for delivery."""
+        with self._lock, self._connect() as conn:
+            updated = conn.execute(
+                """
+                UPDATE outbound
+                SET status=?, live=1, updated_at=?
+                WHERE id=? AND status IN ('pending_approval', 'approved_dry_run', 'send_failed')
+                """,
+                ("sending", _now(), item_id),
+            )
+            if updated.rowcount != 1:
+                return None
+            row = conn.execute("SELECT * FROM outbound WHERE id=?", (item_id,)).fetchone()
+            conn.commit()
+        if not row:
+            return None
+        data = _row_to_dict(row)
+        data["to"] = data.get("to_addr")
+        return data
+
     # ----------------------------------------------------------------- events
     def add_event(self, lead_id: Optional[str], kind: str, detail: str = "") -> None:
         with self._lock, self._connect() as conn:

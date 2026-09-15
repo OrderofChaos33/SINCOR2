@@ -71,6 +71,7 @@ def test_logout_clears_chroma_and_admin_session(tmp_path, monkeypatch):
     with client.session_transaction() as sess:
         assert sess.get("chroma_shop") == "shopowner"
         assert sess.get("admin_username") == "shopowner"
+        sess["is_admin"] = True
     out = client.get("/chroma/logout", follow_redirects=False)
     assert out.status_code in (302, 303)
     with client.session_transaction() as sess:
