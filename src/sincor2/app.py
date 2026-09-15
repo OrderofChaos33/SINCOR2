@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file, make_response
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sincor2.runtime_secrets import resolve_flask_secret
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -132,7 +133,7 @@ except Exception as e:
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'development-key-change-in-production')
+app.config['SECRET_KEY'] = resolve_flask_secret()
 
 # Configure template folder (resolve to root-level templates directory)
 app.template_folder = str(Path(__file__).resolve().parent.parent.parent / 'templates')

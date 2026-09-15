@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
 
+import verticals.auto_detailing.send_gate as send_gate
 from verticals.auto_detailing.send_gate import (
     APPROVED_DRY_RUN,
     KILLED,
@@ -74,3 +78,54 @@ def test_edit_resets_to_pending(store):
     edited = edit(item["id"], body="v2 cleaner copy that books the bay", store=store)
     assert edited["body"] == "v2 cleaner copy that books the bay"
     assert edited["status"] == PENDING
+
+
+def test_approve_rejects_already_sent(store, monkeypatch):
+    monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    item = enqueue(channel="email", kind="quote_followup", body="Book the bay.", store=store)
+    first = approve(item["id"], store=store)
+    assert first["status"] == SENT
+    with pytest.raises(ValueError, match="Already sent"):
+        approve(item["id"], store=store)
+    assert store.get_outbound(item["id"])["status"] == SENT
+
+
+def test_edit_rejects_already_sent(store, monkeypatch):
+    monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    item = enqueue(channel="email", kind="quote_followup", body="Book the bay.", store=store)
+    approve(item["id"], store=store)
+    with pytest.raises(ValueError, match="Already sent"):
+        edit(item["id"], body="new copy", store=store)
+
+
+def test_concurrent_approve_delivers_once(store, monkeypatch):
+    monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    item = enqueue(channel="email", kind="quote_followup", body="Book now.", store=store)
+    calls = {"count": 0}
+
+    def fake_deliver(_item):
+        time.sleep(0.05)
+        calls["count"] += 1
+        return {"ok": True}
+
+    monkeypatch.setattr(send_gate, "_deliver", fake_deliver)
+    results = []
+    errors = []
+
+    def _approve():
+        try:
+            results.append(approve(item["id"], store=store))
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    t1 = threading.Thread(target=_approve)
+    t2 = threading.Thread(target=_approve)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    assert calls["count"] == 1
+    assert len(results) == 1
+    assert len(errors) == 1
+    assert store.get_outbound(item["id"])["status"] == SENT

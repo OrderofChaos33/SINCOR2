@@ -31,14 +31,14 @@ class SINCORAuth:
     def init_app(self, app):
         """Initialize JWT authentication with Flask app"""
 
-        # JWT Configuration
-        app.config['JWT_SECRET_KEY'] = (
-            app.config.get('JWT_SECRET_KEY')
-            or os.environ.get(
-                'JWT_SECRET_KEY',
-                'dev-secret-key-CHANGE-IN-PRODUCTION-min-32-chars'
-            )
-        )
+        # JWT Configuration — env or in-memory random. Never a committed fallback.
+        from sincor2.runtime_secrets import is_banned_secret, resolve_jwt_secret
+
+        existing = app.config.get("JWT_SECRET_KEY")
+        if existing and not is_banned_secret(str(existing)):
+            app.config["JWT_SECRET_KEY"] = existing
+        else:
+            app.config["JWT_SECRET_KEY"] = resolve_jwt_secret()
         app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
         app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
         app.config['JWT_TOKEN_LOCATION'] = ['headers']

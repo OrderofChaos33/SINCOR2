@@ -163,7 +163,11 @@ def login():
 
 @bp.route("/logout")
 def logout():
+    # login() writes chroma_shop + admin_username; _is_authed() also honors is_admin.
+    # Drop all three so a CHROMA login cannot survive /chroma/logout.
     session.pop("chroma_shop", None)
+    session.pop("admin_username", None)
+    session.pop("is_admin", None)
     return redirect(url_for("chroma.login"))
 
 

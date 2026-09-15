@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'sincor-secret-key-change-in-production')
+from sincor2.runtime_secrets import resolve_flask_secret
+app.config['SECRET_KEY'] = resolve_flask_secret()
 
 # Import Stripe integration
 try:

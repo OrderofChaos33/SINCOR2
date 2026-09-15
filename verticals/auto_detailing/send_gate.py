@@ -20,6 +20,7 @@ logger = logging.getLogger("chroma.send_gate")
 PENDING = "pending_approval"
 APPROVED_DRY_RUN = "approved_dry_run"
 SENT = "sent"
+SENDING = "sending"
 KILLED = "killed"
 BLOCKED = "blocked_live_flag_off"
 
@@ -99,6 +100,10 @@ def approve(item_id: str, store: Optional[ChromaStore] = None) -> Dict[str, Any]
         raise ValueError(f"Unknown outbound item: {item_id}")
     if item.get("status") == KILLED:
         raise ValueError("Killed items cannot be approved")
+    if item.get("status") == SENT:
+        raise ValueError("Already sent items cannot be approved again")
+    if item.get("status") == SENDING:
+        raise ValueError("Send already in progress for this item")
 
     if not live_send_enabled():
         updated = store.update_outbound(
@@ -112,14 +117,25 @@ def approve(item_id: str, store: Optional[ChromaStore] = None) -> Dict[str, Any]
         logger.info("CHROMA dry-run hold id=%s", item_id)
         return updated or item
 
-    delivered = _deliver(item)
+    claimed = store.claim_outbound_for_send(item_id)
+    if not claimed:
+        latest = store.get_outbound(item_id)
+        if not latest:
+            raise ValueError(f"Unknown outbound item: {item_id}")
+        if latest.get("status") == KILLED:
+            raise ValueError("Killed items cannot be approved")
+        if latest.get("status") == SENT:
+            raise ValueError("Already sent items cannot be approved again")
+        raise ValueError("Outbound item is no longer sendable")
+
+    delivered = _deliver(claimed)
     updated = store.update_outbound(
         item_id,
         status=SENT if delivered.get("ok") else "send_failed",
         live=True,
         delivery=delivered,
     )
-    store.add_event(item.get("lead_id"), "sent" if delivered.get("ok") else "send_failed", item_id)
+    store.add_event(claimed.get("lead_id"), "sent" if delivered.get("ok") else "send_failed", item_id)
     return updated or item
 
 
@@ -144,6 +160,8 @@ def edit(
     item = store.get_outbound(item_id)
     if not item:
         raise ValueError(f"Unknown outbound item: {item_id}")
+    if item.get("status") == SENT:
+        raise ValueError("Already sent items cannot be edited")
     fields: Dict[str, Any] = {"status": PENDING}
     if body is not None:
         fields["body"] = body
