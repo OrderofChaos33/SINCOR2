@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Business Intelligence Report — $49 once</title>
+  <meta name="description" content="One AXM payment. One packaged intelligence report. No subscription.">
+  <link rel="canonical" href="https://getsincor.com/products/report">
+  <link rel="icon" href="/static/sincor_nav_icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#050814; --card:#0f1420; --line:rgba(255,255,255,.08); --p:#7c3aed; --pl:#a78bfa; --c:#22d3ee; --t:#e2e8f0; --m:#64748b; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--t); font-family:Space Grotesk,sans-serif; line-height:1.6; }
+    nav { display:flex; justify-content:space-between; align-items:center; padding:16px 40px; border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(5,8,20,.94); }
+    nav a { color:var(--m); text-decoration:none; font-size:14px; }
+    .brand { font-weight:700; background:linear-gradient(135deg,var(--pl),var(--c)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .cta, .btn { background:var(--p); color:#fff !important; padding:10px 20px; border-radius:8px; text-decoration:none; font-weight:600; }
+    .hero { max-width:840px; margin:0 auto; padding:88px 28px 36px; text-align:center; }
+    .badge { display:inline-block; border:1px solid rgba(124,58,237,.4); color:var(--pl); padding:6px 12px; border-radius:999px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:16px; }
+    h1 { font-size:clamp(36px,6vw,60px); line-height:1.05; margin-bottom:16px; }
+    .sub { color:var(--m); font-size:18px; margin-bottom:20px; }
+    .price { font-family:JetBrains Mono,monospace; font-size:42px; color:var(--c); }
+    .row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:24px 0; }
+    .btn2 { border:1px solid rgba(124,58,237,.4); color:var(--pl); text-decoration:none; padding:10px 20px; border-radius:8px; }
+    .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; max-width:1000px; margin:0 auto; padding:0 28px 40px; }
+    .metric { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px; text-align:center; }
+    .num { font-family:JetBrains Mono,monospace; font-size:28px; color:var(--c); }
+    .lab { color:var(--m); font-size:13px; }
+    section { max-width:1000px; margin:0 auto; padding:10px 28px 48px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; }
+    .kicker { color:var(--pl); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+    ul { color:var(--m); padding-left:18px; }
+    footer { border-top:1px solid var(--line); padding:24px; text-align:center; color:var(--m); font-size:13px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="brand" href="/">SINCOR</a>
+    <div style="display:flex;gap:20px;align-items:center">
+      <a href="/pricing">Pricing</a>
+      <a class="cta" href="/buy?plan=report">Buy the report</a>
+    </div>
+  </nav>
+  <header class="hero">
+    <div class="badge">Fastest path to a paid deliverable</div>
+    <h1>A full market brief in one shot.</h1>
+    <p class="sub">One AXM payment. One packaged intelligence report. No subscription, no seat math.</p>
+    <div class="price">$49 <span style="font-size:16px;color:#64748b">once</span></div>
+    <div class="row">
+      <a class="btn" href="/buy?plan=report">Buy the report</a>
+      <a class="btn2" href="/pricing">Compare plans</a>
+    </div>
+  </header>
+  <div class="metrics">
+    <div class="metric"><div class="num">49</div><div class="lab">USD list</div></div>
+    <div class="metric"><div class="num">500</div><div class="lab">AXM fixed</div></div>
+    <div class="metric"><div class="num">1</div><div class="lab">deliverable</div></div>
+    <div class="metric"><div class="num">24h</div><div class="lab">turnaround target</div></div>
+  </div>
+  <section>
+    <h2>What you actually get</h2>
+    <ul>
+      <li>Competitor and pricing scan packaged as a brief you can send a client</li>
+      <li>Wallet checkout on Base — AXM first, USDC fallback if spot is dark</li>
+      <li>No monthly seat. Pay once, receive the work product</li>
+    </ul>
+  </section>
+  <section>
+    <h2>On the floor</h2>
+    <div class="grid">
+      <article class="card"><div class="kicker">Discovery</div><h3>Scout</h3><p>Pulls the market slice and source list</p></article>
+      <article class="card"><div class="kicker">Brief</div><h3>Synthesizer</h3><p>Turns raw pull into an executive memo</p></article>
+      <article class="card"><div class="kicker">QA</div><h3>Auditor</h3><p>Flags weak claims before the file ships</p></article>
+    </div>
+  </section>
+  <footer>SINCOR · Base · AXM settlement · Pay at /buy?plan=report</footer>
+</body>
+</html>
