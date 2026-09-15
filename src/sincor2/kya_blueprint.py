@@ -32,8 +32,8 @@ def list_agent():
     body = request.get_json(silent=True) or {}
     try:
         rec = kya.list_from_inbound(body, card=body.get("agent_card") if isinstance(body.get("agent_card"), dict) else None)
-    except ValueError as exc:
-        return _err(str(exc))
+    except ValueError:
+        return _err("bad request")
     return jsonify(rec), 201
 
 
@@ -46,12 +46,11 @@ def bind():
             principal=str(body.get("principal") or ""),
             signature=str(body.get("signature") or ""),
             message=str(body.get("message") or ""),
-            recovered=body.get("recovered"),
         )
     except KeyError:
         return _err("unknown agent", 404)
-    except ValueError as exc:
-        return _err(str(exc))
+    except ValueError:
+        return _err("bad request")
     return jsonify(rec)
 
 
@@ -63,20 +62,23 @@ def verify():
         try:
             kya.apply_stake(kya_id, str(body["stake_wei"]), str(body["stake_tx"]))
         except (KeyError, ValueError) as exc:
-            return _err(str(exc), 404 if isinstance(exc, KeyError) else 400)
+            return _err("unknown kya" if isinstance(exc, KeyError) else "bad request", 404 if isinstance(exc, KeyError) else 400)
     try:
         rec = kya.verify(kya_id)
     except KeyError:
         return _err("unknown kya", 404)
-    except ValueError as exc:
-        return _err(str(exc))
+    except ValueError:
+        return _err("bad request")
     return jsonify(rec)
 
 
 @kya_bp.post("/heartbeat")
 def heartbeat():
     body = request.get_json(silent=True) or {}
-    rec = kya.heartbeat(str(body.get("agent_id") or ""), ok=bool(body.get("ok", True)), latency_ms=body.get("latency_ms"))
+    try:
+        rec = kya.heartbeat(str(body.get("agent_id") or ""), ok=bool(body.get("ok", True)), latency_ms=body.get("latency_ms"))
+    except ValueError:
+        return _err("bad request")
     if rec is None:
         return _err("unknown agent", 404)
     return jsonify(rec)
@@ -86,10 +88,14 @@ def heartbeat():
 def sla():
     body = request.get_json(silent=True) or {}
     try:
+        latency_ms = int(body.get("latency_ms") or 0)
+    except (TypeError, ValueError):
+        return _err("bad latency_ms")
+    try:
         rec = kya.post_sla(
             kya_id=str(body.get("kya_id") or ""),
             ok=bool(body.get("ok", True)),
-            latency_ms=int(body.get("latency_ms") or 0),
+            latency_ms=latency_ms,
             proof_tx=body.get("proof_tx"),
         )
     except KeyError:

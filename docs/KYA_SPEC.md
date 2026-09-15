@@ -27,4 +27,4 @@ Drop-in trust layer on inbound fabric. Does not replace `/v1/a2a/register`.
 - GET /v1/kya/agent/{agent_id}
 - GET /v1/kya/lookup?wallet=
 
-On-chain `contracts/kya/KYARegistry.sol` is bond/revoke truth. Do not deploy until list+bind is live on Railway.
+On-chain KYA registry contract path is TODO (no `contracts/kya/KYARegistry.sol` in this repo yet). Do not deploy until list+bind is live on Railway.

@@ -4,9 +4,6 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
-from pathlib import Path
-
-os.environ.setdefault("KYA_STORE_PATH", os.path.join(tempfile.gettempdir(), "kya_test_records.json"))
 
 from sincor2 import kya_registry as kya
 
@@ -28,10 +25,21 @@ FABRIC_AGENT = {
 
 class KyaFabricTests(unittest.TestCase):
     def setUp(self):
+        self._prior_store_path = os.environ.get("KYA_STORE_PATH")
+        fd, self._store_path = tempfile.mkstemp(prefix="kya_test_records_", suffix=".json")
+        os.close(fd)
+        os.environ["KYA_STORE_PATH"] = self._store_path
         kya.reset()
-        path = Path(os.environ["KYA_STORE_PATH"])
-        if path.exists():
-            path.unlink()
+        if os.path.exists(self._store_path):
+            os.unlink(self._store_path)
+
+    def tearDown(self):
+        if os.path.exists(self._store_path):
+            os.unlink(self._store_path)
+        if self._prior_store_path is None:
+            os.environ.pop("KYA_STORE_PATH", None)
+        else:
+            os.environ["KYA_STORE_PATH"] = self._prior_store_path
 
     def test_list_from_fabric_shape(self):
         rec = kya.list_from_inbound(FABRIC_AGENT)
