@@ -1,1 +1,1 @@
-see-file
+"""Public HTML pages.\n\nExtracted from mvp_app so the gunicorn entry stays the app factory.\nHelpers and Flask `app` live in sincor2.mvp_app; this module binds them\nafter that module has finished constructing the application object.\n"""\nfrom __future__ import annotations\n\nfrom flask import Blueprint\n\nbp = Blueprint(\"mvp_pages\", __name__)\n
