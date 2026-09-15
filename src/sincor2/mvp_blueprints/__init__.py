@@ -14,6 +14,7 @@ def register_mvp_blueprints(app: Flask) -> None:
     from sincor2.mvp_blueprints.sinc import bp as sinc_bp
     from sincor2.mvp_blueprints.launch import bp as launch_bp
     from sincor2.mvp_blueprints.admin import bp as admin_bp
+    from sincor2.mvp_blueprints.wardrobe import bp as wardrobe_bp
 
     for bp in (
         health_bp,
@@ -25,6 +26,7 @@ def register_mvp_blueprints(app: Flask) -> None:
         sinc_bp,
         launch_bp,
         admin_bp,
+        wardrobe_bp,
     ):
         app.register_blueprint(bp)
 
