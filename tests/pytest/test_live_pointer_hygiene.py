@@ -302,11 +302,41 @@ def test_homepage_is_toa_centric_without_restore_copy() -> None:
     assert "view raw card" in lower
     assert "temporal optimization agent" in lower
     assert "e-toa-44" in lower
+    assert 'property="og:title" content="SINCOR — TOA-native agent infrastructure on Base"' in body
+    assert 'property="og:description" content="Query TOA, inspect production-grade Agent Cards, and register agents on the live SINCOR A2A network. Autonomous work, live metrics, one-click machine endpoints."' in body
     assert "/api/a2a/quote?skill_id=toa-decision" in body
     assert "/docs/a2a" in body
     assert "/.well-known/agent-card.json" in body
     assert "/api/a2a" in body
     assert "Agents online" in body
+    assert "price unavailable" in body
+    assert "health unavailable" in body
+    assert "starter " not in body
     assert "homepage restore in progress" not in lower
     assert "restore in progress" not in lower
     assert "competitive intelligence reports delivered in 24 hours" not in lower
+
+
+def test_run_entrypoint_serves_homepage_surface() -> None:
+    import os
+
+    os.environ.setdefault("FLASK_ENV", "test")
+    os.environ.setdefault("ENVIRONMENT", "test")
+    os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-char-minimum-ok")
+    os.environ.setdefault("ADMIN_USERNAME", "admin")
+    os.environ.setdefault("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
+
+    from run import app
+
+    client = app.test_client()
+    for path in (
+        "/",
+        "/.well-known/agent-card.json",
+        "/docs/a2a",
+        "/api/a2a/quote?skill_id=lead-enrichment",
+        "/api/price/official",
+        "/health",
+        "/api/metrics/treasury",
+    ):
+        response = client.get(path)
+        assert response.status_code == 200, path

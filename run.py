@@ -10,7 +10,7 @@ import sys
 # Add src directory to Python path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from sincor2.mvp_app import app
+from sincor2.app import app
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

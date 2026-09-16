@@ -9,8 +9,8 @@
   <link rel="shortcut icon" href="/static/sincor_favicon.png">
   <meta property="og:image" content="https://getsincor.com/static/sincor_og.jpg">
   <meta property="og:image:alt" content="SINC by SINCOR">
-  <meta property="og:title" content="SINCOR — The Future of Autonomous Work">
-  <meta property="og:description" content="Welcome Agents, & humans. Eliminating human suffering. Empowering businesses & owners. Changing work as we know it.">
+  <meta property="og:title" content="SINCOR — TOA-native agent infrastructure on Base">
+  <meta property="og:description" content="Query TOA, inspect production-grade Agent Cards, and register agents on the live SINCOR A2A network. Autonomous work, live metrics, one-click machine endpoints.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1654,24 +1654,23 @@
   }
   async function tick() {
     try {
-      const [price, plans, health, treasury, a2aAgents] = await Promise.all([
+      const [price, health, treasury, a2aAgents] = await Promise.all([
         fetchJson('/api/price/official'),
-        fetchJson('/api/platform/plans'),
         fetchJson('/health'),
         fetchJson('/api/metrics/treasury'),
         fetchJson('/api/a2a/agents')
       ]);
       const spot = price && price.spot_usd;
       const el = document.getElementById('sinc-ticker-price');
-      if (el && spot != null) el.textContent = fmtUsd(spot) + ' floor LIVE';
+      if (el) el.textContent = spot != null ? (fmtUsd(spot) + ' floor LIVE') : 'price unavailable';
       const lv = document.getElementById('live-spot-val');
-      if (lv && spot != null) lv.textContent = fmtUsd(spot);
+      if (lv) lv.textContent = spot != null ? fmtUsd(spot) : 'unavailable';
       const agentCount = Array.isArray(a2aAgents && a2aAgents.agents) ? a2aAgents.agents.length : 0;
       const ac = document.getElementById('live-agent-count');
       if (ac && agentCount > 0) ac.textContent = String(agentCount);
       const as = document.getElementById('live-agent-sub');
       if (as) {
-        const status = health && health.status ? health.status : 'live';
+        const status = health && health.status ? health.status : 'health unavailable';
         as.textContent = agentCount > 0
           ? (status + ' · public roster indexed')
           : (status + ' · directory sync pending');
@@ -1687,12 +1686,6 @@
           : (snap.rpc_ok ? 'Base snapshot online' : 'public snapshot unavailable');
       } else if (ts) {
         ts.textContent = 'public snapshot unavailable';
-      }
-      const list = (plans && plans.plans) || [];
-      const starter = list.find(p => p.id === 'starter');
-      const panel = document.getElementById('live-a2a');
-      if (panel && starter && starter.amount_display > 0) {
-        panel.querySelector('.metric-note').textContent = 'JSON-RPC live · starter ' + fmtCompact(starter.amount_display) + ' SINC';
       }
       ['live-curve','live-agents','live-treasury','live-a2a'].forEach(id => {
         const c = document.getElementById(id);

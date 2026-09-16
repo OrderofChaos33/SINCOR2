@@ -426,6 +426,32 @@ def health_check():
     })
 
 
+@app.route('/api/metrics/treasury')
+@limiter.exempt if limiter else lambda f: f
+def treasury_metrics():
+    """Public treasury KPI snapshot for homepage metrics."""
+    try:
+        from sincor2.treasury_inflow import get_treasury_snapshot, ledger_summary_24h
+    except ImportError as exc:
+        logger.error("treasury_inflow import failed: %s", exc)
+        return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
+
+    try:
+        snap = get_treasury_snapshot(include_onchain=True)
+        summary = ledger_summary_24h()
+        return jsonify(
+            {
+                "status": "ok",
+                "kpi": "treasury_inflow",
+                "snapshot": snap.to_dict(),
+                "ledger_24h": summary,
+            }
+        ), 200
+    except Exception as exc:
+        logger.exception("treasury metrics failed")
+        return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
+
+
 # ==================== PROTECTED ADMIN ROUTES ====================
 
 @app.route('/api/waitlist/analytics')
