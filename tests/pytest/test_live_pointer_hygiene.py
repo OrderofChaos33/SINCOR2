@@ -263,3 +263,50 @@ def test_live_pages_render_canonical_addresses() -> None:
             assert RETIRED_AXM.lower() not in body.lower(), name
             assert "0x9C8c" not in body, name
             assert "0x9c8c" not in body, name
+
+
+def test_homepage_is_toa_centric_without_restore_copy() -> None:
+    pytest.importorskip("flask")
+    from flask import Flask, render_template
+    from sincor2.social_links import SOCIAL_LINKS
+
+    app = Flask(
+        __name__,
+        template_folder=str(ROOT / "templates"),
+        static_folder=str(ROOT / "static"),
+    )
+
+    @app.context_processor
+    def _inject_homepage_context():
+        return {
+            "sinc_token": SINC_TOKEN,
+            "axiom_token": AXIOM_TOKEN,
+            "treasury_address": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+            "social_links": SOCIAL_LINKS,
+            "is_admin": False,
+            "admin_username": "",
+            "is_customer": False,
+            "username": "",
+        }
+
+    with app.app_context():
+        body = render_template(
+            "home.html",
+            sinc_spot_usd=None,
+            sinc_spot_label="$0.15 floor",
+            walletconnect_project_id="",
+        )
+    lower = body.lower()
+    assert "query toa" in lower
+    assert "register agent" in lower
+    assert "view raw card" in lower
+    assert "temporal optimization agent" in lower
+    assert "e-toa-44" in lower
+    assert "/api/a2a/quote?skill_id=toa-decision" in body
+    assert "/docs/a2a" in body
+    assert "/.well-known/agent-card.json" in body
+    assert "/api/a2a" in body
+    assert "Agents online" in body
+    assert "homepage restore in progress" not in lower
+    assert "restore in progress" not in lower
+    assert "competitive intelligence reports delivered in 24 hours" not in lower
