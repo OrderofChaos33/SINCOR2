@@ -275,16 +275,20 @@ def test_live_pages_render_canonical_addresses() -> None:
 
 def test_public_token_copy_omits_retired_curve_and_unproven_verification_claims() -> None:
     files = (
+        "README.md",
         "templates/sinc_gateway.html",
         "templates/sinc_acceptance.html",
         "templates/home.html",
         "templates/whitepaper.html",
         "templates/refer.html",
         "scripts/token_metadata.json",
+        "scripts/ops/buy_watcher.js",
+        "scripts/post_deploy_template_update.ps1",
         "content/notebooklm/SINCOR_pitch_source.md",
         "config/launch_partners.yaml",
     )
     forbidden = (
+        "bonding curve",
         "$1.50 floor",
         "CertiK Skynet 97/100",
         "CertiK 97/100",

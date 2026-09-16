@@ -1,12 +1,12 @@
 /**
- * SINC Buy Event Watcher — live bonding curve on Base
+ * SINC Transfer Watcher — canonical live token on Base
  * Usage: node buy_watcher.js
  * Env: BASE_RPC_URL, NOTIFY_PHONE, TWILIO_SID, TWILIO_AUTH, TWILIO_FROM (all optional except RPC)
  */
 
 const { ethers } = require('ethers');
 
-const CURVE = process.env.SINC_CURVE || '0x75dE341a2BC81806198364F125d4Cde36527619C';
+const SINC_TOKEN = process.env.SINC_TOKEN || '0xe1D836087F6573b665d25CE088793E916D7892f8';
 const RPC_HTTP = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
 const SINC_DECIMALS = 8;
 
@@ -15,11 +15,8 @@ const TWILIO_AUTH = process.env.TWILIO_AUTH || process.env.TWILO_AUTH || '';
 const TWILIO_FROM = process.env.TWILIO_FROM || process.env.TWILO_NUMBER || '';
 const NOTIFY_TO = process.env.NOTIFY_PHONE || process.env.ADMIN_SMS_NUMBER || '';
 
-const CURVE_ABI = [
-    'event Buy(address indexed buyer, uint256 ethIn, uint256 sincOut, address indexed referrer)',
-    'event Sell(address indexed seller, uint256 sincIn, uint256 ethOut)',
-    'function sincSold() view returns (uint256)',
-    'function ethAccumulated() view returns (uint256)',
+const TOKEN_ABI = [
+    'event Transfer(address indexed from, address indexed to, uint256 value)',
 ];
 
 function sendSMS(message) {
@@ -58,8 +55,8 @@ function fmtSinc(raw) {
 }
 
 async function startWatcher() {
-    console.log('=== SINC Buy Watcher (live curve) ===');
-    console.log('Curve:', CURVE);
+    console.log('=== SINC Transfer Watcher (canonical live token) ===');
+    console.log('Token:', SINC_TOKEN);
     console.log('RPC:', RPC_HTTP);
     console.log('Notify:', NOTIFY_TO || 'console only');
     console.log('');
@@ -68,7 +65,7 @@ async function startWatcher() {
     const block = await provider.getBlockNumber();
     console.log('Connected, block:', block);
 
-    const curve = new ethers.Contract(CURVE, CURVE_ABI, provider);
+    const token = new ethers.Contract(SINC_TOKEN, TOKEN_ABI, provider);
     let lastBlock = block;
 
     async function pollEvents() {
@@ -76,24 +73,13 @@ async function startWatcher() {
             const currentBlock = await provider.getBlockNumber();
             if (currentBlock <= lastBlock) return;
 
-            const [buyEvents, sellEvents] = await Promise.all([
-                curve.queryFilter(curve.filters.Buy(), lastBlock + 1, currentBlock),
-                curve.queryFilter(curve.filters.Sell(), lastBlock + 1, currentBlock),
-            ]);
+            const transferEvents = await token.queryFilter(token.filters.Transfer(), lastBlock + 1, currentBlock);
 
-            for (const evt of buyEvents) {
-                const ethIn = ethers.formatEther(evt.args.ethIn);
-                const sincOut = fmtSinc(evt.args.sincOut);
-                const ref = evt.args.referrer;
-                const msg = `SINC BUY: ${sincOut} SINC for ${ethIn} ETH | buyer ${evt.args.buyer.slice(0, 10)}… | ref ${ref.slice(0, 10)}…`;
-                console.log(`[${new Date().toISOString()}]`, msg);
-                sendSMS(msg);
-            }
-
-            for (const evt of sellEvents) {
-                const ethOut = ethers.formatEther(evt.args.ethOut);
-                const sincIn = fmtSinc(evt.args.sincIn);
-                const msg = `SINC SELL: ${sincIn} SINC for ${ethOut} ETH | ${evt.args.seller.slice(0, 10)}…`;
+            for (const evt of transferEvents) {
+                const sincAmount = fmtSinc(evt.args.value);
+                const from = evt.args.from;
+                const to = evt.args.to;
+                const msg = `SINC TRANSFER: ${sincAmount} SINC | ${from.slice(0, 10)}… -> ${to.slice(0, 10)}…`;
                 console.log(`[${new Date().toISOString()}]`, msg);
                 sendSMS(msg);
             }
@@ -105,15 +91,12 @@ async function startWatcher() {
     }
 
     setInterval(pollEvents, 15000);
-    console.log('Polling Buy/Sell every 15s…\n');
+    console.log('Polling transfers every 15s…\n');
 
     setInterval(async () => {
         try {
-            const sold = await curve.sincSold();
-            const eth = ethers.formatEther(await curve.ethAccumulated());
-            console.log(
-                `[${new Date().toISOString()}] Heartbeat: ${fmtSinc(sold)} SINC sold | ${eth} ETH accumulated`
-            );
+            const blockNo = await provider.getBlockNumber();
+            console.log(`[${new Date().toISOString()}] Heartbeat: canonical SINC watcher live at block ${blockNo}`);
         } catch (e) {
             console.error('Heartbeat error:', e.message);
         }

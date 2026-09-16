@@ -220,7 +220,7 @@ flowchart TD
 | DAE layer | `dae/` | Governance, incentives, decentralized identity |
 | Enterprise infra | `enterprise_infrastructure/` | Audit logging, container orchestration |
 | Agents | `agents/` | 43 named agent YAML configs with archetypes and persona vectors |
-| On-chain | `onchain/` | Solidity contracts: bonding curve, limit-order hook, genesis NFT, AXIOM |
+| On-chain | `onchain/` | Solidity contracts and settlement infrastructure for SINC, AXIOM, hooks, and token integrations |
 | Examples | `examples/` | Reference Agent Cards and multi-agent workflow payloads |
 
 ---
@@ -399,13 +399,15 @@ Partnership framework covers eight partnership types and five tiers with automat
 | Token | Contract | Role |
 |---|---|---|
 | **AXIOM (AXM)** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | Primary A2A settlement and billing |
-| **SINC** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Residual / legacy holders (8 decimals) |
+| **SINC** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Canonical live token for platform subscriptions and governance (8 decimals) |
 | **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Fees and A2A routing |
 | **Base chain** | `8453` | Production network |
 
-Live pointers: `src/sincor2/onchain/constants.py`, `CANONICAL_ADDRESSES.md`.
+Live pointers: `src/sincor2/onchain/constants.py`, `CANONICAL_ADDRESSES.md`, `TOKEN_CANON.md`, `/token`, `/token.json`.
 
-Contracts in `onchain/src/`: `SincBondingCurve.sol`, `SincGenesisNFT.sol`, `SincLimitOrderHook.sol` (0.30% base / 3.00% same-block penalty), `Axiom.sol`.
+Official SINC buy path: `https://getsincor.com/buy`. Public token surfaces should reference the canonical live SINC address above and must not route users to retired bonding-curve addresses.
+
+Contracts in `onchain/src/`: `SincGenesisNFT.sol`, `SincLimitOrderHook.sol` (0.30% base / 3.00% same-block penalty), `Axiom.sol`, plus historical contracts retained in-repo for reference.
 
 Deflation: 50% of A2A AXM burned, 50% to treasury; 80% of AXM/WETH pool fees to treasury; SINC stake boosts routing priority.
 
