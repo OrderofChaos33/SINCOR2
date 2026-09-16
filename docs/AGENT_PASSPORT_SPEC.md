@@ -1,6 +1,6 @@
 # Agent Passport — DAE Interop Primitive
 
-**Status:** Design (Issue #149)
+**Status:** Implemented MVP (Issue #149)
 **Goal:** Portable, verifiable agent identity that other DAOs/DAEs can accept for membership, voting weight, or execution rights without SINCOR giving up control.
 
 ## Core Idea
@@ -13,7 +13,7 @@ Passport =
 3. Reputation score (success rate, settlement volume, TOA feedback quality)
 4. Optional expiry / refresh via continued activity
 
-## Minimal Interface Other Protocols Can Call
+## Implemented MVP Interface (on `SincGenesisNFT`)
 
 ```solidity
 interface IAgentPassport {
@@ -21,15 +21,16 @@ interface IAgentPassport {
     function reputation(address agent) external view returns (uint256); // scaled 1e18
     function skills(address agent) external view returns (bytes32[] memory); // skill ids
     function issuedAt(address agent) external view returns (uint64);
+    function attestPassport(address agent, uint256 newScore, bytes32[] calldata skillsToAdd) external;
 }
 ```
 
 ## Implementation Path
 
-1. Keep Genesis NFT as the base identity (already deployed).
-2. Add a lightweight PassportRegistry or extend the NFT with ERC-5192 / custom views that expose the above.
-3. Reputation updated by SINCOR settlement events (SINC/AXM payments + task completion attestations).
-4. Other DAOs add a simple modifier or gate: `require(IAgentPassport(passport).reputation(msg.sender) >= threshold)`.
+1. Genesis NFT remains the non-transferable base identity.
+2. `SincGenesisNFT` now exposes passport-readable fields and emits `PassportAttested` updates.
+3. Curve authority can update score + append unique skill attestations (`bytes32` skill IDs).
+4. Other DAOs can gate permissions with `hasPassport + reputation + skill` checks (see `onchain/test/SincGenesisNFT.t.sol` `PassportGatedTestDAO`).
 
 ## Why This Accelerates Traction
 
@@ -37,9 +38,8 @@ interface IAgentPassport {
 - Creates a reason for agents and operators to accumulate reputation *inside* SINCOR.
 - Does not require SINCOR to join or be governed by external DAOs.
 
-## Next Steps
+## Remaining Next Steps
 
-- [ ] Minimal PassportRegistry contract (or NFT extension)
-- [ ] Event emission on successful A2A task settlement that updates reputation
-- [ ] Example gate contract for a test DAO
-- [ ] Agent Card field advertising passport support
+- [ ] Wire `attestPassport` updates to A2A settlement finalization (automated score updates).
+- [ ] Publish canonical skill namespace for cross-DAO interoperability.
+- [ ] Optional Base-native attestation registry mirror for non-NFT consumers.
