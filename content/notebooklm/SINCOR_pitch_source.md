@@ -63,7 +63,7 @@ Modes: analytics → suggest → active
 
 ## Slide 8 — Tokens
 
-**SINC** `0xe1D836087F6573b665d25CE088793E916D7892f8` — 1B supply, 8 decimals, CertiK 97/100, curve sale  
+**SINC** `0xe1D836087F6573b665d25CE088793E916D7892f8` — 1B supply, 8 decimals, official floor $0.15, buy at getsincor.com/buy  
 **AXM** `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` — agent execution & intel settlement  
 Treasury `0x09E289…12Ac` — platform payments verified on-chain
 
@@ -84,7 +84,7 @@ No Stripe/PayPal in default production path.
 
 ## Slide 10 — Moat & safety
 
-- Sourcify-verified contracts, canonical address doc
+- Canonical token address doc and machine-readable token canon
 - Compliance monitor: internal-only, no outbound alerts
 - Production kill-switches: no auto-sign from web app
 - Guardrails on content, outreach, launch approval
@@ -93,7 +93,7 @@ No Stripe/PayPal in default production path.
 
 ## Slide 11 — Traction & proof
 
-- Bonding curve holds ~65M SINC
+- Live-address allocation proof pending for the 1B token
 - v4 hook limit-order infrastructure deployed
 - Token list packages for Blockscout / Superchain
 - Agent billing log + burn stats API

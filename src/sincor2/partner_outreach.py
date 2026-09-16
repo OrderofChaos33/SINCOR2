@@ -39,8 +39,9 @@ DM_TEMPLATE = """Hi {name} — I'm building SINCOR: 42 autonomous AI agents runn
 Launch: {launch_date} · Live demo: {pitch_deck}
 
 Proof in 30 seconds:
-• SINC {sinc} — CertiK {certik}, Sourcify verified
-• Official curve: {curve}
+• Live SINC: {sinc} · official floor $0.15 / 1B
+• Official buy path: {buy}
+• Canon: {canon}
 
 {angle}
 
@@ -190,8 +191,8 @@ def render_message(partner: dict[str, Any], phase: str = "intro") -> str:
         "pitch_deck": cfg.get("pitch_deck", "https://getsincor.com/pitch"),
         "site": cfg.get("site", "https://getsincor.com"),
         "sinc": proof.get("sinc", ""),
-        "curve": proof.get("curve", ""),
-        "certik": proof.get("certik", "97/100"),
+        "buy": proof.get("buy", "https://getsincor.com/buy"),
+        "canon": proof.get("canon", "https://getsincor.com/token"),
         "angle": partner.get("angle", ""),
         "ask": partner.get("ask", ""),
         "contact_url": partner.get("contact_url", cfg.get("site", "")),

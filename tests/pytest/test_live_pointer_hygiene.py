@@ -190,9 +190,13 @@ def test_token_metadata_json_is_canonical() -> None:
     assert meta["decimals"] == 8
     assert meta["totalSupply"] == "1000000000"
     assert SINC_TOKEN in meta["explorer"]
-    assert SINC_TOKEN in meta["security"]["sourcify"]
+    assert meta["pricing"]["buyPath"] == "https://getsincor.com/buy"
+    assert "sourcify" not in meta["security"]
+    assert "certiK" not in meta["security"]
     blob = json.dumps(meta)
     assert RETIRED_SINC.lower() not in blob.lower()
+    assert "CertiK Skynet 97/100" not in blob
+    assert "Sourcify full-match verified" not in blob
 
 
 def test_tokenlist_is_canonical() -> None:
@@ -263,3 +267,49 @@ def test_live_pages_render_canonical_addresses() -> None:
             assert RETIRED_AXM.lower() not in body.lower(), name
             assert "0x9C8c" not in body, name
             assert "0x9c8c" not in body, name
+            if name in ("home.html", "sinc_gateway.html", "refer.html", "whitepaper.html"):
+                assert "CertiK Skynet 97/100" not in body, name
+                assert "Sourcify full-match" not in body, name
+                assert "0x75dE341a2BC81806198364F125d4Cde36527619C" not in body, name
+
+
+def test_public_token_copy_omits_retired_curve_and_unproven_verification_claims() -> None:
+    files = (
+        "templates/sinc_gateway.html",
+        "templates/sinc_acceptance.html",
+        "templates/home.html",
+        "templates/whitepaper.html",
+        "templates/refer.html",
+        "scripts/token_metadata.json",
+        "content/notebooklm/SINCOR_pitch_source.md",
+        "config/launch_partners.yaml",
+    )
+    forbidden = (
+        "$1.50 floor",
+        "CertiK Skynet 97/100",
+        "CertiK 97/100",
+        "Sourcify full-match",
+        "Sourcify-verified",
+        "Sourcify verified",
+        "0x75dE341a2BC81806198364F125d4Cde36527619C",
+    )
+    for rel in files:
+        body = (ROOT / rel).read_text(encoding="utf-8")
+        for needle in forbidden:
+            assert needle not in body, f"{rel} still contains forbidden token copy: {needle}"
+
+
+def test_token_routes_serve_canon(client) -> None:
+    html = client.get("/token")
+    assert html.status_code == 200
+    page = html.get_data(as_text=True)
+    assert "SINC Token Canon" in page
+    assert SINC_TOKEN in page
+
+    data = client.get("/token.json")
+    assert data.status_code == 200
+    assert data.headers["Content-Type"].startswith("application/json")
+    payload = data.get_json()
+    assert payload["decision"]["official_floor_usd"] == 0.15
+    assert payload["official_buy_url"] == "https://getsincor.com/buy"
+    assert payload["sinc"]["address"].lower() == SINC_TOKEN.lower()

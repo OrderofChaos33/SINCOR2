@@ -172,9 +172,8 @@ def sinc_token_metadata():
     payload['blockscout'] = f'https://base.blockscout.com/token/{SINC_TOKEN}'
     sec = payload.get('security')
     if isinstance(sec, dict):
-        sec['sourcify'] = (
-            f'https://repo.sourcify.dev/contracts/full_match/8453/{SINC_TOKEN}/'
-        )
+        sec.pop('sourcify', None)
+        sec.pop('certiK', None)
     try:
         from launch_content_engine.onchain_stats import build_official_price_payload
         payload['pricing'] = build_official_price_payload()

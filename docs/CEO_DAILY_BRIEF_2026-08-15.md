@@ -10,10 +10,10 @@
 - ETH (Base): 0.00780178 ETH (~$14.68 @ ~$1,881)
 - USDC (Base): dust (~0.345)
 - Multichain residual (ETH/Polygon USDC etc.): ~$13 additional → **Net liquid ~$28**
-- SINC residual: negligible secondary depth; official floor still $1.50 via bonding curve + limit-order hook
+- SINC residual: negligible secondary depth; official floor policy $0.15 via live SINC checkout
 - **Zero realized platform fee or subscription inflow recorded in last 24h+.** Ledger shows projected entries only from scheduler cycles. Capital remains starved.
 
-**SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`):** Bonding curve live, holders ~2.6k, volume near-zero. Secondary market still not viable. All official buys must route through curve/hook.
+**SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`):** Official floor policy is $0.15 and official checkout is getsincor.com/buy. Secondary market still not viable.
 
 **Platform state:**
 - 42 agents claimed 24/7. Agent YAML roster, runner, departments, TOA (E-toa-44), `yield_aggregator` (DRY_RUN default), `treasury_inflow` ledger, `defi_swarm_checkin_scheduler` (5-min loops) are present and structured.

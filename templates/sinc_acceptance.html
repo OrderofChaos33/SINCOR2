@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SINC acceptance &amp; whitelisting — SINCOR</title>
-  <meta name="description" content="Import SINC in wallets, buy via hook router or bonding curve, track whitelist PR status on Base.">
+  <meta name="description" content="Import SINC in wallets, use the official SINC buy path, and track whitelist PR status on Base.">
   <style>
     :root { --bg:#0a0e27; --panel:#0f1629; --cyan:#06b6d4; --purple:#8b5cf6; --text:#f1f5f9; --muted:#94a3b8; --green:#34d399; }
     * { box-sizing:border-box; }
@@ -46,15 +46,15 @@
   </div>
 
   <div class="card">
-    <h2>2 · Buy paths (hook + curve)</h2>
+    <h2>2 · Official buy path</h2>
     <table>
-      <tr><th>Path</th><th>Contract</th><th>Use when</th></tr>
-      <tr><td>ETH bonding curve</td><td class="mono" id="curve-addr">—</td><td>Default; soulbound Genesis NFT on first buy</td></tr>
-      <tr><td>USDC hook router</td><td class="mono" id="router-addr">—</td><td>Lifts $0.10–$0.95 ramp + $1.50+ floor walls</td></tr>
-      <tr><td>Limit-order hook</td><td class="mono" id="hook-addr">—</td><td>~<span id="hook-m">—</span>M SINC on sell walls (read-only)</td></tr>
+      <tr><th>Path</th><th>Reference</th><th>Use when</th></tr>
+      <tr><td>Official checkout</td><td class="mono" id="buy-url">—</td><td>Primary live SINC buy path</td></tr>
+      <tr><td>USDC hook router</td><td class="mono" id="router-addr">—</td><td>On-chain router used by official checkout</td></tr>
+      <tr><td>Limit-order hook</td><td class="mono" id="hook-addr">—</td><td>Supporting Base execution infrastructure</td></tr>
     </table>
     <div class="row">
-      <a class="btn primary" href="/sinc#buy-eth">Buy with ETH</a>
+      <a class="btn primary" href="/buy">Buy SINC</a>
       <a class="btn primary" href="/sinc#buy-usdc">Buy with USDC</a>
       <a class="btn ghost" href="/refer">Referral (3%)</a>
     </div>
@@ -72,7 +72,7 @@
     <h2>4 · Hook ops (automated)</h2>
     <ul style="font-size:14px;color:var(--muted)">
       <li>Hook fill keeper — withdraws USDC when limit orders fill (Windows logon task)</li>
-      <li>Buy watcher — curve Buy/Sell SMS alerts</li>
+      <li>Buy watcher — official checkout and route monitoring</li>
       <li>Daily ops — chain snapshot + wallet watch</li>
     </ul>
   </div>
@@ -84,10 +84,9 @@ async function load() {
     fetch('/api/acceptance/status').then(r => r.json()),
   ]);
   document.getElementById('token-addr').textContent = hook.sinc_token;
-  document.getElementById('curve-addr').textContent = hook.curve;
+  document.getElementById('buy-url').textContent = hook.buy_paths?.checkout || 'https://getsincor.com/buy';
   document.getElementById('router-addr').textContent = hook.router_address;
   document.getElementById('hook-addr').textContent = hook.hook_address;
-  document.getElementById('hook-m').textContent = hook.sinc_in_hook_pm_m;
   const listUrl = acc.token_list_url;
   document.getElementById('list-link').href = listUrl;
   document.getElementById('pr-path').textContent = acc.pr_packages;

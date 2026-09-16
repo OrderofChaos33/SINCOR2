@@ -593,7 +593,7 @@ def cmd_check(_: argparse.Namespace) -> int:
 def cmd_bump(_: argparse.Namespace) -> int:
     meta = load_meta()
     addr = meta["address"]
-    curve = meta.get("relatedContracts", {}).get("bondingCurve", "0x75dE341a2BC81806198364F125d4Cde36527619C")
+    buy_url = meta.get("pricing", {}).get("buyPath", "https://getsincor.com/buy")
     rogue = "0x85372932f9b151a076815d92cf71a97980ffd667"
     results: list[tuple[str, bool, str]] = []
 
@@ -608,7 +608,7 @@ def cmd_bump(_: argparse.Namespace) -> int:
         - **Decimals**: {meta['decimals']}
         - **Logo**: {PUBLIC_LOGO_URL_MIRROR}
         - **Website**: {meta['website']}
-        - **Description**: {meta['descriptionShort']} Official buy venue: bonding curve `{curve}` (not rogue V2 `{rogue}`).
+        - **Description**: {meta['descriptionShort']} Official buy venue: {buy_url}.
 
         Self-hosted token list: https://getsincor.com/tokenlists/sincor.tokenlist.json
         Metadata: https://getsincor.com/.well-known/sinc-token.json
@@ -628,7 +628,7 @@ def cmd_bump(_: argparse.Namespace) -> int:
         - Metadata: https://getsincor.com/.well-known/sinc-token.json
         - Logo: {PUBLIC_LOGO_URL_MIRROR}
 
-        Balancer already lists SINC. Li.Fi issue #595 completed. Official price from bonding curve `{curve}` only — do not use rogue V2 `{rogue}`.
+        Balancer already lists SINC. Li.Fi issue #595 completed. Official buy path: {buy_url}.
 
         Happy to address any review feedback.
         """

@@ -5,19 +5,18 @@ launch_date: "2026-07-07"
 site: https://getsincor.com
 pitch_deck: https://getsincor.com/pitch
 whitepaper: https://getsincor.com/whitepaper
-buy: https://getsincor.com/sinc
+buy: https://getsincor.com/buy
 refer: https://getsincor.com/refer
 
 proof:
   sinc: "0xe1D836087F6573b665d25CE088793E916D7892f8"
-  curve: "0x75dE341a2BC81806198364F125d4Cde36527619C"
+  buy: "https://getsincor.com/buy"
   chain: Base 8453
-  certik: "97/100 Skynet"
-  sourcify: full-match verified
+  canon: "https://getsincor.com/token"
 
 offer_packages:
   curator: "Exclusive first look + embeddable swarm deck + on-chain proof pack"
-  kol: "Coordinated launch-day post + 3% on-chain referral via bonding curve"
+  kol: "Coordinated launch-day post + 3% on-chain referral via official SINC checkout"
   ecosystem: "Technical co-announcement — verified agent platform, not a memecoin"
   media: "Founder demo + agent spotlight footage + verifiable contract links"
 
@@ -88,7 +87,7 @@ partners:
     handle: bankless
     contact_url: https://www.bankless.com/read
     contact_method: form
-    angle: "AI agent token with shipped product + CertiK + Sourcify — contrarian to vaporware"
+    angle: "AI agent token with shipped product + live Base checkout — contrarian to vaporware"
     ask: "Analysis piece or launch mention"
 
   - id: the-defiant
@@ -294,15 +293,15 @@ partners:
     ask: "Retweet launch + confirm token list visibility"
 
   - id: sourcify
-    name: Sourcify (verification)
+    name: Sourcify (metadata)
     role: ecosystem
     tier: P2
     channel: x
     handle: sourcifyeth
     contact_url: https://sourcify.dev/
     contact_method: dm
-    angle: "Full-match verified agent platform contracts"
-    ask: "Verification spotlight tweet"
+    angle: "Canonical contract metadata and wallet visibility for agent platform"
+    ask: "Metadata visibility spotlight tweet"
 
   - id: certik
     name: CertiK Skynet
@@ -312,8 +311,8 @@ partners:
     handle: CertiK
     contact_url: https://skynet.certik.com/
     contact_method: form
-    angle: "97/100 score — co-marketing if allowed"
-    ask: "Skynet badge amplification on launch"
+    angle: "Base-native agent platform with canonical live token copy"
+    ask: "Profile / scan coverage once a live-address report exists"
 
   - id: crypto-marketing-ref
     name: Crypto KOL agencies (vet only)

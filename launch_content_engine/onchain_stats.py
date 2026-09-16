@@ -109,8 +109,8 @@ def fetch_stats() -> dict:
         "hook_floor_usd": hook_floor_usd,
         "eth_usd": eth_usd,
         "price_note": (
-            f"Official SINC price ${hook_floor_usd:.2f} ($150M FDV / 1B tokens). "
-            "Pay at https://getsincor.com/buy."
+            f"Official SINC floor policy ${hook_floor_usd:.2f} ($150M FDV / 1B tokens). "
+            "Live-address market float is not yet proven on-chain. Pay at https://getsincor.com/buy."
         ),
         "rpc_ok": rpc_ok,
         "sinc_token": SINC,
@@ -127,36 +127,40 @@ def build_official_price_payload(stats: dict | None = None) -> dict:
     floor = float(s.get("official_floor_usd", SINC_FLOOR_USD))
     return {
         "source": "sincor_official",
-        "updated": "live",
+        "updated": "policy_locked",
         "official_floor_usd": floor,
         "minimum_buy_usd_per_sinc": floor,
         "official_buy": {
             "price_usd": floor,
             "buy_url": "https://getsincor.com/buy",
-            "note": f"Official SINC price ${floor:.2f} — $150M valuation / 1B supply.",
+            "note": f"Official SINC floor policy ${floor:.2f} — $150M valuation / 1B supply.",
         },
         "aggregator_guidance": {
             "display_price_usd": floor,
             "ignore_rogue_v2_pair": s.get("rogue_v2_pair"),
             "official_buy_url": "https://getsincor.com/buy",
             "price_api": "https://getsincor.com/api/price/official",
-            "message": f"SINC official price is ${floor:.2f} ($150M / 1B tokens).",
+            "message": f"SINC official floor policy is ${floor:.2f} ($150M / 1B tokens).",
         },
         "spot_usd": floor,
         "hook_floor_usd": floor,
         "note": s.get("price_note"),
         "buy_url": "https://getsincor.com/buy",
         "eth_usd": s.get("eth_usd"),
+        "market_data": {
+            "status": "unproven",
+            "holders": 1,
+            "transfers": 0,
+            "note": "Live-address transfer history is unpublished as of the token canon lock.",
+        },
     }
 
 
 def draft_post() -> str:
     s = fetch_stats()
     return (
-        f"SINCOR on-chain snapshot (Base, agent-reported):\n"
-        f"• Official SINC price ${s['official_floor_usd']:.2f} ($150M FDV / 1B)\n"
-        f"• ~{s['sinc_in_hook_pm_m']}M SINC in v4 hook limit orders\n"
-        f"• Safe ops wallet: {s['sinc_in_safe']:,.0f} SINC\n"
-        f"Verified token: {s['sinc_token'][:10]}…\n"
-        f"Checkout: {s['buy_url']}\n"
+        f"Live SINC (Base): {s['sinc_token']}\n"
+        f"Official floor: ${s['official_floor_usd']:.2f} ($150M FDV / 1B)\n"
+        f"Buy: {s['buy_url']}\n"
+        "Canon: https://getsincor.com/token\n"
     )
