@@ -449,7 +449,7 @@ def treasury_metrics():
         ), 200
     except Exception as exc:
         logger.exception("treasury metrics failed")
-        return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
+        return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500
 
 
 # ==================== PROTECTED ADMIN ROUTES ====================
