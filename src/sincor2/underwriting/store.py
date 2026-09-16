@@ -1,89 +1,57 @@
+"""Append-only JSONL store for agents, mandates, receipts, revokes."""
+
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import os
+import threading
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Dict, Iterable, List, Optional
 
-from .types import AuditEvent, IntentMandate, SpendEnvelope, iso, new_id, utcnow
+
+def _default_dir() -> Path:
+    raw = os.environ.get("SINCOR_UNDERWRITE_DIR") or os.environ.get("SINCOR_DATA_DIR")
+    if raw:
+        return Path(raw) / "underwriting"
+    return Path("data") / "underwriting"
 
 
 class UnderwriteStore:
-    def __init__(self, root: str | Path = "data/underwriting") -> None:
-        self.root = Path(root)
+    def __init__(self, root: Optional[Path] = None) -> None:
+        self.root = Path(root) if root else _default_dir()
         self.root.mkdir(parents=True, exist_ok=True)
-        self._mandates = self.root / "mandates.jsonl"
-        self._envelopes = self.root / "envelopes.jsonl"
+        self._lock = threading.Lock()
 
-    def _audit_path(self, ts: datetime | None = None) -> Path:
-        day = (ts or utcnow()).strftime("%Y-%m-%d")
-        return self.root / f"audit-{day}.jsonl"
+    def _path(self, name: str) -> Path:
+        return self.root / f"{name}.jsonl"
 
-    def _append(self, path: Path, obj: dict[str, Any]) -> None:
-        with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(obj, separators=(",", ":")) + "\n")
+    def append(self, collection: str, record: Dict[str, Any]) -> Dict[str, Any]:
+        line = json.dumps(record, separators=(",", ":"), sort_keys=True)
+        with self._lock:
+            with self._path(collection).open("a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+        return record
 
-    def _read_jsonl(self, path: Path) -> list[dict[str, Any]]:
+    def iter(self, collection: str) -> Iterable[Dict[str, Any]]:
+        path = self._path(collection)
         if not path.exists():
-            return []
-        out: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                out.append(json.loads(line))
-        return out
+            return
+        with path.open("r", encoding="utf-8") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    yield json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
 
-    def write_mandate(self, m: IntentMandate) -> None:
-        self._append(self._mandates, m.to_dict())
+    def list(self, collection: str) -> List[Dict[str, Any]]:
+        return list(self.iter(collection))
 
-    def write_envelope(self, e: SpendEnvelope) -> None:
-        self._append(self._envelopes, e.to_dict())
-
-    def audit(self, kind: str, agent_id: str, payload: dict[str, Any],
-              mandate_id: str | None = None, envelope_id: str | None = None) -> AuditEvent:
-        ev = AuditEvent(
-            event_id=new_id(),
-            ts=iso(utcnow()),
-            kind=kind,
-            agent_id=agent_id,
-            payload=payload,
-            mandate_id=mandate_id,
-            envelope_id=envelope_id,
-        )
-        self._append(self._audit_path(), ev.to_dict())
-        return ev
-
-    def latest_mandates(self) -> dict[str, IntentMandate]:
-        latest: dict[str, IntentMandate] = {}
-        for row in self._read_jsonl(self._mandates):
-            m = IntentMandate.from_dict(row)
-            latest[m.mandate_id] = m
-        return latest
-
-    def latest_envelopes(self) -> dict[str, SpendEnvelope]:
-        latest: dict[str, SpendEnvelope] = {}
-        for row in self._read_jsonl(self._envelopes):
-            e = SpendEnvelope.from_dict(row)
-            latest[e.envelope_id] = e
-        return latest
-
-    def get_mandate(self, mandate_id: str) -> IntentMandate | None:
-        return self.latest_mandates().get(mandate_id)
-
-    def get_envelope(self, envelope_id: str) -> SpendEnvelope | None:
-        return self.latest_envelopes().get(envelope_id)
-
-    def active_mandate_for(self, agent_id: str) -> IntentMandate | None:
-        now = utcnow()
-        found: IntentMandate | None = None
-        for m in self.latest_mandates().values():
-            if m.agent_id != agent_id or m.killed:
-                continue
-            exp = datetime.fromisoformat(m.expires_at.replace("Z", "+00:00"))
-            if exp <= now:
-                continue
-            found = m
-        return found
-
-    def iter_audit(self) -> Iterable[dict[str, Any]]:
-        for path in sorted(self.root.glob("audit-*.jsonl")):
-            yield from self._read_jsonl(path)
+    def find_one(self, collection: str, key: str, value: Any) -> Optional[Dict[str, Any]]:
+        last = None
+        for rec in self.iter(collection):
+            if rec.get(key) == value:
+                last = rec
+        return last
