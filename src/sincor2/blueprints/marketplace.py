@@ -365,8 +365,8 @@ def submit_task():
     if payer and settlement is not None:
         try:
             token_symbol = _normalize_new_flow_token(body.get("token_symbol", "AXIOM"))
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
+        except ValueError:
+            return jsonify({"error": "AXM-only settlement. token_symbol must be AXM or AXIOM for new marketplace flows."}), 400
         try:
             amount_decimal = Decimal(str(raw_amount))
             quote = settlement.create_quote(
