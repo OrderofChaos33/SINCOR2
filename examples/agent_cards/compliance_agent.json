@@ -4,14 +4,14 @@
   "version": "1.0.1",
   "supportedInterfaces": [
     {
-      "url": "https://compliance.example.com/api/a2a",
+      "url": "https://getsincor.com/api/a2a",
       "protocolBinding": "JSONRPC",
       "protocolVersion": "1.0.1"
     }
   ],
   "provider": {
-    "organization": "Example Compliance Ops",
-    "url": "https://compliance.example.com"
+    "organization": "SINCOR",
+    "url": "https://getsincor.com"
   },
   "capabilities": {
     "streaming": false,
@@ -26,7 +26,7 @@
   ],
   "skills": [
     {
-      "id": "sbom-generation",
+      "id": "compliance-sbom",
       "name": "SBOM Generation",
       "description": "Builds CycloneDX-style component inventories for release governance.",
       "tags": [
@@ -45,7 +45,7 @@
       ]
     },
     {
-      "id": "lease-accounting",
+      "id": "compliance-filing",
       "name": "Lease Accounting Support",
       "description": "Produces ASC 842 schedules and related operational evidence.",
       "tags": [
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "id": "workflow-bridge",
+      "id": "n8n-workflow-bridge",
       "name": "Workflow Bridge",
       "description": "Triggers and normalizes n8n or webhook-driven automations.",
       "tags": [
@@ -95,5 +95,5 @@
       "apiKey": []
     }
   ],
-  "documentationUrl": "https://compliance.example.com/docs"
+  "documentationUrl": "https://getsincor.com/docs/api"
 }
