@@ -1,0 +1,11 @@
+{
+  "chain_id": 8453,
+  "asset": "AXM",
+  "axm": "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
+  "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+  "erc8004_identity": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+  "verify_fee_axm": 2,
+  "underwrite_bps": 50,
+  "burn_share": 0.5,
+  "free_quota_is_not_settlement": true
+}
