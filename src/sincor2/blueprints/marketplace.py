@@ -9,6 +9,7 @@ from typing import Any, Dict
 
 from flask import Blueprint, current_app, jsonify, request
 
+from marketplace.settlement import TREASURY_ADDRESS
 from sincor2.sinc_access import COST_LISTING_FEE, sinc_required
 from sincor2.vertical_dispatch import dispatch_vertical_task, dispatch_via_router
 
@@ -19,6 +20,15 @@ marketplace_bp = Blueprint("marketplace", __name__, url_prefix="/api/marketplace
 
 def _platform() -> Dict[str, Any]:
     return current_app.extensions.get("sincor_platform", {})
+
+
+def _normalize_new_flow_token(token_symbol: Any) -> str:
+    raw = str(token_symbol or "AXIOM").strip().upper()
+    if raw == "AXM":
+        return "AXIOM"
+    if raw != "AXIOM":
+        raise ValueError("AXM-only settlement. token_symbol must be AXM or AXIOM for new marketplace flows.")
+    return raw
 
 
 # ---------------------------------------------------------------------------
@@ -351,15 +361,18 @@ def submit_task():
     settlement_quote = None
     payer = body.get("payer", "").strip()
     raw_amount = body.get("amount", "1.0")
-    token_symbol = body.get("token_symbol", "SINC")
     settlement = platform.get("settlement")
     if payer and settlement is not None:
+        try:
+            token_symbol = _normalize_new_flow_token(body.get("token_symbol", "AXIOM"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         try:
             amount_decimal = Decimal(str(raw_amount))
             quote = settlement.create_quote(
                 task_reference=decision.task_id,
                 payer=payer,
-                payee=decision.agent_id,
+                payee=TREASURY_ADDRESS,
                 amount=amount_decimal,
                 token_symbol=token_symbol,
             )
