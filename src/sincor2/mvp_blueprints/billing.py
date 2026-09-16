@@ -219,7 +219,7 @@ def x402_challenge(resource_id):
 def x402_verify():
     if not X402_AVAILABLE:
         return jsonify({'ok': False, 'error': 'x402_unavailable'}), 503
-    from sincor2.x402_payments import verify_challenge
+    from sincor2.x402_payments import finalize_challenge_payment, verify_challenge
     data = request.get_json(silent=True) or {}
     result = verify_challenge(
         sanitize_string(data.get('challenge_id', ''), max_length=64),
@@ -230,49 +230,36 @@ def x402_verify():
         code = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
         return jsonify(result), code
     try:
-        from sincor2.agent_billing import record_platform_payment
-        from sincor2.x402_payments import get_resource
-        res = get_resource(result.get('resource_id', ''))
-        if res:
-            record_platform_payment(
-                tx_hash=data.get('tx_hash', ''),
-                payer_wallet=result.get('payer_wallet', ''),
-                token='SINC',
-                amount_atomic=int(res['amount_atomic']),
-                product_name=f"x402:{result.get('resource_id')}",
-                plan_id='x402',
-                payment_id=result.get('challenge_id', ''),
-            )
+        result.update(finalize_challenge_payment(result))
     except Exception:
         pass
     return jsonify(result), 200
 
 
-@bp.route('/api/paid/<resource_id>', methods=['GET'])
+@bp.route('/api/paid/<resource_id>', methods=['GET', 'POST'])
 @limiter.limit("120 per hour")
 def x402_paid_resource(resource_id):
     """Serve paid API payloads after x402 access token presented."""
     if not X402_AVAILABLE:
         return jsonify({'error': 'x402_unavailable'}), 503
-    from sincor2.x402_payments import access_granted
+    from sincor2.x402_payments import access_granted, execute_paid_resource
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
     if not access_granted(token, resource_id):
         from sincor2.x402_payments import create_challenge
         ch = create_challenge(resource_id)
         return jsonify(ch), 402
-
     if resource_id == 'hook_status':
         try:
             from sincor2.hook_stats import fetch_hook_status
             return jsonify({'ok': True, 'resource': resource_id, 'data': fetch_hook_status()}), 200
         except Exception as e:
             return jsonify({'ok': False, 'error': str(e)}), 500
-
-    return jsonify({
-        'ok': True,
-        'resource': resource_id,
-        'message': 'Access granted. Resource handler may be extended per config/x402_pricing.yaml.',
-    }), 200
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = request.args.to_dict(flat=True)
+        payload.pop('access_token', None)
+    status, body = execute_paid_resource(resource_id, payload)
+    return jsonify(body), status
 
 
 @bp.route('/api/payment/webhook', methods=['POST'])
@@ -1403,4 +1390,3 @@ def _handle_paypal_ipn_subscription_event(ipn_data: dict):
         db.commit()
     except Exception as e:
         logger.warning(f"[PAYPAL-IPN] Could not update subscription record: {e}")
-

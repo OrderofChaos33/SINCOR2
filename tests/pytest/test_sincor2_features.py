@@ -56,6 +56,15 @@ class TestGenericAdapter:
         assert "inputModes" in skill
         assert "outputModes" in skill
 
+    def test_agent_card_exposes_base_agentkit_metadata(self):
+        adapter = self._make_adapter()
+        card = adapter.build_agent_card()
+        assert card["wallet"].startswith("0x")
+        assert card["chain_id"] == 8453
+        assert card["paymentMethods"][0]["scheme"] == "x402"
+        assert card["agentKit"]["provider"] == "coinbase-agentkit"
+        assert card["baseCommerce"]["sessionPolicy"]["gasless"] is True
+
     def test_to_flask_blueprint_serves_agent_card(self):
         adapter = self._make_adapter()
         from flask import Flask

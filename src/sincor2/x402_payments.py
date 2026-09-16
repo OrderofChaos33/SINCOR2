@@ -11,14 +11,17 @@ from typing import Any
 
 import yaml
 
+from sincor2.agent_billing import record_platform_payment
 from sincor2.platform_payments import (
     CHAIN_ID,
-    SINC,
-    SINC_DECIMALS,
-    TREASURY,
+    atomic_to_display,
     display_to_atomic,
+    token_address,
+    token_decimals,
+    TREASURY,
     verify_treasury_transfer,
 )
+from sincor2.treasury_inflow import record_inflow
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
 _CONFIG = _ROOT / "config" / "x402_pricing.yaml"
@@ -70,21 +73,36 @@ def get_resource(resource_id: str) -> dict[str, Any] | None:
     if not res:
         return None
     defaults = cfg.get("defaults") or {}
-    amount = float(res.get("amount_sinc", 1))
+    token = str(res.get("token") or defaults.get("token") or "SINC").upper()
+    if token == "AXIOM":
+        token = "AXM"
+    amount = float(
+        res.get(f"amount_{token.lower()}")
+        or res.get("amount")
+        or res.get("amount_display")
+        or res.get("amount_sinc")
+        or 1
+    )
     ttl = int(defaults.get("challenge_ttl_seconds", 900))
-    return {
+    resource = {
         "id": resource_id,
         "label": res.get("label", resource_id),
         "description": res.get("description", ""),
-        "amount_sinc": amount,
-        "amount_atomic": str(display_to_atomic(amount, "SINC")),
-        "token": defaults.get("token", "SINC"),
-        "token_address": SINC,
-        "token_decimals": SINC_DECIMALS,
-        "treasury": defaults.get("treasury", TREASURY),
-        "chain_id": int(defaults.get("chain_id", CHAIN_ID)),
+        "amount_display": amount,
+        "amount_atomic": str(display_to_atomic(amount, token)),
+        "token": token,
+        "token_address": token_address(token),
+        "token_decimals": token_decimals(token),
+        "treasury": res.get("treasury", defaults.get("treasury", TREASURY)),
+        "chain_id": int(res.get("chain_id", defaults.get("chain_id", CHAIN_ID))),
         "ttl_seconds": ttl,
+        "skill_id": str(res.get("skill_id") or ""),
     }
+    if token == "SINC":
+        resource["amount_sinc"] = amount
+    if token == "USDC":
+        resource["amount_usdc"] = amount
+    return resource
 
 
 def list_resources() -> list[dict[str, Any]]:
@@ -114,7 +132,7 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
                 challenge_id,
                 resource_id,
                 resource["amount_atomic"],
-                resource["amount_sinc"],
+                resource["amount_display"],
                 payer_wallet.lower() if payer_wallet else "",
                 now.isoformat(),
                 expires.isoformat(),
@@ -135,8 +153,9 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
         "extra": {
             "challenge_id": challenge_id,
             "token": resource["token"],
-            "amount_display": resource["amount_sinc"],
+            "amount_display": resource["amount_display"],
             "decimals": resource["token_decimals"],
+            "skill_id": resource.get("skill_id", ""),
         },
     }
 
@@ -147,7 +166,10 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
         "challenge_id": challenge_id,
         "expires_at": expires.isoformat(),
         "payment": payload,
-        "message": f"Send {resource['amount_sinc']} SINC to {resource['treasury']} on Base",
+        "message": (
+            f"Send {resource['amount_display']} {resource['token']} "
+            f"to {resource['treasury']} on Base"
+        ),
     }
 
 
@@ -178,10 +200,12 @@ def verify_challenge(
         if expires and datetime.fromisoformat(expires.replace("Z", "+00:00")) < datetime.now(timezone.utc):
             return {"ok": False, "error": "challenge_expired"}
 
+    resource = get_resource(str(row["resource_id"]))
     vr = verify_treasury_transfer(
         tx_hash,
-        token="SINC",
+        token=str((resource or {}).get("token", "SINC")),
         expected_atomic=int(row["amount_atomic"]),
+        treasury=(resource or {}).get("treasury"),
         payer_wallet=payer_wallet,
     )
     if not vr.get("ok"):
@@ -206,6 +230,86 @@ def verify_challenge(
         "access_token": access_token,
         "tx_hash": tx_hash,
         "payer_wallet": vr["payer_wallet"],
+    }
+
+
+def finalize_challenge_payment(result: dict[str, Any]) -> dict[str, Any]:
+    if not result.get("ok") or result.get("status") != "fulfilled":
+        return {}
+    resource = get_resource(str(result.get("resource_id") or ""))
+    if not resource:
+        return {}
+    token = resource["token"]
+    amount_display = float(result.get("amount_display") or resource["amount_display"])
+    payment = record_platform_payment(
+        tx_hash=str(result.get("tx_hash") or ""),
+        payer_wallet=str(result.get("payer_wallet") or ""),
+        token=token,
+        amount_atomic=int(result.get("amount_atomic") or resource["amount_atomic"]),
+        product_name=f"x402:{resource['id']}",
+        plan_id="x402",
+        payment_id=str(result.get("challenge_id") or ""),
+    )
+    inflow = record_inflow(
+        amount_display,
+        asset=token,
+        source="x402_payment",
+        usd_estimate=amount_display,
+        tx_hash=str(result.get("tx_hash") or ""),
+        note=f"x402:{resource['id']}",
+        projected=False,
+    )
+    return {
+        "payment_log": payment,
+        "treasury_inflow": inflow.to_dict() if hasattr(inflow, "to_dict") else {},
+    }
+
+
+def execute_paid_resource(resource_id: str, payload: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:
+    resource = get_resource(resource_id)
+    if not resource:
+        return 404, {"ok": False, "error": "unknown_resource"}
+    if resource.get("skill_id"):
+        from verticals.loader import instantiate_vertical_agents
+        from sincor2.vertical_dispatch import dispatch_vertical_task
+
+        input_payload = payload or {}
+        input_text = json.dumps({"payload": input_payload})
+        dispatched = dispatch_vertical_task(
+            resource["skill_id"],
+            input_text,
+            {"vertical_agents": instantiate_vertical_agents()},
+        )
+        if not dispatched:
+            return 503, {
+                "ok": False,
+                "error": "skill_unavailable",
+                "resource": resource_id,
+                "skill_id": resource["skill_id"],
+            }
+        output, error = dispatched
+        if error:
+            return 502, {
+                "ok": False,
+                "error": "skill_execution_failed",
+                "resource": resource_id,
+                "skill_id": resource["skill_id"],
+                "detail": error,
+            }
+        try:
+            execution = json.loads(output)
+        except json.JSONDecodeError:
+            execution = {"status": "success", "result": {"raw": output}}
+        return 200, {
+            "ok": True,
+            "resource": resource_id,
+            "skill_id": resource["skill_id"],
+            "execution": execution,
+        }
+    return 200, {
+        "ok": True,
+        "resource": resource_id,
+        "message": "Access granted. Resource handler may be extended per config/x402_pricing.yaml.",
     }
 
 

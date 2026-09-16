@@ -114,3 +114,7 @@ def test_agent_card_top_level_protocol_fields():
     assert card["url"].endswith("/api/a2a")
     assert card["preferredTransport"] == "JSONRPC"
     assert card["supportedInterfaces"][0]["protocolBinding"] == "JSONRPC"
+    assert card["wallet"].lower() == a2a_integration.TREASURY_WALLET.lower()
+    assert card["chain_id"] == a2a_integration.CHAIN_ID
+    assert card["paymentMethods"][0]["scheme"] == "x402"
+    assert card["agentKit"]["network"] == "base-mainnet"

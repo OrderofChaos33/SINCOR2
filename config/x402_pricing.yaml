@@ -27,3 +27,10 @@ resources:
     label: "AI content draft (disclosed)"
     amount_sinc: 2.0
     description: "One SEO/agent content draft from the content engine"
+
+  healthcare-credential-check:
+    label: "Healthcare credential status check"
+    token: USDC
+    amount_usdc: 5.0
+    description: "Paid healthcare credential verification on Base with AgentKit/x402 settlement"
+    skill_id: healthcare-credential-check

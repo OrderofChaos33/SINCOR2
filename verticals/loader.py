@@ -34,6 +34,7 @@ VERTICAL_AGENT_CLASSES: Tuple[Type[VerticalAgent], ...] = (
 SKILL_VERTICAL_MAP: Dict[str, str] = {
     "healthcare-rcm": "healthcare_rcm_agent",
     "provider-credentialing": "healthcare_rcm_agent",
+    "healthcare-credential-check": "healthcare_rcm_agent",
     "dental-ops": "dental_ops_agent",
     "dental-compliance": "dental_ops_agent",
     "regulatory-compliance": "compliance_automation_agent",
