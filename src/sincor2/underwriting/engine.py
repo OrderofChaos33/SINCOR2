@@ -71,13 +71,19 @@ def _parse_time(raw: Any) -> datetime | None:
         return None
 
 
+def _is_agent_revoked(agent_id: Any, store: UnderwriteStore | None) -> bool:
+    if not store or not isinstance(agent_id, str) or not agent_id.strip():
+        return False
+    return store.find_one("revokes", "agent_id", agent_id.strip()) is not None
+
+
 def score_mandate(payload: Dict[str, Any], store: UnderwriteStore | None = None) -> Dict[str, Any]:
     now = utcnow()
     requested = _as_float(payload.get("requested_usd") or payload.get("notional_usd"))
     cap = _as_float(payload.get("cap_usd") or payload.get("max_notional_usd") or requested)
     principal = payload.get("principal_wallet")
     agent_wallet = payload.get("agent_wallet")
-    revoked = bool(payload.get("revoked"))
+    revoked = bool(payload.get("revoked")) or _is_agent_revoked(payload.get("agent_id"), store)
     deny_reasons: list[str] = []
 
     if revoked:
@@ -154,11 +160,11 @@ class UnderwritingEngine:
             "deny_reasons": scored["deny_reasons"],
             "created_at": iso(utcnow()),
         }
-        self.store.append("mandates", record)
+        self.store.append("underwrites", record)
         return record
 
     def settle(self, envelope_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        mandate = self.store.find_one("mandates", "envelope_id", envelope_id)
+        mandate = self.store.find_one("underwrites", "envelope_id", envelope_id)
         if not mandate:
             raise KeyError(envelope_id)
         if mandate.get("decision") != "allow":

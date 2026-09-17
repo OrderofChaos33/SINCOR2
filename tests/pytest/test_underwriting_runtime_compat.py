@@ -1,7 +1,10 @@
 from datetime import timedelta
+import sys
+import types
 
-from flask import Flask
+from flask import Blueprint, Flask
 
+from sincor2 import a2a_bootstrap
 from sincor2.underwriting.blueprint import mount_underwriting
 from sincor2.underwriting.store import UnderwriteStore
 from sincor2.underwriting.types import IntentMandate, SpendEnvelope, iso, new_id, utcnow
@@ -15,6 +18,32 @@ def test_underwriting_blueprint_import_and_health_route():
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["ok"] is True
+
+
+def test_register_a2a_mounts_underwriting(monkeypatch):
+    app = Flask(__name__)
+    monkeypatch.setattr(a2a_bootstrap, "install", lambda: None)
+
+    fake_a2a = types.ModuleType("sincor2.a2a_integration")
+
+    class _Router:
+        def __init__(self):
+            self.blueprint = Blueprint("a2a", __name__)
+
+    fake_a2a.A2ARouter = _Router  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "sincor2.a2a_integration", fake_a2a)
+
+    fake_kya = types.ModuleType("sincor2.kya_bootstrap")
+    fake_kya.mount_kya_stack = lambda _app: None  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "sincor2.kya_bootstrap", fake_kya)
+
+    fake_chroma = types.ModuleType("verticals.auto_detailing.blueprint")
+    fake_chroma.register_chroma = lambda _app: None  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "verticals.auto_detailing.blueprint", fake_chroma)
+
+    assert a2a_bootstrap.register_a2a(app) is True
+    response = app.test_client().get("/v1/underwriting/health")
+    assert response.status_code == 200
 
 
 def test_store_legacy_runtime_api_with_string_root(tmp_path):
