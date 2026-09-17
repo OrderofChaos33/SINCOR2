@@ -181,15 +181,18 @@ class UnderwritingEngine:
     def settle(self, envelope_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
         mandate = self.store.find_one("underwrites", "envelope_id", envelope_id)
         envelope = None
+        legacy_mandate = None
         if mandate is None:
             envelope = self.store.find_one("envelopes", "envelope_id", envelope_id)
             if envelope is None:
+                legacy_mandate = self.store.find_one("mandates", "envelope_id", envelope_id)
+            if envelope is None and legacy_mandate is None:
                 raise KeyError(envelope_id)
         else:
             if mandate.get("decision") != "allow":
                 raise PermissionError("mandate denied")
 
-        record = mandate or envelope or {}
+        record = mandate or envelope or legacy_mandate or {}
         if record.get("status") == "revoked" or record.get("denied"):
             raise PermissionError("envelope not settleable")
 
