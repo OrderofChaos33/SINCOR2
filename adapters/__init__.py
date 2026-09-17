@@ -4,6 +4,10 @@ Provides thin wrappers so agents built with any framework (CrewAI, LangGraph,
 BeeAI, or plain Python callables) become first-class SINCOR marketplace
 participants with minimal code.
 
+All exported adapters now emit Base-native commerce metadata by default so
+cards can advertise an AgentKit wallet, sponsored session policy, and x402
+payment rails without extra per-agent boilerplate.
+
 Quick start
 -----------
     from adapters import sincor_agent

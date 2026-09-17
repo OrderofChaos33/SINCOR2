@@ -13,10 +13,26 @@
     "organization": "SINCOR2",
     "url": "https://getsincor.com"
   },
+  "wallet": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+  "chain_id": 8453,
   "capabilities": {
     "streaming": false,
     "pushNotifications": false,
-    "stateTransitionHistory": true
+    "stateTransitionHistory": true,
+    "baseCommerce": {
+      "network": "base",
+      "chainId": 8453,
+      "wallet": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+      "x402": {
+        "enabled": true,
+        "acceptedTokens": ["USDC", "SINC"],
+        "skillIds": ["provider-credentialing", "healthcare-credential-check"]
+      },
+      "sessionPolicy": {
+        "sponsored": true,
+        "gasless": true
+      }
+    }
   },
   "defaultInputModes": [
     "application/json",
@@ -83,5 +99,34 @@
       "apiKey": []
     }
   ],
-  "documentationUrl": "https://getsincor.com/docs/api"
+  "documentationUrl": "https://getsincor.com/docs/api",
+  "paymentMethods": [
+    {
+      "scheme": "x402",
+      "network": "base",
+      "chainId": 8453,
+      "acceptedTokens": ["USDC", "SINC"],
+      "payTo": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
+    }
+  ],
+  "agentKit": {
+    "provider": "coinbase-agentkit",
+    "network": "base-mainnet",
+    "walletAddress": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+    "walletCreation": {
+      "mode": "server-managed",
+      "cdpApiKeyIdEnv": "CDP_API_KEY_ID",
+      "cdpApiKeySecretEnv": "CDP_API_KEY_SECRET",
+      "walletSecretEnv": "AGENTKIT_WALLET_SECRET"
+    },
+    "actionProviders": [
+      {"id": "wallet", "network": "base-mainnet"},
+      {"id": "erc20", "network": "base-mainnet", "tokens": ["USDC", "SINC"]},
+      {"id": "x402", "network": "base-mainnet", "skills": ["provider-credentialing", "healthcare-credential-check"]}
+    ],
+    "sessionPolicy": {
+      "sponsored": true,
+      "gasless": true
+    }
+  }
 }

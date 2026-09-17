@@ -58,6 +58,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from sincor2.base_agentkit import build_base_commerce_profile
 from sincor2.onchain.constants import (
     AXIOM_TOKEN as _CANONICAL_AXIOM,
     BASE_CHAIN_ID as _CANONICAL_CHAIN_ID,
@@ -246,6 +247,11 @@ class AgentCard:
     security_requirements: List[Dict[str, Any]] = field(default_factory=list)
     documentation_url:     Optional[str] = None
     icon_url:              Optional[str] = None
+    wallet:                Optional[str] = None
+    chain_id:              Optional[int] = None
+    payment_methods:       List[Dict[str, Any]] = field(default_factory=list)
+    agentkit:              Dict[str, Any] = field(default_factory=dict)
+    base_commerce:         Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         url = (self.supported_interfaces[0].url
@@ -274,6 +280,16 @@ class AgentCard:
             d["documentationUrl"] = self.documentation_url
         if self.icon_url:
             d["iconUrl"] = self.icon_url
+        if self.wallet:
+            d["wallet"] = self.wallet
+        if self.chain_id:
+            d["chain_id"] = self.chain_id
+        if self.payment_methods:
+            d["paymentMethods"] = self.payment_methods
+        if self.agentkit:
+            d["agentKit"] = self.agentkit
+        if self.base_commerce:
+            d["baseCommerce"] = self.base_commerce
         return d
 
     # Legacy helper — returns a flat dict matching the old agent.json shape so
@@ -1041,6 +1057,12 @@ def refresh_skill_schemas() -> None:
 def build_agent_card() -> AgentCard:
     """Return the canonical SINCOR AgentCard (A2A v1.0.1) for /.well-known/agent-card.json."""
     rpc_url = f"{PLATFORM_URL}/api/a2a"
+    commerce = build_base_commerce_profile(
+        PLATFORM_NAME,
+        wallet=TREASURY_WALLET,
+        skill_ids=[skill.id for skill in SINCOR_SKILLS],
+        accepted_tokens=("AXM", "USDC", "SINC"),
+    )
     return AgentCard(
         name=PLATFORM_NAME,
         description=(
@@ -1078,6 +1100,11 @@ def build_agent_card() -> AgentCard:
         security_schemes={},
         security_requirements=[],
         documentation_url=f"{PLATFORM_URL}/docs/a2a",
+        wallet=commerce["wallet"],
+        chain_id=commerce["chain_id"],
+        payment_methods=commerce["payment_methods"],
+        agentkit=commerce["agentkit"],
+        base_commerce=commerce["base_commerce"],
     )
 
 

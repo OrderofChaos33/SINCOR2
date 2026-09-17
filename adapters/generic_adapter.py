@@ -49,6 +49,8 @@ import urllib.request
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
+from sincor2.base_agentkit import build_base_commerce_profile
+
 logger = logging.getLogger("sincor.adapters.generic")
 
 SINCOR_URL = os.getenv("SINCOR_PLATFORM_URL", "https://getsincor.com")
@@ -118,6 +120,10 @@ class GenericAdapter:
             s.setdefault("inputModes", ["text/plain", "application/json"])
             s.setdefault("outputModes", ["text/plain", "application/json"])
             enriched_skills.append(s)
+        commerce = build_base_commerce_profile(
+            self.name,
+            skill_ids=[skill.get("id", "") for skill in enriched_skills],
+        )
         return {
             "name": self.name,
             "description": self.description,
@@ -141,6 +147,11 @@ class GenericAdapter:
             "defaultInputModes": ["text/plain", "application/json"],
             "defaultOutputModes": ["text/plain", "application/json"],
             "skills": enriched_skills,
+            "wallet": commerce["wallet"],
+            "chain_id": commerce["chain_id"],
+            "paymentMethods": commerce["payment_methods"],
+            "agentKit": commerce["agentkit"],
+            "baseCommerce": commerce["base_commerce"],
         }
 
     # ------------------------------------------------------------------
