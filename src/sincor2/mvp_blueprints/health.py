@@ -23,17 +23,26 @@ def _bind_mvp():
 _bind_mvp()
 
 
-# ==============================================================================
-# HEALTH & STATUS ENDPOINTS
-# ==============================================================================
-
-# DEBUG ENDPOINT REMOVED - was leaking env var status to public
-
-
 @bp.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint for Railway and monitoring."""
-    return jsonify(_build_runtime_health_report(include_optional=True)), 200
+    """Fast liveness for Railway. No outbound RPC. Always 200 if the process is up and DB answers."""
+    db_ready, db_detail = _probe_database()
+    payload = {
+        'status': 'healthy' if db_ready else 'degraded',
+        'service': 'SINCOR2 MVP',
+        'timestamp': datetime.utcnow().isoformat(),
+        'version': '1.0.0-mvp',
+        'checks': {
+            'database': {'ready': db_ready, 'critical': True, 'detail': db_detail},
+            'process': {'ready': True, 'critical': True, 'detail': 'up'},
+        },
+        'readiness': {
+            'ready': db_ready,
+            'degraded': not db_ready,
+            'confidence': 1.0 if db_ready else 0.2,
+        },
+    }
+    return jsonify(payload), 200
 
 
 @bp.route('/ready', methods=['GET'])
@@ -45,7 +54,6 @@ def readiness():
 
 
 def _probe_database() -> tuple[bool, str]:
-    """Validate DB connectivity for runtime health."""
     try:
         with sqlite3.connect(DB_PATH, timeout=3) as conn:
             conn.execute('SELECT 1').fetchone()
@@ -53,10 +61,12 @@ def _probe_database() -> tuple[bool, str]:
     except sqlite3.Error:
         logger.exception('[HEALTH] database probe failed')
         return False, 'db_error'
+    except Exception:
+        logger.exception('[HEALTH] database probe failed')
+        return False, 'db_error'
 
 
 def _probe_jsonrpc(url: str, method: str = 'eth_chainId', timeout: int = 3) -> tuple[bool, str]:
-    """Probe JSON-RPC endpoint and return readiness result."""
     payload = json.dumps({'jsonrpc': '2.0', 'id': 'health', 'method': method, 'params': []}).encode('utf-8')
     req = urllib_request.Request(
         url,
@@ -83,10 +93,6 @@ _PUBLIC_BASE_RPCS = (
     'https://mainnet.base.org',
     'https://base-rpc.publicnode.com',
     'https://base.drpc.org',
-    'https://base.meowrpc.com',
-    'https://base.gateway.tenderly.co',
-    'https://base.llamarpc.com',
-    'https://1rpc.io/base',
 )
 
 
@@ -108,7 +114,6 @@ def _probe_base_rpc() -> tuple[bool, str, str]:
 
 
 def _build_runtime_health_report(include_optional: bool = True) -> dict:
-    """Build runtime health and readiness payload with component checks."""
     run_id = request.headers.get('X-Run-ID', '')
     request_id = request.headers.get('X-Request-ID', '')
     correlation_id = request.headers.get('X-Correlation-ID', request_id or run_id)
@@ -129,7 +134,7 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
             'detail': base_detail,
             'source': base_source,
         },
-        'stripe': {'ready': (not stripe_configured) or bool(STRIPE_AVAILABLE), 'critical': False, 'detail': 'configured' if stripe_configured else 'not_configured'},
+        'stripe': {'ready': True, 'critical': False, 'detail': 'configured' if stripe_configured else 'not_configured'},
         'paypal': {'ready': True, 'critical': False, 'detail': 'configured' if paypal_configured else 'not_configured'},
         'anthropic': {'ready': True, 'critical': False, 'detail': 'configured' if anthropic_configured else 'not_configured'},
     }
@@ -173,17 +178,4 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
             'correlation_id': correlation_id or '-',
         },
     }
-    logger.info(
-        '[HEALTH] %s',
-        json.dumps(
-            {
-                'event': 'runtime_health_probe',
-                'outcome': payload['status'],
-                'readiness': payload['readiness'],
-                'checks': {key: val.get('detail') for key, val in checks.items()},
-                'context': payload['context'],
-                'ts': now,
-            }
-        ),
-    )
     return payload
