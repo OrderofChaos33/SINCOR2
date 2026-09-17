@@ -6,6 +6,7 @@ from flask import Blueprint, Flask
 
 from sincor2 import a2a_bootstrap
 from sincor2.underwriting.blueprint import mount_underwriting
+from sincor2.underwriting.engine import score_mandate
 from sincor2.underwriting.store import UnderwriteStore
 from sincor2.underwriting.types import IntentMandate, SpendEnvelope, iso, new_id, utcnow
 
@@ -85,3 +86,35 @@ def test_store_legacy_runtime_api_with_string_root(tmp_path):
 
     store.audit("smoke", "agent-1", {"ok": True}, mandate.mandate_id, envelope.envelope_id)
     assert list(store.iter_audit())
+
+
+def test_score_mandate_denies_persisted_revoked_agent(tmp_path):
+    store = UnderwriteStore(str(tmp_path))
+    store.append(
+        "agents",
+        {
+            "agent_id": "agent-2",
+            "created_at": "2026-01-01T00:00:00Z",
+            "revoked": False,
+        },
+    )
+    store.append(
+        "revokes",
+        {
+            "agent_id": "agent-2",
+            "reason": "operator_revoke",
+            "created_at": "2026-01-01T01:00:00Z",
+        },
+    )
+    result = score_mandate(
+        {
+            "agent_id": "agent-2",
+            "principal_wallet": "0x" + "34" * 20,
+            "agent_wallet": "0x" + "12" * 20,
+            "requested_usd": "1",
+            "cap_usd": "5",
+        },
+        store,
+    )
+    assert result["decision"] == "deny"
+    assert "revoked" in result["deny_reasons"]

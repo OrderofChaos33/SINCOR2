@@ -74,7 +74,22 @@ def _parse_time(raw: Any) -> datetime | None:
 def _is_agent_revoked(agent_id: Any, store: UnderwriteStore | None) -> bool:
     if not store or not isinstance(agent_id, str) or not agent_id.strip():
         return False
-    return store.find_one("revokes", "agent_id", agent_id.strip()) is not None
+    agent_id = agent_id.strip()
+    latest_revoke: datetime | None = None
+    latest_register: datetime | None = None
+    for row in store.iter("revokes"):
+        if row.get("agent_id") != agent_id:
+            continue
+        ts = _parse_time(row.get("created_at"))
+        if ts and (latest_revoke is None or ts > latest_revoke):
+            latest_revoke = ts
+    for row in store.iter("agents"):
+        if row.get("agent_id") != agent_id:
+            continue
+        ts = _parse_time(row.get("created_at"))
+        if ts and (latest_register is None or ts > latest_register):
+            latest_register = ts
+    return latest_revoke is not None and (latest_register is None or latest_revoke >= latest_register)
 
 
 def score_mandate(payload: Dict[str, Any], store: UnderwriteStore | None = None) -> Dict[str, Any]:
@@ -173,6 +188,9 @@ class UnderwritingEngine:
         amount_usd = _as_float(body.get("amount_usd") or mandate.get("requested_usd"))
         if amount_usd <= 0:
             raise ValueError("amount_usd must be > 0")
+        cap_usd = _as_float(mandate.get("cap_usd") or mandate.get("requested_usd"))
+        if cap_usd > 0 and amount_usd > cap_usd:
+            raise PermissionError("settlement exceeds underwritten cap")
 
         underwrite_fee = amount_usd * (UNDERWRITE_BPS / 10_000.0)
         burn_fee = underwrite_fee * BURN_SHARE
