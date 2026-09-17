@@ -218,6 +218,11 @@ def register_a2a(app) -> bool:
             register_chroma(app)
         except Exception as chroma_err:
             logger.warning("CHROMA mount skipped: %s", chroma_err)
+        try:
+            from sincor2.underwriting.blueprint import mount_underwriting
+            mount_underwriting(app)
+        except Exception as underwrite_err:
+            logger.warning("Underwriting mount skipped: %s", underwrite_err)
         return True
     except Exception as err:
         logger.error("A2ARouter registration failed: %s", err)
