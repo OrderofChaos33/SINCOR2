@@ -1,1 +1,206 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR · Operations</title>
+  <link rel="icon" href="/static/sincor_favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070b14;
+      --panel: #0d1424;
+      --panel-2: #111a2e;
+      --line: rgba(148,163,184,.14);
+      --text: #e8eef8;
+      --muted: #8b97ab;
+      --cyan: #3ee0ff;
+      --good: #3dd68c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+    body { display: flex; min-height: 100vh; overflow-x: hidden; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+    .sidebar {
+      width: 232px; flex: 0 0 232px; background: #080d18;
+      border-right: 1px solid var(--line); padding: 20px 14px;
+      display: flex; flex-direction: column; gap: 18px; min-height: 100vh;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 8px; }
+    .brand img { width: 28px; height: 28px; }
+    .brand strong { font-size: 14px; letter-spacing: .04em; }
+    .plan-chip {
+      margin: 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--cyan);
+      border: 1px solid rgba(62,224,255,.35); border-radius: 999px;
+      padding: 6px 10px; background: rgba(62,224,255,.08);
+    }
+    nav { display: flex; flex-direction: column; gap: 4px; }
+    nav a { padding: 9px 10px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+    nav a.active, nav a:hover { background: var(--panel-2); color: var(--text); }
+    .sidebar .spacer { flex: 1; }
+    .sidebar .foot { font-size: 12px; color: var(--muted); padding: 8px; }
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    header.top {
+      height: 64px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px;
+    }
+    header.top h1 { font-size: 16px; font-weight: 600; }
+    header.top .meta { font-size: 12px; color: var(--muted); display: flex; gap: 16px; align-items: center; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); display: inline-block; }
+    .content { padding: 28px; display: flex; flex-direction: column; gap: 22px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 16px 18px; min-width: 0;
+    }
+    .card label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+    .card .val { font-size: 28px; font-weight: 650; letter-spacing: -.02em; }
+    .card .sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .grid-2 { display: grid; grid-template-columns: 1.4fr .8fr; gap: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+    td { padding: 10px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .status { font-size: 11px; font-weight: 600; color: var(--good); }
+    .idle { color: #c9a227; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      background: #152036; color: var(--text); border: 1px solid var(--line);
+      border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 600;
+    }
+    .btn:hover { border-color: rgba(62,224,255,.4); }
+    .btn.primary { background: var(--cyan); color: #041018; border: none; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    #toast { display: none; font-size: 13px; color: var(--muted); }
+    body.is-member [data-upsell] { display: none !important; }
+    @media (max-width: 980px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; flex: none; min-height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
+      nav { flex-direction: row; flex-wrap: wrap; }
+      .kpis, .grid-2 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .kpis, .grid-2 { grid-template-columns: 1fr; }
+      .content { padding: 16px; }
+    }
+  </style>
+</head>
+<body class="{% if is_member or session.get('plan') or session.get('membership') or session.get('paid') %}is-member{% endif %}"
+      data-plan="{{ (plan or session.get('plan') or session.get('membership') or '')|e }}">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="/static/sincor_nav_icon.png" alt="">
+      <strong>SINCOR</strong>
+    </div>
+    <div class="plan-chip" id="planChip">{{ (plan or session.get('plan') or 'Member')|e }} · Active</div>
+    <nav>
+      <a class="active" href="/dashboard">Overview</a>
+      <a href="/command-center">Agents</a>
+      <a href="/my-orders">Orders</a>
+      <a href="/billing">Billing</a>
+      <a href="/onboarding">Workspace</a>
+      <a href="/admin">Admin</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="foot"><a href="/auth/logout">Sign out</a></div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <h1>Operations console</h1>
+      <div class="meta">
+        <span><span class="dot"></span> Systems online</span>
+        <span id="clock"></span>
+      </div>
+    </header>
+    <div class="content">
+      <section class="kpis">
+        <div class="card"><label>Leads identified</label><div class="val">47</div><div class="sub">This week · stream when agents report</div></div>
+        <div class="card"><label>Outreach sent</label><div class="val">156</div><div class="sub">Today</div></div>
+        <div class="card"><label>Tasks run</label><div class="val">1,247</div><div class="sub">This week</div></div>
+        <div class="card"><label>Utilisation</label><div class="val">62%</div><div class="sub">Roster average</div></div>
+      </section>
+      <section class="grid-2">
+        <div class="card">
+          <label>Agent roster</label>
+          <table>
+            <thead><tr><th>Agent</th><th>Role</th><th>Load</th><th>State</th></tr></thead>
+            <tbody>
+              <tr><td>Scout</td><td>Discovery</td><td>84%</td><td class="status">Active</td></tr>
+              <tr><td>Outreach</td><td>Negotiator</td><td>71%</td><td class="status">Active</td></tr>
+              <tr><td>Content</td><td>Builder</td><td>63%</td><td class="status">Active</td></tr>
+              <tr><td>Social</td><td>Scheduler</td><td>22%</td><td class="idle">Idle</td></tr>
+              <tr><td>Analytics</td><td>Auditor</td><td>78%</td><td class="status">Active</td></tr>
+              <tr><td>Partnerships</td><td>Director</td><td>55%</td><td class="status">Active</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <label>Recent actions</label>
+          <table>
+            <tbody>
+              <tr><td>Scout qualified 3 leads</td><td>2m</td></tr>
+              <tr><td>Outreach sent 8 sequences</td><td>6m</td></tr>
+              <tr><td>Content published 2 posts</td><td>18m</td></tr>
+              <tr><td>Analytics flagged 2 price moves</td><td>4m</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="card">
+        <label>Workspace actions</label>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn primary" data-action="leads">Run lead sweep</button>
+          <button class="btn" data-action="campaign">Queue campaign</button>
+          <button class="btn" data-action="report">Open latest report</button>
+          <a class="btn" href="/command-center">Open command center</a>
+        </div>
+        <p id="toast" style="margin-top:12px"></p>
+      </section>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const body = document.body;
+      const plan = (body.dataset.plan || '').toLowerCase();
+      const cookie = (document.cookie.match(/sincor_plan=([^;]+)/i) || [])[1];
+      const stored = localStorage.getItem('sincor_plan');
+      const resolved = plan || (cookie || '') || (stored || '');
+      if (resolved || document.cookie.indexOf('access_token=') !== -1) {
+        body.classList.add('is-member');
+        const chip = document.getElementById('planChip');
+        if (chip && resolved) chip.textContent = resolved + ' · Active';
+      }
+      document.querySelectorAll('[data-upsell]').forEach(function (el) {
+        if (body.classList.contains('is-member')) el.remove();
+      });
+      function tick() {
+        document.getElementById('clock').textContent = new Date().toISOString().slice(11, 19) + ' UTC';
+      }
+      tick(); setInterval(tick, 1000);
+      const toast = document.getElementById('toast');
+      function say(msg) { toast.style.display = 'block'; toast.textContent = msg; }
+      document.querySelectorAll('[data-action]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const kind = btn.getAttribute('data-action');
+          btn.disabled = true;
+          try {
+            const map = { leads: '/generate-leads', campaign: '/create-campaign', report: '/api/metrics/treasury' };
+            const url = map[kind];
+            if (!url) return;
+            const res = await fetch(url, { method: kind === 'report' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' } });
+            if (res.ok) say('Request accepted. Check activity for output.');
+            else say('Endpoint returned ' + res.status + '. Runtime not attached on this path — no charge.');
+          } catch (e) {
+            say('Network error. Nothing billed.');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
