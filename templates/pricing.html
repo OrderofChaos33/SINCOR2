@@ -76,6 +76,15 @@
             max-width: 560px;
             margin: 0 auto 12px;
         }
+        .hero-note {
+            margin: 14px auto 0;
+            max-width: 760px;
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+        .hero-note a { color: var(--purple-light); text-decoration: none; }
+        .hero-note a:hover { color: #fff; }
 
         .pricing-section {
             max-width: 900px;
@@ -85,7 +94,7 @@
 
         .pricing-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 24px;
             margin-bottom: 48px;
         }
@@ -283,47 +292,51 @@
 
     <div class="hero">
         <div class="hero-eyebrow">Simple, Honest Pricing</div>
-        <h1>Know What Your Competitors<br>Are Doing for <span>$49</span></h1>
-        <p>One-time competitive report or stay ahead every month. No fluff, no enterprise BS â€” just actionable intelligence.</p>
+        <h1>Regulated Vertical Packs That<br>Ship <span>Cash Inflow</span></h1>
+        <p>Healthcare credentialing + RCM and compliance/SBOM packs priced for immediate B2B deployment.</p>
+        <p class="hero-note">Wallet rail is live (USDC on Base to treasury <code>0x09E289…12Ac</code>). Card rail remains blocked (<code>/health stripe=not_configured</code>). Use <a href="/buy#b2b-packs">/buy</a> for paid inquiry + checkout desk.</p>
     </div>
 
     <div class="pricing-section">
         <div class="pricing-grid">
-            <!-- One-Time Report -->
             <div class="plan-card">
-                <div class="plan-name">One-Time Report</div>
-                <div class="plan-price"><sup>$</sup>49</div>
-                <div class="plan-cadence">one-time Â· delivered within 24 hours</div>
-                <div class="plan-desc">Get a full competitive intelligence report on your market. See what your top 3â€“5 competitors are doing and where the gaps are.</div>
+                <div class="plan-name">Credentialing Launch</div>
+                <div class="plan-price"><sup>$</sup>297</div>
+                <div class="plan-cadence">one-time Â· KYA / Adapter</div>
+                <div class="plan-desc">Fast-start healthcare credentialing intake and adapter setup for first paid workflow.</div>
                 <ul class="plan-features">
-                    <li><span class="chk">âœ“</span>Top 3â€“5 competitors analyzed</li>
-                    <li><span class="chk">âœ“</span>Pricing comparison</li>
-                    <li><span class="chk">âœ“</span>Review &amp; reputation breakdown</li>
-                    <li><span class="chk">âœ“</span>Online presence &amp; SEO snapshot</li>
-                    <li><span class="chk">âœ“</span>Marketing &amp; social media activity</li>
-                    <li><span class="chk">âœ“</span>3 clear opportunities to act on</li>
-                    <li><span class="chk">âœ“</span>PDF report delivered by email</li>
+                    <li><span class="chk">âœ“</span>Provider credentialing workflow kickoff</li>
+                    <li><span class="chk">âœ“</span>RCM intake checklist + scope lock</li>
+                    <li><span class="chk">âœ“</span>Pilot inquiry path in under 1 day</li>
                 </ul>
-                <a href="/buy?plan=report" class="btn-plan btn-plan-outline">Get My Report — pay in AXM</a>
+                <a href="/buy#b2b-packs" class="btn-plan btn-plan-outline">Start KYA / Adapter</a>
             </div>
 
-            <!-- Monthly Subscription -->
             <div class="plan-card featured">
                 <div class="plan-badge">Best Value</div>
-                <div class="plan-name">Monthly Intelligence</div>
-                <div class="plan-price"><sup>$</sup>149</div>
-                <div class="plan-cadence">per month Â· cancel anytime</div>
-                <div class="plan-desc">Stay ahead of your market every month. Fresh competitive intel so you always know what's changing and can move before your competitors do.</div>
+                <div class="plan-name">Compliance Operations</div>
+                <div class="plan-price"><sup>$</sup>997</div>
+                <div class="plan-cadence">one-time Â· CHROMA</div>
+                <div class="plan-desc">Compliance sequence buildout with SBOM-ready artifacts and outbound deliverable samples.</div>
                 <ul class="plan-features">
-                    <li><span class="chk">âœ“</span>Everything in the one-time report</li>
-                    <li><span class="chk">âœ“</span>Fresh report delivered monthly</li>
-                    <li><span class="chk">âœ“</span>Track competitor changes over time</li>
-                    <li><span class="chk">âœ“</span>New competitor alerts (if someone enters your market)</li>
-                    <li><span class="chk">âœ“</span>Pricing trend analysis</li>
-                    <li><span class="chk">âœ“</span>Priority email support</li>
-                    <li><span class="chk">âœ“</span>Cancel anytime, no lock-in</li>
+                    <li><span class="chk">âœ“</span>Compliance SBOM skill activation</li>
+                    <li><span class="chk">âœ“</span>Outbound sequence templates included</li>
+                    <li><span class="chk">âœ“</span>Delivery artifacts for pilot sign-off</li>
                 </ul>
-                <a href="/buy?plan=intel" class="btn-plan btn-plan-primary">Start Monthly Intel — pay in SINC</a>
+                <a href="/buy#b2b-packs" class="btn-plan btn-plan-primary">Start CHROMA Pack</a>
+            </div>
+
+            <div class="plan-card">
+                <div class="plan-name">SADAS Execution</div>
+                <div class="plan-price"><sup>$</sup>2,997</div>
+                <div class="plan-cadence">one-time Â· strategic deployment</div>
+                <div class="plan-desc">Deep pilot for regulated operations where fees route to treasury and fund liquidity + TOA compute.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">âœ“</span>Higher-touch pilot onboarding</li>
+                    <li><span class="chk">âœ“</span>Compliance and fulfillment handoff</li>
+                    <li><span class="chk">âœ“</span>Clear paid inquiry path to close</li>
+                </ul>
+                <a href="/buy#b2b-packs" class="btn-plan btn-plan-outline">Start SADAS Pack</a>
             </div>
         </div>
 
@@ -418,4 +431,3 @@
     </div>
 </body>
 </html>
-

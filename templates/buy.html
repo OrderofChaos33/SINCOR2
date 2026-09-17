@@ -90,6 +90,34 @@
             padding: 16px;
             border-radius: 10px;
         }
+        .rail-note {
+            max-width: 860px;
+            margin: 0 auto 24px;
+            padding: 20px 24px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--surface);
+            line-height: 1.6;
+            color: var(--muted);
+        }
+        .rail-note strong { color: var(--text); }
+        .rail-note code { color: var(--purple-light); }
+        .b2b-grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .b2b-pack {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface2);
+            padding: 14px;
+        }
+        .b2b-pack h4 { font-size: 14px; margin-bottom: 4px; color: var(--text); }
+        .b2b-pack p { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+        .b2b-pack a { font-size: 12px; color: var(--purple-light); text-decoration: none; }
+        .b2b-pack a:hover { color: #fff; }
 
         .plans-wrap {
             max-width: 860px;
@@ -265,6 +293,29 @@
     </div>
 
     <div id="payment-status"></div>
+
+    <div class="rail-note" id="b2b-packs">
+        <strong>B2B vertical checkout desk (live):</strong> Wallet rail is live via <strong>USDC on Base</strong> to treasury
+        <code>0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac</code>.
+        Card rail is currently blocked (<code>/health</code> shows <code>stripe=not_configured</code>).
+        <div class="b2b-grid">
+            <div class="b2b-pack">
+                <h4>KYA / Adapter — $297</h4>
+                <p>Credentialing intake + adapter setup for first regulated workflow.</p>
+                <a href="mailto:support@getsincor.com?subject=KYA%20Adapter%20pilot%20%24297">Start paid inquiry →</a>
+            </div>
+            <div class="b2b-pack">
+                <h4>CHROMA — $997</h4>
+                <p>Compliance-ready outreach sequence + sample deliverable pack.</p>
+                <a href="mailto:support@getsincor.com?subject=CHROMA%20pilot%20%24997">Start paid inquiry →</a>
+            </div>
+            <div class="b2b-pack">
+                <h4>SADAS — $2,997</h4>
+                <p>Higher-touch compliance/SBOM operating pack with pilot onboarding.</p>
+                <a href="mailto:support@getsincor.com?subject=SADAS%20pilot%20%242997">Start paid inquiry →</a>
+            </div>
+        </div>
+    </div>
 
     <div class="plans-wrap">
 

@@ -70,6 +70,18 @@
       "freeQuota": 0
     },
     {
+      "id": "compliance-sbom",
+      "name": "Compliance SBOM & Regulatory Filing",
+      "description": "Generate SBOM artefacts, run licence checks, and produce filing-ready compliance packs.",
+      "tags": ["compliance", "sbom", "regulatory", "b2b"],
+      "examples": ["Generate an SBOM and compliance pack for a production release."],
+      "inputModes": ["text/plain", "application/json"],
+      "outputModes": ["application/json"],
+      "sincPrice": 5,
+      "estimatedLatencySeconds": 60,
+      "freeQuota": 0
+    },
+    {
       "id": "market-forecast",
       "name": "Market Forecast & Scenario Planning",
       "description": "Forward-looking forecasts with Monte Carlo simulations and what-if modelling.",
