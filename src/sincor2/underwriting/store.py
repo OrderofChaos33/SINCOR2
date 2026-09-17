@@ -1,4 +1,4 @@
-"""Append-only JSONL store for agents, mandates, receipts, revokes."""
+"""Append-only JSONL store for underwriting runtime + /v1 engine."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import os
 import threading
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
+
+from .types import AuditEvent, IntentMandate, SpendEnvelope, iso, parse_iso, utcnow
 
 
 def _default_dir() -> Path:
@@ -17,7 +19,7 @@ def _default_dir() -> Path:
 
 
 class UnderwriteStore:
-    def __init__(self, root: Optional[Path] = None) -> None:
+    def __init__(self, root: str | os.PathLike[str] | None = None) -> None:
         self.root = Path(root) if root else _default_dir()
         self.root.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
@@ -55,3 +57,67 @@ class UnderwriteStore:
             if rec.get(key) == value:
                 last = rec
         return last
+
+    # Runtime compatibility API (tap/ledger_sim services depend on these methods).
+    def write_mandate(self, mandate: IntentMandate) -> IntentMandate:
+        self.append("mandates", mandate.to_dict())
+        return mandate
+
+    def get_mandate(self, mandate_id: str) -> IntentMandate | None:
+        rec = self.find_one("mandates", "mandate_id", mandate_id)
+        if not rec:
+            return None
+        return IntentMandate.from_dict(rec)
+
+    def active_mandate_for(self, agent_id: str) -> IntentMandate | None:
+        now = utcnow()
+        latest: IntentMandate | None = None
+        for rec in self.iter("mandates"):
+            if rec.get("agent_id") != agent_id:
+                continue
+            try:
+                mandate = IntentMandate.from_dict(rec)
+            except Exception:
+                continue
+            if mandate.killed:
+                continue
+            try:
+                if parse_iso(mandate.expires_at) <= now:
+                    continue
+            except Exception:
+                continue
+            latest = mandate
+        return latest
+
+    def write_envelope(self, envelope: SpendEnvelope) -> SpendEnvelope:
+        self.append("envelopes", envelope.to_dict())
+        return envelope
+
+    def get_envelope(self, envelope_id: str) -> SpendEnvelope | None:
+        rec = self.find_one("envelopes", "envelope_id", envelope_id)
+        if not rec:
+            return None
+        return SpendEnvelope.from_dict(rec)
+
+    def audit(
+        self,
+        kind: str,
+        agent_id: str,
+        payload: Dict[str, Any],
+        mandate_id: str | None = None,
+        envelope_id: str | None = None,
+    ) -> Dict[str, Any]:
+        ev = AuditEvent(
+            event_id=f"audit-{os.urandom(8).hex()}",
+            ts=iso(utcnow()),
+            kind=kind,
+            agent_id=agent_id,
+            payload=payload,
+            mandate_id=mandate_id,
+            envelope_id=envelope_id,
+        ).to_dict()
+        self.append("audit", ev)
+        return ev
+
+    def iter_audit(self) -> Iterable[Dict[str, Any]]:
+        return self.iter("audit")
