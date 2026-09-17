@@ -88,7 +88,8 @@ def settle(envelope_id: str):
 def revoke_envelope(envelope_id: str):
     body = request.get_json(silent=True) or {}
     mandate = _engine.store.find_one("underwrites", "envelope_id", envelope_id)
-    agent_id = str((body.get("agent_id") or (mandate or {}).get("agent_id") or ""))
+    envelope = _engine.store.find_one("envelopes", "envelope_id", envelope_id)
+    agent_id = str((body.get("agent_id") or (mandate or {}).get("agent_id") or (envelope or {}).get("agent_id") or ""))
     try:
         rec = _engine.revoke(agent_id, str(body.get("reason") or "revoke"))
         return jsonify(rec)

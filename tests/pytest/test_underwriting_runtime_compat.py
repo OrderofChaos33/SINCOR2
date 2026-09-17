@@ -118,3 +118,57 @@ def test_score_mandate_denies_persisted_revoked_agent(tmp_path):
     )
     assert result["decision"] == "deny"
     assert "revoked" in result["deny_reasons"]
+
+
+def test_score_mandate_denies_when_requested_exceeds_cap():
+    result = score_mandate(
+        {
+            "agent_id": "agent-3",
+            "principal_wallet": "0x" + "34" * 20,
+            "agent_wallet": "0x" + "12" * 20,
+            "requested_usd": "6",
+            "cap_usd": "5",
+        }
+    )
+    assert result["decision"] == "deny"
+    assert "exceeds cap" in result["deny_reasons"]
+
+
+def test_score_mandate_allows_after_reregistering_post_revoke(tmp_path):
+    store = UnderwriteStore(str(tmp_path))
+    store.append(
+        "agents",
+        {
+            "agent_id": "agent-4",
+            "created_at": "2026-01-01T00:00:00Z",
+            "revoked": False,
+        },
+    )
+    store.append(
+        "revokes",
+        {
+            "agent_id": "agent-4",
+            "reason": "operator_revoke",
+            "created_at": "2026-01-01T01:00:00Z",
+        },
+    )
+    store.append(
+        "agents",
+        {
+            "agent_id": "agent-4",
+            "created_at": "2026-01-01T02:00:00Z",
+            "revoked": False,
+        },
+    )
+    result = score_mandate(
+        {
+            "agent_id": "agent-4",
+            "principal_wallet": "0x" + "34" * 20,
+            "agent_wallet": "0x" + "12" * 20,
+            "requested_usd": "1",
+            "cap_usd": "5",
+        },
+        store,
+    )
+    assert result["decision"] == "allow"
+    assert "revoked" not in result["deny_reasons"]

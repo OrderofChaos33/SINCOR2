@@ -180,15 +180,28 @@ class UnderwritingEngine:
 
     def settle(self, envelope_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
         mandate = self.store.find_one("underwrites", "envelope_id", envelope_id)
-        if not mandate:
-            raise KeyError(envelope_id)
-        if mandate.get("decision") != "allow":
-            raise PermissionError("mandate denied")
+        envelope = None
+        if mandate is None:
+            envelope = self.store.find_one("envelopes", "envelope_id", envelope_id)
+            if envelope is None:
+                raise KeyError(envelope_id)
+        else:
+            if mandate.get("decision") != "allow":
+                raise PermissionError("mandate denied")
 
-        amount_usd = _as_float(body.get("amount_usd") or mandate.get("requested_usd"))
+        record = mandate or envelope or {}
+        if record.get("status") == "revoked" or record.get("denied"):
+            raise PermissionError("envelope not settleable")
+
+        amount_usd = _as_float(body.get("amount_usd") or record.get("requested_usd") or record.get("amount_usd"))
         if amount_usd <= 0:
             raise ValueError("amount_usd must be > 0")
-        cap_usd = _as_float(mandate.get("cap_usd") or mandate.get("requested_usd"))
+        cap_usd = _as_float(
+            record.get("cap_usd")
+            or record.get("requested_usd")
+            or record.get("max_tx_usd")
+            or record.get("amount_usd")
+        )
         if cap_usd > 0 and amount_usd > cap_usd:
             raise PermissionError("settlement exceeds underwritten cap")
 
@@ -199,8 +212,8 @@ class UnderwritingEngine:
         receipt = {
             "receipt_id": str(uuid4()),
             "envelope_id": envelope_id,
-            "agent_id": mandate.get("agent_id"),
-            "payer": body.get("payer") or mandate.get("principal_wallet"),
+            "agent_id": record.get("agent_id"),
+            "payer": body.get("payer") or record.get("principal_wallet"),
             "payee": body.get("payee") or TREASURY,
             "amount_usd": round(amount_usd, 6),
             "verify_fee_axm": VERIFY_FEE_AXM,
