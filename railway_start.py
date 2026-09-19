@@ -1,16 +1,8 @@
-"""Railway / Gunicorn entry. Zero SINCOR imports at module load.
-
-Gunicorn imports this file, then binds PORT. /health is served from this
-function with the stdlib only. sincor2.mvp_app is imported on the first
-non-liveness request so a crash or OOM during that import cannot make
-the replica fail Railway's healthcheck.
-"""
+"""Railway / Gunicorn entry. Zero SINCOR imports at module load."""
 from __future__ import annotations
 
 _LIVENESS = {"/health", "/api/health", "/healthz", "/ready"}
-_HEALTH = (
-    b'{"status":"healthy","service":"SINCOR2 MVP","entry":"railway_start"}'
-)
+_HEALTH = b'{"status":"healthy","service":"SINCOR2 MVP","entry":"railway_start"}'
 _full = None
 _full_error = None
 
@@ -18,6 +10,7 @@ _full_error = None
 def wsgi(environ, start_response):
     global _full, _full_error
     path = environ.get("PATH_INFO") or "/"
+    path = path.split("?", 1)[0]
     if path != "/" and path.endswith("/"):
         path = path.rstrip("/")
     if path in _LIVENESS:
@@ -38,9 +31,7 @@ def wsgi(environ, start_response):
             _full = full
         except Exception as exc:
             _full_error = str(exc)
-            body = (
-                b'{"status":"degraded","service":"SINCOR2 MVP","error":"mvp_app import failed"}'
-            )
+            body = b'{"status":"degraded","service":"SINCOR2 MVP","error":"mvp_app import failed"}'
             start_response(
                 "200 OK",
                 [("Content-Type", "application/json"), ("Content-Length", str(len(body)))],
@@ -58,5 +49,4 @@ def wsgi(environ, start_response):
     return [body]
 
 
-# Gunicorn looks up railway_start:app
 app = wsgi
