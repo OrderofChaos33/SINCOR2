@@ -1,0 +1,41 @@
+name: Truthful metrics
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "TOKEN_CANON.json"
+      - "src/sincor2/metrics_freshness.py"
+      - "src/sincor2/onchain/live_snapshot.py"
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check snapshot age and holder sanity
+        env:
+          PYTHONPATH: src:.
+        run: |
+          python - <<'PY'
+          import json, sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+          canon = json.loads(Path("TOKEN_CANON.json").read_text())
+          verified = datetime.fromisoformat(canon["verified_at"].replace("Z","+00:00"))
+          age = (datetime.now(timezone.utc) - verified).total_seconds()
+          holders = int(canon["sinc"]["onchain_as_of_lock"]["holders"])
+          print("lock_version", canon["lock_version"], "age_h", round(age/3600,2), "holders", holders)
+          if holders < 1000:
+              sys.exit("canon holder count is dead data")
+          if age > 24*3600:
+              print("WARNING: committed snapshot older than 24h — runtime /api/metrics/freshness must refresh live")
+          PY
