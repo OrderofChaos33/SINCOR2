@@ -24,3 +24,9 @@ _bind_mvp()
 
 GENESIS_COOKIE = "sincor_genesis"
 GENESIS_LAUNCH_AT = "2026-09-26T16:00:00.000Z"
+
+
+@bp.route("/")
+def index():
+    """Public landing. Must live on mvp_app's blueprint — sincor2.app is not the Railway entry."""
+    return render_template("home.html")
