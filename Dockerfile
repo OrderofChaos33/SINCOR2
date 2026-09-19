@@ -36,8 +36,8 @@ RUN mkdir -p /data && chown -R appuser:appuser /data /home/appuser/.local
 
 USER appuser
 
-# Healthcheck uses the real PORT at runtime
+# Liveness only. /ready does outbound RPC and can 503; do not use it as a deploy gate.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD python -c "import os, urllib.request; port=os.environ.get('PORT','8080'); urllib.request.urlopen(f'http://localhost:{port}/health', timeout=5); urllib.request.urlopen(f'http://localhost:{port}/ready', timeout=5)" || exit 1
+    CMD python -c "import os, urllib.request; port=os.environ.get('PORT','8080'); urllib.request.urlopen(f'http://localhost:{port}/health', timeout=5)" || exit 1
 
 CMD ["python", "-m", "gunicorn", "sincor2.mvp_app:app", "--config", "gunicorn.conf.py"]
