@@ -9,6 +9,6 @@
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5,
-    "startCommand": "python -m gunicorn sincor2.wsgi:app --config gunicorn.conf.py"
+    "startCommand": "python -m gunicorn railway_start:app --config gunicorn.conf.py --bind 0.0.0.0:${PORT:-8080}"
   }
 }

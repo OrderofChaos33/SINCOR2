@@ -25,7 +25,7 @@ RUN useradd -m -u 1000 appuser
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
 ENV PATH=/home/appuser/.local/bin:$PATH \
-    PYTHONPATH=/app/src \
+    PYTHONPATH=/app:/app/src \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080 \
@@ -36,8 +36,7 @@ RUN mkdir -p /data && chown -R appuser:appuser /data /home/appuser/.local
 
 USER appuser
 
-# Liveness only. Entry is sincor2.wsgi:app so /health binds before mvp_app import.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import os, urllib.request; port=os.environ.get('PORT','8080'); urllib.request.urlopen(f'http://localhost:{port}/health', timeout=5)" || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import os,urllib.request; p=os.environ.get('PORT','8080'); urllib.request.urlopen('http://127.0.0.1:%s/health'%p, timeout=3)"
 
-CMD ["python", "-m", "gunicorn", "sincor2.wsgi:app", "--config", "gunicorn.conf.py"]
+CMD ["python", "-m", "gunicorn", "railway_start:app", "--config", "gunicorn.conf.py"]
