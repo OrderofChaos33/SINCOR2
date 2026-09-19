@@ -150,3 +150,12 @@ coverage.xml
 .grok-revert-marker
 REVERT_MARKER.txt
 REVERT_COMMIT.txt
+
+# Agent / IDE plugin debris — never commit
+.agents/
+.agent/
+.cursor/
+.grok/
+
+# Local on-chain cache
+.onchain-cache.json

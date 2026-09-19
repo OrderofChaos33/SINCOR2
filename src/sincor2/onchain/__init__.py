@@ -29,6 +29,7 @@ from .constants import (
 )
 from .probe import TokenProbe, TokenProbeReport, validate_at_startup
 from .epoch_commitment_pipeline import EpochCommitmentEnvelope, EpochStateCommitmentPipeline
+from .live_snapshot import attach_official_price_fields, fetch_live_onchain
 
 __all__ = [
     "AXIOM_TOKEN",
@@ -57,4 +58,6 @@ __all__ = [
     "validate_at_startup",
     "EpochCommitmentEnvelope",
     "EpochStateCommitmentPipeline",
+    "attach_official_price_fields",
+    "fetch_live_onchain",
 ]
