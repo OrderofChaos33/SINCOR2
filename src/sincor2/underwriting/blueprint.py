@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, redirect, request, session
 
 from sincor2.underwriting.engine import (
     AXM,
@@ -124,3 +124,48 @@ def get_receipt(receipt_id: str):
 @uw_bp.get("/v1/receipts")
 def list_receipts():
     return jsonify({"receipts": _engine.list_receipts()})
+
+
+@uw_bp.get("/underwrite/demo")
+def underwrite_demo():
+    from sincor2.underwriting.runtime import boot
+    from sincor2.underwriting.viewer import render_demo
+
+    rt = boot()
+    return render_demo(rt.store), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@uw_bp.get("/underwrite/complete")
+def underwrite_complete():
+    """Demo completion → canon checkout. Human path is /buy (USDC fallback lives there)."""
+    plan = (request.args.get("plan") or "starter").strip().lower()
+    if plan not in {"starter", "professional", "enterprise"}:
+        plan = "starter"
+    session["underwrite_demo_complete"] = True
+    return redirect(f"/buy?plan={plan}&src=underwrite_demo")
+
+
+@uw_bp.get("/v1/plans/gate")
+def plan_gate_status():
+    from sincor2.plan_gate import allow
+
+    plan = request.args.get("plan") or session.get("plan")
+    feature = request.args.get("feature") or "starter_agents"
+    gate = allow(plan, feature)
+    return jsonify(gate.__dict__)
+
+
+@uw_bp.get("/.well-known/trust-stack.json")
+def trust_stack():
+    return jsonify({
+        "canonical": {
+            "registration": "kya_registry",
+            "reputation": "underwriting_score_engine",
+            "credentials": "kya_erc8004",
+            "settlement": "axm_x402",
+            "public_badge": "agent_passport_genesis_nft",
+        },
+        "doc": "/docs/TRUST_STACK.md",
+        "demo_to_checkout": "/underwrite/complete?plan=starter",
+        "price_api": "https://getsincor.com/api/price/official",
+    })
