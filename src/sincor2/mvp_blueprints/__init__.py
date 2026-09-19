@@ -16,40 +16,28 @@ def register_mvp_blueprints(app: Flask) -> None:
     from sincor2.mvp_blueprints.launch import bp as launch_bp
     from sincor2.mvp_blueprints.admin import bp as admin_bp
     from sincor2.mvp_blueprints.wardrobe import bp as wardrobe_bp
+    from sincor2.mvp_blueprints.genesis import bp as genesis_bp
 
     app.register_blueprint(health_alias_bp)
 
     for bp in (
-        health_bp,
-        ops_bp,
-        auth_bp,
-        billing_bp,
-        pages_bp,
-        webbuilder_bp,
-        sinc_bp,
-        launch_bp,
-        admin_bp,
-        wardrobe_bp,
+        health_bp, ops_bp, auth_bp, billing_bp, pages_bp, webbuilder_bp,
+        sinc_bp, launch_bp, admin_bp, wardrobe_bp, genesis_bp,
     ):
         app.register_blueprint(bp)
 
     try:
         from sincor2.mvp_blueprints.freshness import bp as freshness_bp
-
         app.register_blueprint(freshness_bp)
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         print(f"Freshness blueprint not available: {exc}")
-
     try:
         from verticals.auto_detailing.blueprint import register_chroma
-
         register_chroma(app)
-    except Exception as exc:  # pragma: no cover - platform still boots without CHROMA
+    except Exception as exc:
         print(f"CHROMA blueprint not available: {exc}")
-
     try:
         from sincor2.underwriting.blueprint import mount_underwriting
-
         mount_underwriting(app)
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         print(f"Underwriting blueprint not available: {exc}")
