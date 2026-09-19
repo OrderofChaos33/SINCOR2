@@ -36,8 +36,8 @@ RUN mkdir -p /data && chown -R appuser:appuser /data /home/appuser/.local
 
 USER appuser
 
-# Liveness only. /ready does outbound RPC and can 503; do not use it as a deploy gate.
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+# Liveness only. Entry is sincor2.wsgi:app so /health binds before mvp_app import.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import os, urllib.request; port=os.environ.get('PORT','8080'); urllib.request.urlopen(f'http://localhost:{port}/health', timeout=5)" || exit 1
 
-CMD ["python", "-m", "gunicorn", "sincor2.mvp_app:app", "--config", "gunicorn.conf.py"]
+CMD ["python", "-m", "gunicorn", "sincor2.wsgi:app", "--config", "gunicorn.conf.py"]
