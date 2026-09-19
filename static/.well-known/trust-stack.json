@@ -1,0 +1,12 @@
+{
+  "canonical": {
+    "registration": "kya_registry",
+    "reputation": "underwriting_score_engine",
+    "credentials": "kya_erc8004",
+    "settlement": "axm_x402",
+    "public_badge": "agent_passport_genesis_nft"
+  },
+  "doc": "/docs/TRUST_STACK.md",
+  "demo_to_checkout": "/underwrite/complete?plan=starter",
+  "price_api": "https://getsincor.com/api/price/official"
+}
