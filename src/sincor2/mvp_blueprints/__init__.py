@@ -5,6 +5,7 @@ from flask import Flask
 
 
 def register_mvp_blueprints(app: Flask) -> None:
+    from sincor2.mvp_blueprints.health_aliases import bp as health_alias_bp
     from sincor2.mvp_blueprints.health import bp as health_bp
     from sincor2.mvp_blueprints.ops import bp as ops_bp
     from sincor2.mvp_blueprints.auth import bp as auth_bp
@@ -15,6 +16,8 @@ def register_mvp_blueprints(app: Flask) -> None:
     from sincor2.mvp_blueprints.launch import bp as launch_bp
     from sincor2.mvp_blueprints.admin import bp as admin_bp
     from sincor2.mvp_blueprints.wardrobe import bp as wardrobe_bp
+
+    app.register_blueprint(health_alias_bp)
 
     for bp in (
         health_bp,
