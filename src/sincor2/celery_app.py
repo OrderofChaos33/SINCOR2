@@ -47,7 +47,13 @@ celery.conf.update(
     task_default_delivery_mode=2,
     result_expires=86400,
     broker_connection_retry_on_startup=True,
-    include=["sincor2.async_tasks"],
+    beat_schedule={
+        "refresh-onchain-snapshot-hourly": {
+            "task": "sincor2.onchain.tasks.refresh_onchain_snapshot",
+            "schedule": 3600.0,
+        },
+    },
+    include=["sincor2.async_tasks", "sincor2.onchain.tasks"],
 )
 
 

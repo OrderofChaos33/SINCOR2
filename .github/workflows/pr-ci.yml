@@ -13,6 +13,10 @@ on:
       - ".github/workflows/pr-ci.yml"
       - "requirements.txt"
       - "pyproject.toml"
+      - "TOKEN_CANON.json"
+      - "TOKEN_CANON.md"
+      - "launch_content_engine/**"
+      - "templates/**"
   workflow_dispatch:
 
 permissions:
@@ -29,19 +33,20 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install ruff flask flask-jwt-extended flask-limiter python-dotenv
+          pip install ruff pytest
+          pip install -r requirements.txt
       - name: Ruff
         run: ruff check src/sincor2/mvp_app.py src/sincor2/mvp_blueprints src/sincor2/a2a_inbound.py src/sincor2/contract_net.py tests/pytest/test_a2a_inbound.py
-      - name: Pytest (inbound + contract-net + P0 4/5/6)
+      - name: Pytest (inbound + money surface + boot pin)
         env:
-          PYTHONPATH: src
+          PYTHONPATH: src:.
           FLASK_ENV: test
           ENVIRONMENT: test
           JWT_SECRET_KEY: test-jwt-secret-key-32-char-minimum-ok
           ADMIN_USERNAME: admin
           ADMIN_PASSWORD: admin-password-32-char-minimum-ok
           SINCOR_TASK_QUEUE: eager
-        run: python -m pytest tests/pytest/test_a2a_inbound.py tests/pytest/test_mvp_p0_456.py -q
+        run: python -m pytest tests/pytest/test_a2a_inbound.py tests/pytest/test_mvp_p0_456.py tests/pytest/test_onchain_constants.py tests/pytest/test_live_onchain_snapshot.py tests/pytest/test_import_all_and_http_smoke.py -q
 
   forge:
     runs-on: ubuntu-latest
@@ -55,4 +60,12 @@ jobs:
             forge build --sizes
           else
             echo "onchain/lib not vendored — skipping forge build (V4 hook is source-only until libs are installed)"
+          fi
+      - name: forge test (when libs present)
+        working-directory: onchain
+        run: |
+          if [ -d lib/forge-std ] || [ -d lib/v4-core ]; then
+            forge test --no-match-path '*fork*' -q
+          else
+            echo "onchain/lib not vendored — skipping forge test"
           fi
