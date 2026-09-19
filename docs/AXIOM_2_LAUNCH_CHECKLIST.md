@@ -11,7 +11,7 @@ Locked 2026-09-10. Runtime source: `src/sincor2/onchain/constants.py`. One sourc
 | Role | Address | Status |
 |---|---|---|
 | AXM | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | LIVE — sole A2A settlement |
-| SINC | `0xe1D836087F6573b665d25CE088793E916D7892f8` | LIVE — 8 decimals, $0.15 floor. 1 holder / 0 transfers: do not market float |
+| SINC | `0xe1D836087F6573b665d25CE088793E916D7892f8` | LIVE — 8 decimals, $0.15 floor. Basescan 2026-09-19: 3,455 holders / Transfers widget 0. Do not market audited float |
 | Treasury | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | LIVE |
 | USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | LIVE |
 | Uniswap v4 PoolManager | `0x498581fF718922c3f8e6A244956aF099B2652b2b` | Infra |

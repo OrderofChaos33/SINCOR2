@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Genesis — The Agent Economy, Licensed</title>
+  <meta property="og:title" content="SINCOR Genesis — The Agent Economy, Licensed">
+  <meta property="og:description" content="Apply for Agent License 000001–001000. Verified on-chain. Settles via x402.">
+  <meta property="og:image" content="https://getsincor.com/static/genesis-og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <style>
+    :root { --ink:#f2ead4; --rule:#c4b48a; --bg:#0b0c0a; --dim:#9a917c; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--ink); font-family: "Courier New", Courier, monospace; min-height:100vh; }
+    main { max-width:720px; margin:0 auto; padding:48px 24px 80px; }
+    h1 { font-size:28px; letter-spacing:.02em; margin:24px 0 16px; }
+    .frame { border:1px solid var(--rule); padding:28px; }
+    button { background:transparent; color:var(--ink); border:1px solid var(--rule); padding:12px 18px; cursor:pointer; font:inherit; }
+    input { width:100%; background:#16140f; color:var(--ink); border:1px solid #5c5748; padding:10px; margin:12px 0 16px; font:inherit; }
+    .stats { display:flex; gap:16px; margin:24px 0; font-size:13px; color:var(--dim); }
+    .counter { margin:16px 0; color:var(--rule); }
+    footer { margin-top:48px; font-size:12px; color:var(--dim); }
+    a { color:var(--rule); }
+  </style>
+</head>
+<body>
+  <main class="frame">
+    <div>FORM GEN-001 · BASE 8453</div>
+    <h1>The Agent Economy now requires a license.</h1>
+    <p class="counter" id="licenses-left">1000 of 1,000 priority licenses remain</p>
+    <div class="stats">
+      <div>signups <span id="stat-signups">—</span></div>
+      <div>verifications <span id="stat-verifications">—</span></div>
+      <div>holders <span id="stat-holders">—</span></div>
+    </div>
+    <form id="apply-form">
+      <label for="email">Operator email</label>
+      <input id="email" name="email" type="email" required placeholder="agent@domain.tld">
+      <button type="submit">Apply for Agent License</button>
+    </form>
+    <pre id="result"></pre>
+  </main>
+  <footer>
+    Status: <a href="https://healthchecks.io/">healthchecks.io</a>
+    · <a href="/genesis/quest">KYA quest</a>
+  </footer>
+  <script>
+    async function loadStats() {
+      const r = await fetch('/api/genesis/stats');
+      const j = await r.json();
+      document.getElementById('stat-signups').textContent = j.signups;
+      document.getElementById('stat-verifications').textContent = j.verifications;
+      document.getElementById('stat-holders').textContent = j.holders;
+      if (typeof j.licenses_left === 'number') {
+        document.getElementById('licenses-left').textContent = j.licenses_left + ' of 1,000 priority licenses remain';
+      }
+    }
+    loadStats();
+    setInterval(loadStats, 30000);
+    document.getElementById('apply-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const r = await fetch('/api/genesis/apply', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email}) });
+      document.getElementById('result').textContent = JSON.stringify(await r.json(), null, 2);
+      loadStats();
+    });
+  </script>
+</body>
+</html>

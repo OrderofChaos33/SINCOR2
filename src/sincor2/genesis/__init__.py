@@ -1,0 +1,1 @@
+"""SINCOR Genesis license funnel."""
