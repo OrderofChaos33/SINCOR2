@@ -1,6 +1,6 @@
 {
-  "lock_version": "2026-09-01.1",
-  "locked_at": "2026-09-01T23:00:00Z",
+  "lock_version": "2026-09-19.1",
+  "locked_at": "2026-09-19T14:20:00Z",
   "chain": "base",
   "chain_id": 8453,
   "official_buy_url": "https://getsincor.com/buy",
@@ -22,10 +22,29 @@
     "generation": "v2-live",
     "explorer": "https://basescan.org/token/0xe1D836087F6573b665d25CE088793E916D7892f8",
     "onchain_as_of_lock": {
+      "holders": 3455,
+      "transfers": 0,
+      "verified_at": "2026-09-19T14:20:00Z",
+      "source": "basescan_token_page",
+      "explorer": "https://basescan.org/token/0xe1D836087F6573b665d25CE088793E916D7892f8",
+      "note": "Holders are live explorer-indexed. Basescan still reports Transfers=0 on the overview widget; that is an indexer display, not proof of zero airdrop movement. Do not advertise audited circulating float."
+    },
+    "onchain_at_original_lock": {
+      "locked_at": "2026-09-01T23:00:00Z",
       "holders": 1,
       "transfers": 0,
-      "note": "Do not advertise circulating float or funded buckets until transfer proofs exist."
-    }
+      "note": "Explorer snapshot on the 2026-09-01 policy lock. Historical only."
+    },
+    "onchain_live": {
+      "holders": 3455,
+      "transfers": 0,
+      "verified_at": "2026-09-19T14:20:00Z",
+      "source": "basescan_token_page",
+      "explorer": "https://basescan.org/token/0xe1D836087F6573b665d25CE088793E916D7892f8",
+      "note": "Holders are live explorer-indexed. Basescan still reports Transfers=0 on the overview widget; that is an indexer display, not proof of zero airdrop movement. Do not advertise audited circulating float."
+    },
+    "source_match": "similar_TeamToken_0.6.12",
+    "source_verified_basescan_exact": false
   },
   "axiom": {
     "symbol": "AXM",
@@ -35,7 +54,16 @@
     "total_supply": 1000000000,
     "explorer": "https://basescan.org/token/0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
     "bi_report_axm": 500,
-    "source_verified_basescan": false
+    "source_verified_basescan": false,
+    "onchain_live": {
+      "holders": 3354,
+      "transfers": 3,
+      "verified_at": "2026-09-19T14:20:00Z",
+      "source": "basescan_token_page",
+      "explorer": "https://basescan.org/token/0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
+      "source_verified_basescan": false,
+      "note": "Unverified settlement token. Flag flips only after a live Basescan checkmark."
+    }
   },
   "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
   "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -74,5 +102,13 @@
     "Buy on bonding curve 0x75dE341a2BC81806198364F125d4Cde36527619C",
     "$1.50 floor",
     "100M live SINC supply"
-  ]
+  ],
+  "verified_at": "2026-09-19T14:20:00Z",
+  "onchain_refresh": {
+    "endpoint": "https://getsincor.com/api/price/official",
+    "runtime_module": "sincor2.onchain.live_snapshot",
+    "cache_ttl_s": 300,
+    "celery_task": "sincor2.onchain.tasks.refresh_onchain_snapshot",
+    "schedule": "hourly"
+  }
 }
