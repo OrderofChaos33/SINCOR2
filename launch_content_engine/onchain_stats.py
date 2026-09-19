@@ -41,7 +41,6 @@ RPC_CANDIDATES = [
     "https://base-rpc.publicnode.com",
 ]
 RPC_CANDIDATES = [u for u in RPC_CANDIDATES if u]
-# Official floor: $150M FDV / 1B SINC = $0.15
 SINC_FLOOR_USD = float(os.environ.get("SINC_FLOOR_USD", "0.15"))
 ROUTER = "0x11b86E85cC5170F4165c89ccb11332133B29E283"
 
@@ -68,7 +67,6 @@ def _rpc(method: str, params: list) -> str:
 
 
 def _call(addr: str, sig: str, *args: str) -> str:
-    # cast-style selector + encoded args omitted — use pre-encoded balanceOf
     if sig == "balanceOf":
         wallet = args[0].lower().replace("0x", "").zfill(64)
         data = "0x70a08231" + wallet
@@ -122,10 +120,10 @@ def fetch_stats() -> dict:
 
 
 def build_official_price_payload(stats: dict | None = None) -> dict:
-    """Canonical pricing — $0.15 floor ($150M / 1B SINC)."""
+    """Canonical pricing — $0.15 floor ($150M / 1B SINC) plus live on-chain facts."""
     s = stats or fetch_stats()
     floor = float(s.get("official_floor_usd", SINC_FLOOR_USD))
-    return {
+    payload = {
         "source": "sincor_official",
         "updated": "live",
         "official_floor_usd": floor,
@@ -148,6 +146,12 @@ def build_official_price_payload(stats: dict | None = None) -> dict:
         "buy_url": "https://getsincor.com/buy",
         "eth_usd": s.get("eth_usd"),
     }
+    try:
+        from sincor2.onchain.live_snapshot import attach_official_price_fields
+        attach_official_price_fields(payload)
+    except Exception:
+        payload.setdefault("onchain", {"stale": True, "source": "unavailable"})
+    return payload
 
 
 def draft_post() -> str:
