@@ -37,7 +37,7 @@
       --glow-intense: 0 0 60px rgba(139,92,246,0.5);
     }
     
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; overflow-x: hidden; max-width: 100%; }
     body {
       background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg) 100%);
       color: var(--text);
@@ -103,6 +103,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
     }
     
     .nav-logo {
@@ -119,6 +121,7 @@
       display: flex;
       gap: 40px;
       list-style: none;
+      flex-wrap: wrap;
     }
     
     .nav-links a {
