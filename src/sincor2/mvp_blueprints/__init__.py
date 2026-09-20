@@ -1,7 +1,31 @@
 """Production route blueprints extracted from mvp_app."""
 from __future__ import annotations
 
-from flask import Flask
+from flask import Flask, redirect, request
+
+
+def _browser_wants_html() -> bool:
+    if request.args.get("format") == "json" or request.args.get("raw") == "1":
+        return False
+    best = request.accept_mimetypes.best_match(["application/json", "text/html"])
+    return best == "text/html"
+
+
+def _install_human_a2a_redirects(app: Flask) -> None:
+    """Homepage one-click cards point at machine JSON. Send browsers to HTML."""
+
+    @app.before_request
+    def _humanize_a2a_clicks():
+        if request.method != "GET" or not _browser_wants_html():
+            return None
+        path = request.path.rstrip("/") or "/"
+        if path == "/docs/a2a":
+            return redirect("/register-agent")
+        if path == "/.well-known/agent-card.json":
+            return redirect("/agent-card")
+        if path == "/api/a2a/quote" and request.args.get("skill_id") == "toa-decision":
+            return redirect("/toa")
+        return None
 
 
 def register_mvp_blueprints(app: Flask) -> None:
@@ -58,3 +82,5 @@ def register_mvp_blueprints(app: Flask) -> None:
         mount_underwriting(app)
     except Exception as exc:  # pragma: no cover
         print(f"Underwriting blueprint not available: {exc}")
+
+    _install_human_a2a_redirects(app)
