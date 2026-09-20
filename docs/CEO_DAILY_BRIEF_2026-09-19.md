@@ -1,117 +1,117 @@
-# SINCOR CEO Daily Brief — 2026-09-19
+# SINCOR CEO Daily Brief — 2026-09-19 (EOD refresh 21:56 CDT)
 
 **From:** CEO (Autonomous Swarm Oversight / TOA)  
 **Primary KPI:** Realized Treasury inflow to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`  
-**Mode:** Results only. No theater. Overlapping accountability. Everything measured by treasury inflow.
+**Mode:** Results only. No theater. Overlapping accountability. Measured by treasury inflow.
 
 ## 1. Monetization & Capital — Where We Stand
 
 | Bucket | Amount | Status |
 |--------|--------|--------|
-| On-chain treasury USDC (Base) | **~181.65 USDC (~$181.65)** | **HOLD** |
-| ETH (Base + residual) | ~0.0037 ETH (~$9.17) + multi-chain dust | residual |
-| Net worth (Basescan multichain snapshot) | **~$207** | live |
-| AXM (treasury) | 1,000,000,000 AXM | mark $0 secondary |
-| SINC (live) | residual / 1e9 | mark $0 secondary |
-| Off-chain founder cash | ~$800 | **HOLD** — not loading to chain |
-| Morpho / Yield Aggregator (this wallet) | $0 deployed | **OFF** (product-only) |
-| Combined liquid runway | ~$1,000 | conversion runway only |
+| On-chain treasury USDC (Base) | **181.65 USDC (~$181.65)** | Idle. HOLD lifted 2026-09-10. |
+| ETH (Base) | ~0.00370 ETH (~$9.17) | gas / residual |
+| Multichain net (Basescan) | **~$207** | live |
+| AXM / SINC in treasury | mark $0 secondary | do not treat as runway |
+| Off-chain founder cash | ~$800 | dry powder; do not load blindly |
+| Yield Aggregator deployed (this wallet) | **$0** | DRY_RUN plan ready; no broadcast this cycle |
+| Combined liquid | ~$1,000 | conversion runway + first yield slice |
 
-**Hard EOD Goal (2026-09-19):**  
-1. Realized fee (`projected=false` + Basescan `tx_hash`) **OR** locked paid pilot (Starter $297 / Healthcare RCM / $49 AXM intel) **OR** external A2A settlement with fee path recorded.  
-2. Zero yield allocation of treasury USDC or founder cash.  
-3. 26 DeFi swarms continue product build/test 24/7; Yield Aggregator remains DRY_RUN product surface.  
-4. Self-improving loops: TOA must consume 5-min check-in feedback and re-rank by projected inflow. Loops that do not mutate rankings from measured feedback are invalid.
+**Truth on yield vs conversion:** allocator DRY_RUN on $181.65 at risk_budget 0.30 → cash 40% / Morpho 30.5% / Aave 29.5%. Blended APR **2.49%**. Year gross **~$4.53**. Protocol fee 10 bps ≈ **$0.0045**. One Starter month ($297) beats **65 years** of that yield. Conversion remains the dominant KPI. Cash-loading window is still used for Yield Aggregator **product + founder-signed first slice**, not as a substitute for sales.
 
-One Starter month ($297) still beats years of ~4% on $180. Cash stays dry powder until first measured conversion. Cash loading windows = productive DeFi product work (Yield Aggregator first), not farming the $181.
+**Hard EOD Goal (close of 2026-09-19 / open of 20):**
+1. Realized fee (`projected=false` + Basescan `tx_hash`) **OR** locked paid path (Starter $297 / Healthcare RCM / $49 AXM intel) **OR** founder-signed Yield Aggregator live intent for a capped USDC slice with fee-to-treasury. **Missed this cycle:** no realized fee hash, no paid pilot lock recorded.
+2. 26 DeFi swarms stay in 24/7 product build/test. Self-improving loops must mutate TOA rankings from measured check-in feedback.
+3. Do not farm the full $181 or the $800. First live slice only after founder signer + auditor cap.
 
-## 2. Department Check-In (Daily)
+## 2. Department Check-In (Daily) — 21:56 CDT
 
 | Department | Status / Directive |
 |------------|--------------------|
-| **26 DeFi Swarms** | **LIVE 24/7.** Catalog complete (`src/sincor2/defi/catalog.py` 1..26). Protocol OS runtime (`engine.py`) + Yield Aggregator (P01) production allocator. Scheduler ticks OS and writes submissions. Self-improving loops via TOA feedback ingestion. **Do not farm $181 or $800.** Product surface only. |
-| **TOA (E-toa-44)** | Rank paths by conversion velocity + fee capture. Collapse to top revenue actions. Ingest every 5-min DeFi check-in. Morpho-on-treasury remains discarded until conversion proof. |
-| **Treasury Exec** | Idle on capital deployment. Fee-only path. EXECUTE_LIVE remains off for this wallet. |
-| **Builders** | Land open PR material (#116 OLTWAMMI, #102 TWAMMI/NeutralYield, #81 Moebius v2 lineage). A2A fee-split + `record_platform_fee_inflow`. Foundry green + auditor gate. |
-| **Auditors** | Zero fabricated metrics. DRY_RUN default. Validate before every merge/send. Reject theater. |
-| **Negotiators** | **P0** close ≥1 paid path today (Healthcare RCM / WebBuilder / Starter / $49 intel). Sequences → /buy only. |
-| **Scouts** | Pipeline B2B pilots + A2A counterparties. Healthcare RCM + WebBuilder ICPs every 90m. |
-| **Synthesizers** | Content/SEO supporting conversion + Base DeFi agent narrative. |
-| **Caretakers** | Archive learnings; promote high-performers; registry hygiene. |
-| **Settlement** | AXM-only on canonical `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`. All platform fees → Treasury. |
+| **26 DeFi Swarms** | **MANDATE LIVE 24/7.** Catalog + engine + Yield Aggregator (P01) in repo. Scheduler: `scripts/defi_swarm_checkin_scheduler.py`. This CEO session cannot prove Railway loop is running — ops must confirm process uptime. Product-only on-chain. |
+| **TOA (E-toa-44)** | Rank by conversion velocity + fee capture. Ingest 5-min DeFi check-ins. Discard full-treasury Morpho until first conversion **or** explicit founder cap. |
+| **Treasury Exec** | HOLD lifted. Broadcast still requires Railway `EXECUTE_LIVE=1` + founder signer + no halt file. Default in source = off. |
+| **Builders** | Open PRs: #243 healthcheck truth, #242 genesis funnel, #228 AXM-only settlement, #116 OLTWAMMI+fee-split, #102 TWAMMI/NeutralYield, #81 Moebius v2. Land fee path first. |
+| **Auditors** | Zero fabricated metrics. Gate every send/merge. DRY_RUN default. Cap any first yield slice. |
+| **Negotiators** | **P0 FAIL this cycle if no close.** Sequences → /buy only. Starter / RCM / $49 intel. |
+| **Scouts** | B2B pilots + A2A counterparties. Healthcare RCM + WebBuilder ICPs. Genesis T-7 (26 Sep). |
+| **Synthesizers** | Conversion + Genesis claim narrative. No vanity metrics. |
+| **Caretakers** | Archive this brief into learning store. Registry hygiene. |
+| **Settlement** | AXM-only `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`. Fees → Treasury. |
 
-Live verification this cycle:  
-- https://getsincor.com/health → healthy, service SINCOR2 MVP  
-- Agent Card: https://getsincor.com/.well-known/agent-card.json  
-- Checkout surface: /buy + /products/starter  
+Live this cycle:
+- https://getsincor.com/health → `{"status":"healthy","service":"SINCOR2 MVP","entry":"railway_start"}`
+- Public site + /buy + Agent Card live
+- Treasury last outbound ~33h ago (Uniswap V4 Position Manager multicall) — not a platform-fee inflow
 
-## 3. Findings + Action Plan for Swarm Agents
+## 3. Findings + Swarm Action Plan + Scale
 
 ### Findings
-- Pre-Genesis (launch window 26 Sep 2026). Conversion surface remains the bottleneck.
-- Treasury USDC ~$181.65 (down from ~$192 on 09 Sep; recent activity visible on Basescan). No new realized platform-fee ledger entries with projected=false + tx_hash counted as KPI this cycle.
-- Yield Aggregator code production-ready (`src/sincor2/defi/yield_aggregator.py`). Hard safety: DRY_RUN default; SharedLiquidityVault not primary earn path. Morpho Gauntlet USDC path documented but **off** for this wallet.
-- 26 DeFi protocol catalog + engine + scheduler + tests live. P01 real; remaining 25 have handlers, gates, ranking — executable OS layer, not 26 unaudited mainnet hooks.
-- Outreach send still gated by production host env (RESEND_API_KEY / OUTREACH_ENABLED / AUTONOMOUS_AGENTS) + auditor pass + fee recording.
-- Cash loading windows must be used for **productive DeFi product work** (Yield Aggregator first as sellable module), **not** depositing the $181.
+- T-7 to Genesis (26 Sep 2026). Conversion is still the bottleneck. 1 GitHub star. X founder handles are 2–6 followers. Distribution is not working.
+- Treasury ~$181.65 USDC / ~$207 multi. Down from ~$192 on 09 Sep. No new `projected=false` + `tx_hash` fee this cycle.
+- HOLD.md: HOLD lifted 2026-09-10. Issue #207 / earlier briefs still said Morpho-off. Resolve: **idle USDC may be used by authorized agents under founder signer; Yield Aggregator first; cap the slice; conversion still P0.**
+- Yield Aggregator code is production-oriented (`src/sincor2/defi/yield_aggregator.py`). SharedLiquidityVault still disabled (unverified, 0 txs). Morpho Gauntlet USDC `0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61` is the documented earn path.
+- 26-project catalog exists. That is an OS + ranking layer, not 26 audited mainnet protocols. Do not lie about that.
+- Open PRs carry the fee path. They are not merged.
 
 ### Swarm Action Plan (results-measured)
-1. **Negotiators + Scouts**: Close ≥1 paid path today. Pipeline Healthcare RCM / Starter / $49 AXM intel / WebBuilder. CTA = /buy only.
-2. **Builders**: Merge-ready path for A2A quote fee-split + platform fee recording. Advance #116 / #102 / #81 lineage to green tests + auditor sign-off.
-3. **Yield Aggregator swarm (P01)**: Keep product loop (plan_rebalance, simulate_year_pnl, agent skills, TOA ingest). Emit intents only under EXECUTE_LIVE; never with treasury keys for the $181. Demo tables for sales.
-4. **TOA**: Continuous forecast-simulate-collapse; ingest 5-min check-in feedback; re-rank by projected treasury inflow. Self-improving loops must actually mutate rankings from measured feedback.
-5. **Auditors**: Gate every PR/external send. Reject theater metrics. DRY_RUN default.
-6. **All departments**: Overlapping accountability. Every task maps to treasury inflow or explicit pipeline value. No task without revenue path.
+1. **Negotiators + Scouts:** Close ≥1 paid path. CTA = /buy. Genesis claim list is not revenue until paid.
+2. **Builders:** Merge-ready A2A fee-split + `record_platform_fee_inflow`. Advance #116 / #228 / #243 first.
+3. **Yield Aggregator (P01):** Keep product loop. Hand founder the DRY_RUN plan below. Emit live intents only with `EXECUTE_LIVE=1` + signer. Cap first slice (recommend **$50 USDC** Morpho, leave rest cash).
+4. **TOA:** Feedback → re-rank → dispatch → measure inflow attribution. Loops that do not mutate rankings are invalid.
+5. **Auditors:** Gate. Reject theater.
+6. **All:** Every task maps to treasury inflow or named pipeline value.
 
-### Scaling / Expansion / Traction / Adoption
-- Scale agent count only after first realized conversion (Starter → Professional → Enterprise).
-- Traction lever: A2A discovery → quote → pay with fee split to Treasury + first paid pilot.
-- Adoption: wallet-native /buy + Genesis cohort claim surface (26 Sep).
-- Expansion: keep 26 DeFi product builds; prioritize those with direct fee routing (hooks, vaults, A2A). Yield Aggregator is the first product surface for cash-loading windows.
+### Scaling / Traction / Adoption
+- Do not scale agent count before first realized conversion.
+- Traction: A2A quote → pay → fee to Treasury + first Starter.
+- Adoption: /buy + Genesis 26 Sep claim. Distribution on X is currently near-zero — that is a traction failure, not a branding exercise.
+- Expansion: keep 26 product builds; prioritize fee-routing surfaces (hooks, vaults, A2A). Yield Aggregator is first cash-window product.
 
-## 4. Itemized Detailed Action Plan — Handable to Code Builder
+## 4. Itemized Action Plan — Handable to Code Builder
 
-**Priority order. Parallel where non-conflicting. Feature branches. Full unit tests. Auditor sign-off. DRY_RUN default. Fee-only to treasury. No live mainnet mutation of treasury capital without explicit human gate.**
+Full checklist: `docs/CODE_BUILDER_HANDOFF_2026-09-19.md`
+
+**Priority. Feature branches. Tests. Auditor. DRY_RUN default. Founder signs live.**
 
 ### P0 — Conversion & Fee Path
-1. Wire / harden `build_quote_response` / fee_split into A2A quote route so platform fee → Treasury + AXM handling is deterministic.
-2. Implement / harden `record_platform_fee_inflow(fee, asset="AXM"|"USDC", source="a2a_settlement", tx_hash=..., projected=False)`. Unit test: exactly one realized call on success, zero on failure/simulate.
-3. Enforce AXM-only on new settlement/billing paths (`0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`). Reject non-AXM. Evidence required.
-4. Dashboard / public surfaces: payment-gated, zero fabricated metrics. Numbers from real DB or explicit None.
-5. Production runner host: confirm RESEND (or equivalent) + OUTREACH_ENABLED=true + AUTONOMOUS_AGENTS=true so negotiator sequences can actually send. Auditor must pass each outbox envelope.
+1. Harden `build_quote_response` / fee_split so platform fee → Treasury is deterministic.
+2. Harden `record_platform_fee_inflow(..., projected=False, tx_hash=...)`. Test: one realized call on success, zero on simulate/`0xSIMULATED`.
+3. Enforce AXM-only new settlement (`0x4c3fb66f14fbaa2088c9ae91017ba770da53715a`). Land #228 or equivalent.
+4. Public surfaces: payment-gated, no fabricated metrics.
+5. Production host: `OUTREACH_ENABLED` + mailer key + `AUTONOMOUS_AGENTS` so negotiator sequences actually send. Auditor on each envelope.
+6. #243: health must not lie. Merge if tests green.
 
-### P0 — Open PR / Hook Resolution
-6. #116 lineage: OLTWAMMIHook + A2A quote fee-split — forge test, Sepolia deploy path, solver agent YAML pointer.
-7. #102 lineage: TWAMMIHook / NeutralYieldAgent / Core 10 TOA dispatch / fee observability — green Foundry + Python tests.
-8. #81 lineage: Moebius v2 sealed-bid — confirm tests green; deployment notes for dynamic-fee pools.
+### P0 — Open PR Lineage
+7. #116 OLTWAMMI + A2A fee-split — forge + Sepolia path.
+8. #102 TWAMMI / NeutralYield / TOA dispatch / fee observability.
+9. #81 Moebius v2 — confirm green; notes only until needed.
 
-### P1 — Yield Aggregator Product (not treasury farming)
-9. Keep `EXECUTE_LIVE=0` for treasury wallet. Product demos and sales collateral only.
-10. Extend agent skills / TOA integration for yield product as sellable module (demo plans, APR tables, risk budgets).
-11. Do **not** enable SharedLiquidityVault deposits until verified + successful test deposit on a non-treasury wallet.
-12. Morpho Gauntlet USDC remains documented but **off** for this wallet until conversion proven.
-13. Any cash loading window → immediately feed into Yield Aggregator **product** work (code, tests, agent YAML, TOA ranking), never deposit of the $181.
+### P1 — Yield Aggregator (cash window, product first)
+10. Keep source `EXECUTE_LIVE` default `0`.
+11. First authorized live slice (founder only): **$50 USDC → Morpho Gauntlet USDC** `0xeE8F4eC5672F09119b96Ab6fB59C27E1b7e44b61`. Leave ≥$130 USDC + ETH for gas/optionality. Do not touch founder $800 for yield.
+12. Do not enable SharedLiquidityVault until verified + successful test deposit on a **non-treasury** wallet.
+13. Cash-loading window work this session = product (plan, tests, agent YAML, sales demo tables) + the $50 slice spec. Not a full dump of $181.
 
-### P1 — Swarm Ops & Self-Improving Loops
-14. Ensure `scripts/defi_swarm_checkin_scheduler.py` runs indefinitely; TOA `ingest_feedback` every cycle.
-15. Self-improving loop contract: feedback → TOA re-rank → dispatch → measure inflow attribution → archive learning. Loops that do not consume measured ranking mutations are invalid.
-16. Foundry + Slither on any new hook/vault code. No EXECUTE_LIVE with production keys without explicit human gate + kill-switch clear.
-17. Caretakers: weekly learning archive; promote agents with measured conversion contribution.
+### P1 — Swarm loops
+14. Confirm `scripts/defi_swarm_checkin_scheduler.py` is actually running on Railway. If not, start it.
+15. Loop contract: check-in → TOA `ingest_feedback` → ranking mutation → dispatch → inflow attribution → archive.
+16. Foundry + Slither on new hook/vault code.
+17. Caretakers: weekly learning archive.
 
-### Safety (non-negotiable)
-- DRY_RUN default. Kill switch (`data/TREASURY_EXEC_HALT`). Fee-only to Treasury.  
-- Canonical addresses only from `CANONICAL_ADDRESSES.md` / `src/sincor2/onchain/constants.py`.  
-- No Morpho / yield / LP on the ~$181 USDC or the ~$800 founder cash.  
-- No fabricated metrics.  
-- No destructive git ops without explicit human sign-off.
+### Safety
+- DRY_RUN default. Kill switch `data/TREASURY_EXEC_HALT`. Fee-only to Treasury.
+- Canonical addresses from `CANONICAL_ADDRESSES.md` / `src/sincor2/onchain/constants.py` only.
+- No full-balance Morpho/LP. No fabricated metrics. No destructive git without human sign-off.
 
 ## 5. Tracking
 
-- Brief committed: `docs/CEO_DAILY_BRIEF_2026-09-19.md`
-- Tracking issue: #247
+- Brief: `docs/CEO_DAILY_BRIEF_2026-09-19.md` (this EOD refresh)
+- Builder handoff: `docs/CODE_BUILDER_HANDOFF_2026-09-19.md`
+- Tracking issue: #247 (material items remain — do not close)
+- Related open: #207 conversion, #220 prior brief track, #233 underwriting epic, #156 AXM pivot, #209 token canon
 
-Results only. Hold cash. Convert first. Scale on measured inflow. 26 swarms product-only. Yield Aggregator DRY_RUN.
+**EOD result:** KPI miss. No realized fee. No paid lock. Yield plan computed, not broadcast. Site healthy. T-7 Genesis. Next action is close or founder-sign the $50 Morpho slice — pick one and execute.
 
 ---
 **— CEO / TOA**  
-19 Sep 2026 — Conversion first. 26 swarms 24/7 product build + self-improving loops. Treasury HOLD. Yield Aggregator product surface only.
+19 Sep 2026 21:56 CDT — Conversion first. 26 swarms 24/7 product + real feedback loops. Yield Aggregator first on the cash window, capped. Treasury inflow is the only scoreboard.
