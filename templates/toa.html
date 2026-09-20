@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Query TOA — SINCOR</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; --card:rgba(255,255,255,.04); }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; padding:32px 20px 64px; }
+    .wrap { max-width:860px; margin:0 auto; }
+    a { color:var(--cyan); text-decoration:none; font-weight:600; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(28px,5vw,40px); margin:16px 0 8px; }
+    .sub { color:var(--muted); line-height:1.6; margin-bottom:24px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin:20px 0 24px; }
+    button, .btn { border:none; border-radius:10px; padding:12px 18px; font-weight:700; cursor:pointer; font:inherit; text-decoration:none; display:inline-block; }
+    .primary { background:linear-gradient(135deg,var(--purple),var(--cyan)); color:#fff; }
+    .ghost { background:transparent; border:1px solid rgba(139,92,246,.35); color:var(--text); }
+    .card { background:var(--card); border:1px solid rgba(139,92,246,.25); border-radius:16px; padding:22px; margin-top:16px; }
+    .k { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-family:'JetBrains Mono',monospace; }
+    .val { font-size:28px; font-family:'JetBrains Mono',monospace; margin:6px 0 4px; }
+    pre { white-space:pre-wrap; word-break:break-word; font-family:'JetBrains Mono',monospace; font-size:12px; color:#cbd5e1; line-height:1.6; }
+    .err { color:#fca5a5; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/">← Home</a>
+    <h1>Query TOA</h1>
+    <p class="sub">Live quote for <code>toa-decision</code> on <code>/api/a2a</code>. Machines still use the JSON endpoint.</p>
+    <div class="row">
+      <button class="primary" id="run">Run live quote</button>
+      <a class="btn ghost" href="/api/a2a/quote?skill_id=toa-decision">Raw JSON</a>
+      <a class="btn ghost" href="/register-agent">Register agent</a>
+    </div>
+    <div class="grid" id="stats"></div>
+    <div class="card"><div class="k">Response</div><pre id="out">Loading quote…</pre></div>
+  </div>
+  <script>
+    const out = document.getElementById('out');
+    const stats = document.getElementById('stats');
+    async function run() {
+      out.textContent = 'Querying /api/a2a/quote?skill_id=toa-decision …';
+      stats.innerHTML = '';
+      try {
+        const r = await fetch('/api/a2a/quote?skill_id=toa-decision', { headers: { 'Accept': 'application/json' } });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || r.statusText);
+        const cells = [
+          ['Skill', data.skill_id || data.skillId || 'toa-decision'],
+          ['Price', data.axm_price_display || data.axmPriceDisplay || '—'],
+          ['Latency', (data.estimated_latency_seconds || data.estimatedLatencySeconds || '—') + 's'],
+          ['Chain', data.chain_id || data.chainId || '8453']
+        ];
+        stats.innerHTML = cells.map(([k,v]) => `<div class="card"><div class="k">${k}</div><div class="val">${v}</div></div>`).join('');
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.className = 'err';
+        out.textContent = 'Quote failed: ' + e.message;
+      }
+    }
+    document.getElementById('run').addEventListener('click', run);
+    run();
+  </script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SINCOR Agent Card</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; padding:32px 20px 64px; }
+    .wrap { max-width:960px; margin:0 auto; }
+    a { color:var(--cyan); text-decoration:none; font-weight:600; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(28px,5vw,40px); margin:16px 0 8px; }
+    .sub { color:var(--muted); line-height:1.6; margin-bottom:20px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0 24px; }
+    .btn { display:inline-block; padding:12px 18px; border-radius:10px; background:linear-gradient(135deg,var(--purple),var(--cyan)); color:#fff; border:none; font-weight:700; cursor:pointer; font:inherit; }
+    .ghost { background:transparent; border:1px solid rgba(139,92,246,.35); color:var(--text); }
+    .meta { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+    .card { background:rgba(255,255,255,.04); border:1px solid rgba(139,92,246,.25); border-radius:14px; padding:16px; }
+    .k { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-family:'JetBrains Mono',monospace; }
+    pre { background:#050814; border:1px solid rgba(139,92,246,.2); border-radius:14px; padding:18px; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.6; color:#cbd5e1; }
+    .err { color:#fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/">← Home</a>
+    <h1>Agent Card</h1>
+    <p class="sub">Canonical public card at <code>/.well-known/agent-card.json</code>. Integrators should still fetch the raw JSON.</p>
+    <div class="row">
+      <a class="btn ghost" href="/.well-known/agent-card.json">Raw JSON</a>
+      <button class="btn" id="copy">Copy JSON</button>
+      <a class="btn ghost" href="/toa">Query TOA</a>
+    </div>
+    <div class="meta" id="meta"></div>
+    <pre id="out">Loading card…</pre>
+  </div>
+  <script>
+    let raw = '';
+    const out = document.getElementById('out');
+    fetch('/.well-known/agent-card.json', { headers: { 'Accept': 'application/json' } })
+      .then(r => r.json())
+      .then(d => {
+        raw = JSON.stringify(d, null, 2);
+        out.textContent = raw;
+        document.getElementById('meta').innerHTML = [
+          ['Name', d.name || 'SINCOR'],
+          ['Transport', d.preferredTransport || d.url || '/api/a2a'],
+          ['Skills', (d.skills || []).length],
+          ['Docs', d.documentationUrl || '/docs/a2a']
+        ].map(([k,v]) => `<div class="card"><div class="k">${k}</div><div>${v}</div></div>`).join('');
+      })
+      .catch(e => { out.className = 'err'; out.textContent = 'Card failed: ' + e.message; });
+    document.getElementById('copy').onclick = async () => {
+      if (!raw) return;
+      await navigator.clipboard.writeText(raw);
+      document.getElementById('copy').textContent = 'Copied';
+    };
+  </script>
+</body>
+</html>

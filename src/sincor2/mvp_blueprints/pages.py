@@ -1,16 +1,7 @@
-"""Public HTML pages.
-
-Extracted from mvp_app so the gunicorn entry stays the app factory.
-Helpers and Flask `app` live in sincor2.mvp_app; this module binds them
-after that module has finished constructing the application object.
-
-Railway serves mvp_app, not sincor2.app. Every homepage button that
-renders an HTML template MUST live on this blueprint or it 404s.
-"""
+"""Public HTML pages.\n\nRailway serves mvp_app, not sincor2.app.\n"""
 from __future__ import annotations
 
 import os
-
 from flask import Blueprint
 
 bp = Blueprint("mvp_pages", __name__)
@@ -40,16 +31,11 @@ def _template_exists(name: str) -> bool:
 
 
 def _support_email() -> str:
-    return (
-        os.environ.get("SUPPORT_EMAIL")
-        or os.environ.get("CONTACT_EMAIL")
-        or "support@getsincor.com"
-    )
+    return os.environ.get("SUPPORT_EMAIL") or os.environ.get("CONTACT_EMAIL") or "support@getsincor.com"
 
 
 @bp.route("/")
 def index():
-    """Public landing. Must live on mvp_app — sincor2.app is not the Railway entry."""
     return render_template("home.html")
 
 
@@ -62,12 +48,7 @@ def genesis_alias():
 @bp.route("/login", methods=["GET", "POST"])
 def login_page():
     next_url = request.values.get("next") or request.args.get("next") or ""
-    identifier = (
-        request.form.get("identifier")
-        or request.form.get("email")
-        or request.form.get("username")
-        or ""
-    ).strip()
+    identifier = (request.form.get("identifier") or request.form.get("email") or request.form.get("username") or "").strip()
     password = request.form.get("password") or ""
     oauth_google = False
     oauth_github = False
@@ -76,51 +57,25 @@ def login_page():
         oauth_github = bool(_oauth_provider_ready("github"))
     except Exception:
         pass
-
     if request.method == "GET":
         if _is_admin_session():
             return redirect(_safe_next_url(next_url, "/admin"))
         if session.get("user_email"):
             return redirect(_safe_next_url(next_url, "/dashboard"))
-        return render_template(
-            "login.html",
-            next_url=next_url,
-            identifier=identifier,
-            oauth_google=oauth_google,
-            oauth_github=oauth_github,
-        )
-
+        return render_template("login.html", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github)
     if not identifier:
-        return render_template(
-            "login.html",
-            error="Email or username required.",
-            next_url=next_url,
-            identifier=identifier,
-            oauth_google=oauth_google,
-            oauth_github=oauth_github,
-        ), 400
-
+        return render_template("login.html", error="Email or username required.", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github), 400
     if _admin_credentials_match(identifier, password):
         return _admin_cookie_response(identifier, _safe_next_url(next_url, "/admin"))
-
     customer = None
     try:
         customer = _resolve_customer(identifier)
     except Exception as exc:
         logger.warning("[AUTH] customer resolve failed: %s", exc)
-
     if customer and customer.get("email"):
         session["username"] = customer.get("username") or customer["email"].split("@")[0]
         return _auth_cookie_response(customer["email"], _safe_next_url(next_url, "/dashboard"))
-
-    return render_template(
-        "login.html",
-        error="Invalid credentials.",
-        next_url=next_url,
-        identifier=identifier,
-        oauth_google=oauth_google,
-        oauth_github=oauth_github,
-    ), 401
+    return render_template("login.html", error="Invalid credentials.", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github), 401
 
 
 @bp.route("/logout")
@@ -160,12 +115,7 @@ def operator_console():
 @bp.route("/contact", methods=["GET", "POST"])
 def contact_page():
     if request.method == "GET":
-        return render_template(
-            "contact.html",
-            support_email=_support_email(),
-            sent=request.args.get("sent") == "1",
-        )
-
+        return render_template("contact.html", support_email=_support_email(), sent=request.args.get("sent") == "1")
     name = request.form.get("name") or ""
     if "sanitize_string" in globals():
         name = sanitize_string(str(name), 80)
@@ -174,24 +124,8 @@ def contact_page():
     email = (request.form.get("email") or "").strip()[:254]
     message = (request.form.get("message") or "").strip()[:4000]
     if not email or not message:
-        return render_template(
-            "contact.html",
-            support_email=_support_email(),
-            error="Email and message are required.",
-        ), 400
-
+        return render_template("contact.html", support_email=_support_email(), error="Email and message are required."), 400
     logger.info("[CONTACT] from=%s name=%s msg_len=%s", email, name, len(message))
-    sender = globals().get("email_sender")
-    if sender:
-        try:
-            if hasattr(sender, "send_support_or_sales"):
-                sender.send_support_or_sales(
-                    customer_email=email,
-                    customer_name=name or email,
-                    message=message,
-                )
-        except Exception as exc:
-            logger.warning("[CONTACT] email send failed: %s", exc)
     return redirect("/contact?sent=1")
 
 
@@ -284,3 +218,18 @@ def dashboards_menu():
     if not (_is_admin_session() or session.get("user_email")):
         return redirect("/login?next=/dashboards")
     return render_template("dashboards_menu.html")
+
+
+@bp.route("/toa")
+def toa_page():
+    return render_template("toa.html")
+
+
+@bp.route("/register-agent")
+def register_agent_page():
+    return render_template("register_agent.html")
+
+
+@bp.route("/agent-card")
+def agent_card_page():
+    return render_template("agent_card.html")
