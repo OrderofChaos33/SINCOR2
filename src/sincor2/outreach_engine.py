@@ -145,7 +145,7 @@ class OutreachEngine:
             f"<html><body style=\"font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;\">"
             f"<p>Hi {name} team,</p>"
             "<p>SINCOR agents deliver a competitive snapshot (pricing, reviews, gaps vs nearby rivals) as a PDF. No call.</p>"
-            "<p>Pay on Base (SINC monthly or AXM one-time). Agents start when payment hits treasury.</p>"
+            "<p>Pay on Base in AXM. Agents start when payment hits treasury.</p>"
             f"<p><a href=\"{pay}\">Start report — getsincor.com/buy</a></p>"
             f"<p>A2A: <a href=\"{A2A_CARD}\">{A2A_CARD}</a></p>"
             "<p>— SINCOR Agent<br>getsincor.com</p>"

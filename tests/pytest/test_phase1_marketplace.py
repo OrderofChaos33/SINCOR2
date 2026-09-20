@@ -12,6 +12,11 @@ from marketplace.registry import AgentCardRegistry
 from marketplace.reputation import ReputationEngine
 from marketplace.settlement import SettlementCoordinator
 
+WALLET_A = "0x" + "a" * 40
+WALLET_B = "0x" + "b" * 40
+WALLET_C = "0x" + "c" * 40
+TX_HASH = "0x" + "1" * 64
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -136,8 +141,8 @@ class TestSettlementCoordinator:
     def test_create_quote(self, settlement):
         quote = settlement.create_quote(
             task_reference="task-001",
-            payer="0xPAYER",
-            payee="0xPAYEE",
+            payer=WALLET_A,
+            payee=WALLET_B,
             amount=Decimal("1.5"),
             token_symbol="AXIOM",
         )
@@ -146,19 +151,19 @@ class TestSettlementCoordinator:
         assert quote.amount == "1.5000"
 
     def test_confirm_payment_creates_settlement_record(self, settlement):
-        quote = settlement.create_quote("t-002", "0xA", "0xB", Decimal("2.0"))
+        quote = settlement.create_quote("t-002", WALLET_A, WALLET_B, Decimal("2.0"))
         record = settlement.confirm_payment(
             quote_id=quote.quote_id,
-            tx_hash="0xTXHASH",
+            tx_hash=TX_HASH,
             confirmed_amount=Decimal("2.0"),
         )
         assert record.settlement_id.startswith("settle-")
         assert record.status == "confirmed"
-        assert record.tx_hash == "0xTXHASH"
+        assert record.tx_hash == TX_HASH
 
     def test_treasury_routing_recorded(self, settlement):
-        quote = settlement.create_quote("t-003", "0xA", "0xB", Decimal("1.0"))
-        settlement.confirm_payment(quote.quote_id, "0xTX2", Decimal("1.0"))
+        quote = settlement.create_quote("t-003", WALLET_A, WALLET_B, Decimal("1.0"))
+        settlement.confirm_payment(quote.quote_id, TX_HASH, Decimal("1.0"))
         assert len(settlement.treasury_journal) == 1
         assert settlement.treasury_journal[0]["treasury_address"] != ""
 
@@ -168,7 +173,7 @@ class TestSettlementCoordinator:
         assert event["amount"] == "0.5000"
 
     def test_quote_expiry_timestamp_set(self, settlement):
-        quote = settlement.create_quote("t-004", "0xA", "0xB", Decimal("1.0"), expires_in_minutes=5)
+        quote = settlement.create_quote("t-004", WALLET_A, WALLET_B, Decimal("1.0"), expires_in_minutes=5)
         assert quote.expires_at
 
 
@@ -270,7 +275,7 @@ class TestMarketplaceTaskSubmission:
             json={
                 "skill_id": "healthcare-rcm",
                 "input": {"task_type": "claims_status_tracking", "payload": {"claim_id": "C-1"}},
-                "payer": "0xPAYERADDRESS",
+                "payer": WALLET_A,
                 "amount": "1.0",
                 "token_symbol": "AXIOM",
             },
@@ -278,7 +283,22 @@ class TestMarketplaceTaskSubmission:
         assert resp.status_code == 200
         data = resp.get_json()
         assert "settlement_quote" in data
-        assert data["settlement_quote"]["payer"] == "0xPAYERADDRESS"
+        assert data["settlement_quote"]["payer"] == WALLET_A
+        assert data["settlement_quote"]["token_symbol"] == "AXIOM"
+
+    def test_submit_task_rejects_sinc_token_for_new_flow(self, client):
+        resp = client.post(
+            "/api/marketplace/tasks",
+            json={
+                "skill_id": "healthcare-rcm",
+                "input": {"task_type": "claims_status_tracking", "payload": {"claim_id": "C-1"}},
+                "payer": WALLET_A,
+                "amount": "1.0",
+                "token_symbol": "SINC",
+            },
+        )
+        assert resp.status_code == 400
+        assert "AXM-only settlement" in resp.get_json()["error"]
 
     def test_submit_task_trust_score_in_response(self, client):
         resp = client.post(
@@ -324,22 +344,24 @@ class TestMarketplaceSettlementEndpoints:
                     "task_type": "eligibility_verification",
                     "payload": {"patient_id": "P-001"},
                 },
-                "payer": "0xWALLET",
+                "payer": WALLET_C,
                 "amount": "2.0",
             },
         )
         assert resp.status_code == 200
-        quote_id = resp.get_json()["settlement_quote"]["quote_id"]
+        quote = resp.get_json()["settlement_quote"]
+        assert quote["token_symbol"] == "AXIOM"
+        quote_id = quote["quote_id"]
 
         # 2. Confirm the quote
         resp2 = client.post(
             "/api/marketplace/settlement/confirm",
-            json={"quote_id": quote_id, "tx_hash": "0xTX999", "confirmed_amount": "2.0"},
+            json={"quote_id": quote_id, "tx_hash": TX_HASH, "confirmed_amount": "2.0"},
         )
         assert resp2.status_code == 200
         data = resp2.get_json()
         assert data["settlement"]["status"] == "confirmed"
-        assert data["settlement"]["tx_hash"] == "0xTX999"
+        assert data["settlement"]["tx_hash"] == TX_HASH
 
         # 3. Stats should reflect the settled transaction
         resp3 = client.get("/api/marketplace/settlement/stats")
