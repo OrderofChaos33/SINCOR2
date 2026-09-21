@@ -83,4 +83,16 @@ def register_mvp_blueprints(app: Flask) -> None:
     except Exception as exc:  # pragma: no cover
         print(f"Underwriting blueprint not available: {exc}")
 
+    try:
+        # Consolidation: /api/metrics/treasury previously lived only on the
+        # legacy sincor2.app. Attach the maintained view from the monitoring
+        # blueprint (without its /health route, which mvp_app already serves).
+        from sincor2.blueprints.monitoring import treasury_metrics
+
+        app.add_url_rule(
+            "/api/metrics/treasury", view_func=treasury_metrics, methods=["GET"]
+        )
+    except Exception as exc:  # pragma: no cover
+        print(f"Treasury metrics route not available: {exc}")
+
     _install_human_a2a_redirects(app)
