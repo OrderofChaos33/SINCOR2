@@ -39,4 +39,4 @@ memory_limits:
   semantic_items: 20000
 status: Hatch
 created_date: '2025-08-28'
-constitution_sha256: hash_E-aldebaran-12_synthesizer
+constitution_sha256: sha256:7fb74ad4e0952eff7bfb43e6ed0195a0c6e316a4235fd98fe63ad338c9bfdc62

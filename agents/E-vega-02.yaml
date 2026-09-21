@@ -39,4 +39,4 @@ memory_limits:
   semantic_items: 15000
 status: Hatch
 created_date: '2025-08-28'
-constitution_sha256: hash_E-vega-02_scout
+constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407

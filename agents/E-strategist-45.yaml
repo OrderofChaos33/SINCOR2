@@ -48,7 +48,7 @@ memory_limits:
   semantic_items: 80000
 status: Active
 created_date: '2026-06-21'
-constitution_sha256: hash_E-strategist-45_director
+constitution_sha256: sha256:45753243645d2c415a416104804c3dd2e271129b16fcbe9d4814c45beeb511f8
 version: "1.0.0"
 description: >
   The Content Strategist (E-45) generates high-signal briefs for the copy pipeline.

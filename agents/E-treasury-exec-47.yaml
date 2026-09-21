@@ -17,6 +17,7 @@ constitution_refs:
 - constitution/global.md
 - agents/archetypes/Builder.yaml
 - agents/archetypes/Auditor.yaml
+constitution_sha256: sha256:32b37c029fde6a178c95200207558f820d1a66d51654f8246fb082c57d1064d8
 persona:
   traits:
     O: 0.70
