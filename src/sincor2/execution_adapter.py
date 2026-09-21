@@ -20,7 +20,7 @@ environment. Keys are never logged.
 
 Environment
 -----------
-POLYCLAW_LIVE                 "true" to allow real orders (default: false)
+POLYCLAW_LIVE                 \"true\" to allow real orders (default: false)
 POLYMARKET_PRIVATE_KEY        Polygon EOA key for the CLOB (hex, 0x-prefixed)
 POLYCLAW_PRIVATE_KEY          fallback alias for the same key
 POLYMARKET_PK                 second fallback alias
@@ -30,3 +30,18 @@ POLYMARKET_API_KEY / _SECRET / _PASSPHRASE   CLOB API creds (derived if absent)
 POLYMARKET_HOST               default https://clob.polymarket.com
 POLYGON_RPC_URL               default https://polygon-bor.publicnode.com
 """
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import time
+import urllib.request
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from sincor2.bankroll import Bankroll, get_bankroll
+
+logger = logging.getLogger(\"sincor.execution\")
