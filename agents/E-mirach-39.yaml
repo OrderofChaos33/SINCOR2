@@ -39,4 +39,4 @@ memory_limits:
   semantic_items: 30000
 status: Hatch
 created_date: '2025-08-28'
-constitution_sha256: hash_E-mirach-39_director
+constitution_sha256: sha256:adb9d0c70a30da783d4bc5bd7db41843ece4c2347d7986c462f5b17c73a57707

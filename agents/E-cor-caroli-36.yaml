@@ -39,4 +39,4 @@ memory_limits:
   semantic_items: 22000
 status: Hatch
 created_date: '2025-08-28'
-constitution_sha256: hash_E-cor-caroli-36_auditor
+constitution_sha256: sha256:a2c426babd545fbcc16c79e6c0e965b99c43af63dce8a75807c80d3ec182525c

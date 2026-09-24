@@ -39,4 +39,4 @@ memory_limits:
   semantic_items: 25000
 status: Hatch
 created_date: '2025-08-28'
-constitution_sha256: hash_E-canopus-15_builder
+constitution_sha256: sha256:02d553178446398f413592db7af41585e24378ec11f746c1a9f102b75ff2f0c5

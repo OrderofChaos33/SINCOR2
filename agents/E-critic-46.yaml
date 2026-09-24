@@ -48,7 +48,7 @@ memory_limits:
   semantic_items: 60000
 status: Active
 created_date: '2026-06-21'
-constitution_sha256: hash_E-critic-46_auditor
+constitution_sha256: sha256:4d1920b05281ef923060084e925dcfdd55e4b58e8d99111d637a95d245ff7e4e
 version: "1.1.0"  # Bumped for novelty enforcer integration
 description: >
   The Content Critic (E-46) is the always-on quality gate. It scores every variant
@@ -101,4 +101,4 @@ documentationUrl: /docs/architecture/content-orchestration.md
 defaultInputModes:
 - application/json
 defaultOutputModes:
-- application/json
+- application/json

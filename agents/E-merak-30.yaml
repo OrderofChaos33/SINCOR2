@@ -39,4 +39,4 @@ memory_limits:
   semantic_items: 18000
 status: Hatch
 created_date: '2025-08-28'
-constitution_sha256: hash_E-merak-30_caretaker
+constitution_sha256: sha256:785f8e7b3c792307cdbc1d03f252cfde0a16847386f3294e4c0ce238afb24155

@@ -24,14 +24,14 @@ pydantic==2.9.2
 email-validator==2.2.0
 python-dateutil==2.9.0.post0
 pytz==2024.2
-jsonschema>=4.23.0
+jsonschema==4.23.0
 
 # Database
 SQLAlchemy==2.0.36
 alembic==1.14.0
 Mako==1.3.6
 psycopg2-binary==2.9.10
-redis>=5.0.0
+redis==5.0.0
 
 # Cryptography & Security
 cryptography==43.0.3
@@ -46,14 +46,14 @@ anthropic==0.39.0
 aiohttp==3.10.10
 
 # Polyclaw live trading (Polymarket CLOB + on-chain EOA approvals)
-py-clob-client>=0.17.0
-web3>=6.0.0
-eth-account>=0.10.0
+py-clob-client==0.17.0
+web3==6.0.0
+eth-account==0.10.0
 
 # Scheduling & Async
 APScheduler==3.10.4
 aiofiles==24.1.0
-celery[redis]>=5.4.0
+celery[redis]==5.4.0
 
 # Logging & Observability
 watchtower==3.3.1
