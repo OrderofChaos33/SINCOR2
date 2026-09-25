@@ -70,7 +70,7 @@ aspirations.
 - Research scripts were throwaway (`/tmp/*_study.py`, temp venv) and are not
   committed. Re-run before finalizing parameters.
 
-## Addendum 2026-09-26 — auction-core selection bridge (implemented)
+## Addendum 2026-09-25 — auction-core selection bridge (implemented)
 
 The sealed-bid core had no winner selection; the escrow module had no caller.
 The bridge (`contracts/CommitRevealAuction.sol`, commit `1b14d64`):
@@ -84,13 +84,14 @@ The bridge (`contracts/CommitRevealAuction.sol`, commit `1b14d64`):
   reveal deadline: computes the Vickrey outcome and atomically calls
   `escrow.initializeEscrow`, forwarding the poster's ETH. The escrow's exact
   two-sided funding check makes mispriced funding revert atomically.
-- **Deviation from the ratified timeout rule:** permissionless `timeout()` is
-  now gated behind `revealDeadline + SELECTION_WINDOW` (1 hour), giving the
-  poster a grief-free selection grace period. Rationale: with an ungated
-  timeout, anyone could finalize the auction immediately after the reveal
-  deadline for the cost of gas, denying the poster selection and wasting all
-  bids. Workers stake nothing at the auction layer, so the delay costs them
-  nothing.
+- **Timeout rule (re-ratified 2026-09-25):** the bridge originally gated
+  permissionless `timeout()` behind `revealDeadline + SELECTION_WINDOW`
+  (1 hour). Reverted to the ratified instant rule — `timeout()` is callable
+  the moment the reveal deadline passes. Rationale for instant: the poster's
+  agent submits `selectWinnerAndFund` deterministically at the deadline;
+  a timeout race has no payoff (timeout pays no reward, commits carry no
+  bonds), so griefing is irrational; worst case of a missed deadline is a
+  wasted round, not fund loss.
 - Execution durations (stake-deposit window, execution, challenge,
   adjudication) are owner-settable deployment parameters on the auction core;
   `minStakeBps` is immutable on the escrow (constructor). Concrete
@@ -98,9 +99,9 @@ The bridge (`contracts/CommitRevealAuction.sol`, commit `1b14d64`):
 - Status: compiles (solc 0.8.24, via-IR; 3,509 bytes). Integration tests and
   the calibration study are in flight.
 
-## Addendum 2026-09-26 — review findings and calibration (merge-readiness)
+## Addendum 2026-09-25 — review findings and calibration (merge-readiness)
 
-Adversarial review of the branch (2026-09-26) returned NOT-READY on two P0s,
+Adversarial review of the branch (2026-09-25) returned NOT-READY on two P0s,
 both fixed: (1) `pragma solidity 0.8.24` exact-pin broke `forge build`
 (foundry.toml pins solc 0.8.27) — relaxed to `^0.8.24` on all three
 contracts; (2) `marketplace/contract_net/keccak.py`'s eth-hash backend
@@ -108,7 +109,7 @@ contracts; (2) `marketplace/contract_net/keccak.py`'s eth-hash backend
 ImportError the entire money path. Also fixed: `minStakeBps` constructor
 bound (1..10000 bps), `ChallengerBondUpdated` event, zero-commit rejection.
 
-- **Stake calibration re-run (TOA, 2026-09-26):** recommend
+- **Stake calibration re-run (TOA, 2026-09-25):** recommend
   `minStakeBps = 5000` (50% of bid) and `challengerBond = 0.02 ETH`.
   Residual garbage margin +2.2% of bid at 5000 bps (fully closed ~5437 bps
   at mean adjudicator accuracy); honest participation stays strongly
@@ -158,3 +159,18 @@ calibrated `minStakeBps` fraction.
 
 24/24 escrow tests pass, including reverting-poster ghosting/dispute cases,
 griefing-worker optimistic timeout, and an end-to-end withdraw() pull flow.
+
+## Addendum 2026-09-25 — parameter ratification (user)
+
+- `minStakeBps = 5000` (50% of bid value) and `challengerBond = 0.02 ETH`
+  ratified as deployment parameters, per the TOA calibration study
+  (stake_calibration.md). Modeled: strategic-garbage profit +17.1% -> +2.2%
+  of bid; honest expected loss 4.7% -> 6.3%; frivolous disputes ~0.7%.
+  Caveats stand: modeled, not historical; poster vigilance is load-bearing
+  (at 30% dispute filing no stake level deters garbage); external
+  challengers have no bounty, so rational external enforcement is weak.
+- Poster fast-path (poster-triggered slash for machine-checkable
+  acceptance) remains DEFERRED: no onchain predicate for "machine-checkable"
+  exists yet, and unilateral poster slashing would reintroduce poster bias.
+  Slashing stays adjudicator-only until then.
+- Selection timeout re-ratified as INSTANT (see bridge addendum above).
