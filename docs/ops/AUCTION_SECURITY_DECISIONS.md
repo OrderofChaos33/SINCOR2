@@ -97,3 +97,38 @@ The bridge (`contracts/CommitRevealAuction.sol`, commit `1b14d64`):
   `minStakeBps` / challenger-bond values await the calibration re-run.
 - Status: compiles (solc 0.8.24, via-IR; 3,509 bytes). Integration tests and
   the calibration study are in flight.
+
+## Addendum 2026-09-26 — review findings and calibration (merge-readiness)
+
+Adversarial review of the branch (2026-09-26) returned NOT-READY on two P0s,
+both fixed: (1) `pragma solidity 0.8.24` exact-pin broke `forge build`
+(foundry.toml pins solc 0.8.27) — relaxed to `^0.8.24` on all three
+contracts; (2) `marketplace/contract_net/keccak.py`'s eth-hash backend
+(`pycryptodome`) was missing from requirements.txt — fresh installs would
+ImportError the entire money path. Also fixed: `minStakeBps` constructor
+bound (1..10000 bps), `ChallengerBondUpdated` event, zero-commit rejection.
+
+- **Stake calibration re-run (TOA, 2026-09-26):** recommend
+  `minStakeBps = 5000` (50% of bid) and `challengerBond = 0.02 ETH`.
+  Residual garbage margin +2.2% of bid at 5000 bps (fully closed ~5437 bps
+  at mean adjudicator accuracy); honest participation stays strongly
+  positive. `minStakeBps` is immutable — changing it needs a fresh
+  deployment, so the value must be decided before mainnet. Full tradeoff
+  curve in the study notes.
+- **Poster fast-path: explicitly deferred.** The ratified record allows the
+  poster to adjudicate directly when acceptance is machine-checkable, but
+  the contract cannot observe "machine-checkable" onchain, and letting the
+  poster slash unilaterally reintroduces the bias the optimistic layer
+  exists to prevent. Deferred until a checkable predicate (e.g. a test-
+  harness attestation format) is designed. Poster disputes remain free to
+  file; slashing stays adjudicator-only.
+- **Adjudicator trust assumption (documented):** the adjudicator is a single
+  key with unilateral 50%-slash power; nothing onchain yet involves the
+  optimistic batch layer. Poster+adjudicator collusion is profitable in
+  principle. Mitigation path: multisig/timelock adjudicator or onchain
+  batch-digest verification — tracked as follow-up work, required before
+  mainnet value flows.
+- **Lazy-poster stress result:** if the poster files disputes w.p. 0.30
+  instead of 0.85, no feasible stake deters garbage (EV ≈ +60% of bid).
+  The challenge channel (poster vigilance + optimistic batch watchers) is
+  load-bearing, not optional — reinforces the adjudication follow-ups above.

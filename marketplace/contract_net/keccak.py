@@ -20,10 +20,10 @@ from typing import Iterable
 
 try:
     from eth_hash.auto import keccak as _keccak
-except ImportError as exc:  # pragma: no cover - dependency declared in requirements.txt
+except ImportError as exc:  # pragma: no cover - backend declared in requirements.txt
     raise ImportError(
-        "marketplace.contract_net.keccak requires the 'eth-hash' package "
-        "(pulled in by eth-account>=0.10.0 in requirements.txt)."
+        "marketplace.contract_net.keccak requires a keccak backend for eth-hash "
+        "(declared as 'eth-hash[pycryptodome]' in requirements.txt)."
     ) from exc
 
 

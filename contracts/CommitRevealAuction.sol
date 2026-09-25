@@ -102,6 +102,7 @@ contract CommitRevealAuction {
     error NoCommit();
     error AlreadyRevealed();
     error BadReveal();
+    error EmptyCommit();
     error NotPoster();
     error NoRevealedBids();
     error NoEscrowManager();
@@ -165,6 +166,7 @@ contract CommitRevealAuction {
     function commit(bytes32 auctionId, bytes32 commitHash) external {
         Auction storage a = _liveAuction(auctionId);
         if (block.timestamp > a.commitDeadline) revert CommitWindowClosed();
+        if (commitHash == bytes32(0)) revert EmptyCommit();
         if (commits[auctionId][msg.sender].commit != bytes32(0)) revert AlreadyCommitted();
         commits[auctionId][msg.sender] = Commit({commit: commitHash, revealed: false, price: 0});
         bidders[auctionId].push(msg.sender);

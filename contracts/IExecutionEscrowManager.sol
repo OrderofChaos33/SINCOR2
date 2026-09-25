@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 /**
  * @title IExecutionEscrowManager
@@ -142,6 +142,8 @@ interface IExecutionEscrowManager {
         address indexed newAdjudicator
     );
 
+    event ChallengerBondUpdated(uint256 newBond);
+
     // --- Custom Errors ---
 
     error Unauthorized();
@@ -157,6 +159,7 @@ interface IExecutionEscrowManager {
     error BondExceedsRecordableLimit(uint256 max, uint256 provided);
     error FundingMismatch(uint256 expected, uint256 provided);
     error TransferFailed();
+    error InvalidStakeBps();
 
     // --- State-Changing Functions ---
 

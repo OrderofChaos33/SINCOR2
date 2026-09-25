@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import "./IExecutionEscrowManager.sol";
 
@@ -54,6 +54,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
         uint256 _challengerBond
     ) {
         if (_auctionCore == address(0) || _adjudicator == address(0)) revert Unauthorized();
+        if (_minStakeBps == 0 || _minStakeBps > 10_000) revert InvalidStakeBps();
         auctionCore = _auctionCore;
         adjudicator = _adjudicator;
         minStakeBps = _minStakeBps;
@@ -334,6 +335,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
         // Bound the bond so the uint96 dispute-record cast can never truncate.
         if (newBond > type(uint96).max) revert BondExceedsRecordableLimit(type(uint96).max, newBond);
         challengerBond = newBond;
+        emit ChallengerBondUpdated(newBond);
     }
 
     /// @inheritdoc IExecutionEscrowManager
