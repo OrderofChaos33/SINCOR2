@@ -195,6 +195,7 @@ class AgentSkill:
             "description":              self.description,
             "tags":                     self.tags,
             "examples":                 self.examples,
+            "quoteUrl":                 f"{PLATFORM_URL}/api/a2a/quote?skill_id={self.id}",
             "inputModes":               self.input_modes,
             "outputModes":              self.output_modes,
             "axmPriceWei":              str(self.axm_price_wei),
@@ -247,6 +248,10 @@ class AgentCard:
     security_requirements: List[Dict[str, Any]] = field(default_factory=list)
     documentation_url:     Optional[str] = None
     icon_url:              Optional[str] = None
+    # Machine-readable commerce entry points surfaced aggressively so agent
+    # clients can discover quoting and the full card registry without scraping.
+    quote_endpoint:        Optional[str] = None
+    agent_cards_url:       Optional[str] = None
     wallet:                Optional[str] = None
     chain_id:              Optional[int] = None
     payment_methods:       List[Dict[str, Any]] = field(default_factory=list)
@@ -278,6 +283,10 @@ class AgentCard:
             d["security"] = self.security_requirements
         if self.documentation_url:
             d["documentationUrl"] = self.documentation_url
+        if self.quote_endpoint:
+            d["quoteEndpoint"] = self.quote_endpoint
+        if self.agent_cards_url:
+            d["agentCardsUrl"] = self.agent_cards_url
         if self.icon_url:
             d["iconUrl"] = self.icon_url
         if self.wallet:
@@ -1073,7 +1082,8 @@ def build_agent_card() -> AgentCard:
             "professional-grade intelligence, content, and automation in return. "
             "Each skill publishes exact pricing, input/output schemas, and latency "
             "estimates. The top 5 skills offer a free quota for new external callers. "
-            "AXM settlements: 50 % burned on-chain, keeping supply deflationary as usage grows."
+            "Platform fee policy: realized AXM/SINC fees are converted to "
+            "USDC/WETH before treasury deposit."
         ),
         version=PLATFORM_VERSION,
         supported_interfaces=[
@@ -1100,6 +1110,10 @@ def build_agent_card() -> AgentCard:
         security_schemes={},
         security_requirements=[],
         documentation_url=f"{PLATFORM_URL}/docs/a2a",
+        # Surfaced aggressively: every machine-readable path links the quote
+        # endpoint and the full agent-card registry.
+        quote_endpoint=f"{PLATFORM_URL}/api/a2a/quote",
+        agent_cards_url=f"{PLATFORM_URL}/v1/a2a/cards",
         wallet=commerce["wallet"],
         chain_id=commerce["chain_id"],
         payment_methods=commerce["payment_methods"],
@@ -1669,6 +1683,8 @@ class A2ARouter:
                     "agentCard": f"{PLATFORM_URL}/.well-known/agent-card.json",
                     "legacyCard": f"{PLATFORM_URL}/.well-known/agent.json",
                     "agents": f"{PLATFORM_URL}/api/a2a/agents",
+                    "agentCards": f"{PLATFORM_URL}/v1/a2a/cards",
+                    "directory": f"{PLATFORM_URL}/v1/a2a/directory",
                 },
                 "methods": [
                     "message/send", "message/stream", "tasks/get", "tasks/cancel",

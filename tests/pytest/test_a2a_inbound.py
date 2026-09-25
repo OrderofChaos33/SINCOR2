@@ -325,3 +325,37 @@ def test_chain_probe_endpoint(client):
     assert "escrow" in body
     assert body.get("rpc") in ("skipped", "public_default", "custom", "https://mainnet.base.org") or "rpc" in body
 
+
+
+def test_machine_readable_surfaces_expose_quote_and_cards():
+    # Own client: the shared fixture's minimal app does not mount A2ARouter
+    # (well-known card + /docs/a2a live there, as in production).
+    from flask import Flask
+
+    from sincor2.a2a_bootstrap import register_a2a
+
+    reset_fabric()
+    app = Flask(__name__)
+    register_a2a(app)
+    register_inbound(app)
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    card = client.get("/.well-known/agent-card.json").get_json()
+    assert card["quoteEndpoint"].endswith("/api/a2a/quote")
+    assert card["agentCardsUrl"].endswith("/v1/a2a/cards")
+    assert all(s["quoteUrl"].endswith(f"skill_id={s['id']}") for s in card["skills"])
+
+    directory = client.get("/v1/a2a/directory").get_json()
+    for key in ("quote", "docs", "agentCard", "agentCards"):
+        assert directory[key].startswith("http"), key
+
+    registry = client.get("/v1/a2a/cards").get_json()
+    assert registry["count"] >= 1
+    for card in registry["cards"]:
+        for skill in card.get("skills", []) or []:
+            assert skill["quoteUrl"].endswith(f"skill_id={skill['id']}"), skill.get("id")
+
+    docs = client.get("/docs/a2a").get_json()
+    assert docs["quote"].endswith("/api/a2a/quote")
+    assert docs["discovery"]["agentCards"].endswith("/v1/a2a/cards")

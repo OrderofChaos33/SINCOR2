@@ -230,7 +230,44 @@ def mount(app: Flask) -> None:
             kpis["kya"] = kya_snapshot()
         except Exception:
             pass
-        return jsonify({"agents": list_agents(), "kpis": kpis})
+        try:
+            from sincor2.a2a_integration import PLATFORM_URL
+        except Exception:
+            PLATFORM_URL = ""
+        return jsonify({
+            "agents": list_agents(),
+            "kpis": kpis,
+            # Machine-readable entry points, surfaced aggressively.
+            "quote": f"{PLATFORM_URL}/api/a2a/quote",
+            "docs": f"{PLATFORM_URL}/docs/a2a",
+            "agentCard": f"{PLATFORM_URL}/.well-known/agent-card.json",
+            "agentCards": f"{PLATFORM_URL}/v1/a2a/cards",
+        })
+
+    @bp.get("/v1/a2a/cards")
+    def v1_cards():
+        """Full agent-card registry: platform card + vertical pack cards.
+
+        Every skill in every card carries a ``quoteUrl`` so agent clients
+        can price a skill without scraping HTML or guessing endpoints.
+        """
+        from sincor2.a2a_integration import PLATFORM_URL, build_agent_card
+
+        def _with_quote_urls(card: Dict[str, Any]) -> Dict[str, Any]:
+            for skill in card.get("skills", []) or []:
+                sid = skill.get("id")
+                if sid and "quoteUrl" not in skill:
+                    skill["quoteUrl"] = f"{PLATFORM_URL}/api/a2a/quote?skill_id={sid}"
+            return card
+
+        cards = [_with_quote_urls(build_agent_card().to_dict())]
+        try:
+            from verticals.loader import load_agent_cards
+
+            cards.extend(_with_quote_urls(c) for c in load_agent_cards())
+        except Exception as err:
+            logger.warning("[A2A] vertical cards unavailable: %s", err)
+        return jsonify({"cards": cards, "count": len(cards)})
 
     @bp.get("/v1/a2a/chain")
     def v1_chain():
