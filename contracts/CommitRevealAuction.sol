@@ -19,13 +19,12 @@ import "./IExecutionEscrowManager.sol";
 ///           so front-running an open is impractical. The opener is recorded
 ///           as the poster (the hiring party).
 ///         - `timeout` is permissionless: anyone may finalize the auction
-///           after the reveal deadline *plus the selection window*, giving
-///           the poster a grief-free grace period to select a winner.
+///           the instant the reveal deadline passes (ratified 2026-09-25).
 ///           Unrevealed commits are simply ignored — there are no
 ///           non-reveal bonds.
 ///         - A stalled coordinator can no longer leave commits hanging.
 ///
-///         Selection (added 2026-09-26):
+///         Selection (added 2026-09-25):
 ///         - Procurement Vickrey: the lowest revealed bidder wins and the
 ///           escrow is funded at the *second-lowest* revealed price. With a
 ///           single revealed bid the winner pays their own bid (first-price
@@ -41,9 +40,6 @@ contract CommitRevealAuction {
     /// @dev Default windows when openAuction is called with 0.
     uint64 public constant DEFAULT_COMMIT_WINDOW = 5 minutes;
     uint64 public constant DEFAULT_REVEAL_WINDOW = 5 minutes;
-    /// @dev Grace period after the reveal deadline during which only the
-    ///      poster may select a winner. Permissionless `timeout` opens after.
-    uint64 public constant SELECTION_WINDOW = 1 hours;
 
     struct Auction {
         bool opened;
@@ -107,6 +103,7 @@ contract CommitRevealAuction {
     error NoRevealedBids();
     error NoEscrowManager();
     error NotOwner();
+    error PriceTooLarge();
 
     constructor() {
         owner = msg.sender;
@@ -187,6 +184,12 @@ contract CommitRevealAuction {
         if (entry.revealed) revert AlreadyRevealed();
         bytes32 expected = keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash));
         if (expected != entry.commit) revert BadReveal();
+        // Prices are bounded to uint96: selectWinnerAndFund downcasts the
+        // Vickrey price into the escrow's uint96 bidAmount, and an explicit
+        // downcast truncates silently instead of reverting. Without this
+        // bound a bidder could reveal an unrepresentable price (>= 2^96 wei)
+        // at zero cost and brick selection for the whole auction.
+        if (price > type(uint96).max) revert PriceTooLarge();
         entry.revealed = true;
         entry.price = price;
         emit Revealed(auctionId, msg.sender, price);
@@ -242,7 +245,7 @@ contract CommitRevealAuction {
             auctionId,
             a.poster,
             winner,
-            uint96(price),
+            uint96(price), // safe: reveal() bounds prices to uint96.max
             creditToApply,
             p.executionDuration,
             p.disputeWindowDuration,
@@ -251,15 +254,16 @@ contract CommitRevealAuction {
         );
     }
 
-    /// @notice Finalize the auction after the reveal deadline plus the
-    ///         selection window. Permissionless. Unrevealed commits are
-    ///         ignored; there is nothing to refund because commits carry no
-    ///         bonds. If the poster selected a winner first, this reverts.
+    /// @notice Finalize the auction the instant the reveal deadline passes.
+    ///         Permissionless (ratified: no selection grace period).
+    ///         Unrevealed commits are ignored; there is nothing to refund
+    ///         because commits carry no bonds. If the poster selected a
+    ///         winner first, this reverts.
     function timeout(bytes32 auctionId) external {
         Auction storage a = auctions[auctionId];
         if (!a.opened) revert AuctionNotOpen();
         if (a.finalized) revert AlreadyFinalized();
-        if (block.timestamp <= a.revealDeadline + SELECTION_WINDOW) revert TooEarlyToTimeout();
+        if (block.timestamp <= a.revealDeadline) revert TooEarlyToTimeout();
         a.finalized = true;
         emit TimedOut(auctionId);
     }
