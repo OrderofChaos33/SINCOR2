@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: legacy Flask app. Production serves sincor2.mvp_app (see
+railway_start.py and the Procfile); local dev serves it via run.py.
+This module is kept only for the routes/tests still importing it
+(tests/test_value.py) and is slated for removal once they migrate.
+Do not add new routes, blueprints, or imports against sincor2.app.
+
 SINCOR Main Flask Application with Product Showcase and Waitlist System
 FIXED: Removed async/await for Flask compatibility
 ADDED: JWT Authentication for admin endpoints

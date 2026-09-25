@@ -26,7 +26,9 @@ jobs:
         env:
           PRIVATE_KEY: ${{ secrets.BASE_PRIVATE_KEY }}
         run: |
-          echo "PRIVATE_KEY=$PRIVATE_KEY" > .env
+          # PRIVATE_KEY is already in the environment (see env: above) and
+          # deploy-base.sh prefers it over onchain/.env — never write secrets
+          # to disk on a shared runner.
           chmod +x script/deploy-base.sh
           ./script/deploy-base.sh
 

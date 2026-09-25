@@ -46,7 +46,7 @@ memory_limits:
   semantic_items: 100000
 status: Active
 created_date: '2026-06-10'
-constitution_sha256: hash_E-toa-44_director
+constitution_sha256: sha256:adb9d0c70a30da783d4bc5bd7db41843ece4c2347d7986c462f5b17c73a57707
 description: >
   The Temporal Optimization Agent (TOA) orchestrates probabilistic forecasting,
   Monte Carlo scenario simulation, and wave-function-collapse–style path selection

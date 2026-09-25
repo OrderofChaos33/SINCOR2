@@ -7,7 +7,7 @@ name = "sincor2"
 version = "1.0.1"
 description = "A2A Marketplace and Autonomous Agent Ecosystem"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "OrderofChaos33", email = "support@getsincor.com"}
@@ -87,7 +87,7 @@ skip_gitignore = true
 known_first_party = ["sincor2"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
