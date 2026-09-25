@@ -85,7 +85,7 @@ def test_invite_k_rejects_out_of_band():
 
 
 def test_vickrey_lowest_wins_paid_second():
-    engine = ContractNetEngine(ContractNetConfig(invite_k=4, epsilon=0.12))
+    engine = ContractNetEngine(ContractNetConfig(invite_k=4, epsilon=0.12, allow_hmac_bids=True))
     roster = demo_roster()
     task = demo_tasks()[1]  # develop / test / deploy
     award = engine.run(task, roster, seed=11, force_junior=False)
@@ -120,7 +120,7 @@ def test_hmac_signature_roundtrip():
 
 
 def test_bad_signature_is_rejected():
-    engine = ContractNetEngine()
+    engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
     roster = demo_roster()
     task = demo_tasks()[0]
     award = engine.run(task, roster, seed=3, force_junior=False)
@@ -134,7 +134,7 @@ def test_bad_signature_is_rejected():
 
 
 def test_over_max_price_rejected():
-    engine = ContractNetEngine()
+    engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
     roster = demo_roster()
     task = TaskSpec(
         task_id="tiny-budget",
@@ -187,7 +187,7 @@ def test_uninvited_bid_rejected():
 def test_junior_reserved_pool_excludes_incumbents():
     roster = demo_roster()
     task = demo_tasks()[0]
-    engine = ContractNetEngine()
+    engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
     award = engine.run(task, roster, seed=0, force_junior=True)
     assert award.junior_reserved is True
     assert all(invite.junior for invite in award.invites)
@@ -211,7 +211,7 @@ def test_junior_fallback_when_no_juniors():
 
 
 def test_epsilon_band_over_many_auctions():
-    engine = ContractNetEngine(ContractNetConfig(epsilon=0.12, invite_k=4))
+    engine = ContractNetEngine(ContractNetConfig(epsilon=0.12, invite_k=4, allow_hmac_bids=True))
     roster = demo_roster()
     tasks = demo_tasks()
     awards = engine.run_many(tasks, roster, rounds=80, seed=21)
@@ -227,8 +227,8 @@ def test_shading_cannot_steal_vickrey_win():
     """Bidding above true min cannot improve the payoff versus truthful bidding."""
     roster = demo_roster()
     task = demo_tasks()[4]
-    honest = ContractNetEngine()
-    shaded = ContractNetEngine()
+    honest = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
+    shaded = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
     honest_award = honest.run(task, roster, seed=5, force_junior=False)
     winner = honest_award.winner_id
     assert winner

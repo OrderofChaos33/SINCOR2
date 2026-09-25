@@ -31,6 +31,7 @@ from .types import (
     ContractNetConfig,
     FilterResult,
     SealedBid,
+    SigType,
     TaskSpec,
 )
 from .vickrey import clear_vickrey
@@ -192,6 +193,11 @@ class ContractNetEngine:
             bid.valid = False
             bid.reject_reason = "expired"
             return
+        if bid.sig_type == SigType.HMAC.value and not self.config.allow_hmac_bids:
+            # HMAC is demo-only: priced auctions require secp256k1.
+            bid.valid = False
+            bid.reject_reason = "hmac_not_allowed"
+            return
         secret = signing_secret
         if not secret and agent is not None:
             secret = agent.signing_secret or demo_signing_secret(agent.agent_id)
@@ -218,6 +224,7 @@ class ContractNetEngine:
             sig_type=bid.sig_type,
             expected_address=bid.agent_wallet,
             signing_secret=secret,
+            typed_data=bid.typed_data,
         ):
             bid.valid = False
             bid.reject_reason = "bad_signature"

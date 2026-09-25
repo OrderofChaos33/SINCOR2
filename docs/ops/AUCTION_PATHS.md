@@ -31,8 +31,11 @@ Operator reference for SINCOR2's task-market auction code. Last verified 2026-09
   tamper-resistant — if an agent can influence its own stats, the auction is
   gameable regardless of mechanism.
 - **Commit-reveal contract** (`contracts/CommitRevealAuction.sol`): hides bids
-  from MEV during the commit window, but has **no onchain deadlines**. Timing
-  is enforced offchain; a stalled coordinator leaves commits hanging.
+  from MEV during the commit window. Onchain deadlines are now enforced:
+  per-auction 5-minute commit + 5-minute reveal windows (set at
+  `openAuction`, first call wins), and a permissionless `timeout()` finalizes
+  the auction after the reveal deadline — unrevealed commits are ignored, no
+  bonds. A stalled coordinator can no longer leave commits hanging.
 
 ## 3. Invariants operators must preserve
 

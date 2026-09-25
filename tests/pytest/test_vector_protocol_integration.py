@@ -38,7 +38,7 @@ def _agent(agent_id: str, skills: tuple[str, ...], *, schemas=("default",), budg
 
 def test_contract_net_bids_embed_epoch_binding_fields():
     router = TaskAuctionMemoryRouter()
-    engine = ContractNetEngine(ContractNetConfig(invite_k=3), memory_router=router)
+    engine = ContractNetEngine(ContractNetConfig(invite_k=3, allow_hmac_bids=True), memory_router=router)
 
     agents = [
         _agent("agent-a", ("research", "scrape", "analyze"), schemas=("a2a-v1",), budget=5000),
