@@ -112,6 +112,14 @@ def operator_console():
     return render_template("command_center.html")
 
 
+@bp.route("/command-center")
+def command_center():
+    # Canonical operator surface (dashboard links here). Same gate as /console.
+    if not _is_admin_session():
+        return redirect("/login?next=/command-center")
+    return render_template("command_center.html")
+
+
 @bp.route("/contact", methods=["GET", "POST"])
 def contact_page():
     if request.method == "GET":
@@ -134,6 +142,12 @@ def contact_page():
 @bp.route("/guides")
 def docs_page():
     return render_template("docs.html")
+
+
+@bp.route("/guides/<path:_slug>")
+def guides_alias(_slug):
+    # Retired deep guide URLs keep working for old links/bookmarks.
+    return redirect("/docs")
 
 
 @bp.route("/whitepaper")
