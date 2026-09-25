@@ -69,3 +69,31 @@ aspirations.
   are the reliable signal.
 - Research scripts were throwaway (`/tmp/*_study.py`, temp venv) and are not
   committed. Re-run before finalizing parameters.
+
+## Addendum 2026-09-26 — auction-core selection bridge (implemented)
+
+The sealed-bid core had no winner selection; the escrow module had no caller.
+The bridge (`contracts/CommitRevealAuction.sol`, commit `1b14d64`):
+
+- **Poster = opener.** `openAuction` records `msg.sender` as the poster
+  (hiring party). Signature unchanged.
+- **On-chain Vickrey.** `bidders[]` is tracked per auction at commit time;
+  `vickreyResult()` returns (lowest revealed bidder, second-lowest price),
+  first-price fallback for a sole bidder, ties to the earliest committer.
+- **`selectWinnerAndFund(auctionId, creditToApply)`**, poster-only, after the
+  reveal deadline: computes the Vickrey outcome and atomically calls
+  `escrow.initializeEscrow`, forwarding the poster's ETH. The escrow's exact
+  two-sided funding check makes mispriced funding revert atomically.
+- **Deviation from the ratified timeout rule:** permissionless `timeout()` is
+  now gated behind `revealDeadline + SELECTION_WINDOW` (1 hour), giving the
+  poster a grief-free selection grace period. Rationale: with an ungated
+  timeout, anyone could finalize the auction immediately after the reveal
+  deadline for the cost of gas, denying the poster selection and wasting all
+  bids. Workers stake nothing at the auction layer, so the delay costs them
+  nothing.
+- Execution durations (stake-deposit window, execution, challenge,
+  adjudication) are owner-settable deployment parameters on the auction core;
+  `minStakeBps` is immutable on the escrow (constructor). Concrete
+  `minStakeBps` / challenger-bond values await the calibration re-run.
+- Status: compiles (solc 0.8.24, via-IR; 3,509 bytes). Integration tests and
+  the calibration study are in flight.
