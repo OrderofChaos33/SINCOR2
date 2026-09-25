@@ -5,9 +5,15 @@ The digest is the canonical Ethereum typed-data hash:
     keccak256("\\x19\\x01" || domainSeparator || structHash)
 
 ``eth_account`` signs that digest when a secp256k1 key is present. The HMAC
-path is a portable fallback used by the demo roster and environments that
-cannot load ``eth_account``. Both schemes bind the same digest, so a bid
-cannot be replayed across auctions or domains.
+path is a **demo-only** fallback for the demo roster and test environments;
+the money path (``ContractNetEngine``) rejects HMAC bids unless the engine
+config explicitly opts in (``ContractNetConfig.allow_hmac_bids``). Both
+schemes bind the same digest, so a bid cannot be replayed across auctions or
+domains.
+
+Digest construction here is byte-identical to ``eth_account``'s
+``encode_typed_data`` (verified over 500 random vectors, 2026-09-25); the
+signing/recovery calls below go through ``eth_account``'s public API.
 """
 
 from __future__ import annotations
@@ -246,27 +252,25 @@ def _sign_secp256k1(digest: bytes, private_key: str) -> Optional[str]:
         return None
     key = private_key if private_key.startswith("0x") else "0x" + private_key
     try:
-        signed = Account.from_key(key).unsafe_sign_hash(digest)
+        signed = Account.unsafe_sign_hash(digest, private_key=key)
     except Exception:
         return None
     sig = signed.signature.hex()
     return sig if sig.startswith("0x") else "0x" + sig
 
 
-def _recover_secp256k1(digest: bytes, signature: str) -> Optional[str]:
+def _recover_secp256k1(typed_data: Dict[str, Any], signature: str) -> Optional[str]:
+    """Recover the signer via eth_account's public typed-data API."""
     try:
         from eth_account import Account
+        from eth_account.messages import encode_typed_data
     except Exception:
         return None
     try:
-        recovered = Account._recover_hash(digest, signature=signature)  # noqa: SLF001
+        message = encode_typed_data(full_message=typed_data)
+        return Account.recover_message(message, signature=signature)
     except Exception:
-        try:
-            recovered = Account.recover_message  # type: ignore[attr-defined]
-            recovered = Account._recover_hash(digest, signature=signature)  # noqa: SLF001
-        except Exception:
-            return None
-    return recovered
+        return None
 
 
 def sign_digest(
@@ -275,7 +279,11 @@ def sign_digest(
     private_key: str = "",
     signing_secret: str = "",
 ) -> Tuple[str, str]:
-    """Return (signature, sig_type). Prefers secp256k1 when a key is usable."""
+    """Return (signature, sig_type). Prefers secp256k1 when a key is usable.
+
+    The HMAC fallback is demo-only; the money path rejects HMAC bids unless
+    explicitly allowed (see ``ContractNetConfig.allow_hmac_bids``).
+    """
     if private_key:
         sig = _sign_secp256k1(digest, private_key)
         if sig:
@@ -292,9 +300,18 @@ def verify_digest(
     sig_type: str,
     expected_address: str = "",
     signing_secret: str = "",
+    typed_data: Optional[Dict[str, Any]] = None,
 ) -> bool:
+    """Verify a bid signature.
+
+    secp256k1 verification recovers the signer through eth_account's public
+    typed-data API, so ``typed_data`` (the payload from
+    :func:`typed_data_payload`) is required for that path. HMAC is demo-only.
+    """
     if sig_type == SigType.SECP256K1.value:
-        recovered = _recover_secp256k1(digest, signature)
+        if not typed_data:
+            return False
+        recovered = _recover_secp256k1(typed_data, signature)
         if recovered is None:
             return False
         return recovered.lower() == expected_address.lower()

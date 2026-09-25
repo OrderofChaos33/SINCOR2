@@ -60,6 +60,7 @@ class ContractNetConfig:
     domain_version: str = DOMAIN_VERSION
     vector_dim: int = VECTOR_DIM
     bid_ttl_seconds: int = 120
+    allow_hmac_bids: bool = False  # HMAC is demo-only; money path needs secp256k1
 
     def __post_init__(self) -> None:
         if not (self.invite_k_min <= self.invite_k <= self.invite_k_max):

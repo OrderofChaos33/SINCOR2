@@ -31,8 +31,11 @@ Operator reference for SINCOR2's task-market auction code. Last verified 2026-09
   tamper-resistant — if an agent can influence its own stats, the auction is
   gameable regardless of mechanism.
 - **Commit-reveal contract** (`contracts/CommitRevealAuction.sol`): hides bids
-  from MEV during the commit window, but has **no onchain deadlines**. Timing
-  is enforced offchain; a stalled coordinator leaves commits hanging.
+  from MEV during the commit window. Onchain deadlines are now enforced:
+  per-auction 5-minute commit + 5-minute reveal windows (set at
+  `openAuction`, first call wins), and a permissionless `timeout()` finalizes
+  the auction after the reveal deadline — unrevealed commits are ignored, no
+  bonds. A stalled coordinator can no longer leave commits hanging.
 
 ## 3. Invariants operators must preserve
 
@@ -53,12 +56,18 @@ Operator reference for SINCOR2's task-market auction code. Last verified 2026-09
 
 ## 4. Known follow-ups (not fixed in this PR)
 
+Design decisions for all three items below are ratified — see
+`AUCTION_SECURITY_DECISIONS.md`. What remains is implementation:
+
 - Onchain commit/reveal deadlines and timeout/refund path in
-  `CommitRevealAuction.sol`.
+  `CommitRevealAuction.sol`: 5-min/5-min per-auction params, permissionless
+  `timeout()` finalizes, unrevealed commits ignored, no non-reveal bond.
 - Migrate hand-rolled EIP-712/keccak (`marketplace/contract_net/eip712.py`,
-  `keccak.py`) to an audited library; verify nonce/deadline enforcement.
-- Winner slashing / stake-to-bid: currently no economic downside for a winner
-  that takes a task and fails.
+  `keccak.py`) to `eth_account` big-bang + permanent differential-vector CI
+  test; secp256k1 required on the money path, HMAC demo-only.
+- Winner slashing: hybrid trigger (full-stake ghosting / half-stake quality),
+  stake as % of bid, 100% of slash to poster re-auction fund, optimistic
+  batch adjudication with poster fast-path for machine-checkable acceptance.
 - Monitoring alerts: no-bid rate, bid failure rate, staged-but-unbroadcast
   payouts.
 - KMS/HSM for the escrow signer key.

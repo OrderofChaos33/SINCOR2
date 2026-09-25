@@ -22,10 +22,11 @@ contract_net_bp = Blueprint("contract_net", __name__, url_prefix="/api/contract-
 
 
 def _engine() -> ContractNetEngine:
+    """Demo/sandbox engine: the demo roster signs with HMAC (demo-only)."""
     platform = current_app.extensions.get("sincor_platform") or {}
     engine = platform.get("contract_net")
     if engine is None:
-        engine = ContractNetEngine()
+        engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
         platform = dict(platform)
         platform["contract_net"] = engine
         current_app.extensions["sincor_platform"] = platform
@@ -38,7 +39,9 @@ def _config_from_body(body: Dict[str, Any]) -> Optional[ContractNetConfig]:
     invite_k = clamp_invite_k(int(body.get("invite_k", 4)))
     epsilon = float(body.get("epsilon", 0.12))
     epsilon = min(0.15, max(0.10, epsilon))
-    return ContractNetConfig(invite_k=invite_k, epsilon=epsilon)
+    return ContractNetConfig(
+        invite_k=invite_k, epsilon=epsilon, allow_hmac_bids=True
+    )  # demo roster signs with HMAC (demo-only)
 
 
 @contract_net_bp.get("/health")
