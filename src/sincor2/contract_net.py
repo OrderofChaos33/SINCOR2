@@ -1,7 +1,18 @@
-"""Contract-Net auction evaluator (sync).
+"""Contract-Net auction evaluator (sync) — LEGACY / internal use.
 
 Score = (0.3 * Reputation) - (0.4 * bid^1.1) - (0.3 * minutes)
 Higher score wins. Cheaper + faster + more reputable.
+
+This evaluator is retained for the TOA self-improvement loop
+(``wardrobe/self_improve.py``) and tests. It is NOT the production auction
+path: bids and reputation are read from the store with no signature
+verification, so it is only safe with the in-process ``MemoryHashStore``.
+Passing any other store requires explicit ``allow_external_store=True``
+opt-in (see ``ContractNetEvaluator.__init__``).
+
+Canonical implementations:
+- ``marketplace.contract_net`` — sealed-bid Vickrey (the money path).
+- ``bidding_engine.BiddingEngine`` — multi-criteria first-price path.
 
 Redis keys (when a Redis-like store is attached)
 ------------------------------------------------
@@ -145,7 +156,9 @@ def stage_payout(
     digest = hashlib.sha256(
         f"{task_id}:{wallet}:{amount_axm}:{receipt_hash}".encode()
     ).hexdigest()
-    staged["tx_hash"] = "0x" + digest
+    # NOTE: this is a staged digest, not a real on-chain transaction hash.
+    # It must never be presented as one.
+    staged["staged_tx_digest"] = "0x" + digest
     if live_signer:
         staged["note"] = "signer present — broadcast still requires Railway ESCROW_SIGNER_KEY wiring"
     return staged
@@ -186,7 +199,29 @@ class MemoryHashStore:
 
 
 class ContractNetEvaluator:
-    def __init__(self, store: Optional[MemoryHashStore] = None) -> None:
+    def __init__(
+        self,
+        store: Optional[Any] = None,
+        *,
+        allow_external_store: bool = False,
+    ) -> None:
+        # Bids and reputation are read from the store with no signature
+        # verification, so this evaluator is only safe with the in-process
+        # MemoryHashStore. A shared/external store (e.g. Redis) requires
+        # explicit opt-in because anyone with write access could forge bids
+        # or inflate reputation.
+        if (
+            store is not None
+            and not isinstance(store, MemoryHashStore)
+            and not allow_external_store
+        ):
+            raise ValueError(
+                "ContractNetEvaluator bids are unauthenticated: external store "
+                f"(got {type(store).__name__}) requires explicit opt-in via "
+                "allow_external_store=True. For production auctions use "
+                "marketplace.contract_net (sealed-bid Vickrey) or "
+                "bidding_engine.BiddingEngine instead."
+            )
         self.store = store or MemoryHashStore()
 
     def evaluate_task_bids(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -279,7 +314,7 @@ class ContractNetEvaluator:
             mapping={
                 "status": "settled",
                 "settled_at": str(int(time.time())),
-                "payout_tx": receipt.get("tx_hash") or "",
+                "payout_tx": receipt.get("staged_tx_digest") or "",
             },
         )
         self.store.publish(
@@ -291,7 +326,7 @@ class ContractNetEvaluator:
                         "task_id": task_id,
                         "assigned_agent": agent,
                         "payout_axm": amount,
-                        "tx_hash": receipt.get("tx_hash"),
+                        "staged_tx_digest": receipt.get("staged_tx_digest"),
                     },
                 }
             ),

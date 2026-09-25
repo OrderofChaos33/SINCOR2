@@ -14,6 +14,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import traceback
 import uuid
@@ -210,8 +211,24 @@ class BiddingEngine:
         token_controller:
             Optional ``TokenBudgetController`` instance.  When provided, the
             engine checks every bidder's daily token ceiling before scoring.
-            Pass ``None`` to disable budget enforcement (dev/test only).
+            ``None`` disables budget enforcement — permitted outside
+            production only (with a warning); in production it raises
+            ``ValueError`` (fail-closed).
         """
+        if token_controller is None:
+            env = (
+                os.environ.get("ENVIRONMENT")
+                or os.environ.get("FLASK_ENV")
+                or ""
+            ).strip().lower()
+            if env in ("production", "prod"):
+                raise ValueError(
+                    "BiddingEngine requires a token_controller in production"
+                )
+            logger.warning(
+                "[BIDDING] token_controller=None — daily token budget "
+                "enforcement is DISABLED (dev/test only)"
+            )
         self._tc = token_controller
 
     # ------------------------------------------------------------------
@@ -383,10 +400,71 @@ class BiddingEngine:
                 task_dict, bids_as_dicts, task_market.agent_reputation
             )
 
-            # Write winner back to market (isolated — failure doesn't affect result)
+            # Write the engine's winner back to the market (isolated — failure
+            # doesn't affect the AuctionResult).  We deliberately do NOT call
+            # task_market.evaluate_and_award_task(task_id) here: it re-runs
+            # the market's own scoring and can crown a DIFFERENT winner, giving
+            # two sources of truth.  Instead we record this engine's result
+            # directly, mirroring that method's state changes with OUR winner.
             if result.ok:
                 try:
-                    task_market.evaluate_and_award_task(task_id)
+                    from sincor2.swarm_coordination import (
+                        BidStatus,
+                        TaskAssignment,
+                        TaskStatus,
+                    )
+
+                    market_task = task_market.active_tasks.get(task_id)
+                    market_bids = task_market.get_task_bids(task_id)
+                    winning_bid = None
+                    for b in market_bids:
+                        if getattr(b, "bid_id", "") == result.winner_bid_id:
+                            winning_bid = b
+                            break
+                    if market_task is None or winning_bid is None:
+                        raise ValueError("task or winning bid not found in market")
+
+                    assignment_id = f"A-{uuid.uuid4().hex[:8]}"
+                    assignment = TaskAssignment(
+                        assignment_id=assignment_id,
+                        task_id=task_id,
+                        agent_id=result.winner_agent_id,
+                        assigned_at=datetime.now().isoformat(),
+                        bid_accepted=winning_bid,
+                        progress_milestones=[],
+                        status_updates=[],
+                    )
+
+                    # Update task and bid status (same transitions as the
+                    # market's own award path)
+                    market_task.status = TaskStatus.AWARDED
+                    winning_bid.status = BidStatus.ACCEPTED
+                    for b in market_bids:
+                        if b is not winning_bid and getattr(b, "task_id", task_id) == task_id:
+                            b.status = BidStatus.REJECTED
+
+                    # Store assignment and persist (same as the market's path)
+                    task_market.active_assignments[assignment_id] = assignment
+                    task_market._save_assignments()
+                    task_market._save_active_tasks()
+
+                    # Mirror the market-efficiency bookkeeping
+                    try:
+                        time_to_award = (
+                            datetime.now()
+                            - datetime.fromisoformat(market_task.created_at)
+                        ).total_seconds() / 60
+                    except Exception:
+                        time_to_award = 0.0
+                    stats = getattr(task_market, "market_stats", None)
+                    if isinstance(stats, dict):
+                        current = stats.get("market_efficiency", 0)
+                        stats["market_efficiency"] = (current + time_to_award) / 2
+
+                    logger.info(
+                        "[BIDDING] market award recorded task=%s winner=%s assignment=%s",
+                        task_id, result.winner_agent_id, assignment_id,
+                    )
                 except Exception:
                     logger.warning(
                         "[BIDDING] market award write failed for task=%s (winner=%s)",
@@ -453,10 +531,20 @@ _engine_lock = threading.Lock()
 
 
 def get_bidding_engine(token_controller: Any = None) -> BiddingEngine:
-    """Return the module-level BiddingEngine singleton, creating it if needed."""
+    """Return the module-level BiddingEngine singleton, creating it if needed.
+
+    If the singleton already exists and a *different* non-None controller is
+    passed, a warning is logged — the new controller is not silently ignored.
+    """
     global _engine
     if _engine is None:
         with _engine_lock:
             if _engine is None:
                 _engine = BiddingEngine(token_controller=token_controller)
+    elif token_controller is not None and token_controller is not _engine._tc:
+        logger.warning(
+            "[BIDDING] get_bidding_engine called with a different "
+            "token_controller; singleton already initialised — keeping the "
+            "existing controller"
+        )
     return _engine

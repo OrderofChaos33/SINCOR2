@@ -197,7 +197,7 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
         task = fabric.tasks.get(task_id) or {}
         task["state"] = "settled" if receipt.get("ok") else "failed"
         task["payout_axm"] = amount
-        task["payout_tx"] = receipt.get("tx_hash")
+        task["payout_tx"] = receipt.get("staged_tx_digest")
         task["settled_at"] = ts
         if receipt.get("ok") and fabric.agents.get(agent_id):
             ag = fabric.agents[agent_id]
