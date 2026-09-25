@@ -5,6 +5,8 @@ This module is additive. It does not replace ``sincor2.bidding_engine.BiddingEng
 
 from __future__ import annotations
 
+import logging
+import os
 import time
 import uuid
 from dataclasses import dataclass
@@ -32,6 +34,9 @@ from .types import (
     TaskSpec,
 )
 from .vickrey import clear_vickrey
+
+
+logger = logging.getLogger(__name__)
 
 
 def make_auction_id(task_id: str, salt: str = "") -> str:
@@ -230,7 +235,11 @@ class ContractNetEngine:
         """Run one sealed round.
 
         ``shade`` maps agent_id → multiplier on true_min_price so tests can
-        prove that overbidding cannot improve payoff under Vickrey.
+        prove that overbidding cannot improve payoff under Vickrey. It is a
+        test-only hook: it is honored only when the ``SINCOR_ALLOW_SHADE``
+        environment variable is set to ``"1"`` (exact, case-sensitive match);
+        otherwise a non-empty ``shade`` is ignored with a warning and the
+        round runs unshaded.
         """
         import random
 
@@ -246,7 +255,15 @@ class ContractNetEngine:
         epoch_id = self._epoch_id
         epoch_merkle_root = self._epoch_merkle_root
         bids: List[SealedBid] = []
-        shade = shade or {}
+        if os.environ.get("SINCOR_ALLOW_SHADE") == "1":
+            shade = shade or {}
+        else:
+            if shade:
+                logger.warning(
+                    "shade parameter ignored because SINCOR_ALLOW_SHADE is not "
+                    "set to \"1\"; running unshaded"
+                )
+            shade = {}
         for invite in filtered.invited:
             agent = by_id[invite.agent_id]
             multiplier = float(shade.get(agent.agent_id, 1.0))
