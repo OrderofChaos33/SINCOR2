@@ -174,3 +174,31 @@ griefing-worker optimistic timeout, and an end-to-end withdraw() pull flow.
   exists yet, and unilateral poster slashing would reintroduce poster bias.
   Slashing stays adjudicator-only until then.
 - Selection timeout re-ratified as INSTANT (see bridge addendum above).
+
+## Addendum 2026-09-25 — selection-bridge adversarial review
+
+Dedicated review + 24-test eth-tester suite
+(tests/pytest/test_selection_bridge.py) for the auction-core selection
+bridge (selectWinnerAndFund / vickreyResult / instant timeout).
+
+Findings fixed:
+- Price-domain truncation (Medium): reveal() accepted any uint256 price,
+  but selectWinnerAndFund downcasts to the escrow's uint96 bidAmount, and
+  Solidity explicit downcasts truncate silently. A bidder could reveal an
+  unrepresentable price (>= 2^96 wei) at zero cost (no commit bonds) and,
+  landing as winner or second-lowest, brick selection for the auction
+  (poster forced to timeout()). No fund theft — the escrow's exact-funding
+  check still holds. Fix: reveal() now reverts PriceTooLarge above
+  type(uint96).max (~79B ETH, no legitimate bid exceeds it).
+
+Reviewed and accepted as-is (no change):
+- Unbounded bidders[] iteration: selection is O(n) over committers, but
+  each commit costs the griefer ~80k gas while timeout() stays O(1) and no
+  poster funds are ever at risk pre-selection. Economically irrational to
+  exploit; a cap would create a worse slot-filling grief vector.
+- Zero-price reveals: representable, but the escrow rejects bidAmount=0,
+  so selection reverts atomically and the poster falls back to timeout().
+- Timeout/select race: instant permissionless timeout can frontrun the
+  poster's selection; the poster loses gas only (ratified behavior).
+- Zero/degenerate durations: opener-is-poster makes weird windows
+  self-harm only; owner-set execution params are trusted config.

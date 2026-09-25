@@ -103,6 +103,7 @@ contract CommitRevealAuction {
     error NoRevealedBids();
     error NoEscrowManager();
     error NotOwner();
+    error PriceTooLarge();
 
     constructor() {
         owner = msg.sender;
@@ -183,6 +184,12 @@ contract CommitRevealAuction {
         if (entry.revealed) revert AlreadyRevealed();
         bytes32 expected = keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash));
         if (expected != entry.commit) revert BadReveal();
+        // Prices are bounded to uint96: selectWinnerAndFund downcasts the
+        // Vickrey price into the escrow's uint96 bidAmount, and an explicit
+        // downcast truncates silently instead of reverting. Without this
+        // bound a bidder could reveal an unrepresentable price (>= 2^96 wei)
+        // at zero cost and brick selection for the whole auction.
+        if (price > type(uint96).max) revert PriceTooLarge();
         entry.revealed = true;
         entry.price = price;
         emit Revealed(auctionId, msg.sender, price);
@@ -238,7 +245,7 @@ contract CommitRevealAuction {
             auctionId,
             a.poster,
             winner,
-            uint96(price),
+            uint96(price), // safe: reveal() bounds prices to uint96.max
             creditToApply,
             p.executionDuration,
             p.disputeWindowDuration,
