@@ -53,12 +53,18 @@ Operator reference for SINCOR2's task-market auction code. Last verified 2026-09
 
 ## 4. Known follow-ups (not fixed in this PR)
 
+Design decisions for all three items below are ratified — see
+`AUCTION_SECURITY_DECISIONS.md`. What remains is implementation:
+
 - Onchain commit/reveal deadlines and timeout/refund path in
-  `CommitRevealAuction.sol`.
+  `CommitRevealAuction.sol`: 5-min/5-min per-auction params, permissionless
+  `timeout()` finalizes, unrevealed commits ignored, no non-reveal bond.
 - Migrate hand-rolled EIP-712/keccak (`marketplace/contract_net/eip712.py`,
-  `keccak.py`) to an audited library; verify nonce/deadline enforcement.
-- Winner slashing / stake-to-bid: currently no economic downside for a winner
-  that takes a task and fails.
+  `keccak.py`) to `eth_account` big-bang + permanent differential-vector CI
+  test; secp256k1 required on the money path, HMAC demo-only.
+- Winner slashing: hybrid trigger (full-stake ghosting / half-stake quality),
+  stake as % of bid, 100% of slash to poster re-auction fund, optimistic
+  batch adjudication with poster fast-path for machine-checkable acceptance.
 - Monitoring alerts: no-bid rate, bid failure rate, staged-but-unbroadcast
   payouts.
 - KMS/HSM for the escrow signer key.
