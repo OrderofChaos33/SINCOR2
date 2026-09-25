@@ -132,3 +132,29 @@ bound (1..10000 bps), `ChallengerBondUpdated` event, zero-commit rejection.
   instead of 0.85, no feasible stake deters garbage (EV ≈ +60% of bid).
   The challenge channel (poster vigilance + optimistic batch watchers) is
   load-bearing, not optional — reinforces the adjudication follow-ups above.
+
+## Addendum 2026-09-25 — payout liveness fix (pull-payment fallback)
+
+The 24-test eth-tester suite (tests/pytest/test_execution_escrow.py) exposed a
+genuine liveness bug: all ETH payouts used push-style `_safeTransfer`, so a
+recipient whose receive() reverted permanently bricked escrow resolution --
+ghosting timeout, upheld-dispute resolution, and optimistic payout could never
+complete, locking poster ETH, worker stake, and challenger bonds with no
+recovery path.
+
+Fix (implemented in ExecutionEscrowManager):
+- `_safeTransfer` replaced by `_payout`: tries the push via low-level call;
+  on failure the funds are queued in `pendingWithdrawals[recipient]` (event
+  `PaymentQueued`) instead of reverting the transaction.
+- New `withdraw()`: lets any recipient pull their own queued funds; a still-
+  reverting recipient keeps its funds queued but never blocks anyone else.
+- The re-auction credit ledger remains non-withdrawable: `withdraw()` only
+  moves queued ETH, and no function converts credits into ETH.
+
+Also tightened: `depositStake` now requires the EXACT proportional stake
+(`msg.value == required`, reverts on overpayment). Previously overpayment was
+silently absorbed into `agentStake`, inflating the slash basis beyond the
+calibrated `minStakeBps` fraction.
+
+24/24 escrow tests pass, including reverting-poster ghosting/dispute cases,
+griefing-worker optimistic timeout, and an end-to-end withdraw() pull flow.

@@ -144,6 +144,9 @@ interface IExecutionEscrowManager {
 
     event ChallengerBondUpdated(uint256 newBond);
 
+    event PaymentQueued(address indexed to, uint256 amount);
+    event Withdrawn(address indexed to, uint256 amount);
+
     // --- Custom Errors ---
 
     error Unauthorized();
@@ -160,6 +163,7 @@ interface IExecutionEscrowManager {
     error FundingMismatch(uint256 expected, uint256 provided);
     error TransferFailed();
     error InvalidStakeBps();
+    error NothingToWithdraw();
 
     // --- State-Changing Functions ---
 
@@ -228,9 +232,13 @@ interface IExecutionEscrowManager {
     function setAdjudicator(address newAdjudicator) external;
     function setChallengerBond(uint256 newBond) external;
 
+    /// @notice Pull ETH queued for the caller after a failed push payout.
+    function withdraw() external;
+
     // --- Views ---
 
     function getEscrow(bytes32 auctionId) external view returns (Escrow memory);
     function getDispute(bytes32 auctionId) external view returns (Dispute memory);
     function getPosterReAuctionBalance(address poster) external view returns (uint256);
+    function pendingWithdrawals(address who) external view returns (uint256);
 }

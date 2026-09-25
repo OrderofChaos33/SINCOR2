@@ -61,6 +61,20 @@ contract GriefWorker {
         require(ok, "submit fwd failed");
     }
 }
+
+contract PullReceiver {
+    // Rejects push payouts until `accepting` is flipped, but can always
+    // pull queued funds via withdraw() once it can receive.
+    bool public accepting;
+    receive() external payable { require(accepting, "no-push"); }
+
+    function setAccepting(bool v) external { accepting = v; }
+
+    function pull(address mgr) external {
+        (bool ok, ) = mgr.call(abi.encodeWithSignature("withdraw()"));
+        require(ok, "pull failed");
+    }
+}
 """
 
 
@@ -102,6 +116,10 @@ def _compile():
             contracts["TestReceivers.sol"]["GriefWorker"]["abi"],
             contracts["TestReceivers.sol"]["GriefWorker"]["evm"]["bytecode"]["object"],
         ),
+        "pull": (
+            contracts["TestReceivers.sol"]["PullReceiver"]["abi"],
+            contracts["TestReceivers.sol"]["PullReceiver"]["evm"]["bytecode"]["object"],
+        ),
     }
 
 
@@ -126,7 +144,7 @@ class Env:
         addr = self.w3.eth.get_transaction_receipt(txh).contractAddress
         self.mgr = self.w3.eth.contract(address=addr, abi=abi)
         self.receivers = {}
-        for name in ("reverting", "ok", "grief"):
+        for name in ("reverting", "ok", "grief", "pull"):
             abi_r, bin_r = COMPILED[name]
             f = self.w3.eth.contract(abi=abi_r, bytecode=bin_r)
             txh = f.constructor().transact({"from": self.deployer, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
@@ -258,11 +276,18 @@ def test_initialize_reverts(env):
 # 2. Credit non-extractability
 # ---------------------------------------------------------------------------
 
-def test_no_withdraw_function_in_abi(env):
+def test_withdraw_is_eth_only_no_credit_exit(env):
+    # withdraw() exists now (pull-payment fallback for failed pushes), but
+    # the re-auction credit ledger still has NO eth exit: no function lets a
+    # poster convert ledger credits into withdrawable ETH.
     names = {e["name"] for e in env.mgr.abi if e.get("type") == "function"}
-    for bad in ("withdraw", "claim", "drawReAuctionCredit", "rescue", "sweep", "drain"):
+    assert "withdraw" in names  # pull-payment fallback
+    for bad in ("claim", "drawReAuctionCredit", "rescue", "sweep", "drain"):
         assert not any(bad in n.lower() for n in names), f"extractive fn present: {sorted(names)}"
     assert "posterReAuctionBalances" in names  # ledger is view-only
+    # withdraw() with nothing queued reverts; it can never mint from credits
+    with pytest.raises(TransactionFailed):
+        env.mgr.functions.withdraw().transact({"from": env.poster, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
 
 
 def test_constructor_rejects_out_of_range_min_stake_bps(env):
@@ -434,19 +459,19 @@ def test_deposit_stake_after_deadline_reverts(env):
             {"from": env.agent, "value": required, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
 
 
-def test_deposit_stake_overpayment_is_accepted_not_reverted(env):
-    # OBSERVED BEHAVIOR (deviation from an "exact amount only" reading):
-    # depositStake accepts msg.value ABOVE the required minimum and records
-    # the FULL overpaid amount as agentStake. Documented here; the funds are
-    # not lost (returned on reject / halved on upheld dispute).
+def test_deposit_stake_overpayment_reverts(env):
+    # Exact stake: overpayment reverts (InsufficientStake) rather than being
+    # absorbed into agentStake, so the slash basis can never silently exceed
+    # minStakeBps of the bid.
     w3, mgr = env.w3, env.mgr
     bid = w3.to_wei(2, "ether")
     required = bid * MIN_STAKE_BPS // 10000
     over = required + w3.to_wei(0.25, "ether")
     aid = new_aid(w3, "stake-over")
     env.init_escrow(aid, env.poster, env.agent, bid, 0, bid)
-    mgr.functions.depositStake(aid).transact({"from": env.agent, "value": over, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
-    assert env.get_escrow(aid)[5] == over
+    with pytest.raises(TransactionFailed):
+        mgr.functions.depositStake(aid).transact({"from": env.agent, "value": over, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    assert env.get_escrow(aid)[5] == 0 and env.get_escrow(aid)[13] == AWAITING_STAKE
 
 
 # ---------------------------------------------------------------------------
@@ -703,12 +728,11 @@ def test_unstaked_timeout_refunds_with_no_slash(env):
 # 10. Reverting-recipient robustness
 # ---------------------------------------------------------------------------
 
-def test_reverting_poster_bricks_ghosting_timeout(env):
-    """FINDING: payouts use push-style _safeTransfer which reverts the whole
-    transaction (TransferFailed) when the recipient's receive() reverts.
-    A reverting poster permanently bricks the escrow: ghosting timeout can
-    never complete, the agent's stake and the poster's own ETH are locked
-    with no recovery path (no rescue/pull function exists)."""
+def test_reverting_poster_queues_payout_on_ghosting_timeout(env):
+    """Push-try/pull-fallback: a reverting poster no longer bricks the escrow.
+    Ghosting timeout completes (stake slashed to the poster fund) and the
+    poster's ETH refund is queued in pendingWithdrawals instead of reverting
+    the transaction. The poster's own failure to receive never blocks anyone."""
     w3, mgr = env.w3, env.mgr
     poster = env.receivers["reverting"]
     bid = w3.to_wei(2, "ether")
@@ -718,18 +742,22 @@ def test_reverting_poster_bricks_ghosting_timeout(env):
     mgr.functions.depositStake(aid).transact({"from": env.agent, "value": stake, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
     env.travel_past(env.get_escrow(aid)[8])
 
-    with pytest.raises(TransactionFailed):
-        mgr.functions.timeout(aid).transact({"from": env.anyone, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
-    # atomic revert: nothing moved, escrow stuck in ExecutionPhase
-    esc = env.get_escrow(aid)
-    assert esc[13] == EXECUTION_PHASE and esc[5] == stake and esc[3] == bid
+    r = w3.eth.get_transaction_receipt(
+        mgr.functions.timeout(aid).transact({"from": env.anyone, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0}))
+    # escrow resolved: stake slashed into the poster fund
+    assert env.get_escrow(aid)[13] == SLASHED
+    assert mgr.functions.getPosterReAuctionBalance(poster).call() == stake
+    # poster's ETH refund queued, not lost, not blocking
+    assert mgr.functions.pendingWithdrawals(poster).call() == bid
+    queued = events_of(mgr, "PaymentQueued", r)
+    assert len(queued) == 1 and queued[0]["args"]["to"] == poster and queued[0]["args"]["amount"] == bid
 
 
-def test_reverting_poster_bricks_upheld_dispute_resolution(env):
-    """FINDING: same push-payment brittleness on the dispute path. With a
-    reverting poster, the adjudicator can NEVER finalize an upheld dispute:
-    every resolveQualityDispute call reverts, so the challenger's bond and
-    the worker's stake are locked indefinitely."""
+def test_reverting_poster_queues_refund_on_upheld_dispute(env):
+    """Same pull-fallback on the dispute path: an upheld dispute resolves
+    even when the poster reverts on receive. The poster refund is queued;
+    the challenger bond is still returned and the worker still gets the
+    unslashed half of stake."""
     w3, mgr = env.w3, env.mgr
     poster = env.receivers["reverting"]
     bid = w3.to_wei(2, "ether")
@@ -741,17 +769,19 @@ def test_reverting_poster_bricks_upheld_dispute_resolution(env):
     mgr.functions.openQualityDispute(aid, b"\x06" * 32).transact(
         {"from": env.challenger, "value": env.challenger_bond, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
 
-    with pytest.raises(TransactionFailed):
-        mgr.functions.resolveQualityDispute(aid, True).transact(
-            {"from": env.adjudicator, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
-    assert env.get_escrow(aid)[13] == DISPUTE_WINDOW
+    mgr.functions.resolveQualityDispute(aid, True).transact(
+        {"from": env.adjudicator, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    assert env.get_escrow(aid)[13] == FINALIZED
+    # poster refund queued; half the stake slashed to the poster fund
+    assert mgr.functions.pendingWithdrawals(poster).call() == bid
+    assert mgr.functions.getPosterReAuctionBalance(poster).call() == stake // 2
 
 
-def test_griefing_worker_bricks_optimistic_timeout(env):
-    """FINDING: a worker contract that reverts on receive bricks the
-    optimistic (no-dispute) timeout too. The payout is all-or-nothing, so a
-    griefing worker can permanently lock its own bid+stake AND deny the
-    poster any further progress on the auction."""
+def test_griefing_worker_queues_payout_on_optimistic_timeout(env):
+    """A griefing worker can no longer brick the optimistic timeout: the
+    payout is queued in pendingWithdrawals and the escrow finalizes. The
+    worker only hurts itself (it must pull, and its receive() still reverts
+    on withdraw -- its funds stay queued, nobody else is blocked)."""
     w3, mgr = env.w3, env.mgr
     grief = env.receivers["grief"]
     grief_worker = w3.eth.contract(address=grief, abi=COMPILED["grief"][0])
@@ -767,9 +797,38 @@ def test_griefing_worker_bricks_optimistic_timeout(env):
         {"from": env.deployer, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
 
     env.travel_past(env.get_escrow(aid)[11] + 600)
+    mgr.functions.timeout(aid).transact({"from": env.anyone, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    assert env.get_escrow(aid)[13] == FINALIZED
+    assert mgr.functions.pendingWithdrawals(grief).call() == bid + stake
+
+
+def test_withdraw_pull_flow(env):
+    """End-to-end pull: a receiver that rejects pushes can still retrieve
+    queued funds via withdraw()."""
+    w3, mgr = env.w3, env.mgr
+    puller = env.receivers["pull"]
+    puller_c = w3.eth.contract(address=puller, abi=COMPILED["pull"][0])
+    bid = w3.to_wei(2, "ether")
+    stake = bid * MIN_STAKE_BPS // 10000
+    aid = new_aid(w3, "pull-flow")
+    env.init_escrow(aid, puller, env.agent, bid, 0, bid)
+    mgr.functions.depositStake(aid).transact({"from": env.agent, "value": stake, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    env.travel_past(env.get_escrow(aid)[8])
+    mgr.functions.timeout(aid).transact({"from": env.anyone, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+
+    assert mgr.functions.pendingWithdrawals(puller).call() == bid
+    # withdrawing with nothing queued reverts
     with pytest.raises(TransactionFailed):
-        mgr.functions.timeout(aid).transact({"from": env.anyone, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
-    assert env.get_escrow(aid)[13] == DISPUTE_WINDOW
+        mgr.functions.withdraw().transact({"from": env.anyone, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    # the receiver starts accepting, then pulls its queued funds
+    puller_c.functions.setAccepting(True).transact({"from": env.deployer, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    before = w3.eth.get_balance(puller)
+    r = w3.eth.get_transaction_receipt(
+        puller_c.functions.pull(mgr.address).transact({"from": env.deployer, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0}))
+    assert mgr.functions.pendingWithdrawals(puller).call() == 0
+    assert w3.eth.get_balance(puller) == before + bid
+    evts = events_of(mgr, "Withdrawn", r)
+    assert len(evts) == 1 and evts[0]["args"]["to"] == puller and evts[0]["args"]["amount"] == bid
 
 
 def test_contract_wallet_poster_payout_succeeds(env):

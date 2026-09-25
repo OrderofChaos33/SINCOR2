@@ -36,6 +36,12 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
     /// @notice Ledger of re-auction credits per poster. Backed 1:1 by ETH held
     ///        in this contract (slashed stakes + slashed challenger bonds).
     mapping(address => uint256) public posterReAuctionBalances;
+    /// @notice Pull-payment ledger. ETH payouts use push-try/pull-fallback:
+    ///        if a recipient's receive() reverts, the funds are queued here
+    ///        instead of bricking escrow resolution. Anyone can pull their
+    ///        own queued funds via withdraw(); queued funds never block
+    ///        anyone else's resolution.
+    mapping(address => uint256) public pendingWithdrawals;
 
     modifier onlyAuctionCore() {
         if (msg.sender != auctionCore) revert Unauthorized();
@@ -121,7 +127,9 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
         if (block.timestamp > esc.stakeDepositDeadline) revert StakeDepositExpired();
 
         uint256 required = (uint256(esc.bidAmount) * minStakeBps) / 10000;
-        if (msg.value < required) revert InsufficientStake(required, msg.value);
+        // Exact stake: overpayment would silently inflate the slash basis,
+        // so it reverts rather than being absorbed into agentStake.
+        if (msg.value != required) revert InsufficientStake(required, msg.value);
 
         esc.agentStake = uint96(msg.value);
         esc.executionDeadline = uint32(block.timestamp + esc.executionDuration);
@@ -222,11 +230,11 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
         // ETH -- credits must not become extractable.
         posterReAuctionBalances[m.poster] += m.creditBacking;
 
-        _safeTransfer(m.poster, m.ethDeposited);
+        _payout(m.poster, m.ethDeposited);
         // Honest challenger gets their bond back; they were right.
-        if (d.challengerBond > 0) _safeTransfer(d.challenger, d.challengerBond);
+        if (d.challengerBond > 0) _payout(d.challenger, d.challengerBond);
         // Worker keeps the unslashed half of their stake.
-        if (stakeRefund > 0) _safeTransfer(m.selectedAgent, stakeRefund);
+        if (stakeRefund > 0) _payout(m.selectedAgent, stakeRefund);
     }
 
     /**
@@ -254,7 +262,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
         esc.creditBacking = 0;
         delete disputes[auctionId];
 
-        _safeTransfer(m.selectedAgent, payout);
+        _payout(m.selectedAgent, payout);
     }
 
     /// @inheritdoc IExecutionEscrowManager
@@ -271,7 +279,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
             esc.creditBacking = 0;
             posterReAuctionBalances[m.poster] += m.creditBacking;
             emit EscrowTimedOut(auctionId, m.poster, m.ethDeposited);
-            _safeTransfer(m.poster, m.ethDeposited);
+            _payout(m.poster, m.ethDeposited);
             return;
         }
 
@@ -288,7 +296,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
             emit SlashExecuted(
                 auctionId, m.selectedAgent, m.poster, SlashReason.ExecutionGhosting, m.agentStake, m.agentStake
             );
-            _safeTransfer(m.poster, m.ethDeposited);
+            _payout(m.poster, m.ethDeposited);
             return;
         }
 
@@ -316,7 +324,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
             delete disputes[auctionId];
             // State -> Finalized BEFORE any external call (reentrancy).
             _finalizePayout(esc, auctionId);
-            if (d.challengerBond > 0) _safeTransfer(d.challenger, d.challengerBond);
+            if (d.challengerBond > 0) _payout(d.challenger, d.challengerBond);
             return;
         }
 
@@ -368,16 +376,35 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
         esc.ethDeposited = 0;
         esc.creditBacking = 0;
         emit EscrowFinalized(auctionId, agent, bidAmount, stake);
-        _safeTransfer(agent, bidAmount + stake);
+        _payout(agent, bidAmount + stake);
     }
 
     /**
-     * @dev Low-level call instead of .transfer: agents may be contract
-     *      wallets, and the 2300-gas stipend would strand their payouts.
+     * @dev Push-try / pull-fallback payout. Low-level call instead of
+     *      .transfer: agents may be contract wallets, and the 2300-gas
+     *      stipend would strand their payouts. If the recipient's receive()
+     *      reverts, the funds are queued in pendingWithdrawals instead of
+     *      reverting the whole transaction -- a greedy recipient can never
+     *      brick escrow resolution or lock anyone else's funds.
      */
-    function _safeTransfer(address to, uint256 amount) internal {
+    function _payout(address to, uint256 amount) internal {
         if (amount == 0) return;
         (bool success, ) = payable(to).call{value: amount}("");
+        if (!success) {
+            pendingWithdrawals[to] += amount;
+            emit PaymentQueued(to, amount);
+        }
+    }
+
+    /// @notice Pull any ETH queued for the caller after a failed push payout.
+    /// @dev If the caller's receive() still reverts, this reverts and the
+    ///      funds stay queued -- the caller's problem alone, never a blocker.
+    function withdraw() external override {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+        pendingWithdrawals[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
         if (!success) revert TransferFailed();
+        emit Withdrawn(msg.sender, amount);
     }
 }
