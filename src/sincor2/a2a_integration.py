@@ -10,8 +10,10 @@ with the SINCOR agent swarm.
 AXIOM (AXM) is the settlement token for every inter-agent transaction:
   • External agents acquire AXM to pay for SINCOR agent tasks.
   • SINCOR agents earn AXM for fulfilled tasks (deposited to their wallet).
-  • A2A payment receipts: 50 % of each received AXM payment is burned to
-    0x...dEaD (deflationary mechanics); 50 % goes to the SINCOR treasury.
+  • A2A payment receipts: the platform fee (A2A_PLATFORM_FEE_BPS, default 5 %)
+    of each paid task routes 100 % to the SINCOR treasury.  No burn.
+    Realized AXM/SINC fees are converted to USDC/WETH before treasury
+    deposit (policy lock 2026-09-26; swap executor pending).
   • DEX trading fees: 80 % of Uniswap V4 AXM/WETH pool trading fees are
     routed (off-chain team commitment, publicly auditable on Basescan) to
     the ecosystem treasury.  These two fee streams are independent.
@@ -99,6 +101,14 @@ SINC_PRICE_PER_TASK = int(os.getenv("SINC_PRICE_PER_TASK", "1"))  # 1 SINC defau
 AXM_PRICE_PER_TASK = int(os.getenv("AXM_PRICE_PER_TASK", str(1 * 10**18)))  # 1 AXM default
 A2A_PLATFORM_FEE_BPS = int(os.getenv("A2A_PLATFORM_FEE_BPS", "500"))
 _BPS_DENOM = 10_000
+# Fee policy (locked 2026-09-26, no burn): the platform fee is
+# A2A_PLATFORM_FEE_BPS of each paid task, routed 100 % to the treasury.
+# Realized AXM/SINC fees are converted to USDC/WETH before treasury deposit.
+# Swap execution is not built yet — conversion records carry status "pending"
+# until the forwarder executor (signing key in the Secure Vault) is wired.
+# Deflationary mechanics are deferred to a later governance decision.
+FEE_CONVERSION_TARGETS = ("USDC", "WETH")
+FEE_CONVERSION_STATUS_PENDING = "pending"
 ALLOWED_A2A_ASSETS = frozenset({"AXM", "AXIOM"})
 
 PLATFORM_URL     = os.getenv("PLATFORM_URL", "https://getsincor.com")
@@ -424,7 +434,7 @@ SINCOR_SKILLS: List[AgentSkill] = [
             "Enrich and score this list of 50 SaaS companies for enterprise fit.",
             "Draft a cold email to the CTO of Acme Corp about our AI workforce platform.",
         ],
-        axm_price_wei=int(2.5 * 10**18),   # 2.5 AXM → 30-50% margin after 50% burn
+        axm_price_wei=int(2.5 * 10**18),   # 2.5 AXM → ~95% margin after 5% platform fee
         sinc_price=3,
         input_schema={
             "type": "object",
@@ -1899,6 +1909,11 @@ class A2ARouter:
                 (task_id + result_content).encode()
             ).hexdigest()
 
+            # Fee policy (locked 2026-09-26): 5 % platform fee, 100 % to treasury,
+            # no burn.  Conversion of realized AXM/SINC to USDC/WETH happens
+            # before treasury deposit; the swap executor is pending, so the
+            # obligation is recorded here.
+            platform_fee_wei = _compute_platform_fee_wei(task.axm_paid)
             proof = {
                 "proof_of_settlement": {
                     "task_id":        task.id,
@@ -1907,10 +1922,16 @@ class A2ARouter:
                     "tx_hash":        tx_hash or task.tx_hash or "",
                     "axm_paid_wei":   str(task.axm_paid),
                     "axm_paid_display": f"{task.axm_paid / 10**18:.4f} AXM",
-                    "burn_amount_wei":  str(task.axm_paid // 2),
-                    "burn_to":        DEAD_ADDRESS,
-                    "treasury_amount_wei": str(task.axm_paid - task.axm_paid // 2),
+                    "platform_fee_bps": A2A_PLATFORM_FEE_BPS,
+                    "platform_fee_wei":  str(platform_fee_wei),
+                    "burn_amount_wei":  "0",
+                    "treasury_amount_wei": str(platform_fee_wei),
                     "treasury":       TREASURY_WALLET,
+                    "fee_conversion": {
+                        "policy":  "convert to USDC/WETH before treasury deposit",
+                        "targets": list(FEE_CONVERSION_TARGETS),
+                        "status":  FEE_CONVERSION_STATUS_PENDING,
+                    },
                     "result_hash":    result_hash,
                     "settled_at":     task.updated_at,
                     "chain_id":       CHAIN_ID,
@@ -2247,16 +2268,26 @@ def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[s
     tx_hash = task.tx_hash
     axm_paid = task.axm_paid
     free_call = bool(task.metadata.get("free_call"))
+    # Fee policy (locked 2026-09-26): 5 % platform fee, 100 % to treasury,
+    # no burn.  Conversion to USDC/WETH is recorded as a pending obligation
+    # until the swap executor is built.
+    platform_fee_wei = _compute_platform_fee_wei(axm_paid)
     proof = {
         "task_id":             task.id,
         "skill_id":            skill_id,
         "caller_id":           caller_id,
         "tx_hash":             tx_hash or "",
         "axm_paid_wei":        str(axm_paid),
-        "burn_amount_wei":     str(axm_paid // 2),
-        "burn_to":             DEAD_ADDRESS,
-        "treasury_amount_wei": str(axm_paid - axm_paid // 2),
+        "platform_fee_bps":    A2A_PLATFORM_FEE_BPS,
+        "platform_fee_wei":    str(platform_fee_wei),
+        "burn_amount_wei":     "0",
+        "treasury_amount_wei": str(platform_fee_wei),
         "treasury":            TREASURY_WALLET,
+        "fee_conversion": {
+            "policy":  "convert to USDC/WETH before treasury deposit",
+            "targets": list(FEE_CONVERSION_TARGETS),
+            "status":  FEE_CONVERSION_STATUS_PENDING,
+        },
         "result_hash":         result_hash,
         "settled_at":          _now(),
         "chain_id":            CHAIN_ID,
@@ -2853,40 +2884,47 @@ def _dispatch_to_swarm_stream(task: A2ATask) -> Generator[str, None, None]:
 
 
 # ---------------------------------------------------------------------------
-# AXIOM burn-on-receipt helper  (called by billing / webhook handlers)
+# AXM receipt helper  (called by billing / webhook handlers)
 # ---------------------------------------------------------------------------
 
 def record_axm_receipt(tx_hash: str, amount_wei: int, from_address: str) -> Dict[str, Any]:
     """
-    Record an incoming AXM payment, schedule the 50 % burn.
+    Record an incoming AXM payment under the locked fee policy (2026-09-26):
+    5 % platform fee, 100 % to treasury, no burn.  Realized fees are converted
+    to USDC/WETH before treasury deposit; the swap executor is not built yet,
+    so this function records the conversion as a pending obligation.
 
     In production this is called by the on-chain event listener (web3.py or
-    a Moralis / Alchemy webhook).  The actual burn tx is signed and broadcast
-    by the billing-forwarder wallet; this function only records intent and
-    returns the expected burn amount.
+    a Moralis / Alchemy webhook).  The actual conversion txs are signed and
+    broadcast by the billing-forwarder wallet (key in the Secure Vault);
+    this function only records intent.
 
-    Returns a dict with burn_amount_wei and treasury_amount_wei for the caller
-    to act on.
+    Returns a dict with platform_fee_wei, treasury, and the fee_conversion
+    obligation for the caller to act on.
     """
-    burn_amount     = amount_wei // 2
-    treasury_amount = amount_wei - burn_amount
+    platform_fee_wei = _compute_platform_fee_wei(amount_wei)
 
     logger.info(
-        "AXM receipt: from=%s  amount=%.4f AXM  burn=%.4f AXM  treasury=%.4f AXM  tx=%s",
+        "AXM receipt: from=%s  amount=%.4f AXM  platform_fee=%.4f AXM  treasury=%s  tx=%s",
         from_address,
         amount_wei / 10**18,
-        burn_amount / 10**18,
-        treasury_amount / 10**18,
+        platform_fee_wei / 10**18,
+        TREASURY_WALLET,
         tx_hash,
     )
 
     return {
         "tx_hash":           tx_hash,
         "amount_wei":        amount_wei,
-        "burn_amount_wei":   burn_amount,
-        "burn_to":           DEAD_ADDRESS,
-        "treasury_amount_wei": treasury_amount,
+        "platform_fee_bps":  A2A_PLATFORM_FEE_BPS,
+        "platform_fee_wei":  platform_fee_wei,
+        "burn_amount_wei":   0,
         "treasury":          TREASURY_WALLET,
+        "fee_conversion": {
+            "policy":  "convert to USDC/WETH before treasury deposit",
+            "targets": list(FEE_CONVERSION_TARGETS),
+            "status":  FEE_CONVERSION_STATUS_PENDING,
+        },
         "axiom_contract":    AXIOM_CONTRACT,
         "chain_id":          CHAIN_ID,
     }

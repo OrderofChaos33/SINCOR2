@@ -1,0 +1,869 @@
+{
+  "contractName": "IExecutionEscrowManager",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "max",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "provided",
+          "type": "uint256"
+        }
+      ],
+      "name": "BondExceedsRecordableLimit",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "DisputeWindowExpired",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ExecutionWindowExpired",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "expected",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "provided",
+          "type": "uint256"
+        }
+      ],
+      "name": "FundingMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "required",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "provided",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientBond",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "required",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "available",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientReAuctionBalance",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "required",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "provided",
+          "type": "uint256"
+        }
+      ],
+      "name": "InsufficientStake",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidResultHash",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidStakeBps",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidState",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NothingToWithdraw",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "StakeDepositExpired",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TransferFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "Unauthorized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroBidAmount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousAdjudicator",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newAdjudicator",
+          "type": "address"
+        }
+      ],
+      "name": "AdjudicatorRotated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newBond",
+          "type": "uint256"
+        }
+      ],
+      "name": "ChallengerBondUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "payoutAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "stakeReturned",
+          "type": "uint256"
+        }
+      ],
+      "name": "EscrowFinalized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "selectedAgent",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "bidAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "ethDeposited",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "creditApplied",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "stakeDepositDeadline",
+          "type": "uint32"
+        }
+      ],
+      "name": "EscrowInitialized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "ethRefunded",
+          "type": "uint256"
+        }
+      ],
+      "name": "EscrowTimedOut",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "PaymentQueued",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "challenger",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "batchDigest",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "bondAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "resolutionDeadline",
+          "type": "uint32"
+        }
+      ],
+      "name": "QualityDisputeOpened",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "bool",
+          "name": "slashUpheld",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "slashedAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "QualityDisputeResolved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "ReAuctionFundCredited",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "creditUsed",
+          "type": "uint256"
+        }
+      ],
+      "name": "ReAuctionFundDrawn",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "resultHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "disputeDeadline",
+          "type": "uint32"
+        }
+      ],
+      "name": "ResultSubmitted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum IExecutionEscrowManager.SlashReason",
+          "name": "reason",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amountSlashed",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amountToReAuctionFund",
+          "type": "uint256"
+        }
+      ],
+      "name": "SlashExecuted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "stakeAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "executionDeadline",
+          "type": "uint32"
+        }
+      ],
+      "name": "StakeDeposited",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "Withdrawn",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "depositStake",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getDispute",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "challenger",
+              "type": "address"
+            },
+            {
+              "internalType": "uint96",
+              "name": "challengerBond",
+              "type": "uint96"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "batchDigest",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "disputeTimestamp",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct IExecutionEscrowManager.Dispute",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getEscrow",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "poster",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "selectedAgent",
+              "type": "address"
+            },
+            {
+              "internalType": "uint96",
+              "name": "bidAmount",
+              "type": "uint96"
+            },
+            {
+              "internalType": "uint96",
+              "name": "ethDeposited",
+              "type": "uint96"
+            },
+            {
+              "internalType": "uint96",
+              "name": "creditBacking",
+              "type": "uint96"
+            },
+            {
+              "internalType": "uint96",
+              "name": "agentStake",
+              "type": "uint96"
+            },
+            {
+              "internalType": "uint32",
+              "name": "stakeDepositDeadline",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "executionDuration",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "executionDeadline",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "disputeWindowDuration",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "adjudicationWindowDuration",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "resultSubmittedTimestamp",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "resultHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "enum IExecutionEscrowManager.ExecutionState",
+              "name": "state",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bool",
+              "name": "disputeActive",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct IExecutionEscrowManager.Escrow",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        }
+      ],
+      "name": "getPosterReAuctionBalance",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "selectedAgent",
+          "type": "address"
+        },
+        {
+          "internalType": "uint96",
+          "name": "bidAmount",
+          "type": "uint96"
+        },
+        {
+          "internalType": "uint96",
+          "name": "creditToApply",
+          "type": "uint96"
+        },
+        {
+          "internalType": "uint32",
+          "name": "executionDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "disputeWindowDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "adjudicationWindowDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "stakeDepositWindow",
+          "type": "uint32"
+        }
+      ],
+      "name": "initializeEscrow",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "batchDigest",
+          "type": "bytes32"
+        }
+      ],
+      "name": "openQualityDispute",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "who",
+          "type": "address"
+        }
+      ],
+      "name": "pendingWithdrawals",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bool",
+          "name": "slashWorker",
+          "type": "bool"
+        }
+      ],
+      "name": "resolveQualityDispute",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newAdjudicator",
+          "type": "address"
+        }
+      ],
+      "name": "setAdjudicator",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "newBond",
+          "type": "uint256"
+        }
+      ],
+      "name": "setChallengerBond",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "resultHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "submitResult",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "timeout",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x"
+}

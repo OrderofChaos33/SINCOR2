@@ -359,3 +359,36 @@ def test_machine_readable_surfaces_expose_quote_and_cards():
     docs = client.get("/docs/a2a").get_json()
     assert docs["quote"].endswith("/api/a2a/quote")
     assert docs["discovery"]["agentCards"].endswith("/v1/a2a/cards")
+
+
+def test_fee_policy_locked_no_burn():
+    from sincor2.a2a_integration import (
+        A2A_PLATFORM_FEE_BPS,
+        FEE_CONVERSION_TARGETS,
+        record_axm_receipt,
+    )
+
+    assert A2A_PLATFORM_FEE_BPS == 500
+    receipt = record_axm_receipt("0x" + "cc" * 32, 10 * 10**18, "0x" + "dd" * 20)
+    assert receipt["platform_fee_bps"] == 500
+    assert receipt["platform_fee_wei"] == (10 * 10**18 * 500) // 10_000
+    assert receipt["burn_amount_wei"] == 0
+    assert "burn_to" not in receipt
+    conv = receipt["fee_conversion"]
+    assert conv["status"] == "pending"
+    assert set(conv["targets"]) == set(FEE_CONVERSION_TARGETS) == {"USDC", "WETH"}
+
+
+def test_treasury_journal_marks_fee_conversion():
+    import sys
+    from decimal import Decimal
+
+    sys.path.insert(0, "marketplace")
+    from settlement import SettlementCoordinator
+
+    coordinator = SettlementCoordinator()
+    event = coordinator.route_to_treasury(Decimal("0.5"), "AXM")
+    assert event["fee_conversion"]["status"] == "pending"
+    assert event["fee_conversion"]["targets"] == ["USDC", "WETH"]
+    usdc = coordinator.route_to_treasury(Decimal("1"), "USDC")
+    assert "fee_conversion" not in usdc

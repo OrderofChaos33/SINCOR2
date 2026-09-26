@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
+import hmac as _hmac
+
 from sincor2.a2a_inbound import (
     AUCTION_WINDOW_MS,
     HEARTBEAT_TTL_S,
@@ -26,8 +28,100 @@ from sincor2.contract_net import calculate_bid_score, stage_payout
 
 logger = logging.getLogger("sincor.a2a.inbound")
 
+# ---------------------------------------------------------------------------
+# Sealed-bid commit/reveal shim.
+#
+# Ratified auction decisions (docs/ops/AUCTION_SECURITY_DECISIONS.md) call for
+# 5-minute commit + 5-minute reveal windows per auction with a permissionless
+# timeout. The Solidity CommitRevealAuction is not yet deployed and has no
+# Python wiring, so this shim implements the same commit/reveal discipline in
+# the Python task flow as a forward-compatible stepping stone.
+#
+# Commitment scheme — mirrors CommitRevealAuction.reveal EXACTLY:
+#     keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash))
+# where price is the bid in wei as a 32-byte big-endian integer, salt is a
+# 32-byte bidder-chosen nonce, and agentIdHash = keccak256(agent_id).
+# A client that computes commitments for this shim can reuse the identical
+# preimage when the on-chain contracts go live.
+#
+# Documented divergences from the contracts:
+#  * Task binding is STRUCTURAL, not cryptographic: the contract keys commits
+#    by (auctionId, msg.sender) in a mapping; the shim keys fabric.commits by
+#    (task_id, agent_id). The commitment itself does not hash the task id.
+#  * Selection stays composite-score (score desc, earliest-commit tiebreak)
+#    among REVEALED bids. Vickrey (lowest wins, second-lowest funds) lives in
+#    the Solidity contracts and is intentionally NOT reimplemented here.
+#  * No staking/slashing in the shim: sinc_stake is recorded at registration
+#    but not enforced. Stake mechanics arrive with the contract wiring.
+# ---------------------------------------------------------------------------
+COMMIT_WINDOW_MS = 5 * 60 * 1000
+REVEAL_WINDOW_MS = 5 * 60 * 1000
+UINT96_MAX = 2**96 - 1
 
-def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float = 1.5) -> Dict[str, Any]:
+
+def _keccak256(data: bytes) -> bytes:
+    try:
+        from eth_hash.auto import keccak
+        return keccak(data)
+    except Exception:
+        from sha3 import keccak_256  # type: ignore
+        return keccak_256(data).digest()
+
+
+def sealed_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
+    """Compute the sealed-bid commitment.
+
+    Mirrors ``CommitRevealAuction.reveal``: ``keccak256(abi.encodePacked(
+    bytes32(price), salt, agentIdHash))``. ``salt`` must be 32 bytes;
+    ``agentIdHash`` is ``keccak256(agent_id)`` so the bidder's identity is
+    pseudonymous in the commitment itself.
+    """
+    if price_wei <= 0:
+        raise ValueError("price_wei must be positive")
+    if len(salt) != 32:
+        raise ValueError("salt must be 32 bytes")
+    agent_id_hash = _keccak256(str(agent_id).encode("utf-8"))
+    return _keccak256(int(price_wei).to_bytes(32, "big") + bytes(salt) + agent_id_hash)
+
+
+def _parse_bytes32_hex(value: Any, field: str) -> bytes:
+    raw = str(value or "").strip().lower()
+    if raw.startswith("0x"):
+        raw = raw[2:]
+    if len(raw) != 64:
+        raise ValueError(f"{field} must be 32 bytes as hex (64 hex chars)")
+    try:
+        return bytes.fromhex(raw)
+    except ValueError:
+        raise ValueError(f"{field} is not valid hex")
+
+
+def _commit_key(task_id: str, agent_id: str) -> str:
+    return f"{task_id}\x00{agent_id}"
+
+
+def _sealed_agent_checks(fabric: Any, task: Dict[str, Any], agent_id: str) -> Dict[str, Any]:
+    """Shared bidder eligibility checks (mirrors place_bid's fail-fast set)."""
+    agent = fabric.agents.get(agent_id)
+    if not agent:
+        raise KeyError("unknown agent")
+    ts = _now_ms()
+    if ts - int(agent.get("last_heartbeat") or 0) > HEARTBEAT_TTL_S * 1000:
+        raise PermissionError("agent heartbeat expired")
+    if not (set(agent.get("capability_tags") or []) & set(task.get("tags") or [])):
+        raise PermissionError("capability mismatch")
+    if task.get("requires_merit") and float(agent.get("reputation") or 0) < 0.15:
+        raise PermissionError("merit required")
+    return agent
+
+
+def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float = 1.5,
+                sealed: bool = False) -> Dict[str, Any]:
+    """Create a task. When ``sealed`` is true the task runs a sealed-bid
+    commit/reveal auction: per-task 5-minute commit + 5-minute reveal windows
+    (ratified in docs/ops/AUCTION_SECURITY_DECISIONS.md) are stamped at
+    creation, and only commit/reveal bids are accepted — the legacy plaintext
+    ``POST /v1/a2a/bids`` path is rejected for sealed tasks."""
     skill = str(skill or "").strip().lower()
     if not skill:
         raise ValueError("skill is required")
@@ -51,6 +145,12 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
             "state": "open",
             "created_at": ts,
             "auction_closes_at": None,
+            "sealed": bool(sealed),
+            # Sealed-bid windows are anchored at creation, mirroring the
+            # contract's commitDeadline = open + commitW,
+            # revealDeadline = open + commitW + revealW.
+            "commit_deadline": (ts + COMMIT_WINDOW_MS) if sealed else None,
+            "reveal_deadline": (ts + COMMIT_WINDOW_MS + REVEAL_WINDOW_MS) if sealed else None,
             "assigned_to": None,
             "winner_score": None,
             "winning_bid_axm": None,
@@ -60,7 +160,7 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
         }
         fabric.tasks[task_id] = task
         snap = dict(task)
-    fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty})
+    fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed)})
     return snap
 
 
@@ -72,13 +172,30 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
         task = fabric.tasks.get(task_id)
         if not task or task["state"] not in ("open", "auction"):
             return dict(task) if task else None
-        closes_at = task.get("auction_closes_at")
-        if closes_at is None or ts < int(closes_at):
-            return dict(task)
-        cands = [b for b in fabric.bids.values() if b.get("task_id") == task_id]
+        ghosted = 0
+        if task.get("sealed"):
+            # Sealed-bid shim: the reveal deadline governs closing. Anyone may
+            # trigger close once it passes (permissionless timeout, mirroring
+            # the ratified instant-timeout). Only REVEALED bids are eligible;
+            # unrevealed commits are dropped (ghosted).
+            if ts < int(task.get("reveal_deadline") or 0):
+                return dict(task)
+            prefix = f"{task_id}\x00"
+            ghosted = sum(
+                1 for key, c in fabric.commits.items()
+                if key.startswith(prefix) and not c.get("revealed")
+            )
+        else:
+            closes_at = task.get("auction_closes_at")
+            if closes_at is None or ts < int(closes_at):
+                return dict(task)
+        cands = [b for b in fabric.bids.values()
+                 if b.get("task_id") == task_id and b.get("revealed", True)]
         if not cands:
             task["state"] = "expired"
             task["expired_reason"] = "auction_timeout"
+            if task.get("sealed"):
+                task["ghosted_commits"] = ghosted
             return dict(task)
         winner = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))[0]
         task.update({
@@ -89,6 +206,8 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
             "time_est_ms": winner.get("time_est_ms"),
             "assigned_at": ts,
         })
+        if task.get("sealed"):
+            task["ghosted_commits"] = ghosted
         snap = dict(task)
         tags = list(task.get("tags") or [])
     fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
@@ -122,6 +241,13 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
 
 
 def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) -> Dict[str, Any]:
+    """Legacy plaintext bid path.
+
+    DEPRECATED in favor of the sealed-bid commit/reveal flow
+    (``POST /v1/a2a/bids/commit`` + ``POST /v1/a2a/bids/reveal``). Kept
+    working for pre-shim clients: a plaintext bid is treated as an
+    immediately-revealed bid. Rejected for sealed tasks.
+    """
     if bid_axm <= 0 or time_est_sec <= 0:
         raise ValueError("bid_axm and estimated_seconds must be positive")
     fabric = get_fabric()
@@ -133,6 +259,8 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
             raise KeyError("unknown task")
         if task["state"] not in ("open", "auction"):
             raise RuntimeError("auction closed")
+        if task.get("sealed"):
+            raise RuntimeError("sealed auction: use commit/reveal, not plaintext bids")
         agent = fabric.agents.get(agent_id)
         if not agent:
             raise KeyError("unknown agent")
@@ -154,6 +282,10 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
             "reputation": float(agent.get("reputation") or 0),
             "score": score,
             "received_at": ts,
+            # Legacy plaintext bids count as immediately revealed so the
+            # sealed-bid close path (revealed-only) stays backward compatible.
+            "revealed": True,
+            "via": "legacy-plaintext",
         }
         fabric.bids[bid_id] = bid
         task["state"] = "auction"
@@ -167,6 +299,137 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
         timer = threading.Timer(AUCTION_WINDOW_MS / 1000.0, lambda: close_auction(task_id))
         timer.daemon = True
         timer.start()
+    return snap
+
+
+def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
+    """Publish a sealed-bid commitment (commit phase).
+
+    Mirrors ``CommitRevealAuction.commit``: one commitment per (task, agent),
+    rejected after the commit deadline. The commitment is opaque to the
+    platform until reveal — the bid price stays hidden.
+    """
+    commitment_bytes = _parse_bytes32_hex(commitment, "commitment")
+    if commitment_bytes == bytes(32):
+        raise ValueError("commitment must not be zero")
+    fabric = get_fabric()
+    ts = _now_ms()
+    close_auction(task_id)
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task:
+            raise KeyError("unknown task")
+        if not task.get("sealed"):
+            raise RuntimeError("task is not a sealed auction")
+        if task["state"] not in ("open", "auction"):
+            raise RuntimeError("auction closed")
+        commit_deadline = task.get("commit_deadline")
+        if commit_deadline is not None and ts > int(commit_deadline):
+            raise PermissionError("commit window closed")
+        _sealed_agent_checks(fabric, task, agent_id)
+        key = _commit_key(task_id, agent_id)
+        if key in fabric.commits:
+            raise RuntimeError("already committed")
+        record = {
+            "task_id": task_id,
+            "agent_id": agent_id,
+            "commitment": "0x" + commitment_bytes.hex(),
+            "committed_at": ts,
+            "revealed": False,
+            "revealed_at": None,
+            "price_wei": None,
+        }
+        fabric.commits[key] = record
+        task["state"] = "auction"
+        snap = dict(record)
+        tags = list(task.get("tags") or [])
+    fabric.publish("bid.committed", tags, {"task_id": task_id, "agent_id": agent_id})
+    return snap
+
+
+# Neutral default when a reveal omits estimated_seconds. The time estimate is
+# NOT part of the sealed commitment (the contract binds price only), so it is
+# just a scheduling hint; the default is deliberately uncompetitive to
+# incentivize bidders to state their real estimate.
+DEFAULT_REVEAL_TIME_EST_SEC = 3600
+
+
+def reveal_bid(task_id: str, agent_id: str, bid_axm: float, nonce: Any,
+               time_est_sec: int = DEFAULT_REVEAL_TIME_EST_SEC) -> Dict[str, Any]:
+    """Reveal a sealed bid (reveal phase).
+
+    Mirrors ``CommitRevealAuction.reveal``: recomputes the commitment from
+    (price_wei, salt, agent_id) with a constant-time comparison, enforces the
+    reveal window, and rejects double-reveals. A valid reveal materializes a
+    normal bid record (``revealed=True``) eligible for ``close_auction``.
+    """
+    bid_axm = float(bid_axm)
+    if bid_axm <= 0:
+        raise ValueError("bid_axm must be positive")
+    if int(time_est_sec) <= 0:
+        raise ValueError("estimated_seconds must be positive")
+    salt = _parse_bytes32_hex(nonce, "nonce")
+    price_wei = int(round(bid_axm * 1e18))
+    if price_wei > UINT96_MAX:
+        # Mirror the contract's PriceTooLarge guard: the on-chain selection
+        # downcasts to uint96, so an unrepresentable price must be rejected
+        # at reveal, not discovered at selection time.
+        raise ValueError("price exceeds uint96 max")
+    fabric = get_fabric()
+    ts = _now_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task:
+            raise KeyError("unknown task")
+        if not task.get("sealed"):
+            raise RuntimeError("task is not a sealed auction")
+        key = _commit_key(task_id, agent_id)
+        commit = fabric.commits.get(key)
+        if not commit:
+            raise KeyError("unknown commitment: commit first")
+        if commit.get("revealed"):
+            raise RuntimeError("already revealed")
+        # Window is checked before task state so a late reveal reports the
+        # specific "reveal window closed" error rather than generic
+        # "auction closed".
+        commit_deadline = task.get("commit_deadline")
+        reveal_deadline = task.get("reveal_deadline")
+        if commit_deadline is not None and reveal_deadline is not None:
+            if ts <= int(commit_deadline):
+                raise PermissionError("reveal window not open yet")
+            if ts > int(reveal_deadline):
+                raise PermissionError("reveal window closed")
+        if task["state"] not in ("open", "auction"):
+            raise RuntimeError("auction closed")
+        expected = sealed_commitment(price_wei, salt, agent_id)
+        if not _hmac.compare_digest(expected, bytes.fromhex(commit["commitment"][2:])):
+            raise ValueError("commitment mismatch: wrong bid_axm or nonce")
+        agent = _sealed_agent_checks(fabric, task, agent_id)
+        score = calculate_bid_score(bid_axm, int(time_est_sec), float(agent.get("reputation") or 0))
+        bid_id = "bid_" + uuid.uuid4().hex[:10]
+        bid = {
+            "bid_id": bid_id,
+            "task_id": task_id,
+            "agent_id": agent_id,
+            "bid_axm": bid_axm,
+            "price_wei": price_wei,
+            "estimated_seconds": int(time_est_sec),
+            "time_est_ms": int(time_est_sec) * 1000,
+            "reputation": float(agent.get("reputation") or 0),
+            "score": score,
+            # Ties break to the earliest COMMIT (not the earliest reveal),
+            # mirroring the ratified Vickrey tiebreak.
+            "received_at": int(commit["committed_at"]),
+            "revealed": True,
+            "via": "commit-reveal",
+        }
+        fabric.bids[bid_id] = bid
+        commit["revealed"] = True
+        commit["revealed_at"] = ts
+        commit["price_wei"] = price_wei
+        snap = dict(bid)
+        tags = list(task.get("tags") or [])
+    fabric.publish("bid.revealed", tags, {"task_id": task_id, "agent_id": agent_id, "bid_id": bid_id})
     return snap
 
 
@@ -238,7 +501,7 @@ def attach_market_routes(bp: Blueprint) -> None:
     def v1_tasks():
         body = request.get_json(silent=True) or {}
         try:
-            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5))
+            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")))
             return jsonify(task), 201
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
@@ -261,6 +524,61 @@ def attach_market_routes(bp: Blueprint) -> None:
             return _http_error(str(err), 403)
         except RuntimeError as err:
             return _http_error(str(err), 409)
+
+    @bp.post("/v1/a2a/bids/commit")
+    def v1_bids_commit():
+        """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}.
+
+        commitment = keccak256(abi.encodePacked(bytes32(price_wei), salt,
+        keccak256(agent_id))) as 0x hex — the exact CommitRevealAuction
+        preimage, so clients can reuse it on-chain later.
+        """
+        body = request.get_json(silent=True) or {}
+        try:
+            record = commit_bid(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), body.get("commitment"))
+            return jsonify(record), 201
+        except ValueError as err:
+            return _http_error(str(err), 400)
+        except KeyError as err:
+            return _http_error(str(err), 404)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
+        except RuntimeError as err:
+            return _http_error(str(err), 409)
+
+    @bp.post("/v1/a2a/bids/reveal")
+    def v1_bids_reveal():
+        """Sealed-bid reveal phase. Body: {task_id, agent_id, bid_axm, nonce}
+        (+ optional estimated_seconds). The commitment is recomputed and
+        compared in constant time; only valid reveals become bids."""
+        body = request.get_json(silent=True) or {}
+        try:
+            bid = reveal_bid(
+                str(body.get("task_id") or ""),
+                str(body.get("agent_id") or ""),
+                float(body.get("bid_axm") or 0),
+                body.get("nonce"),
+                int(body.get("estimated_seconds") or DEFAULT_REVEAL_TIME_EST_SEC),
+            )
+            return jsonify(bid), 201
+        except ValueError as err:
+            return _http_error(str(err), 400)
+        except KeyError as err:
+            return _http_error(str(err), 404)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
+        except RuntimeError as err:
+            return _http_error(str(err), 409)
+
+    @bp.post("/v1/a2a/tasks/<task_id>/close")
+    def v1_tasks_close(task_id):
+        """Permissionless auction close (timeout). Anyone may call once the
+        reveal deadline (sealed) or auction window (legacy) has passed;
+        mirrors the ratified permissionless timeout()."""
+        task = close_auction(str(task_id or ""))
+        if task is None:
+            return _http_error("unknown task", 404)
+        return jsonify(task), 200
 
     @bp.post("/v1/a2a/proofs")
     @bp.post("/api/v1/proofs")

@@ -73,6 +73,9 @@ class Fabric:
         self.tasks: Dict[str, Dict[str, Any]] = {}
         self.bids: Dict[str, Dict[str, Any]] = {}
         self.proofs: Dict[str, Dict[str, Any]] = {}
+        # Sealed-bid shim: (task_id, agent_id) -> commitment record. Keyed
+        # with a NUL separator; see a2a_inbound_market.commit_bid.
+        self.commits: Dict[str, Dict[str, Any]] = {}
         self.events: deque = deque(maxlen=500)
         self.event_seq = 0
 

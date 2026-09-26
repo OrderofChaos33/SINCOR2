@@ -306,6 +306,15 @@ class SettlementCoordinator:
             'amount': str(amount.quantize(_QUANT)),
             'routed_at': datetime.now(timezone.utc).isoformat(),
         }
+        # Fee policy lock (2026-09-26): realized AXM/SINC fees are converted to
+        # USDC/WETH before treasury deposit.  The swap executor is pending, so
+        # the obligation is recorded on the journal event.
+        if sym in ('AXIOM', 'SINC'):
+            event['fee_conversion'] = {
+                'policy': 'convert to USDC/WETH before treasury deposit',
+                'targets': ['USDC', 'WETH'],
+                'status': 'pending',
+            }
         self.treasury_journal.append(event)
         return event
 

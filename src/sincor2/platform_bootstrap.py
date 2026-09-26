@@ -38,7 +38,16 @@ def bootstrap_platform(app: Flask) -> Dict[str, Any]:
     except Exception as err:
         logger.warning("A2A production bootstrap skipped: %s", err)
 
-    storage_path = _REPO_ROOT / "marketplace" / "agent_cards.json"
+    # Never let tests mutate the repo's registry file: bootstrap writes the
+    # merged vertical cards on register(), and test runs were dirtying
+    # marketplace/agent_cards.json as a side effect (broke stash workflows).
+    _test_env = os.getenv("FLASK_ENV", "").lower() == "test" or os.getenv("ENVIRONMENT", "").lower() == "test"
+    if _test_env:
+        import tempfile
+
+        storage_path = Path(tempfile.mkdtemp(prefix="sincor-test-cards-")) / "agent_cards.json"
+    else:
+        storage_path = _REPO_ROOT / "marketplace" / "agent_cards.json"
     registry = AgentCardRegistry(storage_path=storage_path)
 
     registered = 0
