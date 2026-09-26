@@ -162,8 +162,43 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
         }
         fabric.tasks[task_id] = task
         snap = dict(task)
-    fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed)})
+    if sealed:
+        _anchor_onchain_auction(fabric, task_id)
+        with fabric.lock:
+            snap = dict(fabric.tasks[task_id])
+    fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
     return snap
+
+
+def _anchor_onchain_auction(fabric: Any, task_id: str) -> None:
+    """Open the onchain auction mirroring a sealed Python task.
+
+    No-op unless AUCTION_ONCHAIN_ANCHOR=1.  Fail-closed: if the open
+    transaction fails (or the relayer is misconfigured) the Python task is
+    removed and creation raises — a task must not promise onchain
+    settlement without the auction existing.
+    """
+    from sincor2.onchain.auction_relayer import (
+        anchor_enabled,
+        get_relayer,
+    )
+
+    if not anchor_enabled():
+        return
+    relayer = get_relayer()
+    try:
+        if relayer is None:
+            raise RuntimeError("relayer is not configured")
+        opened = relayer.open_auction(task_id)
+    except Exception as err:
+        with fabric.lock:
+            fabric.tasks.pop(task_id, None)
+        raise RuntimeError(f"onchain auction open failed: {err}")
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if task is not None:
+            task["auction_id"] = opened["auction_id"]
+            task["onchain_open_tx"] = opened["tx_hash"]
 
 
 def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
@@ -240,7 +275,43 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 logger.warning("stake release failed for %s: %s", agent_id, err)
     if snap["state"] == "assigned":
         fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
+        if snap.get("auction_id"):
+            _fund_onchain_escrow(fabric, task_id)
     return snap
+
+
+def _fund_onchain_escrow(fabric: Any, task_id: str) -> None:
+    """Poster step: select the onchain Vickrey winner and fund the escrow.
+
+    No-op unless AUCTION_ONCHAIN_FUND=1.  Fail-LOUD, never brick: the Python
+    assignment stands regardless; the outcome is recorded on the task for
+    operator retry.  When nobody bid onchain (the normal case while the
+    Python API is the primary path) this is a graceful no-op marked
+    ``python_only``.
+    """
+    from sincor2.onchain.auction_relayer import fund_enabled, get_relayer
+
+    if not fund_enabled():
+        return
+    relayer = get_relayer()
+    outcome = "failed"
+    try:
+        if relayer is None:
+            raise RuntimeError("relayer is not configured")
+        vickrey = relayer.read_vickrey(task_id)
+        if vickrey is None:
+            outcome = "python_only"  # no onchain reveals; nothing to fund
+        else:
+            _winner, price_wei = vickrey
+            tx_hash = relayer.select_winner_and_fund(task_id, price_wei)
+            outcome = tx_hash
+    except Exception as err:
+        logger.error("onchain escrow funding failed for task %s: %s",
+                     task_id, err)
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if task is not None:
+            task["onchain_funding"] = outcome
 
 
 def expire_stale_assignments() -> List[Dict[str, Any]]:
