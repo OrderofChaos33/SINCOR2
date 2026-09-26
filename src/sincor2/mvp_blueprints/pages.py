@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date, datetime, timezone
 from flask import Blueprint
 
 bp = Blueprint("mvp_pages", __name__)
@@ -19,7 +20,29 @@ def _bind_mvp():
 _bind_mvp()
 
 GENESIS_COOKIE = "sincor_genesis"
-GENESIS_LAUNCH_AT = "2026-09-26T16:00:00.000Z"
+GENESIS_LAUNCH_AT = "2026-11-09T00:00:00.000Z"  # legacy constant; SINCOR_LAUNCH_DATE is authoritative
+_LAUNCH_DATE_DEFAULT = "2026-11-09"
+
+
+def _launch_date() -> date:
+    """UTC launch date. SINCOR_LAUNCH_DATE (YYYY-MM-DD); bad values fall back to the default, never 500."""
+    raw = (os.environ.get("SINCOR_LAUNCH_DATE") or "").strip() or _LAUNCH_DATE_DEFAULT
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except Exception:
+        return date(2026, 11, 9)
+
+
+def _launch_at_iso() -> str:
+    return _launch_date().strftime("%Y-%m-%dT00:00:00.000Z")
+
+
+def _genesis_count() -> int:
+    try:
+        from sincor2.genesis_cohort import genesis_count
+        return int(genesis_count())
+    except Exception:
+        return 0
 
 
 def _template_exists(name: str) -> bool:
@@ -36,7 +59,60 @@ def _support_email() -> str:
 
 @bp.route("/")
 def index():
-    return render_template("home.html")
+    # Launch gate (recalibrated to 2026-11-09; override via SINCOR_LAUNCH_DATE).
+    # Bypass order, all intentional and documented:
+    #   1. ?inner=1 — the genesis gate embeds the live homepage as a blurred
+    #      backdrop via an iframe to /?inner=1. Serving the gate here would
+    #      recurse infinitely (gate inside gate), so the backdrop always gets
+    #      the real homepage.
+    #   2. Admin sessions — the operator previews the live homepage.
+    #   3. Genesis claim cookie — claiming a genesis pass lifts the gate for
+    #      that browser (the gate's own copy promises "the current site stays
+    #      behind this gate until you claim").
+    # Everything else (APIs, webhooks, /buy, auth, A2A) is deliberately NOT
+    # gated here — only the public homepage is.
+    if request.args.get("inner") == "1":
+        return render_template("home.html")
+    if _is_admin_session():
+        return render_template("home.html")
+    if request.cookies.get(GENESIS_COOKIE) == "claimed":
+        return render_template("home.html")
+    if datetime.now(timezone.utc).date() >= _launch_date():
+        return render_template("home.html")
+    return render_template(
+        "genesis_gate.html",
+        launch_at=_launch_at_iso(),
+        genesis_count=_genesis_count(),
+    )
+
+
+@bp.route("/api/genesis/claim", methods=["POST"])
+@limiter.limit("10 per minute")
+def genesis_claim_api():
+    """Genesis pass claim — the signup target of the launch gate's form.
+
+    Public and intentionally ungated by launch date (it must work before
+    launch). A successful claim sets the genesis cookie, which lifts the
+    homepage gate for that browser.
+    """
+    try:
+        from sincor2.genesis_cohort import claim as genesis_claim
+    except Exception:
+        return jsonify({"ok": False, "error": "Claim service unavailable."}), 503
+    payload = request.get_json(silent=True) or {}
+    result = genesis_claim(
+        payload.get("email", ""),
+        payload.get("password", ""),
+        payload.get("wallet", ""),
+    )
+    status = 200 if result.get("ok") else 400
+    resp = jsonify(result)
+    if result.get("ok"):
+        resp.set_cookie(
+            GENESIS_COOKIE, "claimed",
+            max_age=365 * 86400, httponly=True, samesite="Lax",
+        )
+    return resp, status
 
 
 @bp.route("/genesis")
@@ -118,6 +194,122 @@ def command_center():
     if not _is_admin_session():
         return redirect("/login?next=/command-center")
     return render_template("command_center.html")
+
+
+def _admin_page(template: str, next_path: str, **ctx):
+    """Render an admin-only page; non-admins bounce to login like /command-center."""
+    if not _is_admin_session():
+        return redirect("/login?next=" + next_path)
+    return render_template(template, **ctx)
+
+
+@bp.route("/admin-dashboard")
+def admin_dashboard_page():
+    # Jinja-resilient: metrics=None / activity=[] render as "—" placeholders.
+    return _admin_page("admin_dashboard.html", "/admin-dashboard", metrics=None, activity=[])
+
+
+@bp.route("/consciousness-dashboard")
+def consciousness_dashboard_page():
+    # Socket.IO-only interface; renders its 3D console and shows a
+    # "Disconnected" state when the realtime backend is absent. No HTTP
+    # data dependencies.
+    return _admin_page("consciousness_transfer_dashboard.html", "/consciousness-dashboard")
+
+
+@bp.route("/executive-dashboard")
+def executive_dashboard_page():
+    return _admin_page("executive_dashboard.html", "/executive-dashboard")
+
+
+@bp.route("/professional-dashboard")
+def professional_dashboard_page():
+    # StrictUndefined is on: every {{ }} var must be passed. Values below are
+    # honest placeholders (zeros / "—"), not live business data.
+    return _admin_page(
+        "professional_dashboard.html",
+        "/professional-dashboard",
+        company_name="SINCOR",
+        industry="technology",
+        current_date=datetime.now(timezone.utc).strftime("%B %d, %Y"),
+        metrics={
+            "new_leads_today": 0,
+            "appointments_scheduled": 0,
+            "completion_rate": 0,
+            "customer_satisfaction": 0,
+            "revenue_today": "—",
+        },
+        industry_metrics={
+            "vehicles_completed": 0,
+            "monthly_revenue": "—",
+            "avg_service_value": "—",
+            "booking_conversion": "—",
+            "repeat_customers": "—",
+            "next_available": "—",
+        },
+        agents={"coordination_score": 0, "active_count": 0},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Dashboard data APIs (admin-only). The executive dashboard fetches these on
+# load; the values below are honest placeholders (zeros / "Unknown"), not
+# telemetry — wire them to real sources before treating the numbers as live.
+# ---------------------------------------------------------------------------
+
+@bp.route("/api/executive-metrics")
+def executive_metrics_api():
+    if not _is_admin_session():
+        return jsonify({"error": "Admin session required."}), 401
+    return jsonify({
+        "leads": {"total_leads": 0, "status": "No live feed"},
+        "system": {"health_score": 0, "health_status": "Unknown", "uptime_days": 0, "uptime_percentage": 0},
+        "agents": {"coordination_score": 0, "total_agents_available": 0, "status": "Unknown"},
+        "database": {"total_databases": 0, "total_size_mb": 0, "status": "Unknown"},
+        "performance": {"status": "Monitoring"},
+    })
+
+
+@bp.route("/api/recent-activity")
+def recent_activity_api():
+    if not _is_admin_session():
+        return jsonify({"error": "Admin session required."}), 401
+    return jsonify([])
+
+
+# ---------------------------------------------------------------------------
+# Professional-dashboard action stubs. The 8 endpoints below back the
+# dashboard's lead-gen / integration buttons. No backend for any of them
+# exists in the codebase (never did, not even legacy app.py), so these are
+# explicit capability stubs: they return the JSON contract the page's JS
+# expects with success=false and a plain-language reason, instead of 404ing
+# into a cryptic parse error. They are NOT functional integrations.
+# ---------------------------------------------------------------------------
+
+_PROFESSIONAL_STUB_ERRORS = {
+    "generate-leads": "Lead generation is not connected on this deployment.",
+    "create-campaign": "Campaign automation is not connected on this deployment.",
+    "analyze-opportunities": "Opportunity analysis is not connected on this deployment.",
+    "connect-calendar": "Calendar integration is not connected on this deployment.",
+    "connect-payments": "Payments integration is not connected on this deployment.",
+    "connect-email": "Email integration is not connected on this deployment.",
+    "connect-sms": "SMS integration is not connected on this deployment.",
+    "test-email": "Email sending is not connected on this deployment.",
+}
+
+
+def _register_professional_stubs():
+    for _path, _message in _PROFESSIONAL_STUB_ERRORS.items():
+        def _view(_message=_message):
+            if not _is_admin_session():
+                return jsonify({"success": False, "error": "Admin session required."}), 401
+            return jsonify({"success": False, "error": _message}), 501
+
+        _view.__name__ = "professional_stub_" + _path.replace("-", "_")
+        bp.route("/" + _path, methods=["POST"])(_view)
+
+
+_register_professional_stubs()
 
 
 @bp.route("/contact", methods=["GET", "POST"])
