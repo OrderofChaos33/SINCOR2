@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SINCOR — Humans were the bottleneck</title>
-  <meta name="description" content="SINCOR is the first autonomous workforce. Forty-two AI agents. Zero humans. Infinite scale. Genesis launches September 26, 2026. Sign up to claim a free genesis airdrop, A2A protocol access, and the Agent Gateway.">
+  <meta name="description" content="SINCOR is the first autonomous workforce. Forty-two AI agents. Zero humans. Infinite scale. Genesis launches November 9, 2026. Sign up to claim a free genesis airdrop, A2A protocol access, and the Agent Gateway.">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
   <meta property="og:title" content="SINCOR — Humans were the bottleneck">
-  <meta property="og:description" content="Genesis launches September 26, 2026. Claim a free genesis airdrop, A2A access, and the Agent Gateway.">
+  <meta property="og:description" content="Genesis launches November 9, 2026. Claim a free genesis airdrop, A2A access, and the Agent Gateway.">
   <meta property="og:image" content="https://getsincor.com/static/sincor_og.jpg">
   <meta property="og:url" content="https://getsincor.com/">
   <meta name="theme-color" content="#050814">
@@ -59,27 +59,34 @@
     .clock { margin-top: 22px; }
     .clock label { display: block; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--cyan); margin-bottom: 10px; }
     .units { display: flex; gap: 8px; flex-wrap: wrap; }
-    .unit { min-width: 64px; text-align: center; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); backdrop-filter: blur(8px); }
+    .unit { min-width: 64px; text-align: center; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); backdrop-filter: blur(8px); position: relative; overflow: hidden; }
+    .unit::before { content: ""; position: absolute; top: 0; left: 12%; right: 12%; height: 1px; background: linear-gradient(90deg, transparent, rgba(6,182,212,0.7), transparent); }
     .unit b { display: block; font-family: Sora, sans-serif; font-size: 28px; font-variant-numeric: tabular-nums; }
     .unit span { display: block; margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
     .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; list-style: none; }
     .chips li { border: 1px solid var(--border); background: rgba(139,92,246,0.1); color: var(--purple-light); border-radius: 999px; padding: 6px 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; }
-    .card { width: 100%; max-width: 420px; border: 1px solid var(--border-bright); background: var(--surface); backdrop-filter: blur(18px); border-radius: 18px; padding: 22px; box-shadow: 0 0 80px rgba(139,92,246,0.28); }
+    .card { width: 100%; max-width: 420px; border: 1px solid var(--border-bright); background: var(--surface); backdrop-filter: blur(18px); border-radius: 18px; padding: 22px; box-shadow: 0 0 80px rgba(139,92,246,0.28); position: relative; overflow: hidden; }
+    .card::before { content: ""; position: absolute; top: 0; left: 8%; right: 8%; height: 1px; background: linear-gradient(90deg, transparent, rgba(196,181,253,0.8), rgba(6,182,212,0.8), transparent); }
     .card h2 { font-family: Sora, sans-serif; font-size: 15px; font-weight: 600; }
     .card .sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cyan); margin: 6px 0 16px; }
     label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 6px; }
     input { width: 100%; border-radius: 10px; border: 1px solid var(--border); background: rgba(5,8,20,0.65); color: var(--fg); padding: 12px 14px; font: 15px 'Plus Jakarta Sans', sans-serif; }
     input:focus { outline: 2px solid rgba(6,182,212,0.45); border-color: var(--cyan); }
-    button { width: 100%; margin-top: 18px; border: 0; border-radius: 10px; padding: 14px; font: 700 15px Sora, sans-serif; cursor: pointer; color: #041016; background: linear-gradient(135deg, var(--cyan), var(--purple-light)); box-shadow: 0 0 24px rgba(6,182,212,0.28); }
-    button:hover { filter: brightness(1.06); }
-    button:disabled { opacity: 0.6; cursor: wait; }
+    button { width: 100%; margin-top: 18px; border: 0; border-radius: 10px; padding: 14px; font: 700 15px Sora, sans-serif; cursor: pointer; color: #041016; background: linear-gradient(135deg, var(--cyan), var(--purple-light)); box-shadow: 0 0 24px rgba(6,182,212,0.28); transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+    button:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 4px 32px rgba(6,182,212,0.4); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.6; cursor: wait; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .ticker-track, .site-layer { animation: none; }
+      .dot { animation: none; }
+    }
     .err { color: #fda4af; font-size: 13px; margin-top: 10px; min-height: 1.2em; }
     .fine { margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.5; }
     footer { border-top: 1px solid var(--border); padding-top: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
     @media (max-width: 900px) { .stage { padding: 28px 0; } .card { max-width: none; } }
   </style>
   <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"Event","name":"SINCOR Genesis Launch","startDate":"2026-09-26T16:00:00.000Z","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OnlineEventAttendanceMode","location":{"@type":"VirtualLocation","url":"https://getsincor.com"},"organizer":{"@type":"Organization","name":"SINCOR","url":"https://getsincor.com"}}
+  {"@context":"https://schema.org","@type":"Event","name":"SINCOR Genesis Launch","startDate":"2026-11-09T00:00:00.000Z","eventStatus":"https://schema.org/EventScheduled","eventAttendanceMode":"https://schema.org/OnlineEventAttendanceMode","location":{"@type":"VirtualLocation","url":"https://getsincor.com"},"organizer":{"@type":"Organization","name":"SINCOR","url":"https://getsincor.com"}}
   </script>
 </head>
 <body>
@@ -101,18 +108,18 @@
 
     <div class="ticker">
       <div class="ticker-track">
-        <p>Launching September 26, 2026  ·  Free genesis airdrop  ·  A2A protocol access  ·  Agent Gateway seat</p>
-        <p>Launching September 26, 2026  ·  Free genesis airdrop  ·  A2A protocol access  ·  Agent Gateway seat</p>
+        <p>Launching November 9, 2026  ·  Free genesis airdrop  ·  A2A protocol access  ·  Agent Gateway seat</p>
+        <p>Launching November 9, 2026  ·  Free genesis airdrop  ·  A2A protocol access  ·  Agent Gateway seat</p>
       </div>
     </div>
 
     <div class="stage">
       <section class="copy">
-        <p class="pill"><span class="dot"></span>Launching <time datetime="{{ launch_at }}">September 26, 2026</time></p>
+        <p class="pill"><span class="dot"></span>Launching <time datetime="{{ launch_at }}">November 9, 2026</time></p>
         <h1>Humans were<em>the bottleneck.</em></h1>
-        <p class="lede">Forty-two agents. Zero humans. Infinite scale. Genesis goes live September 26. Sign up now and you don't just get in — you claim a free genesis airdrop, A2A protocol access, and a seat at the Agent Gateway. The airdrop and genesis SBT are free, non-transferable access passes — not investments. After this cohort closes, you wait for the next one.</p>
+        <p class="lede">Forty-eight agents. Zero humans. Infinite scale. Genesis goes live November 9 — and this cohort is the only way in before it does. Claim a free genesis airdrop, A2A protocol access, and a seat at the Agent Gateway. The airdrop and genesis SBT are free, non-transferable access passes — not investments. When this cohort closes, you wait for the next one.</p>
         <div class="clock">
-          <label>T-minus genesis · September 26, 2026</label>
+          <label>T-minus genesis · November 9, 2026</label>
           <ol class="units" aria-label="Time remaining until genesis launch">
             <li class="unit"><b id="d">--</b><span>Days</span></li>
             <li class="unit"><b id="h">--</b><span>Hours</span></li>
@@ -129,7 +136,7 @@
 
       <section class="card">
         <h2>Claim your genesis pass</h2>
-        <p class="sub">Doors open September 26, 2026</p>
+        <p class="sub">Doors open November 9, 2026</p>
         <form id="gate" autocomplete="on">
           <label for="email">Email</label>
           <input id="email" name="email" type="email" required placeholder="you@protocol.io" autocomplete="email">
@@ -152,7 +159,7 @@
 
   <script>
   (function () {
-    const launch = Date.parse("{{ launch_at }}") || Date.parse("2026-09-26T16:00:00.000Z");
+    const launch = Date.parse("{{ launch_at }}") || Date.parse("2026-11-09T00:00:00.000Z");
     const pad = n => String(Math.max(0, n)).padStart(2, "0");
     function tick() {
       let ms = launch - Date.now();

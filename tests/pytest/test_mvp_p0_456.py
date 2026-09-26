@@ -186,9 +186,15 @@ def test_training_vault_unauthed_401(mvp_client):
 
 def test_legacy_mock_dashboards_not_on_mvp_app(mvp_client):
     """gunicorn sincor2.mvp_app:app must not serve app.py mock telemetry dashboards."""
-    for path in ("/professional", "/executive", "/admin-dashboard", "/consciousness-transfer"):
+    for path in ("/professional", "/executive", "/consciousness-transfer"):
         r = mvp_client.get(path, follow_redirects=False)
         assert r.status_code == 404, path
+    # NOTE (2026-09-26): /admin-dashboard now exists on mvp_app intentionally —
+    # the real template, admin-gated, with honest placeholders (no mock
+    # telemetry). It must still refuse anonymous visitors.
+    r = mvp_client.get("/admin-dashboard", follow_redirects=False)
+    assert r.status_code in (301, 302), "/admin-dashboard"
+    assert "/login" in r.headers.get("Location", "")
 
 
 def test_a2a_quote_canonical_axm(mvp_client):

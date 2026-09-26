@@ -112,13 +112,24 @@ class StakeLedger:
             self._data["events"] = self._data["events"][-5000:]
 
     # -- deposits -----------------------------------------------------------
-    def deposit(self, agent_id: str, amount_wei: int) -> Dict[str, Any]:
-        """Record an exact stake deposit (on-chain movement is separate)."""
+    def deposit(self, agent_id: str, amount_wei: int,
+                reference: Optional[str] = None) -> Dict[str, Any]:
+        """Record an exact stake deposit (on-chain movement is separate).
+
+        ``reference`` is an optional opaque external reference (e.g. the
+        0x tx hash of an on-chain AXM transfer) stored on the deposit
+        event for future reconciliation.  The ledger itself is offchain
+        accounting; a reference never moves funds.
+        """
         if amount_wei <= 0:
             raise ValueError("deposit must be positive")
         rec = self._agent(agent_id)
         rec["deposited_wei"] = str(int(rec["deposited_wei"]) + int(amount_wei))
-        self._event("deposit", agent_id=agent_id, amount_wei=str(amount_wei))
+        detail: Dict[str, Any] = {"agent_id": agent_id,
+                                  "amount_wei": str(amount_wei)}
+        if reference:
+            detail["reference"] = str(reference)
+        self._event("deposit", **detail)
         self._save()
         return self.balance_of(agent_id)
 

@@ -69,7 +69,13 @@ echo "Validating A2A compliance …"
 
 AGENT_NAME=$(echo "$CARD" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('name',''))")
 AGENT_VERSION=$(echo "$CARD" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('version',''))")
+AGENT_DESC=$(echo "$CARD" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('description',''))")
 SKILL_COUNT=$(echo "$CARD" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('skills',[])))")
+SKILLS_OK=$(echo "$CARD" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+skills=d.get('skills',[])
+print('yes' if all(isinstance(s,dict) and s.get('id') and s.get('name') for s in skills) else 'no')")
 
 if [[ -z "$AGENT_NAME" ]]; then
   echo "ERROR: Agent Card missing 'name' field." >&2; exit 1
@@ -77,8 +83,14 @@ fi
 if [[ -z "$AGENT_VERSION" ]]; then
   echo "ERROR: Agent Card missing 'version' field." >&2; exit 1
 fi
+if [[ -z "$AGENT_DESC" ]]; then
+  echo "ERROR: Agent Card missing 'description' field (required by the SINCOR registrar)." >&2; exit 1
+fi
 if [[ "$SKILL_COUNT" -lt 1 ]]; then
   echo "ERROR: Agent Card must include at least one skill." >&2; exit 1
+fi
+if [[ "$SKILLS_OK" != "yes" ]]; then
+  echo "ERROR: every skill needs 'id' and 'name' fields (required by the SINCOR registrar)." >&2; exit 1
 fi
 
 echo "  Agent  : ${AGENT_NAME} v${AGENT_VERSION}"
@@ -139,7 +151,8 @@ fi
 
 echo ""
 echo "✓ Agent registered with SINCOR marketplace."
-echo "  Marketplace URL: ${SINCOR_URL%/}$(python3 -c "import json; r=json.load(open('/tmp/sincor_receipt.json')); print(r.get('marketplace_url',''))")"
+echo "  Directory: ${SINCOR_URL%/}/v1/a2a/directory"
+echo "  Agent cards: ${SINCOR_URL%/}/v1/a2a/cards"
 
 if [[ "$SINC_STAKE" -gt 0 ]]; then
   echo "  SINC staked: ${SINC_STAKE} (routing priority boost active)"
