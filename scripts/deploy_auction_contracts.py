@@ -114,7 +114,8 @@ def main() -> int:
     ap.add_argument("--sepolia", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--verify", action="store_true",
-                    help="attempt Basescan source verification (needs BASESCAN_API_KEY)")
+                    help="attempt Basescan + Sourcify source verification "
+                         "(Basescan needs BASESCAN_API_KEY)")
     ap.add_argument("--i-understand-mainnet", action="store_true")
     args = ap.parse_args()
 
@@ -270,29 +271,36 @@ def main() -> int:
     # contract, and the constructor args. The runtime ABI files under
     # src/sincor2/onchain/abis/ are refreshed from this exact compile so
     # the platform always talks to the deployed bytecode with a matching ABI.
+    art_dir = _write_artifacts(compiled, std_input, out_dir, chain_id)
+def _write_artifacts(compiled, std_input, out_dir, chain_id,
+                     abis_dir=None) -> str:
+    """Write verification artifacts; returns the artifact directory."""
     art_dir = os.path.join(out_dir, "artifacts", f"base-{chain_id}-auction")
     os.makedirs(art_dir, exist_ok=True)
     with open(os.path.join(art_dir, "standard-json-input.json"), "w",
               encoding="utf-8") as fh:
         json.dump(std_input, fh, indent=2)
+    if abis_dir is None:
+        abis_dir = os.path.join(REPO, "src", "sincor2", "onchain", "abis")
     for label, fname in (("auction", "CommitRevealAuction"),
                          ("escrow", "ExecutionEscrowManager")):
-        abi, bytecode = compiled[label]
+        abi, bytecode, _runtime = compiled[label]
         with open(os.path.join(art_dir, f"{fname}.abi.json"), "w",
                   encoding="utf-8") as fh:
             json.dump(abi, fh, indent=2)
         with open(os.path.join(art_dir, f"{fname}.bytecode.txt"), "w",
                   encoding="utf-8") as fh:
             fh.write("0x" + bytecode)
-        abis_dir = os.path.join(REPO, "src", "sincor2", "onchain", "abis")
         os.makedirs(abis_dir, exist_ok=True)
         with open(os.path.join(abis_dir, f"{fname}.json"), "w",
                   encoding="utf-8") as fh:
             json.dump({"abi": abi}, fh, indent=2)
     print(f"Verification artifacts: {art_dir}/")
+    return art_dir
 
     if args.verify:
         _verify_on_basescan(chain_id, manifest, art_dir)
+        _verify_on_sourcify(chain_id, manifest, art_dir)
 
     print("\nExport for the platform (Railway env):")
     print(f"  COMMIT_REVEAL_AUCTION_ADDRESS={auction_addr}")
@@ -387,6 +395,57 @@ def _verify_on_basescan(chain_id: int, manifest: dict, art_dir: str) -> None:
         print(f"[verify] {name}: {result.get('message')} "
               f"-> {result.get('result')}")
         print("         check status with action=checkverifystatus&guid=<result>")
+
+
+def _verify_on_sourcify(chain_id: int, manifest: dict, art_dir: str) -> None:
+    """Best-effort source verification via the Sourcify v2 API.
+
+    Needs no API key. Async: submits the standard JSON input, then polls
+    the job. Failures are reported, never fatal.
+    """
+    import time
+    import urllib.request
+
+    with open(os.path.join(art_dir, "standard-json-input.json"),
+              encoding="utf-8") as fh:
+        std_input = json.load(fh)
+    # Sourcify wants "0.8.24+commit.e11b9ed9" (no leading v).
+    compiler_version = _solc_version_string().removeprefix("v")
+    for name in ("CommitRevealAuction", "ExecutionEscrowManager"):
+        address = manifest["contracts"][name]["address"]
+        url = (f"https://sourcify.dev/server/v2/verify/"
+               f"{chain_id}/{address}")
+        payload = json.dumps({
+            "compilerVersion": compiler_version,
+            "contractIdentifier": f"{name}.sol:{name}",
+            "stdJsonInput": std_input,
+        }).encode()
+        try:
+            req = urllib.request.Request(
+                url, data=payload,
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                job = json.loads(resp.read().decode())
+            verification_id = job.get("verificationId")
+            if not verification_id:
+                print(f"[sourcify] {name}: unexpected response: {job}")
+                continue
+            status = None
+            for _ in range(12):  # ~60s of polling
+                time.sleep(5)
+                with urllib.request.urlopen(
+                    f"https://sourcify.dev/server/v2/verify/{verification_id}",
+                    timeout=30,
+                ) as sresp:
+                    status = json.loads(sresp.read().decode())
+                state = status.get("status")
+                if state not in ("pending", "submitted", None):
+                    break
+            print(f"[sourcify] {name}: {json.dumps(status)[:300]}")
+        except Exception as err:  # noqa: BLE001 - best effort
+            print(f"[sourcify] {name}: request failed: {err}")
+    print("[sourcify] manual check: "
+          "https://sourcify.dev/server/v2/contract/<chainId>/<address>")
 
 
 if __name__ == "__main__":
