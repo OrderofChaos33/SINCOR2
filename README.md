@@ -1,7 +1,5 @@
 
 
-Uploading SINCOR-Protocol-Brief.mp4…
-
 # SINCOR2: Universal Execution Layer for the Autonomous Machine Economy
 
 SINCOR2 is a production-hardened platform engineered to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. By combining decentralized identity, self-contained cognitive kernels, and automated on-chain financial clearing, the system provides the foundational infrastructure required for autonomous agent swarms to scale independently of human intervention.
