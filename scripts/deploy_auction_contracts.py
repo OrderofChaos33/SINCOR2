@@ -44,6 +44,11 @@ BASE_SEPOLIA_CHAIN = 84532
 
 
 def compile_contracts():
+    """Compile both contracts; returns (compiled, standard_json_input).
+
+    The standard JSON input is the exact compiler input — saving it is
+    what makes the deployment byte-for-byte verifiable later.
+    """
     import solcx
 
     solcx.set_solc_version(SOLC_VERSION)
@@ -69,7 +74,7 @@ def compile_contracts():
     out = solcx.compile_standard(std, solc_version=SOLC_VERSION,
                                  allow_paths=CONTRACTS_DIR)
     contracts = out["contracts"]
-    return {
+    compiled = {
         "auction": (
             contracts["CommitRevealAuction.sol"]["CommitRevealAuction"]["abi"],
             contracts["CommitRevealAuction.sol"]["CommitRevealAuction"]["evm"]["bytecode"]["object"],
@@ -79,6 +84,7 @@ def compile_contracts():
             contracts["ExecutionEscrowManager.sol"]["ExecutionEscrowManager"]["evm"]["bytecode"]["object"],
         ),
     }
+    return compiled, std
 
 
 def deploy(w3, account, abi, bytecode, args=(), value=0):
@@ -103,6 +109,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sepolia", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--verify", action="store_true",
+                    help="attempt Basescan source verification (needs BASESCAN_API_KEY)")
     ap.add_argument("--i-understand-mainnet", action="store_true")
     args = ap.parse_args()
 
@@ -112,8 +120,8 @@ def main() -> int:
     key = os.environ.get("DEPLOYER_KEY", "").strip()
     adjudicator = os.environ.get("ADJUDICATOR_ADDRESS", "").strip()
 
-    print(f"Compiling with solc {SOLC_VERSION} (via-IR)...")
-    compiled = compile_contracts()
+    print(f"Compiling with solc {SOLC_VERSION} (via-IR, optimizer 200 runs)...")
+    compiled, std_input = compile_contracts()
     print("  CommitRevealAuction bytecode:",
           len(compiled["auction"][1]) // 2, "bytes")
     print("  ExecutionEscrowManager bytecode:",
@@ -160,9 +168,10 @@ def main() -> int:
     print(f"  -> {auction_addr}  ({h1})")
 
     print("[2/3] Deploying ExecutionEscrowManager...")
+    escrow_args = (auction_addr, adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND_WEI)
     escrow_addr, h2 = deploy(
         w3, account, *compiled["escrow"],
-        args=(auction_addr, adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND_WEI),
+        args=escrow_args,
     )
     print(f"  -> {escrow_addr}  ({h2})")
 
@@ -208,6 +217,14 @@ def main() -> int:
         },
         "linkTx": h3,
         "solc": SOLC_VERSION,
+        "optimizer": {"enabled": True, "runs": 200},
+        "viaIR": True,
+        # ABI-encoded constructor args (Basescan "constructor arguments" field).
+        "constructorArgs": {
+            "CommitRevealAuction": "0x",
+            "ExecutionEscrowManager": "0x" + _encode_constructor_args(
+                w3, compiled["escrow"][0], escrow_args).hex(),
+        },
     }
     out_dir = os.path.join(REPO, "onchain", "deployments")
     os.makedirs(out_dir, exist_ok=True)
@@ -216,12 +233,130 @@ def main() -> int:
         json.dump(manifest, fh, indent=2)
     print(f"Manifest: {out_path}")
 
+    # --- verification artifacts -------------------------------------------
+    # Everything needed to verify on Basescan/Sourcify later, even from a
+    # different machine: the exact standard-JSON compiler input (reproduces
+    # the bytecode byte-for-byte), the ABI + creation bytecode per
+    # contract, and the constructor args. The runtime ABI files under
+    # src/sincor2/onchain/abis/ are refreshed from this exact compile so
+    # the platform always talks to the deployed bytecode with a matching ABI.
+    art_dir = os.path.join(out_dir, "artifacts", f"base-{chain_id}-auction")
+    os.makedirs(art_dir, exist_ok=True)
+    with open(os.path.join(art_dir, "standard-json-input.json"), "w",
+              encoding="utf-8") as fh:
+        json.dump(std_input, fh, indent=2)
+    for label, fname in (("auction", "CommitRevealAuction"),
+                         ("escrow", "ExecutionEscrowManager")):
+        abi, bytecode = compiled[label]
+        with open(os.path.join(art_dir, f"{fname}.abi.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump(abi, fh, indent=2)
+        with open(os.path.join(art_dir, f"{fname}.bytecode.txt"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("0x" + bytecode)
+        abis_dir = os.path.join(REPO, "src", "sincor2", "onchain", "abis")
+        os.makedirs(abis_dir, exist_ok=True)
+        with open(os.path.join(abis_dir, f"{fname}.json"), "w",
+                  encoding="utf-8") as fh:
+            json.dump({"abi": abi}, fh, indent=2)
+    print(f"Verification artifacts: {art_dir}/")
+
+    if args.verify:
+        _verify_on_basescan(chain_id, manifest, art_dir)
+
     print("\nExport for the platform (Railway env):")
     print(f"  COMMIT_REVEAL_AUCTION_ADDRESS={auction_addr}")
     print(f"  EXECUTION_ESCROW_ADDRESS={escrow_addr}")
     print(f"  AUCTION_RPC_URL={rpc}")
     print("  AUCTION_ONCHAIN_ANCHOR=1")
+    print("\nBasescan verification (manual fallback):")
+    print("  https://basescan.org/verifyContract "
+          "-> Standard JSON input, solc 0.8.24, optimizer 200 runs, via-IR")
+    print(f"  input file: {art_dir}/standard-json-input.json")
     return 0
+
+
+def _encode_constructor_args(w3, abi, args) -> bytes:
+    ctor = next((e for e in abi if e.get("type") == "constructor"), None)
+    if ctor is None:
+        return b""
+    types = [i["type"] for i in ctor.get("inputs", [])]
+    from eth_abi import encode
+
+    return encode(types, args)
+
+
+def _solc_version_string() -> str:
+    """Full Basescan compiler string, e.g. v0.8.24+commit.e11b9ed9."""
+    import solcx
+    import solcx.install
+    import subprocess
+
+    solcx.set_solc_version(SOLC_VERSION)
+    full = f"v{SOLC_VERSION}"
+    try:
+        out = subprocess.run(
+            [str(solcx.install.get_executable(version=SOLC_VERSION)),
+             "--version"],
+            capture_output=True, text=True, timeout=15)
+        for line in out.stdout.splitlines():
+            if "Version:" in line and "commit." in line:
+                # 'Version: 0.8.24+commit.e11b9ed9.Linux.g++'
+                commit = line.split("commit.")[1].split(".")[0]
+                return f"v{SOLC_VERSION}+commit.{commit}"
+    except Exception:  # noqa: BLE001 - fall back to the short form
+        pass
+    return full
+
+
+def _verify_on_basescan(chain_id: int, manifest: dict, art_dir: str) -> None:
+    """Best-effort source verification via the Basescan API.
+
+    Needs BASESCAN_API_KEY. Failures are reported, never fatal — the
+    artifacts above are sufficient for manual verification.
+    """
+    import urllib.parse
+    import urllib.request
+
+    api_key = os.environ.get("BASESCAN_API_KEY", "").strip()
+    if not api_key:
+        print("[verify] BASESCAN_API_KEY not set; skipping auto-verification.")
+        return
+    api_url = ("https://api-sepolia.basescan.org/api"
+               if chain_id == BASE_SEPOLIA_CHAIN
+               else "https://api.basescan.org/api")
+    with open(os.path.join(art_dir, "standard-json-input.json"),
+              encoding="utf-8") as fh:
+        source = fh.read()
+    for name, key in (("CommitRevealAuction", "CommitRevealAuction"),
+                      ("ExecutionEscrowManager", "ExecutionEscrowManager")):
+        info = manifest["contracts"][name]
+        payload = {
+            "module": "contract",
+            "action": "verifysourcecode",
+            "contractaddress": info["address"],
+            "sourceCode": source,
+            "codeformat": "solidity-standard-json-input",
+            "contractname": f"{name}.sol:{name}",
+            "compilerversion": _solc_version_string(),
+            "optimizationUsed": 1,
+            "runs": 200,
+            "constructorArguements":  # sic: Basescan's misspelled param name
+                manifest["constructorArgs"][name].removeprefix("0x"),
+            "apikey": api_key,
+        }
+        req = urllib.request.Request(
+            api_url, data=urllib.parse.urlencode(payload).encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read().decode())
+        except Exception as err:  # noqa: BLE001 - best effort
+            print(f"[verify] {name}: request failed: {err}")
+            continue
+        print(f"[verify] {name}: {result.get('message')} "
+              f"-> {result.get('result')}")
+        print("         check status with action=checkverifystatus&guid=<result>")
 
 
 if __name__ == "__main__":
