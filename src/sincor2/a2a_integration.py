@@ -104,8 +104,9 @@ _BPS_DENOM = 10_000
 # Fee policy (locked 2026-09-26, no burn): the platform fee is
 # A2A_PLATFORM_FEE_BPS of each paid task, routed 100 % to the treasury.
 # Realized AXM/SINC fees are converted to USDC/WETH before treasury deposit.
-# Swap execution is not built yet — conversion records carry status "pending"
-# until the forwarder executor (signing key in the Secure Vault) is wired.
+# Conversion obligations are executed by the forwarder swap executor in
+# onchain/fee_conversion_executor.py (signing key in the Secure Vault;
+# ships disarmed — see docs/ops/FEE_EXECUTOR_RUNBOOK.md for arming).
 # Deflationary mechanics are deferred to a later governance decision.
 FEE_CONVERSION_TARGETS = ("USDC", "WETH")
 FEE_CONVERSION_STATUS_PENDING = "pending"
