@@ -117,7 +117,7 @@ def _sealed_agent_checks(fabric: Any, task: Dict[str, Any], agent_id: str) -> Di
 
 
 def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float = 1.5,
-                sealed: bool = False) -> Dict[str, Any]:
+                sealed: bool = False, poster_id: Optional[str] = None) -> Dict[str, Any]:
     """Create a task. When ``sealed`` is true the task runs a sealed-bid
     commit/reveal auction: per-task 5-minute commit + 5-minute reveal windows
     (ratified in docs/ops/AUCTION_SECURITY_DECISIONS.md) are stamped at
@@ -147,6 +147,7 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
             "created_at": ts,
             "auction_closes_at": None,
             "sealed": bool(sealed),
+            "poster_id": str(poster_id) if poster_id else None,
             # Sealed-bid windows are anchored at creation, mirroring the
             # contract's commitDeadline = open + commitW,
             # revealDeadline = open + commitW + revealW.
@@ -169,10 +170,14 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     expire_stale_assignments()
     fabric = get_fabric()
     ts = _now_ms()
+    ghosts: List[str] = []
+    losers: List[str] = []
+    poster_id: Optional[str] = None
     with fabric.lock:
         task = fabric.tasks.get(task_id)
         if not task or task["state"] not in ("open", "auction"):
             return dict(task) if task else None
+        poster_id = task.get("poster_id")
         ghosted = 0
         if task.get("sealed"):
             # Sealed-bid shim: the reveal deadline governs closing. Anyone may
@@ -182,10 +187,12 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
             if ts < int(task.get("reveal_deadline") or 0):
                 return dict(task)
             prefix = f"{task_id}\x00"
-            ghosted = sum(
-                1 for key, c in fabric.commits.items()
+            ghost_records = [
+                c for key, c in fabric.commits.items()
                 if key.startswith(prefix) and not c.get("revealed")
-            )
+            ]
+            ghosted = len(ghost_records)
+            ghosts = [c["agent_id"] for c in ghost_records]
         else:
             closes_at = task.get("auction_closes_at")
             if closes_at is None or ts < int(closes_at):
@@ -197,21 +204,42 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
             task["expired_reason"] = "auction_timeout"
             if task.get("sealed"):
                 task["ghosted_commits"] = ghosted
-            return dict(task)
-        winner = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))[0]
-        task.update({
-            "state": "assigned",
-            "assigned_to": winner["agent_id"],
-            "winner_score": winner["score"],
-            "winning_bid_axm": winner["bid_axm"],
-            "time_est_ms": winner.get("time_est_ms"),
-            "assigned_at": ts,
-        })
-        if task.get("sealed"):
-            task["ghosted_commits"] = ghosted
-        snap = dict(task)
-        tags = list(task.get("tags") or [])
-    fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
+            snap = dict(task)
+            tags = list(task.get("tags") or [])
+        else:
+            winner = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))[0]
+            losers = [b["agent_id"] for b in cands
+                      if b["agent_id"] != winner["agent_id"]]
+            task.update({
+                "state": "assigned",
+                "assigned_to": winner["agent_id"],
+                "winner_score": winner["score"],
+                "winning_bid_axm": winner["bid_axm"],
+                "time_est_ms": winner.get("time_est_ms"),
+                "assigned_at": ts,
+            })
+            if task.get("sealed"):
+                task["ghosted_commits"] = ghosted
+            snap = dict(task)
+            tags = list(task.get("tags") or [])
+    # Stake settlement (outside the fabric lock; separate ledger).
+    # Ghosting => 100 % slash of the locked stake -> poster re-auction credit.
+    # Losers are released; the winner's lock stays until proof settlement.
+    if ghosts or losers:
+        from sincor2.onchain.stake_ledger import stake_ledger
+        ledger = stake_ledger()
+        for agent_id in ghosts:
+            try:
+                ledger.slash_ghost(agent_id, task_id, poster_id=poster_id)
+            except Exception as err:  # never brick auction close on accounting
+                logger.warning("ghost slash failed for %s: %s", agent_id, err)
+        for agent_id in losers:
+            try:
+                ledger.release(agent_id, task_id)
+            except Exception as err:
+                logger.warning("stake release failed for %s: %s", agent_id, err)
+    if snap["state"] == "assigned":
+        fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
     return snap
 
 
@@ -328,6 +356,15 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
         if commit_deadline is not None and ts > int(commit_deadline):
             raise PermissionError("commit window closed")
         _sealed_agent_checks(fabric, task, agent_id)
+        # Stake enforcement (ratified minStakeBps=5000): the bid value is
+        # still sealed, so the commit locks stake against the public bounty.
+        # Insufficient stake => the commit itself is rejected.
+        from sincor2.onchain.stake_ledger import stake_ledger, InsufficientStake
+        bounty_wei = int(round(float(task.get("bounty_axm") or 0) * 1e18))
+        try:
+            stake_ledger().lock_for_commit(agent_id, task_id, bounty_wei)
+        except InsufficientStake as err:
+            raise PermissionError(str(err))
         key = _commit_key(task_id, agent_id)
         if key in fabric.commits:
             raise RuntimeError("already committed")
@@ -405,6 +442,14 @@ def reveal_bid(task_id: str, agent_id: str, bid_axm: float, nonce: Any,
         expected = sealed_commitment(price_wei, salt, agent_id)
         if not _hmac.compare_digest(expected, bytes.fromhex(commit["commitment"][2:])):
             raise ValueError("commitment mismatch: wrong bid_axm or nonce")
+        # Stake top-up: the true bid value is now known.  If bid*50 % exceeds
+        # the bounty-based lock, the bidder must cover the difference or the
+        # reveal is rejected.
+        from sincor2.onchain.stake_ledger import stake_ledger, InsufficientStake
+        try:
+            stake_ledger().top_up_for_reveal(agent_id, task_id, price_wei)
+        except InsufficientStake as err:
+            raise PermissionError(str(err))
         agent = _sealed_agent_checks(fabric, task, agent_id)
         score = calculate_bid_score(bid_axm, int(time_est_sec), float(agent.get("reputation") or 0))
         bid_id = "bid_" + uuid.uuid4().hex[:10]
@@ -482,6 +527,15 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
         }
         fabric.proofs[proof_id] = proof
         snap = dict(proof)
+    # The winner's stake lock survives the auction; it releases here on
+    # successful settlement.  A failed settlement keeps the lock so the
+    # adjudicator can rule (quality slash is adjudicator-only).
+    if receipt.get("ok"):
+        try:
+            from sincor2.onchain.stake_ledger import stake_ledger
+            stake_ledger().release(agent_id, task_id)
+        except Exception as err:
+            logger.warning("winner stake release failed for %s: %s", agent_id, err)
     fabric.publish("proof.settled", tags, snap)
     _save_agents(fabric)
     snap["http_status"] = 202
@@ -507,7 +561,7 @@ def attach_market_routes(bp: Blueprint) -> None:
     def v1_tasks():
         body = request.get_json(silent=True) or {}
         try:
-            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")))
+            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=body.get("poster_id") or body.get("agent_id"))
             return jsonify(task), 201
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
@@ -601,6 +655,25 @@ def attach_market_routes(bp: Blueprint) -> None:
             return _http_error(str(err), 403)
         except RuntimeError as err:
             return _http_error(str(err), 409)
+
+    @bp.get("/v1/a2a/registration-velocity")
+    def v1_registration_velocity():
+        """External-agent registration velocity (operating directive).
+
+        Machine-readable ranking input: totals, external/internal split,
+        per-day series, and the volume-over-vanity TOA objective weights
+        driven by measured external registrations/day.
+        """
+        from sincor2.registration_velocity import (
+            velocity_report,
+            volume_over_vanity_weights,
+        )
+        fabric = get_fabric()
+        with fabric.lock:
+            agents = {aid: dict(a) for aid, a in fabric.agents.items()}
+        report = velocity_report(agents)
+        report["toa_objective_weights"] = volume_over_vanity_weights(report)
+        return jsonify(report), 200
 
     @bp.get("/v1/a2a/stream")
     @bp.get("/api/v1/stream")

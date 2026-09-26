@@ -11,10 +11,13 @@ from sincor2.contract_net import calculate_bid_score
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
     from sincor2.a2a_inbound import reset_fabric
+    from sincor2.onchain.stake_ledger import reset_stake_ledger
 
     reset_fabric()
+    # Stake enforcement is active: each test gets an isolated ledger.
+    reset_stake_ledger(path=str(tmp_path / "stake.json"))
     app = Flask(__name__)
     register_inbound(app)
     app.config["TESTING"] = True
@@ -22,6 +25,8 @@ def client():
 
 
 def _register(client, agent_id):
+    from sincor2.onchain.stake_ledger import stake_ledger
+
     r = client.post(
         "/v1/a2a/register",
         json={
@@ -34,6 +39,8 @@ def _register(client, agent_id):
     assert r.status_code in (200, 201), r.get_json()
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id})
     assert r.status_code == 200
+    # Fund the agent so the commit-time stake lock (bounty * 50 %) succeeds.
+    stake_ledger().deposit(agent_id, 10 * 10**18)
 
 
 def _sealed_task(client, skill="lead-enrichment"):
