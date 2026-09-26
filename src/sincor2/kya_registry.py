@@ -11,7 +11,7 @@ import re
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
 WALLET_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
@@ -454,6 +454,25 @@ def snapshot() -> Dict[str, Any]:
         "verified": sum(1 for r in recs if r.get("status") == "verified"),
         "revoked": sum(1 for r in recs if r.get("revoked")),
     }
+
+
+def live_statuses(kya_ids: Optional[Iterable[str]] = None) -> Dict[str, str]:
+    """Refresh and return {kya_id: status} for KYA records.
+
+    Single lock acquisition — read paths (directory listings) use this
+    instead of N get_by_agent()/refresh_status() round-trips. Refresh is
+    in-memory only (no save()); revocation always wins via refresh_status().
+    """
+    with _LOCK:
+        if kya_ids is None:
+            recs = list(_STORE.values())
+        else:
+            recs = [_STORE[k] for k in kya_ids if k in _STORE]
+        out: Dict[str, str] = {}
+        for rec in recs:
+            refresh_status(rec)
+            out[rec["kya_id"]] = rec.get("status")
+        return out
 
 
 def hook_listed(agent: Dict[str, Any]) -> Optional[Dict[str, Any]]:

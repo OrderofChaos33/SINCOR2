@@ -50,6 +50,21 @@ def _kya_heartbeat(agent_id: str) -> None:
         logger.debug("[KYA] heartbeat hook skipped: %s", err)
 
 
+def _live_kya_statuses() -> Dict[str, str]:
+    """Fail-open KYA status lookup for directory listings.
+
+    The directory must not 500 if KYA is unavailable: on any error we log
+    and return {}, and list_agents() falls back to stored kya_status values.
+    """
+    try:
+        from sincor2.kya_registry import live_statuses
+
+        return live_statuses()
+    except Exception as err:
+        logger.warning("[KYA] directory status lookup skipped: %s", err)
+        return {}
+
+
 def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
     parsed = _normalize_registration(body)
     agent_id = parsed["agent_id"]
@@ -165,9 +180,16 @@ def list_agents(live_only: bool = False) -> List[Dict[str, Any]]:
     fabric = get_fabric()
     ts = _now_ms()
     ttl_ms = HEARTBEAT_TTL_S * 1000
+    # Consulted outside fabric.lock: KYA has its own lock, one batch call
+    # (no N+1). Fail-open: {} on error, rows keep their stored kya_status.
+    kya_statuses = _live_kya_statuses()
     with fabric.lock:
         out = []
         for agent in fabric.agents.values():
+            kya_id = agent.get("kya_id")
+            live_kya = kya_statuses.get(kya_id) if kya_id else None
+            if live_kya == "revoked":
+                continue  # revoked agents disappear from the directory
             age = ts - int(agent.get("last_heartbeat") or 0)
             status = "live" if age <= ttl_ms else "stale"
             if agent.get("probation") and status == "live":
@@ -176,6 +198,8 @@ def list_agents(live_only: bool = False) -> List[Dict[str, Any]]:
                 continue
             row = dict(agent)
             row["status"] = status
+            if live_kya is not None:
+                row["kya_status"] = live_kya  # replace stale value with live KYA status
             row["heartbeat_age_ms"] = age
             out.append(row)
         return sorted(out, key=lambda a: a.get("registered_at") or 0, reverse=True)
