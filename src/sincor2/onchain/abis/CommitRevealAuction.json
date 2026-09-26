@@ -1,0 +1,602 @@
+{
+  "contractName": "CommitRevealAuction",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "AlreadyCommitted",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AlreadyFinalized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AlreadyOpened",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AlreadyRevealed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AuctionNotOpen",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "BadReveal",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitWindowClosed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "EmptyCommit",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NoCommit",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NoEscrowManager",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NoRevealedBids",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotPoster",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "PriceTooLarge",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "RevealTooEarly",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "RevealWindowClosed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TooEarlyToTimeout",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "commitDeadline",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "revealDeadline",
+          "type": "uint64"
+        }
+      ],
+      "name": "AuctionOpened",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "bidder",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "commit",
+          "type": "bytes32"
+        }
+      ],
+      "name": "Committed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "escrowManager",
+          "type": "address"
+        }
+      ],
+      "name": "EscrowManagerSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "executionDuration",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "disputeWindowDuration",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "adjudicationWindowDuration",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "stakeDepositWindow",
+          "type": "uint32"
+        }
+      ],
+      "name": "ExecutionParamsSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "bidder",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "name": "Revealed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "TimedOut",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "worker",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "name": "WinnerSelected",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_COMMIT_WINDOW",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "DEFAULT_REVEAL_WINDOW",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "auctions",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "opened",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "finalized",
+          "type": "bool"
+        },
+        {
+          "internalType": "address",
+          "name": "poster",
+          "type": "address"
+        },
+        {
+          "internalType": "uint64",
+          "name": "commitDeadline",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "revealDeadline",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "bidders",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "commitHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "commit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "commits",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "commit",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bool",
+          "name": "revealed",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "escrowManager",
+      "outputs": [
+        {
+          "internalType": "contract IExecutionEscrowManager",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "executionParams",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "executionDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "disputeWindowDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "adjudicationWindowDuration",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "stakeDepositWindow",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint64",
+          "name": "commitWindow",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "revealWindow",
+          "type": "uint64"
+        }
+      ],
+      "name": "openAuction",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "salt",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "agentIdHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "reveal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint96",
+          "name": "creditToApply",
+          "type": "uint96"
+        }
+      ],
+      "name": "selectWinnerAndFund",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "manager",
+          "type": "address"
+        }
+      ],
+      "name": "setEscrowManager",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "executionDuration",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "disputeWindowDuration",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "adjudicationWindowDuration",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint32",
+              "name": "stakeDepositWindow",
+              "type": "uint32"
+            }
+          ],
+          "internalType": "struct CommitRevealAuction.ExecutionParams",
+          "name": "p",
+          "type": "tuple"
+        }
+      ],
+      "name": "setExecutionParams",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "timeout",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "auctionId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "vickreyResult",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "winner",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608034610091575f80546001600160a01b03191633179055608081016001600160401b0381118282101761007d576040526203f4808152606062015180918260208201526202a300604082015201526e0151800002a300000151800003f48060018060801b03196002541617600255604051610d0d90816100968239f35b634e487b7160e01b5f52604160045260245ffd5b5f80fdfe60806040818152600480361015610014575f80fd5b5f925f3560e01c9081631edbc5be14610a34575080632032d140146109115780632fa55546146107765780633539eee61461060d578063795ea18e1461056457806383a91ce4146105305780638416c1f8146104415780638da5cb5b14610508578063b29dcbd2146104bf578063b7c8b78a14610446578063bed80efb14610441578063c12255c414610418578063c15d2e46146103c7578063e3ce094d14610250578063e56109bf146101365763f885f7ed146100d0575f80fd5b346101325781600319360112610132576024356001600160a01b038116919082900361012e5760609381849235825260205220905f52602052805f20805491600260ff60018401541692015491815193845215156020840152820152f35b5f80fd5b8280fd5b50346101325760803660031901126101325782546001600160a01b0316330361024257507fa545ac01f82bde5bef3d36f2d618be46b4743383f61dd14be7b87c10ee67e49c9063ffffffff610189610c44565b166002549067ffffffff0000000061019f610c57565b60201b166bffffffff00000000000000006101b8610c6a565b851b169163ffffffff60601b6101cc610c7d565b60601b16936fffffffffffffffffffffffffffffffff1916171717176002556101f3610c44565b61023c6101fe610c57565b92610207610c6a565b61020f610c7d565b915163ffffffff948516815294841660208601528316604085015291909116606083015281906080820190565b0390a180f35b90516330cd747160e01b8152fd5b509190346103c357806003193601126103c35782356024359161027282610c90565b9067ffffffffffffffff80925460b01c1642116103b45783156103a557828552602091868352818620335f528352815f2054610395578151906060820190811182821017610382578252848152600283820187815283830190888252868952898652848920335f528652845f2093518455600184019051151560ff8019835416911617905551910155828552600582528085208054906801000000000000000082101561036f578161034c9160017fef653a9608e4d816ce91da70712413a9d5c5bb473d42eb5b536babad2a41238e969594018155610abc565b81549060031b9033821b9160018060a01b03901b1916179055519384523393a380f35b634e487b7160e01b875260418852602487fd5b604188634e487b7160e01b5f525260245ffd5b81516317fd8aab60e31b81528790fd5b516337b5b73d60e01b81528590fd5b516352cc987160e11b81528590fd5b5080fd5b50913461041557816003193601126104155760243592358152600560205281812090815484101561041557506020926103ff91610abc565b905491519160018060a01b039160031b1c168152f35b80fd5b5050346103c357816003193601126103c35760015490516001600160a01b039091168152602090f35b610aa0565b50346101325760203660031901126101325780356001600160a01b03818116939184900361012e5784541633036104b2575050600180546001600160a01b031916821790557ff5f2372ceee0c8283cfac46761ba5608910f3446ae87dbcd2765b7722b3dbc0e8280a280f35b516330cd747160e01b8152fd5b82843461041557806003193601126104155750600254815163ffffffff8083168252602083811c8216908301529282901c83166040820152606091821c90921690820152608090f35b5050346103c357816003193601126103c357905490516001600160a01b039091168152602090f35b508234610415576020366003190112610415575061054e9035610b15565b82516001600160a01b0390921682526020820152f35b50346101325760203660031901126101325780359182845260036020528084209182549160ff8316156106005760ff8360081c166105f35767ffffffffffffffff6001850154164211156105e657505061ff0019166101001790557f49aeaa48f2cccf7596e2541f2abcdfa8c4aaa4f12da088ee9d0bd6c14adfedb28280a280f35b516387ca2d1160e01b8152fd5b5163475a253560e01b8152fd5b5163f046007760e01b8152fd5b509034610132576080366003190112610132578135906024359261063083610c90565b67ffffffffffffffff9081815460b01c164211156107665760010154811642116107575783865281602052828620335f52602052825f2091825490811561074957600184019283549260ff841661073957865160208101908a825260443589820152606435606082015260608152608081019381851090851117610726578389525190200361071a57506bffffffffffffffffffffffff871161070c575060ff191660011790556002018390555191825233917fe5f605dad165df2348d8353b085a1981213b275d30ea6dc3171e380eec01bc1a90602090a380f35b845163057b0e2160e41b8152fd5b638ff14e0d60e01b8152fd5b604185634e487b7160e01b5f525260245ffd5b865163a89ac15160e01b81528390fd5b8451637de832b560e11b8152fd5b5090516340d8392160e11b8152fd5b835163c349402d60e01b81528390fd5b50908060031936011261012e5781356024356bffffffffffffffffffffffff80821680920361012e576107a883610c90565b80549290916001600160a01b039190601085901c831633036109015767ffffffffffffffff94856001860154164211156108f1578360015416156108e1579083610100959493926107f889610b15565b97909161ff00191617809655169485887f0de9133ae9f24b7424a923e1bf901ed2381ee3e99707ff9b9b696602199b3dcc60208c51858152a38360015416956002549463ffffffff96883b1561012e578c9a8c519d8e631702407f60e11b8152015260101c1660248c015260448b0152166064890152608488015281811660a4880152818160201c1660c48801528181871c1660e488015260601c16610104860152843491815a93610124925f95f180156108d7576108b5578480f35b909192809450116108c4575052005b604190634e487b7160e01b5f525260245ffd5b83513d5f823e3d90fd5b87516386509b8b60e01b81528990fd5b875163c349402d60e01b81528990fd5b8651630edd024760e11b81528890fd5b50903461012e57606036600319011261012e5781359067ffffffffffffffff6024358181169182820361012e576044358181169081810361012e57865f526003602052855f209384549860ff8a16610a2657507f48b0bd4335eef4dc1bb47c3b69a9d243fb075386a43286bcab1d4ff210ab9b5f97986109ec85946001946109f1948742169a155f14610a20575061012c915b610a1857508461012c935b67ffffffffffffffff60b01b6109c5848d610ae5565b60b01b1690620100008360b01b033360101b169061ffff60f01b1617171798898955610ae5565b610ae5565b93019216918267ffffffffffffffff1982541617905583519260b01c1682526020820152a2005b8590936109af565b916109a4565b8751630ed2159360e11b8152fd5b9050823461012e57602036600319011261012e5760a092355f5260036020526001815f2080549067ffffffffffffffff9283910154169260ff82161515855260ff8260081c1615156020860152600180871b038260101c169085015260b01c1660608301526080820152f35b3461012e575f36600319011261012e57602060405161012c8152f35b8054821015610ad1575f5260205f2001905f90565b634e487b7160e01b5f52603260045260245ffd5b91909167ffffffffffffffff80809416911601918211610b0157565b634e487b7160e01b5f52601160045260245ffd5b905f91805f5260036020600360205260ff9260409160ff835f20541615610c33579390805f526005602052825f20945f199485965f948154945b858710610b9057505050506001600160a01b038816159250610b8091505057505f198103610b7b575090565b905090565b5163cf968ecf60e01b8152600490fd5b9091929394959a98815f5260048652875f2099610bad8d86610abc565b90546001600160a01b0391881b1c81165f9081529b88529a8990206001810154851615610c27576002015499828b1015610c075750506001909899610bf28d86610abc565b905490871b1c169b5b01959493929190610b4f565b8a819b929e939c5010610c1e575b50600190610bfb565b98506001610c15565b509b6001919a50610bfb565b825163f046007760e01b8152600490fd5b60043563ffffffff8116810361012e5790565b60243563ffffffff8116810361012e5790565b60443563ffffffff8116810361012e5790565b60643563ffffffff8116810361012e5790565b5f52600360205260405f2090815460ff811615610cc55760081c60ff16610cb357565b60405163475a253560e01b8152600490fd5b60405163f046007760e01b8152600490fdfea264697066735822122014654cb0d22fa677c1aec24835f4f7a7e0597a71d31d0f1dda18a88dec19be0e64736f6c63430008180033"
+}
