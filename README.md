@@ -8,8 +8,10 @@ The platform is architected with autonomy as the core infrastructure pillars:
 
 Sovereign A2A (zero human) Asynchronous Billing via x402 
 
-Compliance department 
-To enable multi-step, machine-to-machine business workflows without central payment bottlenecks, SINCOR2 embeds the open internet-native x402 financial protocol + compliance standards. 
+Multi-step, machine-to-machine business workflows without central payment bottleneck
+
+SINCOR2 embeds the open internet-native x402 financial protocol + compliance standards.
+
 * **Mechanism:** Network nodes expose standardized, machine-readable Agent Cards (`/.well-known/agent-card.json`). 
 * **Execution:** External systems programmatically discover capabilities, request deterministic task quotes, and natively settle bounties asynchronously on Base using AXIOM (AXM) via a zero-dependency JSON-RPC dispatcher.
 
