@@ -926,6 +926,90 @@ def attach_market_routes(bp: Blueprint) -> None:
         report["toa_objective_weights"] = volume_over_vanity_weights(report)
         return jsonify(report), 200
 
+    # Sanity cap on self-service deposits: 1e9 AXM. Rejects float garbage
+    # and absurd values; legitimate stake is orders of magnitude smaller.
+    MAX_DEPOSIT_AXM = 1_000_000_000.0
+
+    @bp.post("/v1/a2a/stake/deposit")
+    def v1_stake_deposit():
+        """Self-service stake deposit (offchain AXM ledger — Pool 1).
+
+        Body: {agent_id, amount_axm, tx_hash?}. Records stake in the
+        process-wide stake-ledger singleton, so the deposit is visible to
+        commit_bid immediately (no reload; the flip side is that a
+        deposit is only visible to the process that received it).
+
+        Currency note: this moves offchain AXM-denominated ledger
+        accounting only. It does not move funds on any chain. The optional
+        tx_hash is stored on the deposit event as a reconciliation
+        reference for a future on-chain deposit flow.
+
+        The agent must be registered (unknown agent -> 404). A fresh
+        heartbeat is NOT required: an agent with an expired heartbeat may
+        still top up stake; the heartbeat gate applies at commit time.
+        """
+        body = request.get_json(silent=True) or {}
+        try:
+            agent_id = str(body.get("agent_id") or "").strip()
+            if not agent_id:
+                raise ValueError("agent_id is required")
+            fabric = get_fabric()
+            with fabric.lock:
+                if agent_id not in fabric.agents:
+                    raise KeyError("unknown agent")
+            raw_amount = body.get("amount_axm")
+            if raw_amount is None:
+                raise ValueError("amount_axm is required")
+            amount_axm = float(raw_amount)
+            if not (amount_axm > 0):
+                raise ValueError("amount_axm must be positive")
+            if amount_axm > MAX_DEPOSIT_AXM:
+                raise ValueError(
+                    f"amount_axm exceeds maximum of {MAX_DEPOSIT_AXM:g}")
+            amount_wei = int(round(amount_axm * 1e18))
+            if amount_wei <= 0:
+                raise ValueError("amount_axm is too small to represent")
+            tx_hash = body.get("tx_hash")
+            if tx_hash is not None:
+                tx_hash = str(tx_hash).strip()
+                if len(tx_hash) != 66 or not tx_hash.startswith("0x"):
+                    raise ValueError(
+                        "tx_hash must be 0x-prefixed 32-byte hex")
+                try:
+                    bytes.fromhex(tx_hash[2:])
+                except ValueError:
+                    raise ValueError(
+                        "tx_hash must be 0x-prefixed 32-byte hex")
+            from sincor2.onchain.stake_ledger import stake_ledger
+            summary = stake_ledger().deposit(
+                agent_id, amount_wei, reference=tx_hash)
+            result = dict(summary)
+            result["deposit_wei"] = str(amount_wei)
+            result["tx_hash"] = tx_hash
+            result["ledger"] = "offchain-axm"
+            return jsonify(result), 201
+        except (ValueError, OverflowError) as err:
+            return _http_error(str(err), 400)
+        except KeyError as err:
+            return _http_error(str(err), 404)
+
+    @bp.get("/v1/a2a/stake/<agent_id>")
+    def v1_stake_balance(agent_id):
+        """Stake balance for a registered agent (offchain AXM ledger).
+
+        Returns deposited/locked/bonded/available/slashed (wei strings).
+        Unknown agent -> 404.
+        """
+        agent_id = str(agent_id or "").strip()
+        fabric = get_fabric()
+        with fabric.lock:
+            if agent_id not in fabric.agents:
+                return _http_error("unknown agent", 404)
+        from sincor2.onchain.stake_ledger import stake_ledger
+        summary = stake_ledger().balance_of(agent_id)
+        summary["ledger"] = "offchain-axm"
+        return jsonify(summary), 200
+
     @bp.get("/v1/a2a/stream")
     @bp.get("/api/v1/stream")
     def v1_stream():
