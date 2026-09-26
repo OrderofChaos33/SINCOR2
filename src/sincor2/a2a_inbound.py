@@ -53,6 +53,28 @@ PROBATION_SEEDS = (
 )
 
 
+# Sealed-bid seeds (2026-09-26): a dozen tasks across the four target
+# verticals, created with the commit/reveal shim.  (skill_id, bounty_axm)
+SEALED_PROBATION_SEEDS = (
+    # WebBuilder local sites
+    ("local-business-site-builder", 2.5),
+    ("local-business-site-builder", 3.0),
+    ("local-business-site-builder", 1.8),
+    # Auto detailing
+    ("detailing-booking", 1.2),
+    ("detailing-presence", 1.6),
+    ("detailing-lead-ingest", 1.0),
+    # Lead enrichment / outbound
+    ("lead-enrichment", 1.4),
+    ("outreach-sequence", 1.1),
+    ("deal-scoring", 1.8),
+    # Healthcare credentialing / RCM
+    ("healthcare-credential-check", 2.2),
+    ("dental-billing-scrub", 1.9),
+    ("cashflow-recovery", 2.6),
+)
+
+
 def _now_ms() -> int:
     return int(time.time() * 1000)
 

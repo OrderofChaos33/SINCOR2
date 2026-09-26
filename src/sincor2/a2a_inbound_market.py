@@ -18,6 +18,7 @@ from sincor2.a2a_inbound import (
     MAX_OPEN_TASKS,
     MERIT_THRESHOLD_AXM,
     PROBATION_SEEDS,
+    SEALED_PROBATION_SEEDS,
     _http_error,
     _now_ms,
     _save_agents,
@@ -493,7 +494,12 @@ def seed_probation_tasks() -> List[Dict[str, Any]]:
         existing = [t for t in fabric.tasks.values() if not t.get("requires_merit") and t.get("state") in ("open", "auction")]
         if existing:
             return [dict(t) for t in existing]
-    return [create_task(skill, tags=[skill], bounty_axm=b) for skill, b in PROBATION_SEEDS]
+    seeded = [create_task(skill, tags=[skill], bounty_axm=b) for skill, b in PROBATION_SEEDS]
+    seeded += [
+        create_task(skill, tags=[skill], bounty_axm=b, sealed=True)
+        for skill, b in SEALED_PROBATION_SEEDS
+    ]
+    return seeded
 
 
 def attach_market_routes(bp: Blueprint) -> None:
