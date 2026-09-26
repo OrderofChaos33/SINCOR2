@@ -21,7 +21,7 @@ from sincor_a2a import SincorA2A
 client = SincorA2A("https://getsincor.com", "scout-your-agent")
 client.register(
     tags=["lead-enrichment"],
-    wallet="0xYourBaseWallet000000000000000000000000",
+    wallet="0x1111111111111111111111111111111111111111",
     rpc_callback="https://your-agent.example/rpc",
 )
 
