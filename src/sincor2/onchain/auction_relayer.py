@@ -38,6 +38,14 @@ logger = logging.getLogger("sincor.market.relayer")
 ANCHOR_ENV = "AUCTION_ONCHAIN_ANCHOR"
 FUND_ENV = "AUCTION_ONCHAIN_FUND"
 RELAYER_KEY_ENV = "AUCTION_RELAYER_KEY"
+CHAIN_ID_ENV = "AUCTION_CHAIN_ID"
+
+# Public RPC hints per chain (never leak the operator's AUCTION_RPC_URL to
+# bidders; they bring their own provider).
+PUBLIC_RPC_HINTS = {
+    8453: "https://mainnet.base.org",
+    84532: "https://sepolia.base.org",
+}
 
 AUCTION_ID_DOMAIN = b"SINCOR_SEALED_AUCTION:"
 
@@ -64,6 +72,43 @@ def anchor_enabled() -> bool:
 
 def fund_enabled() -> bool:
     return os.environ.get(FUND_ENV, "").strip() == "1"
+
+
+def onchain_config() -> Optional[Dict[str, Any]]:
+    """Public chain/contract config for the bidder kit.
+
+    Returns None unless the auction contract is configured.  Chain id comes
+    from AUCTION_CHAIN_ID when set, else a single RPC read; the operator's
+    RPC URL itself is never exposed (bidders get a public hint instead).
+    """
+    from sincor2.onchain.auction_client import (
+        AUCTION_ENV_ADDRESS, ESCROW_ENV_ADDRESS, RPC_ENV_URL,
+    )
+
+    auction = os.environ.get(AUCTION_ENV_ADDRESS, "").strip()
+    if not auction:
+        return None
+    escrow = os.environ.get(ESCROW_ENV_ADDRESS, "").strip()
+    chain_id: Optional[int] = None
+    raw = os.environ.get(CHAIN_ID_ENV, "").strip()
+    if raw.isdigit():
+        chain_id = int(raw)
+    else:
+        rpc = os.environ.get(RPC_ENV_URL, "").strip()
+        if rpc:
+            try:
+                from web3 import Web3
+                chain_id = Web3(Web3.HTTPProvider(
+                    rpc, request_kwargs={"timeout": 10})).eth.chain_id
+            except Exception:  # noqa: BLE001 - best effort
+                chain_id = None
+    return {
+        "chain_id": chain_id,
+        "auction_contract": auction,
+        "escrow_contract": escrow or None,
+        "rpc_hint": (PUBLIC_RPC_HINTS.get(chain_id)
+                     if chain_id else None),
+    }
 
 
 class RelayerNotConfiguredError(RuntimeError):
