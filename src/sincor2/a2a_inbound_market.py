@@ -828,6 +828,85 @@ def attach_market_routes(bp: Blueprint) -> None:
         except RuntimeError as err:
             return _http_error(str(err), 409)
 
+    @bp.get("/v1/a2a/auctions")
+    def v1_auctions():
+        """List sealed auctions with an onchain anchor — the discovery
+        endpoint for wallet-based bidders. Each entry carries the contract,
+        chain, auction id, and deadlines needed to bid from your own wallet.
+        """
+        from sincor2.onchain.auction_relayer import onchain_config
+        config = onchain_config()
+        fabric = get_fabric()
+        with fabric.lock:
+            tasks = [dict(t) for t in fabric.tasks.values()
+                     if t.get("sealed") and t.get("auction_id")]
+        auctions = [{
+            "task_id": t["task_id"],
+            "skill": t.get("skill"),
+            "bounty_axm": t.get("bounty_axm"),
+            "state": t.get("state"),
+            "auction_id": t.get("auction_id"),
+            "commit_deadline_ms": t.get("commit_deadline"),
+            "reveal_deadline_ms": t.get("reveal_deadline"),
+            "chain_id": (config or {}).get("chain_id"),
+            "auction_contract": (config or {}).get("auction_contract"),
+        } for t in tasks]
+        return jsonify({"auctions": auctions,
+                        "escrow_contract": (config or {}).get(
+                            "escrow_contract")}), 200
+
+    @bp.get("/v1/a2a/tasks/<task_id>/bidder-kit")
+    def v1_bidder_kit(task_id):
+        """Everything a wallet-based bidder needs for one onchain auction:
+        chain, contract addresses, auction id, deadlines, the exact
+        commitment scheme, and price bounds. Pass ?agent_id= to get your
+        precomputed agent_id_hash too.
+
+        Currency note: the onchain auction settles in native ETH (wei
+        prices here), not AXM. The contract's onchain deadlines are
+        authoritative; the millisecond mirrors below track the anchor.
+        """
+        from sincor2.onchain.auction_relayer import onchain_config
+        from sincor2.onchain.bidder_client import UINT96_MAX, agent_id_hash
+        task = get_fabric().tasks.get(str(task_id or ""))
+        if task is None:
+            return _http_error("unknown task", 404)
+        if not task.get("sealed") or not task.get("auction_id"):
+            return _http_error("task has no onchain auction anchor", 404)
+        config = onchain_config()
+        if config is None:
+            return _http_error("onchain auctions not configured", 503)
+        kit = {
+            "task_id": task["task_id"],
+            "skill": task.get("skill"),
+            "bounty_axm": task.get("bounty_axm"),
+            "state": task.get("state"),
+            "chain_id": config.get("chain_id"),
+            "rpc_hint": config.get("rpc_hint"),
+            "auction_contract": config.get("auction_contract"),
+            "escrow_contract": config.get("escrow_contract"),
+            "auction_id": task.get("auction_id"),
+            "commit_deadline_ms": task.get("commit_deadline"),
+            "reveal_deadline_ms": task.get("reveal_deadline"),
+            "commitment_scheme": (
+                "keccak256(abi.encodePacked(bytes32(price_wei), "
+                "bytes32(salt), keccak256(utf8(agent_id))))"),
+            "price_bounds_wei": {"min": 0, "max": str(UINT96_MAX)},
+            "functions": [
+                "commit(bytes32 auctionId, bytes32 commitHash)",
+                "reveal(bytes32 auctionId, uint256 price, bytes32 salt, "
+                "bytes32 agentIdHash)",
+                "vickreyResult(bytes32 auctionId) -> (address winner, "
+                "uint256 price)",
+            ],
+            "docs": "/docs/a2a/bidder-wallet-flow",
+        }
+        agent_id = request.args.get("agent_id")
+        if agent_id:
+            kit["agent_id"] = agent_id
+            kit["agent_id_hash"] = "0x" + agent_id_hash(agent_id).hex()
+        return jsonify(kit), 200
+
     @bp.get("/v1/a2a/registration-velocity")
     def v1_registration_velocity():
         """External-agent registration velocity (operating directive).
