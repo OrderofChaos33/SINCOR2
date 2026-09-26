@@ -68,30 +68,34 @@ def compile_contracts():
         "settings": {
             "optimizer": {"enabled": True, "runs": 200},
             "viaIR": True,
-            "outputSelection": {"*": {"*": ["abi", "evm.bytecode.object"]}},
+            "outputSelection": {"*": {"*": ["abi", "evm.bytecode.object",
+                                            "evm.deployedBytecode.object"]}},
         },
     }
     out = solcx.compile_standard(std, solc_version=SOLC_VERSION,
                                  allow_paths=CONTRACTS_DIR)
     contracts = out["contracts"]
+
+    def _triple(source_unit: str, name: str):
+        c = contracts[source_unit][name]
+        return (c["abi"],
+                c["evm"]["bytecode"]["object"],
+                c["evm"]["deployedBytecode"]["object"])
+
     compiled = {
-        "auction": (
-            contracts["CommitRevealAuction.sol"]["CommitRevealAuction"]["abi"],
-            contracts["CommitRevealAuction.sol"]["CommitRevealAuction"]["evm"]["bytecode"]["object"],
-        ),
-        "escrow": (
-            contracts["ExecutionEscrowManager.sol"]["ExecutionEscrowManager"]["abi"],
-            contracts["ExecutionEscrowManager.sol"]["ExecutionEscrowManager"]["evm"]["bytecode"]["object"],
-        ),
+        "auction": _triple("CommitRevealAuction.sol", "CommitRevealAuction"),
+        "escrow": _triple("ExecutionEscrowManager.sol",
+                          "ExecutionEscrowManager"),
     }
     return compiled, std
 
 
-def deploy(w3, account, abi, bytecode, args=(), value=0):
+def deploy(w3, account, compiled_triple, args=(), value=0):
+    abi, bytecode, _runtime = compiled_triple
     contract = w3.eth.contract(abi=abi, bytecode=bytecode)
     tx = contract.constructor(*args).build_transaction({
         "from": account.address,
-        "nonce": w3.eth.get_transaction_count(account.address),
+        "nonce": w3.eth.get_transaction_count(account.address, "pending"),
         "gasPrice": w3.eth.gas_price,
         "value": value,
         "chainId": w3.eth.chain_id,
@@ -148,6 +152,22 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
+    # --- compliance checkpoint: read every deploy, not just the first ------
+    print("""
+    == COMPLIANCE CHECKPOINT ==
+    - The SINCOR token is platform access for the A2A ecosystem, NOT an
+      investment. Nothing in this ceremony promises returns, price floors,
+      or yield.
+    - These contracts are ETH-settled auction/escrow mechanics, not a sale.
+    - Adjudication is single-key for now; decentralization is an OPEN item.
+      Do not represent dispute resolution as decentralized.
+    - Fee policy: 5% to treasury, converted to USDC/WETH, NO burn.
+      Do not state otherwise in any copy around this deploy.
+    - Legal review is still advisable before any token/equity sale.
+    """)
+    if not args.sepolia:
+        print("Mainnet: the --i-understand-mainnet flag confirms the above.\n")
+
     from web3 import Web3
     from eth_account import Account
 
@@ -164,13 +184,13 @@ def main() -> int:
         return 2
 
     print("\n[1/3] Deploying CommitRevealAuction...")
-    auction_addr, h1 = deploy(w3, account, *compiled["auction"])
+    auction_addr, h1 = deploy(w3, account, compiled["auction"])
     print(f"  -> {auction_addr}  ({h1})")
 
     print("[2/3] Deploying ExecutionEscrowManager...")
     escrow_args = (auction_addr, adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND_WEI)
     escrow_addr, h2 = deploy(
-        w3, account, *compiled["escrow"],
+        w3, account, compiled["escrow"],
         args=escrow_args,
     )
     print(f"  -> {escrow_addr}  ({h2})")
@@ -179,7 +199,7 @@ def main() -> int:
     auction = w3.eth.contract(address=auction_addr, abi=compiled["auction"][0])
     tx = auction.functions.setEscrowManager(escrow_addr).build_transaction({
         "from": account.address,
-        "nonce": w3.eth.get_transaction_count(account.address),
+        "nonce": w3.eth.get_transaction_count(account.address, "pending"),
         "gasPrice": w3.eth.gas_price,
         "chainId": chain_id,
     })
@@ -202,6 +222,16 @@ def main() -> int:
     assert bps == MIN_STAKE_BPS, "minStakeBps mismatch"
     assert bond == CHALLENGER_BOND_WEI, "challengerBond mismatch"
     print("\nVerification OK: contracts linked, params match ratified values.")
+
+    # Byte-for-byte: the code actually on chain must equal this exact
+    # compile. Catches toolchain drift, proxy games, and wrong-artifact
+    # deploys before any money touches the contracts.
+    for label, addr in (("auction", auction_addr), ("escrow", escrow_addr)):
+        onchain = bytes(w3.eth.get_code(addr)).hex()
+        expected = compiled[label][2].removeprefix("0x")
+        assert onchain.lower() == expected.lower(), \
+            f"{label}: onchain runtime bytecode differs from local compile"
+    print("Verification OK: onchain runtime bytecode matches local compile.")
 
     manifest = {
         "network": "base-sepolia" if args.sepolia else "base",

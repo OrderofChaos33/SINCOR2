@@ -154,7 +154,10 @@ class AuctionRelayer:
         account = Account.from_key(self._relayer_key)
         tx = fn.build_transaction({
             "from": account.address,
-            "nonce": self.w3.eth.get_transaction_count(account.address),
+            # "pending" so back-to-back poster txs (open, fund) can't reuse
+            # a nonce while the first is still in flight.
+            "nonce": self.w3.eth.get_transaction_count(account.address,
+                                                      "pending"),
             "gasPrice": self.w3.eth.gas_price,
             "value": value_wei,
             "chainId": self.w3.eth.chain_id,

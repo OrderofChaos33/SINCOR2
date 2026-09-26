@@ -85,7 +85,7 @@ class _FakeEth:
         self.sent = []
         self.nonces = {}
 
-    def get_transaction_count(self, addr):
+    def get_transaction_count(self, addr, block="latest"):
         return self.nonces.get(addr, 0)
 
     @property
