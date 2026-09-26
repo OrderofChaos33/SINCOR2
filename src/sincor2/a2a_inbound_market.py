@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 import uuid
@@ -58,6 +59,37 @@ logger = logging.getLogger("sincor.a2a.inbound")
 COMMIT_WINDOW_MS = 5 * 60 * 1000
 REVEAL_WINDOW_MS = 5 * 60 * 1000
 UINT96_MAX = 2**96 - 1
+
+# Dispute authorizations expire quickly to bound replay; adjudicate() is
+# idempotent on consumed locks, so in-window replays are harmless.
+DISPUTE_MAX_SKEW_MS = 15 * 60 * 1000
+
+
+def _dispute_message(task_id: str, agent_id: str, upheld: bool,
+                     adjudicator: str, expires_at_ms: int) -> str:
+    """Canonical EIP-191 message the adjudicator signs for a dispute ruling."""
+    return "|".join([
+        "SINCOR-DISPUTE",
+        task_id,
+        agent_id,
+        "1" if upheld else "0",
+        adjudicator.lower(),
+        str(expires_at_ms),
+    ])
+
+
+def _recover_dispute_signer(message: str, signature: str) -> str:
+    """Recover the signer address of a dispute authorization (EIP-191)."""
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
 
 
 def _keccak256(data: bytes) -> bytes:
@@ -710,6 +742,75 @@ def attach_market_routes(bp: Blueprint) -> None:
         if task is None:
             return _http_error("unknown task", 404)
         return jsonify(task), 200
+
+    @bp.post("/v1/a2a/disputes")
+    def v1_disputes():
+        """File a quality dispute against the winning agent's locked stake.
+
+        Adjudicator-signed only (secp256k1 — HMAC is demo-only per the
+        ratified EIP-712 decision, and slashing is on the money path).
+
+        Body: {task_id, agent_id, upheld, adjudicator_address,
+               expires_at_ms, signature}
+
+        The adjudicator EIP-191-signs the canonical message
+            SINCOR-DISPUTE|<task_id>|<agent_id>|<1|0>|<adjudicator>|<expires_at_ms>
+        The recovered signer must equal SINCOR_ADJUDICATOR_ID (set it to the
+        adjudicator's Ethereum address). expires_at_ms bounds replay to a
+        15-minute window; replays inside the window are harmless because
+        adjudicate() is idempotent on consumed locks.
+
+        upheld=true  -> 50% slash of the winner's locked stake (proceeds
+                          become poster re-auction credit).
+        upheld=false -> stake released, no slash.
+        """
+        from sincor2.onchain.stake_ledger import (
+            ADJUDICATOR_ENV, stake_ledger,
+        )
+        body = request.get_json(silent=True) or {}
+        task_id = str(body.get("task_id") or "")
+        agent_id = str(body.get("agent_id") or "")
+        upheld = body.get("upheld")
+        adjudicator = str(body.get("adjudicator_address") or "")
+        signature = str(body.get("signature") or "")
+        if (not task_id or not agent_id or upheld is None
+                or not adjudicator or not signature
+                or body.get("expires_at_ms") is None):
+            return _http_error(
+                "task_id, agent_id, upheld, adjudicator_address, "
+                "expires_at_ms, signature required", 400)
+        try:
+            expires_at_ms = int(body.get("expires_at_ms"))
+        except (TypeError, ValueError):
+            return _http_error("expires_at_ms must be an integer", 400)
+        now_ms = _now_ms()
+        if expires_at_ms <= now_ms:
+            return _http_error("dispute authorization expired", 403)
+        if expires_at_ms - now_ms > DISPUTE_MAX_SKEW_MS:
+            return _http_error("expires_at_ms too far in the future", 400)
+        expected = os.environ.get(ADJUDICATOR_ENV, "").strip()
+        if not expected:
+            return _http_error("adjudicator not configured", 503)
+        message = _dispute_message(task_id, agent_id, bool(upheld),
+                                   adjudicator, expires_at_ms)
+        try:
+            signer = _recover_dispute_signer(message, signature)
+        except Exception:  # noqa: BLE001 - any recovery failure rejects
+            return _http_error("bad signature", 403)
+        if signer.lower() != expected.lower() \
+                or adjudicator.lower() != expected.lower():
+            # Never reveal which of the two checks failed.
+            return _http_error("not the adjudicator", 403)
+        if get_fabric().tasks.get(task_id) is None:
+            return _http_error("unknown task", 404)
+        try:
+            result = stake_ledger().adjudicate(
+                agent_id, task_id, bool(upheld), adjudicator=expected)
+            return jsonify(result), 200
+        except PermissionError as err:
+            return _http_error(str(err), 403)
+        except (KeyError, ValueError) as err:
+            return _http_error(str(err), 400)
 
     @bp.post("/v1/a2a/proofs")
     @bp.post("/api/v1/proofs")
