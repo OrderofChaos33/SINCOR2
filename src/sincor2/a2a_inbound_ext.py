@@ -82,6 +82,11 @@ def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
             "probation": reputation < 0.15,
             "last_heartbeat": ts,
             "registered_at": int(existing.get("registered_at") or ts),
+            # Origin classification for registration-velocity ranking
+            # (operating directive): the platform agent is internal,
+            # every API registration is external.  Preserved across
+            # re-registrations like registered_at.
+            "origin": str(existing.get("origin") or ("internal" if agent_id == _PLATFORM_AGENT_ID else "external")),
             "status": "probation" if reputation < 0.15 else "live",
         }
         fabric.agents[agent_id] = agent
