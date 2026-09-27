@@ -96,6 +96,7 @@ ENDPOINT_POLICY: Dict[str, str] = {
     "GET /api/a2a/quote": "quote",
     "POST /api/a2a/quote": "quote",
     # reads (attach_market_routes / mount)
+    "GET /v1/a2a/tasks": "read",
     "GET /v1/a2a/auctions": "read",
     "GET /v1/a2a/tasks/<task_id>/bidder-kit": "read",
     "GET /v1/a2a/cards": "read",
@@ -106,6 +107,12 @@ ENDPOINT_POLICY: Dict[str, str] = {
     # same abuse class as bids: cheap writes that mutate ledger rows).
     "POST /v1/a2a/stake/deposit": "bid",
     "GET /v1/a2a/stake/<agent_id>": "read",
+    # launch bounty pool (attach_market_routes): public status read, and
+    # admin-gated writes in the same cheap-write abuse class as bids.
+    "GET /v1/a2a/pool": "read",
+    "POST /v1/a2a/pool/fund": "bid",
+    "POST /v1/a2a/pool/allocate": "bid",
+    "POST /v1/a2a/pool/release": "bid",
 }
 
 

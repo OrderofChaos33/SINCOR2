@@ -18,11 +18,11 @@ from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_OPEN_TASKS,
     MERIT_THRESHOLD_AXM,
-    PROBATION_SEEDS,
     SEALED_PROBATION_SEEDS,
     _http_error,
     _now_ms,
     _save_agents,
+    _save_tasks,
     _apply_reputation,
     get_fabric,
 )
@@ -60,6 +60,87 @@ logger = logging.getLogger("sincor.a2a.inbound")
 COMMIT_WINDOW_MS = 5 * 60 * 1000
 REVEAL_WINDOW_MS = 5 * 60 * 1000
 UINT96_MAX = 2**96 - 1
+
+
+def listing_ttl_ms() -> int:
+    """Outer listing lifetime for a task (default 24 h).
+
+    ``SINCOR_TASK_LISTING_TTL_S`` overrides. This is the backstop that
+    retires stale listings; sealed-bid windows (5+5 min per auction attempt)
+    are refreshed inside it by ``refresh_stale_listings``.
+    """
+    try:
+        seconds = float(os.environ.get("SINCOR_TASK_LISTING_TTL_S", "86400"))
+    except (TypeError, ValueError):
+        seconds = 86400.0
+    return max(60_000, int(seconds * 1000))
+
+
+def refresh_stale_listings() -> List[Dict[str, Any]]:
+    """Keep standing listings biddable; expire genuinely dead ones.
+
+    Fixes the ~10-minute listing death: a sealed task whose reveal window
+    passed with ZERO commits used to sit open but unbiddable (the next
+    commit would expire it via ``close_auction``). Now such tasks get
+    fresh 5+5-minute windows re-anchored at now. Tasks that received
+    commits follow the normal close/ghost path untouched.
+
+    - Any biddable task past its ``listing_expires_at`` is marked expired
+      (reason ``listing_ttl``) — except ``auto_refresh`` seed listings,
+      whose TTL is extended so the standing board never goes dark.
+    - Seed listings (``auto_refresh``) that a permissionless ``close()``
+      expired via ``auction_timeout`` with zero commits are revived.
+    """
+    fabric = get_fabric()
+    ts = _now_ms()
+    ttl = listing_ttl_ms()
+    changed: List[Dict[str, Any]] = []
+
+    def _reanchor(task: Dict[str, Any]) -> None:
+        task["commit_deadline"] = ts + COMMIT_WINDOW_MS
+        task["reveal_deadline"] = ts + COMMIT_WINDOW_MS + REVEAL_WINDOW_MS
+        task["state"] = "open"
+        if task.get("auto_refresh"):
+            task["listing_expires_at"] = ts + ttl
+
+    with fabric.lock:
+        for task in fabric.tasks.values():
+            task_id = task.get("task_id")
+            prefix = f"{task_id}\x00"
+            has_commits = any(k.startswith(prefix) for k in fabric.commits)
+            state = task.get("state")
+            if state in ("open", "auction"):
+                listing_exp = task.get("listing_expires_at")
+                if listing_exp is not None and ts > int(listing_exp):
+                    if task.get("auto_refresh"):
+                        task["listing_expires_at"] = ts + ttl
+                    else:
+                        task["state"] = "expired"
+                        task["expired_reason"] = "listing_ttl"
+                        task["expired_at"] = ts
+                        changed.append(dict(task))
+                        continue
+                if (task.get("sealed") and not has_commits
+                        and ts > int(task.get("reveal_deadline") or 0)):
+                    _reanchor(task)
+                    changed.append(dict(task))
+            elif (state == "expired"
+                    and task.get("expired_reason") == "auction_timeout"
+                    and task.get("auto_refresh") and not has_commits):
+                listing_exp = task.get("listing_expires_at")
+                if listing_exp is not None and ts > int(listing_exp):
+                    continue
+                _reanchor(task)
+                task.pop("expired_reason", None)
+                task.pop("expired_at", None)
+                changed.append(dict(task))
+    if changed:
+        _save_tasks(fabric)
+        for snap in changed:
+            fabric.publish("task.refreshed", list(snap.get("tags") or []),
+                           {"task_id": snap.get("task_id"),
+                            "state": snap.get("state")})
+    return changed
 
 # Dispute authorizations expire quickly to bound replay; adjudicate() is
 # idempotent on consumed locks, so in-window replays are harmless.
@@ -150,12 +231,18 @@ def _sealed_agent_checks(fabric: Any, task: Dict[str, Any], agent_id: str) -> Di
 
 
 def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float = 1.5,
-                sealed: bool = False, poster_id: Optional[str] = None) -> Dict[str, Any]:
+                sealed: bool = False, poster_id: Optional[str] = None,
+                seed_key: Optional[str] = None, auto_refresh: bool = False) -> Dict[str, Any]:
     """Create a task. When ``sealed`` is true the task runs a sealed-bid
     commit/reveal auction: per-task 5-minute commit + 5-minute reveal windows
     (ratified in docs/ops/AUCTION_SECURITY_DECISIONS.md) are stamped at
     creation, and only commit/reveal bids are accepted — the legacy plaintext
-    ``POST /v1/a2a/bids`` path is rejected for sealed tasks."""
+    ``POST /v1/a2a/bids`` path is rejected for sealed tasks.
+
+    ``seed_key`` tags standing seed listings (dedupe key); ``auto_refresh``
+    marks listings the board keeps biddable (see refresh_stale_listings).
+    Every task carries ``listing_expires_at``, the outer listing TTL.
+    """
     skill = str(skill or "").strip().lower()
     if not skill:
         raise ValueError("skill is required")
@@ -186,6 +273,11 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
             # revealDeadline = open + commitW + revealW.
             "commit_deadline": (ts + COMMIT_WINDOW_MS) if sealed else None,
             "reveal_deadline": (ts + COMMIT_WINDOW_MS + REVEAL_WINDOW_MS) if sealed else None,
+            # Outer listing lifetime; refresh_stale_listings() enforces it.
+            "listing_expires_at": ts + listing_ttl_ms(),
+            # Standing seed listings: dedupe key + board-managed refresh.
+            "seed_key": seed_key,
+            "auto_refresh": bool(auto_refresh),
             "assigned_to": None,
             "winner_score": None,
             "winning_bid_axm": None,
@@ -199,6 +291,7 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
         _anchor_onchain_auction(fabric, task_id)
         with fabric.lock:
             snap = dict(fabric.tasks[task_id])
+    _save_tasks(fabric)
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
     return snap
 
@@ -324,6 +417,7 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
         fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
         if snap.get("auction_id"):
             _fund_onchain_escrow(fabric, task_id)
+    _save_tasks(fabric)
     return snap
 
 
@@ -384,6 +478,8 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
             list(snap.get("tags") or []),
             {"task_id": snap["task_id"], "reason": "execution_timeout"},
         )
+    if expired:
+        _save_tasks(fabric)
     return expired
 
 
@@ -399,6 +495,7 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
         raise ValueError("bid_axm and estimated_seconds must be positive")
     fabric = get_fabric()
     ts = _now_ms()
+    refresh_stale_listings()
     close_auction(task_id)
     with fabric.lock:
         task = fabric.tasks.get(task_id)
@@ -442,6 +539,7 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
         snap = dict(bid)
         tags = list(task.get("tags") or [])
     fabric.publish("bid.received", tags, snap)
+    _save_tasks(fabric)
     if start:
         timer = threading.Timer(AUCTION_WINDOW_MS / 1000.0, lambda: close_auction(task_id))
         timer.daemon = True
@@ -461,6 +559,9 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
         raise ValueError("commitment must not be zero")
     fabric = get_fabric()
     ts = _now_ms()
+    # Re-anchor zero-commit sealed listings first: a commit arriving after a
+    # stale window must refresh the listing, not kill it via close_auction.
+    refresh_stale_listings()
     close_auction(task_id)
     with fabric.lock:
         task = fabric.tasks.get(task_id)
@@ -500,6 +601,7 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
         snap = dict(record)
         tags = list(task.get("tags") or [])
     fabric.publish("bid.committed", tags, {"task_id": task_id, "agent_id": agent_id})
+    _save_tasks(fabric)
     return snap
 
 
@@ -594,6 +696,7 @@ def reveal_bid(task_id: str, agent_id: str, bid_axm: float, nonce: Any,
         snap = dict(bid)
         tags = list(task.get("tags") or [])
     fabric.publish("bid.revealed", tags, {"task_id": task_id, "agent_id": agent_id, "bid_id": bid_id})
+    _save_tasks(fabric)
     return snap
 
 
@@ -653,22 +756,56 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
             logger.warning("winner stake release failed for %s: %s", agent_id, err)
     fabric.publish("proof.settled", tags, snap)
     _save_agents(fabric)
+    _save_tasks(fabric)
     snap["http_status"] = 202
     return snap
 
 
 def seed_probation_tasks() -> List[Dict[str, Any]]:
+    """Seed the 12 sealed vertical listings — into an EMPTY store only.
+
+    Boot idempotency: if the task store already holds any tasks (restored
+    from disk after a reboot, or created by operators), seeding is skipped
+    so a reboot never duplicates listings. Each seed carries ``seed_key``
+    (dedupe identity) and ``auto_refresh`` so the board keeps the standing
+    listings biddable via ``refresh_stale_listings``.
+
+    The legacy plaintext ``PROBATION_SEEDS`` are retired: the sealed-bid
+    shim is the forward path (plaintext ``place_bid`` stays working for
+    pre-shim clients on operator-created tasks).
+    """
     fabric = get_fabric()
     with fabric.lock:
-        existing = [t for t in fabric.tasks.values() if not t.get("requires_merit") and t.get("state") in ("open", "auction")]
-        if existing:
-            return [dict(t) for t in existing]
-    seeded = [create_task(skill, tags=[skill], bounty_axm=b) for skill, b in PROBATION_SEEDS]
-    seeded += [
-        create_task(skill, tags=[skill], bounty_axm=b, sealed=True)
-        for skill, b in SEALED_PROBATION_SEEDS
+        if fabric.tasks:
+            return [dict(t) for t in fabric.tasks.values()]
+    seeded = [
+        create_task(skill, tags=[skill], bounty_axm=bounty, sealed=True,
+                    seed_key=f"{skill}@{bounty}", auto_refresh=True)
+        for skill, bounty in SEALED_PROBATION_SEEDS
     ]
+    refresh_stale_listings()
     return seeded
+
+
+def _require_pool_admin():
+    """Admin gate for bounty-pool write endpoints.
+
+    Returns ``None`` when authorized, otherwise an error response tuple.
+    Deny-by-default: an unset ``SINCOR_BOUNTY_POOL_ADMIN_KEY`` disables the
+    admin surface (503). Key accepted via ``X-Admin-Key`` header or the
+    ``admin_key`` body field, mirroring the mvp_app admin-key pattern.
+    """
+    from sincor2.a2a_bounty_pool import ADMIN_KEY_ENV, pool_admin_configured
+    if not pool_admin_configured():
+        return _http_error("bounty pool admin not configured", 503)
+    key = request.headers.get("X-Admin-Key", "") or ""
+    if not key:
+        body = request.get_json(silent=True) or {}
+        key = str(body.get("admin_key") or "")
+    expected = os.environ.get(ADMIN_KEY_ENV, "")
+    if not key or not _hmac.compare_digest(str(key), expected):
+        return _http_error("admin authorization required", 401)
+    return None
 
 
 def attach_market_routes(bp: Blueprint) -> None:
@@ -680,6 +817,53 @@ def attach_market_routes(bp: Blueprint) -> None:
             return jsonify(task), 201
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
+
+    @bp.get("/v1/a2a/tasks")
+    def v1_tasks_list():
+        """List task listings with filters + pagination.
+
+        Query params: ``state`` (comma-separated), ``tags``
+        (comma-separated, any-match), ``min_bounty`` (float AXM),
+        ``page`` (1-based), ``per_page`` (max 100). Newest first.
+        The board is refreshed first so listings are never silently
+        unbiddable (see refresh_stale_listings).
+        """
+        refresh_stale_listings()
+        expire_stale_assignments()
+        states = {s.strip().lower() for s in (request.args.get("state") or "").split(",") if s.strip()}
+        tags = {t.strip().lower() for t in (request.args.get("tags") or "").split(",") if t.strip()}
+        try:
+            min_bounty = float(request.args.get("min_bounty") or 0)
+        except (TypeError, ValueError):
+            return _http_error("min_bounty must be a number", 400)
+        try:
+            page = max(1, int(request.args.get("page") or 1))
+            per_page = min(100, max(1, int(request.args.get("per_page") or 20)))
+        except (TypeError, ValueError):
+            return _http_error("page and per_page must be integers", 400)
+        fabric = get_fabric()
+        with fabric.lock:
+            tasks = [dict(t) for t in fabric.tasks.values()]
+        if states:
+            tasks = [t for t in tasks if str(t.get("state") or "").lower() in states]
+        if tags:
+            tasks = [t for t in tasks
+                     if tags & {str(x).lower() for x in (t.get("tags") or [])}]
+        if min_bounty > 0:
+            tasks = [t for t in tasks
+                     if float(t.get("bounty_axm") or 0) >= min_bounty]
+        tasks.sort(key=lambda t: (-int(t.get("created_at") or 0),
+                                  str(t.get("task_id") or "")))
+        total = len(tasks)
+        pages = max(1, (total + per_page - 1) // per_page)
+        start = (page - 1) * per_page
+        return jsonify({
+            "tasks": tasks[start:start + per_page],
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": pages,
+        }), 200
 
     @bp.post("/v1/a2a/bids")
     @bp.post("/api/v1/bids")
@@ -1036,6 +1220,83 @@ def attach_market_routes(bp: Blueprint) -> None:
         summary = stake_ledger().balance_of(agent_id)
         summary["ledger"] = "offchain-axm"
         return jsonify(summary), 200
+
+    # -- Launch bounty pool -------------------------------------------
+    # Offchain AXM reservation ledger for external-agent launch bounties.
+    # Writes are admin-gated (SINCOR_BOUNTY_POOL_ADMIN_KEY); the reserve is
+    # operator-configured via SINCOR_LAUNCH_BOUNTY_AXM (default 0 = pool
+    # unconfigured, fund() refuses). Ledger-only: moves no funds on-chain.
+
+    @bp.get("/v1/a2a/pool")
+    def v1_pool_status():
+        """Public pool status: reserve / funded / allocated / available."""
+        from sincor2.a2a_bounty_pool import bounty_pool
+        return jsonify(bounty_pool().status()), 200
+
+    @bp.post("/v1/a2a/pool/fund")
+    def v1_pool_fund():
+        """Move reserve into the spendable pool. Body: {amount_axm?}.
+
+        Omit amount_axm to fund the full remaining reserve. 503 when the
+        operator has not configured a reserve (default zero).
+        """
+        denied = _require_pool_admin()
+        if denied is not None:
+            return denied
+        from sincor2.a2a_bounty_pool import PoolNotConfigured, PoolError, bounty_pool
+        body = request.get_json(silent=True) or {}
+        try:
+            raw = body.get("amount_axm")
+            result = bounty_pool().fund(None if raw is None else float(raw))
+            return jsonify(result), 200
+        except PoolNotConfigured as err:
+            return _http_error(str(err), 503)
+        except (PoolError, TypeError, ValueError) as err:
+            return _http_error(str(err), 400)
+
+    @bp.post("/v1/a2a/pool/allocate")
+    def v1_pool_allocate():
+        """Reserve pool funds for a task. Body: {task_id, amount_axm, reason?}.
+
+        Creates an allocation record; the amount leaves the available
+        balance until released. The task must exist.
+        """
+        denied = _require_pool_admin()
+        if denied is not None:
+            return denied
+        from sincor2.a2a_bounty_pool import PoolError, bounty_pool
+        body = request.get_json(silent=True) or {}
+        task_id = str(body.get("task_id") or "").strip()
+        if not task_id:
+            return _http_error("task_id is required", 400)
+        if get_fabric().tasks.get(task_id) is None:
+            return _http_error("unknown task", 404)
+        try:
+            alloc = bounty_pool().allocate(
+                task_id, float(body.get("amount_axm") or 0),
+                str(body.get("reason") or ""))
+            return jsonify(alloc), 201
+        except (PoolError, TypeError, ValueError) as err:
+            return _http_error(str(err), 400)
+
+    @bp.post("/v1/a2a/pool/release")
+    def v1_pool_release():
+        """Return an allocation to the pool unspent. Body: {allocation_id}."""
+        denied = _require_pool_admin()
+        if denied is not None:
+            return denied
+        from sincor2.a2a_bounty_pool import PoolError, bounty_pool
+        body = request.get_json(silent=True) or {}
+        allocation_id = str(body.get("allocation_id") or "").strip()
+        if not allocation_id:
+            return _http_error("allocation_id is required", 400)
+        try:
+            alloc = bounty_pool().release(allocation_id)
+            return jsonify(alloc), 200
+        except KeyError as err:
+            return _http_error(str(err), 404)
+        except (PoolError, TypeError, ValueError) as err:
+            return _http_error(str(err), 400)
 
     @bp.get("/v1/a2a/stream")
     @bp.get("/api/v1/stream")
