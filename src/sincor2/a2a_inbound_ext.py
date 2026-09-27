@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from flask import Flask, jsonify, request
 
@@ -21,6 +21,7 @@ from sincor2.a2a_inbound import (
     _normalize_registration,
     _now_ms,
     _save_agents,
+    _apply_reputation,
     get_fabric,
     health_snapshot,
 )
@@ -65,11 +66,25 @@ def _live_kya_statuses() -> Dict[str, str]:
         return {}
 
 
-def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
+def register_agent_record(body: Dict[str, Any],
+                          _internal_reputation: Optional[float] = None) -> Dict[str, Any]:
+    """Register (or re-register) an agent record.
+
+    Reputation is earned-only and never declared: ``body["reputation"]`` is
+    silently ignored (existing clients may still send it; it is read-only
+    in API responses). New agents start at 0.0 (probation); re-registration
+    preserves already-earned reputation. The only path that assigns
+    reputation at registration time is the internal platform seed, via
+    ``_internal_reputation`` — the HTTP route never passes it.
+    """
     parsed = _normalize_registration(body)
     agent_id = parsed["agent_id"]
     if not _AGENT_ID_RE.match(agent_id):
         raise ValueError("agent_id must be 1-128 chars of A-Za-z0-9._:-")
+    if agent_id == _PLATFORM_AGENT_ID and _internal_reputation is None:
+        # The platform agent is seeded internally at startup; it cannot be
+        # registered (or have its wallet/callback overwritten) via the API.
+        raise ValueError("reserved agent_id")
     wallet = parsed["wallet"]
     if wallet and not _WALLET_RE.match(wallet):
         raise ValueError("wallet must be a 0x-prefixed 20-byte hex address")
@@ -79,7 +94,10 @@ def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
         if agent_id not in fabric.agents and len(fabric.agents) >= MAX_AGENTS:
             raise OverflowError("directory full")
         existing = fabric.agents.get(agent_id) or {}
-        reputation = float(body["reputation"]) if body.get("reputation") is not None else float(existing.get("reputation") or 0.0)
+        if _internal_reputation is not None:
+            reputation = float(_internal_reputation)
+        else:
+            reputation = float(existing.get("reputation") or 0.0)
         agent = {
             "agent_id": agent_id,
             "name": parsed["name"],
@@ -93,8 +111,6 @@ def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
             "sinc_staked": parsed["sinc_stake"],
             "reputation": reputation,
             "sponsored": bool(existing.get("sponsored", True)),
-            "requires_merit": reputation < 0.15,
-            "probation": reputation < 0.15,
             "last_heartbeat": ts,
             "registered_at": int(existing.get("registered_at") or ts),
             # Origin classification for registration-velocity ranking
@@ -102,8 +118,10 @@ def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
             # every API registration is external.  Preserved across
             # re-registrations like registered_at.
             "origin": str(existing.get("origin") or ("internal" if agent_id == _PLATFORM_AGENT_ID else "external")),
-            "status": "probation" if reputation < 0.15 else "live",
         }
+        # probation / requires_merit / status derive from the merit
+        # threshold in one place (never declared, never KYA-derived).
+        _apply_reputation(agent, reputation)
         fabric.agents[agent_id] = agent
         snapshot = dict(agent)
     _save_agents(fabric)
@@ -150,8 +168,7 @@ def ensure_platform_agent() -> Dict[str, Any]:
         "rpc_callback": f"{base}/api/a2a",
         "wallet": os.environ.get("TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"),
         "chain_id": BASE_CHAIN_ID,
-        "reputation": 1.0,
-    })
+    }, _internal_reputation=1.0)
     _start_platform_heartbeat()
     logger.info("[A2A] Platform agent live id=%s status=%s", snapshot.get("agent_id"), snapshot.get("status"))
     return snapshot

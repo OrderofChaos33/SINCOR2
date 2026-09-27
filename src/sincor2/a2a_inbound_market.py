@@ -23,6 +23,7 @@ from sincor2.a2a_inbound import (
     _http_error,
     _now_ms,
     _save_agents,
+    _apply_reputation,
     get_fabric,
 )
 from sincor2.a2a_timeouts import assignment_deadline_ms
@@ -305,6 +306,20 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 ledger.release(agent_id, task_id)
             except Exception as err:
                 logger.warning("stake release failed for %s: %s", agent_id, err)
+    # Ghosting zeroes earned reputation and restores probation. This is the
+    # behavior penalty for committing without revealing; it applies to every
+    # detected ghost independent of ledger accounting, and never bricks
+    # the close.
+    if ghosts:
+        try:
+            with fabric.lock:
+                for agent_id in ghosts:
+                    agent = fabric.agents.get(agent_id)
+                    if agent is not None:
+                        _apply_reputation(agent, 0.0)
+            _save_agents(fabric)
+        except Exception as err:
+            logger.warning("ghost reputation reset failed: %s", err)
     if snap["state"] == "assigned":
         fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
         if snap.get("auction_id"):
@@ -613,10 +628,7 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
         task["settled_at"] = ts
         if receipt.get("ok") and fabric.agents.get(agent_id):
             ag = fabric.agents[agent_id]
-            ag["reputation"] = min(1.0, float(ag.get("reputation") or 0) + 0.2)
-            ag["probation"] = float(ag["reputation"]) < 0.15
-            ag["requires_merit"] = ag["probation"]
-            ag["status"] = "probation" if ag["probation"] else "live"
+            _apply_reputation(ag, float(ag.get("reputation") or 0) + 0.2)
         proof = {
             "proof_id": proof_id,
             "task_id": task_id,
@@ -806,6 +818,21 @@ def attach_market_routes(bp: Blueprint) -> None:
         try:
             result = stake_ledger().adjudicate(
                 agent_id, task_id, bool(upheld), adjudicator=expected)
+            if bool(upheld) and int(result.get("slashed_wei") or 0) > 0:
+                # Upheld quality dispute halves earned reputation (min 0).
+                # Idempotent: the ledger slash is a no-op on replay
+                # (slashed_wei == 0), so a replayed ruling cannot halve twice.
+                try:
+                    _fabric = get_fabric()
+                    with _fabric.lock:
+                        _agent = _fabric.agents.get(agent_id)
+                        if _agent is not None:
+                            _apply_reputation(
+                                _agent, float(_agent.get("reputation") or 0.0) / 2.0)
+                    _save_agents(_fabric)
+                except Exception as rep_err:
+                    logger.warning("reputation halve failed for %s: %s",
+                                   agent_id, rep_err)
             return jsonify(result), 200
         except PermissionError as err:
             return _http_error(str(err), 403)
