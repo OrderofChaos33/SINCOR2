@@ -241,6 +241,19 @@ def _live_identities_for_wallet(wallet: str, exclude_agent_id: Optional[str] = N
 def tombstones_snapshot() -> Dict[str, Any]:
     with _LOCK:
         return {"count": len(_TOMBSTONES), "tombstones": list(_TOMBSTONES.values())}
+
+
+def is_wallet_tombstoned(wallet: str) -> bool:
+    """Public read: has this wallet been tombstoned (revoked or ghost-flagged)?
+
+    Used by the recovery track's tombstone gate. Any tombstone — any reason —
+    disqualifies the wallet from sponsored recovery: the platform does not
+    front money to wallets it has killed.
+    """
+    if not wallet:
+        return False
+    with _LOCK:
+        return wallet.lower() in _TOMBSTONES
     return json.dumps(obj, separators=(",", ":"), sort_keys=True, ensure_ascii=True)
 
 

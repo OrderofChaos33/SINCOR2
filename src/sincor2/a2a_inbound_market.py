@@ -1458,3 +1458,10 @@ def attach_market_routes(bp: Blueprint) -> None:
     from sincor2.sponsored_stake import attach_sponsored_stake_routes
 
     attach_sponsored_stake_routes(bp)
+
+    # Bankruptcy recovery track: admin-gated, default off. Deterministic
+    # eligibility (honest-fail only, tombstoned wallets excluded) with a
+    # fixed per-wallet escalation ladder; fronting reuses sponsored stake.
+    from sincor2.recovery import attach_recovery_routes
+
+    attach_recovery_routes(bp)
