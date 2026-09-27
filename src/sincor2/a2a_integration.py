@@ -1134,6 +1134,72 @@ def build_agent_card() -> AgentCard:
 
 
 # ---------------------------------------------------------------------------
+# Marketplace manifest factory (/.well-known/sincor-marketplace.json)
+# ---------------------------------------------------------------------------
+
+def build_marketplace_manifest() -> Dict[str, Any]:
+    """Return the SINCOR marketplace discovery manifest.
+
+    Advertises the task/directory/quote endpoints plus the MCP entry point so
+    an MCP-capable agent can go manifest → MCP server → tools → bid.
+    """
+    base = PLATFORM_URL
+    return {
+        "name": "SINCOR Agent Marketplace",
+        "version": "1.0.0",
+        "description": (
+            "Discovery manifest for the SINCOR agent marketplace: open task "
+            "auctions (sealed-bid commit/reveal), the agent directory, AXM "
+            "price quotes, and the MCP server entry point. Reputation is "
+            "earned-only and never declared; KYA-gated discovery excludes "
+            "revoked agents."
+        ),
+        "endpoints": {
+            "auctions": f"{base}/v1/a2a/auctions",
+            "bidder_kit": f"{base}/v1/a2a/tasks/{{task_id}}/bidder-kit",
+            "agent_cards": f"{base}/v1/a2a/cards",
+            "directory": f"{base}/v1/a2a/directory",
+            "quote": f"{base}/api/a2a/quote",
+            "registration_velocity": f"{base}/v1/a2a/registration-velocity",
+            "register": f"{base}/v1/a2a/register",
+            "bids": f"{base}/v1/a2a/bids",
+            "bids_commit": f"{base}/v1/a2a/bids/commit",
+            "bids_reveal": f"{base}/v1/a2a/bids/reveal",
+        },
+        "mcp": {
+            "transport": "stdio",
+            "protocol": "JSON-RPC 2.0",
+            "module": "sincor2.mcp_server",
+            "run": "python -m sincor2.mcp_server",
+            "config_env": {"SINCOR_MCP_BASE_URL": base},
+            "tools": ["list_tasks", "get_task", "get_agent_card",
+                      "get_quote", "register_agent", "submit_bid"],
+            "write_tool_policy": (
+                "register_agent and submit_bid are default-deny: each call "
+                "first returns a confirmation_required payload describing the "
+                "exact HTTP request; the operator re-invokes with an identical "
+                "argument set plus confirmation_token and action_id."
+            ),
+        },
+        "upgrade_path": {
+            "task_list": (
+                "list_tasks currently reads GET /v1/a2a/auctions (sealed "
+                "auctions with onchain anchors). When the sibling "
+                "GET /v1/a2a/tasks endpoint merges, the MCP list_tasks tool "
+                "switches to it for the full task inventory."
+            ),
+        },
+        "rate_limit_tiers": {
+            "register": "5/hour + 20/day per IP",
+            "bid": "30/min + 300/hour per agent_id",
+            "quote": "60/min + 2000/hour per IP",
+            "read": "120/min + 5000/hour per IP",
+        },
+        "invariants": "docs/architecture/AUCTION_GROUND_TRUTH.md",
+    }
+
+
+# ---------------------------------------------------------------------------
 # In-memory stores (replace with Redis / DB in production)
 # ---------------------------------------------------------------------------
 # NOTE: this store is process-local and non-persistent. All tasks are lost on
@@ -1680,6 +1746,14 @@ class A2ARouter:
         def agent_card_legacy():
             from flask import jsonify
             return jsonify(build_agent_card().to_legacy_dict())
+
+        # ── Discovery — marketplace manifest ────────────────────────────────
+        @bp.route("/.well-known/sincor-marketplace.json", methods=["GET"])
+        def marketplace_manifest():
+            """Marketplace discovery manifest: task/directory/quote endpoints
+            plus the MCP server entry point. jsonify → application/json."""
+            from flask import jsonify
+            return jsonify(build_marketplace_manifest())
 
         @bp.route("/docs/a2a", methods=["GET"])
         def a2a_docs():
