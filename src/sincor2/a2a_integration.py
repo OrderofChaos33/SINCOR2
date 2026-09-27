@@ -1988,6 +1988,12 @@ class A2ARouter:
                 "primary_token":               A2A_PRIMARY_TOKEN,
             })
 
+        # A2A abuse-class rate limits (policies in sincor2.a2a_rate_limits).
+        # Only ENDPOINT_POLICY routes (here: /api/a2a/quote) are limited;
+        # discovery, docs, RPC dispatch, settle, leaderboard stay untouched.
+        from sincor2.a2a_rate_limits import a2a_rate_limit_check
+        bp.before_request(a2a_rate_limit_check)
+
 
 # ---------------------------------------------------------------------------
 # JSON-RPC helpers

@@ -46,6 +46,20 @@ def isolated_waitlist_db(tmp_path, monkeypatch):
     monkeypatch.setattr(waitlist_system, "waitlist_manager", fresh_manager)
 
 
+@pytest.fixture(autouse=True)
+def _reset_a2a_rate_limits():
+    """Isolate the in-memory A2A rate limiter between tests.
+
+    The enforcer (sincor2.a2a_rate_limits) keys per-IP tiers on the test
+    client's address, so without a reset one test's traffic would bleed
+    into the next. Harmless for tests that never touch A2A routes.
+    """
+    from sincor2.a2a_rate_limits import reset_a2a_limits
+    reset_a2a_limits()
+    yield
+    reset_a2a_limits()
+
+
 @pytest.fixture
 def app(monkeypatch, isolated_waitlist_db):
     from sincor2 import app as app_module

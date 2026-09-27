@@ -303,6 +303,11 @@ def mount(app: Flask) -> None:
         return jsonify(probe_base_chain())
 
     attach_market_routes(bp)
+    # A2A abuse-class rate limits (policies in sincor2.a2a_rate_limits).
+    # Only ENDPOINT_POLICY routes are limited; admin/health/heartbeat/
+    # proofs/stream stay untouched.
+    from sincor2.a2a_rate_limits import a2a_rate_limit_check
+    bp.before_request(a2a_rate_limit_check)
     app.register_blueprint(bp)
     try:
         from sincor2.kya_blueprint import kya_bp

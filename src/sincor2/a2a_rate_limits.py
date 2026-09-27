@@ -102,6 +102,10 @@ ENDPOINT_POLICY: Dict[str, str] = {
     "GET /v1/a2a/directory": "read",
     "GET /v1/a2a/agents": "read",
     "GET /v1/a2a/registration-velocity": "read",
+    # stake self-service (attach_market_routes; added when the route shipped —
+    # same abuse class as bids: cheap writes that mutate ledger rows).
+    "POST /v1/a2a/stake/deposit": "bid",
+    "GET /v1/a2a/stake/<agent_id>": "read",
 }
 
 
@@ -192,3 +196,82 @@ class SlidingWindowLimiter:
 
         events.append(now)
         return True, {"retry_after": 0.0}
+
+
+# ---------------------------------------------------------------------------
+# Enforcement: before_request wiring for the A2A blueprints
+# ---------------------------------------------------------------------------
+# The policies above are enforced with the SlidingWindowLimiter spec class
+# itself (not flask-limiter strings), because the task contract requires an
+# exact 429 JSON body *including* Retry-After — which the spec's check()
+# returns deterministically. This keeps one code path for production
+# (mvp_app) and bare-Flask test apps, with no extension-init dance.
+#
+# Wire once per blueprint:
+#     from sincor2.a2a_rate_limits import a2a_rate_limit_check
+#     bp.before_request(a2a_rate_limit_check)
+#
+# Only routes present in ENDPOINT_POLICY are limited. Everything else —
+# admin/operator routes, health checks, heartbeats, proof submission, task
+# create/close, the SSE stream, chain probes — is deliberately untouched.
+
+import math
+
+_ENFORCER = SlidingWindowLimiter()
+
+
+def reset_a2a_limits() -> None:
+    """Clear all recorded hits. Test isolation hook — call between tests."""
+    _ENFORCER._hits.clear()
+
+
+def _client_ip() -> str:
+    try:
+        from flask_limiter.util import get_remote_address
+        return get_remote_address() or "unknown"
+    except Exception:
+        try:
+            from flask import request
+            return request.remote_addr or "unknown"
+        except Exception:
+            return "unknown"
+
+
+def a2a_rate_limit_check():
+    """Flask before_request handler. Returns a 429 response on breach,
+    None when the request may proceed."""
+    from flask import jsonify, request
+
+    rule = request.url_rule
+    if rule is None:
+        return None
+    policy = policy_for(request.method, str(rule))
+    if policy is None:
+        return None
+
+    if policy == "bid":
+        # Per-agent keying: agents behind one NAT egress must not share a
+        # bucket. Falls back to IP when the body carries no agent_id.
+        body = request.get_json(silent=True) or {}
+        agent_id = str(body.get("agent_id") or "").strip()
+        client_key = a2a_client_key(agent_id=agent_id or None, ip=_client_ip())
+    else:
+        # register / quote / dispute / read: no stable agent identity at
+        # this layer (or the agent_id names someone else, as in disputes),
+        # so key on client IP — same get_remote_address the app limiter uses.
+        client_key = a2a_client_key(ip=_client_ip())
+
+    allowed, info = _ENFORCER.check(policy, client_key)
+    if allowed:
+        return None
+
+    retry_after = int(math.ceil(info.get("retry_after") or 0.0))
+    resp = jsonify({
+        "error": "rate_limited",
+        "status": 429,
+        "policy": policy,
+        "retry_after": retry_after,
+    })
+    resp.status_code = 429
+    resp.headers["Retry-After"] = str(retry_after)
+    return resp
