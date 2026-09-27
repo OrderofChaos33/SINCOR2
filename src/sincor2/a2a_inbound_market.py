@@ -57,8 +57,24 @@ logger = logging.getLogger("sincor.a2a.inbound")
 #  * No staking/slashing in the shim: sinc_stake is recorded at registration
 #    but not enforced. Stake mechanics arrive with the contract wiring.
 # ---------------------------------------------------------------------------
-COMMIT_WINDOW_MS = 5 * 60 * 1000
-REVEAL_WINDOW_MS = 5 * 60 * 1000
+# Sealed-bid windows. The ratified production values are 5-minute commit +
+# 5-minute reveal (docs/ops/AUCTION_SECURITY_DECISIONS.md, canonical in
+# docs/architecture/AUCTION_GROUND_TRUTH.md); they remain the defaults.
+# The env overrides exist so the quickstart and CI can exercise the REAL
+# commit -> wait -> reveal -> close path without a 10-minute wall-clock
+# wait. They never weaken the money path: the onchain contract keeps its
+# own windows, and production leaves these unset.
+def _sealed_window_ms(env_name: str, default_ms: int) -> int:
+    try:
+        return max(1_000, int(os.environ.get(env_name, "") or default_ms))
+    except (TypeError, ValueError):
+        return default_ms
+
+
+COMMIT_WINDOW_MS = _sealed_window_ms(
+    "SINCOR_SEALED_COMMIT_WINDOW_MS", 5 * 60 * 1000)
+REVEAL_WINDOW_MS = _sealed_window_ms(
+    "SINCOR_SEALED_REVEAL_WINDOW_MS", 5 * 60 * 1000)
 UINT96_MAX = 2**96 - 1
 
 # Dispute authorizations expire quickly to bound replay; adjudicate() is
@@ -651,6 +667,16 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
             stake_ledger().release(agent_id, task_id)
         except Exception as err:
             logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        # Sponsored-stake recoup: the staged payout is the agent's earnings
+        # event. Any outstanding platform-fronted stake is recouped here
+        # (partially or fully). Never bricks settlement on accounting.
+        try:
+            from sincor2.sponsored_stake import recoup_sponsored_stake
+            recoup_sponsored_stake(
+                agent_id, int(round(amount * 1e18)), task_id=task_id)
+        except Exception as err:
+            logger.warning(
+                "sponsored-stake recoup skipped for %s: %s", agent_id, err)
     fabric.publish("proof.settled", tags, snap)
     _save_agents(fabric)
     snap["http_status"] = 202
@@ -680,6 +706,21 @@ def attach_market_routes(bp: Blueprint) -> None:
             return jsonify(task), 201
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
+
+    @bp.get("/v1/a2a/tasks/<task_id>")
+    def v1_task_detail(task_id):
+        """Public task view. Sealed-safe: carries deadlines and state but
+        no bid or commitment details — the sealed information stays
+        hidden until reveal."""
+        task = get_fabric().tasks.get(str(task_id or ""))
+        if task is None:
+            return _http_error("unknown task", 404)
+        view = {k: task.get(k) for k in (
+            "task_id", "skill", "tags", "bounty_axm", "requires_merit",
+            "state", "sealed", "commit_deadline", "reveal_deadline",
+            "created_at", "assigned_to", "winning_bid_axm", "proof_id",
+            "payout_axm", "expired_reason", "ghosted_commits")}
+        return jsonify(view), 200
 
     @bp.post("/v1/a2a/bids")
     @bp.post("/api/v1/bids")
@@ -1070,3 +1111,10 @@ def attach_market_routes(bp: Blueprint) -> None:
             mimetype="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
         )
+
+    # Sponsored stake (genesis cohort): admin-gated, default off. The
+    # mechanism lives in sincor2.sponsored_stake; the routes are attached
+    # here so every A2A app surface (bare test app and mvp_app) gets them.
+    from sincor2.sponsored_stake import attach_sponsored_stake_routes
+
+    attach_sponsored_stake_routes(bp)
