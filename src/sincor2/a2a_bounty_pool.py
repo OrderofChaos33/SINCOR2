@@ -105,6 +105,20 @@ class BountyPool:
         self._allocations: Dict[str, Dict[str, Any]] = {}
         self._history: List[Dict[str, Any]] = []
         self._load()
+        if not self.path.is_file() and self.reserve_wei > 0:
+            # Fresh disk (first boot, or a redeploy wiped the ephemeral
+            # ledger): the operator configured a reserve via
+            # SINCOR_LAUNCH_BOUNTY_AXM, so rehydrate it instead of silently
+            # refusing allocations until someone re-funds by hand. A warm
+            # ledger file is always trusted as-is.
+            self._funded_wei = self.reserve_wei
+            self._record("fund", self.reserve_wei,
+                         {"auto_rehydrate": True,
+                          "reason": "fresh disk; reserve configured"})
+            self._save()
+            logger.warning(
+                "bounty pool ledger missing on boot; auto-funded %s AXM "
+                "from configured reserve", _wei_to_axm(self.reserve_wei))
 
     # -- persistence ------------------------------------------------------
     def _load(self) -> None:
@@ -156,9 +170,10 @@ class BountyPool:
     def fund(self, amount_axm: Optional[float] = None) -> Dict[str, Any]:
         """Move reserve into the spendable pool.
 
-        ``amount_axm=None`` funds the full remaining reserve. Raises
-        ``PoolNotConfigured`` when the operator has not set a reserve
-        (``SINCOR_LAUNCH_BOUNTY_AXM`` defaults to 0).
+        ``amount_axm=None`` funds the full remaining reserve, and is
+        idempotent: when nothing remains it returns the current status
+        instead of raising. Raises ``PoolNotConfigured`` when the operator
+        has not set a reserve (``SINCOR_LAUNCH_BOUNTY_AXM`` defaults to 0).
         """
         with self._lock:
             if self.reserve_wei <= 0:
@@ -166,13 +181,18 @@ class BountyPool:
                     f"launch bounty pool not configured: set {RESERVE_ENV} "
                     "to earmark AXM for launch bounties")
             remaining = self.reserve_wei - self._funded_wei
-            amount_wei = remaining if amount_axm is None else _axm_to_wei(amount_axm)
-            if amount_wei <= 0:
-                raise PoolError("amount_axm must be positive")
-            if amount_wei > remaining:
-                raise PoolError(
-                    f"amount exceeds remaining reserve "
-                    f"({_wei_to_axm(remaining):g} AXM)")
+            if amount_axm is None:
+                if remaining <= 0:
+                    return self._status_locked()
+                amount_wei = remaining
+            else:
+                amount_wei = _axm_to_wei(amount_axm)
+                if amount_wei <= 0:
+                    raise PoolError("amount_axm must be positive")
+                if amount_wei > remaining:
+                    raise PoolError(
+                        f"amount exceeds remaining reserve "
+                        f"({_wei_to_axm(remaining):g} AXM)")
             self._funded_wei += amount_wei
             self._record("fund", amount_wei, {})
             self._save()

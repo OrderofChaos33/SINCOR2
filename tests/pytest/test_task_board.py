@@ -426,15 +426,53 @@ def test_pool_persists_across_reboot(board_client, tmp_path, monkeypatch):
     from sincor2.a2a_bounty_pool import reset_bounty_pool
 
     pool_path = str(tmp_path / "pool.json")
-    reset_bounty_pool(path=pool_path)
-    r = board_client.post("/v1/a2a/pool/fund", json={"amount_axm": 50},
+    reset_bounty_pool(path=pool_path)  # fresh disk: auto-funds the reserve
+    assert board_client.get("/v1/a2a/pool").get_json()["funded_axm"] == 50
+
+    task_id = _seed_task_id(board_client)
+    r = board_client.post("/v1/a2a/pool/allocate",
+                          json={"task_id": task_id, "amount_axm": 20,
+                                "reason": "reboot test"},
                           headers=_admin_headers())
-    assert r.status_code == 200
+    assert r.status_code == 201, r.get_json()
 
     reset_bounty_pool(path=pool_path)  # simulate restart: rebuild from file
     status = board_client.get("/v1/a2a/pool").get_json()
     assert status["funded_axm"] == 50
-    assert status["available_axm"] == 50
+    assert status["allocated_axm"] == 20
+    assert status["available_axm"] == 30
+
+
+def test_pool_rehydrates_on_fresh_disk(board_client, tmp_path, monkeypatch):
+    """A redeploy wiping the ephemeral ledger must not strand the pool:
+    with a reserve configured and no ledger file, boot auto-funds."""
+    monkeypatch.setenv("SINCOR_LAUNCH_BOUNTY_AXM", "75")
+    from sincor2.a2a_bounty_pool import reset_bounty_pool
+
+    pool_path = str(tmp_path / "pool.json")
+    assert not os.path.exists(pool_path)
+    reset_bounty_pool(path=pool_path)
+    status = board_client.get("/v1/a2a/pool").get_json()
+    assert status["reserve_axm"] == 75
+    assert status["funded_axm"] == 75
+    assert status["available_axm"] == 75
+
+    # explicit fund with nothing remaining is idempotent, not an error
+    r = board_client.post("/v1/a2a/pool/fund", json={},
+                          headers=_admin_headers())
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["funded_axm"] == 75
+
+
+def test_pool_no_rehydrate_without_reserve(board_client, tmp_path, monkeypatch):
+    """Deny-by-default holds: no reserve configured, no auto-fund."""
+    monkeypatch.delenv("SINCOR_LAUNCH_BOUNTY_AXM", raising=False)
+    from sincor2.a2a_bounty_pool import reset_bounty_pool
+
+    reset_bounty_pool(path=str(tmp_path / "pool.json"))
+    status = board_client.get("/v1/a2a/pool").get_json()
+    assert status["reserve_axm"] == 0
+    assert status["funded_axm"] == 0
 
 
 # ---------------------------------------------------------------------------
