@@ -248,7 +248,8 @@ def _sealed_agent_checks(fabric: Any, task: Dict[str, Any], agent_id: str) -> Di
 
 def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float = 1.5,
                 sealed: bool = False, poster_id: Optional[str] = None,
-                seed_key: Optional[str] = None, auto_refresh: bool = False) -> Dict[str, Any]:
+                seed_key: Optional[str] = None, auto_refresh: bool = False,
+                title: Optional[str] = None, description: Optional[str] = None) -> Dict[str, Any]:
     """Create a task. When ``sealed`` is true the task runs a sealed-bid
     commit/reveal auction: per-task 5-minute commit + 5-minute reveal windows
     (ratified in docs/ops/AUCTION_SECURITY_DECISIONS.md) are stamped at
@@ -278,6 +279,8 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
             "skill": skill,
             "tags": tag_list,
             "bounty_axm": bounty,
+            "title": str(title).strip() if title else None,
+            "description": str(description).strip() if description else None,
             "requires_merit": bounty >= MERIT_THRESHOLD_AXM,
             "state": "open",
             "created_at": ts,
@@ -839,7 +842,9 @@ def attach_market_routes(bp: Blueprint) -> None:
     def v1_tasks():
         body = request.get_json(silent=True) or {}
         try:
-            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=body.get("poster_id") or body.get("agent_id"))
+            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=body.get("poster_id") or body.get("agent_id"),
+                             seed_key=str(body.get("seed_key") or "") or None, auto_refresh=bool(body.get("auto_refresh")),
+                             title=body.get("title"), description=body.get("description"))
             return jsonify(task), 201
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
@@ -853,7 +858,8 @@ def attach_market_routes(bp: Blueprint) -> None:
         if task is None:
             return _http_error("unknown task", 404)
         view = {k: task.get(k) for k in (
-            "task_id", "skill", "tags", "bounty_axm", "requires_merit",
+            "task_id", "skill", "tags", "bounty_axm", "title", "description",
+            "requires_merit",
             "state", "sealed", "commit_deadline", "reveal_deadline",
             "created_at", "assigned_to", "winning_bid_axm", "proof_id",
             "payout_axm", "expired_reason", "ghosted_commits")}
