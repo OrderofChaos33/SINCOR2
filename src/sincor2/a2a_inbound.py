@@ -11,6 +11,7 @@ import threading
 import time
 import uuid
 from collections import deque
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -142,6 +143,7 @@ def get_fabric() -> Fabric:
             if _FABRIC is None:
                 _FABRIC = Fabric()
                 _load_agents(_FABRIC)
+                _load_tasks(_FABRIC)
     return _FABRIC
 
 
@@ -184,6 +186,75 @@ def _save_agents(fabric: Fabric) -> None:
         path.write_text(json.dumps({"agents": list(fabric.agents.values()), "saved_at": _now_ms()}), encoding="utf-8")
     except Exception as err:
         logger.warning("[A2A] persist failed: %s", err)
+
+
+def _tasks_persist_path():
+    """File backing the task listings. ``SINCOR_A2A_TASKS_PATH`` overrides
+    for tests; otherwise the persistent data dir (``SINCOR_DATA_DIR``)."""
+    override = os.environ.get("SINCOR_A2A_TASKS_PATH", "").strip()
+    if override:
+        return Path(override)
+    try:
+        from sincor2.data_paths import data_dir
+        return data_dir() / "a2a_inbound_tasks.json"
+    except Exception:
+        return None
+
+
+def _tasks_persist_enabled() -> bool:
+    """Write-through task persistence.
+
+    On in production, and whenever ``SINCOR_A2A_TASKS_PATH`` explicitly
+    opts in. Off by default under FLASK_ENV/ENVIRONMENT=test so existing
+    suites keep full in-memory isolation (mirrors the platform_bootstrap
+    temp-registry convention); persistence tests set the override.
+    """
+    if os.environ.get("SINCOR_A2A_TASKS_PATH", "").strip():
+        return True
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENVIRONMENT") or "production").strip().lower()
+    return env not in {"test", "testing"}
+
+
+def _load_tasks(fabric: Fabric) -> None:
+    """Restore task listings into a fresh fabric (boot path only)."""
+    if not _tasks_persist_enabled():
+        return
+    path = _tasks_persist_path()
+    if path is None or not path.is_file():
+        return
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        tasks = raw.get("tasks") if isinstance(raw, dict) else raw
+        items = tasks.values() if isinstance(tasks, dict) else tasks
+        if items:
+            for task in items:
+                if isinstance(task, dict) and task.get("task_id"):
+                    fabric.tasks[task["task_id"]] = task
+    except Exception as err:
+        logger.warning("[A2A] task restore failed: %s", err)
+
+
+def _save_tasks(fabric: Fabric) -> None:
+    """Write-through task persistence (atomic tmp + os.replace).
+
+    Call outside ``fabric.lock`` after a task mutation, mirroring
+    ``_save_agents``. Never raises: a failed write is logged, never fatal.
+    """
+    if not _tasks_persist_enabled():
+        return
+    path = _tasks_persist_path()
+    if path is None:
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(
+            json.dumps({"tasks": list(fabric.tasks.values()), "saved_at": _now_ms()}),
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)
+    except Exception as err:
+        logger.warning("[A2A] task persist failed: %s", err)
 
 
 def health_snapshot() -> Dict[str, Any]:
