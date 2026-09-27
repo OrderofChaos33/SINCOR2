@@ -39,6 +39,31 @@ _FABRIC_LOCK = threading.Lock()
 _PLATFORM_AGENT_ID = "sincor-agent-swarm"
 _HEARTBEAT_THREAD = None
 _HEARTBEAT_STOP = threading.Event()
+
+REPUTATION_MERIT_THRESHOLD = 0.15
+"""Reputation at or above this clears probation / requires_merit.
+
+Reputation is earned-only: it is never accepted from a registration
+request body. New agents start at 0.0; settlement increments it;
+ghosting and upheld quality disputes reduce it. KYA verifies identity,
+not competence, so KYA status never feeds this number.
+"""
+
+
+def _apply_reputation(agent: Dict[str, Any], new_value: float) -> float:
+    """Set earned reputation and recompute probation / merit / status.
+
+    Single source of truth for the merit threshold so registration,
+    settlement, ghosting, and adjudication cannot drift apart.
+    Clamps to [0.0, 1.0]. Returns the applied value.
+    """
+    rep = max(0.0, min(1.0, float(new_value or 0.0)))
+    agent["reputation"] = rep
+    probation = rep < REPUTATION_MERIT_THRESHOLD
+    agent["probation"] = probation
+    agent["requires_merit"] = probation
+    agent["status"] = "probation" if probation else "live"
+    return rep
 PROBATION_SEEDS = (
     ("lead-enrichment", 0.8),
     ("lead-enrichment", 1.2),
@@ -245,9 +270,10 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def register_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
+def register_agent_record(body: Dict[str, Any],
+                          _internal_reputation: Optional[float] = None) -> Dict[str, Any]:
     from sincor2.a2a_inbound_ext import register_agent_record as _impl
-    return _impl(body)
+    return _impl(body, _internal_reputation=_internal_reputation)
 
 
 def ensure_platform_agent() -> Dict[str, Any]:
