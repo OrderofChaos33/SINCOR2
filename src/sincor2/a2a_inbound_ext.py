@@ -42,6 +42,18 @@ def _kya_listed(agent: Dict[str, Any]) -> None:
         logger.warning("[KYA] list hook skipped: %s", err)
 
 
+def _kya_flag_ghost(agent_id: str) -> None:
+    """Tombstone the wallet+card behind a ghosted identity so a rebirth
+    under a new agent_id is flagged. Never raises — shedding detection
+    must not break auction close."""
+    try:
+        from sincor2.kya_registry import flag_ghost
+
+        flag_ghost(agent_id)
+    except Exception as err:
+        logger.warning("[KYA] ghost flag skipped: %s", err)
+
+
 def _kya_heartbeat(agent_id: str) -> None:
     try:
         from sincor2.kya_registry import hook_heartbeat

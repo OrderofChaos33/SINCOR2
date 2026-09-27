@@ -113,6 +113,36 @@ def revoke():
     return jsonify(rec)
 
 
+@kya_bp.post("/unstake/request")
+def unstake_request():
+    body = request.get_json(silent=True) or {}
+    try:
+        rec = kya.request_unstake(str(body.get("kya_id") or ""))
+    except KeyError:
+        return _err("unknown kya", 404)
+    except ValueError as exc:
+        return _err(str(exc))
+    return jsonify(rec)
+
+
+@kya_bp.post("/unstake/finalize")
+def unstake_finalize():
+    body = request.get_json(silent=True) or {}
+    try:
+        result = kya.finalize_unstake(str(body.get("kya_id") or ""))
+    except KeyError:
+        return _err("unknown kya", 404)
+    except ValueError as exc:
+        return _err(str(exc))
+    return jsonify(result)
+
+
+@kya_bp.get("/tombstones")
+def tombstones():
+    """Static path must sit above /<kya_id> or Flask treats 'tombstones' as an id."""
+    return jsonify(kya.tombstones_snapshot())
+
+
 @kya_bp.get("/agent/<agent_id>")
 def by_agent(agent_id: str):
     rec = kya.get_by_agent(agent_id)

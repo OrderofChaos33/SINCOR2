@@ -26,9 +26,21 @@ HEARTBEAT_SAVE_MIN_INTERVAL_MS = 5_000
 STORE_KEY = "sincor:kya:records"
 REDIS_KEY = STORE_KEY
 
+# Identity-persistence policy (anti-whitewash).
+# A wallet may back at most this many live (non-revoked) agent identities.
+# Binding beyond the cap requires revoking one first — and revocation writes
+# a tombstone, so shedding is visible rather than free.
+MAX_IDENTITIES_PER_WALLET = 3
+# Clean-exit timelock: an unstake request finalizes only after this long with
+# no revocation and no open dispute hold. Rage-quitting to dodge a dispute
+# does not work; honest quitting does.
+UNSTAKE_TIMELOCK_MS = 7 * 24 * 60 * 60 * 1000
+
 _LOCK = threading.Lock()
 _STORE: Dict[str, Dict[str, Any]] = {}
 _BY_AGENT: Dict[str, str] = {}
+_BY_CARD: Dict[str, set] = {}
+_TOMBSTONES: Dict[str, Dict[str, Any]] = {}
 _LAST_HEARTBEAT_SAVE_MS = 0
 
 
@@ -40,6 +52,8 @@ def reset() -> None:
     with _LOCK:
         _STORE.clear()
         _BY_AGENT.clear()
+        _BY_CARD.clear()
+        _TOMBSTONES.clear()
     global _LAST_HEARTBEAT_SAVE_MS
     _LAST_HEARTBEAT_SAVE_MS = 0
 
@@ -81,6 +95,18 @@ def _ingest(records) -> None:
             if isinstance(rec, dict) and rec.get("kya_id") and rec.get("agent_id"):
                 _STORE[rec["kya_id"]] = rec
                 _BY_AGENT[rec["agent_id"]] = rec["kya_id"]
+                ch = rec.get("card_hash")
+                if ch:
+                    _BY_CARD.setdefault(ch, set()).add(rec["agent_id"])
+
+
+def _ingest_tombstones(tombstones) -> None:
+    if not isinstance(tombstones, list):
+        return
+    with _LOCK:
+        for t in tombstones:
+            if isinstance(t, dict) and t.get("wallet"):
+                _TOMBSTONES[str(t["wallet"]).lower()] = t
 
 
 def _persist_path() -> Optional[Path]:
@@ -99,7 +125,11 @@ def _parse_blob(raw) -> None:
     if not raw:
         return
     parsed = json.loads(raw) if isinstance(raw, str) else raw
-    _ingest(parsed.get("records") if isinstance(parsed, dict) else parsed)
+    if isinstance(parsed, dict):
+        _ingest(parsed.get("records"))
+        _ingest_tombstones(parsed.get("tombstones"))
+    else:
+        _ingest(parsed)
 
 
 def load() -> None:
@@ -132,7 +162,11 @@ def load() -> None:
 
 def save() -> None:
     with _LOCK:
-        payload = json.dumps({"records": list(_STORE.values()), "saved_at": _now_ms()})
+        payload = json.dumps({
+            "records": list(_STORE.values()),
+            "tombstones": list(_TOMBSTONES.values()),
+            "saved_at": _now_ms(),
+        })
     store = _sqlite()
     if store is not None:
         try:
@@ -155,6 +189,59 @@ def save() -> None:
         path.write_text(payload, encoding="utf-8")
     except Exception:
         pass
+
+
+def _write_tombstone(wallet: str, agent_id: str, card_hash: str, reason: str) -> Dict[str, Any]:
+    """Record a dead identity. Tombstones are append-mostly history: revoking
+    or ghost-flagging an identity marks its wallet+card so a reborn identity
+    behind the same wallet or card is flagged, not silently fresh."""
+    t = {
+        "wallet": wallet.lower(),
+        "agent_id": agent_id,
+        "card_hash": card_hash,
+        "reason": reason,
+        "tombstoned_at": _now_ms(),
+    }
+    with _LOCK:
+        _TOMBSTONES[wallet.lower()] = t
+    return t
+
+
+def _identity_risk(agent_id: str, wallet: str, card_hash: str) -> Dict[str, Any]:
+    """Whitewash detection: is this (new) identity a rebirth of a dead one?"""
+    risk: Dict[str, Any] = {}
+    with _LOCK:
+        tomb = _TOMBSTONES.get(wallet.lower()) if wallet else None
+        others = sorted(a for a in _BY_CARD.get(card_hash, set()) if a != agent_id) if card_hash else []
+    if tomb:
+        risk["tombstoned_wallet"] = {
+            "prior_agent_id": tomb.get("agent_id"),
+            "reason": tomb.get("reason"),
+            "tombstoned_at": tomb.get("tombstoned_at"),
+        }
+    if others:
+        risk["card_reuse"] = {
+            "note": "same agent card previously listed under different agent_id(s)",
+            "other_agent_ids": others,
+        }
+    return risk
+
+
+def _live_identities_for_wallet(wallet: str, exclude_agent_id: Optional[str] = None) -> int:
+    wallet_l = wallet.lower()
+    with _LOCK:
+        return sum(
+            1 for r in _STORE.values()
+            if not r.get("revoked")
+            and r.get("agent_id") != exclude_agent_id
+            and (r.get("principal", "").lower() == wallet_l or r.get("agent_wallet", "").lower() == wallet_l)
+        )
+
+
+def tombstones_snapshot() -> Dict[str, Any]:
+    with _LOCK:
+        return {"count": len(_TOMBSTONES), "tombstones": list(_TOMBSTONES.values())}
+    return json.dumps(obj, separators=(",", ":"), sort_keys=True, ensure_ascii=True)
 
 
 def _canonical(obj: Any) -> str:
@@ -292,11 +379,15 @@ def list_from_inbound(agent: Dict[str, Any], card: Optional[Dict[str, Any]] = No
         "created_at": _now_ms(),
         "updated_at": _now_ms(),
         "chain_id": CHAIN_ID,
+        "identity_risk": _identity_risk(agent_id, principal, c_hash),
+        "unstake_requested_at": None,
+        "dispute_hold": False,
     }
     rec["score"] = score(rec)
     with _LOCK:
         _STORE[kya_id] = rec
         _BY_AGENT[agent_id] = kya_id
+        _BY_CARD.setdefault(c_hash, set()).add(agent_id)
     save()
     return rec
 
@@ -323,9 +414,15 @@ def bind(agent_id: str, principal: str, signature: str, message: str, recovered:
     signer = recovered_addr.lower()
     if signer != principal.lower():
         raise ValueError("signer mismatch")
+    # Wallet cardinality: one wallet backs at most MAX_IDENTITIES_PER_WALLET
+    # live identities. Binding beyond the cap requires revoking one first,
+    # which writes a tombstone — shedding stays visible.
+    if _live_identities_for_wallet(principal, exclude_agent_id=agent_id) >= MAX_IDENTITIES_PER_WALLET:
+        raise ValueError("wallet identity cap reached; revoke an existing identity first")
     rec["principal"] = principal
     rec["attestation"] = {"scheme": "eip191", "message": message, "signature": signature, "recovered": recovered_addr}
     rec["status"] = "bound"
+    rec["identity_risk"] = _identity_risk(agent_id, principal, rec.get("card_hash") or "")
     refresh_status(rec)
     save()
     return rec
@@ -406,9 +503,93 @@ def revoke(kya_id: str, reason: str = "") -> Dict[str, Any]:
     rec["revoked"] = True
     rec["revoke_reason"] = reason
     rec["status"] = "revoked"
+    _write_tombstone(
+        rec.get("agent_wallet") or rec.get("principal") or "",
+        rec.get("agent_id") or "",
+        rec.get("card_hash") or "",
+        reason or "revoked",
+    )
     refresh_status(rec)
     save()
     return rec
+
+
+def flag_ghost(agent_id: str) -> Optional[Dict[str, Any]]:
+    """Mark the wallet+card behind a ghosted identity. The KYA record itself
+    is left for the market layer's reputation reset; the tombstone makes the
+    shed visible so the next identity behind the same wallet or card is
+    flagged by _identity_risk(). Never raises — shedding detection must not
+    break auction close."""
+    try:
+        rec = get_by_agent(agent_id)
+        if rec is None:
+            return None
+        tomb = _write_tombstone(
+            rec.get("agent_wallet") or rec.get("principal") or "",
+            rec.get("agent_id") or "",
+            rec.get("card_hash") or "",
+            "ghosting",
+        )
+        jobs = rec.setdefault("jobs", {})
+        jobs["slashed"] = int(jobs.get("slashed") or 0) + 1
+        refresh_status(rec)
+        save()
+        return tomb
+    except Exception:
+        return None
+
+
+def request_unstake(kya_id: str) -> Dict[str, Any]:
+    """Begin a clean exit: starts the timelock. The agent keeps its status
+    until finalize; it may still heartbeat and work during the wait."""
+    rec = get(kya_id)
+    if rec is None:
+        raise KeyError("unknown kya")
+    if rec.get("revoked"):
+        raise ValueError("revoked")
+    if int(rec.get("stake_axm_wei") or 0) <= 0:
+        raise ValueError("no stake locked")
+    rec["unstake_requested_at"] = _now_ms()
+    refresh_status(rec)
+    save()
+    return rec
+
+
+def set_dispute_hold(kya_id: str, held: bool) -> Optional[Dict[str, Any]]:
+    """Adjudication hook: an open dispute blocks unstake finalization so an
+    agent cannot rage-quit to dodge a ruling."""
+    rec = get(kya_id)
+    if rec is None:
+        return None
+    rec["dispute_hold"] = bool(held)
+    save()
+    return rec
+
+
+def finalize_unstake(kya_id: str) -> Dict[str, Any]:
+    """Complete a clean exit after the timelock. Returns the released amount;
+    the caller (custody layer) moves the funds — the registry only clears
+    the accounting so the stake cannot be double-counted."""
+    rec = get(kya_id)
+    if rec is None:
+        raise KeyError("unknown kya")
+    if rec.get("revoked"):
+        raise ValueError("revoked")
+    requested = rec.get("unstake_requested_at")
+    if not requested:
+        raise ValueError("no unstake requested")
+    if _now_ms() - int(requested) < UNSTAKE_TIMELOCK_MS:
+        raise ValueError("timelock active")
+    if rec.get("dispute_hold"):
+        raise ValueError("dispute hold active")
+    released = str(int(rec.get("stake_axm_wei") or 0))
+    rec["stake_axm_wei"] = "0"
+    rec["stake_tx"] = None
+    rec["unstake_requested_at"] = None
+    rec["status"] = "bound"
+    refresh_status(rec)
+    save()
+    return {"kya_id": kya_id, "released_axm_wei": released}
 
 
 def get(kya_id: str) -> Optional[Dict[str, Any]]:
@@ -453,6 +634,9 @@ def snapshot() -> Dict[str, Any]:
         "listed": len(recs),
         "verified": sum(1 for r in recs if r.get("status") == "verified"),
         "revoked": sum(1 for r in recs if r.get("revoked")),
+        "tombstoned": len(_TOMBSTONES),
+        "max_identities_per_wallet": MAX_IDENTITIES_PER_WALLET,
+        "unstake_timelock_ms": UNSTAKE_TIMELOCK_MS,
     }
 
 
