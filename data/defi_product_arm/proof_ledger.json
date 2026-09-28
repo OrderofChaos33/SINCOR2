@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "entry_id": "ev_917b1ca00bd0",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "test_run",
+      "timestamp": 1790606983.9803748,
+      "commit": "db966ddbee92f0b819ad011e92c0c9d4c2772be5",
+      "recorded_by": "xioix/track1",
+      "details": {
+        "suite": "tests/pytest/test_p01_vault_units.py",
+        "passed": 24,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p01_vault_units.py -q",
+        "scope": "yield_aggregator allocator: dry-run default, risk budget, concentration cap, treasury fee, disabled-strategy exclusion"
+      }
+    }
+  ]
+}
