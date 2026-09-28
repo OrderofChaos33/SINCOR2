@@ -44,6 +44,51 @@
       "recorded_by": "xioix/track1",
       "sku": "SINCOR-DEFI-P03-DARKPOOL",
       "timestamp": 1790607125.8821597
+    },
+    {
+      "entry_id": "ev_9b55ee0e0aed",
+      "sku": "SINCOR-DEFI-P04-MEV",
+      "kind": "test_run",
+      "timestamp": 1790610008.788034,
+      "commit": "ddfed7d598843831f11adc097a5ee225def28cb4",
+      "recorded_by": "xioix/p04p06-builder",
+      "details": {
+        "suite": "tests/pytest/test_p04_mev_units.py",
+        "passed": 33,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p04_mev_units.py -q",
+        "scope": "mev_capture: flow metering, sandwich/backrun detection, bid shading, 20bps treasury, protection guardrail"
+      }
+    },
+    {
+      "entry_id": "ev_994bccab8c1c",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "test_run",
+      "timestamp": 1790610008.7885869,
+      "commit": "ddfed7d598843831f11adc097a5ee225def28cb4",
+      "recorded_by": "xioix/p04p06-builder",
+      "details": {
+        "suite": "tests/pytest/test_p05_insurance_units.py",
+        "passed": 26,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p05_insurance_units.py -q",
+        "scope": "insurance_mutual: risk tiers, reserve gate, assessor quorum/slashing, pro-rata shortfall, pull fallback"
+      }
+    },
+    {
+      "entry_id": "ev_6944ad4c9d1b",
+      "sku": "SINCOR-DEFI-P06-PERPS",
+      "kind": "test_run",
+      "timestamp": 1790610008.7889266,
+      "commit": "ddfed7d598843831f11adc097a5ee225def28cb4",
+      "recorded_by": "xioix/p04p06-builder",
+      "details": {
+        "suite": "tests/pytest/test_p06_perp_units.py",
+        "passed": 27,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p06_perp_units.py -q",
+        "scope": "perp_hedge_swarm: integer sizing, drift delta band + hysteresis, funding gates, liq ladder, 12bps fee, pull unwind"
+      }
     }
   ]
 }

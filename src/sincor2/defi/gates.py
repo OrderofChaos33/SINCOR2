@@ -42,13 +42,17 @@ STAGE_MAP: Dict[str, str] = {
     "deploy": "product",
 }
 
-# protocol_id -> repo-relative implementation path. Only P01 has real
-# strategy math today (src/sincor2/defi/yield_aggregator.py); everything else
-# is unimplemented until its build-phase tasks land.
+# protocol_id -> repo-relative implementation path. P01 (yield_aggregator),
+# P04 (mev_capture), P05 (insurance_mutual), P06 (perp_hedge_swarm) have
+# real strategy math; everything else is unimplemented until its
+# build-phase tasks land.
 IMPLEMENTATIONS: Dict[str, str] = {
     "P01_YIELD_AGG": os.path.join("src", "sincor2", "defi", "yield_aggregator.py"),
-    "P02_CLMM": os.path.join("src", "sincor2", "defi", "clmm_manager.py"),
+"P02_CLMM": os.path.join("src", "sincor2", "defi", "clmm_manager.py"),
     "P03_INTENT_DARK": os.path.join("src", "sincor2", "defi", "intent_dark_pool.py"),
+    "P04_MEV": os.path.join("src", "sincor2", "defi", "mev_capture.py"),
+    "P05_INSURANCE": os.path.join("src", "sincor2", "defi", "insurance_mutual.py"),
+    "P06_PERPS": os.path.join("src", "sincor2", "defi", "perp_hedge_swarm.py"),
 }
 
 # protocol_id -> auction spec filename stem (~/workspace/sincor2-auction-tasks/specs/)

@@ -10,5 +10,17 @@
   "SINCOR-DEFI-P03-DARKPOOL": {
     "stage": "test",
     "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P04-MEV": {
+    "stage": "test",
+    "version": "0.1.0"
+  },
+  "SINCOR-DEFI-P05-MUTUAL": {
+    "stage": "test",
+    "version": "0.1.0"
+  },
+  "SINCOR-DEFI-P06-PERPS": {
+    "stage": "test",
+    "version": "0.1.0"
   }
 }

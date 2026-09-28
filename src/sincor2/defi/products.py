@@ -2,9 +2,10 @@
 
 One arm, 26 products, each minted a SKU from the canonical catalog — single
 source of truth, no drift. Lifecycle: spec -> build -> test -> audit ->
-product -> catalog, enforced by gates.py. All 26 start at ``spec`` except P01,
-which has real strategy math in the repo (src/sincor2/defi/yield_aggregator.py)
-and starts at ``build``.
+product -> catalog, enforced by gates.py. All 26 start at ``spec`` except
+P01, P04, P05, P06, which have real strategy math in the repo
+(src/sincor2/defi/yield_aggregator.py, mev_capture.py, insurance_mutual.py,
+perp_hedge_swarm.py) and start at ``build``.
 
 CLI:
     python -m sincor2.defi.products status
@@ -59,10 +60,14 @@ SLUGS: Dict[str, str] = {
     "P26_DEFI_OS": "DEFIOS",
 }
 
-# Products with code evidence justifying a head start. P01's yield aggregator
-# is real, tested strategy math (see src/sincor2/defi/yield_aggregator.py).
+# Products with code evidence justifying a head start. P01's yield aggregator,
+# P04's MEV capture, P05's insurance mutual, and P06's perp hedge swarm are
+# real, tested strategy math (see src/sincor2/defi/).
 INITIAL_STAGE_OVERRIDES: Dict[str, str] = {
     "P01_YIELD_AGG": "build",
+    "P04_MEV": "build",
+    "P05_INSURANCE": "build",
+    "P06_PERPS": "build",
 }
 
 
