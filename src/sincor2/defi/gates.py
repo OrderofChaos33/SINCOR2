@@ -47,6 +47,7 @@ STAGE_MAP: Dict[str, str] = {
 # is unimplemented until its build-phase tasks land.
 IMPLEMENTATIONS: Dict[str, str] = {
     "P01_YIELD_AGG": os.path.join("src", "sincor2", "defi", "yield_aggregator.py"),
+    "P02_CLMM": os.path.join("src", "sincor2", "defi", "clmm_manager.py"),
 }
 
 # protocol_id -> auction spec filename stem (~/workspace/sincor2-auction-tasks/specs/)
