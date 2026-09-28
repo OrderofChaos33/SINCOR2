@@ -5,8 +5,13 @@ Ratified parameters (2026-09-25, docs/ops/AUCTION_SECURITY_DECISIONS.md):
   * challengerBond = 0.02 ETH — bond required to open a quality dispute.
   * Ghosting (commit without reveal): 100 % slash of the locked stake.
   * Upheld quality failure: 50 % slash of the locked stake.
-  * 100 % of slashed proceeds become non-withdrawable poster re-auction
-    credit (deferred deflationary mechanics stay deferred).
+  * Slashed proceeds become non-withdrawable re-auction credit, EXCEPT the
+    platform's unrecouped sponsored front, which is clawed back to the
+    platform treasury first (senior creditor). Only the remainder becomes
+    poster re-auction credit. This is the subsidy-extraction invariant
+    (2026-09-27): platform-fronted capital can never be converted into a
+    poster's reusable re-auction balance via sybil ghosting. Clawback is
+    not a slash — it is the platform reclaiming its own fronted capital.
   * Exact stake deposits; adjudicator-only slashing (poster fast-path
     deferred).
 
@@ -200,11 +205,49 @@ class StakeLedger:
                 "slashing is adjudicator-only; poster fast-path is deferred")
         return caller
 
+    def _sponsored_outstanding_wei(self, agent_id: str) -> int:
+        """The platform's senior claim on this agent: unrecouped sponsored
+        front (fronted minus recouped-from-earnings). Zero when the agent
+        has no sponsorship or it is fully settled — i.e. the platform is
+        already whole and the agent's stake is genuinely their own.
+
+        Fail-open with a loud log: if the sponsored-stake ledger cannot be
+        read, auction close must not break (liveness outranks the narrow
+        race — an attacker cannot cause this read to fail remotely, it is
+        a local file). The invariant is enforced on the normal path.
+        """
+        try:
+            from sincor2.sponsored_stake import sponsored_ledger
+            return int(sponsored_ledger().outstanding_wei(agent_id))
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error("clawback: sponsored outstanding unreadable for %s "
+                         "(%s); treating as zero", agent_id, exc)
+            return 0
+
+    def _split_slash(self, agent_id: str, slashed_wei: int
+                     ) -> tuple[int, int]:
+        """Split slashed proceeds into (clawback_wei, poster_credit_wei).
+
+        Subsidy-extraction invariant: the platform's unrecouped fronted
+        capital is senior. It is clawed back to the platform treasury
+        first; only the remainder becomes poster re-auction credit. This
+        makes sybil ghost-farming unprofitable: self-funded stake can
+        become re-auction credit, sponsored money always returns home.
+        """
+        slashed_wei = int(slashed_wei)
+        if slashed_wei <= 0:
+            return 0, 0
+        clawback = min(slashed_wei, self._sponsored_outstanding_wei(agent_id))
+        return clawback, slashed_wei - clawback
+
     def slash(self, agent_id: str, task_id: str, slash_bps: int, reason: str,
               adjudicator: Optional[str] = None,
               poster_id: Optional[str] = None) -> Dict[str, Any]:
         """Slash ``slash_bps`` of the agent's locked stake for ``task_id``.
-        100 % of proceeds become non-withdrawable poster re-auction credit."""
+
+        Proceeds split by the subsidy-extraction invariant: the platform's
+        unrecouped sponsored front is clawed back to the treasury first;
+        only the remainder becomes poster re-auction credit."""
         caller = self._check_adjudicator(adjudicator)
         rec = self._agent(agent_id)
         locked = int(rec["locks"].pop(task_id, "0"))
@@ -216,21 +259,35 @@ class StakeLedger:
             # Unslashed remainder is freed (not re-locked).
             pass
         credit_to = poster_id or "__platform__"
-        self.credit_reauction(credit_to, slashed,
-                              f"slash:{reason}:{task_id}")
+        clawback_wei, poster_wei = self._split_slash(agent_id, slashed)
+        if clawback_wei:
+            self.credit_reauction("__platform__", clawback_wei,
+                                  f"clawback:sponsored:{task_id}")
+        if poster_wei:
+            self.credit_reauction(credit_to, poster_wei,
+                                  f"slash:{reason}:{task_id}")
         self._event("slash", agent_id=agent_id, task_id=task_id,
                     slash_bps=slash_bps, slashed_wei=str(slashed),
-                    reason=reason, adjudicator=caller, credited_to=credit_to)
+                    reason=reason, adjudicator=caller,
+                    clawback_wei=str(clawback_wei),
+                    poster_credit_wei=str(poster_wei),
+                    credited_to=credit_to)
         self._save()
         return {"agent_id": agent_id, "task_id": task_id,
                 "slashed_wei": str(slashed), "reason": reason,
+                "clawback_wei": str(clawback_wei),
+                "poster_credit_wei": str(poster_wei),
                 "reauction_credited_to": credit_to}
 
     def slash_ghost(self, agent_id: str, task_id: str,
                     poster_id: Optional[str] = None) -> Dict[str, Any]:
         """Ghosting: committed but never revealed => 100 % slash.
         Called by close_auction (system path); the adjudicator gate is
-        satisfied by the protocol rule itself."""
+        satisfied by the protocol rule itself.
+
+        Subsidy-extraction invariant: the platform's unrecouped sponsored
+        front is clawed back to the treasury first; only the remainder
+        becomes poster re-auction credit."""
         rec = self._agent(agent_id)
         locked = int(rec["locks"].pop(task_id, "0"))
         if locked <= 0:
@@ -239,14 +296,24 @@ class StakeLedger:
         rec["deposited_wei"] = str(int(rec["deposited_wei"]) - locked)
         rec["slashed_wei"] = str(int(rec["slashed_wei"]) + locked)
         credit_to = poster_id or "__platform__"
-        self.credit_reauction(credit_to, locked, f"slash:ghosting:{task_id}")
+        clawback_wei, poster_wei = self._split_slash(agent_id, locked)
+        if clawback_wei:
+            self.credit_reauction("__platform__", clawback_wei,
+                                  f"clawback:sponsored:ghosting:{task_id}")
+        if poster_wei:
+            self.credit_reauction(credit_to, poster_wei,
+                                  f"slash:ghosting:{task_id}")
         self._event("slash", agent_id=agent_id, task_id=task_id,
                     slash_bps=GHOST_SLASH_BPS, slashed_wei=str(locked),
                     reason="ghosting", adjudicator="protocol",
+                    clawback_wei=str(clawback_wei),
+                    poster_credit_wei=str(poster_wei),
                     credited_to=credit_to)
         self._save()
         return {"agent_id": agent_id, "task_id": task_id,
                 "slashed_wei": str(locked), "reason": "ghosting",
+                "clawback_wei": str(clawback_wei),
+                "poster_credit_wei": str(poster_wei),
                 "reauction_credited_to": credit_to}
 
     # -- challenger bonds -------------------------------------------------------
