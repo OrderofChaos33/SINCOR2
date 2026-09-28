@@ -84,11 +84,14 @@ def _compile():
         esc_src = f.read()
     with open(os.path.join(CONTRACTS_DIR, "IExecutionEscrowManager.sol")) as f:
         iface_src = f.read()
+    with open(os.path.join(CONTRACTS_DIR, "security", "ScopedPausable.sol")) as f:
+        pausable_src = f.read()
     std = {
         "language": "Solidity",
         "sources": {
             "ExecutionEscrowManager.sol": {"content": esc_src},
             "IExecutionEscrowManager.sol": {"content": iface_src},
+            "security/ScopedPausable.sol": {"content": pausable_src},
             "TestReceivers.sol": {"content": RECEIVERS_SRC},
         },
         "settings": {
@@ -135,11 +138,13 @@ class Env:
         accts = self.tester.get_accounts()
         self.deployer, self.core, self.adjudicator = accts[0], accts[1], accts[2]
         self.poster, self.agent, self.challenger, self.anyone = accts[3], accts[4], accts[5], accts[6]
+        self.guardian = accts[7]
         self.challenger_bond = self.w3.to_wei(0.1, "ether")
         abi, bytecode = COMPILED["escrow"]
         factory = self.w3.eth.contract(abi=abi, bytecode=bytecode)
         txh = factory.constructor(
-            self.core, self.adjudicator, MIN_STAKE_BPS, self.challenger_bond
+            self.core, self.adjudicator, MIN_STAKE_BPS, self.challenger_bond,
+            self.guardian
         ).transact({"from": self.deployer, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
         addr = self.w3.eth.get_transaction_receipt(txh).contractAddress
         self.mgr = self.w3.eth.contract(address=addr, abi=abi)
@@ -297,13 +302,15 @@ def test_constructor_rejects_out_of_range_min_stake_bps(env):
     for bad_bps in (0, 10001, 10**18):
         with pytest.raises(TransactionFailed):
             factory.constructor(
-                env.core, env.adjudicator, bad_bps, env.challenger_bond
+                env.core, env.adjudicator, bad_bps, env.challenger_bond,
+                env.guardian
             ).transact({"from": env.deployer, "maxFeePerGas": 10_000_000_000,
                         "maxPriorityFeePerGas": 0})
     # boundary values deploy fine
     for ok_bps in (1, 10000):
         txh = factory.constructor(
-            env.core, env.adjudicator, ok_bps, env.challenger_bond
+            env.core, env.adjudicator, ok_bps, env.challenger_bond,
+            env.guardian
         ).transact({"from": env.deployer, "maxFeePerGas": 10_000_000_000,
                     "maxPriorityFeePerGas": 0})
         addr = w3.eth.get_transaction_receipt(txh).contractAddress

@@ -2,9 +2,9 @@
 """Deploy the SINCOR2 sealed-bid auction contracts to Base.
 
 Deploys (in order):
-  1. CommitRevealAuction (no constructor args; deployer becomes owner)
+  1. CommitRevealAuction(guardianMultisig; deployer becomes owner)
   2. ExecutionEscrowManager(auction, adjudicator, minStakeBps=5000,
-     challengerBond=0.02 ETH)
+     challengerBond=0.02 ETH, guardianMultisig)
   3. auction.setEscrowManager(escrow)  (owner-only link)
 Then verifies the wiring on-chain and writes a deployment manifest to
 ``onchain/deployments/base-<chainid>-auction.json``.
@@ -12,6 +12,9 @@ Then verifies the wiring on-chain and writes a deployment manifest to
 Usage:
   export DEPLOYER_KEY=0x...            # NEVER commit; Secure Vault in prod
   export ADJUDICATOR_ADDRESS=0x...     # single-key for now (decentralization open)
+  export SINCOR_GUARDIAN_MULTISIG=0x... # REQUIRED: 2-of-3 Safe; never a founder EOA.
+                                       # Emergency pause guardian; authority
+                                       # self-sunsets 180 days post-deploy.
   python scripts/deploy_auction_contracts.py [--sepolia] [--dry-run]
 
   --sepolia  : rehearse on Base Sepolia (chain 84532) instead of mainnet (8453)
@@ -58,12 +61,15 @@ def compile_contracts():
         escrow_src = f.read()
     with open(os.path.join(CONTRACTS_DIR, "IExecutionEscrowManager.sol")) as f:
         iface_src = f.read()
+    with open(os.path.join(CONTRACTS_DIR, "security", "ScopedPausable.sol")) as f:
+        pausable_src = f.read()
     std = {
         "language": "Solidity",
         "sources": {
             "CommitRevealAuction.sol": {"content": auction_src},
             "ExecutionEscrowManager.sol": {"content": escrow_src},
             "IExecutionEscrowManager.sol": {"content": iface_src},
+            "security/ScopedPausable.sol": {"content": pausable_src},
         },
         "settings": {
             "optimizer": {"enabled": True, "runs": 200},
@@ -124,6 +130,7 @@ def main() -> int:
                          BASE_SEPOLIA_RPC if args.sepolia else BASE_MAINNET_RPC)
     key = os.environ.get("DEPLOYER_KEY", "").strip()
     adjudicator = os.environ.get("ADJUDICATOR_ADDRESS", "").strip()
+    guardian = os.environ.get("SINCOR_GUARDIAN_MULTISIG", "").strip()
 
     print(f"Compiling with solc {SOLC_VERSION} (via-IR, optimizer 200 runs)...")
     compiled, std_input = compile_contracts()
@@ -147,6 +154,11 @@ def main() -> int:
         return 2
     if not adjudicator:
         print("ERROR: ADJUDICATOR_ADDRESS is not set.", file=sys.stderr)
+        return 2
+    if not guardian:
+        print("ERROR: SINCOR_GUARDIAN_MULTISIG is not set. Pass the real "
+              "2-of-3 Safe address; the pause guardian is never a founder "
+              "EOA and is never defaulted.", file=sys.stderr)
         return 2
     if not args.sepolia and not args.i_understand_mainnet:
         print("ERROR: mainnet deploy requires --i-understand-mainnet.",
@@ -185,11 +197,12 @@ def main() -> int:
         return 2
 
     print("\n[1/3] Deploying CommitRevealAuction...")
-    auction_addr, h1 = deploy(w3, account, compiled["auction"])
+    auction_addr, h1 = deploy(w3, account, compiled["auction"], args=(guardian,))
     print(f"  -> {auction_addr}  ({h1})")
 
     print("[2/3] Deploying ExecutionEscrowManager...")
-    escrow_args = (auction_addr, adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND_WEI)
+    escrow_args = (auction_addr, adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND_WEI,
+                   guardian)
     escrow_addr, h2 = deploy(
         w3, account, compiled["escrow"],
         args=escrow_args,

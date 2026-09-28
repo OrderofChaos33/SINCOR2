@@ -781,6 +781,17 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
             stake_ledger().release(agent_id, task_id)
         except Exception as err:
             logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        # Reputation-weighted collateral: a dispute-free settlement is the
+        # veteran-building event.  Recorded against the task's poster so
+        # wash-trading with a sock-puppet poster cannot inflate R_i.
+        # Never bricks settlement on accounting.
+        try:
+            from sincor2.onchain.stake_ledger import stake_ledger
+            _task = get_fabric().tasks.get(task_id) or {}
+            stake_ledger().record_completion(
+                agent_id, task_id, poster_id=_task.get("poster_id"))
+        except Exception as err:
+            logger.warning("reputation record failed for %s: %s", agent_id, err)
         # Sponsored-stake recoup: the staged payout is the agent's earnings
         # event. Any outstanding platform-fronted stake is recouped here
         # (partially or fully). Never bricks settlement on accounting.

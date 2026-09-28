@@ -81,7 +81,8 @@ def test_auction_id_parity_with_relayer():
 def _deploy_auction():
     solcx.set_solc_version(SOLC_VERSION)
     srcs = {}
-    for name in ("CommitRevealAuction.sol", "IExecutionEscrowManager.sol"):
+    for name in ("CommitRevealAuction.sol", "IExecutionEscrowManager.sol",
+                 os.path.join("security", "ScopedPausable.sol")):
         srcs[name] = {"content": open(
             os.path.join(CONTRACTS_DIR, name)).read()}
     std = {
@@ -107,8 +108,9 @@ def chain():
     tester = EthereumTester(PyEVMBackend())
     w3 = Web3(EthereumTesterProvider(tester))
     deployer = tester.get_accounts()[0]
+    guardian = tester.get_accounts()[1]
     contract = w3.eth.contract(abi=ABI, bytecode=BYTECODE)
-    txh = contract.constructor().transact({"from": deployer, **TX})
+    txh = contract.constructor(guardian).transact({"from": deployer, **TX})
     address = w3.eth.get_transaction_receipt(txh).contractAddress
     return tester, w3, w3.eth.contract(address=address, abi=ABI)
 
