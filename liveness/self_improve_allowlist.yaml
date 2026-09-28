@@ -1,0 +1,144 @@
+# SINCOR task fountain — LANE C (self-improvement) allowlist.
+#
+# The ONLY self-improvement tasks the fountain may ever post. Every entry is
+# a concrete, pre-approved task shape: exact file paths, runnable-test
+# acceptance criteria, and mandatory "delivery: branch + PR, never direct to
+# main" with a human merge gate.
+#
+# HARD BLOCKLIST (enforced in fountain.py — a Lane C task touching any of
+# these is REFUSED, even if listed here):
+#   money paths, auth, stake ledger, pool ledger, task board state logic,
+#   contracts/, keys/credentials, adjudication, KYA.
+#
+# seed_key: selfimprove-<id>-<YYYY-MM-DD>  (daily idempotency)
+# poster_id: sincor-fountain | sealed: true
+#
+# To add a new task: append an entry here, get human approval, commit.
+# The fountain will never invent a task that is not in this file.
+
+delivery_policy: >-
+  Delivery: branch + PR, never direct to main. Human merge gate is
+  mandatory — no self-merge, no auto-merge. The PR must link this task_id.
+
+tasks:
+  - id: docs-wire-clarity
+    title: "Docs clarity pass: A2A external wire spec"
+    file_paths:
+      - docs/A2A_EXTERNAL_WIRE.md
+    description: |
+      Improve clarity of docs/A2A_EXTERNAL_WIRE.md without changing any
+      protocol semantics: fix typos, tighten ambiguous sentences, ensure
+      every endpoint example matches the current route signatures.
+      Exact file paths: docs/A2A_EXTERNAL_WIRE.md (docs only — no code).
+      Acceptance criteria (runnable tests):
+      1. `python -m pytest tests/pytest/test_a2a_inbound.py -q` passes before and after.
+      2. `git diff --name-only` on the PR shows ONLY docs/A2A_EXTERNAL_WIRE.md.
+      3. No route path, status code, or field name in the doc is altered
+         (reviewer spot-checks 5 endpoint examples against code).
+      Delivery: branch + PR, never direct to main. Human merge gate is mandatory.
+    tags: [docs, self-improve, copy]
+    bounty_axm: 1.0
+    estimated_seconds: 3600
+
+  - id: docs-ops-checklist-refresh
+    title: "Docs refresh: production checklist accuracy"
+    file_paths:
+      - docs/A2A_PRODUCTION_CHECKLIST.md
+    description: |
+      Reconcile docs/A2A_PRODUCTION_CHECKLIST.md against the current repo:
+      check off items that are done, flag stale items, add missing
+      operational steps discovered since it was written. Docs only.
+      Exact file paths: docs/A2A_PRODUCTION_CHECKLIST.md (docs only — no code).
+      Acceptance criteria (runnable tests):
+      1. Every checkbox item cites the code path or runbook that proves its state.
+      2. `git diff --name-only` on the PR shows ONLY docs/A2A_PRODUCTION_CHECKLIST.md.
+      3. No item is marked done without a verifiable reference.
+      Delivery: branch + PR, never direct to main. Human merge gate is mandatory.
+    tags: [docs, self-improve, ops]
+    bounty_axm: 1.0
+    estimated_seconds: 3600
+
+  - id: test-coverage-liveness-disclosure
+    title: "Test coverage: liveness disclosure endpoint"
+    file_paths:
+      - tests/pytest/test_liveness_phase1.py
+      - src/sincor2/liveness.py
+    description: |
+      Add pytest coverage for the liveness disclosure surface (read-only
+      tests; the src/sincor2/liveness.py file is listed only as the
+      subject under test — behavior must not change).
+      Exact file paths: tests/pytest/test_liveness_phase1.py (new tests only);
+      src/sincor2/liveness.py is the subject under test and must be byte-identical after.
+      Acceptance criteria (runnable tests):
+      1. `python -m pytest tests/pytest/test_liveness_phase1.py -q` passes,
+         including at least 3 NEW tests covering /.well-known/liveness-agents.json
+         (content-type, agent count = 6, every agent_id disclosed).
+      2. `git diff --stat src/sincor2/liveness.py` is empty (subject untouched).
+      3. Full neighboring suite `tests/pytest/test_task_dedupe_admin.py` still passes.
+      Delivery: branch + PR, never direct to main. Human merge gate is mandatory.
+    tags: [tests, self-improve, coverage]
+    bounty_axm: 1.5
+    estimated_seconds: 5400
+
+  - id: refactor-net-retry-benchmark
+    title: "Non-money-path refactor: HTTP retry helper with benchmarks"
+    file_paths:
+      - liveness/net.py
+    description: |
+      Refactor liveness/net.py for readability (extract the backoff loop
+      into a named helper, add type hints) with ZERO behavior change.
+      This is a pure HTTP client helper — it never touches money paths,
+      ledgers, auth, or contracts.
+      Exact file paths: liveness/net.py only.
+      Acceptance criteria (runnable tests):
+      1. `python -m pytest tests/pytest/test_liveness_phase1.py -q` passes.
+      2. A before/after benchmark script (included in the PR) shows retry
+         timing behavior unchanged: same attempts, same backoff schedule,
+         p50 request latency within 10% on a local stub server.
+      3. `git diff --name-only` shows ONLY liveness/net.py (+ the benchmark script).
+      Delivery: branch + PR, never direct to main. Human merge gate is mandatory.
+    tags: [refactor, self-improve, benchmark]
+    bounty_axm: 1.5
+    estimated_seconds: 7200
+
+  - id: docs-agent-ops-playbook
+    title: "Docs: agent operator playbook accuracy pass"
+    file_paths:
+      - docs/AGENT_OPS.md
+    description: |
+      Accuracy pass over docs/AGENT_OPS.md: verify every command and
+      endpoint against current code, fix drift, keep semantics unchanged.
+      Docs only.
+      Exact file paths: docs/AGENT_OPS.md (docs only — no code).
+      Acceptance criteria (runnable tests):
+      1. Every shell command in the doc is executed in a sandbox; all exit 0
+         (list the commands and results in the PR description).
+      2. `git diff --name-only` shows ONLY docs/AGENT_OPS.md.
+      3. No endpoint path or parameter in the doc contradicts the code.
+      Delivery: branch + PR, never direct to main. Human merge gate is mandatory.
+    tags: [docs, self-improve, ops]
+    bounty_axm: 1.0
+    estimated_seconds: 3600
+
+  - id: dead-code-sweep-liveness
+    title: "Dead-code removal: liveness tooling only"
+    file_paths:
+      - liveness/fountain.py
+      - liveness/runner.py
+      - liveness/register_cohort.py
+    description: |
+      Remove provably dead code (unused functions, unreachable branches)
+      in the liveness tooling ONLY. No behavior change, no new features.
+      Exact file paths: liveness/fountain.py, liveness/runner.py,
+      liveness/register_cohort.py (liveness tooling only — never src/,
+      never contracts/, never ledgers).
+      Acceptance criteria (runnable tests):
+      1. `python -m pytest tests/pytest/test_liveness_phase1.py -q` passes.
+      2. Coverage or vulture-style report attached to the PR proving each
+         removed symbol had zero references (excluding its own definition).
+      3. Before/after: `python -m py_compile` clean; `--help` output of each
+         script byte-identical.
+      Delivery: branch + PR, never direct to main. Human merge gate is mandatory.
+    tags: [refactor, self-improve, dead-code]
+    bounty_axm: 1.25
+    estimated_seconds: 5400

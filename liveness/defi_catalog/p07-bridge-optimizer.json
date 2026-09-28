@@ -1,0 +1,542 @@
+[
+  {
+    "task_key": "p07-architecture-spec",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "spec",
+    "title": "Draft cross-chain bridge optimizer architecture spec",
+    "description": "Write docs/architecture/p07-bridge-optimizer.md: route scorer, bridge allowlist registry, storage-proof verifier (Axiom/Herodotus), async settlement engine, slippage caps, and the agent solver loop. Map the catalog gates (bridge_whitelist, slippage_cap) to enforcing components and describe the localized-crunch fulfillment pattern from the A-SINC deep spec. Acceptance: spec enumerates every async failure mode (proof expiry, bridge depeg, reorg) with a recovery path.",
+    "skill": "p07-architecture-spec",
+    "tags": [
+      "defi",
+      "bridge",
+      "spec"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": []
+  },
+  {
+    "task_key": "p07-interface-definitions",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "spec",
+    "title": "Define interfaces for bridge routing contracts",
+    "description": "Create onchain/src/p07/interfaces/IBridgeRouter.sol, IStorageProofVerifier.sol and IAllowlistRegistry.sol with NatSpec and fixed signatures for scoring, proof submission and settlement. Acceptance: compile under solc 0.8.24; every cross-rollup handoff the agents perform is declared exactly once.",
+    "skill": "p07-interface-definitions",
+    "tags": [
+      "defi",
+      "bridge",
+      "solidity"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": []
+  },
+  {
+    "task_key": "p07-economic-model",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "spec",
+    "title": "Model bridge routing economics and fee capture",
+    "description": "Write docs/economics/p07-bridge-economics.md: route scoring function, cross-rollup premium capture model, 10 bps fee to Treasury, and risk budgets (min capital $100, max_alloc_pct 0.20). Acceptance: the scoring function is validated against synthetic route fixtures; fee flow traces to Treasury end-to-end.",
+    "skill": "p07-economic-model",
+    "tags": [
+      "defi",
+      "bridge",
+      "economics"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": []
+  },
+  {
+    "task_key": "p07-repo-layout",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "scaffold",
+    "title": "Scaffold p07 repo layout and interfaces",
+    "description": "Create onchain/src/p07/, src/sincor2/defi/p07_bridge/, tests/pytest/test_p07_*, configs/agents/p07-bridge-agent.yaml; wire interfaces from the spec. Acceptance: tree exists, imports resolve, solc 0.8.24 compiles the interface set with zero errors.",
+    "skill": "p07-repo-layout",
+    "tags": [
+      "defi",
+      "bridge",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model"
+    ]
+  },
+  {
+    "task_key": "p07-boilerplate",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "scaffold",
+    "title": "Starter bridge router and solver agent boilerplate",
+    "description": "Write BridgeRouter skeleton (ReentrancyGuard, SafeERC20, non-bricking try/catch on external bridge calls) and the Python solver agent skeleton with TOA hooks and structured logging. Acceptance: compiles under solc 0.8.24, agent boots with dummy config, stub test green.",
+    "skill": "p07-boilerplate",
+    "tags": [
+      "defi",
+      "bridge",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model"
+    ]
+  },
+  {
+    "task_key": "p07-route-scorer",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "core",
+    "title": "Build cross-bridge route scorer",
+    "description": "Implement the route scoring engine over allowlisted bridges: latency, fee, depth and historical reliability inputs with a single normalized score, plus a Python reference in src/sincor2/defi/p07_bridge/scorer.py. Acceptance: scores are deterministic and reproduce the reference within 1e-9 across 1k fixture routes; scoring rejects any bridge not on the allowlist before any other computation.",
+    "skill": "p07-route-scorer",
+    "tags": [
+      "defi",
+      "bridge",
+      "routing"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model",
+      "p07-repo-layout",
+      "p07-boilerplate"
+    ]
+  },
+  {
+    "task_key": "p07-proof-verifier",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "core",
+    "title": "Build storage-proof verification for async settlement",
+    "description": "Implement the Axiom/Herodotus storage-proof verifier that lets agents settle trustlessly later across isolated L2 rollups, with an ultra-light client parser for agent-side proof checks. Acceptance: valid proofs verify and settle; expired or malformed proofs revert; proof parsing adds no more than the documented latency budget.",
+    "skill": "p07-proof-verifier",
+    "tags": [
+      "defi",
+      "bridge",
+      "proofs"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model",
+      "p07-repo-layout",
+      "p07-boilerplate"
+    ]
+  },
+  {
+    "task_key": "p07-allowlist-registry",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "core",
+    "title": "Build bridge allowlist registry",
+    "description": "Implement the onchain allowlist registry with admin-governed bridge registration, per-bridge risk caps, and revocation. Acceptance: routing reverts for any non-allowlisted bridge; revocation immediately excludes the bridge from new routes while in-flight proofs settle safely.",
+    "skill": "p07-allowlist-registry",
+    "tags": [
+      "defi",
+      "bridge",
+      "allowlist"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model",
+      "p07-repo-layout",
+      "p07-boilerplate"
+    ]
+  },
+  {
+    "task_key": "p07-async-settlement",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "core",
+    "title": "Build async cross-rollup settlement engine",
+    "description": "Implement the settlement engine: fulfill via private local pools on the destination rollup when a localized crunch is detected, then settle trustlessly via storage proofs later. Acceptance: full detect-fulfill-prove-settle cycle completes on L2 forks; funds are never released without a verified proof.",
+    "skill": "p07-async-settlement",
+    "tags": [
+      "defi",
+      "bridge",
+      "settlement"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model",
+      "p07-repo-layout",
+      "p07-boilerplate"
+    ]
+  },
+  {
+    "task_key": "p07-slippage-caps",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "core",
+    "title": "Implement slippage caps and quote guardrails",
+    "description": "Implement the slippage_cap gate: per-route and per-bridge slippage ceilings enforced onchain and re-checked by the agent before submission. Acceptance: routes exceeding the cap revert onchain and are skipped agent-side; caps are YAML-configurable with safe defaults.",
+    "skill": "p07-slippage-caps",
+    "tags": [
+      "defi",
+      "bridge",
+      "slippage"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model",
+      "p07-repo-layout",
+      "p07-boilerplate"
+    ]
+  },
+  {
+    "task_key": "p07-agent-solver-loop",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "core",
+    "title": "Build bridge solver agent loop",
+    "description": "Build the Python solver agent: monitors localized crunches (e.g. stablecoin premium on one rollup), scores routes, fulfills via local pools, submits proofs. Acceptance: agent completes a full cycle on test fixtures with TOA telemetry and error handling with backoff.",
+    "skill": "p07-agent-solver-loop",
+    "tags": [
+      "defi",
+      "bridge",
+      "agent"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model",
+      "p07-repo-layout",
+      "p07-boilerplate"
+    ]
+  },
+  {
+    "task_key": "p07-edge-cases",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "core",
+    "title": "Handle bridge optimizer edge cases",
+    "description": "Handle proof expiry, bridge depeg/halt, reorgs, and destination-chain congestion with graceful degradation. Acceptance: each case has a dedicated test and a one-page incident doc in docs/ops/p07-edge-cases.md.",
+    "skill": "p07-edge-cases",
+    "tags": [
+      "defi",
+      "bridge",
+      "edge-cases"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p07-architecture-spec",
+      "p07-interface-definitions",
+      "p07-economic-model",
+      "p07-repo-layout",
+      "p07-boilerplate"
+    ]
+  },
+  {
+    "task_key": "p07-unit-tests",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "testing",
+    "title": "Unit tests for route scoring and gates",
+    "description": "Write tests/pytest/test_p07_unit.py covering scorer determinism, allowlist enforcement, slippage caps and proof verifier happy/error paths. Acceptance: 100% pass; non-allowlisted bridge routes asserted to revert.",
+    "skill": "p07-unit-tests",
+    "tags": [
+      "defi",
+      "bridge",
+      "tests"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p07-route-scorer",
+      "p07-proof-verifier",
+      "p07-allowlist-registry",
+      "p07-async-settlement",
+      "p07-slippage-caps",
+      "p07-agent-solver-loop",
+      "p07-edge-cases"
+    ]
+  },
+  {
+    "task_key": "p07-integration-tests",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "testing",
+    "title": "Integration tests for async bridge flow",
+    "description": "Write tests/pytest/test_p07_integration.py: agent scores, fulfills, submits proof, settles on local L2 fixtures. Acceptance: full async cycle green; proof-expiry path covered.",
+    "skill": "p07-integration-tests",
+    "tags": [
+      "defi",
+      "bridge",
+      "tests"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p07-route-scorer",
+      "p07-proof-verifier",
+      "p07-allowlist-registry",
+      "p07-async-settlement",
+      "p07-slippage-caps",
+      "p07-agent-solver-loop",
+      "p07-edge-cases"
+    ]
+  },
+  {
+    "task_key": "p07-fuzz-invariant",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "testing",
+    "title": "Fuzz and invariant tests for settlement safety",
+    "description": "Fuzz scoring inputs and proof payloads; assert invariants: no settlement without valid proof, no routing via non-allowlisted bridge, slippage caps never exceeded. Acceptance: 10k+ fuzz runs green; counterexamples fixed and recorded.",
+    "skill": "p07-fuzz-invariant",
+    "tags": [
+      "defi",
+      "bridge",
+      "fuzz"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p07-route-scorer",
+      "p07-proof-verifier",
+      "p07-allowlist-registry",
+      "p07-async-settlement",
+      "p07-slippage-caps",
+      "p07-agent-solver-loop",
+      "p07-edge-cases"
+    ]
+  },
+  {
+    "task_key": "p07-fork-simulation",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "testing",
+    "title": "Multi-rollup fork simulation of bridge routing",
+    "description": "Simulate localized crunches (stablecoin premium on one rollup) against forks, run the solver end-to-end. Acceptance: report in tests/reports/p07-fork-sim.md with premium captured, fees to Treasury, and reproducible block pins.",
+    "skill": "p07-fork-simulation",
+    "tags": [
+      "defi",
+      "bridge",
+      "simulation"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p07-route-scorer",
+      "p07-proof-verifier",
+      "p07-allowlist-registry",
+      "p07-async-settlement",
+      "p07-slippage-caps",
+      "p07-agent-solver-loop",
+      "p07-edge-cases"
+    ]
+  },
+  {
+    "task_key": "p07-audit-prep",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "audit",
+    "title": "Audit-prep package for bridge optimizer",
+    "description": "Assemble docs/audits/p07/: frozen code, NatSpec, threat model (fake proofs, allowlist governance capture, depeg), gate enforcement map. Acceptance: complete contract inventory and proof-trust assumptions documented.",
+    "skill": "p07-audit-prep",
+    "tags": [
+      "defi",
+      "bridge",
+      "audit"
+    ],
+    "bounty_axm": 4.0,
+    "effort": "L",
+    "depends_on": [
+      "p07-unit-tests",
+      "p07-integration-tests",
+      "p07-fuzz-invariant",
+      "p07-fork-simulation"
+    ]
+  },
+  {
+    "task_key": "p07-findings-remediation",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "audit",
+    "title": "Remediate bridge optimizer audit findings",
+    "description": "Fix all findings with priority to proof-verification and allowlist issues; each fix links to its finding ID. Acceptance: zero open high/medium findings; regression tests for each fix pass.",
+    "skill": "p07-findings-remediation",
+    "tags": [
+      "defi",
+      "bridge",
+      "audit"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p07-unit-tests",
+      "p07-integration-tests",
+      "p07-fuzz-invariant",
+      "p07-fork-simulation"
+    ]
+  },
+  {
+    "task_key": "p07-gas-optimization",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "audit",
+    "title": "Gas optimization for bridge contracts",
+    "description": "Optimize scoring, proof submission and settlement paths without weakening gates. Acceptance: before/after gas report in docs/audits/p07/gas.md with zero behavioral change in tests.",
+    "skill": "p07-gas-optimization",
+    "tags": [
+      "defi",
+      "bridge",
+      "gas"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p07-unit-tests",
+      "p07-integration-tests",
+      "p07-fuzz-invariant",
+      "p07-fork-simulation"
+    ]
+  },
+  {
+    "task_key": "p07-technical-docs",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "docs",
+    "title": "Technical docs for bridge optimizer",
+    "description": "Write docs/p07-bridge-optimizer.md: contract reference, proof flow, scoring function, gate semantics. Acceptance: a new builder can run the solver from the docs alone; all references resolve.",
+    "skill": "p07-technical-docs",
+    "tags": [
+      "defi",
+      "bridge",
+      "docs"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p07-route-scorer",
+      "p07-proof-verifier",
+      "p07-allowlist-registry",
+      "p07-async-settlement",
+      "p07-slippage-caps",
+      "p07-agent-solver-loop",
+      "p07-edge-cases",
+      "p07-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p07-runbook-yaml",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "docs",
+    "title": "Agent YAML config and ops runbook",
+    "description": "Write configs/agents/p07-bridge-agent.yaml and docs/ops/p07-runbook.md (deploy, monitor, depeg response, proof-expiry handling). Acceptance: agent boots from YAML; runbook covers depeg and proof-expiry incidents.",
+    "skill": "p07-runbook-yaml",
+    "tags": [
+      "defi",
+      "bridge",
+      "runbook"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p07-route-scorer",
+      "p07-proof-verifier",
+      "p07-allowlist-registry",
+      "p07-async-settlement",
+      "p07-slippage-caps",
+      "p07-agent-solver-loop",
+      "p07-edge-cases",
+      "p07-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p07-dashboard-hooks",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "docs",
+    "title": "Dashboard and monitoring hooks",
+    "description": "Expose route scores, proof latency, settlement backlog, gate states and Treasury fee accrual in the status feed. Acceptance: feed reports real values or 'unknown', never fabricated 'healthy'.",
+    "skill": "p07-dashboard-hooks",
+    "tags": [
+      "defi",
+      "bridge",
+      "monitoring"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p07-route-scorer",
+      "p07-proof-verifier",
+      "p07-allowlist-registry",
+      "p07-async-settlement",
+      "p07-slippage-caps",
+      "p07-agent-solver-loop",
+      "p07-edge-cases",
+      "p07-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p07-testnet-deploy",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "deploy",
+    "title": "Testnet deploy scripts for bridge optimizer",
+    "description": "Write scripts/deploy/p07/ deploying to Base Sepolia with a minimal bridge allowlist and live routing disabled. Acceptance: idempotent scripts; addresses and allowlist recorded; live path reverts.",
+    "skill": "p07-testnet-deploy",
+    "tags": [
+      "defi",
+      "bridge",
+      "deploy"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p07-audit-prep",
+      "p07-findings-remediation",
+      "p07-gas-optimization"
+    ]
+  },
+  {
+    "task_key": "p07-mainnet-checklist",
+    "project_id": "P07",
+    "project_name": "Cross-Chain Bridge Optimizer",
+    "phase": "deploy",
+    "title": "Mainnet readiness checklist for bridge optimizer",
+    "description": "Write docs/ops/p07-mainnet-checklist.md: audit sign-off, allowlist governance, proof-oracle trust assumptions, key custody. Acceptance: checklist signed off by the auditor task; no mainnet action without allowlist quorum.",
+    "skill": "p07-mainnet-checklist",
+    "tags": [
+      "defi",
+      "bridge",
+      "deploy"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p07-audit-prep",
+      "p07-findings-remediation",
+      "p07-gas-optimization"
+    ]
+  }
+]

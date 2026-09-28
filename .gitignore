@@ -159,3 +159,7 @@ REVERT_COMMIT.txt
 
 # Local on-chain cache
 .onchain-cache.json
+
+# Liveness Phase 1 runtime state (never commit: salts, queue, cursor)
+liveness/state/
+liveness/fountain_state.json

@@ -1,0 +1,479 @@
+[
+ {
+  "task_key": "p05-mutual-architecture-spec",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "spec",
+  "title": "Draft risk mutual architecture spec",
+  "description": "Deliverable: docs/p05/ARCHITECTURE.md covering the mutual pool lifecycle (capitalize → underwrite → claim → assess → payout), the Nexus-style cover model for smart-contract risk, premium pricing from on-chain risk scores (base 200 bps × tier multiplier, cap 1,500 bps), SINAX attestation-gated claims (interface + assessor-signature bootstrap, with the missing sinax/ module named as future work), the 130% reserve-ratio solvency model, and the 30-day claim window. Acceptance criteria: (1) spec ratifies the catalog gates — reserve_ratio (130% floor, enforced per underwrite) and claim_window (30 days, immutable per cover) — with numeric values; (2) solvency proof sketch shows the pool cannot pay beyond reserves (payout ≤ free reserves, pro-rata haircut otherwise); (3) worked premium example to the wei. Numeric constraints: quorum for assessor votes > 5× cover amount; timelock 48h. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-architecture-spec",
+  "tags": [
+   "defi",
+   "insurance",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p05-mutual-interface-definitions",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "spec",
+  "title": "Define mutual, claims, and attestation interfaces",
+  "description": "Deliverable: onchain/src/hooks/IRiskMutual.sol (buyCover, fileClaim, assessClaim, redeemCapital; events CoverBought, ClaimFiled, ClaimAssessed, PayoutClaimed) and src/sincor2/defi/p05/interfaces.py (risk-score schema v1, SINAX attestation verifier interface, actuarial model interface) — frozen before core. Acceptance criteria: (1) Solidity compiles under solc 0.8.24; (2) Python is mypy-clean; (3) every downstream core module imports these interfaces; (4) score schema versioned (v1) so feed format changes are explicit. Numeric constraints: score range 0..1 fixed-point (1e18 scale); premium inputs in wei/bps. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-interface-definitions",
+  "tags": [
+   "defi",
+   "insurance",
+   "spec",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-economic-fee-model",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "spec",
+  "title": "Specify economic and fee model",
+  "description": "Deliverable: docs/p05/ECONOMICS.md — 25 bps protocol fee on premiums forwarded to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac at collection; premium formula premium = 200 bps × tier_multiplier(score) × cover_amount × (duration_days/365), tiers 0.5×/1.0×/2.0×, cap 1,500 bps; capital-provider yield from underwriting surplus (11% target APR loss-free); reserve-ratio floor economics (130%); loss-ratio ratchet rule (base rate +50 bps if loss ratio > 70% of premiums for two quarters). Acceptance criteria: (1) worked premium examples for three risk tiers (scores 0.15/0.35/0.70 → 100/200/400 bps) with math to the wei, e.g. $100k cover × 90 days × 200 bps = $493.15 premium, $1.23 to treasury; (2) table proves the pool cannot underwrite past the 130% floor; (3) sensitivity table: loss ratios 0%/30%/70% vs capital-provider APR. Numeric constraints: fee 25 bps; floor 130%; cap 1,500 bps. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-economic-fee-model",
+  "tags": [
+   "defi",
+   "insurance",
+   "spec",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-repo-scaffold",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "scaffold",
+  "title": "Create repo layout and stub interfaces",
+  "description": "Deliverable: onchain/src/hooks/p05/, src/sincor2/defi/p05/, agents/defi/p05/, tests/pytest/test_p05_*.py stubs, docs/p05/; agent YAML skeleton agents/defi/p05/risk_underwriter.yaml (name, budgets, score cadence per repo convention). Acceptance criteria: (1) tree committed; stubs compile/collect with zero errors; (2) YAML skeleton validates; (3) CI lints pass. Numeric constraints: none yet; structure only. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-repo-scaffold",
+  "tags": [
+   "defi",
+   "insurance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-interface-definitions"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-boilerplate-starter",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "scaffold",
+  "title": "Write boilerplate starter code",
+  "description": "Deliverable: RiskMutual.sol boilerplate with ReentrancyGuard + SafeERC20, non-bricking try/catch on payout paths, role constants (UNDERWRITER_ROLE, ASSESSOR_ROLE, GUARDIAN_ROLE); Python package with risk-score client skeleton, EIP-712 signing helpers, and TOA hooks. Acceptance criteria: (1) forge build succeeds; (2) pytest collects with zero import errors; (3) no unresolved stub markers in public function bodies (grep-verified in CI). Numeric constraints: none yet; structure only. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-boilerplate-starter",
+  "tags": [
+   "defi",
+   "insurance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-repo-scaffold"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-pool-contract",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "core",
+  "title": "Implement mutual pool contract",
+  "description": "Deliverable: onchain/src/hooks/p05/RiskMutual.sol — capital deposits minting mutual shares (ERC-4626-style, _decimalsOffset()=6), per-protocol cover inventory, premium collection with immediate 25 bps treasury forwarding, reserve accounting with the 130% reserve_ratio floor enforced on every underwrite. Acceptance criteria: (1) compiles under solc 0.8.24; (2) any underwrite that would breach the 130% floor reverts; (3) capital redeemable only against unlocked reserves (locked-cover obligations protected). Numeric constraints: floor exactly 130%; redeem math to the wei. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-pool-contract",
+  "tags": [
+   "defi",
+   "insurance",
+   "core",
+   "solidity"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p05-mutual-boilerplate-starter"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-premium-pricing",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "core",
+  "title": "Implement risk-score premium pricing",
+  "description": "Deliverable: on-chain premium formula consuming the underwriter agent's EIP-712 signed risk scores — premium = 200 bps × tier_multiplier(score) × cover_amount × (duration_days/365), tiers 0.5×/1.0×/2.0× at score ≤0.20 / 0.20–0.50 / >0.50, hard cap 1,500 bps; score staleness guard (> 7,200 blocks blocks new covers). Acceptance criteria: (1) three fixture protocols (scores 0.15/0.35/0.70) produce exactly 100/200/400 bps on identical terms; (2) stale score blocks new covers; (3) premium never exceeds the 1,500 bps cap. Numeric constraints: base 200 bps; cap 1,500 bps; staleness 7,200 blocks. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-premium-pricing",
+  "tags": [
+   "defi",
+   "insurance",
+   "core",
+   "solidity",
+   "pricing"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p05-mutual-pool-contract"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-underwriter-agent",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "core",
+  "title": "Build underwriter agent with signed score feeds",
+  "description": "Deliverable: src/sincor2/defi/p05/underwriter.py — computes risk scores 0..1 from audit count/recency (30%), TVL and concentration (20%), exploit history (25%), code-change velocity (15%), oracle/dependency risk (10%); publishes EIP-712 signed score feeds on a 24h cadence in the versioned v1 schema; full error handling and heartbeat. Acceptance criteria: (1) agent scores a 10-protocol fixture matching the expected tiers (low/mid/high); (2) score feed format pinned and versioned; (3) a feed older than 7,200 blocks is rejected by the pricing contract. Numeric constraints: weights sum to 100%; cadence 24h; staleness 7,200 blocks. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-underwriter-agent",
+  "tags": [
+   "defi",
+   "insurance",
+   "core",
+   "agent"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p05-mutual-premium-pricing"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-sinax-claims",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "core",
+  "title": "Implement SINAX-attested claims",
+  "description": "Deliverable: claims flow — fileClaim(coverId, attestation) with the attestation bundle (machine loss-proof + incident timestamp inside the cover period) verified via ISinaxAttestationVerifier (bootstrap implementation: whitelisted-assessor EIP-712 signatures; interface reserved for the future SINAX module — the missing sinax/ directory is documented as a known gap); assessor review path with 14-day window and 5× quorum rule; claim_window enforcement (30 days, late claims revert). Acceptance criteria: (1) claim with valid attestation pays out; (2) claim without attestation reverts; (3) claim filed on day 31 reverts; (4) double-claim (same coverId + incident hash) reverts. Numeric constraints: window 30 days; review 14 days; quorum 5×. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-sinax-claims",
+  "tags": [
+   "defi",
+   "insurance",
+   "core",
+   "solidity",
+   "claims"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p05-mutual-pool-contract"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-payout-logic",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "core",
+  "title": "Implement payout and pro-rata shortfall logic",
+  "description": "Deliverable: payout engine — verified claims paid from reserves via pull-based claimPayout(); aggregate claims exceeding free reserves trigger the pro-rata haircut (payout_i = claim_i × reserves / Σclaims, to the wei, with a public shortfallFactor); per-claimant try/catch so one reverting receiver never bricks others; 25 bps of premiums already routed to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac at collection. Acceptance criteria: (1) shortfall simulation at 150% of reserves pays correct pro-rata amounts to the wei; (2) failed payout transfer never bricks other claimants; (3) fee routing asserted per premium collection. Numeric constraints: haircut math exact to 1 wei; fee 25 bps. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-payout-logic",
+  "tags": [
+   "defi",
+   "insurance",
+   "core",
+   "solidity",
+   "fees"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p05-mutual-sinax-claims"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-governance",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "core",
+  "title": "Implement mutual governance with timelock",
+  "description": "Deliverable: member governance — cover-listing votes (which protocols are insurable; quorum ≥ 10% of mutual shares, ≥ 60% yes), parameter changes (reserve_ratio, claim_window, base rate) behind a 48h TimelockController, assessor appointment with bonding. Acceptance criteria: (1) listing vote passes only at quorum with the required majority; (2) parameter change executes only after the 48h timelock elapses; (3) admin cannot bypass either path (tested with direct calls). Numeric constraints: quorum 10%; majority 60%; timelock 48h; assessor bond 1,000 units. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-governance",
+  "tags": [
+   "defi",
+   "insurance",
+   "core",
+   "governance"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-payout-logic"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-access-edge-cases",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "core",
+  "title": "Access control and edge-case handling",
+  "description": "Deliverable: role wiring (UNDERWRITER_ROLE for score feeds, ASSESSOR_ROLE bonded, GUARDIAN_ROLE) plus edge cases — protocol exploited while cover active (covered, payout flows), exploit before cover start (excluded), overlapping covers on the same protocol (each pays independently up to its cover amount), capital redemption during an open claim window (queued until window closes). Acceptance criteria: (1) unauthorized score update reverts; (2) every edge case has a dedicated test; (3) guardian pause blocks new underwriting but never blocks in-window claimPayout. Numeric constraints: assessor bond 1,000 units; redemption queue preserves the 130% floor. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-access-edge-cases",
+  "tags": [
+   "defi",
+   "insurance",
+   "core",
+   "security"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-governance",
+   "p05-mutual-underwriter-agent"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-unit-tests",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "testing",
+  "title": "Write unit tests for mutual contracts",
+  "description": "Deliverable: Foundry tests for pool, pricing, claims, governance; pytest for underwriter scoring. Acceptance criteria: (1) 24/24 pass; (2) each test cites the rule it guards; (3) pricing boundary tests at score 0.20/0.50 and the 1,500 bps cap. Numeric constraints: premium assertions exact to 1 wei; quorum math tested at 5× boundary. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-unit-tests",
+  "tags": [
+   "defi",
+   "insurance",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-access-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-integration-tests",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "testing",
+  "title": "Write integration tests: cover to claim",
+  "description": "Deliverable: full cycle test — capitalize → buy cover → simulated exploit → attestation → fileClaim → assess → payout → redeem; asserts correct payouts, treasury fee events (25 bps at collection), and reserve accounting. Acceptance criteria: (1) end-to-end cycle completes; (2) payouts exact to the wei per the pro-rata rules; (3) suite green in CI. Numeric constraints: fixture cover $100k, 90-day term; premium computed per the formula. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-integration-tests",
+  "tags": [
+   "defi",
+   "insurance",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p05-mutual-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-invariant-fuzz",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "testing",
+  "title": "Invariant and fuzz tests",
+  "description": "Deliverable: Foundry invariant suite + docs/p05/INVARIANTS.md — (a) reserves ≥ locked cover obligations × 130%; (b) total payouts ≤ reserves; (c) premiums collected ≥ fees routed to treasury; (d) no double-claim under fuzzed sequences. Acceptance criteria: (1) 10,000 runs per invariant, zero counterexamples; (2) any counterexample fixed and recorded; (3) INVARIANTS.md documents each bound. Numeric constraints: 10k runs; reserve floor 130%. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-invariant-fuzz",
+  "tags": [
+   "defi",
+   "insurance",
+   "testing",
+   "fuzz"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-fork-simulation",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "testing",
+  "title": "Fork simulation with a historical exploit",
+  "description": "Deliverable: fork at a pinned block before a real historical DeFi exploit; underwrite cover on the victim protocol with pre-exploit risk scores; simulate the exploit and run the full claims flow with the attestation stub; publish docs/p05/FORK_SIM.md. Acceptance criteria: (1) report records the pinned block, exploit timeline, claim transaction hashes, payout amounts, and reserve-ratio impact; (2) claim pays out correctly per the pro-rata rules; (3) simulation is re-runnable from the documented block pin. Numeric constraints: block pin documented; payout math to the wei. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-fork-simulation",
+  "tags": [
+   "defi",
+   "insurance",
+   "testing",
+   "fork"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-invariant-fuzz"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-audit-prep",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "audit",
+  "title": "Assemble audit-prep package",
+  "description": "Deliverable: docs/p05/AUDIT.md — threat model (attestation forgery, score manipulation, governance capture, reserve drain, correlated-dependency cascade), privileged-role matrix, 100% NatSpec coverage, deployment parameters, actuarial assumptions (base rate, tier multipliers, loss-ratio ratchet rule); code frozen with a tagged commit. Acceptance criteria: (1) package passes the repo audit checklist; (2) attestation trust assumptions (assessor allowlist bootstrap) stated explicitly; (3) actuarial review of the pricing parameters recorded. Numeric constraints: checklist completeness binary. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-audit-prep",
+  "tags": [
+   "defi",
+   "insurance",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p05-mutual-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-findings-remediation",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "audit",
+  "title": "Remediate audit findings",
+  "description": "Deliverable: triaged findings, fixes for all High/Critical, documented accepted risks for Medium/Low with rationale, one regression test per finding, docs/p05/FINDINGS.md ledger. Acceptance criteria: (1) auditor sign-off recorded; (2) no open item above Low without written acceptance; (3) actuarial assumptions re-confirmed after any pricing-related fix. Numeric constraints: zero open High/Critical. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-findings-remediation",
+  "tags": [
+   "defi",
+   "insurance",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p05-mutual-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-gas-optimization",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "audit",
+  "title": "Gas optimization pass",
+  "description": "Deliverable: profile buyCover/fileClaim/assess/payout paths; pack storage, minimize SSTOREs on the claim path; docs/p05/GAS.md before/after report. Acceptance criteria: (1) ≥ 15% gas improvement on the claim path; (2) fuzz suite re-run green with zero behavior change; (3) per-function before/after table published. Numeric constraints: improvement ≥ 15% on claim path. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-gas-optimization",
+  "tags": [
+   "defi",
+   "insurance",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p05-mutual-findings-remediation"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-technical-docs",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "docs",
+  "title": "Write technical documentation",
+  "description": "Deliverable: docs/p05/TECHNICAL.md — pool mechanics, premium formula with worked tiers, claims flow, attestation model (bootstrap vs future SINAX), governance, solvency math, actuarial assumptions. Acceptance criteria: (1) reimplementable from the doc alone; (2) actuarial assumptions explicit (base rate, tier multipliers, loss-ratio ratchet); (3) all diagrams current with final code. Numeric constraints: doc completeness. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-technical-docs",
+  "tags": [
+   "defi",
+   "insurance",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-gas-optimization"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-agent-config-runbook",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "docs",
+  "title": "Ship agent YAML config and ops runbook",
+  "description": "Deliverable: finalized agents/defi/p05/risk_underwriter.yaml (score cadence 24h, data sources, alert thresholds) plus docs/p05/RUNBOOK.md — score-feed cadence and emergency rescore procedure, exploit-response procedure (freeze new covers on the victim protocol within 1 hour of confirmation), claim-window operations, key rotation, incident escalation, and the late-discovery governance path (75% supermajority, +14 days max, once per incident). Acceptance criteria: (1) agent boots from the YAML with no code changes; (2) runbook rehearsed with logged timestamps, including a simulated exploit drill; (3) emergency rescore publishes within 1 hour in the drill. Numeric constraints: cadence 24h; staleness ceiling 7,200 blocks. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-agent-config-runbook",
+  "tags": [
+   "defi",
+   "insurance",
+   "docs",
+   "ops"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-dashboard-monitoring",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "docs",
+  "title": "Build dashboard and monitoring hooks",
+  "description": "Deliverable: src/sincor2/defi/p05/monitor.py — TVL, reserve ratio, open covers, premium income, claims in window, treasury fees — emitted to the SINCOR dashboard schema; alerts on reserve ratio approaching 140% (pre-breach warning), score staleness approaching 7,200 blocks, exploit events on covered protocols, and shortfall factor < 1.0 (haircut active — immediate page). Acceptance criteria: (1) panel renders fork-sim data; (2) alert fires on the simulated exploit; (3) haircut alert fires in the shortfall simulation. Numeric constraints: thresholds as specified. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-dashboard-monitoring",
+  "tags": [
+   "defi",
+   "insurance",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-agent-config-runbook"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-testnet-deploy",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "deploy",
+  "title": "Write and execute testnet deploy scripts",
+  "description": "Deliverable: scripts/p05/deploy_testnet.sh + onchain/script/p05/Deploy.s.sol deploying RiskMutual to Base Sepolia; Basescan verification; capitalize the pool, underwrite test covers, run a scripted claim end-to-end. Acceptance criteria: (1) verified contracts linked in docs/p05/DEPLOY.md with claim transaction hashes; (2) 25 bps treasury fee observed at collection; (3) liveUnderwritingEnabled verified false on testnet. Numeric constraints: test capital documented; live underwriting stays blocked. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-testnet-deploy",
+  "tags": [
+   "defi",
+   "insurance",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p05-mutual-dashboard-monitoring"
+  ]
+ },
+ {
+  "task_key": "p05-mutual-mainnet-readiness",
+  "project_id": "P05",
+  "project_name": "DeFi Risk Mutual",
+  "phase": "deploy",
+  "title": "Mainnet readiness checklist",
+  "description": "Deliverable: docs/p05/MAINNET_CHECKLIST.md — audit sign-off, actuarial review signed, initial capitalization plan (≥ $200 min pool capital, target first-loss buffer), multisig ownership, monitoring/alerting live, runbook rehearsed, go/no-go table. Acceptance criteria: (1) every box signed; (2) no live underwriting without ratified reserve parameters and the founder-signed release transaction; (3) liveUnderwritingEnabled verified false at deploy. Numeric constraints: checklist 100% signed. Per specs/p05-defi-insurance.md §Acceptance criteria.",
+  "skill": "p05-mutual-mainnet-readiness",
+  "tags": [
+   "defi",
+   "insurance",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p05-mutual-testnet-deploy"
+  ]
+ }
+]

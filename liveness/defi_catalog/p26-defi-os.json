@@ -1,0 +1,494 @@
+[
+  {
+    "task_key": "p26-defios-architecture-spec",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "spec",
+    "title": "Draft DeFi OS meta-layer architecture spec",
+    "description": "Write docs/spec/P26_ARCHITECTURE.md for the TOA + SINAX recursive optimization layer on top of the other 25 protocols: the canonical protocol registry (wrapping src/sincor2/defi/catalog.py), the fee telemetry ingestor, the ROI ranker, the kill-switch executor, the TOA feedback loop, and the dashboard API. It states the meta invariant: the OS ranks by fee generation and kills negative-ROI ticks but produces no yield itself. Done looks like a reviewed spec with component boundaries and the kill authority chain defined.",
+    "skill": "p26-defios-architecture-spec",
+    "tags": [
+      "defi",
+      "defi-os",
+      "spec",
+      "architecture",
+      "meta"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": []
+  },
+  {
+    "task_key": "p26-defios-interface-definitions",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "spec",
+    "title": "Define P26 interfaces against the protocol catalog",
+    "description": "Define Python interfaces in src/sincor2/defi/p26/interfaces.py: ProtocolRegistry, FeeTelemetry, ROIRanker, KillExecutor protocols, all typed against the catalog.py ProtocolSpec (the canonical registry of all 26 protocols). Done looks like type-checked interfaces with a stub ranking over the 25 non-meta catalog entries.",
+    "skill": "p26-defios-interface-definitions",
+    "tags": [
+      "defi",
+      "defi-os",
+      "spec",
+      "interfaces"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": []
+  },
+  {
+    "task_key": "p26-defios-ranking-kill-criteria-spec",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "spec",
+    "title": "Write P26 ranking and kill-criteria spec",
+    "description": "Write docs/spec/P26_RANKING_KILL_CRITERIA.md instead of a fee model: how protocols are ranked by fee generation (rank_by_fee gate), the negative-ROI definition and measurement window (kill_negative_roi gate), kill preconditions, and appeal/override paths. The OS itself takes 0 bps and targets 0% APR. Done looks like a spec precise enough that the ranker and kill-switch implement it without interpretation gaps.",
+    "skill": "p26-defios-ranking-kill-criteria-spec",
+    "tags": [
+      "defi",
+      "defi-os",
+      "spec",
+      "ranking",
+      "kill-criteria"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p26-defios-repo-layout",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "scaffold",
+    "title": "Create P26 repo layout and package skeleton",
+    "description": "Create src/sincor2/defi/p26/ with registry.py, telemetry.py, ranker.py, killswitch.py, feedback.py, proofs.py, api.py, plus tests/pytest/test_p26_*.py stubs, agent YAML configs/agents/p26-defi-os.yaml, and a docs runbook stub. Done looks like a package importing cleanly per the repo's Python-agent conventions.",
+    "skill": "p26-defios-repo-layout",
+    "tags": [
+      "defi",
+      "defi-os",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-architecture-spec",
+      "p26-defios-interface-definitions"
+    ]
+  },
+  {
+    "task_key": "p26-defios-starter-code",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "scaffold",
+    "title": "Write P26 starter boilerplate",
+    "description": "Write starter boilerplate: a registry stub reading all 26 entries from catalog.py, a mock telemetry feed, and a no-op ranker with TOA hooks. Done looks like compileall passing and a stub ranking listing all 25 ranked protocols.",
+    "skill": "p26-defios-starter-code",
+    "tags": [
+      "defi",
+      "defi-os",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-repo-layout"
+    ]
+  },
+  {
+    "task_key": "p26-defios-protocol-registry",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "core",
+    "title": "Build the canonical protocol registry wrapper",
+    "description": "Build the registry in src/sincor2/defi/p26/registry.py: wraps src/sincor2/defi/catalog.py as the single source of truth, exposes per-protocol gates, risk scores, and fee bps, and fails closed if the catalog is incomplete or mutated unexpectedly. Done looks like the registry asserting catalog completeness (26 protocols, swarm ids 1..26) on load.",
+    "skill": "p26-defios-protocol-registry",
+    "tags": [
+      "defi",
+      "defi-os",
+      "core",
+      "registry",
+      "catalog"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p26-defios-starter-code"
+    ]
+  },
+  {
+    "task_key": "p26-defios-fee-telemetry-ingestor",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "core",
+    "title": "Build the fee telemetry ingestor",
+    "description": "Build the telemetry ingestor in src/sincor2/defi/p26/telemetry.py: collects realized fee-generation data from all 25 protocols into a normalized per-tick ledger, with staleness detection, source attestation, and full error handling. Done looks like the ingestor producing a complete 25-protocol fee ledger from mocked feeds with stale sources flagged, never silently zero-filled.",
+    "skill": "p26-defios-fee-telemetry-ingestor",
+    "tags": [
+      "defi",
+      "defi-os",
+      "core",
+      "telemetry",
+      "fees"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p26-defios-protocol-registry",
+      "p26-defios-interface-definitions"
+    ]
+  },
+  {
+    "task_key": "p26-defios-roi-ranker",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "core",
+    "title": "Build the ROI ranker",
+    "description": "Build the ranker in src/sincor2/defi/p26/ranker.py: ranks the 25 protocols by fee generation and ROI per the ranking spec, with deterministic tie-breaking and TOA hooks for forecast overlays. Done looks like a ranking over mocked telemetry that matches a hand-computed expected order exactly.",
+    "skill": "p26-defios-roi-ranker",
+    "tags": [
+      "defi",
+      "defi-os",
+      "core",
+      "ranking",
+      "roi"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p26-defios-fee-telemetry-ingestor",
+      "p26-defios-ranking-kill-criteria-spec"
+    ]
+  },
+  {
+    "task_key": "p26-defios-kill-switch-executor",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "core",
+    "title": "Build the kill-switch executor",
+    "description": "Build the kill-switch executor in src/sincor2/defi/p26/killswitch.py: kills negative-ROI ticks ONLY via the approved path (kill preconditions from the criteria spec, SINAX attestation where required, audit-logged), and refuses kills on positive-ROI or unmeasured ticks. Done looks like tests proving valid kills execute through the approved path while premature kills are refused with reasons.",
+    "skill": "p26-defios-kill-switch-executor",
+    "tags": [
+      "defi",
+      "defi-os",
+      "core",
+      "kill-switch",
+      "security"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p26-defios-roi-ranker"
+    ]
+  },
+  {
+    "task_key": "p26-defios-toa-feedback-loop",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "core",
+    "title": "Build the TOA recursive feedback loop",
+    "description": "Build the recursive optimization loop: the OS feeds rankings and kill outcomes back into TOA ingest_feedback so TOA reprioritizes revenue paths across the 25 protocols, closing the self-improvement cycle. Done looks like a simulated cycle where a killed tick's capital is reprioritized and the next ranking reflects the feedback.",
+    "skill": "p26-defios-toa-feedback-loop",
+    "tags": [
+      "defi",
+      "defi-os",
+      "core",
+      "toa",
+      "feedback"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p26-defios-kill-switch-executor",
+      "p26-defios-roi-ranker"
+    ]
+  },
+  {
+    "task_key": "p26-defios-sinax-proof-hooks",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "core",
+    "title": "Build SINAX proof hooks for kill decisions",
+    "description": "Build SINAX proof hooks in src/sincor2/defi/p26/proofs.py: kill decisions carry SINAX attestations (stubs where the prover is unavailable) so every kill is verifiable after the fact. Done looks like each executed kill producing an attestation record linked to the ranking snapshot that justified it.",
+    "skill": "p26-defios-sinax-proof-hooks",
+    "tags": [
+      "defi",
+      "defi-os",
+      "core",
+      "sinax",
+      "proofs"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-kill-switch-executor"
+    ]
+  },
+  {
+    "task_key": "p26-defios-dashboard-api",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "core",
+    "title": "Build the DeFi OS dashboard API",
+    "description": "Build the dashboard API exposing live protocol rankings, kill history with reasons, fee-generation trends, and OS health, using the status-feed schema (unknown, never healthy, on failure). Done looks like API responses validating against a schema in tests.",
+    "skill": "p26-defios-dashboard-api",
+    "tags": [
+      "defi",
+      "defi-os",
+      "core",
+      "dashboard",
+      "api"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-roi-ranker",
+      "p26-defios-toa-feedback-loop"
+    ]
+  },
+  {
+    "task_key": "p26-defios-unit-tests",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "testing",
+    "title": "Write P26 unit tests",
+    "description": "Write unit tests under tests/pytest/test_p26_defi_os_unit.py covering the registry, telemetry normalization, ranker determinism, kill preconditions, and SINAX hook wiring. Done looks like all tests passing with coverage of src/sincor2/defi/p26/ above 85%.",
+    "skill": "p26-defios-unit-tests",
+    "tags": [
+      "defi",
+      "defi-os",
+      "testing",
+      "unit"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-sinax-proof-hooks",
+      "p26-defios-dashboard-api"
+    ]
+  },
+  {
+    "task_key": "p26-defios-integration-tests",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "testing",
+    "title": "Write P26 integration tests",
+    "description": "Write integration tests: telemetry to ranking to kill decision to TOA feedback to dashboard, run against all 25 catalog entries. Done looks like a green cycle where a mocked negative-ROI protocol is killed through the approved path and the ranking updates.",
+    "skill": "p26-defios-integration-tests",
+    "tags": [
+      "defi",
+      "defi-os",
+      "testing",
+      "integration"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p26-defios-unit-tests",
+      "p26-defios-toa-feedback-loop"
+    ]
+  },
+  {
+    "task_key": "p26-defios-invariant-fuzz-tests",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "testing",
+    "title": "Write P26 invariant and fuzz tests",
+    "description": "Write property and invariant tests: the OS never kills a positive-ROI tick, never kills an unmeasured tick, never emits yield itself, and rankings are deterministic for fixed telemetry across fuzzed ledgers. Done looks like invariants holding over at least 1000 randomized telemetry sets.",
+    "skill": "p26-defios-invariant-fuzz-tests",
+    "tags": [
+      "defi",
+      "defi-os",
+      "testing",
+      "fuzz",
+      "invariants"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p26-defios-fork-simulation",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "testing",
+    "title": "Run P26 fork simulation with real protocol data",
+    "description": "Run the telemetry ingestor and ranker against a mainnet fork pulling real fee data for the live-eligible protocols, verifying ranking stability and that no kill fires without full preconditions. Done looks like a completed fork run with a sane ranking and zero unjustified kills.",
+    "skill": "p26-defios-fork-simulation",
+    "tags": [
+      "defi",
+      "defi-os",
+      "testing",
+      "fork-simulation"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-integration-tests"
+    ]
+  },
+  {
+    "task_key": "p26-defios-audit-prep",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "audit",
+    "title": "Assemble P26 audit-prep package",
+    "description": "Assemble the audit-prep package: frozen code snapshot, a threat model focused on ranking manipulation, telemetry spoofing, and unauthorized kills, plus a known-limitations log. Done looks like a single reviewable directory with the commit hash recorded.",
+    "skill": "p26-defios-audit-prep",
+    "tags": [
+      "defi",
+      "defi-os",
+      "audit"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p26-defios-invariant-fuzz-tests",
+      "p26-defios-fork-simulation"
+    ]
+  },
+  {
+    "task_key": "p26-defios-findings-remediation",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "audit",
+    "title": "Remediate P26 audit findings",
+    "description": "Remediate all audit findings rated medium or higher, re-running the full P26 suite and the kill-precondition tests after each fix. Done looks like zero open medium-or-higher findings with the full suite green.",
+    "skill": "p26-defios-findings-remediation",
+    "tags": [
+      "defi",
+      "defi-os",
+      "audit",
+      "remediation"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p26-defios-audit-prep"
+    ]
+  },
+  {
+    "task_key": "p26-defios-gas-optimization",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "audit",
+    "title": "Gas-optimize P26 kill-switch execution path",
+    "description": "Gas-optimize the kill-switch execution path (onchain call efficiency for tick kills): measure gas per kill and target a 20% reduction without changing precondition behavior. Done looks like a committed before/after gas report with all tests still passing.",
+    "skill": "p26-defios-gas-optimization",
+    "tags": [
+      "defi",
+      "defi-os",
+      "audit",
+      "gas"
+    ],
+    "bounty_axm": 4.0,
+    "effort": "L",
+    "depends_on": [
+      "p26-defios-findings-remediation"
+    ]
+  },
+  {
+    "task_key": "p26-defios-technical-docs",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "docs",
+    "title": "Write P26 technical documentation",
+    "description": "Write technical docs: a component reference for src/sincor2/defi/p26/, the ranking and kill-criteria semantics, and the meta-layer invariants (no yield produced, kills only via approved path). Done looks like docs building without warnings with every public function documented.",
+    "skill": "p26-defios-technical-docs",
+    "tags": [
+      "defi",
+      "defi-os",
+      "docs"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-architecture-spec",
+      "p26-defios-roi-ranker"
+    ]
+  },
+  {
+    "task_key": "p26-defios-agent-yaml-runbook",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "docs",
+    "title": "Ship P26 agent YAML config and ops runbook",
+    "description": "Ship configs/agents/p26-defi-os.yaml (budgets, memory, TOA hooks, check-in cadence) plus docs/ops/P26_RUNBOOK.md covering ranking review, kill authorization, and override procedures. Done looks like a validating YAML and executable runbook steps.",
+    "skill": "p26-defios-agent-yaml-runbook",
+    "tags": [
+      "defi",
+      "defi-os",
+      "docs",
+      "ops",
+      "yaml"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-starter-code"
+    ]
+  },
+  {
+    "task_key": "p26-defios-dashboard-monitoring-hooks",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "docs",
+    "title": "Add P26 dashboard monitoring hooks",
+    "description": "Add monitoring hooks: ranking-change alerts, kill-event feed, telemetry-staleness alarm, and OS health metrics wired to the SINCOR dashboard. Done looks like hooks emitting on the feed schema with alerts firing on simulated telemetry gaps.",
+    "skill": "p26-defios-dashboard-monitoring-hooks",
+    "tags": [
+      "defi",
+      "defi-os",
+      "docs",
+      "monitoring"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-dashboard-api"
+    ]
+  },
+  {
+    "task_key": "p26-defios-testnet-deploy-scripts",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "deploy",
+    "title": "Write P26 testnet deploy scripts",
+    "description": "Write testnet deploy scripts for any P26 onchain components plus the offchain agent deployment (Railway/Gunicorn) with kill execution defaulting to dry-run. Done looks like scripts running end-to-end on Base Sepolia with agent check-ins visible in logs.",
+    "skill": "p26-defios-testnet-deploy-scripts",
+    "tags": [
+      "defi",
+      "defi-os",
+      "deploy",
+      "testnet"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p26-defios-findings-remediation"
+    ]
+  },
+  {
+    "task_key": "p26-defios-mainnet-readiness-checklist",
+    "project_id": "P26",
+    "project_name": "Self-Improving DeFi OS",
+    "phase": "deploy",
+    "title": "Produce P26 mainnet readiness checklist",
+    "description": "Produce the mainnet readiness checklist: audit sign-off, kill-authority policy, ranking-source verification, rollback plan, and a printed compliance checkpoint pre-flight. Done looks like a reviewed and signed checklist with go/no-go recorded.",
+    "skill": "p26-defios-mainnet-readiness-checklist",
+    "tags": [
+      "defi",
+      "defi-os",
+      "deploy",
+      "mainnet"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p26-defios-testnet-deploy-scripts"
+    ]
+  }
+]

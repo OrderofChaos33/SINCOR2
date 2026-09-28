@@ -1,0 +1,465 @@
+[
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [],
+  "description": "Deliverable: docs/architecture/P14_PREDICTION.md with a data-flow diagram.\nAcceptance criteria: (1) market data ingestion, forecasting engine, Kelly-capped sizing, and order lifecycle each map to a module; (2) the wallet-isolation boundary is drawn and the polyclaw_wallet_only rule is stated as fail-closed; (3) kelly_cap and polyclaw_wallet_only gate semantics are defined numerically.\nConstraints: live path is the Polyclaw wallet only, never the treasury; live_blocked=false.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "spec",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-prediction-architecture-spec",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "spec"
+  ],
+  "task_key": "p14-prediction-architecture-spec",
+  "title": "Prediction-market architecture spec with wallet-isolation boundary"
+ },
+ {
+  "bounty_axm": 0.75,
+  "depends_on": [
+   "p14-prediction-architecture-spec"
+  ],
+  "description": "Deliverable: IMarketDataFeed, IForecastEngine, IKellySizer, IPolyclawWalletAdapter with typed signatures in src/sincor2/agents/p14_prediction/api.py.\nAcceptance criteria: (1) every spec flow (ingest, forecast, size, execute, settle) maps to an interface function; (2) mypy passes on the module with zero errors; (3) no strategy type reaches the signing boundary.\nConstraints: wallet interface exposes no treasury-key path.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "spec",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-market-interfaces",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "interfaces"
+  ],
+  "task_key": "p14-market-interfaces",
+  "title": "Typed Python interfaces for feed, forecast, sizer, wallet"
+ },
+ {
+  "bounty_axm": 0.75,
+  "depends_on": [
+   "p14-prediction-architecture-spec"
+  ],
+  "description": "Deliverable: economics model document with the Kelly fraction table and fee-accrual formula.\nAcceptance criteria: (1) sizing model with the quarter-Kelly (0.25) fraction table validated against scripted trade histories; (2) 15 bps protocol fee on settled PnL traces to Treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac; (3) 16% expected APR derivation shown with assumptions.\nConstraints: max allocation 10% of bankroll per position; fee on settled PnL, not notional.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "spec",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-economic-fee-model",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "economics"
+  ],
+  "task_key": "p14-economic-fee-model",
+  "title": "Economics model: 15 bps fee on settled PnL, Kelly fraction table"
+ },
+ {
+  "bounty_axm": 0.75,
+  "depends_on": [
+   "p14-prediction-architecture-spec"
+  ],
+  "description": "Deliverable: src/sincor2/agents/p14_prediction/, config/agents/, tests/pytest/test_p14_*.py stubs, scripts/deploy_p14.py stub.\nAcceptance criteria: (1) directories exist and import paths resolve; (2) pytest collects stubs with zero errors; (3) py-clob-client pinned in requirements (it was missing from requirements.lock).\nConstraints: layout matches the api.py module map.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "scaffold",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-repo-layout",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "scaffold"
+  ],
+  "task_key": "p14-repo-layout",
+  "title": "Create P14 repo layout and test stubs"
+ },
+ {
+  "bounty_axm": 0.75,
+  "depends_on": [
+   "p14-repo-layout",
+   "p14-market-interfaces"
+  ],
+  "description": "Deliverable: working boilerplate classes with error handling and TOA hook stubs; config/agents/p14-prediction.yaml with dry_run=true and polyclaw_wallet_only=true.\nAcceptance criteria: (1) agent imports cleanly and boots in dry-run from the YAML; (2) CI picks up the new test files; (3) no stub can sign or broadcast.\nConstraints: dry_run=true is the default; live requires explicit config change.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "scaffold",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-boilerplate-code",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "scaffold"
+  ],
+  "task_key": "p14-boilerplate-code",
+  "title": "Agent boilerplate: feed/forecast/sizer/wallet stubs with dry-run default"
+ },
+ {
+  "bounty_axm": 5.5,
+  "depends_on": [
+   "p14-boilerplate-code"
+  ],
+  "description": "Deliverable: src/sincor2/agents/p14_prediction/forecast.py consuming market prices and event metadata.\nAcceptance criteria: (1) outputs calibrated win probabilities with confidence intervals; (2) engine beats the naive baseline Brier score on scripted historical markets; (3) calibration history persisted per market category.\nConstraints: any category with Brier > 0.25 triggers recalibration, not more capital.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "L",
+  "phase": "core",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-forecasting-engine",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "forecasting"
+  ],
+  "task_key": "p14-forecasting-engine",
+  "title": "Probability forecasting engine with Brier-score calibration tracking"
+ },
+ {
+  "bounty_axm": 5.0,
+  "depends_on": [
+   "p14-boilerplate-code"
+  ],
+  "description": "Deliverable: the ONLY live execution path - signs and submits orders exclusively through the Polyclaw wallet.\nAcceptance criteria: (1) fail-closed check on every call hard-blocks any treasury-key usage attempt; (2) red-team test attempting treasury-key usage: 100% of attempts blocked and logged; (3) dry-run orders execute end-to-end with wallet state isolated from strategy logic.\nConstraints: minimal code in the adapter; no strategy logic inside the signing boundary.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "L",
+  "phase": "core",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-polyclaw-wallet-adapter",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "wallet"
+  ],
+  "task_key": "p14-polyclaw-wallet-adapter",
+  "title": "Polyclaw-wallet-only execution adapter with treasury-key red-team test"
+ },
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [
+   "p14-forecasting-engine"
+  ],
+  "description": "Deliverable: Kelly sizer converting forecast edge into a capped stake.\nAcceptance criteria: (1) f_deployed = f* x 0.25 x confidence^2, hard-clamped to 10% of bankroll; (2) unit tests prove stakes never exceed the Kelly cap across randomized edges; (3) cap binding triggers a logged warning.\nConstraints: kelly_cap gate; full Kelly never deployed.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "core",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-kelly-position-sizer",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "kelly"
+  ],
+  "task_key": "p14-kelly-position-sizer",
+  "title": "Kelly-capped position sizer: quarter-Kelly times confidence squared"
+ },
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [
+   "p14-boilerplate-code"
+  ],
+  "description": "Deliverable: feed fetching order books, market metadata, and resolution sources with retries and rate-limit handling.\nAcceptance criteria: (1) pulls live-format data from stubbed endpoints and survives injected failures; (2) data older than 60s is marked unusable for sizing; (3) markets below $10k 24h volume or without a resolvable oracle are excluded.\nConstraints: resolution via UMA optimistic oracle (~2h dispute window) or Chainlink Data Streams for short-duration markets.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "core",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-market-data-integration",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "data"
+  ],
+  "task_key": "p14-market-data-integration",
+  "title": "Polymarket/OpenClaw market-data integration with staleness guard"
+ },
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [
+   "p14-kelly-position-sizer",
+   "p14-polyclaw-wallet-adapter"
+  ],
+  "description": "Deliverable: lifecycle manager opening positions via the wallet adapter and tracking them to resolution.\nAcceptance criteria: (1) scripted market lifecycle (open, resolve, redeem) completes in dry-run; (2) expected vs realized PnL reconciles to the cent; (3) near-resolution entry blocking and force-review work.\nConstraints: GTC maker orders preferred (0% fee markets); FOK for exits.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "core",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-order-lifecycle-manager",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "orders"
+  ],
+  "task_key": "p14-order-lifecycle-manager",
+  "title": "Order lifecycle manager: open, track, resolve, redeem, reconcile"
+ },
+ {
+  "bounty_axm": 0.75,
+  "depends_on": [
+   "p14-kelly-position-sizer"
+  ],
+  "description": "Deliverable: per-market loss limit, daily loss circuit breaker, 10% max_alloc_pct enforcement.\nAcceptance criteria: (1) breaching any limit halts new orders with a named alert; (2) daily breaker at 5% of bankroll resets only via the documented manual procedure, never automatically; (3) portfolio cap 60% deployed and category cap 40% enforced.\nConstraints: per-market loss limit 3% of bankroll; max 90 days to resolution.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "core",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-risk-limits",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "risk"
+  ],
+  "task_key": "p14-risk-limits",
+  "title": "Risk limits and daily circuit breaker with manual reset"
+ },
+ {
+  "bounty_axm": 0.75,
+  "depends_on": [
+   "p14-order-lifecycle-manager"
+  ],
+  "description": "Deliverable: fee routing to Treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac recorded in a fee ledger.\nAcceptance criteria: (1) fee math unit-checked against scripted settlements; (2) ledger reconciles to the treasury-bound total to the cent; (3) per-trade attribution present for every fee entry.\nConstraints: 15 bps on settled PnL only; losing trades accrue no fee.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "core",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-fee-routing",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "fees"
+  ],
+  "task_key": "p14-fee-routing",
+  "title": "Route 15 bps of settled PnL to Treasury with per-trade attribution"
+ },
+ {
+  "bounty_axm": 1.0,
+  "depends_on": [
+   "p14-forecasting-engine",
+   "p14-kelly-position-sizer",
+   "p14-fee-routing"
+  ],
+  "description": "Deliverable: tests/pytest/test_p14_units.py.\nAcceptance criteria: (1) all tests pass and the suite runs in CI; (2) forecast calibration math checked against known Brier values; (3) Kelly cap enforcement and fee ledger math covered.\nConstraints: suite runs under 5 minutes in CI.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "testing",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-unit-tests",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "testing"
+  ],
+  "task_key": "p14-unit-tests",
+  "title": "Unit tests for forecast calibration, Kelly cap, fee ledger"
+ },
+ {
+  "bounty_axm": 1.0,
+  "depends_on": [
+   "p14-market-data-integration",
+   "p14-order-lifecycle-manager",
+   "p14-polyclaw-wallet-adapter",
+   "p14-risk-limits"
+  ],
+  "description": "Deliverable: tests/pytest/test_p14_integration.py.\nAcceptance criteria: (1) end-to-end pass: ingest stubbed data, forecast, size, execute via the Polyclaw adapter in dry-run, resolve, redeem; (2) PnL assertions hold; (3) red-team case proves treasury keys are never touched.\nConstraints: all external calls stubbed; deterministic fixtures.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "testing",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-integration-tests",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "testing"
+  ],
+  "task_key": "p14-integration-tests",
+  "title": "Integration tests for the full trade lifecycle in dry-run"
+ },
+ {
+  "bounty_axm": 1.0,
+  "depends_on": [
+   "p14-unit-tests"
+  ],
+  "description": "Deliverable: property/fuzz tests over randomized forecasts and market sequences.\nAcceptance criteria: (1) stakes never exceed the Kelly cap under randomized forecasts; (2) losses never exceed the daily breaker; (3) the fee ledger always balances; zero property violations on a full run.\nConstraints: seed corpus checked in for reproducibility.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "testing",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-invariant-fuzz-tests",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "fuzzing"
+  ],
+  "task_key": "p14-invariant-fuzz-tests",
+  "title": "Property and fuzz tests: Kelly cap, breaker, ledger balance"
+ },
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [
+   "p14-integration-tests",
+   "p14-invariant-fuzz-tests"
+  ],
+  "description": "Deliverable: scripts/sim_p14_backtest.py replaying scripted historical market data.\nAcceptance criteria: (1) runs green end-to-end; (2) realized PnL, max drawdown, Brier score, and fee totals logged per market; (3) walk-forward split used - in-sample-only tuning rejected.\nConstraints: backtest must be green before any live discussion.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "testing",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-backtest-simulation",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "simulation"
+  ],
+  "task_key": "p14-backtest-simulation",
+  "title": "Historical backtest simulation with PnL, drawdown, Brier, fees"
+ },
+ {
+  "bounty_axm": 4.0,
+  "depends_on": [
+   "p14-backtest-simulation"
+  ],
+  "description": "Deliverable: audits/p14/ with frozen code hash, threat model, wallet-isolation proof, findings tracker.\nAcceptance criteria: (1) threat model covers oracle/resolution manipulation, wallet key compromise, Kelly overbet from miscalibration; (2) the Polyclaw-only live path formally documented and evidenced; (3) findings tracker initialized.\nConstraints: code hash frozen and recorded.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "L",
+  "phase": "audit",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-audit-prep-package",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "audit"
+  ],
+  "task_key": "p14-audit-prep-package",
+  "title": "Audit-prep package with wallet-isolation proof"
+ },
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [
+   "p14-audit-prep-package"
+  ],
+  "description": "Deliverable: fixes for all findings with regression tests per finding.\nAcceptance criteria: (1) findings tracker shows every item closed with a linked test; (2) full suite passes on the remediated tree; (3) threat model updated for each fixed class.\nConstraints: no fix weakens the wallet isolation boundary.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "audit",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-findings-remediation",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "audit"
+  ],
+  "task_key": "p14-findings-remediation",
+  "title": "Remediate audit findings with regression tests"
+ },
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [
+   "p14-findings-remediation"
+  ],
+  "description": "Deliverable: optimized hot paths plus a before/after benchmark report.\nAcceptance criteria: (1) measurable latency reduction on the decision loop; (2) identical outputs on the regression corpus; (3) forecast inference, feed polling, and sizing each benchmarked.\nConstraints: no behavioral change; sizing math bit-identical.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "audit",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-performance-optimization",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "performance"
+  ],
+  "task_key": "p14-performance-optimization",
+  "title": "Optimize decision-loop performance: inference, polling, sizing"
+ },
+ {
+  "bounty_axm": 1.0,
+  "depends_on": [
+   "p14-backtest-simulation"
+  ],
+  "description": "Deliverable: docs/p14/ with system overview, forecasting methodology, Kelly sizing reference, wallet-isolation design.\nAcceptance criteria: (1) docs build without warnings; (2) sizing formulas fully specified with worked examples; (3) a new builder can operate the agent from docs alone.\nConstraints: numeric parameters table matches the spec.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "docs",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-technical-docs",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "docs"
+  ],
+  "task_key": "p14-technical-docs",
+  "title": "Technical documentation: system, methodology, sizing, wallet isolation"
+ },
+ {
+  "bounty_axm": 1.0,
+  "depends_on": [
+   "p14-polyclaw-wallet-adapter"
+  ],
+  "description": "Deliverable: config/agents/p14-prediction.yaml and docs/ops/P14_RUNBOOK.md.\nAcceptance criteria: (1) agent boots from the YAML in dry-run; (2) YAML holds Kelly fraction 0.25, loss limits, market allowlist, TOA hooks; (3) runbook breaker procedure matches the implemented circuit breaker.\nConstraints: dry_run=true default; wallet credentials path never in repo.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "docs",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-agent-config-runbook",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "ops"
+  ],
+  "task_key": "p14-agent-config-runbook",
+  "title": "Agent YAML config and ops runbook with breaker procedure"
+ },
+ {
+  "bounty_axm": 1.0,
+  "depends_on": [
+   "p14-backtest-simulation"
+  ],
+  "description": "Deliverable: structured JSON logs for forecasts, positions, PnL, drawdown, breaker state, fee accrual.\nAcceptance criteria: (1) dry-run emits sample payloads validating against the feed schema; (2) feed reports real values or 'unknown', never fabricated 'healthy'; (3) Brier score per category exposed.\nConstraints: staleness > 60s marks values unknown.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "docs",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-dashboard-monitoring",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "monitoring"
+  ],
+  "task_key": "p14-dashboard-monitoring",
+  "title": "Dashboard and monitoring hooks in the SINCOR feed format"
+ },
+ {
+  "bounty_axm": 2.0,
+  "depends_on": [
+   "p14-findings-remediation",
+   "p14-agent-config-runbook"
+  ],
+  "description": "Deliverable: scripts/deploy_p14.py installing the agent service, wiring the wallet credentials path, configuring the dashboard feed.\nAcceptance criteria: (1) dry-run deploy succeeds in a container; (2) script is idempotent; (3) wallet credentials path never in the repo.\nConstraints: staging only; no live capital.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "M",
+  "phase": "deploy",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-testnet-deploy-scripts",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "deploy"
+  ],
+  "task_key": "p14-testnet-deploy-scripts",
+  "title": "Staging deploy scripts for the P14 agent"
+ },
+ {
+  "bounty_axm": 1.0,
+  "depends_on": [
+   "p14-testnet-deploy-scripts"
+  ],
+  "description": "Deliverable: docs/ops/P14_MAINNET_CHECKLIST.md.\nAcceptance criteria: (1) every item marked pass/blocked with an owner; (2) covers audit sign-off, backtest green, wallet-isolation re-verified, live capital limits, key-management plan, rollback procedure, TOA revenue gate; (3) no live capital without audit sign-off and founder approval.\nConstraints: live path remains Polyclaw wallet only.\nReference: per specs/p14-prediction-markets.md §Acceptance criteria.",
+  "effort": "S",
+  "phase": "deploy",
+  "project_id": "P14",
+  "project_name": "Prediction Market Automation",
+  "skill": "p14-mainnet-readiness-checklist",
+  "tags": [
+   "defi",
+   "prediction-markets",
+   "deploy"
+  ],
+  "task_key": "p14-mainnet-readiness-checklist",
+  "title": "Mainnet readiness checklist with owner per item"
+ }
+]

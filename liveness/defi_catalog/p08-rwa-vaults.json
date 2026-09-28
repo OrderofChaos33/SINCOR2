@@ -1,0 +1,542 @@
+[
+ {
+  "task_key": "p08-architecture-spec",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "spec",
+  "title": "RWA vault architecture spec with gate-to-component mapping",
+  "description": "Deliverable: docs/architecture/p08-rwa-vaults.md.\nAcceptance criteria: (1) every catalog gate (compliance_pack, kyc_flag) maps to an enforcing contract/module with the exact check named; (2) the dry-run-to-live promotion procedure is defined step by step including the 48h timelock and 2-of-3 multisig; (3) the yield-only-after-gate invariant is stated with the revert condition.\nConstraints: fee 15 bps on distributions, target APR 8%, max_alloc_pct 0.10, min capital $500, live_blocked=true.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-architecture-spec",
+  "tags": [
+   "defi",
+   "rwa",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p08-interface-definitions",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "spec",
+  "title": "Solidity interfaces for vault, gate, and KYC registry",
+  "description": "Deliverable: onchain/src/p08/interfaces/IRWAVault.sol, IComplianceGate.sol, IKYCRegistry.sol with NatSpec.\nAcceptance criteria: (1) compiles under solc 0.8.24 with zero errors and zero warnings; (2) deposit, gate-check, yield-accrual, and redemption signatures are fixed and versioned; (3) the gate is consulted on every yield-bearing path by interface contract.\nConstraints: ERC-4626-style share math; pull-pattern payouts.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-interface-definitions",
+  "tags": [
+   "defi",
+   "rwa",
+   "solidity"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p08-economic-model",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "spec",
+  "title": "RWA vault economic model: yield sources, 15 bps fee, risk budgets",
+  "description": "Deliverable: docs/economics/p08-rwa-economics.md.\nAcceptance criteria: (1) model reproduces the 8% target APR under documented assumptions (T-bill sleeve ~4.3%, private-credit sleeve 9-11%); (2) the 15 bps Treasury fee flow traces from distribution to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac; (3) risk budgets stated: min capital $500, max_alloc_pct 0.10.\nConstraints: fee applies to distributions only, not deposits or AUM.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-economic-model",
+  "tags": [
+   "defi",
+   "rwa",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p08-repo-layout",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "scaffold",
+  "title": "Scaffold P08 repo layout and wire interfaces",
+  "description": "Deliverable: onchain/src/p08/, src/sincor2/defi/p08_rwa/, tests/pytest/test_p08_*, configs/agents/p08-compliance-agent.yaml.\nAcceptance criteria: (1) full tree exists with imports resolving; (2) interfaces compile under solc 0.8.24 with zero errors; (3) test stubs are collected by pytest with zero collection errors.\nConstraints: module layout mirrors src/sincor2/defi/yield_aggregator.py conventions.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-repo-layout",
+  "tags": [
+   "defi",
+   "rwa",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model"
+  ]
+ },
+ {
+  "task_key": "p08-boilerplate",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "scaffold",
+  "title": "RWAVault skeleton and compliance-agent starter code",
+  "description": "Deliverable: RWAVault.sol skeleton (ReentrancyGuard, SafeERC20, non-bricking try/catch) plus the Python compliance-agent skeleton with TOA hooks.\nAcceptance criteria: (1) compiles under solc 0.8.24; (2) agent boots and answers a health ping; (3) stub test green in CI.\nConstraints: EXECUTE_LIVE env pattern reused from yield_aggregator.py; no live paths in the skeleton.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-boilerplate",
+  "tags": [
+   "defi",
+   "rwa",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model"
+  ]
+ },
+ {
+  "task_key": "p08-compliance-gate",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "core",
+  "title": "ComplianceGate contract: 4-check gate, yield-only-after-gate",
+  "description": "Deliverable: onchain/src/p08/ComplianceGate.sol enforcing compliance_pack.\nAcceptance criteria: (1) all yield functions revert unless all 4 checks pass (KYC flags true, attestation <= 24h old, NAV deviation < 2%, sanctions blocklist clear); (2) capital stays dry-run until the documented gate payload plus 48h timelock promotion; (3) no call path can accrue yield pre-gate, proven by test.\nConstraints: gate evaluation atomic in one call; promotion idempotent.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-compliance-gate",
+  "tags": [
+   "defi",
+   "rwa",
+   "compliance"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model",
+   "p08-repo-layout",
+   "p08-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p08-vault-core",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "core",
+  "title": "RWAVault core: ERC-4626 shares, deposits, redemption",
+  "description": "Deliverable: onchain/src/p08/RWAVault.sol with deposit, share accounting, redemption.\nAcceptance criteria: (1) share math matches the Python reference within 1 wei; (2) redemptions always permitted even when yield is gated; (3) 1,000 dead shares minted to address(0) at deployment neutralizing first-deposit inflation.\nConstraints: pull-pattern payouts; principal never pausable.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-vault-core",
+  "tags": [
+   "defi",
+   "rwa",
+   "vault"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model",
+   "p08-repo-layout",
+   "p08-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p08-dry-run-capital",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "core",
+  "title": "Dry-run capital manager with atomic promotion ledger",
+  "description": "Deliverable: src/sincor2/defi/p08_rwa/capital.py mirroring deposits in a simulated book with zero on-chain yield exposure.\nAcceptance criteria: (1) dry-run ledger reconciles to vault state to the wei before and after promotion; (2) promotion is atomic and idempotent (re-call is a no-op); (3) pre-promotion simulated yield never touches a live path.\nConstraints: shadow NAV pricing runs against the dry-run book only.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-dry-run-capital",
+  "tags": [
+   "defi",
+   "rwa",
+   "capital"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model",
+   "p08-repo-layout",
+   "p08-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p08-kyc-registry",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "core",
+  "title": "KYC flag registry with attestation and revocation",
+  "description": "Deliverable: onchain/src/p08/KYCRegistry.sol consulted by the gate on every yield path.\nAcceptance criteria: (1) revoked flags block yield immediately while principal stays redeemable; (2) admin attestation flow is 48h-timelocked; (3) registry events are queryable for audit.\nConstraints: revocation freezes yield, never principal.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-kyc-registry",
+  "tags": [
+   "defi",
+   "rwa",
+   "kyc"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model",
+   "p08-repo-layout",
+   "p08-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p08-compliance-agent",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "core",
+  "title": "Python compliance agent: pack assembly, gate submission, monitoring",
+  "description": "Deliverable: src/sincor2/defi/p08_rwa/agent.py.\nAcceptance criteria: (1) agent assembles compliance packs (KYC attestations, custodian PoR, NAV report, geo list, SINAX bytecode proof) and submits gate requests; (2) gate-pass and gate-fail fixtures complete with full error handling; (3) TOA telemetry emitted per cycle.\nConstraints: agent never signs promotions; it proposes, the multisig disposes.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-compliance-agent",
+  "tags": [
+   "defi",
+   "rwa",
+   "agent"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model",
+   "p08-repo-layout",
+   "p08-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p08-yield-accrual",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "core",
+  "title": "Post-gate yield accrual with pull-pattern distribution",
+  "description": "Deliverable: yield accrual in RWAVault.sol activating only after gate pass, with pull-style claims.\nAcceptance criteria: (1) pre-gate accrual is exactly zero under all paths; (2) post-gate accrual matches the reference model within 1 wei; (3) a reverting recipient blocks only their own claim, never the payout run.\nConstraints: 15 bps of each distribution swept to Treasury in the same call.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-yield-accrual",
+  "tags": [
+   "defi",
+   "rwa",
+   "yield"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model",
+   "p08-repo-layout",
+   "p08-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p08-edge-cases",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "core",
+  "title": "RWA vault edge cases: revocation, write-downs, queues, stale oracles",
+  "description": "Deliverable: edge-case handling plus docs/ops/p08-edge-cases.md incident write-ups.\nAcceptance criteria: (1) gate revocation mid-accrual freezes yield, keeps principal redeemable; (2) asset write-down > 5% in one NAV update pauses accrual pending multisig resume; (3) redemption queue under compliance review settles T+2; oracle data > 36h old reverts.\nConstraints: each case has a dedicated test and a written incident playbook.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-edge-cases",
+  "tags": [
+   "defi",
+   "rwa",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p08-architecture-spec",
+   "p08-interface-definitions",
+   "p08-economic-model",
+   "p08-repo-layout",
+   "p08-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p08-unit-tests",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "testing",
+  "title": "Unit tests: gate pass/fail, promotion, revocation, share math",
+  "description": "Deliverable: tests/pytest/test_p08_unit.py.\nAcceptance criteria: (1) 100% pass; (2) pre-gate yield paths asserted to revert on every entry point; (3) share math checked against the Python reference within 1 wei.\nConstraints: tests run in CI under 5 minutes.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-unit-tests",
+  "tags": [
+   "defi",
+   "rwa",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p08-compliance-gate",
+   "p08-vault-core",
+   "p08-dry-run-capital",
+   "p08-kyc-registry",
+   "p08-compliance-agent",
+   "p08-yield-accrual",
+   "p08-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p08-integration-tests",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "testing",
+  "title": "Integration tests: agent-to-vault RWA lifecycle",
+  "description": "Deliverable: tests/pytest/test_p08_integration.py.\nAcceptance criteria: (1) full lifecycle green: deposit, dry-run, pack, gate pass, promote, accrue, redeem; (2) gate-fail path keeps capital dry-run with zero yield; (3) 15 bps fee asserted to Treasury on distributions.\nConstraints: fixtures use deterministic NAV sequences.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-integration-tests",
+  "tags": [
+   "defi",
+   "rwa",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p08-compliance-gate",
+   "p08-vault-core",
+   "p08-dry-run-capital",
+   "p08-kyc-registry",
+   "p08-compliance-agent",
+   "p08-yield-accrual",
+   "p08-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p08-fuzz-invariant",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "testing",
+  "title": "Fuzz and invariant tests for vault safety",
+  "description": "Deliverable: fuzz harness over deposits, redemptions, gate transitions.\nAcceptance criteria: (1) 10k+ fuzz runs green; (2) invariants hold: no yield pre-gate, share price monotonic post-gate, payouts never bricked; (3) every counterexample fixed and recorded in the report.\nConstraints: seed corpus checked in for reproducibility.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-fuzz-invariant",
+  "tags": [
+   "defi",
+   "rwa",
+   "fuzz"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p08-compliance-gate",
+   "p08-vault-core",
+   "p08-dry-run-capital",
+   "p08-kyc-registry",
+   "p08-compliance-agent",
+   "p08-yield-accrual",
+   "p08-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p08-fork-simulation",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "testing",
+  "title": "Base fork simulation of the RWA vault",
+  "description": "Deliverable: fork simulation run plus tests/reports/p08-fork-sim.md.\nAcceptance criteria: (1) simulation runs against a pinned Base fork block with compliance fixtures; (2) report records accrual, Treasury fees, and reproducible block pins; (3) gate-closed pre-promotion state verified on the fork.\nConstraints: block pin documented; re-runnable by a reviewer.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-fork-simulation",
+  "tags": [
+   "defi",
+   "rwa",
+   "simulation"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p08-compliance-gate",
+   "p08-vault-core",
+   "p08-dry-run-capital",
+   "p08-kyc-registry",
+   "p08-compliance-agent",
+   "p08-yield-accrual",
+   "p08-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p08-audit-prep",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "audit",
+  "title": "Audit-prep package for RWA vaults",
+  "description": "Deliverable: docs/audits/p08/ with frozen code, NatSpec, threat model, gate map.\nAcceptance criteria: (1) complete contract inventory with trust assumptions on custodian and oracle; (2) threat model covers gate bypass, KYC oracle compromise, share-price manipulation; (3) every gate check maps to its enforcing line of code.\nConstraints: code hash frozen and recorded in the package.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-audit-prep",
+  "tags": [
+   "defi",
+   "rwa",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p08-unit-tests",
+   "p08-integration-tests",
+   "p08-fuzz-invariant",
+   "p08-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p08-findings-remediation",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "audit",
+  "title": "Remediate RWA vault audit findings",
+  "description": "Deliverable: fixes for all audit findings with linked regression tests.\nAcceptance criteria: (1) zero open high/medium findings; (2) each fix links to its finding ID; (3) regression test per fix passes on the remediated tree.\nConstraints: no fix weakens a gate check; re-audit delta noted.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-findings-remediation",
+  "tags": [
+   "defi",
+   "rwa",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p08-unit-tests",
+   "p08-integration-tests",
+   "p08-fuzz-invariant",
+   "p08-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p08-gas-optimization",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "audit",
+  "title": "Gas optimization for RWA vault contracts",
+  "description": "Deliverable: optimized deposit/accrual/redemption paths plus docs/audits/p08/gas.md.\nAcceptance criteria: (1) before/after gas report published; (2) zero behavioral change across the full test suite; (3) gate checks not weakened or reordered by optimization.\nConstraints: no optimization may remove a require on a yield path.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-gas-optimization",
+  "tags": [
+   "defi",
+   "rwa",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p08-unit-tests",
+   "p08-integration-tests",
+   "p08-fuzz-invariant",
+   "p08-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p08-technical-docs",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "docs",
+  "title": "Technical docs for RWA vaults",
+  "description": "Deliverable: docs/p08-rwa-vaults.md.\nAcceptance criteria: (1) a new builder can integrate from the docs alone (contract reference, gate semantics, promotion procedure, compliance model); (2) all references resolve; (3) numeric parameters table matches the spec.\nConstraints: docs versioned alongside the frozen code hash.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-technical-docs",
+  "tags": [
+   "defi",
+   "rwa",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p08-compliance-gate",
+   "p08-vault-core",
+   "p08-dry-run-capital",
+   "p08-kyc-registry",
+   "p08-compliance-agent",
+   "p08-yield-accrual",
+   "p08-edge-cases",
+   "p08-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p08-runbook-yaml",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "docs",
+  "title": "Agent YAML config and ops runbook",
+  "description": "Deliverable: configs/agents/p08-compliance-agent.yaml and docs/ops/p08-runbook.md.\nAcceptance criteria: (1) agent boots from the YAML in dry-run; (2) runbook covers gate submission, revocation response, and promotion; (3) revocation and write-down incidents have step-by-step playbooks.\nConstraints: YAML defaults keep capital dry-run.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-runbook-yaml",
+  "tags": [
+   "defi",
+   "rwa",
+   "runbook"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p08-compliance-gate",
+   "p08-vault-core",
+   "p08-dry-run-capital",
+   "p08-kyc-registry",
+   "p08-compliance-agent",
+   "p08-yield-accrual",
+   "p08-edge-cases",
+   "p08-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p08-dashboard-hooks",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "docs",
+  "title": "Dashboard and monitoring hooks for gate, KYC, capital, fees",
+  "description": "Deliverable: status-feed hooks exposing gate status, KYC flags, dry-run vs live capital, accrual, Treasury fees.\nAcceptance criteria: (1) feed reports real values or 'unknown', never fabricated 'healthy'; (2) dry-run/live capital mismatch raises a P0 alert; (3) payloads validate against STATUS_FEED_SCHEMA.\nConstraints: staleness > 60s marks values unknown.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-dashboard-hooks",
+  "tags": [
+   "defi",
+   "rwa",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p08-compliance-gate",
+   "p08-vault-core",
+   "p08-dry-run-capital",
+   "p08-kyc-registry",
+   "p08-compliance-agent",
+   "p08-yield-accrual",
+   "p08-edge-cases",
+   "p08-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p08-testnet-deploy",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "deploy",
+  "title": "Testnet deploy scripts for RWA vaults",
+  "description": "Deliverable: scripts/deploy/p08/ targeting Base Sepolia.\nAcceptance criteria: (1) scripts are idempotent; (2) deployed with capital in dry-run and gate closed; addresses, gate state, and dry-run ledger recorded; (3) yield path reverts pre-gate on the deployed contracts.\nConstraints: no mainnet addresses in scripts; Sepolia only.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-testnet-deploy",
+  "tags": [
+   "defi",
+   "rwa",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p08-audit-prep",
+   "p08-findings-remediation",
+   "p08-gas-optimization"
+  ]
+ },
+ {
+  "task_key": "p08-mainnet-checklist",
+  "project_id": "P08",
+  "project_name": "RWA Tokenization Vaults",
+  "phase": "deploy",
+  "title": "Mainnet readiness checklist for RWA vaults",
+  "description": "Deliverable: docs/ops/p08-mainnet-checklist.md.\nAcceptance criteria: (1) checklist signed off by the auditor task; (2) covers audit sign-off, compliance pack requirements, key custody, legal review; (3) no mainnet promotion without a gate pass.\nConstraints: live_blocked=true until every item passes with evidence links.\nReference: per specs/p08-rwa-vaults.md §Acceptance criteria.",
+  "skill": "p08-mainnet-checklist",
+  "tags": [
+   "defi",
+   "rwa",
+   "deploy"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p08-audit-prep",
+   "p08-findings-remediation",
+   "p08-gas-optimization"
+  ]
+ }
+]

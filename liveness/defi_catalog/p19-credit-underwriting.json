@@ -1,0 +1,485 @@
+[
+ {
+  "task_key": "p19-credit-underwriting-architecture-spec",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "spec",
+  "title": "Specify credit pipeline: score to LTV to vault to health monitor",
+  "description": "Write docs/architecture/P19_CREDIT_ARCHITECTURE.md: on-chain credit scoring pipeline, score-to-max-LTV mapping, ERC-6551 token-bound vault per borrower, ML health monitoring with the yield-hedging circuit breaker, and the hard no-unsecured-book rule. (1) The catalog gates score_floor (350) and concentration_cap (10% per borrower, 40% per band) map to named enforcement points. (2) The doc states the exact check that blocks an unsecured loan (draw reverts when collateral is zero or amount exceeds collateral × maxLTV). (3) Attestation, vault, and circuit-breaker data flows are specified. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-architecture-spec",
+  "tags": [
+   "defi",
+   "credit",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p19-credit-underwriting-scoring-model-spec",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "spec",
+  "title": "Specify the 300–850 scoring model and score-to-LTV table",
+  "description": "Specify the scoring model: wallet-behavior input features (age, repayment vs liquidation history, utilization, tx count, protocol diversity, rug/mixer penalties), score bands, the score-to-max-LTV table (75/65/55/45/35% for bands 750+/650+/550+/450+/350+, ineligible below 350), 72h staleness policy, and score_floor 350. (1) The mapping table is fully specified. (2) Any score maps to exactly one max LTV. (3) Monotonicity (higher score never yields lower LTV) is a stated requirement. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-scoring-model-spec",
+  "tags": [
+   "defi",
+   "credit",
+   "spec",
+   "scoring"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-fee-model",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "spec",
+  "title": "Specify 20 bps origination plus 20 bps accrual fee model",
+  "description": "Specify the 20 bps fee on originated credit lines and 20 bps on interest accruals, routed to the SINCOR treasury at 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac, with worked examples for a scored line drawdown. (1) A reviewer can compute the treasury take for any originated line from the spec alone. (2) The worked example shows both fee legs (e.g. $10k line at 8% APR for 1y → $20 + $16 = $36). (3) Fee events carry per-line accounting. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-fee-model",
+  "tags": [
+   "defi",
+   "credit",
+   "spec",
+   "fees"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-repo-layout",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "scaffold",
+  "title": "Create P19 contract, agent, and test skeleton tree",
+  "description": "Create onchain/src/p19-credit/{interfaces,scoring,vaults,CreditUnderwriter.sol}, src/sincor2/defi/p19_credit/, tests/pytest/test_p19_credit.py, and agents/p19-credit-underwriting.yaml as an empty-but-valid skeleton with a README module map. (1) The tree exists with all listed paths. (2) The YAML parses against the repo agent schema. (3) No test collector errors from the new paths. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-repo-layout",
+  "tags": [
+   "defi",
+   "credit",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-starter-code",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "scaffold",
+  "title": "Write CreditUnderwriter and scoring-agent starter skeletons",
+  "description": "Write the CreditUnderwriter skeleton with ReentrancyGuard and SafeERC20, non-bricking try/catch on score-oracle reads, plus a Python scoring agent skeleton with error handling and a TOA hook stub. (1) Compiles under solc 0.8.24. (2) The agent imports and answers a health ping. (3) No unguarded external calls exist in the stubs. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-starter-code",
+  "tags": [
+   "defi",
+   "credit",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-score-registry",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "core",
+  "title": "Implement ScoreRegistry with EIP-712 attestations and 72h staleness",
+  "description": "Implement the score registry: 2-of-3 multisig allowlisted attestors sign EIP-712 ScoreAttestations {borrower, score, issuedAt, nonce} with replay protection; borrows revert on missing, stale (>72h), or below-floor (<350) scores. (1) Compiles under solc 0.8.24. (2) A borrow with a stale or below-floor score reverts. (3) Forged or replayed attestations fail verification in tests. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-score-registry",
+  "tags": [
+   "defi",
+   "credit",
+   "core",
+   "scoring"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p19-credit-underwriting-starter-code"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-score-to-ltv-mapping",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "core",
+  "title": "Implement the timelocked monotonic score-to-LTV table",
+  "description": "Implement the on-chain score-to-max-LTV table from the spec (75/65/55/45/35% across the five eligible bands), updatable only via 48h timelock, with monotonicity enforced on every update. (1) Table lookups match the spec mapping exactly. (2) A non-monotonic update reverts. (3) Table updates emit events with old and new values. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-score-to-ltv-mapping",
+  "tags": [
+   "defi",
+   "credit",
+   "core",
+   "ltv"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p19-credit-underwriting-starter-code",
+   "p19-credit-underwriting-score-registry"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-erc6551-vault",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "core",
+  "title": "Implement ERC-6551 token-bound borrower vaults",
+  "description": "Implement per-borrower ERC-6551 token-bound vaults: the factory calls the registry createAccount (ERC-1167 minimal-proxy pattern) bound to a non-transferable borrower credit NFT; collateral locks inside the borrower's own TBA; the underwriting agent executes allowlisted yield strategies inside the vault without custody. (1) Collateral is locked in the borrower's token-bound vault. (2) Only vault logic can move collateral. (3) Strategy execution never transfers custody to the agent. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-erc6551-vault",
+  "tags": [
+   "defi",
+   "credit",
+   "core",
+   "vault",
+   "erc6551"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p19-credit-underwriting-starter-code",
+   "p19-credit-underwriting-score-to-ltv-mapping"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-line-issuance",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "core",
+  "title": "Implement line issuance with a hard score-derived LTV cap",
+  "description": "Implement line origination: draw(amount) requires amount ≤ collateralValue × maxLTV(live score), with collateral priced via Chainlink (staleness >2h reverts draws). (1) An unsecured (zero-collateral) borrow attempt reverts. (2) An over-cap draw reverts. (3) Line accounting matches emitted events to the wei. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-line-issuance",
+  "tags": [
+   "defi",
+   "credit",
+   "core",
+   "lending"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p19-credit-underwriting-starter-code",
+   "p19-credit-underwriting-erc6551-vault"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-health-monitor",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "core",
+  "title": "Implement the health monitor with the 25% yield-hedging circuit breaker",
+  "description": "Implement the health monitor: HF = collateral×maxLTV / debt; when HF < 1.15 the agent routes up to 25% of vault collateral into the allowlisted delta-hedge; when HF < 1.05 permissionless liquidation via Dutch auction (5% starting discount, 6h decay). (1) A simulated health drop triggers the hedging route. (2) Position health improves without liquidation in tests. (3) The liquidation path executes permissionlessly at HF < 1.05. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-health-monitor",
+  "tags": [
+   "defi",
+   "credit",
+   "core",
+   "health",
+   "circuit-breaker"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p19-credit-underwriting-starter-code",
+   "p19-credit-underwriting-line-issuance"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-concentration-cap",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "core",
+  "title": "Enforce 10% per-borrower and 40% per-band concentration caps",
+  "description": "Enforce concentration_cap on-chain: no single borrower may exceed 10% of total originated credit and no single score band may exceed 40%. (1) An origination that would breach either cap reverts. (2) Caps are tested at the exact boundary. (3) Cap values are timelock-governed. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-concentration-cap",
+  "tags": [
+   "defi",
+   "credit",
+   "core",
+   "concentration-cap"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-starter-code",
+   "p19-credit-underwriting-health-monitor"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-access-control-edge-cases",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "core",
+  "title": "Implement P19 roles, attester rotation, and reentrancy guards",
+  "description": "Roles: score attester allowlist (2-of-3 multisig), risk parameter admin (48h timelock), pauser; handle attester key rotation, score disputes, and reentrancy attempts on drawdown. (1) Unauthorized attestation reverts. (2) A reentrancy attempt on drawdown reverts. (3) Attestor revocation freezes new originations within one block in tests. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-access-control-edge-cases",
+  "tags": [
+   "defi",
+   "credit",
+   "core",
+   "access-control",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-starter-code",
+   "p19-credit-underwriting-concentration-cap"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-unit-tests",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "testing",
+  "title": "Write P19 unit tests for the LTV table, staleness, and cap math",
+  "description": "Write tests/pytest/test_p19_credit.py covering the score-to-LTV table, score staleness reverts, and line cap math. (1) The unsecured-borrow attempt test reverts as required. (2) Every score band maps to its exact max LTV. (3) All unit tests are green. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-unit-tests",
+  "tags": [
+   "defi",
+   "credit",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-access-control-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-integration-tests",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "testing",
+  "title": "Write P19 full-lifecycle integration test",
+  "description": "End-to-end in CI: agent attests a score, borrower locks collateral in the ERC-6551 vault, draws a line at the score-derived LTV, the health monitor hedges on a drop, treasury receives its cut. (1) The full lifecycle runs without manual steps. (2) LTV-cap assertions hold at each draw. (3) The treasury receives exactly 20 bps on origination and 20 bps on accruals. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-integration-tests",
+  "tags": [
+   "defi",
+   "credit",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p19-credit-underwriting-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-invariant-fuzz-tests",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "testing",
+  "title": "Fuzz P19 debt-cap invariants across 10k runs",
+  "description": "Fuzz invariants: outstanding debt never exceeds collateral × maxLTV for the borrower's live score; no line exists with zero collateral. (1) 10,000 fuzz runs with zero debt-cap violations. (2) Zero zero-collateral lines across all runs. (3) Stale-score draws are hit by the fuzzer and revert every time. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-invariant-fuzz-tests",
+  "tags": [
+   "defi",
+   "credit",
+   "testing",
+   "fuzz"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-fork-simulation",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "testing",
+  "title": "Simulate scored borrowing on a fork across 20+ shock paths",
+  "description": "Simulate scored borrowing on a mainnet fork with real wallet histories feeding the scoring agent across market shocks. (1) No originated line breaches its LTV cap on 20+ shock paths. (2) The circuit breaker fires before any liquidation in every path. (3) Score staleness (72h) is exercised on-fork. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-fork-simulation",
+  "tags": [
+   "defi",
+   "credit",
+   "testing",
+   "fork"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-audit-prep",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "audit",
+  "title": "Assemble P19 audit-prep package",
+  "description": "Audit package: flattened sources, full natspec, threat model (attester compromise, score oracle manipulation, ERC-6551 callback attacks), and a fairness/bias review note on the scoring model. (1) Passes the repo audit-readiness checklist with zero missing artifacts. (2) The threat model covers the three named attack classes. (3) The bias review note is filed with the package. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-audit-prep",
+  "tags": [
+   "defi",
+   "credit",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p19-credit-underwriting-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-findings-remediation",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "audit",
+  "title": "Remediate all P19 audit findings with regression tests",
+  "description": "Fix every audit finding with a regression test proving each fix. (1) Findings log 100% closed. (2) Each fix links to its regression test. (3) No new warnings introduced. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-findings-remediation",
+  "tags": [
+   "defi",
+   "credit",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p19-credit-underwriting-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-gas-optimization",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "audit",
+  "title": "Optimize P19 gas with drawdown under 300k",
+  "description": "Gas report for attest/originate/drawdown paths; pack score storage; batch attestations. (1) Documented gas report committed. (2) drawdown() completes under 300k gas on the reference fork. (3) All tests still pass after optimization. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-gas-optimization",
+  "tags": [
+   "defi",
+   "credit",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p19-credit-underwriting-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-technical-docs",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "docs",
+  "title": "Write P19 risk-reviewer documentation",
+  "description": "Technical docs: scoring model features and bands, score-to-LTV table, ERC-6551 vault mechanics, circuit-breaker behavior, and the no-unsecured-book guarantee. (1) A risk reviewer can validate every enforcement point from the docs. (2) The no-unsecured-book guarantee is proven in text with the exact revert conditions. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-technical-docs",
+  "tags": [
+   "defi",
+   "credit",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-agent-config-runbook",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "docs",
+  "title": "Ship P19 agent YAML config and ops runbook",
+  "description": "Deliver agents/p19-credit-underwriting.yaml (budgets, memory, heartbeat, TOA hook) and docs/ops/P19_CREDIT_RUNBOOK.md covering attester outage and mass health-drop procedures. (1) YAML validates against the repo agent schema. (2) The runbook covers the top 5 failure modes with executable steps, including attester key rotation. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-agent-config-runbook",
+  "tags": [
+   "defi",
+   "credit",
+   "docs",
+   "ops"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-monitoring-hooks",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "docs",
+  "title": "Build P19 dashboard and monitoring hooks",
+  "description": "Monitoring hooks: originated credit by score band, aggregate utilization vs concentration caps, health-factor distribution, treasury fee inflow to the SINCOR dashboard. (1) Hooks emit structured metrics per STATUS_FEED_SCHEMA. (2) Hooks report unknown rather than healthy on stale data. (3) An alert fires when >5% of the book sits below HF 1.15. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-monitoring-hooks",
+  "tags": [
+   "defi",
+   "credit",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-testnet-deploy",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "deploy",
+  "title": "Deploy P19 to Base Sepolia with seeded bands and a test attester",
+  "description": "Write scripts/defi/p19/deploy_testnet.py deploying the registry, underwriter, and vault factory to Base Sepolia with seeded score bands and a test attester. (1) Contracts are deployed and verified. (2) A scored borrow executes end-to-end on Sepolia. (3) The 20 bps origination fee is observable on-chain. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-testnet-deploy",
+  "tags": [
+   "defi",
+   "credit",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p19-credit-underwriting-audit-prep",
+   "p19-credit-underwriting-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p19-credit-underwriting-mainnet-readiness",
+  "project_id": "P19",
+  "project_name": "Decentralized Credit Underwriting",
+  "phase": "deploy",
+  "title": "Produce P19 mainnet readiness checklist",
+  "description": "Mainnet readiness checklist: audit sign-off, attester allowlist finalized (2-of-3), score_floor 350 and concentration caps ratified, timelock active, dry-run default confirmed, treasury address 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac verified. (1) Every item is signed off with evidence links. (2) No mainnet credit line opens before sign-off. Ref: per specs/p19-credit-underwriting.md §Acceptance criteria.",
+  "skill": "p19-credit-underwriting-mainnet-readiness",
+  "tags": [
+   "defi",
+   "credit",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p19-credit-underwriting-testnet-deploy"
+  ]
+ }
+]
