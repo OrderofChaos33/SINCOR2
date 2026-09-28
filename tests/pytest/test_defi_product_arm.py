@@ -145,7 +145,10 @@ def test_no_stage_skipping(isolated, ledger):
 
 
 def test_build_to_test_refuses_without_implementation(isolated, ledger):
-    p = _at_stage("SINCOR-DEFI-P02-CLMM", "build")
+    # NOTE: uses P04_MEV as the no-implementation example. P01/P02/P03 now
+    # ship reference implementations (build phase landed), so they no longer
+    # exercise the "missing implementation" refusal path.
+    p = _at_stage("SINCOR-DEFI-P04-MEV", "build")
     res = evaluate(p, "test", ledger, products.REPO_ROOT)
     assert not res.ok
     failed = {r.check for r in res.reasons if not r.ok}
