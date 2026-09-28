@@ -107,3 +107,32 @@ def test_delete_refuses_task_with_bids(client):
 def test_delete_unknown_task_404(client):
     hdr = {"X-Admin-Key": "test-admin-key"}
     assert client.delete("/v1/a2a/tasks/tsk_nope", headers=hdr).status_code == 404
+
+
+def test_allocation_count_excludes_released(client):
+    """allocation_count must track live allocations only.
+
+    Regression: a retried allocate POST (the 2026-09-27 wave-1 incident)
+    double-allocates the same task; after releasing the duplicate, the
+    count, allocated_axm, and available_axm must all agree on the live set.
+    """
+    hdr = {"X-Admin-Key": "test-admin-key"}
+    assert client.post("/v1/a2a/pool/fund", json={}, headers=hdr).status_code == 200
+    task = _mk()
+    a1 = client.post("/v1/a2a/pool/allocate",
+                     json={"task_id": task["task_id"], "amount_axm": 5},
+                     headers=hdr).get_json()
+    a2 = client.post("/v1/a2a/pool/allocate",
+                     json={"task_id": task["task_id"], "amount_axm": 5},
+                     headers=hdr).get_json()
+    assert a1["allocation_id"] != a2["allocation_id"]
+    pool = client.get("/v1/a2a/pool").get_json()
+    assert pool["allocation_count"] == 2
+    rr = client.post("/v1/a2a/pool/release",
+                     json={"allocation_id": a2["allocation_id"]},
+                     headers=hdr)
+    assert rr.status_code == 200
+    pool = client.get("/v1/a2a/pool").get_json()
+    assert pool["allocation_count"] == 1
+    assert pool["allocated_axm"] == 5
+    assert pool["available_axm"] == 95
