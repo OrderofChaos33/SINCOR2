@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "./IExecutionEscrowManager.sol";
+import "./security/ScopedPausable.sol";
 
 /**
  * @title ExecutionEscrowManager
@@ -21,7 +22,7 @@ import "./IExecutionEscrowManager.sol";
  *        dispute -- it can only fire after the resolution deadline passes,
  *        and then it defaults to the optimistic (worker-favor) outcome.
  */
-contract ExecutionEscrowManager is IExecutionEscrowManager {
+contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     /// @notice The sealed-bid core; the only caller allowed to initialize escrows.
     address public immutable auctionCore;
     /// @notice Optimistic batch adjudicator; resolves quality disputes.
@@ -57,8 +58,9 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
         address _auctionCore,
         address _adjudicator,
         uint256 _minStakeBps,
-        uint256 _challengerBond
-    ) {
+        uint256 _challengerBond,
+        address _guardian
+    ) ScopedPausable(_guardian) {
         if (_auctionCore == address(0) || _adjudicator == address(0)) revert Unauthorized();
         if (_minStakeBps == 0 || _minStakeBps > 10_000) revert InvalidStakeBps();
         auctionCore = _auctionCore;
@@ -120,7 +122,9 @@ contract ExecutionEscrowManager is IExecutionEscrowManager {
     }
 
     /// @inheritdoc IExecutionEscrowManager
-    function depositStake(bytes32 auctionId) external payable override {
+    /// @dev Pausable: stake deposits inject new capital. In-flight escrows
+    ///      (submitResult, disputes, timeout, withdraw) are never paused.
+    function depositStake(bytes32 auctionId) external payable override whenNotPaused {
         Escrow storage esc = escrows[auctionId];
         if (esc.state != ExecutionState.AwaitingStake) revert InvalidState();
         if (msg.sender != esc.selectedAgent) revert Unauthorized();

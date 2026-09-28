@@ -45,7 +45,9 @@ TX = {"maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0}
 def _compile():
     solcx.set_solc_version(SOLC_VERSION)
     srcs = {}
-    for name in ("CommitRevealAuction.sol", "ExecutionEscrowManager.sol", "IExecutionEscrowManager.sol"):
+    for name in ("CommitRevealAuction.sol", "ExecutionEscrowManager.sol",
+                   "IExecutionEscrowManager.sol",
+                   os.path.join("security", "ScopedPausable.sol")):
         with open(os.path.join(CONTRACTS_DIR, name)) as f:
             srcs[name] = {"content": f.read()}
     std = {
@@ -84,16 +86,18 @@ class Env:
         self.deployer, self.poster, self.adjudicator = accts[0], accts[1], accts[2]
         self.bidders = accts[3:8]
         self.anyone = accts[8]
+        self.guardian = accts[9]
 
         abi_a, bin_a = COMPILED["auction"]
-        txh = self.w3.eth.contract(abi=abi_a, bytecode=bin_a).constructor().transact(
-            {"from": self.deployer, **TX})
+        txh = self.w3.eth.contract(abi=abi_a, bytecode=bin_a).constructor(
+            self.guardian).transact({"from": self.deployer, **TX})
         self.auction = self.w3.eth.contract(
             address=self.w3.eth.get_transaction_receipt(txh).contractAddress, abi=abi_a)
 
         abi_e, bin_e = COMPILED["escrow"]
         txh = self.w3.eth.contract(abi=abi_e, bytecode=bin_e).constructor(
-            self.auction.address, self.adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND
+            self.auction.address, self.adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND,
+            self.guardian
         ).transact({"from": self.deployer, **TX})
         self.escrow = self.w3.eth.contract(
             address=self.w3.eth.get_transaction_receipt(txh).contractAddress, abi=abi_e)
@@ -386,7 +390,7 @@ def test_unrevealed_auction_timeout_is_clean(env):
 def test_no_escrow_manager_reverts_but_timeout_still_works(env):
     abi_a, bin_a = COMPILED["auction"]
     bare = env.w3.eth.contract(abi=abi_a, bytecode=bin_a)
-    txh = bare.constructor().transact({"from": env.deployer, **TX})
+    txh = bare.constructor(env.guardian).transact({"from": env.deployer, **TX})
     addr = env.w3.eth.get_transaction_receipt(txh).contractAddress
     orphan = env.w3.eth.contract(address=addr, abi=abi_a)
 

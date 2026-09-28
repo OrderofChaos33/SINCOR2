@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "./IExecutionEscrowManager.sol";
+import "./security/ScopedPausable.sol";
 
 /// @title CommitRevealAuction
 /// @notice Sealed-bid commit/reveal with onchain deadlines, plus the
@@ -36,7 +37,7 @@ import "./IExecutionEscrowManager.sol";
 ///           selectable.
 ///         - `vickreyResult` is a view so the poster's agent can read the
 ///           exact funding amount before submitting.
-contract CommitRevealAuction {
+contract CommitRevealAuction is ScopedPausable {
     /// @dev Default windows when openAuction is called with 0.
     uint64 public constant DEFAULT_COMMIT_WINDOW = 5 minutes;
     uint64 public constant DEFAULT_REVEAL_WINDOW = 5 minutes;
@@ -105,7 +106,7 @@ contract CommitRevealAuction {
     error NotOwner();
     error PriceTooLarge();
 
-    constructor() {
+    constructor(address _guardian) ScopedPausable(_guardian) {
         owner = msg.sender;
         // Sane defaults; the owner tunes them per deployment.
         executionParams = ExecutionParams({
@@ -140,7 +141,10 @@ contract CommitRevealAuction {
     ///         The opener is recorded as the poster (hiring party).
     /// @param commitWindow Seconds for the commit phase (0 = 5-minute default).
     /// @param revealWindow Seconds for the reveal phase (0 = 5-minute default).
-    function openAuction(bytes32 auctionId, uint64 commitWindow, uint64 revealWindow) external {
+    function openAuction(bytes32 auctionId, uint64 commitWindow, uint64 revealWindow)
+        external
+        whenNotPaused
+    {
         Auction storage a = auctions[auctionId];
         if (a.opened) revert AlreadyOpened();
         uint64 now_ = uint64(block.timestamp);
@@ -160,7 +164,7 @@ contract CommitRevealAuction {
         if (a.finalized) revert AlreadyFinalized();
     }
 
-    function commit(bytes32 auctionId, bytes32 commitHash) external {
+    function commit(bytes32 auctionId, bytes32 commitHash) external whenNotPaused {
         Auction storage a = _liveAuction(auctionId);
         if (block.timestamp > a.commitDeadline) revert CommitWindowClosed();
         if (commitHash == bytes32(0)) revert EmptyCommit();

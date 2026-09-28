@@ -52,7 +52,8 @@ def _compile():
     solcx.set_solc_version(SOLC_VERSION)
     srcs = {}
     for name in ("CommitRevealAuction.sol", "ExecutionEscrowManager.sol",
-                 "IExecutionEscrowManager.sol"):
+                 "IExecutionEscrowManager.sol",
+                 os.path.join("security", "ScopedPausable.sol")):
         with open(os.path.join(CONTRACTS_DIR, name)) as f:
             srcs[name] = {"content": f.read()}
     std = {
@@ -98,6 +99,7 @@ class Env:
         accts = self.tester.get_accounts()
         self.deployer, self.adjudicator = accts[0], accts[1]
         self.bidders = accts[2:7]
+        self.guardian = accts[9]
 
         # Ephemeral poster key — never written anywhere.
         self.poster_acct = w3.eth.account.create()
@@ -108,14 +110,15 @@ class Env:
         self.poster = self.poster_acct.address
 
         abi_a, bin_a = COMPILED["auction"]
-        txh = w3.eth.contract(abi=abi_a, bytecode=bin_a).constructor().transact(
-            {"from": self.deployer, **TX})
+        txh = w3.eth.contract(abi=abi_a, bytecode=bin_a).constructor(
+            self.guardian).transact({"from": self.deployer, **TX})
         self.auction = w3.eth.contract(
             address=w3.eth.get_transaction_receipt(txh).contractAddress, abi=abi_a)
 
         abi_e, bin_e = COMPILED["escrow"]
         txh = w3.eth.contract(abi=abi_e, bytecode=bin_e).constructor(
-            self.auction.address, self.adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND
+            self.auction.address, self.adjudicator, MIN_STAKE_BPS, CHALLENGER_BOND,
+            self.guardian
         ).transact({"from": self.deployer, **TX})
         self.escrow = w3.eth.contract(
             address=w3.eth.get_transaction_receipt(txh).contractAddress, abi=abi_e)
