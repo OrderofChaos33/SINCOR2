@@ -65,9 +65,11 @@ def test_all_26_registered_no_drift(isolated):
 
 def test_initial_stages(isolated):
     reg = {p["protocol_id"]: p for p in products.build_registry()}
-    assert reg["P01_YIELD_AGG"]["stage"] == "build"  # real strategy math in repo
+    # P01/P04/P05/P06 have real strategy math in the repo -> start at build
+    for pid in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
+        assert reg[pid]["stage"] == "build", pid
     for pid, p in reg.items():
-        if pid != "P01_YIELD_AGG":
+        if pid not in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
             assert p["stage"] == "spec", pid
 
 
@@ -101,6 +103,20 @@ def test_spec_to_build_happy(isolated, ledger):
 def test_build_to_test_happy(isolated, ledger):
     sku = "SINCOR-DEFI-P01-VAULT"
     ledger.append(sku, KIND_TEST_RUN, {"suite": "test_yield_aggregator", "passed": 12, "failed": 0})
+    p = _at_stage(sku, "build")
+    res = evaluate(p, "test", ledger, products.REPO_ROOT)
+    assert res.ok, [r.__dict__ for r in res.reasons]
+
+
+@pytest.mark.parametrize("sku,suite,passed", [
+    ("SINCOR-DEFI-P04-MEV", "tests/pytest/test_p04_mev_units.py", 33),
+    ("SINCOR-DEFI-P05-MUTUAL", "tests/pytest/test_p05_insurance_units.py", 26),
+    ("SINCOR-DEFI-P06-PERPS", "tests/pytest/test_p06_perp_units.py", 27),
+])
+def test_build_to_test_happy_p04_p05_p06(isolated, ledger, sku, suite, passed):
+    """P04/P05/P06 have real implementations + passing suites: build->test ok."""
+    ledger.append(sku, KIND_TEST_RUN,
+                  {"suite": suite, "passed": passed, "failed": 0})
     p = _at_stage(sku, "build")
     res = evaluate(p, "test", ledger, products.REPO_ROOT)
     assert res.ok, [r.__dict__ for r in res.reasons]
