@@ -22,5 +22,17 @@
   "SINCOR-DEFI-P06-PERPS": {
     "stage": "test",
     "version": "0.1.0"
+  },
+  "SINCOR-DEFI-P08-RWA": {
+    "stage": "test",
+    "version": "0.1.0"
+  },
+  "SINCOR-DEFI-P10-FLASHARB": {
+    "stage": "test",
+    "version": "0.1.0"
+  },
+  "SINCOR-DEFI-P14-PREDICT": {
+    "stage": "test",
+    "version": "0.1.0"
   }
 }

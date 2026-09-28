@@ -161,16 +161,28 @@ def test_no_stage_skipping(isolated, ledger):
 
 
 def test_build_to_test_refuses_without_implementation(isolated, ledger):
-    # NOTE: uses P07_BRIDGE as the no-implementation example. P01-P06 now
-    # ship reference implementations, so they no longer exercise the
-    # "missing implementation" refusal path. Convention: lowest-numbered
-    # product without an entry in gates.IMPLEMENTATIONS.
+    # NOTE: uses P07_BRIDGE as the no-implementation example. P01-P06 and
+    # P08/P10/P14 now ship reference implementations, so they no longer
+    # exercise the "missing implementation" refusal path. Convention:
+    # lowest-numbered product without an entry in gates.IMPLEMENTATIONS.
     p = _at_stage("SINCOR-DEFI-P07-BRIDGE", "build")
     res = evaluate(p, "test", ledger, products.REPO_ROOT)
     assert not res.ok
     failed = {r.check for r in res.reasons if not r.ok}
     assert "implementation_present" in failed
     assert all(r.evidence for r in res.reasons)  # machine-readable
+
+
+def test_new_implementations_reach_test_gate(isolated, ledger):
+    # P08/P10/P14 reference builds land with passing test-run evidence:
+    # build -> test must now pass for all three.
+    for sku in ("SINCOR-DEFI-P08-RWA", "SINCOR-DEFI-P10-FLASHARB",
+                "SINCOR-DEFI-P14-PREDICT"):
+        ledger.append(sku, KIND_TEST_RUN,
+                      {"suite": "t", "passed": 20, "failed": 0})
+        p = _at_stage(sku, "build")
+        res = evaluate(p, "test", ledger, products.REPO_ROOT)
+        assert res.ok, (sku, [r.__dict__ for r in res.reasons])
 
 
 def test_live_blocked_cannot_reach_product(isolated, ledger):

@@ -89,6 +89,51 @@
         "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p06_perp_units.py -q",
         "scope": "perp_hedge_swarm: integer sizing, drift delta band + hysteresis, funding gates, liq ladder, 12bps fee, pull unwind"
       }
+    },
+    {
+      "entry_id": "ev_3ab7c97eb0f5",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "test_run",
+      "timestamp": 1790609927.7274287,
+      "commit": null,
+      "recorded_by": "xioix/track-p08p10p14",
+      "details": {
+        "suite": "tests/pytest/test_p08_rwa_units.py",
+        "passed": 24,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p08_rwa_units.py -q",
+        "scope": "rwa_vaults: 4626 share math, 4-check compliance gate, yield-only-after-gate, KYC revocation freezes yield not principal, pull claims, 15bps treasury fee, NAV oracle staleness/write-down breaker, dead-share inflation defense"
+      }
+    },
+    {
+      "entry_id": "ev_77d63a6b82af",
+      "sku": "SINCOR-DEFI-P10-FLASHARB",
+      "kind": "test_run",
+      "timestamp": 1790609927.727929,
+      "commit": null,
+      "recorded_by": "xioix/track-p08p10p14",
+      "details": {
+        "suite": "tests/pytest/test_p10_flash_units.py",
+        "passed": 25,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p10_flash_units.py -q",
+        "scope": "flash_arbitrage: scan-only gate (execution reverts), TTL-emitting scanner, profit-floor + gas-ceiling gates, safety dry-run, callback-caller verification, atomic 30bps treasury settlement, versioned self-improvement loop"
+      }
+    },
+    {
+      "entry_id": "ev_59113d958ac8",
+      "sku": "SINCOR-DEFI-P14-PREDICT",
+      "kind": "test_run",
+      "timestamp": 1790609927.7282803,
+      "commit": null,
+      "recorded_by": "xioix/track-p08p10p14",
+      "details": {
+        "suite": "tests/pytest/test_p14_prediction_units.py",
+        "passed": 28,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p14_prediction_units.py -q",
+        "scope": "prediction_markets: ingest staleness/quality bars, Brier calibration beats naive, triple edge vetoes, quarter-Kelly x confidence^2 with 10% cap, fail-closed Polyclaw wallet adapter (treasury-key red-team), lifecycle to-the-cent PnL, risk limits + manual-only breaker reset, 15bps settled-PnL fee ledger, dry-run backtest"
+      }
     }
   ]
 }
