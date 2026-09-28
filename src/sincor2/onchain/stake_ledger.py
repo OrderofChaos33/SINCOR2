@@ -24,8 +24,14 @@ Lifecycle wired in ``a2a_inbound_market``:
   commit_bid    -> lock_for_commit (insufficient stake => commit REJECTED)
   reveal_bid    -> top_up_for_reveal (shortfall => reveal REJECTED)
   close_auction -> losers released; ghosts slashed 100 %; winner stays locked
-  submit_proof  -> winner released on settlement
+  submit_proof  -> winner released on settlement + record_completion
   adjudicate()  -> adjudicator-only quality slash (50 %)
+
+Reputation-weighted collateral (2026-09-28):
+  B_stake,i = B_base x (1 - 0.8 x R_i).  R_i is built here from dispute-free
+  completions (trailing 180d, distinct posters, 90-day tenure gate, 0.5^U
+  for upheld disputes); ghosting resets it to zero.  Vickrey selection is
+  untouched — reputation buys bidding capacity, never wins.
 
 This is the Python accounting layer.  On-chain stake deposits / slashing via
 ExecutionEscrowManager are the later wiring step once contracts deploy.
@@ -52,6 +58,46 @@ QUALITY_SLASH_BPS = 5_000     # upheld quality failure: 50 %
 # the operator sets ADJUDICATOR_AGENT_ID to the adjudicator's agent id.
 ADJUDICATOR_ENV = "SINCOR_ADJUDICATOR_ID"
 
+# --- Reputation-weighted collateral (ratified 2026-09-28) -----------------------
+# B_stake,i = B_base x (1 - COLLATERAL_ALPHA x R_i),  R_i in [0, 1].
+#
+# A newborn (R_i = 0) locks 100 % of the base requirement; a proven agent
+# (R_i = 1) locks only 20 %.  The discount factor is bid-INDEPENDENT, so it
+# scales the capital cost of bidding without touching the Vickrey payment
+# rule: selection stays strictly lowest-revealed-bid, and the truthfulness
+# argument holds relative to the current design (bidding already carries a
+# bid-scaled capital cost today; the discount multiplies it by a constant).
+# Reputation buys bidding CAPACITY (5x concurrent bids on the same
+# collateral pool), never wins.  That capacity gap is the switching cost:
+# leaving SINCOR resets R_i to 0 and the operator must immediately lock 5x
+# more capital for the same execution volume.
+#
+# R_i = min(1, D/50) x min(1, P/3) x min(1, tenure/90d) x 0.5^U, where
+#   D = dispute-free completions in the trailing 180 days,
+#   P = distinct posters served in the trailing 180 days (wash-trading
+#       against your own sock-puppet poster cannot inflate this),
+#   tenure = days since first recorded completion (an account cannot be
+#       farmed to veteran in an afternoon: farm-then-burn is blunted),
+#   U = upheld quality disputes in the trailing 180 days.
+# Ghosting clears the whole record (R_i -> 0): the true punishment is not
+# the slash, it is the collateral regime change — every concurrent and
+# future bid suddenly needs 5x capital.
+#
+# COLLATERAL_ALPHA is FIXED at launch.  It is not adaptive, not tuned, not
+# voted per-epoch — there is deliberately no env override.  Changing it is
+# a governance action with the same ceremony as changing MIN_STAKE_BPS.
+COLLATERAL_ALPHA = 0.8
+# Integer form of the alpha, used for exact wei arithmetic.  Float math on
+# 1e18-scale wei silently loses hundreds of wei (float64 has ~9e15 exact
+# integers); the discount is therefore computed in basis points throughout.
+COLLATERAL_ALPHA_BPS = 8000
+REP_WINDOW_DAYS = 180
+REP_COMPLETIONS_FOR_FULL = 50
+REP_POSTERS_FOR_FULL = 3
+REP_TENURE_DAYS_FOR_FULL = 90
+_REP_WINDOW_SEC = REP_WINDOW_DAYS * 86400
+_REP_MAX_COMPLETIONS = 1000  # bound per-agent history growth
+
 
 class InsufficientStake(PermissionError):
     pass
@@ -68,6 +114,10 @@ def required_stake_wei(bid_value_wei: int) -> int:
 
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _now_ts() -> int:
+    return int(time.time())
 
 
 class StakeLedger:
@@ -116,6 +166,117 @@ class StakeLedger:
         if len(self._data["events"]) > 5000:
             self._data["events"] = self._data["events"][-5000:]
 
+    # -- reputation-weighted collateral ------------------------------------
+    def _rep(self, agent_id: str) -> Dict[str, Any]:
+        """Lazy per-agent reputation record for collateral scoring.
+
+        This is the LEDGER's collateral score input.  It is deliberately
+        separate from the marketplace agent card's display ``reputation``
+        scalar: that scalar prices bids, this one prices capital.
+        """
+        rec = self._agent(agent_id)
+        rep = rec.get("rep")
+        if not isinstance(rep, dict):
+            rep = {"completions": [], "upheld": [], "first_seen": None}
+            rec["rep"] = rep
+        rep.setdefault("completions", [])
+        rep.setdefault("upheld", [])
+        rep.setdefault("first_seen", None)
+        return rep
+
+    @staticmethod
+    def _prune_rep(rep: Dict[str, Any], now: int) -> None:
+        cutoff = now - _REP_WINDOW_SEC
+        rep["completions"] = [c for c in rep["completions"]
+                              if isinstance(c, dict)
+                              and int(c.get("ts", 0)) >= cutoff]
+        rep["upheld"] = [ts for ts in rep["upheld"] if int(ts) >= cutoff]
+        # Bound history growth; only the trailing window matters.
+        if len(rep["completions"]) > _REP_MAX_COMPLETIONS:
+            rep["completions"] = rep["completions"][-_REP_MAX_COMPLETIONS:]
+
+    def reputation_score(self, agent_id: str, now: Optional[int] = None
+                         ) -> float:
+        """R_i in [0, 1]: the agent's verified execution reputation.
+
+        min(1, D/50) x min(1, P/3) x min(1, tenure/90d) x 0.5^U over the
+        trailing 180-day window.  Pure read (prunes stale entries)."""
+        now = int(now) if now is not None else _now_ts()
+        rep = self._rep(agent_id)
+        self._prune_rep(rep, now)
+        completions = rep["completions"]
+        d = len(completions)
+        posters = {str(c.get("poster")) for c in completions
+                   if c.get("poster")}
+        p = len(posters)
+        u = len(rep["upheld"])
+        first_seen = rep.get("first_seen")
+        tenure_days = max(0.0, (now - int(first_seen)) / 86400.0) \
+            if first_seen else 0.0
+        r = (min(1.0, d / REP_COMPLETIONS_FOR_FULL)
+             * min(1.0, p / REP_POSTERS_FOR_FULL)
+             * min(1.0, tenure_days / REP_TENURE_DAYS_FOR_FULL)
+             * (0.5 ** u))
+        return max(0.0, min(1.0, r))
+
+    def _discounted(self, base_wei: int, agent_id: str) -> tuple[int, float]:
+        # Exact integer math: keep_bps = 10000 - 8000*R_bps/10000, so a
+        # veteran (R=1) keeps exactly base*2000//10000 = base//5 wei.
+        r = self.reputation_score(agent_id)
+        r_bps = int(round(r * BPS_DENOM))
+        keep_bps = BPS_DENOM - (COLLATERAL_ALPHA_BPS * r_bps) // BPS_DENOM
+        return int(base_wei) * keep_bps // BPS_DENOM, r
+
+    def stake_required_wei(self, bid_value_wei: int, agent_id: str) -> int:
+        """Reputation-weighted stake requirement for a bid value.
+
+        B_stake,i = B_base x (1 - 0.8 x R_i).  Newborns lock the full base
+        requirement; proven agents lock as little as 20 %.  This is the
+        amount fronting paths (sponsored stake, recovery track) should size
+        against — a given front buys a veteran 5x the bidding capacity.
+        """
+        need, _ = self._discounted(required_stake_wei(int(bid_value_wei)),
+                                  agent_id)
+        return need
+
+    def record_completion(self, agent_id: str, task_id: str,
+                          poster_id: Optional[str] = None,
+                          at: Optional[int] = None) -> float:
+        """Record a dispute-free execution (settlement, or a dispute the
+        adjudicator did NOT uphold).  Idempotent on (agent, task): a
+        retried settlement cannot double-count.  Returns the new R_i."""
+        now = int(at) if at is not None else _now_ts()
+        rep = self._rep(agent_id)
+        self._prune_rep(rep, now)
+        if not any(c.get("task_id") == task_id for c in rep["completions"]):
+            rep["completions"].append({
+                "task_id": str(task_id),
+                "poster": str(poster_id) if poster_id else None,
+                "ts": now,
+            })
+            if rep.get("first_seen") is None:
+                rep["first_seen"] = now
+            self._event("rep_completion", agent_id=agent_id, task_id=task_id,
+                        poster_id=str(poster_id) if poster_id else None)
+            self._save()
+        return self.reputation_score(agent_id, now=now)
+
+    def _record_upheld_dispute(self, agent_id: str) -> None:
+        rep = self._rep(agent_id)
+        now = _now_ts()
+        self._prune_rep(rep, now)
+        rep["upheld"].append(now)
+        self._event("rep_upheld_dispute", agent_id=agent_id)
+        self._save()
+
+    def _reset_reputation_score(self, agent_id: str) -> None:
+        """Ghosting: clear the execution record.  R_i -> 0 immediately —
+        the collateral regime change is the real punishment."""
+        rec = self._agent(agent_id)
+        rec["rep"] = {"completions": [], "upheld": [], "first_seen": None}
+        self._event("rep_reset", agent_id=agent_id, reason="ghosting")
+        self._save()
+
     # -- deposits -----------------------------------------------------------
     def deposit(self, agent_id: str, amount_wei: int,
                 reference: Optional[str] = None) -> Dict[str, Any]:
@@ -143,17 +304,23 @@ class StakeLedger:
         deposited = int(rec["deposited_wei"])
         locked = sum(int(v) for v in rec["locks"].values())
         bonded = sum(int(v) for v in rec["bonds"].values())
+        score = self.reputation_score(agent_id)
         return {"agent_id": agent_id, "deposited_wei": str(deposited),
                 "locked_wei": str(locked), "bonded_wei": str(bonded),
                 "available_wei": str(deposited - locked - bonded),
-                "slashed_wei": rec["slashed_wei"]}
+                "slashed_wei": rec["slashed_wei"],
+                "reputation_score": f"{score:.4f}",
+                "stake_discount_bps": str(int(COLLATERAL_ALPHA * score
+                                             * BPS_DENOM))}
 
     # -- commit / reveal locks ------------------------------------------------
     def lock_for_commit(self, agent_id: str, task_id: str,
                         bounty_wei: int) -> int:
-        """Lock bounty*50% at commit.  Raises InsufficientStake => the
-        commit itself must be rejected."""
-        need = required_stake_wei(bounty_wei)
+        """Lock stake at commit.  The requirement is reputation-weighted:
+        B_stake,i = bounty*50 % x (1 - 0.8 x R_i).  Raises InsufficientStake
+        => the commit itself must be rejected."""
+        base = required_stake_wei(bounty_wei)
+        need, score = self._discounted(base, agent_id)
         bal = self.balance_of(agent_id)
         if int(bal["available_wei"]) < need:
             raise InsufficientStake(
@@ -162,15 +329,19 @@ class StakeLedger:
         rec = self._agent(agent_id)
         rec["locks"][task_id] = str(int(rec["locks"].get(task_id, "0")) + need)
         self._event("lock", agent_id=agent_id, task_id=task_id,
-                    amount_wei=str(need), basis="bounty_at_commit")
+                    amount_wei=str(need), basis="bounty_at_commit",
+                    base_stake_wei=str(base),
+                    reputation_score=f"{score:.4f}")
         self._save()
         return need
 
     def top_up_for_reveal(self, agent_id: str, task_id: str,
                           bid_wei: int) -> int:
-        """After reveal the true bid value is known; top the lock up to
-        bid*50 %.  Raises InsufficientStake => the reveal must be rejected."""
-        need = required_stake_wei(bid_wei)
+        """After reveal the true bid value is known; top the lock up to the
+        reputation-weighted bid*50 %.  Raises InsufficientStake => the
+        reveal must be rejected."""
+        base = required_stake_wei(bid_wei)
+        need, score = self._discounted(base, agent_id)
         rec = self._agent(agent_id)
         locked = int(rec["locks"].get(task_id, "0"))
         if locked >= need:
@@ -182,7 +353,9 @@ class StakeLedger:
                 f"(needs {need}, locked {locked})")
         rec["locks"][task_id] = str(need)
         self._event("top_up", agent_id=agent_id, task_id=task_id,
-                    amount_wei=str(extra), basis="bid_at_reveal")
+                    amount_wei=str(extra), basis="bid_at_reveal",
+                    base_stake_wei=str(base),
+                    reputation_score=f"{score:.4f}")
         self._save()
         return extra
 
@@ -258,6 +431,11 @@ class StakeLedger:
         if remainder:
             # Unslashed remainder is freed (not re-locked).
             pass
+        if reason == "quality_failure_upheld":
+            # Reputation-weighted collateral: an upheld dispute halves the
+            # execution record's weight (0.5^U).  The slash takes the locked
+            # stake; the R_i hit raises every future lock toward full.
+            self._record_upheld_dispute(agent_id)
         credit_to = poster_id or "__platform__"
         clawback_wei, poster_wei = self._split_slash(agent_id, slashed)
         if clawback_wei:
@@ -287,7 +465,13 @@ class StakeLedger:
 
         Subsidy-extraction invariant: the platform's unrecouped sponsored
         front is clawed back to the treasury first; only the remainder
-        becomes poster re-auction credit."""
+        becomes poster re-auction credit.
+
+        Collateral regime change: ghosting clears the agent's execution
+        record (R_i -> 0), so every concurrent and future bid immediately
+        requires up to 5x the collateral.  The slash takes the stake; the
+        reset takes the capital efficiency."""
+        self._reset_reputation_score(agent_id)
         rec = self._agent(agent_id)
         locked = int(rec["locks"].pop(task_id, "0"))
         if locked <= 0:
@@ -362,12 +546,15 @@ class StakeLedger:
         from the challenger separately via post_challenger_bond).
 
         upheld=True  -> 50 % slash of the winner's locked stake.
-        upheld=False -> stake released, no slash."""
+        upheld=False -> stake released, no slash.  A dispute the adjudicator
+        does NOT uphold leaves the work standing, so it counts as a
+        dispute-free completion for reputation-weighted collateral."""
         if upheld:
             return self.slash(agent_id, task_id, QUALITY_SLASH_BPS,
                               "quality_failure_upheld",
                               adjudicator=adjudicator, poster_id=poster_id)
         released = self.release(agent_id, task_id)
+        self.record_completion(agent_id, task_id, poster_id=poster_id)
         self._event("adjudicated", agent_id=agent_id, task_id=task_id,
                     upheld=False, released_wei=str(released),
                     adjudicator=str(adjudicator or ""))
