@@ -130,3 +130,80 @@ def test_slash_event_records_split(ledgers):
     assert ev["clawback_wei"] == str(10 * AXM)
     assert ev["poster_credit_wei"] == "0"
     assert ev["reason"] == "ghosting"
+
+
+def test_repeated_slashes_capped_at_outstanding(ledgers):
+    """Cumulative-cap invariant: two ghost slashes against one 25 AXM
+    front can never claw back more than 25 total.  Once the claim is
+    settled, further slashes route entirely to poster re-auction credit."""
+    from sincor2.sponsored_stake import sponsored_ledger
+
+    _front()  # 25 AXM front
+    ledgers.deposit(AGENT, 100 * AXM, reference="self-funded")
+
+    # Ghost 1: lock 60, slash 60 -> 25 clawed back, 35 to the poster.
+    ledgers.lock_for_commit(AGENT, "t-cap-1", 120 * AXM)
+    out1 = ledgers.slash_ghost(AGENT, "t-cap-1", poster_id=POSTER)
+    assert out1["clawback_wei"] == str(25 * AXM)
+    assert out1["poster_credit_wei"] == str(35 * AXM)
+
+    # Ghost 2: lock 40, slash 40 -> claim exhausted: 0 clawed back,
+    # all 40 to the poster.
+    ledgers.lock_for_commit(AGENT, "t-cap-2", 80 * AXM)
+    out2 = ledgers.slash_ghost(AGENT, "t-cap-2", poster_id=POSTER)
+    assert out2["clawback_wei"] == "0"
+    assert out2["poster_credit_wei"] == str(40 * AXM)
+
+    assert ledgers.reauction_credit("__platform__") == 25 * AXM
+    assert ledgers.reauction_credit(POSTER) == 75 * AXM
+    assert sponsored_ledger().outstanding_wei(AGENT) == 0
+
+
+def test_clawback_settles_claim_no_double_recoup(ledgers):
+    """A clawback reduces the sponsored outstanding, so a later earnings
+    recoup cannot double-recover what the slash already settled."""
+    from sincor2.sponsored_stake import (
+        recoup_sponsored_stake,
+        sponsored_ledger,
+    )
+
+    _front()  # 25 AXM front
+    out = _ghost(ledgers, lock_axm=10)  # slash 10 -> clawback 10
+    assert out["clawback_wei"] == str(10 * AXM)
+    assert sponsored_ledger().outstanding_wei(AGENT) == 15 * AXM
+
+    rec = recoup_sponsored_stake(AGENT, 100 * AXM, task_id="t-earn")
+    assert rec["recouped_wei"] == str(15 * AXM)  # not 25
+    assert rec["outstanding_wei"] == "0"
+    assert sponsored_ledger().outstanding_wei(AGENT) == 0
+
+
+def test_full_clawback_settles_sponsorship(ledgers):
+    from sincor2.sponsored_stake import sponsored_ledger
+
+    _front()  # 25 AXM front, fully sponsored agent
+    out = _ghost(ledgers, lock_axm=25, poster_id=POSTER)
+    assert out["clawback_wei"] == str(25 * AXM)
+    assert out["poster_credit_wei"] == "0"
+    status = sponsored_ledger().status_of(AGENT)
+    assert status["status"] == "settled"
+    assert status["clawed_back_wei"] == str(25 * AXM)
+    # A further slash finds no claim left.
+    assert sponsored_ledger().apply_clawback(AGENT, 10 * AXM, "t-x") == 0
+
+
+def test_apply_clawback_idempotent_per_task(ledgers):
+    from sincor2.sponsored_stake import sponsored_ledger
+
+    _front()
+    first = sponsored_ledger().apply_clawback(AGENT, 10 * AXM, "t-dedupe")
+    second = sponsored_ledger().apply_clawback(AGENT, 10 * AXM, "t-dedupe")
+    assert first == 10 * AXM
+    assert second == 0
+    assert sponsored_ledger().outstanding_wei(AGENT) == 15 * AXM
+
+
+def test_apply_clawback_unknown_agent_zero(ledgers):
+    from sincor2.sponsored_stake import sponsored_ledger
+
+    assert sponsored_ledger().apply_clawback("ghost-agent", 10 * AXM, "t") == 0

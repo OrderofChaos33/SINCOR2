@@ -12,6 +12,9 @@ Ratified parameters (2026-09-25, docs/ops/AUCTION_SECURITY_DECISIONS.md):
     (2026-09-27): platform-fronted capital can never be converted into a
     poster's reusable re-auction balance via sybil ghosting. Clawback is
     not a slash — it is the platform reclaiming its own fronted capital.
+    Every clawback SETTLES the sponsored claim as it is collected, so
+    repeated slashes can never claw back more in total than was fronted
+    and a later earnings recoup cannot double-recover (2026-09-28).
   * Exact stake deposits; adjudicator-only slashing (poster fast-path
     deferred).
 
@@ -378,39 +381,47 @@ class StakeLedger:
                 "slashing is adjudicator-only; poster fast-path is deferred")
         return caller
 
-    def _sponsored_outstanding_wei(self, agent_id: str) -> int:
-        """The platform's senior claim on this agent: unrecouped sponsored
-        front (fronted minus recouped-from-earnings). Zero when the agent
-        has no sponsorship or it is fully settled — i.e. the platform is
-        already whole and the agent's stake is genuinely their own.
+    def _apply_sponsored_clawback(self, agent_id: str, slashed_wei: int,
+                                  task_id: str) -> int:
+        """Settle the platform's senior claim against slashed proceeds.
 
-        Fail-open with a loud log: if the sponsored-stake ledger cannot be
-        read, auction close must not break (liveness outranks the narrow
-        race — an attacker cannot cause this read to fail remotely, it is
+        One call both caps the clawback at the outstanding front AND
+        records it in the sponsored ledger (shrinking the claim), so
+        repeated slashes can never cumulatively claw back more than the
+        platform fronted, and a later earnings-recoup cannot
+        double-recover.  Returns the amount actually applied.
+
+        Fail-open with a loud log: if the sponsored ledger cannot be
+        written, auction close must not break (liveness outranks the narrow
+        race — an attacker cannot cause this write to fail remotely, it is
         a local file). The invariant is enforced on the normal path.
         """
         try:
             from sincor2.sponsored_stake import sponsored_ledger
-            return int(sponsored_ledger().outstanding_wei(agent_id))
+            return int(sponsored_ledger().apply_clawback(
+                agent_id, slashed_wei, task_id))
         except Exception as exc:  # pragma: no cover - defensive
-            logger.error("clawback: sponsored outstanding unreadable for %s "
+            logger.error("clawback: sponsored apply failed for %s "
                          "(%s); treating as zero", agent_id, exc)
             return 0
 
-    def _split_slash(self, agent_id: str, slashed_wei: int
+    def _split_slash(self, agent_id: str, slashed_wei: int, task_id: str
                      ) -> tuple[int, int]:
         """Split slashed proceeds into (clawback_wei, poster_credit_wei).
 
         Subsidy-extraction invariant: the platform's unrecouped fronted
         capital is senior. It is clawed back to the platform treasury
-        first; only the remainder becomes poster re-auction credit. This
-        makes sybil ghost-farming unprofitable: self-funded stake can
-        become re-auction credit, sponsored money always returns home.
+        first — settling the sponsored claim as it is collected — and only
+        the remainder becomes poster re-auction credit. This makes sybil
+        ghost-farming unprofitable: self-funded stake can become
+        re-auction credit, sponsored money always returns home, and never
+        more than once.
         """
         slashed_wei = int(slashed_wei)
         if slashed_wei <= 0:
             return 0, 0
-        clawback = min(slashed_wei, self._sponsored_outstanding_wei(agent_id))
+        clawback = self._apply_sponsored_clawback(agent_id, slashed_wei,
+                                                 task_id)
         return clawback, slashed_wei - clawback
 
     def slash(self, agent_id: str, task_id: str, slash_bps: int, reason: str,
@@ -437,7 +448,8 @@ class StakeLedger:
             # stake; the R_i hit raises every future lock toward full.
             self._record_upheld_dispute(agent_id)
         credit_to = poster_id or "__platform__"
-        clawback_wei, poster_wei = self._split_slash(agent_id, slashed)
+        clawback_wei, poster_wei = self._split_slash(agent_id, slashed,
+                                                     task_id)
         if clawback_wei:
             self.credit_reauction("__platform__", clawback_wei,
                                   f"clawback:sponsored:{task_id}")
@@ -480,7 +492,8 @@ class StakeLedger:
         rec["deposited_wei"] = str(int(rec["deposited_wei"]) - locked)
         rec["slashed_wei"] = str(int(rec["slashed_wei"]) + locked)
         credit_to = poster_id or "__platform__"
-        clawback_wei, poster_wei = self._split_slash(agent_id, locked)
+        clawback_wei, poster_wei = self._split_slash(agent_id, locked,
+                                                     task_id)
         if clawback_wei:
             self.credit_reauction("__platform__", clawback_wei,
                                   f"clawback:sponsored:ghosting:{task_id}")

@@ -22,6 +22,12 @@ Mechanics
   Recoupment runs even if the operator later disables fronting — disabling
   stops *new* fronts, it does not forgive outstanding ones.
 * Statuses: ``fronted`` -> ``recouping`` -> ``settled``.
+* Clawback: when the stake ledger slashes an agent with an unrecouped
+  front, the platform's senior claim is settled out of the slashed
+  proceeds FIRST (``apply_clawback``), before any remainder becomes poster
+  re-auction credit.  Every clawback reduces the outstanding claim, so
+  repeated slashes can never claw back more in total than was fronted,
+  and a later earnings recoup cannot double-recover.
 
 Currency note: the stake ledger is AXM-denominated offchain accounting
 (Pool 1). Sponsored stake moves ledger accounting only, never funds
@@ -117,8 +123,9 @@ class SponsoredStakeLedger:
         rec = self._data["agents"].get(agent_id)
         if not rec or rec.get("status") == STATUS_SETTLED:
             return 0
-        return int(rec.get("fronted_wei", "0")) - int(
-            rec.get("recouped_wei", "0"))
+        return (int(rec.get("fronted_wei", "0"))
+                - int(rec.get("recouped_wei", "0"))
+                - int(rec.get("clawed_back_wei", "0")))
 
     def front(self, agent_id: str, amount_wei: int,
               approved_by: str) -> Dict[str, Any]:
@@ -152,6 +159,7 @@ class SponsoredStakeLedger:
             "agent_id": agent_id,
             "fronted_wei": str(amount_wei),
             "recouped_wei": "0",
+            "clawed_back_wei": "0",
             "status": STATUS_FRONTED,
             "approved_by": str(approved_by or "admin"),
             "fronted_at": _now(),
@@ -196,6 +204,53 @@ class SponsoredStakeLedger:
         return {"agent_id": agent_id, "recouped_wei": str(take),
                 "outstanding_wei": str(new_outstanding),
                 "status": rec["status"]}
+
+    def apply_clawback(self, agent_id: str, amount_wei: int,
+                       task_id: Optional[str] = None) -> int:
+        """Settle the platform's senior claim from slashed stake proceeds.
+
+        Called by the stake ledger when a slash routes proceeds to the
+        platform treasury: the platform has recovered part of its front,
+        so the outstanding claim shrinks by the applied amount.  Returns
+        the amount applied — never more than the outstanding claim.
+
+        Cumulative cap: because every clawback reduces the outstanding
+        claim, repeated slashes can never claw back more in total than the
+        platform fronted, and a later earnings recoup cannot double-recover
+        what a clawback already settled.
+
+        Idempotent per task: a retried slash for the same task_id applies
+        zero (one lock per task, so a second genuine slash for the same
+        task cannot exist).  Runs regardless of the enablement flag, like
+        recoup: disabling stops new fronts, it never forgives — or
+        revives — claims.
+        """
+        amount_wei = int(amount_wei)
+        rec = self._data["agents"].get(agent_id)
+        if rec is None or amount_wei <= 0:
+            return 0
+        done = rec.setdefault("clawback_tasks", [])
+        if task_id and str(task_id) in done:
+            return 0
+        outstanding = self.outstanding_wei(agent_id)
+        if outstanding <= 0:
+            return 0
+        applied = min(amount_wei, outstanding)
+        rec["clawed_back_wei"] = str(
+            int(rec.get("clawed_back_wei", "0")) + applied)
+        if task_id:
+            done.append(str(task_id))
+        new_outstanding = outstanding - applied
+        rec["status"] = (STATUS_SETTLED if new_outstanding == 0
+                         else STATUS_RECOUPING)
+        if new_outstanding == 0:
+            rec["settled_at"] = _now()
+        self._event("clawback", agent_id=agent_id,
+                    clawed_back_wei=str(applied),
+                    outstanding_wei=str(new_outstanding),
+                    task_id=str(task_id or ""))
+        self._save()
+        return applied
 
 
 # --- process-wide singleton (overridable in tests) -----------------------------
