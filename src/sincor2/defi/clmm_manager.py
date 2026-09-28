@@ -26,6 +26,14 @@ Safety rules (hard):
   config; the default refuses.
 - Defense pause never blocks user withdrawals or claims.
 - All money math is integer-exact (wei); conservation is asserted.
+- AUDIT-PREP 2026-09-28 float64 sweep: the JIT flag threshold
+  (``removed * 10000 >= added * jit_sensitivity_bps``) is integer-exact;
+  the old float64 form false-flagged at wei scale. Remaining float64 is
+  deliberate and documented: ``JITFlag.confidence`` is an informational
+  ratio bounded in [0,1] (never a money-math input), and
+  ``VolRangeAgent.realized_vol`` consumes float *prices* (not wei) as a
+  heuristic whose output is snapped to tick spacing and clamped to
+  ``vol_band`` — neither feeds settlement, fees, or flag decisions.
 
 This is a REFERENCE build for design validation and agent simulation —
 not a deployed protocol.
@@ -51,7 +59,32 @@ TREASURY = os.getenv(
 # Catalog gates mirrored as code constants.
 VOL_BAND_TICKS = int(os.getenv("CLMM_VOL_BAND_TICKS", "240"))      # max shift bound
 TICK_SHIFT_STEP = int(os.getenv("CLMM_TICK_SHIFT_STEP", "60"))     # tick_distance
-JIT_SENSITIVITY = float(os.getenv("CLMM_JIT_SENSITIVITY", "0.95")) # min removed fraction
+
+
+def _jit_sensitivity_bps() -> int:
+    """JIT flag threshold as integer basis points (canonical representation).
+
+    AUDIT NOTE 2026-09-28: this was previously ``float(os.getenv(...))``
+    compared as ``removed >= added * 0.95``. float64 carries ~15-16
+    significant decimal digits, so for wei-scale ``added`` (up to 2**256)
+    the product silently drops low-order digits and the flag/no-flag
+    decision becomes input-dependent noise near the boundary — a false
+    positive means an unjust surcharge on an honest LP. The threshold is
+    now integer bps and the comparison is
+    ``removed * 10_000 >= added * bps``, exact for arbitrary-size ints.
+    """
+    raw_bps = os.getenv("CLMM_JIT_SENSITIVITY_BPS")
+    if raw_bps is not None:
+        return int(raw_bps)
+    # Legacy env var carried a decimal fraction ("0.95"); parse it with
+    # Decimal so "0.95" -> 9500 exactly — never round-trip through float64.
+    from decimal import Decimal
+
+    return int(Decimal(os.getenv("CLMM_JIT_SENSITIVITY", "0.95")) * 10_000)
+
+
+JIT_SENSITIVITY_BPS = _jit_sensitivity_bps()  # 9500 == 95%
+JIT_SENSITIVITY_DEN = 10_000
 COOLDOWN_BLOCKS = int(os.getenv("CLMM_COOLDOWN_BLOCKS", "10"))
 MAX_SHIFT_TICKS = int(os.getenv("CLMM_MAX_SHIFT_TICKS", "480"))
 TREASURY_CUT_BPS = 15                      # 15 bps of captured proceeds
@@ -129,7 +162,10 @@ class PoolConfig:
     fee_tier_bps: int = 30
     vol_band_ticks: int = VOL_BAND_TICKS
     tick_shift_step: int = TICK_SHIFT_STEP
-    jit_sensitivity: float = JIT_SENSITIVITY
+    # Integer-exact flag threshold in basis points (see _jit_sensitivity_bps).
+    # Replaces the old float ``jit_sensitivity`` (removed 2026-09-28 audit-prep:
+    # float64 threshold misclassified at wei scale).
+    jit_sensitivity_bps: int = JIT_SENSITIVITY_BPS
     cooldown_blocks: int = COOLDOWN_BLOCKS
     max_shift_ticks: int = MAX_SHIFT_TICKS
 
@@ -139,10 +175,12 @@ class JITDetector:
     """Flags same-block add/remove sequences around a swap.
 
     Rule: a provider is flagged when, within ONE block containing a swap,
-    it adds liquidity and then removes >= ``jit_sensitivity`` of what it
-    added. Multi-position splitting is aggregated per provider per block.
-    Two-block (or longer) sequences are legitimate rebalancing and are
-    never flagged.
+    it adds liquidity and then removes >= ``jit_sensitivity_bps``/10000 of
+    what it added. The comparison is integer-exact
+    (``removed * 10_000 >= added * jit_sensitivity_bps``) — never float64,
+    which misclassifies at wei scale. Multi-position splitting is
+    aggregated per provider per block. Two-block (or longer) sequences are
+    legitimate rebalancing and are never flagged.
     """
 
     def __init__(self, config: PoolConfig):
@@ -179,7 +217,10 @@ class JITDetector:
                 removed = prov_removed.get(provider, 0)
                 if added <= 0:
                     continue
-                if removed >= added * self.config.jit_sensitivity:
+                # Integer-exact threshold (audit-prep 2026-09-28): the old
+                # float64 form ``removed >= added * 0.95`` dropped low-order
+                # digits at wei scale and false-flagged honest LPs.
+                if removed * JIT_SENSITIVITY_DEN >= added * self.config.jit_sensitivity_bps:
                     captured = min(removed, added)
                     flags.append(
                         JITFlag(
@@ -190,6 +231,9 @@ class JITDetector:
                             added_wei=added,
                             removed_wei=removed,
                             captured_value_wei=captured,
+                            # Informational ratio only, bounded in [0, 1];
+                            # never an input to money math. float64 relative
+                            # error (~2e-16) is immaterial here.
                             confidence=min(1.0, removed / added),
                         )
                     )

@@ -193,10 +193,22 @@ class YieldAggregator:
                 continue
             out.append(s)
         if not out:
-            cash = next((s for s in self.strategies if s.kind == StrategyKind.CASH), None)
+            # Fail safe to cash — but to the SAFEST enabled cash, not just
+            # the first CASH-kind row. AUDIT-PREP 2026-09-28: the old code
+            # took the first CASH-kind strategy regardless of its risk_score
+            # or enabled flag, so a degenerate table could "fail safe" into
+            # a disabled or high-risk row (found by invariant fuzzing).
+            # Default-universe behavior is unchanged (one enabled cash row).
+            cash = self._safest_cash()
             if cash:
                 out = [cash]
         return out
+
+    def _safest_cash(self) -> Optional[YieldStrategy]:
+        """Lowest-risk enabled CASH-kind strategy, or None."""
+        cashes = [s for s in self.strategies
+                  if s.kind == StrategyKind.CASH and s.enabled]
+        return min(cashes, key=lambda s: s.risk_score, default=None)
 
     def plan_rebalance(
         self,
@@ -239,23 +251,55 @@ class YieldAggregator:
             else:
                 scores[s.id] = max(s.estimated_apr, 0.0) / (1.0 + s.risk_score)
 
-        total_score = sum(scores.values()) or 1.0
+        total_score = sum(scores.values())
+        if total_score <= 0:
+            # Degenerate table: no strategy has positive risk-adjusted
+            # expectation (and cash is ineligible/disabled). The old code
+            # emitted zero-weight allocations summing to 0 — an incoherent
+            # plan. Fail safe to the safest enabled cash instead.
+            # AUDIT-PREP 2026-09-28 (found by invariant fuzzing). Never
+            # reached on the default universe (cash always scores 0.15).
+            warnings.append(
+                "no strategy with positive expectation; failing safe to cash")
+            cash = self._safest_cash()
+            if cash is None:
+                warnings.append("no enabled cash available; empty plan")
+                return RebalancePlan(
+                    timestamp=time.time(), mode="dry_run",
+                    total_capital_usd=capital_usd, allocations=[],
+                    expected_blended_apr=0.0, max_risk_score=0.0,
+                    fee_to_treasury_bps=self.fee_to_treasury_bps,
+                    treasury=TREASURY, vault=MORPHO_USDC_VAULT,
+                    warnings=warnings)
+            scores = {cash.id: 0.15}
+            eligible = [cash]
+            total_score = 0.15
         raw_weights = {sid: sc / total_score for sid, sc in scores.items()}
 
-        capped: Dict[str, float] = {}
-        overflow = 0.0
-        for sid, w in raw_weights.items():
-            if w > MAX_SINGLE_STRATEGY_PCT:
-                overflow += w - MAX_SINGLE_STRATEGY_PCT
-                capped[sid] = MAX_SINGLE_STRATEGY_PCT
-            else:
-                capped[sid] = w
-
-        if overflow > 0:
-            room = {
-                sid: max(MAX_SINGLE_STRATEGY_PCT - w, 0.0) for sid, w in capped.items()
-            }
-            room_sum = sum(room.values()) or 1.0
+        # Water-fill the single-strategy concentration cap: cap every
+        # over-weight strategy and redistribute the overflow to strategies
+        # with room, iterating until no overflow remains.
+        #
+        # AUDIT-PREP 2026-09-28: the old single-pass redistribution pushed a
+        # room-holding recipient OVER the cap when room was scarce (found by
+        # invariant fuzzing: 2-strategy table -> recipient at 0.60).
+        # Precedence note: with fewer than ceil(1/0.40) = 3 eligible
+        # strategies a 40% cap and full investment cannot both hold, so
+        # capital conservation wins and the cap yields (documented, not
+        # silent). With 3+ eligible strategies the cap holds exactly.
+        capped: Dict[str, float] = dict(raw_weights)
+        for _ in range(len(capped) + 1):
+            overflow = 0.0
+            for sid, w in capped.items():
+                if w > MAX_SINGLE_STRATEGY_PCT:
+                    overflow += w - MAX_SINGLE_STRATEGY_PCT
+                    capped[sid] = MAX_SINGLE_STRATEGY_PCT
+            if overflow <= 0:
+                break
+            room = {sid: MAX_SINGLE_STRATEGY_PCT - w for sid, w in capped.items()}
+            room_sum = sum(room.values())
+            if room_sum <= 0:
+                break  # no room anywhere: conservation takes precedence
             for sid in capped:
                 capped[sid] += overflow * (room[sid] / room_sum)
 
