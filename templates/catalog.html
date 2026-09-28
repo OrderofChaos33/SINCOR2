@@ -1,0 +1,142 @@
+{% extends "layouts/base.html" %}
+{% block title %}SINCOR · DeFi catalog{% endblock %}
+{% block page_title %}DeFi product catalog{% endblock %}
+{% block content %}
+<section class="kpis">
+  <div class="card"><label>Total SKUs</label><div class="val" id="kTotal">—</div><div class="sub">speculative DeFi arm</div></div>
+  <div class="card"><label>At test stage</label><div class="val" id="kTest">—</div><div class="sub">built + evidence recorded</div></div>
+  <div class="card"><label>At spec stage</label><div class="val" id="kSpec">—</div><div class="sub">design specs, not products</div></div>
+  <div class="card"><label>With proof evidence</label><div class="val" id="kProof">—</div><div class="sub">proof-ledger entries</div></div>
+</section>
+
+<section class="card">
+  <div class="toolbar">
+    <input class="input" id="q" type="search" placeholder="Search name, SKU, or category…" aria-label="Search catalog">
+  </div>
+  <div class="toolbar" id="stageChips" style="margin-bottom:0"></div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h3 id="countLine"><span class="loading">Loading catalog…</span></h3></div>
+  <div id="tableBox"></div>
+  <p class="muted" style="margin-top:12px;font-size:12px">Stages follow the product-arm lifecycle
+  (spec → build → test → audit → product → catalog). Spec-stage entries are design
+  specifications — not live products. Compliance scores are computed from the
+  proof ledger and spec text; evidence counts are ledger entries per SKU.</p>
+  <p id="catErr" style="display:none" class="err"></p>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+  var skus = [];
+  var activeStage = 'all';
+  var STAGES = ['spec', 'build', 'test', 'audit', 'product', 'catalog'];
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>\"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function pillFor(st) {
+    var cls = st === 'test' ? 'open' : st === 'build' ? 'auction'
+      : st === 'audit' ? 'warn' : (st === 'product' || st === 'catalog') ? 'good' : '';
+    return '<span class="pill ' + cls + '">' + esc(st) + '</span>';
+  }
+  function scoreCell(s) {
+    if (s === null || s === undefined) return '<span class="muted">—</span>';
+    var pct = Math.max(0, Math.min(100, Number(s)));
+    var cls = pct >= 70 ? 'good' : pct >= 40 ? 'warn' : 'bad';
+    return '<span class="pill ' + cls + '">' + pct.toFixed(1) + '</span>';
+  }
+  function evidenceCell(r) {
+    if (!r.evidence_count) return '<span class="muted">—</span>';
+    var inner = r.evidence.map(function (e) {
+      var when = e.timestamp ? new Date(e.timestamp * 1000).toISOString().slice(0, 10) : '—';
+      return '<div style="margin:6px 0"><code>' + esc(e.entry_id) + '</code> · ' + esc(e.kind || '—')
+        + '<br><span class="muted">' + esc(e.suite || 'no suite recorded')
+        + ' · ' + esc(when) + ' · ' + esc(e.recorded_by || '—') + '</span></div>';
+    }).join('');
+    return '<details><summary>' + r.evidence_count + ' entr' + (r.evidence_count === 1 ? 'y' : 'ies') + '</summary>' + inner + '</details>';
+  }
+
+  function filtered() {
+    var q = document.getElementById('q').value.trim().toLowerCase();
+    return skus.filter(function (r) {
+      if (activeStage !== 'all' && String(r.stage).toLowerCase() !== activeStage) return false;
+      if (!q) return true;
+      return (r.name + ' ' + r.sku + ' ' + r.category).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  function render() {
+    var list = filtered();
+    document.getElementById('countLine').textContent =
+      list.length + ' of ' + skus.length + ' SKUs' + (activeStage !== 'all' ? ' · stage: ' + activeStage : '');
+    if (!list.length) {
+      document.getElementById('tableBox').innerHTML = '<p class="muted">No SKUs match this filter.</p>';
+      return;
+    }
+    var html = '<table><thead><tr><th>Product</th><th>Category</th><th>Stage</th>'
+      + '<th>Compliance</th><th>Evidence</th><th>Version</th></tr></thead><tbody>';
+    list.forEach(function (r) {
+      html += '<tr><td><strong>' + esc(r.name) + '</strong><br><code class="muted">' + esc(r.sku) + '</code></td>'
+        + '<td>' + esc(r.category) + '</td>'
+        + '<td>' + pillFor(String(r.stage).toLowerCase()) + '</td>'
+        + '<td>' + scoreCell(r.compliance_score) + '</td>'
+        + '<td>' + evidenceCell(r) + '</td>'
+        + '<td class="muted">' + esc(r.version) + '</td></tr>';
+    });
+    document.getElementById('tableBox').innerHTML = html + '</tbody></table>';
+  }
+
+  function renderChips() {
+    var box = document.getElementById('stageChips');
+    var counts = { all: skus.length };
+    skus.forEach(function (r) {
+      var st = String(r.stage).toLowerCase();
+      counts[st] = (counts[st] || 0) + 1;
+    });
+    var html = '<button class="chip' + (activeStage === 'all' ? ' on' : '') + '" data-stage="all">All (' + counts.all + ')</button>';
+    STAGES.forEach(function (st) {
+      if (!counts[st]) return;
+      html += '<button class="chip' + (activeStage === st ? ' on' : '') + '" data-stage="' + st + '">'
+        + st + ' (' + counts[st] + ')</button>';
+    });
+    box.innerHTML = html;
+    box.querySelectorAll('.chip').forEach(function (b) {
+      b.addEventListener('click', function () {
+        activeStage = b.getAttribute('data-stage');
+        renderChips(); render();
+      });
+    });
+  }
+
+  function kpis() {
+    var byStage = {};
+    var withProof = 0;
+    skus.forEach(function (r) {
+      var st = String(r.stage).toLowerCase();
+      byStage[st] = (byStage[st] || 0) + 1;
+      if (r.evidence_count > 0) withProof += 1;
+    });
+    document.getElementById('kTotal').textContent = skus.length;
+    document.getElementById('kTest').textContent = byStage.test || 0;
+    document.getElementById('kSpec').textContent = byStage.spec || 0;
+    document.getElementById('kProof').textContent = withProof;
+  }
+
+  document.getElementById('q').addEventListener('input', render);
+  window.sincorFetch('/api/defi/catalog').then(function (d) {
+    if (!d || !d.skus) {
+      var e = document.getElementById('catErr');
+      e.style.display = 'block';
+      e.textContent = 'Catalog data unreachable. Values shown as —.';
+      return;
+    }
+    skus = d.skus;
+    kpis(); renderChips(); render();
+  });
+})();
+</script>
+{% endblock %}

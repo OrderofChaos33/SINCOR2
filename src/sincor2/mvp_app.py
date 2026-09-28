@@ -816,6 +816,11 @@ from sincor2.blueprints.console import console_bp as _console_bp
 
 app.register_blueprint(_console_bp)
 
+# DeFi product-arm catalog: /catalog + GET /api/defi/catalog (read-only).
+from sincor2.blueprints.defi_catalog import defi_catalog_bp as _defi_catalog_bp
+
+app.register_blueprint(_defi_catalog_bp)
+
 # /command-center page on production (GET only). Same login gate as the other
 # operator surfaces on this app (see /dashboard, /operator). The full
 # command-center API blueprint is deliberately NOT mounted here: its
