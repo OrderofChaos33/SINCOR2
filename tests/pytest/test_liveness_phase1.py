@@ -133,10 +133,20 @@ def fake(monkeypatch, tmp_path):
     srv = FakeServer()
     monkeypatch.setattr(liv_runner, "get_json", srv.get_json)
     monkeypatch.setattr(liv_runner, "post_json", srv.post_json)
+    # _task_index() now paginates via get_all_pages; the fake server has no
+    # real pagination, so serve its whole inventory as a single short page.
+    monkeypatch.setattr(
+        liv_runner, "get_all_pages",
+        lambda base_url, path, **kw: srv.get_json(
+            base_url, path + "?per_page=100&page=1")["tasks"])
     # fountain executors call net's functions via fountain's own namespace,
     # so they need the fake too (otherwise they hit the real network)
     monkeypatch.setattr(fountain, "get_json", srv.get_json)
     monkeypatch.setattr(fountain, "post_json", srv.post_json)
+    monkeypatch.setattr(
+        fountain, "get_all_pages",
+        lambda base_url, path, **kw: srv.get_json(
+            base_url, path + "?per_page=100&page=1")["tasks"])
     monkeypatch.setattr(liv_runner, "COMMITS_PATH",
                         str(tmp_path / "commits.json"))
     monkeypatch.setattr(liv_runner, "QUEUE_PATH",

@@ -35,7 +35,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from net import HttpError, get_json, post_json  # noqa: E402
+from net import HttpError, get_all_pages, get_json, post_json  # noqa: E402
 
 import yaml  # noqa: E402
 
@@ -65,7 +65,7 @@ class FountainRefused(Exception):
 
 def execute_defi_metrics_sweep(base_url: str):
     pool = get_json(base_url, "/v1/a2a/pool")
-    tasks = get_json(base_url, "/v1/a2a/tasks?per_page=100").get("tasks", [])
+    tasks = get_all_pages(base_url, "/v1/a2a/tasks", per_page=100)
     by_state = {}
     for t in tasks:
         by_state[t.get("state", "?")] = by_state.get(t.get("state", "?"), 0) + 1
@@ -92,7 +92,7 @@ def execute_defi_metrics_sweep(base_url: str):
 def execute_auction_health_check(base_url: str):
     import time
     now_ms = int(time.time() * 1000)
-    tasks = get_json(base_url, "/v1/a2a/tasks?per_page=100").get("tasks", [])
+    tasks = get_all_pages(base_url, "/v1/a2a/tasks", per_page=100)
     stale = [t for t in tasks
              if t.get("state") in ("open", "auction")
              and t.get("reveal_deadline") and now_ms > int(t["reveal_deadline"])]
@@ -163,7 +163,7 @@ def execute_fee_ledger_watch(base_url: str):
 
 
 def execute_task_board_audit(base_url: str):
-    tasks = get_json(base_url, "/v1/a2a/tasks?per_page=100").get("tasks", [])
+    tasks = get_all_pages(base_url, "/v1/a2a/tasks", per_page=100)
     seeds = [t.get("seed_key") for t in tasks if t.get("seed_key")]
     dupes = len(seeds) - len(set(seeds))
     missing = sum(1 for t in tasks if not t.get("seed_key"))
@@ -598,7 +598,7 @@ def post_lane_c(base_url: str, max_n: int = 3, st: dict | None = None):
 # ---------------------------------------------------------------------------
 
 def _live_seed_keys(base_url: str):
-    tasks = get_json(base_url, "/v1/a2a/tasks?per_page=100").get("tasks", [])
+    tasks = get_all_pages(base_url, "/v1/a2a/tasks", per_page=100)
     return ({t.get("seed_key") for t in tasks if t.get("seed_key")},
             {t.get("seed_key"): t.get("state") for t in tasks if t.get("seed_key")})
 

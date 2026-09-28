@@ -34,7 +34,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from net import HttpError, get_json, post_json  # noqa: E402
+from net import HttpError, get_all_pages, get_json, post_json  # noqa: E402
 import fountain  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -148,6 +148,15 @@ class Runner:
         self.by_id = {a["agent_id"]: a for a in cohort}
         self.commits = load_commits()
         self.now_ms = int(time.time() * 1000)
+        # Flips to False on any partial failure (e.g. one agent's
+        # heartbeat dies).  one_pass()/main() turn this into a nonzero
+        # process exit code so cron can detect a degraded pass.
+        self.pass_ok = True
+
+    def note_failure(self, msg):
+        """Log a partial failure and mark the pass as failed."""
+        log(msg)
+        self.pass_ok = False
 
     # -- step 1: heartbeats -------------------------------------------------
     def heartbeat_all(self):
@@ -165,14 +174,23 @@ class Runner:
                         post_json(self.base_url, "/v1/a2a/heartbeat",
                                   {"agent_id": aid})
                     except HttpError as e2:
-                        log(f"  re-register failed for {aid}: {e2}")
+                        self.note_failure(f"  re-register failed for {aid}: {e2}")
+                    except Exception as e2:
+                        self.note_failure(
+                            f"  re-register transport failure for {aid}: {e2}")
                 else:
-                    log(f"heartbeat failed for {aid}: {e}")
+                    self.note_failure(f"heartbeat failed for {aid}: {e}")
+            except Exception as e:
+                # Transport failure AFTER net.py exhausted its retries
+                # (truncated read, connection reset, ...).  Isolate it to
+                # this agent: log, mark the pass degraded, keep going.
+                self.note_failure(f"heartbeat transport failure for {aid}: {e}")
 
     # -- steps 2-5: auction lifecycle ---------------------------------------
     def _task_index(self):
-        tasks = get_json(self.base_url,
-                         "/v1/a2a/tasks?per_page=100").get("tasks", [])
+        # Paginated: a single page is NEVER treated as the full inventory
+        # (a truncated page would silently drop tasks from the pass).
+        tasks = get_all_pages(self.base_url, "/v1/a2a/tasks", per_page=100)
         return {t["task_id"]: t for t in tasks}
 
     def recover_and_reveal(self, tasks):
@@ -448,6 +466,25 @@ def fountain_type_of(seed_key: str):
     return "-".join(parts[:-3])
 
 
+def one_pass(base_url, cohort) -> bool:
+    """Run a single pass. Returns True iff the pass fully succeeded.
+
+    A raised exception OR any partial failure recorded on the Runner
+    (r.pass_ok == False) both yield False, which main() turns into a
+    nonzero process exit code.  A failed pass never exits 0.
+    """
+    r = Runner(base_url, cohort)
+    try:
+        r.run_once()
+    except Exception as e:
+        log(f"pass failed: {e}")
+        return False
+    if not r.pass_ok:
+        log("pass completed with partial failures")
+        return False
+    return True
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default="https://getsincor.com")
@@ -459,20 +496,13 @@ def main() -> int:
     os.makedirs(STATE_DIR, exist_ok=True)
     cohort = load_cohort()
 
-    def one_pass():
-        r = Runner(args.base_url, cohort)
-        try:
-            r.run_once()
-        except Exception as e:
-            log(f"pass failed: {e}")
-
     if args.daemon:
         log(f"liveness daemon starting against {args.base_url}")
         while True:
-            one_pass()
+            one_pass(args.base_url, cohort)
             time.sleep(50)
     else:
-        one_pass()
+        return 0 if one_pass(args.base_url, cohort) else 1
     return 0
 
 
