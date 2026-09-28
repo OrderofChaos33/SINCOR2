@@ -1,0 +1,477 @@
+[
+  {
+    "task_key": "p03-darkpool-architecture-spec",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "spec",
+    "title": "Draft dark pool architecture spec",
+    "description": "Deliver docs/p03/ARCHITECTURE.md: intent lifecycle (submit -> zk-matched -> settle), off-chain matching via zk-coprocessors (Succinct/Bonsai), on-chain settlement of net balances on L1/L2, agent roles for intent submission and matching, privacy model (sizes/prices hidden from mempools), and the CoW-style split logic for SINC self-funding. Done = spec ratifies catalog gates (min_out, split_threshold, axm_only_settlement) with numeric values and a data-flow diagram showing what is proven vs revealed.",
+    "skill": "p03-darkpool-architecture-spec",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "spec"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": []
+  },
+  {
+    "task_key": "p03-darkpool-interface-definitions",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "spec",
+    "title": "Define intent and settlement interfaces",
+    "description": "Deliver onchain/src/hooks/IDarkPool.sol (submitIntent, cancelIntent, settleBatch, claimBalances) and src/sincor2/defi/p03/interfaces.py (intent schema, batch proof verification interface, net-balance accounting). Done = Solidity compiles under solc 0.8.24; Python mypy-clean; interfaces frozen before core work.",
+    "skill": "p03-darkpool-interface-definitions",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "spec",
+      "interfaces"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-economic-fee-model",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "spec",
+    "title": "Specify economic and fee model",
+    "description": "Deliver docs/p03/ECONOMICS.md: 8 bps protocol fee on settled volume routed to the canonical treasury address, solver competition model, split_threshold economics (when CoW-style splitting beats direct routing), and min_out slippage protection math. Done = worked example of a SINC self-funding batch with fee math to the wei and settlement restricted to AXM/USDC only.",
+    "skill": "p03-darkpool-economic-fee-model",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "spec",
+      "economics"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-repo-scaffold",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "scaffold",
+    "title": "Create repo layout and stub interfaces",
+    "description": "Create onchain/src/hooks/p03/, circuits/p03/ (zk circuit stubs), src/sincor2/defi/p03/, agents/defi/p03/, tests/pytest/test_p03_*.py stubs, docs/p03/; agent YAML skeletons for intent submitter and matcher. Done = tree committed, stubs compile/collect, CI lints pass.",
+    "skill": "p03-darkpool-repo-scaffold",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-interface-definitions"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-boilerplate-starter",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "scaffold",
+    "title": "Write boilerplate starter code",
+    "description": "Fill stubs: DarkPool.sol with ReentrancyGuard + SafeERC20, non-bricking try/catch on settlement transfers; Python package with intent dataclasses, proof-verifier client skeleton, TOA hooks; circuit stub with documented public/private inputs. Done = forge build succeeds; pytest collects; no unresolved stub markers in public bodies.",
+    "skill": "p03-darkpool-boilerplate-starter",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-repo-scaffold"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-intent-contract",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "core",
+    "title": "Implement intent submission contract",
+    "description": "Implement intent lifecycle in onchain/src/hooks/p03/DarkPool.sol: submitIntent (hash-commit of size/price/limit), cancelIntent, expiry handling, per-user nonce and replay protection. Stores only commitments onchain; plaintext never touches chain or mempool. Done = compiles under solc 0.8.24; cancel/refund path proven; replay of a settled intent reverts.",
+    "skill": "p03-darkpool-intent-contract",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "core",
+      "solidity"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p03-darkpool-boilerplate-starter"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-zk-circuits",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "core",
+    "title": "Build zk matching circuits",
+    "description": "Implement circuits/p03/match.circom (or Halo2 equivalent): private inputs (intent sizes, limit prices), public inputs (commitment roots, batch id), constraints proving the match is price-valid and size-consistent without revealing values; generate verifier contract. Done = circuit compiles, trusted-setup artifacts documented, proof verifies onchain for a 10-intent batch, proving time benchmarked.",
+    "skill": "p03-darkpool-zk-circuits",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "core",
+      "zk"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p03-darkpool-intent-contract"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-matcher-agent",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "core",
+    "title": "Build off-chain matcher agent",
+    "description": "src/sincor2/defi/p03/matcher.py: collects intents, computes optimal matches off-chain, generates zk proofs via Succinct/Bonsai adapter, submits batch + proof onchain; 99% of compute off-chain per the coordination spec. Full error handling, idempotent batch submission. Done = agent matches a 50-intent fixture, proof verifies, batch settles; duplicate batch submission is a safe no-op.",
+    "skill": "p03-darkpool-matcher-agent",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "core",
+      "agent"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p03-darkpool-zk-circuits"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-settlement",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "core",
+    "title": "Implement net-balance settlement",
+    "description": "Implement settleBatch(): verify zk proof, compute net balances, settle in AXM/USDC only (axm_only_settlement gate enforced in code), pull-based claims with non-bricking try/catch. Done = settlement test: mixed long/short intents net to correct balances; non-AXM/USDC settlement asset reverts; failed transfer never bricks the batch.",
+    "skill": "p03-darkpool-settlement",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "core",
+      "solidity"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p03-darkpool-zk-circuits"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-split-solver",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "core",
+    "title": "Implement CoW-style split solver",
+    "description": "Python solver applying split_threshold: splits large intents across dark-pool matches and allowlisted DEX venues when splitting improves net execution vs direct routing; integrates with the A2A marketplace for SINC self-funding orders. Done = solver benchmark on fixtures shows split routing beating single-venue by the modeled margin; min_out enforced on every leg.",
+    "skill": "p03-darkpool-split-solver",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "core",
+      "solver"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p03-darkpool-matcher-agent"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-fee-access-control",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "core",
+    "title": "Implement fee logic and access control",
+    "description": "8 bps fee on settled volume to the canonical treasury address; roles: MATCHER_ROLE (batch submission), GUARDIAN_ROLE (pause), ADMIN; fee accounting per batch with events. Done = fee math test exact to the wei; unauthorized settleBatch reverts; pause blocks new intents but not withdrawals.",
+    "skill": "p03-darkpool-fee-access-control",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "core",
+      "fees",
+      "security"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-settlement"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-edge-cases",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "core",
+    "title": "Handle edge cases: expiry, partial fills, proof failure",
+    "description": "Cover: intent expiry before matching (auto-refund), partial fills with pro-rata accounting, invalid zk proof (batch rejected, intents reusable), L1/L2 settlement asset mismatch, matcher downtime (intents remain cancellable). Done = each edge case tested; no path locks user funds beyond the claim window.",
+    "skill": "p03-darkpool-edge-cases",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "core",
+      "edge-cases"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-fee-access-control",
+      "p03-darkpool-split-solver"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-unit-tests",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "testing",
+    "title": "Write unit tests for contracts and circuits",
+    "description": "Foundry tests for intent lifecycle + settlement; circuit constraint tests; Python unit tests for solver split logic and intent schema validation. Done = 24/24 pass; circuit tests cover under-constrained-input attacks.",
+    "skill": "p03-darkpool-unit-tests",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "testing",
+      "unit"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-edge-cases"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-integration-tests",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "testing",
+    "title": "Write integration tests: intent to settlement",
+    "description": "tests/pytest/test_p03_darkpool_integration.py: submit 20 intents -> matcher produces batch -> proof verifies -> settleBatch -> claims; plus split-solver path via A2A marketplace fixture. Done = end-to-end batch settles with correct net balances; suite green in CI.",
+    "skill": "p03-darkpool-integration-tests",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "testing",
+      "integration"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p03-darkpool-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-invariant-fuzz",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "testing",
+    "title": "Invariant and fuzz tests",
+    "description": "Invariants: settled conservation (ins == outs + fees), no intent settles twice, AXM/USDC-only settlement under fuzzed asset lists, matcher output always verifies or is rejected. Done = 10k runs each, zero counterexamples, docs/p03/INVARIANTS.md.",
+    "skill": "p03-darkpool-invariant-fuzz",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "testing",
+      "fuzz"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-integration-tests"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-fork-simulation",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "testing",
+    "title": "Fork simulation with realistic order flow",
+    "description": "Fork Base at a pinned block; replay a synthetic whale order-flow through the dark pool; measure privacy (no size/price leakage onchain), settlement gas per batch, and SINC self-funding slippage vs direct DEX. Done = docs/p03/FORK_SIM.md with slippage-improvement and gas numbers.",
+    "skill": "p03-darkpool-fork-simulation",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "testing",
+      "fork"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-invariant-fuzz"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-audit-prep",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "audit",
+    "title": "Assemble audit-prep package",
+    "description": "docs/p03/AUDIT.md: threat model (proof forgery, intent front-running via commitment leakage, settlement asset confusion, matcher liveness), circuit audit notes, role matrix, NatSpec. Freeze tagged commit. Done = passes repo audit checklist; circuit trusted-setup ceremony documented.",
+    "skill": "p03-darkpool-audit-prep",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "audit"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p03-darkpool-fork-simulation"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-findings-remediation",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "audit",
+    "title": "Remediate audit findings",
+    "description": "Fix all High/Critical findings across contracts and circuits; regression tests per finding; docs/p03/FINDINGS.md ledger. Done = auditor sign-off; circuit re-audited after any constraint change.",
+    "skill": "p03-darkpool-findings-remediation",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "audit",
+      "remediation"
+    ],
+    "bounty_axm": 4.0,
+    "effort": "L",
+    "depends_on": [
+      "p03-darkpool-audit-prep"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-gas-optimization",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "audit",
+    "title": "Gas optimization pass",
+    "description": "Profile submitIntent/settleBatch/claim; batch calldata packing, proof-verification gas. Done = docs/p03/GAS.md with before/after, >=15% improvement on settleBatch, fuzz suite re-run green.",
+    "skill": "p03-darkpool-gas-optimization",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "audit",
+      "gas"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p03-darkpool-findings-remediation"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-technical-docs",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "docs",
+    "title": "Write technical documentation",
+    "description": "docs/p03/TECHNICAL.md: intent lifecycle, circuit design and public/private inputs, matching algorithm, settlement math, privacy guarantees and their limits. Done = reimplementable from the doc; privacy claims precisely scoped.",
+    "skill": "p03-darkpool-technical-docs",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "docs"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-gas-optimization"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-agent-config-runbook",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "docs",
+    "title": "Ship agent YAML configs and ops runbook",
+    "description": "Finalize agents/defi/p03/intent_submitter.yaml and matcher.yaml plus docs/p03/RUNBOOK.md: Bonsai proving setup, batch cadence, proof-failure triage, key rotation, incident escalation. Done = runbook rehearsed end-to-end with logged timestamps.",
+    "skill": "p03-darkpool-agent-config-runbook",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "docs",
+      "ops"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-technical-docs"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-dashboard-monitoring",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "docs",
+    "title": "Build dashboard and monitoring hooks",
+    "description": "src/sincor2/defi/p03/monitor.py: intents open/matched, batch proving latency, settlement volume, fees to treasury, privacy-health checks. Done = panel renders fork-sim data; alert fires on proof-failure streak.",
+    "skill": "p03-darkpool-dashboard-monitoring",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "docs",
+      "monitoring"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-agent-config-runbook"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-testnet-deploy",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "deploy",
+    "title": "Write and execute testnet deploy scripts",
+    "description": "scripts/p03/deploy_testnet.sh + onchain/script/p03/Deploy.s.sol to Base Sepolia (verifier, dark pool, test tokens); verify; run scripted intent batches through Bonsai proving. Done = verified contracts in docs/p03/DEPLOY.md with batch settlement tx hashes.",
+    "skill": "p03-darkpool-testnet-deploy",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "deploy",
+      "testnet"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p03-darkpool-dashboard-monitoring"
+    ]
+  },
+  {
+    "task_key": "p03-darkpool-mainnet-readiness",
+    "project_id": "P03",
+    "project_name": "Intent Solver & Dark Pool",
+    "phase": "deploy",
+    "title": "Mainnet readiness checklist",
+    "description": "docs/p03/MAINNET_CHECKLIST.md: audit + circuit-audit sign-off, trusted-setup artifacts published, multisig, monitoring live, runbook rehearsed, rollback plan, go/no-go table. Done = every box signed; no mainnet batch without dual sign-off.",
+    "skill": "p03-darkpool-mainnet-readiness",
+    "tags": [
+      "defi",
+      "dark-pool",
+      "deploy",
+      "mainnet"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p03-darkpool-testnet-deploy"
+    ]
+  }
+]

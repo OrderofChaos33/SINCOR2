@@ -1431,6 +1431,11 @@ def create_app():
     except Exception as e:
         print(f"Command center blueprint not available: {e}")
     try:
+        from sincor2.liveness import attach_liveness
+        attach_liveness(app)
+    except Exception as e:
+        print(f"Liveness disclosure not available: {e}")
+    try:
         from sincor2.a2a_bootstrap import register_a2a
         if not register_a2a(app):
             print("A2A integration not available: register_a2a returned False")

@@ -1,0 +1,483 @@
+[
+  {
+    "task_key": "p18-structured-products-architecture-spec",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "spec",
+    "title": "Draft structured product vault architecture spec",
+    "description": "Write docs/architecture/P18_STRUCTURED_ARCHITECTURE.md: principal-protected sleeve plus yield sleeve design, PT/YT tranche tokens, payoff calculator, cap-rate and principal-floor enforcement points. Acceptance: the doc states the exact on-chain checks enforcing the principal floor and cap rate, and maps catalog gates (principal_floor, cap_rate) to code locations.",
+    "skill": "p18-structured-products-architecture-spec",
+    "tags": [
+      "defi",
+      "structured-products",
+      "spec"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": []
+  },
+  {
+    "task_key": "p18-structured-products-interface-definitions",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "spec",
+    "title": "Define vault, tranche, and payoff interfaces",
+    "description": "Deliver IStructuredVault.sol (deposit, split, redeem), ITrancheToken.sol, and IPayoffCalculator.sol in onchain/src/p18-structured/interfaces/ plus Python types. Acceptance: interfaces compile under solc 0.8.24 and a mock payoff calculator implementing them prices the spec's example product exactly.",
+    "skill": "p18-structured-products-interface-definitions",
+    "tags": [
+      "defi",
+      "structured-products",
+      "spec",
+      "interfaces"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-fee-model",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "spec",
+    "title": "Specify 12 bps fee model to Treasury",
+    "description": "Specify the 12 bps fee on deposits and on yield-sleeve harvests, routed to the SINCOR treasury at 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac, with worked examples for a principal-protected note. Acceptance: a reviewer can compute the treasury take for any deposit and harvest from the spec alone.",
+    "skill": "p18-structured-products-fee-model",
+    "tags": [
+      "defi",
+      "structured-products",
+      "spec",
+      "fees"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-repo-layout",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "scaffold",
+    "title": "Create P18 repo layout and skeletons",
+    "description": "Create onchain/src/p18-structured/{interfaces,tranches,vaults,StructuredVault.sol}, src/sincor2/defi/p18_structured/, tests/pytest/test_p18_structured.py, and agents/p18-structured-products.yaml as an empty-but-valid skeleton with a README module map. Acceptance: tree exists, YAML parses, no test collector errors from new paths.",
+    "skill": "p18-structured-products-repo-layout",
+    "tags": [
+      "defi",
+      "structured-products",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-starter-code",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "scaffold",
+    "title": "Write vault and agent starter code",
+    "description": "Write the StructuredVault skeleton with ReentrancyGuard, SafeERC20, non-bricking try/catch on the yield-source adapter, plus a Python agent skeleton with error handling and a TOA hook stub. Acceptance: compiles under solc 0.8.24 and the agent imports and answers a health ping.",
+    "skill": "p18-structured-products-starter-code",
+    "tags": [
+      "defi",
+      "structured-products",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-repo-layout"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-tranche-tokens",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "core",
+    "title": "Build PT and YT tranche tokens",
+    "description": "Implement principal tokens (PT, redeemable for the protected principal at maturity) and yield tokens (YT, claim on the yield sleeve) as ERC-20s minted only by the vault on deposit split. Proven-agent work: split/mint accounting with exact conservation. Acceptance: compiles under solc 0.8.24; PT+YT always minted in exact proportion to the deposit with zero supply drift.",
+    "skill": "p18-structured-products-tranche-tokens",
+    "tags": [
+      "defi",
+      "structured-products",
+      "core",
+      "tranches"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p18-structured-products-starter-code"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-principal-protection-sleeve",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "core",
+    "title": "Build principal-protection sleeve",
+    "description": "Implement the protection sleeve: deposits buy discounted zero-coupon-equivalent positions sized so PT redemption always meets the principal floor at maturity; floor enforced on-chain at redeem time. Proven-agent work: discount sizing math under rate moves. Acceptance: PT redemption can never return less than the principal floor in tests, including rate-shock scenarios.",
+    "skill": "p18-structured-products-principal-protection-sleeve",
+    "tags": [
+      "defi",
+      "structured-products",
+      "core",
+      "principal-protection"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p18-structured-products-starter-code",
+      "p18-structured-products-tranche-tokens"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-yield-sleeve",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "core",
+    "title": "Build yield sleeve with source adapter",
+    "description": "Implement the yield sleeve: remaining capital routes into an allowlisted yield source (e.g., Morpho) via an adapter with non-bricking try/catch; harvests split between YT holders and the treasury fee. Acceptance: a yield-source failure never bricks PT redemption and harvest accounting matches events to the wei.",
+    "skill": "p18-structured-products-yield-sleeve",
+    "tags": [
+      "defi",
+      "structured-products",
+      "core",
+      "yield-sleeve"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p18-structured-products-starter-code",
+      "p18-structured-products-principal-protection-sleeve"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-payoff-calculator",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "core",
+    "title": "Build cap-rate payoff calculator",
+    "description": "Implement the payoff calculator: participation rate and cap rate applied to the underlying's measured return at maturity, with fixed-point math and rounding that always favors the vault. Acceptance: calculator output matches the spec's worked payoff examples exactly, and payouts never exceed the cap rate.",
+    "skill": "p18-structured-products-payoff-calculator",
+    "tags": [
+      "defi",
+      "structured-products",
+      "core",
+      "payoff"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p18-structured-products-starter-code",
+      "p18-structured-products-yield-sleeve"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-cap-rate-enforcement",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "core",
+    "title": "Enforce cap rate on payouts",
+    "description": "Enforce the cap rate on-chain: any computed payout above the cap is clamped, with the clamp emitted as an event; cap parameters updatable only via timelock. Acceptance: a test with an underlying return above the cap receives exactly the capped payout.",
+    "skill": "p18-structured-products-cap-rate-enforcement",
+    "tags": [
+      "defi",
+      "structured-products",
+      "core",
+      "cap-rate"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p18-structured-products-starter-code",
+      "p18-structured-products-payoff-calculator"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-expiry-settlement",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "core",
+    "title": "Build maturity and settlement",
+    "description": "Implement maturity: permissionless settle() finalizes the underlying return measurement, PT redeems at protected principal plus capped upside, YT claims residual yield. Acceptance: full deposit-to-maturity lifecycle settles in tests with exact balance assertions.",
+    "skill": "p18-structured-products-expiry-settlement",
+    "tags": [
+      "defi",
+      "structured-products",
+      "core",
+      "settlement"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-starter-code",
+      "p18-structured-products-cap-rate-enforcement"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-access-control-edge-cases",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "core",
+    "title": "Build access control and edge cases",
+    "description": "Roles: product lister, yield-source allowlister, pauser; emergency early-maturity path; handle oracle staleness on the return measurement and reentrancy attempts. Acceptance: unauthorized actions revert, and a stale-oracle settlement attempt reverts rather than settling wrong.",
+    "skill": "p18-structured-products-access-control-edge-cases",
+    "tags": [
+      "defi",
+      "structured-products",
+      "core",
+      "access-control",
+      "edge-cases"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-starter-code",
+      "p18-structured-products-expiry-settlement"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-unit-tests",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "testing",
+    "title": "Write P18 unit tests",
+    "description": "Write tests/pytest/test_p18_structured.py covering tranche mint conservation, payoff calculator vs spec examples, and floor/cap enforcement. Acceptance: all unit tests green with the calculator matching worked examples exactly.",
+    "skill": "p18-structured-products-unit-tests",
+    "tags": [
+      "defi",
+      "structured-products",
+      "testing",
+      "unit"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-access-control-edge-cases"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-integration-tests",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "testing",
+    "title": "Write P18 integration tests",
+    "description": "End-to-end: agent lists a product, user deposits, split mints PT/YT, yield accrues, maturity settles, treasury receives 12 bps. Acceptance: full lifecycle in CI with floor and fee assertions.",
+    "skill": "p18-structured-products-integration-tests",
+    "tags": [
+      "defi",
+      "structured-products",
+      "testing",
+      "integration"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p18-structured-products-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-invariant-fuzz-tests",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "testing",
+    "title": "Write P18 invariant/fuzz tests",
+    "description": "Fuzz invariants: PT redemption >= principal floor; payout <= cap rate; PT+YT supply conservation across splits/redeems. Acceptance: 10k fuzz runs, zero violations.",
+    "skill": "p18-structured-products-invariant-fuzz-tests",
+    "tags": [
+      "defi",
+      "structured-products",
+      "testing",
+      "fuzz"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-fork-simulation",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "testing",
+    "title": "Run mainnet-fork structured product simulation",
+    "description": "Simulate the full lifecycle on a mainnet fork with a real yield source across rate paths. Acceptance: principal floor holds on all paths and capped payouts never exceed the cap on 20+ simulated paths.",
+    "skill": "p18-structured-products-fork-simulation",
+    "tags": [
+      "defi",
+      "structured-products",
+      "testing",
+      "fork"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-audit-prep",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "audit",
+    "title": "Assemble P18 audit-prep package",
+    "description": "Audit package: flattened sources, full natspec, threat model (yield-source compromise, return-measurement manipulation, cap/floor parameter griefing). Acceptance: passes the repo audit-readiness checklist with zero missing artifacts.",
+    "skill": "p18-structured-products-audit-prep",
+    "tags": [
+      "defi",
+      "structured-products",
+      "audit"
+    ],
+    "bounty_axm": 4.0,
+    "effort": "L",
+    "depends_on": [
+      "p18-structured-products-fork-simulation"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-findings-remediation",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "audit",
+    "title": "Remediate P18 audit findings",
+    "description": "Fix every audit finding with a regression test proving each fix. Acceptance: findings log 100% closed with linked tests, no new warnings.",
+    "skill": "p18-structured-products-findings-remediation",
+    "tags": [
+      "defi",
+      "structured-products",
+      "audit",
+      "remediation"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p18-structured-products-audit-prep"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-gas-optimization",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "audit",
+    "title": "Optimize P18 gas costs",
+    "description": "Gas report for deposit/split/settle paths; pack tranche storage; batch settlement. Acceptance: documented gas report and settle under 300k gas on the reference fork.",
+    "skill": "p18-structured-products-gas-optimization",
+    "tags": [
+      "defi",
+      "structured-products",
+      "audit",
+      "gas"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p18-structured-products-audit-prep"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-technical-docs",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "docs",
+    "title": "Write P18 technical documentation",
+    "description": "Technical docs: tranche mechanics, payoff formula with worked examples, yield-source onboarding guide, floor/cap accounting. Acceptance: a new builder can list a second structured product from the docs alone.",
+    "skill": "p18-structured-products-technical-docs",
+    "tags": [
+      "defi",
+      "structured-products",
+      "docs"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-integration-tests"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-agent-config-runbook",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "docs",
+    "title": "Write P18 agent YAML config and ops runbook",
+    "description": "Deliver agents/p18-structured-products.yaml (budgets, memory, heartbeat, TOA hook) and docs/ops/P18_STRUCTURED_RUNBOOK.md covering yield-source failure and oracle outage. Acceptance: YAML validates against the repo agent schema; runbook covers the top 5 failure modes.",
+    "skill": "p18-structured-products-agent-config-runbook",
+    "tags": [
+      "defi",
+      "structured-products",
+      "docs",
+      "ops"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-technical-docs"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-monitoring-hooks",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "docs",
+    "title": "Build P18 dashboard and monitoring hooks",
+    "description": "Monitoring hooks: TVL per product, PT coverage ratio vs floor, realized yield, treasury fee inflow to the SINCOR dashboard. Acceptance: hooks emit structured metrics and report unknown rather than healthy on stale data, per STATUS_FEED_SCHEMA.",
+    "skill": "p18-structured-products-monitoring-hooks",
+    "tags": [
+      "defi",
+      "structured-products",
+      "docs",
+      "monitoring"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-technical-docs"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-testnet-deploy",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "deploy",
+    "title": "Write P18 testnet deploy scripts",
+    "description": "Write scripts/defi/p18/deploy_testnet.py deploying the vault, tranche token factory, and payoff calculator to Base Sepolia with a seeded principal-protected product. Acceptance: deployed, verified, and a deposit-to-maturity cycle executes on Sepolia.",
+    "skill": "p18-structured-products-testnet-deploy",
+    "tags": [
+      "defi",
+      "structured-products",
+      "deploy",
+      "testnet"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p18-structured-products-audit-prep",
+      "p18-structured-products-technical-docs"
+    ]
+  },
+  {
+    "task_key": "p18-structured-products-mainnet-readiness",
+    "project_id": "P18",
+    "project_name": "Structured Product Vaults",
+    "phase": "deploy",
+    "title": "Produce P18 mainnet readiness checklist",
+    "description": "Mainnet readiness checklist: audit sign-off, floor/cap parameters ratified, yield-source allowlist finalized, timelock active, dry-run default confirmed, treasury address verified. Acceptance: every item signed off with evidence links before any mainnet deployment.",
+    "skill": "p18-structured-products-mainnet-readiness",
+    "tags": [
+      "defi",
+      "structured-products",
+      "deploy",
+      "mainnet"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p18-structured-products-testnet-deploy"
+    ]
+  }
+]

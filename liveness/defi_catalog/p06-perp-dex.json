@@ -1,0 +1,542 @@
+[
+ {
+  "task_key": "p06-architecture-spec",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "spec",
+  "title": "Draft perp DEX hedging swarm architecture spec",
+  "description": "Deliverable: docs/architecture/p06-perp-dex-hedging-swarm.md covering the contract system (PerpHedgeEngine, liquidation buffer ladder, live-block gate), the Python agent loop (15-min check-ins), the delta-neutral strategy (LST collateral + exact matching perp short, 5% over-hedge headroom), and the gate table — delta_band (3% band, 1% hysteresis), funding_sign (entry ≥ +8% now / +5% 24h avg; kill on 2 consecutive negative hourly checkpoints), liq_buffer (4×/2×/1.5× maintenance margin ladder). Acceptance criteria: (1) doc lists every component with data flows; (2) each gate maps to its enforcing contract/function; (3) the 12 bps fee route to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac is cited; (4) spec reviewed against repo standards before any core work starts. Numeric constraints: isolated margin only; 1× notional sizing; oracle staleness 120s. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-architecture-spec",
+  "tags": [
+   "defi",
+   "perps",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p06-interface-definitions",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "spec",
+  "title": "Define Solidity interfaces for the perp hedging engine",
+  "description": "Deliverable: onchain/src/p06/interfaces/IPerpHedgeEngine.sol, IHedgeAgentAdapter.sol, ILiveBlockGate.sol with full NatSpec and fixed function signatures for sizing, rebalance, unwind, and the live-block gate — frozen before core. Acceptance criteria: (1) all three files compile under solc 0.8.24 with zero errors; (2) every external entrypoint used by the Python agent is declared exactly once (no duplicates, no gaps); (3) NatSpec on 100% of public entries. Numeric constraints: gate thresholds appear as named constants, not magic numbers. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-interface-definitions",
+  "tags": [
+   "defi",
+   "perps",
+   "solidity"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p06-economic-model",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "spec",
+  "title": "Model perp hedge economics and fee routing",
+  "description": "Deliverable: docs/economics/p06-hedge-economics.md with the delta-neutral sizing math, funding-rate edge capture logic (entry only when elevated and persistent; ~18-day break-even at 10% APR against ~0.5% round-trip cost), 12 bps protocol fee routing to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac on positive realized P&L, and risk budgets (min capital $250, max_alloc_pct 0.15 per catalog P06). Acceptance criteria: (1) a runnable Python model reproduces the worked numbers in the doc within 0.1%; (2) the fee flow traces end-to-end to the treasury address; (3) break-even table covers funding regimes 5%/10%/20%/40% APR. Numeric constraints: fee 12 bps; model tolerance 0.1%. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-economic-model",
+  "tags": [
+   "defi",
+   "perps",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p06-repo-layout",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "scaffold",
+  "title": "Scaffold p06 repo layout and interfaces",
+  "description": "Deliverable: onchain/src/p06/, src/sincor2/defi/p06_perps/, tests/pytest/test_p06_*, configs/agents/p06-hedge-agent.yaml; wire the frozen interfaces into the layout with one-line READMEs per directory (noting the deliberate deviation: P06 is not a Uniswap hook, so it does not live under onchain/src/hooks/). Acceptance criteria: (1) directory tree exists; (2) all Python imports resolve; (3) solc 0.8.24 compiles the interface set with zero errors; (4) CI lints pass. Numeric constraints: none yet; structure only. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-repo-layout",
+  "tags": [
+   "defi",
+   "perps",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model"
+  ]
+ },
+ {
+  "task_key": "p06-boilerplate",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "scaffold",
+  "title": "Starter PerpHedgeEngine and agent boilerplate",
+  "description": "Deliverable: PerpHedgeEngine skeleton (ReentrancyGuard, SafeERC20, non-bricking try/catch on external DEX calls) and the Python hedge agent skeleton with TOA hooks, config parsing, and structured logging. Acceptance criteria: (1) boilerplate compiles under solc 0.8.24; (2) the agent boots with a dummy config; (3) a stub test passes under pytest; (4) no unresolved stub markers in public bodies. Numeric constraints: none yet; structure only. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-boilerplate",
+  "tags": [
+   "defi",
+   "perps",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model"
+  ]
+ },
+ {
+  "task_key": "p06-hedge-sizing-engine",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "core",
+  "title": "Build delta-neutral hedge sizing engine",
+  "description": "Deliverable: sizing engine computing the exact perp short notional against LST collateral positions with precision-safe fixed-point math (shortNotional = spotExposureUSD × 1.05 liq_headroom), plus the Python reference model in src/sincor2/defi/p06_perps/sizing.py. Acceptance criteria: (1) on-chain sizing matches the Python reference within 1 wei across the full fuzz vector range of collateral and price inputs; (2) the delta_band gate (projected |delta| ≤ 3%) is enforced before any position opens; (3) 1× notional sizing — no directional multiplier. Numeric constraints: headroom 5%; parity 1 wei; band 3%. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-hedge-sizing-engine",
+  "tags": [
+   "defi",
+   "perps",
+   "sizing"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model",
+   "p06-repo-layout",
+   "p06-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p06-liquidation-engine",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "core",
+  "title": "Build liquidation buffer manager",
+  "description": "Deliverable: liq_buffer gate as a health-factor ladder — target margin ratio ≥ 4× maintenance at open; agent-initiated unwind at 2×; contract pauses new opens at 1.5× (existing positions and unwinds never paused); pull-style payout fallback (pendingWithdrawals) so a reverting recipient cannot brick the unwind. Acceptance criteria: (1) fork simulation across 2025-style volatility shocks shows zero liquidations; (2) unwind completes within the configured buffer window once the 2× rung is hit; (3) reverting recipient falls back to pull-withdrawals cleanly. Numeric constraints: ladder 4×/2×/1.5×; isolated margin only. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-liquidation-engine",
+  "tags": [
+   "defi",
+   "perps",
+   "risk"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model",
+   "p06-repo-layout",
+   "p06-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p06-funding-monitor",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "core",
+  "title": "Build funding-rate monitor agent",
+  "description": "Deliverable: Python funding monitor polling Hyperliquid funding rates each 15-min check-in cycle; enforces the funding_sign gate (entry requires ≥ +8% annualized now and +5% 24h average; kill on 2 consecutive negative hourly checkpoints → auto-unwind); every path has error handling with exponential backoff and TOA telemetry hooks. Acceptance criteria: (1) against recorded funding-flip fixtures the agent reacts within one check-in cycle of the second negative checkpoint; (2) no kill decision is made on stale funding data; (3) backoff and telemetry verified in tests. Numeric constraints: cadence 15 min; kill after 2 consecutive negative hours. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-funding-monitor",
+  "tags": [
+   "defi",
+   "perps",
+   "funding"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model",
+   "p06-repo-layout",
+   "p06-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p06-live-block-gate",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "core",
+  "title": "Enforce live-blocked gate in code",
+  "description": "Deliverable: live-block gate — contract-level liveEnabled defaults false; every live path (open, rebalance, settle) reverts without it; release requires the founder-signed conversion proof; gate state queryable from the agent before any action. Acceptance criteria: (1) tests assert each live path reverts pre-proof and succeeds post-proof; (2) the agent queries gate state before building any live intent; (3) no role besides the founder proof path can flip the gate. Numeric constraints: binary gate — no partial states. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-live-block-gate",
+  "tags": [
+   "defi",
+   "perps",
+   "gate"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model",
+   "p06-repo-layout",
+   "p06-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p06-position-loop",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "core",
+  "title": "Build position open/rebalance/unwind loop controller",
+  "description": "Deliverable: loop controller orchestrating open, rebalance, and unwind between the Python agent and PerpHedgeEngine — non-bricking try/catch on every external DEX call, idempotent action records (replay-safe by action ID). Acceptance criteria: (1) a full open-rebalance-unwind cycle completes on a Base Sepolia fork; (2) all fees accounted to treasury (12 bps on the profitable close, exact to the wei); (3) replaying any action ID is a safe no-op. Numeric constraints: idempotency by action ID; fee 12 bps on positive realized P&L only. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-position-loop",
+  "tags": [
+   "defi",
+   "perps",
+   "execution"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model",
+   "p06-repo-layout",
+   "p06-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p06-delta-band-controller",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "core",
+  "title": "Implement delta_band rebalance controller",
+  "description": "Deliverable: delta_band gate with 1% hysteresis — rebalances fire only when |net delta| exits the 3% band, and re-entry requires returning inside 2%; band parameters loaded from the agent YAML config. Acceptance criteria: (1) unit tests drive delta through and around the band edges and assert zero redundant rebalances; (2) hysteresis proven: oscillation at the edge triggers at most one rebalance; (3) band parameters reload from YAML without code changes. Numeric constraints: band 3%; hysteresis 1% (re-enter at 2%). Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-delta-band-controller",
+  "tags": [
+   "defi",
+   "perps",
+   "rebalance"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model",
+   "p06-repo-layout",
+   "p06-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p06-edge-cases",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "core",
+  "title": "Handle perp swarm edge cases",
+  "description": "Deliverable: handling for stale oracle prices (> 120s → no new actions, positions hold), venue downtime (agent holds, retries with backoff, pages after 3 failed cycles), partial fills on unwind (< 95% → retry with 50 bps slippage widening, max 5 attempts), and funding-rate staleness (no kill decision on stale data); each degrades gracefully without bricking the engine or stranding capital. Acceptance criteria: (1) every edge case has a dedicated test; (2) one-page incident doc per case in docs/ops/p06-edge-cases.md describing detection and recovery; (3) no case strands capital or bricks unwind. Numeric constraints: staleness 120s; slippage 50 bps; retries 5. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-edge-cases",
+  "tags": [
+   "defi",
+   "perps",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p06-architecture-spec",
+   "p06-interface-definitions",
+   "p06-economic-model",
+   "p06-repo-layout",
+   "p06-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p06-unit-tests",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "testing",
+  "title": "Unit tests for perp hedge sizing and gates",
+  "description": "Deliverable: tests/pytest/test_p06_unit.py covering sizing math (1-wei parity), delta_band (3% band, 1% hysteresis), funding_sign (entry/kill thresholds), liq_buffer ladder (4×/2×/1.5×), and the live-block revert matrix. Acceptance criteria: (1) 100% of new tests pass; (2) gate revert cases asserted explicitly (revert reason checked), not merely not-crashing; (3) band-edge tests prove zero redundant rebalances. Numeric constraints: parity 1 wei; thresholds at exact boundaries. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-unit-tests",
+  "tags": [
+   "defi",
+   "perps",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p06-hedge-sizing-engine",
+   "p06-liquidation-engine",
+   "p06-funding-monitor",
+   "p06-live-block-gate",
+   "p06-position-loop",
+   "p06-delta-band-controller",
+   "p06-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p06-integration-tests",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "testing",
+  "title": "Integration tests for agent-to-contract perp flow",
+  "description": "Deliverable: tests/pytest/test_p06_integration.py exercising the Python agent against the contracts on an in-process chain — commit sizing, open, funding flip, unwind. Acceptance criteria: (1) full lifecycle passes; (2) the live-block gate reverts are exercised end-to-end (pre-proof revert, post-proof success); (3) 12 bps fee on the profitable close routes to treasury exactly. Numeric constraints: fixture position $10k notional; fee math to the wei. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-integration-tests",
+  "tags": [
+   "defi",
+   "perps",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p06-hedge-sizing-engine",
+   "p06-liquidation-engine",
+   "p06-funding-monitor",
+   "p06-live-block-gate",
+   "p06-position-loop",
+   "p06-delta-band-controller",
+   "p06-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p06-fuzz-invariant",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "testing",
+  "title": "Fuzz and invariant tests for hedge neutrality",
+  "description": "Deliverable: fuzz/invariant tests asserting the portfolio stays delta-neutral within the 3% band across randomized prices, funding rates, and shock sequences; sizing parity (on-chain vs Python within 1 wei) under fuzz; unwind path never bricks. Acceptance criteria: (1) 10,000+ fuzz runs green; (2) any found counterexample is fixed and recorded; (3) unwind completes under every fuzzed shock sequence. Numeric constraints: 10k+ runs; band 3%; parity 1 wei. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-fuzz-invariant",
+  "tags": [
+   "defi",
+   "perps",
+   "fuzz"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p06-hedge-sizing-engine",
+   "p06-liquidation-engine",
+   "p06-funding-monitor",
+   "p06-live-block-gate",
+   "p06-position-loop",
+   "p06-delta-band-controller",
+   "p06-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p06-fork-simulation",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "testing",
+  "title": "Base fork simulation of perp swarm",
+  "description": "Deliverable: run the swarm against a Base mainnet fork with realistic liquidity, funding rates, and fee accounting; publish tests/reports/p06-fork-sim.md. Acceptance criteria: (1) report shows hedge P&L, funding captured, and treasury fee accrual with reproducible block pins; (2) zero liquidations across the simulated window; (3) report is re-runnable from the documented pins. Numeric constraints: block pins documented; P&L broken down per position set. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-fork-simulation",
+  "tags": [
+   "defi",
+   "perps",
+   "simulation"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p06-hedge-sizing-engine",
+   "p06-liquidation-engine",
+   "p06-funding-monitor",
+   "p06-live-block-gate",
+   "p06-position-loop",
+   "p06-delta-band-controller",
+   "p06-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p06-audit-prep",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "audit",
+  "title": "Audit-prep package for perp hedging swarm",
+  "description": "Deliverable: audit package at docs/audits/p06/ — frozen code, 100% NatSpec coverage, threat model (oracle manipulation, liquidation cascade, live-gate bypass, API-wallet compromise), economic assumptions (18-day break-even honesty check, entry gate rationale), complete contract inventory, gate-enforcement map, and the conversion-proof precondition stated explicitly for any live intent. Acceptance criteria: (1) package complete with contract inventory and gate map; (2) conversion-proof precondition explicit; (3) threat model covers all four named vectors. Numeric constraints: checklist completeness binary. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-audit-prep",
+  "tags": [
+   "defi",
+   "perps",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p06-unit-tests",
+   "p06-integration-tests",
+   "p06-fuzz-invariant",
+   "p06-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p06-findings-remediation",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "audit",
+  "title": "Remediate perp swarm audit findings",
+  "description": "Deliverable: fixes for every audit finding, prioritized by live-gate bypass, precision, and reentrancy; each fix links to its finding ID; regression tests added per fixed issue. Acceptance criteria: (1) zero open high/medium findings; (2) regression tests added for each fixed issue and all pass; (3) the live-gate bypass class re-tested adversarially after fixes. Numeric constraints: zero open high/medium. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-findings-remediation",
+  "tags": [
+   "defi",
+   "perps",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p06-unit-tests",
+   "p06-integration-tests",
+   "p06-fuzz-invariant",
+   "p06-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p06-gas-optimization",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "audit",
+  "title": "Gas optimization for perp hedge contracts",
+  "description": "Deliverable: profile and optimize the hot paths (sizing, rebalance, gate checks) without weakening any gate; gas report before/after in docs/audits/p06/gas.md. Acceptance criteria: (1) measurable savings with zero behavioral change — full test suite green after optimization; (2) no gate threshold altered; (3) report published. Numeric constraints: savings reported per function in gas units. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-gas-optimization",
+  "tags": [
+   "defi",
+   "perps",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p06-unit-tests",
+   "p06-integration-tests",
+   "p06-fuzz-invariant",
+   "p06-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p06-technical-docs",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "docs",
+  "title": "Technical docs for perp hedging swarm",
+  "description": "Deliverable: docs/p06-perp-dex.md — contract reference, agent architecture, gate semantics (delta_band, funding_sign, liq_buffer with exact thresholds), and the delta-neutral math appendix (sizing formula, parity proof, break-even analysis). Acceptance criteria: (1) a new builder can implement a compatible agent from the docs alone; (2) all code references resolve to real files; (3) every numeric parameter from the spec table appears. Numeric constraints: doc completeness. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-technical-docs",
+  "tags": [
+   "defi",
+   "perps",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p06-hedge-sizing-engine",
+   "p06-liquidation-engine",
+   "p06-funding-monitor",
+   "p06-live-block-gate",
+   "p06-position-loop",
+   "p06-delta-band-controller",
+   "p06-edge-cases",
+   "p06-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p06-runbook-yaml",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "docs",
+  "title": "Agent YAML config and ops runbook",
+  "description": "Deliverable: configs/agents/p06-hedge-agent.yaml (budgets, memory, 15-min check-in cadence, gate parameters: band 3%/hysteresis 1%, funding entry +8%/+5%, kill on 2 negative hours, buffer ladder 4×/2×/1.5×) and docs/ops/p06-runbook.md (deploy, monitor, unwind procedures). Acceptance criteria: (1) agent boots from the YAML with no code changes; (2) runbook covers the funding-flip and margin-stress incidents with step-by-step procedures; (3) gate parameters reload from YAML without code changes. Numeric constraints: parameters match the spec table exactly. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-runbook-yaml",
+  "tags": [
+   "defi",
+   "perps",
+   "runbook"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p06-hedge-sizing-engine",
+   "p06-liquidation-engine",
+   "p06-funding-monitor",
+   "p06-live-block-gate",
+   "p06-position-loop",
+   "p06-delta-band-controller",
+   "p06-edge-cases",
+   "p06-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p06-dashboard-hooks",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "docs",
+  "title": "Dashboard and monitoring hooks",
+  "description": "Deliverable: metrics endpoints/hooks for hedge delta, margin ratio, funding rate, gate states, and treasury fee accrual, exposed in the swarm status feed and registered in the monitoring config. Acceptance criteria: (1) the feed reports real values or 'unknown', never a fabricated 'healthy'; (2) hooks registered in the monitoring config; (3) alerts wired for funding < +2% annualized, |delta| > 2%, margin ratio < 3×, oracle staleness > 60s, and any liveEnabled state change. Numeric constraints: thresholds as specified. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-dashboard-hooks",
+  "tags": [
+   "defi",
+   "perps",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p06-hedge-sizing-engine",
+   "p06-liquidation-engine",
+   "p06-funding-monitor",
+   "p06-live-block-gate",
+   "p06-position-loop",
+   "p06-delta-band-controller",
+   "p06-edge-cases",
+   "p06-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p06-testnet-deploy",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "deploy",
+  "title": "Testnet deploy scripts for perp swarm",
+  "description": "Deliverable: scripts/deploy/p06/ deploying PerpHedgeEngine to Base Sepolia with the live-block gate engaged (liveEnabled=false) and the agent config pointed at the deployment. Acceptance criteria: (1) deploy script is idempotent (re-runnable without duplicating state); (2) deployment addresses and gate state recorded; (3) the live path reverts on testnet as expected (pre-proof revert proven). Numeric constraints: gate verified false post-deploy. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-testnet-deploy",
+  "tags": [
+   "defi",
+   "perps",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p06-audit-prep",
+   "p06-findings-remediation",
+   "p06-gas-optimization"
+  ]
+ },
+ {
+  "task_key": "p06-mainnet-checklist",
+  "project_id": "P06",
+  "project_name": "Perp DEX Hedging Swarm",
+  "phase": "deploy",
+  "title": "Mainnet readiness checklist for perp swarm",
+  "description": "Deliverable: docs/ops/p06-mainnet-checklist.md — audit sign-off, conversion-proof precondition (founder-signed proof + mainnet tier-table verification), API-wallet custody (withdraw-disabled API wallets), monitoring live, and the explicit live-block release procedure. Acceptance criteria: (1) checklist signed off by the auditor task; (2) no mainnet action possible without the conversion-proof step checked; (3) release procedure is a logged ceremony, not a config flip. Numeric constraints: checklist 100% signed. Per specs/p06-perp-dex.md §Acceptance criteria.",
+  "skill": "p06-mainnet-checklist",
+  "tags": [
+   "defi",
+   "perps",
+   "deploy"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p06-audit-prep",
+   "p06-findings-remediation",
+   "p06-gas-optimization"
+  ]
+ }
+]

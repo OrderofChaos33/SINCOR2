@@ -1,0 +1,484 @@
+[
+ {
+  "task_key": "p17-options-architecture-spec",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "spec",
+  "title": "Specify covered-only options architecture with enforcement map",
+  "description": "Write docs/architecture/P17_OPTIONS_ARCHITECTURE.md: covered-call/put vault design, option token lifecycle, vault integration points. (1) The doc names the exact on-chain require statements that make an uncovered mint revert. (2) The catalog gates covered_only and expiry_band each map to a named enforcement point (mint-time require, listing-time require). (3) The expiry band 7–90 days with fixed tenors {7,14,30,60,90} is stated numerically, plus the 15 bps premium fee to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac and 100% collateral cover. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-architecture-spec",
+  "tags": [
+   "defi",
+   "options",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p17-options-interface-definitions",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "spec",
+  "title": "Define IOptionToken, ICoveredVault, IPricingOracle interfaces",
+  "description": "Deliver IOptionToken.sol (ERC-20 with immutable strike/expiry/isCall metadata), ICoveredVault.sol (deposit, writeOption, exercise, settle), and IPricingOracle.sol in onchain/src/p17-options/interfaces/, plus matching Python types. (1) All interfaces compile under solc 0.8.24. (2) A mock vault implementing them passes a smoke test. (3) Signatures cover the full series lifecycle: list, write, buy, exercise, settle, sweep. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-interface-definitions",
+  "tags": [
+   "defi",
+   "options",
+   "spec",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p17-options-economic-model",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "spec",
+  "title": "Specify Black-Scholes premium model and 15 bps fee routing",
+  "description": "Specify the premium model: Black-Scholes with Chainlink spot, 30-day realized-vol feed, risk-free rate 4% annualized; the 15 bps fee on premium routed to the SINCOR treasury at 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac; worked pricing examples for one call and one put. (1) Worked examples recompute by hand within rounding. (2) The fee take is unambiguous per trade (15 bps of premium). (3) Premium rails [0.5%, 50%] of notional and vol clamp [10%, 300%] are stated numerically. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-economic-model",
+  "tags": [
+   "defi",
+   "options",
+   "spec",
+   "fees"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p17-options-repo-layout",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "scaffold",
+  "title": "Create P17 contract, agent, and test skeleton tree",
+  "description": "Create onchain/src/p17-options/{interfaces,tokens,vaults,oracles,OptionsProtocol.sol}, src/sincor2/defi/p17_options/, tests/pytest/test_p17_options.py, and agents/p17-options.yaml as an empty-but-valid skeleton with a README module map. (1) The tree exists with all listed paths. (2) The YAML parses against the repo agent schema. (3) No test collector errors from the new paths. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-repo-layout",
+  "tags": [
+   "defi",
+   "options",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p17-options-starter-code",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "scaffold",
+  "title": "Write OptionToken, vault, and agent starter skeletons",
+  "description": "Write the OptionToken ERC-20 skeleton with expiry metadata, vault stubs using ReentrancyGuard and SafeERC20, non-bricking try/catch on oracle reads, plus a Python agent skeleton with error handling and a TOA hook stub. (1) Contracts compile under solc 0.8.24. (2) The agent imports and answers a health ping. (3) No unguarded external calls exist in the stubs. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-starter-code",
+  "tags": [
+   "defi",
+   "options",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p17-options-option-token",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "core",
+  "title": "Implement OptionToken ERC-20 with vault-only mint",
+  "description": "Implement OptionToken.sol: ERC-20 with immutable strike, expiry, and call/put flag; mintable only by the authorized vault; burnable on exercise or expiry settlement. (1) Compiles under solc 0.8.24. (2) Any mint attempt from a non-vault address reverts. (3) Strike/expiry/isCall metadata is immutable after deployment. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-option-token",
+  "tags": [
+   "defi",
+   "options",
+   "core",
+   "token"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p17-options-starter-code"
+  ]
+ },
+ {
+  "task_key": "p17-options-covered-call-vault",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "core",
+  "title": "Implement CoveredVault with mint-time coverage require",
+  "description": "Implement CoveredVault.sol: writers deposit underlying (calls) or K USDC (puts); option tokens mint only against locked collateral; withdrawals blocked while options are live. (1) A naked-short mint attempt reverts in tests. (2) Minted calls never exceed locked underlying and minted puts never exceed locked USDC divided by strike. (3) Series open-interest cap 10,000 and per-writer 20% cap are enforced. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-covered-call-vault",
+  "tags": [
+   "defi",
+   "options",
+   "core",
+   "vault"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p17-options-starter-code",
+   "p17-options-option-token"
+  ]
+ },
+ {
+  "task_key": "p17-options-pricing-oracle-adapter",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "core",
+  "title": "Implement Chainlink adapter and on-chain Black-Scholes pricer with expiry gate",
+  "description": "Implement the Chainlink spot + realized-vol feed adapter and the on-chain premium pricer, with the expiry_band gate rejecting series outside 7–90 days and stale-price reverts. (1) Pricing matches the spec worked examples within 1%. (2) Out-of-band expiries revert. (3) Spot feeds older than 2h revert pricing, exercise, and settlement. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-pricing-oracle-adapter",
+  "tags": [
+   "defi",
+   "options",
+   "core",
+   "pricing",
+   "oracle"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p17-options-starter-code",
+   "p17-options-covered-call-vault"
+  ]
+ },
+ {
+  "task_key": "p17-options-exercise-settlement",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "core",
+  "title": "Implement ITM exercise with exact strike math",
+  "description": "Implement in-the-money exercise: holders burn option tokens; call buyers pay K USDC and receive 1 underlying, put buyers deliver 1 underlying and receive K USDC; settlement uses the oracle price at exercise. (1) An ITM call exercises to the exact strike-formula amount to the wei. (2) OTM exercise reverts. (3) Exercise is only possible inside the 24h post-expiry window. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-exercise-settlement",
+  "tags": [
+   "defi",
+   "options",
+   "core",
+   "exercise",
+   "settlement"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p17-options-starter-code",
+   "p17-options-pricing-oracle-adapter"
+  ]
+ },
+ {
+  "task_key": "p17-options-expiry-handling",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "core",
+  "title": "Implement permissionless settle, auto-settle, and collateral release",
+  "description": "Implement permissionless settlement of expired series: settle() snapshots the expiry price, OTM options burn to zero, ITM-but-unexercised options auto-settle at the expiry price, and sweep() releases writer collateral. (1) After expiry, a permissionless sweep call settles the full series. (2) Writers can withdraw after the sweep. (3) A second settle on the same series reverts. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-expiry-handling",
+  "tags": [
+   "defi",
+   "options",
+   "core",
+   "expiry"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p17-options-starter-code",
+   "p17-options-exercise-settlement"
+  ]
+ },
+ {
+  "task_key": "p17-options-access-control",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "core",
+  "title": "Implement P17 roles behind a 48h timelock",
+  "description": "Roles: series lister, oracle updater, pauser; all admin actions behind a 48h timelock. (1) Unauthorized role actions revert. (2) Pausing halts writes but never traps withdrawable collateral. (3) The timelock delay is exactly 48h and cannot be bypassed. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-access-control",
+  "tags": [
+   "defi",
+   "options",
+   "core",
+   "access-control"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-starter-code",
+   "p17-options-expiry-handling"
+  ]
+ },
+ {
+  "task_key": "p17-options-edge-cases",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "core",
+  "title": "Handle P17 stale-oracle, dust, and reentrancy edge cases",
+  "description": "Handle: stale oracle reverts exercise, zero-premium and dust-strike series, minimum premium $1.00, and reentrancy attempts on exercise/withdraw. (1) Each case has a passing test. (2) A reentrancy attempt on exercise reverts. (3) Sub-$1 premiums are rejected at buy time. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-edge-cases",
+  "tags": [
+   "defi",
+   "options",
+   "core",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-starter-code",
+   "p17-options-access-control"
+  ]
+ },
+ {
+  "task_key": "p17-options-unit-tests",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "testing",
+  "title": "Write P17 unit tests for mint auth, coverage, and pricing",
+  "description": "Write tests/pytest/test_p17_options.py covering token mint authorization, vault coverage accounting, and the pricing formula against the spec examples. (1) The naked-short mint test reverts as required. (2) Pricing tests land within 1% of the spec examples. (3) All unit tests are green. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-unit-tests",
+  "tags": [
+   "defi",
+   "options",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p17-options-integration-tests",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "testing",
+  "title": "Write P17 full-lifecycle integration test",
+  "description": "End-to-end in CI: agent lists a series, writer deposits collateral, buyer pays premium, buyer exercises ITM, treasury receives its cut. (1) The full lifecycle runs without manual steps. (2) Premium math is asserted to the wei. (3) The treasury receives exactly 15 bps of premium. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-integration-tests",
+  "tags": [
+   "defi",
+   "options",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p17-options-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p17-options-invariant-fuzz-tests",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "testing",
+  "title": "Fuzz P17 coverage and settlement invariants across 10k runs",
+  "description": "Fuzz invariants: minted options always fully covered by locked collateral; expired series always settle to zero net liability. (1) 10,000 fuzz runs with zero coverage violations. (2) Zero settlement-liability violations. (3) The naked-short path is hit by the fuzzer and reverts every time. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-invariant-fuzz-tests",
+  "tags": [
+   "defi",
+   "options",
+   "testing",
+   "fuzz"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p17-options-fork-simulation",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "testing",
+  "title": "Simulate P17 write/exercise/expiry on a Base fork across 20+ price paths",
+  "description": "Simulate write/exercise/expiry on a Base fork with real Chainlink feeds across volatile price paths. (1) Settlement amounts match the pricing model within tolerance on 20+ price paths. (2) No series ends undercollateralized on any path. (3) The 24h exercise window and auto-settle fallback both execute on-fork. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-fork-simulation",
+  "tags": [
+   "defi",
+   "options",
+   "testing",
+   "fork"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p17-options-audit-prep",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "audit",
+  "title": "Assemble P17 audit-prep package",
+  "description": "Audit package: flattened sources, full natspec, threat model (oracle manipulation, expiry griefing, coverage-ratio edge cases), economic attack review of the premium model. (1) Passes the repo audit-readiness checklist with zero missing artifacts. (2) The threat model covers the three named attack classes with mitigations. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-audit-prep",
+  "tags": [
+   "defi",
+   "options",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p17-options-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p17-options-findings-remediation",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "audit",
+  "title": "Remediate all P17 audit findings with regression tests",
+  "description": "Fix every audit finding with a regression test proving each fix. (1) Findings log 100% closed. (2) Each fix links to its regression test. (3) No new warnings introduced. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-findings-remediation",
+  "tags": [
+   "defi",
+   "options",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p17-options-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p17-options-gas-optimization",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "audit",
+  "title": "Optimize P17 gas with exercise under 250k",
+  "description": "Gas report for write/exercise/settle paths; pack option series storage; batch expiry sweeps. (1) Documented gas report committed. (2) exercise() completes under 250k gas on the reference fork. (3) All tests still pass after optimization. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-gas-optimization",
+  "tags": [
+   "defi",
+   "options",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p17-options-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p17-options-technical-docs",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "docs",
+  "title": "Write P17 integrator documentation",
+  "description": "Technical docs: covered-only invariant explanation, premium pricing math, series lifecycle, vault integration guide for external protocols. (1) A protocol integrator can list and settle a series from the docs alone. (2) Every numeric parameter (15 bps, 7–90d band, 10k OI cap, 20% writer cap) is documented. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-technical-docs",
+  "tags": [
+   "defi",
+   "options",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p17-options-agent-config-runbook",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "docs",
+  "title": "Ship P17 agent YAML config and ops runbook",
+  "description": "Deliver agents/p17-options.yaml (budgets, memory, heartbeat, TOA hook) and docs/ops/P17_OPTIONS_RUNBOOK.md covering oracle outage and expiry-crush procedures. (1) YAML validates against the repo agent schema. (2) The runbook covers the top 5 failure modes with executable steps. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-agent-config-runbook",
+  "tags": [
+   "defi",
+   "options",
+   "docs",
+   "ops"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p17-options-monitoring-hooks",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "docs",
+  "title": "Build P17 dashboard and monitoring hooks",
+  "description": "Monitoring hooks: open interest per series, aggregate coverage ratio, premium volume, treasury fee inflow to the SINCOR dashboard. (1) Hooks emit structured metrics per STATUS_FEED_SCHEMA. (2) Hooks report unknown rather than healthy on stale data. (3) Coverage ratio alert fires if it ever reads below 1.0. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-monitoring-hooks",
+  "tags": [
+   "defi",
+   "options",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p17-options-testnet-deploy",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "deploy",
+  "title": "Deploy P17 to Base Sepolia with a seeded option series",
+  "description": "Write scripts/defi/p17/deploy_testnet.py deploying the token factory, covered vaults, and oracle adapter to Base Sepolia with a seeded option series. (1) Contracts are deployed and verified. (2) A full write-to-expiry lifecycle executes on Sepolia. (3) The 15 bps treasury fee is observable on-chain. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-testnet-deploy",
+  "tags": [
+   "defi",
+   "options",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p17-options-audit-prep",
+   "p17-options-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p17-options-mainnet-readiness",
+  "project_id": "P17",
+  "project_name": "On-Chain Options Protocol",
+  "phase": "deploy",
+  "title": "Produce P17 mainnet readiness checklist",
+  "description": "Mainnet readiness checklist: audit sign-off, oracle feed liveness verified, expiry-band parameters ratified, timelock active, dry-run default confirmed, treasury address 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac verified. (1) Every item is signed off with evidence links. (2) No mainnet deployment occurs before sign-off; live_blocked stays true until then. Ref: per specs/p17-options-protocol.md §Acceptance criteria.",
+  "skill": "p17-options-mainnet-readiness",
+  "tags": [
+   "defi",
+   "options",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p17-options-testnet-deploy"
+  ]
+ }
+]

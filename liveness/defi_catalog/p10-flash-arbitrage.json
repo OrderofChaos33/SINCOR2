@@ -1,0 +1,542 @@
+[
+ {
+  "task_key": "p10-architecture-spec",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "spec",
+  "title": "Flash arb architecture spec with scan-only live-block contract",
+  "description": "Deliverable: docs/architecture/p10-flash-arbitrage.md.\nAcceptance criteria: (1) every execution path proven revert-safe with the atomicity argument stated; (2) gates profit_floor and gas_ceiling map to enforcing components; (3) the scan-only live-block is specified as a code gate: opportunity scan only, EXECUTE_LIVE does not enable flash loans.\nConstraints: fee 30 bps on net profit, risk_score 0.70, max_alloc_pct 0.10, min capital $0.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-architecture-spec",
+  "tags": [
+   "defi",
+   "flashloan",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p10-interface-definitions",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "spec",
+  "title": "Solidity interfaces for executor, scanner, and safety module",
+  "description": "Deliverable: onchain/src/p10/interfaces/IFlashArbExecutor.sol, IOpportunityScanner.sol, IExecutionSafety.sol with NatSpec.\nAcceptance criteria: (1) compiles under solc 0.8.24 with zero errors and zero warnings; (2) execute() is atomic revert-on-any-loss by interface contract; (3) scan, safety-check, and execute signatures are fixed and versioned.\nConstraints: provider callbacks abstracted behind IFlashProvider.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-interface-definitions",
+  "tags": [
+   "defi",
+   "flashloan",
+   "solidity"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p10-economic-model",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "spec",
+  "title": "Flash arb economics: edge distribution, 30 bps fee, sizing",
+  "description": "Deliverable: docs/economics/p10-flash-economics.md.\nAcceptance criteria: (1) model reproduces the 22% target APR under documented assumptions; (2) 30 bps Treasury fee flow traces from net profit to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac; (3) break-even math shown: $1M Aave V3 borrow = $500 fee + ~$12 gas, minimum edge 0.051%, production floor 3x at 0.15%.\nConstraints: risk_score 0.70 forces conservative sizing; fee on net profit only.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-economic-model",
+  "tags": [
+   "defi",
+   "flashloan",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p10-repo-layout",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "scaffold",
+  "title": "Scaffold P10 repo layout and wire interfaces",
+  "description": "Deliverable: onchain/src/p10/, src/sincor2/defi/p10_arb/, tests/pytest/test_p10_*, configs/agents/p10-arb-agent.yaml.\nAcceptance criteria: (1) full tree exists with imports resolving; (2) interfaces compile under solc 0.8.24 with zero errors; (3) test stubs collected by pytest with zero collection errors.\nConstraints: EXECUTE_LIVE gates scanning only, never execution.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-repo-layout",
+  "tags": [
+   "defi",
+   "flashloan",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model"
+  ]
+ },
+ {
+  "task_key": "p10-boilerplate",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "scaffold",
+  "title": "FlashArbExecutor skeleton and scanner-agent starter code",
+  "description": "Deliverable: FlashArbExecutor.sol skeleton (ReentrancyGuard, SafeERC20, atomic revert-on-loss, non-bricking try/catch) plus the Python scanner-agent skeleton with TOA hooks.\nAcceptance criteria: (1) compiles under solc 0.8.24; (2) agent boots and answers a health ping; (3) stub test green in CI.\nConstraints: callback caller verification stubbed from day one.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-boilerplate",
+  "tags": [
+   "defi",
+   "flashloan",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model"
+  ]
+ },
+ {
+  "task_key": "p10-opportunity-scanner",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "core",
+  "title": "Arbitrage opportunity scanner with TTL-emitting candidates",
+  "description": "Deliverable: Python scanner polling Base DEX venues and mempool-adjacent feeds, emitting scored candidates.\nAcceptance criteria: (1) scanner reproduces fixture opportunities deterministically; (2) expired candidates (TTL 2 blocks, ~4s) are never emitted to the executor, enforced in the emitter; (3) candidate score = gross_edge minus swap fees, flash premium, slippage estimate.\nConstraints: scan cadence every block (~2s); venues: Uniswap V3/V4, Aerodrome plus allowlist.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-opportunity-scanner",
+  "tags": [
+   "defi",
+   "flashloan",
+   "scanning"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model",
+   "p10-repo-layout",
+   "p10-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p10-execution-safety",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "core",
+  "title": "Atomic execution safety module with eth_call dry-run",
+  "description": "Deliverable: ExecutionSafety module: pre-execution profit simulation via eth_call at the pending block plus slippage-bounded calldata.\nAcceptance criteria: (1) no test can produce a loss-making execution; all failures revert with capital intact; (2) callback caller verified (require msg.sender == provider); (3) minOut committed at build time, max 50 bps slippage per leg.\nConstraints: simulated net <= 0 aborts before any signature.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-execution-safety",
+  "tags": [
+   "defi",
+   "flashloan",
+   "safety"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model",
+   "p10-repo-layout",
+   "p10-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p10-profit-floor",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "core",
+  "title": "Profit-floor filter: max($50, 0.15% of notional)",
+  "description": "Deliverable: profit_floor gate filtering candidates below the net-profit floor after gas, fees, and slippage.\nAcceptance criteria: (1) filter matrix tests prove sub-floor opportunities never reach the executor; (2) floor = max($50, 0.15% of notional), YAML-configurable; (3) every rejection logged with the computed net.\nConstraints: floor evaluated on net, not gross edge.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-profit-floor",
+  "tags": [
+   "defi",
+   "flashloan",
+   "profit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model",
+   "p10-repo-layout",
+   "p10-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p10-gas-ceiling",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "core",
+  "title": "Gas-ceiling estimator with $25 hard cap",
+  "description": "Deliverable: gas_ceiling gate with pre-execution estimation on exact calldata.\nAcceptance criteria: (1) estimator matches observed gas within +/-15% on fixtures; (2) opportunities breaching the $25 ceiling are skipped, never executed; (3) ceiling evaluated against the pending block's fee, not the last mined block.\nConstraints: $25 hard cap per attempt; estimation via eth_estimateGas.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-gas-ceiling",
+  "tags": [
+   "defi",
+   "flashloan",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model",
+   "p10-repo-layout",
+   "p10-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p10-live-block-gate",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "core",
+  "title": "Scan-only live-block gate enforced in code",
+  "description": "Deliverable: code-level gate so the engine performs opportunity scan only.\nAcceptance criteria: (1) tests assert live execution reverts while scanning works; (2) gate state queryable before any action; (3) EXECUTE_LIVE=1 does not enable flash loans - proven by test.\nConstraints: default deny; any future release needs a separate founder-signed gate.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-live-block-gate",
+  "tags": [
+   "defi",
+   "flashloan",
+   "gate"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model",
+   "p10-repo-layout",
+   "p10-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p10-self-improving-loop",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "core",
+  "title": "Self-improving backtest loop with versioned parameters",
+  "description": "Deliverable: Python loop feeding scanned/executed opportunities back into strategy parameters with TOA ranking.\nAcceptance criteria: (1) loop improves fixture backtest P&L on a walk-forward split without overfitting; (2) parameter sets versioned; rollback restores prior parameters exactly; (3) no automatic retry on revert (a revert means the edge vanished).\nConstraints: in-sample-only tuning rejected; walk-forward required.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-self-improving-loop",
+  "tags": [
+   "defi",
+   "flashloan",
+   "learning"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model",
+   "p10-repo-layout",
+   "p10-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p10-edge-cases",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "core",
+  "title": "Flash arb edge cases: venue downtime, sandwich competition, stale feeds",
+  "description": "Deliverable: graceful-degradation handling plus docs/ops/p10-edge-cases.md incident write-ups.\nAcceptance criteria: (1) venue downtime degrades to fewer venues, never a stuck attempt; (2) reverted flash-loan callbacks revert cleanly with capital intact; (3) stale price feeds are excluded from scoring, never traded on.\nConstraints: each case has a dedicated test and a written playbook.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-edge-cases",
+  "tags": [
+   "defi",
+   "flashloan",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p10-architecture-spec",
+   "p10-interface-definitions",
+   "p10-economic-model",
+   "p10-repo-layout",
+   "p10-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p10-unit-tests",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "testing",
+  "title": "Unit tests: scanner scoring, filter matrices, atomic-revert guarantee",
+  "description": "Deliverable: tests/pytest/test_p10_unit.py.\nAcceptance criteria: (1) 100% pass; (2) profit-floor and gas-ceiling matrices green across boundary values; (3) loss-making executions asserted impossible across the fixture set.\nConstraints: tests run in CI under 5 minutes.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-unit-tests",
+  "tags": [
+   "defi",
+   "flashloan",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p10-opportunity-scanner",
+   "p10-execution-safety",
+   "p10-profit-floor",
+   "p10-gas-ceiling",
+   "p10-live-block-gate",
+   "p10-self-improving-loop",
+   "p10-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p10-integration-tests",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "testing",
+  "title": "Integration tests: scan-to-execute flow with live gate engaged",
+  "description": "Deliverable: tests/pytest/test_p10_integration.py.\nAcceptance criteria: (1) agent scans, filters, safety-checks, and executes atomically on fixtures; (2) full flow green end-to-end; (3) scan-only gate reverts live paths end-to-end.\nConstraints: fixtures deterministic; TTL expiry covered.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-integration-tests",
+  "tags": [
+   "defi",
+   "flashloan",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p10-opportunity-scanner",
+   "p10-execution-safety",
+   "p10-profit-floor",
+   "p10-gas-ceiling",
+   "p10-live-block-gate",
+   "p10-self-improving-loop",
+   "p10-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p10-fuzz-invariant",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "testing",
+  "title": "Fuzz and invariant tests for execution safety",
+  "description": "Deliverable: fuzz harness over opportunity payloads, gas estimates, venue states.\nAcceptance criteria: (1) 10k+ fuzz runs green; (2) invariants hold: never execute at net loss, never exceed gas ceiling, scan-only gate never bypassed; (3) every counterexample fixed and recorded.\nConstraints: seed corpus checked in for reproducibility.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-fuzz-invariant",
+  "tags": [
+   "defi",
+   "flashloan",
+   "fuzz"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p10-opportunity-scanner",
+   "p10-execution-safety",
+   "p10-profit-floor",
+   "p10-gas-ceiling",
+   "p10-live-block-gate",
+   "p10-self-improving-loop",
+   "p10-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p10-fork-simulation",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "testing",
+  "title": "Base mainnet-fork simulation of the flash arb engine",
+  "description": "Deliverable: fork simulation run plus tests/reports/p10-fork-sim.md.\nAcceptance criteria: (1) engine runs against a pinned Base mainnet fork with realistic venue liquidity; (2) report records captured arb, Treasury fees, and reproducible block pins; (3) real-world negative-roundtrip findings documented (Base WETH/USDC spreads do not survive both-leg fees).\nConstraints: block pin documented; re-runnable by a reviewer.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-fork-simulation",
+  "tags": [
+   "defi",
+   "flashloan",
+   "simulation"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p10-opportunity-scanner",
+   "p10-execution-safety",
+   "p10-profit-floor",
+   "p10-gas-ceiling",
+   "p10-live-block-gate",
+   "p10-self-improving-loop",
+   "p10-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p10-audit-prep",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "audit",
+  "title": "Audit-prep package for the flash arb engine",
+  "description": "Deliverable: docs/audits/p10/ with frozen code, NatSpec, threat model, gate map.\nAcceptance criteria: (1) complete contract inventory with the scan-only precondition documented; (2) threat model covers reentrancy, callback abuse, gate bypass; (3) every gate maps to its enforcing line of code.\nConstraints: code hash frozen and recorded.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-audit-prep",
+  "tags": [
+   "defi",
+   "flashloan",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p10-unit-tests",
+   "p10-integration-tests",
+   "p10-fuzz-invariant",
+   "p10-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p10-findings-remediation",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "audit",
+  "title": "Remediate flash arb audit findings",
+  "description": "Deliverable: fixes for all audit findings with linked regression tests.\nAcceptance criteria: (1) zero open high/medium findings; (2) each fix links to its finding ID; (3) regression test per fix passes, prioritizing execution-safety and gate-bypass issues.\nConstraints: no fix weakens a safety check.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-findings-remediation",
+  "tags": [
+   "defi",
+   "flashloan",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p10-unit-tests",
+   "p10-integration-tests",
+   "p10-fuzz-invariant",
+   "p10-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p10-gas-optimization",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "audit",
+  "title": "Gas optimization for flash arb contracts",
+  "description": "Deliverable: optimized hot execution path plus docs/audits/p10/gas.md.\nAcceptance criteria: (1) before/after gas report published; (2) zero behavioral change across the full test suite; (3) safety checks not weakened or reordered.\nConstraints: no optimization may remove a require on the execution path.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-gas-optimization",
+  "tags": [
+   "defi",
+   "flashloan",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p10-unit-tests",
+   "p10-integration-tests",
+   "p10-fuzz-invariant",
+   "p10-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p10-technical-docs",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "docs",
+  "title": "Technical docs for the flash arb engine",
+  "description": "Deliverable: docs/p10-flash-arbitrage.md.\nAcceptance criteria: (1) a new builder can run the engine from the docs alone (executor reference, scanner design, safety invariants, gate semantics); (2) all references resolve; (3) scan-only precondition stated up front.\nConstraints: docs versioned alongside the frozen code hash.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-technical-docs",
+  "tags": [
+   "defi",
+   "flashloan",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p10-opportunity-scanner",
+   "p10-execution-safety",
+   "p10-profit-floor",
+   "p10-gas-ceiling",
+   "p10-live-block-gate",
+   "p10-self-improving-loop",
+   "p10-edge-cases",
+   "p10-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p10-runbook-yaml",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "docs",
+  "title": "Agent YAML config and ops runbook",
+  "description": "Deliverable: configs/agents/p10-arb-agent.yaml and docs/ops/p10-runbook.md.\nAcceptance criteria: (1) agent boots from the YAML; (2) runbook covers deploy, monitor, incident response; (3) reverted-execution and gate incidents have step-by-step playbooks.\nConstraints: YAML defaults keep the live gate engaged.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-runbook-yaml",
+  "tags": [
+   "defi",
+   "flashloan",
+   "runbook"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p10-opportunity-scanner",
+   "p10-execution-safety",
+   "p10-profit-floor",
+   "p10-gas-ceiling",
+   "p10-live-block-gate",
+   "p10-self-improving-loop",
+   "p10-edge-cases",
+   "p10-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p10-dashboard-hooks",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "docs",
+  "title": "Dashboard and monitoring hooks for scans, filters, executions, fees",
+  "description": "Deliverable: status-feed hooks exposing scanned opportunities, filter pass/fail, execution results, gate states, Treasury fees.\nAcceptance criteria: (1) feed reports real values or 'unknown', never fabricated 'healthy'; (2) sim-vs-observed gas delta and executor revert rate exposed; (3) payloads validate against STATUS_FEED_SCHEMA.\nConstraints: staleness > 60s marks values unknown.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-dashboard-hooks",
+  "tags": [
+   "defi",
+   "flashloan",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p10-opportunity-scanner",
+   "p10-execution-safety",
+   "p10-profit-floor",
+   "p10-gas-ceiling",
+   "p10-live-block-gate",
+   "p10-self-improving-loop",
+   "p10-edge-cases",
+   "p10-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p10-testnet-deploy",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "deploy",
+  "title": "Testnet deploy scripts for the flash arb engine",
+  "description": "Deliverable: scripts/deploy/p10/ targeting Base Sepolia.\nAcceptance criteria: (1) scripts are idempotent; (2) deployed with the scan-only gate engaged; addresses and gate state recorded; (3) live execution path reverts on the deployed contracts.\nConstraints: Sepolia only; no mainnet addresses in scripts.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-testnet-deploy",
+  "tags": [
+   "defi",
+   "flashloan",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p10-audit-prep",
+   "p10-findings-remediation",
+   "p10-gas-optimization"
+  ]
+ },
+ {
+  "task_key": "p10-mainnet-checklist",
+  "project_id": "P10",
+  "project_name": "Flash Loan Arbitrage Engine",
+  "phase": "deploy",
+  "title": "Mainnet readiness checklist for the flash arb engine",
+  "description": "Deliverable: docs/ops/p10-mainnet-checklist.md.\nAcceptance criteria: (1) checklist signed off by the auditor task; (2) covers audit sign-off, execution release procedure, key custody, monitoring; (3) records that no live execution happens without the explicit, separately-gated release step.\nConstraints: live_blocked=true until every item passes with evidence links.\nReference: per specs/p10-flash-arbitrage.md §Acceptance criteria.",
+  "skill": "p10-mainnet-checklist",
+  "tags": [
+   "defi",
+   "flashloan",
+   "deploy"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p10-audit-prep",
+   "p10-findings-remediation",
+   "p10-gas-optimization"
+  ]
+ }
+]

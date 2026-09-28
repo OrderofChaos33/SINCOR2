@@ -1,0 +1,484 @@
+[
+ {
+  "task_key": "p20-compliance-automation-architecture-spec",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "spec",
+  "title": "Specify the fail-closed gatekeeper architecture",
+  "description": "Write docs/architecture/P20_COMPLIANCE_ARCHITECTURE.md: the gatekeeper decision engine, KYC/AML verifier plugin architecture, geo-block registry, protocol integration hooks, and the fail-closed policy on provider outage. (1) The catalog gates kyc_aml and geo_block map to named enforcement points. (2) Fail-closed on unreachable/stale providers is stated as a blocking requirement. (3) The gatekeeper's pass/fail-only scope is explicit: it produces decisions, not yield (fee_bps 0). Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-architecture-spec",
+  "tags": [
+   "defi",
+   "compliance",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p20-compliance-automation-interface-definitions",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "spec",
+  "title": "Define IGatekeeper, IVerifierPlugin, and IGeoRegistry interfaces",
+  "description": "Deliver IGatekeeper.sol (check(address) returning pass/fail with an evidence reference), IVerifierPlugin.sol, and IGeoRegistry.sol in onchain/src/p20-compliance/interfaces/, plus Python types. (1) All interfaces compile under solc 0.8.24. (2) A mock plugin passes a smoke test. (3) The interfaces extend the existing onchain/src/ComplianceGuard.sol ISanctionsOracle pattern. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-interface-definitions",
+  "tags": [
+   "defi",
+   "compliance",
+   "spec",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-decision-model-spec",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "spec",
+  "title": "Specify the KYC/AML decision model (0 bps: decisions, not fees)",
+  "description": "Specify the decision model: KYC/AML rule set, sanctions-list sources (OFAC SDN, EU consolidated, UN), risk-tier thresholds, 90-day KYC validity, 5-year evidence retention, appeal flow, and the fail-closed rule when a provider is unreachable. (1) A reviewer can determine the exact pass/fail outcome for any documented input case from the spec. (2) The REFER verdict blocks until manually resolved. (3) List staleness beyond 48h forces fail-closed. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-decision-model-spec",
+  "tags": [
+   "defi",
+   "compliance",
+   "spec",
+   "decision-model"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-repo-layout",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "scaffold",
+  "title": "Create P20 contract, agent, and test skeleton tree",
+  "description": "Create onchain/src/p20-compliance/{interfaces,plugins,registry,Gatekeeper.sol}, src/sincor2/defi/p20_compliance/, tests/pytest/test_p20_compliance.py, and agents/p20-compliance-automation.yaml as an empty-but-valid skeleton with a README module map. (1) The tree exists with all listed paths. (2) The YAML parses against the repo agent schema. (3) No test collector errors from the new paths. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-repo-layout",
+  "tags": [
+   "defi",
+   "compliance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-starter-code",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "scaffold",
+  "title": "Write Gatekeeper and screening-agent starter skeletons",
+  "description": "Write the Gatekeeper skeleton with ReentrancyGuard and non-bricking try/catch on plugin calls, plus a Python screening agent skeleton with error handling and a TOA hook stub. (1) Compiles under solc 0.8.24. (2) The agent imports and answers a health ping. (3) A failing plugin call degrades to FAIL, never to pass or brick. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-starter-code",
+  "tags": [
+   "defi",
+   "compliance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-kyc-provider-adapter",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "core",
+  "title": "Implement the KYC verifier plugin with replay protection",
+  "description": "Implement the KYC verifier plugin interface plus a reference adapter: verifyIdentity() consumes an EIP-712 signed attestation (issuer allowlisted, 90-day validity, nonce replay protection). (1) Compiles under solc 0.8.24. (2) A forged or replayed attestation fails verification in tests. (3) Expired (>90d) attestations verify as STALE, which the engine treats as FAIL. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-kyc-provider-adapter",
+  "tags": [
+   "defi",
+   "compliance",
+   "core",
+   "kyc"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p20-compliance-automation-starter-code"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-aml-screening-adapter",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "core",
+  "title": "Implement AML screening with a bounded 3-hop taint lookback",
+  "description": "Implement the AML screening adapter: the off-chain agent screens addresses and fund flows against sanctions/taint lists with a bounded 3-hop lookback (mixer/darknet/scam interaction = automatic FAIL) and commits keccak256(attestation) on-chain; no PII touches the chain. (1) A test address seeded from a sanctioned source fails screening. (2) A clean address passes. (3) The lookback is provably bounded at 3 hops. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-aml-screening-adapter",
+  "tags": [
+   "defi",
+   "compliance",
+   "core",
+   "aml",
+   "screening"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p20-compliance-automation-starter-code",
+   "p20-compliance-automation-kyc-provider-adapter"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-geo-block-registry",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "core",
+  "title": "Implement the ISO-3166 geo-block registry",
+  "description": "Implement the jurisdiction blocklist registry: ISO-3166 region codes with allow/block status, updatable only via 48h timelocked admin, consulted by the decision engine on every check. (1) An address resolving to a blocked jurisdiction fails the gatekeeper check. (2) A registry update inside the 48h timelock window reverts. (3) Geo keys on attested jurisdiction, not IP. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-geo-block-registry",
+  "tags": [
+   "defi",
+   "compliance",
+   "core",
+   "geo-block"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p20-compliance-automation-starter-code",
+   "p20-compliance-automation-aml-screening-adapter"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-decision-engine",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "core",
+  "title": "Implement the fail-closed pass/fail decision engine",
+  "description": "Implement the decision engine combining KYC, AML, and geo signals into a single pass/fail with an evidence reference; FAIL when any plugin fails, is stale, or is unreachable; REFER blocks until manually resolved. (1) Every signal combination maps to the spec's expected outcome. (2) Provider-outage cases fail closed in tests. (3) PASS decisions cache for 24h and any list update invalidates the cache. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-decision-engine",
+  "tags": [
+   "defi",
+   "compliance",
+   "core",
+   "decision-engine"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p20-compliance-automation-starter-code",
+   "p20-compliance-automation-geo-block-registry"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-protocol-integration-hook",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "core",
+  "title": "Implement the protocol deposit-gating hook",
+  "description": "Implement the integration hook that protocols call before accepting deposits: a FAIL verdict reverts the deposit with a queryable on-chain rejection code. (1) An integration test proves a failing address cannot deposit into a hooked vault. (2) A passing address can deposit. (3) The rejection code is readable on-chain for auditors. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-protocol-integration-hook",
+  "tags": [
+   "defi",
+   "compliance",
+   "core",
+   "integration-hook"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p20-compliance-automation-starter-code",
+   "p20-compliance-automation-decision-engine"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-audit-trail",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "core",
+  "title": "Implement the append-only decision audit trail",
+  "description": "Implement the append-only decision log: every pass/fail with evidence hash, timestamp, and plugin versions, plus off-chain Ed25519-signed, hash-chained receipts. (1) The log is immutable: no update/delete path exists. (2) A full decision history replays from events. (3) The off-chain receipt chain verifies end-to-end without repo access. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-audit-trail",
+  "tags": [
+   "defi",
+   "compliance",
+   "core",
+   "audit-trail"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-starter-code",
+   "p20-compliance-automation-protocol-integration-hook"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-access-control-edge-cases",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "core",
+  "title": "Implement P20 roles, 24h emergency overrides, and edge cases",
+  "description": "Roles: list admin (48h timelock), emergency blocklist override with 24h auto-expiry and on-chain reason, appeals reviewer; handle provider outage (fail-closed), conflicting plugin results, and reentrancy attempts on the hook. (1) Emergency overrides auto-expire at 24h. (2) A KYC fail still blocks a deposit during an override of an unrelated list. (3) A reentrancy attempt on the hook reverts. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-access-control-edge-cases",
+  "tags": [
+   "defi",
+   "compliance",
+   "core",
+   "access-control",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-starter-code",
+   "p20-compliance-automation-audit-trail"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-unit-tests",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "testing",
+  "title": "Write P20 unit tests for the decision matrix, geo registry, and trail",
+  "description": "Write tests/pytest/test_p20_compliance.py covering the decision matrix, geo registry, and audit-trail immutability. (1) The KYC-fail-blocks-deposit test passes. (2) The full decision matrix matches the spec. (3) All unit tests are green. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-unit-tests",
+  "tags": [
+   "defi",
+   "compliance",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-access-control-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-integration-tests",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "testing",
+  "title": "Write P20 full pass-path and fail-path integration tests",
+  "description": "End-to-end in CI: screening agent screens an address, gatekeeper decides, hooked vault gates the deposit, decision lands in the audit trail. (1) The full pass path and full fail path both run. (2) Evidence assertions hold on both paths. (3) The fail path leaves the vault balance unchanged. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-integration-tests",
+  "tags": [
+   "defi",
+   "compliance",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p20-compliance-automation-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-invariant-fuzz-tests",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "testing",
+  "title": "Fuzz P20 fail-closed invariants across 10k runs",
+  "description": "Fuzz invariants: any unreachable/stale provider yields FAIL; no failing address ever passes the hook; the audit trail only appends. (1) 10,000 fuzz runs with zero violations. (2) Zero passes on incomplete signal across all runs. (3) Zero trail mutations across all runs. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-invariant-fuzz-tests",
+  "tags": [
+   "defi",
+   "compliance",
+   "testing",
+   "fuzz"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-fork-simulation",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "testing",
+  "title": "Screen 20+ real addresses on a mainnet fork",
+  "description": "Simulate screening on a mainnet fork against real chain history: sanctioned-source fund flows must fail, clean flows pass. (1) 20+ real addresses screened. (2) Zero false passes on tainted flows. (3) Mixer-interaction addresses fail automatically. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-fork-simulation",
+  "tags": [
+   "defi",
+   "compliance",
+   "testing",
+   "fork"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-audit-prep",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "audit",
+  "title": "Assemble P20 audit-prep package",
+  "description": "Audit package: flattened sources, full natspec, threat model (list-admin compromise, evidence tampering, privacy of screened data), and a data-privacy review of the evidence log. (1) Passes the repo audit-readiness checklist with zero missing artifacts. (2) The threat model covers the three named classes. (3) The privacy review confirms no PII on-chain (salted hashes only). Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-audit-prep",
+  "tags": [
+   "defi",
+   "compliance",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p20-compliance-automation-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-findings-remediation",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "audit",
+  "title": "Remediate all P20 audit findings with regression tests",
+  "description": "Fix every audit finding with a regression test proving each fix. (1) Findings log 100% closed. (2) Each fix links to its regression test. (3) No new warnings introduced. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-findings-remediation",
+  "tags": [
+   "defi",
+   "compliance",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p20-compliance-automation-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-gas-optimization",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "audit",
+  "title": "Optimize P20 gas with gatekeeper check under 150k",
+  "description": "Gas report for check/hook paths; keep screening off-chain with on-chain commitments; cache PASS decisions within their 24h validity window. (1) Documented gas report committed. (2) Gatekeeper check completes under 150k gas on the reference fork. (3) All tests still pass after optimization. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-gas-optimization",
+  "tags": [
+   "defi",
+   "compliance",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p20-compliance-automation-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-technical-docs",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "docs",
+  "title": "Write P20 protocol-integration documentation",
+  "description": "Technical docs: decision model rules, plugin onboarding guide, geo-list management, evidence schema, and the fail-closed policy. (1) A protocol team can integrate the deposit hook from the docs alone. (2) The fail-closed policy and override procedure are documented with exact TTLs (24h override, 48h timelock, 24h cache). Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-technical-docs",
+  "tags": [
+   "defi",
+   "compliance",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-agent-config-runbook",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "docs",
+  "title": "Ship P20 agent YAML config and ops runbook",
+  "description": "Deliver agents/p20-compliance-automation.yaml (budgets, memory, heartbeat, TOA hook) and docs/ops/P20_COMPLIANCE_RUNBOOK.md covering provider outage, emergency override, and appeals. (1) YAML validates against the repo agent schema. (2) The runbook covers the top 5 failure modes with executable steps, including the outage circuit-breaker drill. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-agent-config-runbook",
+  "tags": [
+   "defi",
+   "compliance",
+   "docs",
+   "ops"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-monitoring-hooks",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "docs",
+  "title": "Build P20 dashboard and monitoring hooks",
+  "description": "Monitoring hooks: decision latency (target p99 < 2s off-chain), pass/fail/refer rates, blocklist hit counts, provider staleness alerts to the SINCOR dashboard. (1) Hooks emit structured metrics per STATUS_FEED_SCHEMA. (2) Hooks report unknown rather than healthy on stale data. (3) A staleness alert fires when any list version exceeds 24h. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-monitoring-hooks",
+  "tags": [
+   "defi",
+   "compliance",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-testnet-deploy",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "deploy",
+  "title": "Deploy P20 to Base Sepolia with seeded test lists",
+  "description": "Write scripts/defi/p20/deploy_testnet.py deploying the gatekeeper, reference plugins, and geo registry to Base Sepolia with seeded test lists. (1) Contracts are deployed and verified. (2) A hooked test vault gates deposits on Sepolia (one pass, one fail). (3) Decisions land in the on-chain audit trail. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-testnet-deploy",
+  "tags": [
+   "defi",
+   "compliance",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p20-compliance-automation-audit-prep",
+   "p20-compliance-automation-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p20-compliance-automation-mainnet-readiness",
+  "project_id": "P20",
+  "project_name": "DeFi Compliance Automation",
+  "phase": "deploy",
+  "title": "Produce P20 mainnet readiness checklist",
+  "description": "Mainnet readiness checklist: audit sign-off, jurisdiction blocklist ratified, provider contracts reviewed, redundant providers live, emergency override procedure drilled, dry-run default confirmed. (1) Every item is signed off with evidence links. (2) Enforcing mode is not enabled on mainnet before sign-off. Ref: per specs/p20-compliance-automation.md §Acceptance criteria.",
+  "skill": "p20-compliance-automation-mainnet-readiness",
+  "tags": [
+   "defi",
+   "compliance",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p20-compliance-automation-testnet-deploy"
+  ]
+ }
+]

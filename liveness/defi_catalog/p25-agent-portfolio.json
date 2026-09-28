@@ -1,0 +1,492 @@
+[
+ {
+  "task_key": "p25-agent-portfolio-architecture-spec",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "spec",
+  "title": "Spec P25 agent-managed portfolio: ingest, risk budget, allocator, 5% cash floor",
+  "description": "Deliverable: docs/spec/P25_ARCHITECTURE.md for swarm-driven user portfolios: swarm weight ingestor (3600 s cadence), risk-budget engine (0.28 blended, 0.40 position cap, >0.60 exclusion), portfolio allocator, 5% USDC cash-floor guard, daily rebalancer (2.5% drift trigger), AXM/SINC fee module (10 bps p.a.). Acceptance: (1) weight pipeline defined from TOA signals to normalized weights with feed-hash provenance; (2) risk-budget semantics written as inequalities the engine implements verbatim; (3) fee flow defined as per-tick AUM accrual in AXM/SINC to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-architecture-spec",
+  "tags": [
+   "defi",
+   "portfolio",
+   "spec",
+   "architecture"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p25-agent-portfolio-interface-definitions",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "spec",
+  "title": "Define P25 Python interfaces and portfolio weight schema",
+  "description": "Deliverable: src/sincor2/defi/p25/interfaces.py with SwarmWeightIngestor, RiskBudget, PortfolioAllocator protocols and the portfolio weight schema consumed from swarm outputs. Acceptance: (1) protocols type-check under mypy strict; (2) weight schema enforces sum=1.0, per-weight <=0.40, cash_pct >=0.05 at validation time; (3) a stub weight set validates against the schema. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-interface-definitions",
+  "tags": [
+   "defi",
+   "portfolio",
+   "spec",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p25-agent-portfolio-economic-model",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "spec",
+  "title": "Write P25 economics: 7% APR, 10 bps p.a. in AXM/SINC, worked fee example",
+  "description": "Deliverable: docs/spec/P25_ECONOMICS.md with target_apr=0.07, fee 10 bps per annum on AUM denominated in AXM (default) or SINC (user choice), risk_score bound 0.28, max_alloc_pct=0.40, cash floor 5%, min_capital_usd=25.0. Acceptance: (1) worked example: $1M AUM -> $1,000/yr = 2,000 AXM at $0.50, matching to the wei; (2) per-tick accrual formula fee_tick = aum * 0.0010 * tick_s/31557600 stated for implementation; (3) denomination choice and quarterly reversibility documented. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-economic-model",
+  "tags": [
+   "defi",
+   "portfolio",
+   "spec",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-repo-layout",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "scaffold",
+  "title": "Create P25 repo layout: src/sincor2/defi/p25/ package skeleton",
+  "description": "Deliverable: src/sincor2/defi/p25/ with ingestor.py, risk.py, allocator.py, rebalancer.py, fees.py, guards.py, api.py, interfaces.py; tests/pytest/test_p25_*.py stubs; configs/agents/p25-agent-portfolio.yaml; docs runbook stub. Acceptance: (1) package imports cleanly with no circular imports; (2) every module satisfies its protocol from interfaces.py at import time; (3) agent YAML validates. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-repo-layout",
+  "tags": [
+   "defi",
+   "portfolio",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-architecture-spec",
+   "p25-agent-portfolio-interface-definitions"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-starter-code",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "scaffold",
+  "title": "Write P25 starter boilerplate: ingestor stub, mock swarm feed, defaults",
+  "description": "Deliverable: ingestor stub with TOA hooks, mock swarm weight feed, config defaults fee_bps=10, target_apr=0.07, fee assets AXM/SINC. Acceptance: (1) compileall passes; (2) stub weight set produces a valid portfolio draft (sum=1.0, caps respected); (3) defaults asserted in a config test. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-starter-code",
+  "tags": [
+   "defi",
+   "portfolio",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-risk-budget-engine",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "core",
+  "title": "Build the risk-budget engine: 0.28 blended cap, itemized rejections",
+  "description": "Deliverable: src/sincor2/defi/p25/risk.py converting the 0.28 risk budget into per-position limits: blended sum(w_i * r_i) <= 0.28, w_i <= 0.40, protocols with r_i > 0.60 ineligible (read from catalog PROTOCOL_BY_ID at ingest time, not hardcoded). Acceptance: (1) over-budget weight sets rejected with itemized violations, never silently clamped; (2) eligibility follows catalog changes automatically (proven by mutating a fixture catalog); (3) allocator scale->cap->renormalize loop converges or rejects within 10 iterations. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-risk-budget-engine",
+  "tags": [
+   "defi",
+   "portfolio",
+   "core",
+   "risk"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p25-agent-portfolio-starter-code",
+   "p25-agent-portfolio-economic-model"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-swarm-weight-ingestor",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "core",
+  "title": "Build the swarm weight ingestor: TOA signals -> weights, 3600 s staleness HOLD",
+  "description": "Deliverable: src/sincor2/defi/p25/ingestor.py consuming swarm outputs (TOA-ranked protocol signals for P01-P25) into normalized weights via signal = toa_score * (1 - risk_score), with 3600 s staleness detection and TOA ingest_feedback hooks. Acceptance: (1) fresh swarm outputs produce valid weights summing to 1.0; (2) feeds older than 3600 s trigger HOLD: no rebalance plan, reads keep serving last-good weights, alert fires; (3) P26 excluded from the signal universe. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-swarm-weight-ingestor",
+  "tags": [
+   "defi",
+   "portfolio",
+   "core",
+   "swarms",
+   "toa"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p25-agent-portfolio-starter-code",
+   "p25-agent-portfolio-interface-definitions"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-portfolio-allocator",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "core",
+  "title": "Build the portfolio allocator: weights + risk budget -> target portfolio",
+  "description": "Deliverable: allocator.py combining ingested swarm weights with the risk budget into target portfolios: scale down highest-risk positions until blended <=0.28, enforce w_i <=0.40, reserve the 5% cash floor, emit TargetPortfolio with feed-hash provenance. Acceptance: (1) allocations sum to 1.0 within 1e-9 honoring caps and floor; (2) invalid inputs raise with itemized causes instead of defaulting; (3) feed hash recorded for every target. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-portfolio-allocator",
+  "tags": [
+   "defi",
+   "portfolio",
+   "core",
+   "allocator"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p25-agent-portfolio-risk-budget-engine",
+   "p25-agent-portfolio-swarm-weight-ingestor"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-cash-floor-guard",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "core",
+  "title": "Implement the cash-floor guard: 5% USDC on every plan",
+  "description": "Deliverable: cash-floor guard in src/sincor2/defi/p25/guards.py requiring cash_pct >= 0.05 in USDC on every allocation and rebalance plan; breaching plans rejected before trade computation. Acceptance: (1) floor-breach plans rejected with the shortfall quantified; (2) compliant rebalances pass; (3) every rejection written to the audit log. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-cash-floor-guard",
+  "tags": [
+   "defi",
+   "portfolio",
+   "core",
+   "gates",
+   "risk"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-starter-code"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-axm-sinc-fee-module",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "core",
+  "title": "Build the AXM/SINC fee module: 10 bps p.a., per-user ledger",
+  "description": "Deliverable: fees.py accruing fee_tick = aum_usd * 0.0010 * (tick_s / 31557600) per tick, denominated in AXM (default) or SINC per user choice, with per-user ledger and batched treasury settlement (>= $10 equivalent). Acceptance: (1) fee math matches the P25_ECONOMICS.md $1M/2,000-AXM worked example to the wei; (2) denomination recorded at the price on the tick, reversible quarterly; (3) settlement targets only 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-axm-sinc-fee-module",
+  "tags": [
+   "defi",
+   "portfolio",
+   "core",
+   "fees",
+   "axm",
+   "sinc"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p25-agent-portfolio-economic-model",
+   "p25-agent-portfolio-portfolio-allocator"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-rebalancer",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "core",
+  "title": "Build the rebalancer: 2.5% drift trigger, batched deltas, $25 dust filter",
+  "description": "Deliverable: rebalancer.py computing drift = |current_w - target_w| per position on the daily 86400 s cadence; emitting batched delta trades when any drift >= 0.025; dropping trades < $25; re-checking cash floor and risk budget post-trade. Acceptance: (1) drifted mock portfolio converges to target within tolerance in one pass; (2) all-drifts-below-2.5% emits NOOP with no trades; (3) post-trade portfolio re-passes guards or the plan is rejected. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-rebalancer",
+  "tags": [
+   "defi",
+   "portfolio",
+   "core",
+   "rebalance"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p25-agent-portfolio-portfolio-allocator",
+   "p25-agent-portfolio-cash-floor-guard"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-portfolio-api",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "core",
+  "title": "Build the user portfolio API: sealed-safe reads, schema-validated",
+  "description": "Deliverable: user-facing API exposing current allocation, target weights, per-position drift, fee history, and rebalance status; responses sealed-safe per user_id. Acceptance: (1) all responses validate against the published schema; (2) cross-user read attempts return 403/empty in 100% of tests; (3) stale-feed HOLD state is visible in rebalance status. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-portfolio-api",
+  "tags": [
+   "defi",
+   "portfolio",
+   "core",
+   "api"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-rebalancer",
+   "p25-agent-portfolio-axm-sinc-fee-module"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-unit-tests",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "testing",
+  "title": "Write P25 unit tests: risk, ingestor, allocator, floor, fees",
+  "description": "Deliverable: tests/pytest/test_p25_agent_portfolio_unit.py covering risk engine, ingestor normalization, allocator caps, cash-floor guard, and fee math. Acceptance: (1) all tests pass; (2) coverage of src/sincor2/defi/p25/ >= 85%; (3) fee tests pin the per-tick accrual formula to the wei. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-unit-tests",
+  "tags": [
+   "defi",
+   "portfolio",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-cash-floor-guard",
+   "p25-agent-portfolio-axm-sinc-fee-module"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-integration-tests",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "testing",
+  "title": "Write P25 integration tests: weights->allocation->rebalance->fees->API",
+  "description": "Deliverable: end-to-end tests: swarm weights to allocation to rebalance to fee accrual to API read, plus stale-feed HOLD behavior. Acceptance: (1) green pipeline from mock signals to settled fee ledger to API read; (2) stale swarm output freezes rebalancing without bricking reads; (3) a full rebalance cycle keeps fee accounting exact. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-integration-tests",
+  "tags": [
+   "defi",
+   "portfolio",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p25-agent-portfolio-unit-tests",
+   "p25-agent-portfolio-rebalancer",
+   "p25-agent-portfolio-portfolio-api"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-invariant-fuzz-tests",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "testing",
+  "title": "Write P25 invariant/fuzz tests: 1000+ randomized weight sets",
+  "description": "Deliverable: property tests asserting (a) allocations sum to 1.0 within 1e-9, (b) cash floor never breached, (c) blended risk never exceeds 0.28, (d) fees always denominated in AXM/SINC. Acceptance: (1) invariants hold over >=1000 randomized weight sets; (2) violations fail loudly with the offending set logged; (3) fixed fuzz seeds for reproducibility. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-invariant-fuzz-tests",
+  "tags": [
+   "defi",
+   "portfolio",
+   "testing",
+   "fuzz",
+   "invariants"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-fork-simulation",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "testing",
+  "title": "Run P25 fork simulation: real protocol data through the pipeline",
+  "description": "Deliverable: fork run of ingestor, allocator, and rebalancer with real protocol data feeding the swarm-weight pipeline. Acceptance: (1) completed run producing valid target portfolios with all guards enforced; (2) zero unexpected errors; (3) run log records feed hashes, weights, and drift decisions for review. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-fork-simulation",
+  "tags": [
+   "defi",
+   "portfolio",
+   "testing",
+   "fork-simulation"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-audit-prep",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "audit",
+  "title": "Assemble P25 audit-prep package: snapshot, threat model, limitations log",
+  "description": "Deliverable: single reviewable directory with frozen snapshot (commit hash recorded), threat model covering weight manipulation, stale-feed exploitation, fee diversion, and cross-user reads, plus known-limitations log. Acceptance: (1) snapshot builds and all P25 tests pass from the frozen tree; (2) each threat maps to a mitigating control and its test; (3) limitations log states the advisory-only posture (P25 never signs) explicitly. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-audit-prep",
+  "tags": [
+   "defi",
+   "portfolio",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p25-agent-portfolio-invariant-fuzz-tests",
+   "p25-agent-portfolio-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-findings-remediation",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "audit",
+  "title": "Remediate P25 audit findings: zero open medium+ with suite green",
+  "description": "Deliverable: fixes for all audit findings rated medium or higher, each with a regression test. Acceptance: (1) zero open medium-or-higher findings; (2) full P25 suite plus guard tests re-run green after each fix; (3) each fix references the finding ID in its commit message. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-findings-remediation",
+  "tags": [
+   "defi",
+   "portfolio",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p25-agent-portfolio-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-gas-optimization",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "audit",
+  "title": "Gas-optimize P25 onchain components: 20% reduction target with report",
+  "description": "Deliverable: gas measurements for any onchain components (fee settlement, rebalance execution adapters) and optimizations targeting >=20% reduction on hot paths without behavior change. Acceptance: (1) committed before/after gas report with per-path numbers; (2) all P25 tests still pass; (3) no change to fee math, caps, or guard semantics (verified by the invariant suite). Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-gas-optimization",
+  "tags": [
+   "defi",
+   "portfolio",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p25-agent-portfolio-findings-remediation"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-technical-docs",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "docs",
+  "title": "Write P25 technical docs: modules, weight schema, risk/floor semantics",
+  "description": "Deliverable: technical docs with component reference for src/sincor2/defi/p25/, weight schema, risk-budget and cash-floor semantics, and the AXM/SINC fee flow. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) a reader can implement a new signal source from the weight-schema docs alone. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-technical-docs",
+  "tags": [
+   "defi",
+   "portfolio",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-architecture-spec",
+   "p25-agent-portfolio-portfolio-allocator"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-agent-yaml-runbook",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "docs",
+  "title": "Ship P25 agent YAML config and ops runbook",
+  "description": "Deliverable: configs/agents/p25-agent-portfolio.yaml (budgets, memory, TOA hooks, check-in cadence) and docs/ops/P25_RUNBOOK.md (weight-feed ops, rebalance review, fee reconciliation). Acceptance: (1) YAML validates; (2) runbook steps executable in order (dry-run first); (3) fee-reconciliation procedure ties the per-user ledger to treasury settlements. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-agent-yaml-runbook",
+  "tags": [
+   "defi",
+   "portfolio",
+   "docs",
+   "ops",
+   "yaml"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-starter-code"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-dashboard-monitoring-hooks",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "docs",
+  "title": "Add P25 dashboard monitoring hooks: drift, staleness, fee accrual",
+  "description": "Deliverable: monitoring hooks on the feed schema: drift-vs-target alert, stale-weight-feed alarm (3600 s), fee-accrual metrics. Acceptance: (1) hooks emit valid feed-schema events; (2) simulated staleness fires the alarm within one ingest cycle; (3) simulated >5% drift for 48 h without rebalance fires the drift alert. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-dashboard-monitoring-hooks",
+  "tags": [
+   "defi",
+   "portfolio",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-rebalancer"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-testnet-deploy-scripts",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "deploy",
+  "title": "Write P25 testnet deploy scripts: dry-run default, Sepolia end-to-end",
+  "description": "Deliverable: deploy scripts for P25 offchain agent (Railway/Gunicorn) plus any onchain components, with dry-run defaulting ON. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs; (3) flipping dry-run off requires an explicit flag and prints the compliance checkpoint. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-testnet-deploy-scripts",
+  "tags": [
+   "defi",
+   "portfolio",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p25-agent-portfolio-findings-remediation"
+  ]
+ },
+ {
+  "task_key": "p25-agent-portfolio-mainnet-readiness-checklist",
+  "project_id": "P25",
+  "project_name": "Agent-Managed Portfolio",
+  "phase": "deploy",
+  "title": "Produce P25 mainnet readiness checklist with signed go/no-go",
+  "description": "Deliverable: mainnet readiness checklist (audit signoff, weight-feed source verification, treasury 0x09E289...9612Ac verification, rollback plan, printed compliance checkpoint) with go/no-go recorded; advisory/accounting paths may go live before automated execution. Acceptance: (1) every item has owner + evidence link; (2) checklist reviewed and signed with go/no-go recorded; (3) automated rebalance execution stays dry-run until separately signed. Judged per specs/p25-agent-portfolio.md §Acceptance criteria.",
+  "skill": "p25-agent-portfolio-mainnet-readiness-checklist",
+  "tags": [
+   "defi",
+   "portfolio",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p25-agent-portfolio-testnet-deploy-scripts"
+  ]
+ }
+]

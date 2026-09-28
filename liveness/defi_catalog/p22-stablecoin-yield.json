@@ -1,0 +1,490 @@
+[
+ {
+  "task_key": "p22-stablecoin-yield-architecture-spec",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "spec",
+  "title": "Spec P22 yield-maximizer architecture: venues, optimizer, 10 bps fee router",
+  "description": "Deliverable: docs/spec/P22_ARCHITECTURE.md for the USDC/USDT-only yield swarm (scanner at 300 s cadence, Morpho-on-Base adapter, allocation optimizer, TOA rebalance hooks, 10 bps fee router to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac). Acceptance: (1) venue allowlist table lists exactly the 5 approved Base (chain id 8453) venues with adapter assignments; (2) optimizer constraints written as equations (weights sum to 1.0, per-venue <=0.50, depth <=10% of venue liquidity, Morpho tie-break within 5 bps); (3) rebalance triggers quantified (delta APR >=50 bps, gas <25% of projected gain, >=4 h cooldown) and stable_only + morpho_preferred gate semantics defined. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-architecture-spec",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "spec",
+   "architecture"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p22-stablecoin-yield-interface-definitions",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "spec",
+  "title": "Define P22 Python interfaces and PoolQuote schema",
+  "description": "Deliverable: src/sincor2/defi/p22/interfaces.py with StableVenueAdapter, PoolQuote, AllocationPlan protocols. Acceptance: (1) PoolQuote carries venue, asset, net_apr, depth_usd, ts and type-checks under mypy strict; (2) asset field constrained to USDC/USDT with chain_id pinned to 8453; (3) a stub quote validates against the schema and a stub adapter satisfies the protocol at type-check time. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-interface-definitions",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "spec",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p22-stablecoin-yield-economic-model",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "spec",
+  "title": "Write P22 economics: 5.8% target APR, 10 bps fee, worked net-APR example",
+  "description": "Deliverable: docs/spec/P22_ECONOMICS.md with target_apr=0.058, fee_bps=10 on realized yield only, risk_score bound 0.22, max_alloc_pct=0.50, min_capital_usd=10.0. Acceptance: (1) worked example: $100,000 at 5.8% -> $5,800/yr yield -> $58.00/yr fee (net APR 5.7942%), matching fee math to the cent; (2) venue-rotation trigger table (50 bps delta, 4 h cooldown, gas<25% gain) the optimizer implements verbatim; (3) depth-cap rule (<=10% of venue liquidity) with a numeric example. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-economic-model",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "spec",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-repo-layout",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "scaffold",
+  "title": "Create P22 repo layout: src/sincor2/defi/p22/ package skeleton",
+  "description": "Deliverable: src/sincor2/defi/p22/ with scanner.py, adapters/, optimizer.py, fees.py, gates.py, interfaces.py; tests/pytest/test_p22_*.py stubs; configs/agents/p22-stablecoin-yield.yaml; docs runbook stub. Acceptance: (1) `python -m compileall` passes and the package imports cleanly with no circular imports; (2) every module exposes the interface from interfaces.py (import-time protocol check); (3) agent YAML validates against the repo's agent-config schema. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-repo-layout",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-architecture-spec",
+   "p22-stablecoin-yield-interface-definitions"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-starter-code",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "scaffold",
+  "title": "Write P22 starter boilerplate: scanner stub, mock adapter, config defaults",
+  "description": "Deliverable: scanner stub with TOA hooks, mock venue adapter returning fixed PoolQuotes, config defaults fee_bps=10, target_apr=0.058, preferred venue Morpho on Base. Acceptance: (1) compileall passes; (2) stub scan over 3 mock venues produces schema-valid ranked PoolQuotes; (3) defaults asserted in a config test (fee_bps==10, target_apr==0.058). Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-starter-code",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-stable-only-gate",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "core",
+  "title": "Implement the stable_only gate: reject non-USDC/USDT at every entrypoint",
+  "description": "Deliverable: stable_only enforcement in src/sincor2/defi/p22/gates.py rejecting any venue/asset outside the USDC/USDT Base allowlist before quoting or allocation, with a logged security event per rejection. Acceptance: (1) DAI, ETH, cbBTC and 20+ unknown token addresses are rejected at scan, adapter, and allocator entrypoints; (2) USDC and USDT pass all three entrypoints; (3) each rejection emits a structured security log with asset address and venue. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-stable-only-gate",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "core",
+   "gates",
+   "security"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-starter-code"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-morpho-base-adapter",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "core",
+  "title": "Build the Morpho-on-Base venue adapter (quote + supply/withdraw tx building)",
+  "description": "Deliverable: adapters/morpho.py implementing StableVenueAdapter for Morpho vaults on Base (chain 8453): vault discovery, ERC-4626 supply/withdraw call construction, net-APR reads net of curator performance fees (Steakhouse 25%, Moonwell Flagship 15%, Gauntlet 0%). Acceptance: (1) adapter quotes and builds transactions against a Base fork with zero unexpected reverts; (2) every external call wrapped in try/catch degrading to venue_skipped, never an uncaught exception; (3) net APR math matches P22_ECONOMICS.md fee treatment to 1 bps. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-morpho-base-adapter",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "core",
+   "morpho",
+   "base"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p22-stablecoin-yield-stable-only-gate",
+   "p22-stablecoin-yield-interface-definitions"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-pool-yield-scanner",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "core",
+  "title": "Build the stable pool yield scanner with 300 s cadence and TWAP",
+  "description": "Deliverable: scanner.py polling USDC/USDT pools across allowlisted Base venues, normalizing net APR after curator + protocol fees, emitting PoolQuotes with TOA forecast-overlay hooks. Acceptance: (1) scan over mocked venues produces ranked, schema-valid quotes; (2) optimizer consumes a 4-hour TWAP of APR, not spot quotes (proven by a spike-injection test where a 12% one-block spike does not move the TWAP ranking); (3) quotes older than 600 s are discarded and stale/missing data never raises. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-pool-yield-scanner",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "core",
+   "scanner",
+   "toa"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p22-stablecoin-yield-starter-code"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-allocation-optimizer",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "core",
+  "title": "Build the allocation optimizer: caps, depth limits, Morpho tie-break",
+  "description": "Deliverable: optimizer.py maximizing weighted net APR subject to sum=1.0, per-venue <=0.50, depth <=10% of venue liquidity, risk_score <=0.22, preferring Morpho on Base on ties within 5 bps. Acceptance: (1) allocations sum to 1.0 within 1e-9 and respect all caps across 200 randomized quote sets; (2) tie-break test: two venues within 5 bps -> Morpho venue wins; (3) over-depth quotes get weight capped at the 10% liquidity rule with the remainder reallocated. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-allocation-optimizer",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "core",
+   "optimizer"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p22-stablecoin-yield-pool-yield-scanner",
+   "p22-stablecoin-yield-morpho-base-adapter",
+   "p22-stablecoin-yield-economic-model"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-fee-routing",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "core",
+  "title": "Implement 10 bps fee on realized yield to 0x09E289...9612Ac",
+  "description": "Deliverable: fees.py computing fee = floor(realized_yield_wei * 10 / 10000) per 300 s tick against a per-deposit principal baseline, with per-user ledger and batched treasury settlement (>= $10 batches). Acceptance: (1) fee math matches the P22_ECONOMICS.md worked example to the wei; (2) fees accrue only on realized yield deltas, never on TWAP marks (proven by a mark-up/no-withdrawal test accruing zero fees); (3) settlement transactions target only 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-fee-routing",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "core",
+   "fees"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-economic-model",
+   "p22-stablecoin-yield-allocation-optimizer"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-secondary-venue-adapter",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "core",
+  "title": "Build the secondary venue adapter: Aave V3 Base USDC/USDT",
+  "description": "Deliverable: adapters/aave_v3.py implementing StableVenueAdapter for Aave V3 on Base (IPool supply/withdraw, getReserveData APR reads) as fallback when Morpho quotes are stale or depth-capped. Acceptance: (1) interface-conformant quoting and tx-building verified against a Base fork; (2) utilization-driven APR reads use the same 4-hour TWAP treatment as the Morpho adapter; (3) fallback test: Morpho adapter forced stale -> optimizer routes to Aave V3 with caps intact. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-secondary-venue-adapter",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "core",
+   "venues"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p22-stablecoin-yield-morpho-base-adapter"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-toa-rebalance-hooks",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "core",
+  "title": "Wire TOA rebalance hooks: forecast-driven rotation under cooldown",
+  "description": "Deliverable: TOA ingest_feedback-driven rebalancing where the optimizer consumes TOA revenue forecasts to trigger venue rotation, with the 4-hour churn cooldown enforced. Acceptance: (1) simulated TOA forecast flipping the preferred venue rotates allocation within one rebalance cycle; (2) a second flip inside the 4 h cooldown window is deferred, not executed; (3) TOA-forced rotations still respect the 50 bps delta and gas<25%-of-gain gates. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-toa-rebalance-hooks",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "core",
+   "toa",
+   "rebalance"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p22-stablecoin-yield-allocation-optimizer"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-unit-tests",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "testing",
+  "title": "Write P22 unit tests: gate, fee math, quote normalization, optimizer caps",
+  "description": "Deliverable: tests/pytest/test_p22_stablecoin_yield_unit.py covering stable_only rejection matrix, fee math to the wei, TWAP quote normalization, and optimizer cap enforcement. Acceptance: (1) all tests pass; (2) coverage of src/sincor2/defi/p22/ >= 85%; (3) fee tests pin the $100k/5.8% -> $58.00 worked example. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-unit-tests",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-stable-only-gate",
+   "p22-stablecoin-yield-fee-routing"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-integration-tests",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "testing",
+  "title": "Write P22 integration tests: scan->optimize->allocate->fee pipeline",
+  "description": "Deliverable: end-to-end integration tests: scanner to optimizer to allocation plan to fee routing, plus TOA-triggered rotation and secondary-adapter fallback. Acceptance: (1) green pipeline from mock quotes to settled fee ledger; (2) simulated Morpho outage falls back to Aave V3 with zero exceptions and caps intact; (3) a full rotation cycle accrues the exact 10 bps fee on the realized delta. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-integration-tests",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p22-stablecoin-yield-unit-tests",
+   "p22-stablecoin-yield-allocation-optimizer",
+   "p22-stablecoin-yield-secondary-venue-adapter"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-invariant-fuzz-tests",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "testing",
+  "title": "Write P22 invariant/fuzz tests: 1000+ randomized quote sets",
+  "description": "Deliverable: property tests asserting (a) portfolio never holds non-USDC/USDT, (b) allocations sum to 1.0 within 1e-9, (c) per-venue <=0.50 and depth <=10% caps hold. Acceptance: (1) invariants hold over >=1000 randomized quote sets including adversarial spikes and stale feeds; (2) any invariant violation fails loudly with the offending quote set logged; (3) fuzz corpus seeds are fixed for reproducibility. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-invariant-fuzz-tests",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "testing",
+   "fuzz",
+   "invariants"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-fork-simulation",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "testing",
+  "title": "Run P22 against a Base mainnet fork with live Morpho/Aave quotes",
+  "description": "Deliverable: fork run executing scanner, both adapters, and optimizer against Base mainnet state with live Morpho vault and Aave V3 market data. Acceptance: (1) real quotes flow through to a valid allocation plan (caps respected, stable_only enforced); (2) zero unexpected reverts across the run; (3) run log records per-venue TWAP APRs and the chosen weights for review. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-fork-simulation",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "testing",
+   "fork-simulation"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-audit-prep",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "audit",
+  "title": "Assemble P22 audit-prep package: snapshot, threat model, limitations log",
+  "description": "Deliverable: single reviewable directory with frozen code snapshot (commit hash recorded), threat model covering venue spoofing, stale-quote exploitation, and fee diversion, plus a known-limitations log. Acceptance: (1) snapshot builds and all P22 tests pass from the frozen tree; (2) threat model lists each attack with the mitigating control and its test; (3) limitations log states the TWAP lag tradeoff and the $10 min-capital rationale explicitly. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-audit-prep",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p22-stablecoin-yield-invariant-fuzz-tests",
+   "p22-stablecoin-yield-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-findings-remediation",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "audit",
+  "title": "Remediate P22 audit findings: zero open medium+ with suite green",
+  "description": "Deliverable: fixes for all audit findings rated medium or higher, each with a regression test. Acceptance: (1) zero open medium-or-higher findings; (2) full P22 suite plus stable_only gate tests re-run green after each fix; (3) each fix references the finding ID in its commit message. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-findings-remediation",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p22-stablecoin-yield-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-gas-optimization",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "audit",
+  "title": "Gas-optimize P22 adapter tx paths: 20% reduction target with report",
+  "description": "Deliverable: gas measurements per supply/withdraw/reallocate call path and optimizations targeting >=20% reduction on hot paths without behavior change. Acceptance: (1) committed before/after gas report with per-path numbers; (2) all P22 tests still pass; (3) no change to fee math, caps, or gate semantics (verified by the invariant suite). Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-gas-optimization",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p22-stablecoin-yield-findings-remediation"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-technical-docs",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "docs",
+  "title": "Write P22 technical docs: component reference, gates, Morpho preference",
+  "description": "Deliverable: technical docs covering src/sincor2/defi/p22/ component reference, StableVenueAdapter interface, stable_only gate semantics, and the Morpho-preferred tie-break policy. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) a reader can implement a third adapter from the docs alone. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-technical-docs",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-architecture-spec",
+   "p22-stablecoin-yield-allocation-optimizer"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-agent-yaml-runbook",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "docs",
+  "title": "Ship P22 agent YAML config and ops runbook",
+  "description": "Deliverable: configs/agents/p22-stablecoin-yield.yaml (budgets, memory, TOA hooks, 5-min check-in cadence) and docs/ops/P22_RUNBOOK.md (venue allowlist change procedure, rebalance ops, outage fallback). Acceptance: (1) YAML validates against the repo agent-config schema; (2) runbook steps are executable in order by an operator (dry-run first); (3) allowlist-change procedure requires spec amendment + audit re-signoff, stated explicitly. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-agent-yaml-runbook",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "docs",
+   "ops",
+   "yaml"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-starter-code"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-dashboard-monitoring-hooks",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "docs",
+  "title": "Add P22 dashboard monitoring hooks: APR drift, venue outage, gate alarm",
+  "description": "Deliverable: monitoring hooks emitting on the feed schema: net APR vs 5.8% target drift alert, venue-outage metric (no fresh quote in 600 s), stable_only violation P0 alarm. Acceptance: (1) hooks emit valid feed-schema events; (2) simulated venue failure fires the outage alert within one scan cycle; (3) a stable_only violation test fires the P0 alarm. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-dashboard-monitoring-hooks",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-toa-rebalance-hooks"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-testnet-deploy-scripts",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "deploy",
+  "title": "Write P22 testnet deploy scripts: dry-run default, Sepolia end-to-end",
+  "description": "Deliverable: deploy scripts for P22 offchain agent (Railway/Gunicorn) plus any onchain components, with dry-run defaulting ON. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs every 5 min; (3) flipping dry-run off requires an explicit flag and prints the compliance checkpoint. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-testnet-deploy-scripts",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p22-stablecoin-yield-findings-remediation"
+  ]
+ },
+ {
+  "task_key": "p22-stablecoin-yield-mainnet-readiness-checklist",
+  "project_id": "P22",
+  "project_name": "Stablecoin Yield Maximizer",
+  "phase": "deploy",
+  "title": "Produce P22 mainnet readiness checklist with signed go/no-go",
+  "description": "Deliverable: mainnet readiness checklist covering audit signoff, venue allowlist freeze, treasury address verification (0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac), rollback plan, and printed compliance checkpoint pre-flight. Acceptance: (1) every item has an owner and evidence link; (2) checklist reviewed and signed with go/no-go recorded; (3) live rotation stays dry-run until all items are signed. Judged per specs/p22-stablecoin-yield.md §Acceptance criteria.",
+  "skill": "p22-stablecoin-yield-mainnet-readiness-checklist",
+  "tags": [
+   "defi",
+   "stablecoin",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p22-stablecoin-yield-testnet-deploy-scripts"
+  ]
+ }
+]

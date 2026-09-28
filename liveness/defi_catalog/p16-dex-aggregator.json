@@ -1,0 +1,483 @@
+[
+ {
+  "task_key": "p16-dex-aggregator-architecture-spec",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "spec",
+  "title": "DEX aggregator architecture spec: routing, allowlist, TOA feed, min_out",
+  "description": "Deliverable: docs/architecture/P16_DEX_AGG_ARCHITECTURE.md.\nAcceptance criteria: (1) the multi-split routing engine, on-chain venue allowlist registry, off-chain TOA forecast feed hook, and min_out protection policy are each specified; (2) every allowlisted Base venue onboarding step and the allowlist update procedure are named; (3) the exact slippage/min_out math is stated and reviewed against the catalog gates (min_out, venue_whitelist).\nConstraints: fee 6 bps, risk_score 0.26, max_alloc_pct 0.50, live_blocked=true.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-architecture-spec",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p16-dex-aggregator-interface-definitions",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "spec",
+  "title": "Router and venue-adapter interfaces plus Python quote dataclasses",
+  "description": "Deliverable: onchain/src/p16-dex-aggregator/interfaces/IDEXRouter.sol and IVenueAdapter.sol; QuoteRequest/RouteQuote dataclasses in src/sincor2/defi/p16_dex_aggregator/types.py.\nAcceptance criteria: (1) interfaces compile under solc 0.8.24 with zero errors and zero warnings; (2) quote() is an exact view and swap() honors a caller-supplied minOut; (3) the Python dataclasses serialize round-trip through JSON.\nConstraints: adapter quote tolerance 1 wei vs fork snapshot.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-interface-definitions",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "spec",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-fee-model",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "spec",
+  "title": "6 bps fee model to Treasury with worked multi-split examples",
+  "description": "Deliverable: fee model document: 6 bps on the input token of every executed swap, swept to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac.\nAcceptance criteria: (1) a reviewer can compute the exact treasury take for any routed swap from the spec alone; (2) worked fee-math examples for multi-split routes included; (3) fee-on-transfer tokens handled by a measured-input (balance-before/after) rule.\nConstraints: fee taken in the input token, same transaction as the swap.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-fee-model",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "spec",
+   "fees"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-repo-layout",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "scaffold",
+  "title": "Create P16 repo layout and skeletons",
+  "description": "Deliverable: onchain/src/p16-dex-aggregator/{interfaces,adapters,RouterGateway.sol}, src/sincor2/defi/p16_dex_aggregator/, tests/pytest/test_p16_dex_aggregator.py, agents/p16-dex-aggregator.yaml as an empty-but-valid skeleton with a module-map README.\nAcceptance criteria: (1) directory tree exists; (2) YAML parses and validates; (3) no test collector errors from the new paths.\nConstraints: layout mirrors the interface module map.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-repo-layout",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-starter-code",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "scaffold",
+  "title": "RouterGateway skeleton and Python agent starter code",
+  "description": "Deliverable: RouterGateway.sol skeleton (ReentrancyGuard, SafeERC20, non-bricking try/catch around each venue call) plus a Python agent skeleton in src/sincor2/defi/p16_dex_aggregator/agent.py with error handling and a TOA hook stub.\nAcceptance criteria: (1) contract compiles under solc 0.8.24; (2) agent imports and answers a health ping; (3) stub test green in CI.\nConstraints: router defaults to dry-run quoting, never executing.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-starter-code",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-venue-adapters",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "core",
+  "title": "Venue adapter interface plus Uniswap V3/V4 and Aerodrome adapters",
+  "description": "Deliverable: IVenueAdapter plus production adapters for Uniswap V3/V4 and Aerodrome on Base.\nAcceptance criteria: (1) compiles under solc 0.8.24; (2) adapter quotes match fork snapshots of real pools within 1-wei tolerance; (3) swap() honors a caller-supplied minOut on every path.\nConstraints: fee tiers 5/30/100 bps for V3; volatile and stable curves for Aerodrome.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-venue-adapters",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "core",
+   "adapters"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p16-dex-aggregator-starter-code"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-route-split-optimizer",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "core",
+  "title": "Multi-split route optimizer maximizing net output after gas",
+  "description": "Deliverable: split solver allocating input across allowlisted venues, in Python with an optional on-chain split verifier.\nAcceptance criteria: (1) on 100 synthetic quote sets the optimizer never violates min_out and allocations always sum to 100%; (2) average net realized output beats best-single-venue routing; (3) objective is output minus gas minus fees, never gross output.\nConstraints: max 3 splits per swap; dust legs under $10 never emitted; gas penalization per added leg.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-route-split-optimizer",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "core",
+   "routing"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p16-dex-aggregator-starter-code",
+   "p16-dex-aggregator-venue-adapters"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-toa-forecast-feed",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "core",
+  "title": "TOA slippage forecasts reweighting route selection",
+  "description": "Deliverable: Python agent consuming TOA slippage/forecast feeds per venue pair and reweighting route selection each cycle, with the forecast hook wired into the agent YAML.\nAcceptance criteria: (1) a TOA forecast JSON showing venue degradation measurably shifts recommended route weights in an integration test; (2) hook wired via src/sincor2/forecasting_engine.py and the agent YAML; (3) stale forecasts excluded from weighting.\nConstraints: forecast staleness cutoff 60s.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-toa-forecast-feed",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "core",
+   "toa"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p16-dex-aggregator-starter-code",
+   "p16-dex-aggregator-route-split-optimizer"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-min-out-protection",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "core",
+  "title": "On-chain min_out protection with committed-quote check",
+  "description": "Deliverable: min_out enforced in RouterGateway - the whole swap reverts if realized output falls below minOut adjusted by the configured slippage tolerance.\nAcceptance criteria: (1) minOut committed at execution time from a fresh quote (same-tx re-quote or 1-block-fresh signed quote); (2) tests prove a revert on a manipulated quote and a pass on an honest one; (3) default slippage tolerance 50 bps.\nConstraints: minOut = quoted x (1 - slippage_bps/10000); off-chain quotes never trusted without re-validation.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-min-out-protection",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "core",
+   "slippage"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p16-dex-aggregator-starter-code",
+   "p16-dex-aggregator-toa-forecast-feed"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-fee-to-treasury",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "core",
+  "title": "6 bps fee sweep to Treasury on every swap",
+  "description": "Deliverable: fee sweep in the input token to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac on every executed swap, recorded in an on-chain fee ledger event.\nAcceptance criteria: (1) a fork test asserts the treasury balance delta equals exactly 6 bps of input on a real routed swap; (2) fee-ledger event emitted per swap; (3) fee transfer failure reverts the swap.\nConstraints: exactly 6 bps, not approximately; measured-input rule for fee-on-transfer tokens.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-fee-to-treasury",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "core",
+   "fees",
+   "treasury"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p16-dex-aggregator-starter-code",
+   "p16-dex-aggregator-min-out-protection"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-venue-allowlist-registry",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "core",
+  "title": "Venue allowlist registry with 24h timelock",
+  "description": "Deliverable: allowlist registry with admin add/remove behind a timelock; RouterGateway reverts on any non-allowlisted venue adapter.\nAcceptance criteria: (1) removal takes effect only after the 24h timelock elapses; (2) an attempted swap through a removed venue reverts post-timelock; (3) add/remove events queryable for audit.\nConstraints: genesis allowlist - Uniswap V3, Uniswap V4, Aerodrome on Base.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-venue-allowlist-registry",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "core",
+   "allowlist"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-starter-code",
+   "p16-dex-aggregator-fee-to-treasury"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-edge-cases",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "core",
+  "title": "Router edge cases: venue isolation, dust, WETH path, reentrancy",
+  "description": "Deliverable: edge-case handling for failing venues, dust amounts, WETH wrap/unwrap, and reentrancy attempts.\nAcceptance criteria: (1) a failing venue is isolated by try/catch so one revert never bricks the route - the failed leg's input is returned; (2) dust legs under $10 merged or dropped; (3) a reentrancy attempt against the callback path reverts; each case has a passing test.\nConstraints: WETH wrap/unwrap inside the atomic transaction.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-edge-cases",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "core",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-starter-code",
+   "p16-dex-aggregator-venue-allowlist-registry"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-unit-tests",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "testing",
+  "title": "P16 unit tests: optimizer math, registry, fee math",
+  "description": "Deliverable: tests/pytest/test_p16_dex_aggregator.py.\nAcceptance criteria: (1) 100% of new code paths in the optimizer and registry covered, all green; (2) split-sum and gas-penalization math tested on synthetic sets; (3) fee math tested to the wei.\nConstraints: suite runs in CI under 5 minutes.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-unit-tests",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-integration-tests",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "testing",
+  "title": "P16 integration tests: agent-to-router path with mocked venues",
+  "description": "Deliverable: end-to-end test - Python agent builds a route, calls RouterGateway against mocked venue adapters.\nAcceptance criteria: (1) full agent-to-router path runs in CI with mocked venues; (2) min_out holds on every run; (3) the 6 bps treasury fee lands exactly.\nConstraints: mocked venues deterministic; real-pool coverage left to the fork test.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-integration-tests",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p16-dex-aggregator-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-invariant-fuzz-tests",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "testing",
+  "title": "P16 invariant and fuzz tests: minOut, fee, allowlist",
+  "description": "Deliverable: fuzz harness over routes, quotes, and venue states.\nAcceptance criteria: (1) 10k fuzz runs with zero invariant violations; (2) invariants: any executed swap realizes >= minOut, fee taken equals exactly 6 bps, only allowlisted venues ever execute; (3) every counterexample fixed and recorded.\nConstraints: seed corpus checked in for reproducibility.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-invariant-fuzz-tests",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "testing",
+   "fuzz"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-fork-simulation",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "testing",
+  "title": "Base mainnet-fork routing simulation on real pools",
+  "description": "Deliverable: fork simulation run with a report.\nAcceptance criteria: (1) routed swaps simulated on a pinned Base mainnet fork against real Uniswap V3 and Aerodrome pools; (2) at least 5 real-pool swaps settle with realized output >= minOut; (3) treasury fee deltas correct on every swap.\nConstraints: block pin documented; re-runnable by a reviewer.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-fork-simulation",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "testing",
+   "fork"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-audit-prep",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "audit",
+  "title": "P16 audit-prep package: flattened sources, natspec, threat model",
+  "description": "Deliverable: audit package with flattened sources, full natspec, threat model, and trust assumptions on off-chain components.\nAcceptance criteria: (1) package passes the repo's audit-readiness checklist with zero missing artifacts; (2) threat model covers malicious venue adapter, stale TOA forecast, admin key compromise; (3) every gate maps to its enforcing line of code.\nConstraints: code hash frozen and recorded.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-audit-prep",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p16-dex-aggregator-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-findings-remediation",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "audit",
+  "title": "Remediate P16 audit findings with regression tests",
+  "description": "Deliverable: fixes for every finding in the audit findings log, each with a regression test proving the fix.\nAcceptance criteria: (1) findings log shows 100% closed with linked tests; (2) no new warnings introduced; (3) full suite passes on the remediated tree.\nConstraints: no fix weakens min_out or the allowlist.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-findings-remediation",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p16-dex-aggregator-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-gas-optimization",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "audit",
+  "title": "Optimize P16 gas costs with a documented gas report",
+  "description": "Deliverable: gas report for quote/execute paths with packed calldata and storage, redundant external calls removed.\nAcceptance criteria: (1) documented gas report published; (2) routed-swap execution under 300k gas on the reference fork; (3) zero behavioral change across the test suite.\nConstraints: no optimization may remove a require on the execution path.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-gas-optimization",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p16-dex-aggregator-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-technical-docs",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "docs",
+  "title": "P16 technical documentation: routing math, adapter onboarding, TOA schema",
+  "description": "Deliverable: technical docs covering routing math, venue adapter onboarding guide, TOA forecast schema, min_out/fee accounting.\nAcceptance criteria: (1) a new builder can add a third Base venue adapter from the docs alone; (2) optimizer objective and constraints fully specified; (3) all references resolve.\nConstraints: numeric parameters table matches the spec.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-technical-docs",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-agent-config-runbook",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "docs",
+  "title": "P16 agent YAML config and ops runbook",
+  "description": "Deliverable: agents/p16-dex-aggregator.yaml (budgets, memory, heartbeat, TOA hook) and docs/ops/P16_DEX_AGG_RUNBOOK.md.\nAcceptance criteria: (1) YAML validates against the repo agent schema; (2) runbook covers incident procedures for venue outages and forecast staleness; (3) runbook covers the top 5 failure modes with step-by-step responses.\nConstraints: router defaults to dry-run quoting.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-agent-config-runbook",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "docs",
+   "ops"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-monitoring-hooks",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "docs",
+  "title": "P16 dashboard and monitoring hooks with unknown-on-stale semantics",
+  "description": "Deliverable: monitoring hooks exposing route fill rate, realized vs forecast slippage, and treasury fee inflow.\nAcceptance criteria: (1) hooks emit structured metrics feeding the SINCOR dashboard; (2) the feed reports unknown rather than healthy when data is stale, per STATUS_FEED_SCHEMA; (3) per-venue revert rate exposed.\nConstraints: staleness > 60s marks values unknown.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-monitoring-hooks",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-testnet-deploy",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "deploy",
+  "title": "P16 testnet deploy scripts for Base Sepolia",
+  "description": "Deliverable: scripts/defi/p16/deploy_testnet.py deploying RouterGateway, both venue adapters, and the allowlist registry.\nAcceptance criteria: (1) contracts deployed and verified on Base Sepolia with seeded allowlist entries; (2) a test swap executes end-to-end on Sepolia; (3) script idempotent.\nConstraints: Sepolia only; no mainnet addresses in scripts.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-testnet-deploy",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p16-dex-aggregator-audit-prep",
+   "p16-dex-aggregator-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p16-dex-aggregator-mainnet-readiness",
+  "project_id": "P16",
+  "project_name": "Best-Execution DEX Aggregator",
+  "phase": "deploy",
+  "title": "P16 mainnet readiness checklist with evidence links",
+  "description": "Deliverable: mainnet readiness checklist document.\nAcceptance criteria: (1) checklist signed off item-by-item with evidence links; (2) covers audit sign-off, timelock active, monitoring live, dry-run default confirmed, treasury address verified; (3) nothing deploys to mainnet until all items pass.\nConstraints: live_blocked=true until every item passes.\nReference: per specs/p16-dex-aggregator.md §Acceptance criteria.",
+  "skill": "p16-dex-aggregator-mainnet-readiness",
+  "tags": [
+   "defi",
+   "dex-aggregator",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p16-dex-aggregator-testnet-deploy"
+  ]
+ }
+]

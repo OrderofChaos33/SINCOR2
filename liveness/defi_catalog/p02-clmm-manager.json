@@ -1,0 +1,477 @@
+[
+  {
+    "task_key": "p02-clmm-architecture-spec",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "spec",
+    "title": "Draft CLMM architecture spec",
+    "description": "Deliver docs/p02/ARCHITECTURE.md: hook lifecycle across beforeSwap/afterSwap/beforeModifyPosition, JIT-attack detection model (same-block add+remove sequence), response options (dynamic tick shift vs transient fee on the JIT provider), proceeds distribution to passive LPs, and range-width policy driven by realized volatility. Done = spec ratifies the vol_band and tick_distance catalog gates with numeric bands and maps every state variable to EIP-1153 transient storage or persistent storage with justification.",
+    "skill": "p02-clmm-architecture-spec",
+    "tags": [
+      "defi",
+      "clmm",
+      "spec"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": []
+  },
+  {
+    "task_key": "p02-clmm-interface-definitions",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "spec",
+    "title": "Define hook interfaces and data structures",
+    "description": "Deliver onchain/src/hooks/IJITDefenseHook.sol plus Python interfaces src/sincor2/defi/p02/interfaces.py: position descriptors, vol-band config, JIT event schema, fee-distribution accounting. Done = interfaces compile under solc 0.8.24, Python side mypy-clean, and every core task references these types without redefinition.",
+    "skill": "p02-clmm-interface-definitions",
+    "tags": [
+      "defi",
+      "clmm",
+      "spec",
+      "interfaces"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-economic-fee-model",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "spec",
+    "title": "Specify economic and fee model",
+    "description": "Deliver docs/p02/ECONOMICS.md: 15 bps protocol fee on captured JIT proceeds routed to the canonical treasury address, LP proceeds-distribution formula (pro-rata by passive liquidity-seconds), and cost model proving transient-fee defense is cheaper than tick-shifting under stated gas assumptions. Done = worked numeric example of a detected JIT attack with fee split to the wei.",
+    "skill": "p02-clmm-economic-fee-model",
+    "tags": [
+      "defi",
+      "clmm",
+      "spec",
+      "economics"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-architecture-spec"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-repo-scaffold",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "scaffold",
+    "title": "Create repo layout and stub interfaces",
+    "description": "Create onchain/src/hooks/p02/, src/sincor2/defi/p02/, agents/defi/p02/, tests/pytest/test_p02_*.py stubs, docs/p02/; agent YAML skeleton agents/defi/p02/clmm_manager.yaml per repo convention. Done = tree committed, stubs import/compile, CI lints pass.",
+    "skill": "p02-clmm-repo-scaffold",
+    "tags": [
+      "defi",
+      "clmm",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-interface-definitions"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-boilerplate-starter",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "scaffold",
+    "title": "Write boilerplate starter code",
+    "description": "Fill stubs: JITDefenseHook.sol extending LiquidityAmplifierHook with ReentrancyGuard, transient-storage helpers (TSTORE/TLOAD wrappers), and non-bricking try/catch around pool callbacks; Python package with vol-feed client skeleton and TOA hooks. Done = forge build succeeds; pytest collects stubs; no unresolved stub markers in public bodies.",
+    "skill": "p02-clmm-boilerplate-starter",
+    "tags": [
+      "defi",
+      "clmm",
+      "scaffold"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-repo-scaffold"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-hook-skeleton",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "core",
+    "title": "Implement hook skeleton on Uniswap V4",
+    "description": "Implement onchain/src/hooks/p02/JITDefenseHook.sol with correct hook permissions (beforeSwap/afterSwap/beforeModifyPosition/afterModifyPosition), PoolManager integration, and transient-storage lifecycle (set in before-phase, consumed in after-phase, cleared). Done = compiles under solc 0.8.24, hook address has valid permission bits, deploys against a V4 PoolManager on local fork.",
+    "skill": "p02-clmm-hook-skeleton",
+    "tags": [
+      "defi",
+      "clmm",
+      "core",
+      "solidity"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p02-clmm-boilerplate-starter"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-jit-detection",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "core",
+    "title": "Implement JIT attack detection",
+    "description": "Implement same-block add/remove detection: track liquidity deltas per position per block via transient storage, flag sequences where liquidity is added and fully removed within the same block around a swap, with configurable sensitivity to avoid false positives on legitimate rebalancing. Done = detection test battery: true JIT flagged, two-block rebalance not flagged, multi-position splitting attack flagged.",
+    "skill": "p02-clmm-jit-detection",
+    "tags": [
+      "defi",
+      "clmm",
+      "core",
+      "solidity"
+    ],
+    "bounty_axm": 5.0,
+    "effort": "L",
+    "depends_on": [
+      "p02-clmm-hook-skeleton"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-dynamic-tick-shift",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "core",
+    "title": "Implement dynamic tick-shift response",
+    "description": "On confirmed JIT detection, shift the managed position's ticks away from the attack range by tick_distance steps, bounded by vol_band, in afterModifyPosition. Includes cooldown to prevent oscillation and a max-shift guard. Done = fork test shows managed position migrates off the JIT range within one block; cooldown prevents ping-pong across 100 simulated attacks.",
+    "skill": "p02-clmm-dynamic-tick-shift",
+    "tags": [
+      "defi",
+      "clmm",
+      "core",
+      "solidity"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p02-clmm-jit-detection"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-transient-fee",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "core",
+    "title": "Implement transient fee on JIT providers",
+    "description": "Alternative/complementary response: apply a transient fee surcharge to the flagged JIT provider's swap/position actions, computed from captured value, with proceeds accounted per pool. Fee logic isolated so a revert in fee math can never brick the swap (non-bricking try/catch). Done = flagged provider pays the surcharge in simulation; honest LPs' effective fee unchanged; swap never reverts due to fee logic.",
+    "skill": "p02-clmm-transient-fee",
+    "tags": [
+      "defi",
+      "clmm",
+      "core",
+      "solidity"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p02-clmm-jit-detection"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-proceeds-distribution",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "core",
+    "title": "Implement proceeds distribution to passive LPs",
+    "description": "Distribute captured JIT proceeds pro-rata by passive liquidity-seconds to LPs who held through the attack block; pull-based claim (never push, non-bricking), 15 bps of proceeds routed to the canonical treasury address. Done = distribution test with 5 LPs matches expected pro-rata amounts to the wei; treasury cut exact.",
+    "skill": "p02-clmm-proceeds-distribution",
+    "tags": [
+      "defi",
+      "clmm",
+      "core",
+      "solidity",
+      "fees"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-transient-fee"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-vol-range-agent",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "core",
+    "title": "Build realized-vol range-width agent",
+    "description": "src/sincor2/defi/p02/vol_agent.py: computes realized volatility from pool price history, sets managed range width within vol_band, emits re-range intents; dry_run_default enforced (no live LP without auditor sign-off gate in code). Python error handling + TOA forecast hooks. Done = agent reproduces target range widths on historical fixtures; live LP path is hard-blocked until the auditor gate constant is flipped with a signed config.",
+    "skill": "p02-clmm-vol-range-agent",
+    "tags": [
+      "defi",
+      "clmm",
+      "core",
+      "agent"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p02-clmm-dynamic-tick-shift"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-access-edge-cases",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "core",
+    "title": "Access control and edge cases",
+    "description": "Roles: MANAGER_ROLE (agent), GUARDIAN_ROLE (pause defense responses); edge cases: empty-pool deployment, first-LP share math, tick spacing rounding, transient-storage collision across pools, defense triggered mid-rebalance. Done = unauthorized manager call reverts; every edge case has a test; defense pause never blocks user withdrawals.",
+    "skill": "p02-clmm-access-edge-cases",
+    "tags": [
+      "defi",
+      "clmm",
+      "core",
+      "security"
+    ],
+    "bounty_axm": 0.75,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-proceeds-distribution",
+      "p02-clmm-vol-range-agent"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-unit-tests",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "testing",
+    "title": "Write unit tests for hook logic",
+    "description": "Foundry + pytest suites under onchain/test/p02/ and tests/pytest/test_p02_units.py: permission bits, transient-storage lifecycle, JIT flagging true/false positives, tick-shift math, fee math. Done = 24/24 pass; each test cites the rule it guards.",
+    "skill": "p02-clmm-unit-tests",
+    "tags": [
+      "defi",
+      "clmm",
+      "testing",
+      "unit"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-access-edge-cases"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-integration-tests",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "testing",
+    "title": "Write integration tests on V4 pool flows",
+    "description": "Spin local V4 PoolManager, deploy hook, run: honest LP lifecycle, JIT attack simulation, tick-shift response, fee capture, LP claims. Done = full attack->capture->distribute cycle completes with expected balances; suite green in CI.",
+    "skill": "p02-clmm-integration-tests",
+    "tags": [
+      "defi",
+      "clmm",
+      "testing",
+      "integration"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p02-clmm-unit-tests"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-invariant-fuzz",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "testing",
+    "title": "Invariant and fuzz tests",
+    "description": "Invariants: transient storage never leaks across blocks, honest LP value never decreases due to defense, captured proceeds == distributed + treasury cut, tick shifts stay within vol_band under fuzzed price paths. Done = 10k runs each, zero counterexamples, docs/p02/INVARIANTS.md.",
+    "skill": "p02-clmm-invariant-fuzz",
+    "tags": [
+      "defi",
+      "clmm",
+      "testing",
+      "fuzz"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-integration-tests"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-fork-simulation",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "testing",
+    "title": "Mainnet-fork simulation with real JIT traffic",
+    "description": "Fork Base/Ethereum at a pinned block, replay historical blocks containing known JIT (sandwich-style LP) activity through the hook, measure detection precision/recall and gas overhead of transient storage. Done = docs/p02/FORK_SIM.md with precision/recall numbers and per-swap gas delta.",
+    "skill": "p02-clmm-fork-simulation",
+    "tags": [
+      "defi",
+      "clmm",
+      "testing",
+      "fork"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-invariant-fuzz"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-audit-prep",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "audit",
+    "title": "Assemble audit-prep package",
+    "description": "docs/p02/AUDIT.md: threat model (transient-storage misuse, false-positive griefing, tick-shift manipulation, fee accounting), role matrix, NatSpec, parameters. Freeze tagged commit. Done = passes repo audit checklist; every external call annotated.",
+    "skill": "p02-clmm-audit-prep",
+    "tags": [
+      "defi",
+      "clmm",
+      "audit"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p02-clmm-fork-simulation"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-findings-remediation",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "audit",
+    "title": "Remediate audit findings",
+    "description": "Triage and fix all High/Critical findings; regression tests per finding; findings ledger docs/p02/FINDINGS.md. Done = auditor sign-off; nothing above Low left open without written acceptance.",
+    "skill": "p02-clmm-findings-remediation",
+    "tags": [
+      "defi",
+      "clmm",
+      "audit",
+      "remediation"
+    ],
+    "bounty_axm": 4.0,
+    "effort": "L",
+    "depends_on": [
+      "p02-clmm-audit-prep"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-gas-optimization",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "audit",
+    "title": "Gas optimization pass",
+    "description": "Profile beforeSwap/afterSwap overhead; minimize transient slot usage, pack structs. Done = docs/p02/GAS.md with before/after per hook entry point, >=15% improvement on the swap path, fuzz suite re-run green.",
+    "skill": "p02-clmm-gas-optimization",
+    "tags": [
+      "defi",
+      "clmm",
+      "audit",
+      "gas"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p02-clmm-findings-remediation"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-technical-docs",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "docs",
+    "title": "Write technical documentation",
+    "description": "docs/p02/TECHNICAL.md: hook lifecycle diagrams, JIT detection algorithm, response selection logic, distribution math, transient-storage map. Done = reimplementable from the doc; diagrams match final code.",
+    "skill": "p02-clmm-technical-docs",
+    "tags": [
+      "defi",
+      "clmm",
+      "docs"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-gas-optimization"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-agent-config-runbook",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "docs",
+    "title": "Ship agent YAML config and ops runbook",
+    "description": "Finalize agents/defi/p02/clmm_manager.yaml plus docs/p02/RUNBOOK.md: vol-band tuning, false-positive triage, guardian pause procedure, auditor gate release checklist for live LP. Done = runbook rehearsed in dry-run with logged timestamps.",
+    "skill": "p02-clmm-agent-config-runbook",
+    "tags": [
+      "defi",
+      "clmm",
+      "docs",
+      "ops"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-technical-docs"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-dashboard-monitoring",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "docs",
+    "title": "Build dashboard and monitoring hooks",
+    "description": "src/sincor2/defi/p02/monitor.py: JIT detections, proceeds captured, distribution claims, range-width vs vol, treasury fees; alerts on detection spikes and distribution backlog. Done = panel renders fork-sim data; alert fires on simulated attack burst.",
+    "skill": "p02-clmm-dashboard-monitoring",
+    "tags": [
+      "defi",
+      "clmm",
+      "docs",
+      "monitoring"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-agent-config-runbook"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-testnet-deploy",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "deploy",
+    "title": "Write and execute testnet deploy scripts",
+    "description": "scripts/p02/deploy_testnet.sh + onchain/script/p02/Deploy.s.sol to Base Sepolia with a V4 pool; verify; run scripted JIT attack to prove end-to-end capture. Done = verified hook in docs/p02/DEPLOY.md with attack/capture/claim tx hashes.",
+    "skill": "p02-clmm-testnet-deploy",
+    "tags": [
+      "defi",
+      "clmm",
+      "deploy",
+      "testnet"
+    ],
+    "bounty_axm": 2.0,
+    "effort": "M",
+    "depends_on": [
+      "p02-clmm-dashboard-monitoring"
+    ]
+  },
+  {
+    "task_key": "p02-clmm-mainnet-readiness",
+    "project_id": "P02",
+    "project_name": "Concentrated Liquidity Manager",
+    "phase": "deploy",
+    "title": "Mainnet readiness checklist",
+    "description": "docs/p02/MAINNET_CHECKLIST.md: audit sign-off, auditor release of the live-LP gate, multisig, timelock, monitoring live, runbook rehearsed, rollback plan, go/no-go table. Done = every box signed; no live LP without auditor sign-off.",
+    "skill": "p02-clmm-mainnet-readiness",
+    "tags": [
+      "defi",
+      "clmm",
+      "deploy",
+      "mainnet"
+    ],
+    "bounty_axm": 1.0,
+    "effort": "S",
+    "depends_on": [
+      "p02-clmm-testnet-deploy"
+    ]
+  }
+]

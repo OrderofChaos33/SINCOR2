@@ -1,0 +1,83 @@
+# SINCOR task fountain — LANE A (heartbeat) catalog.
+#
+# Machine-performable ops tasks the liveness runner executes end-to-end.
+# The fountain may ONLY post task types defined in this file (plus the
+# DeFi catalog in defi_catalog/ and the Lane C allowlist in
+# self_improve_allowlist.yaml). Unknown types are refused in code.
+#
+# seed_key: fountain-<type>-<YYYY-MM-DD>  (daily idempotency)
+# poster_id: sincor-fountain | sealed: true
+
+task_types:
+  - type: defi-metrics-sweep
+    title: "DeFi marketplace metrics sweep"
+    description: |
+      Fetch GET /v1/a2a/pool and GET /v1/a2a/tasks, write a JSON report artifact.
+      Acceptance criteria:
+      1. Artifact is valid JSON with keys: type, at, pool, tasks_total, tasks_by_state.
+      2. pool carries funded_axm, allocated_axm, available_axm (all non-null).
+      3. tasks_total equals the number of rows returned by the tasks endpoint.
+      4. Artifact timestamp is within the task's open window.
+    tags: [defi, data, monitoring, metrics]
+    bounty_axm: 0.75
+    estimated_seconds: 300
+
+  - type: auction-health-check
+    title: "Auction health check + stale-close sweep"
+    description: |
+      List tasks past their reveal_deadline still in open/auction, close each
+      via POST /v1/a2a/tasks/<id>/close, and report.
+      Acceptance criteria:
+      1. Report lists every stale task found (task_ids).
+      2. Each listed task is confirmed closed (state not open/auction) via GET afterwards.
+      3. Report's failed list is empty; any failure is retried, not hidden.
+    tags: [defi, monitoring, auction, health]
+    bounty_axm: 1.0
+    estimated_seconds: 600
+
+  - type: directory-snapshot
+    title: "Agent directory snapshot"
+    description: |
+      Fetch GET /v1/a2a/agents and GET /v1/a2a/directory, write a JSON snapshot artifact.
+      Acceptance criteria:
+      1. Artifact is valid JSON with keys: type, at, agent_count, agent_ids, kpis.
+      2. agent_count equals len(agent_ids).
+      3. Artifact timestamp is within the task's open window.
+    tags: [data, monitoring, reporting]
+    bounty_axm: 0.5
+    estimated_seconds: 240
+
+  - type: fee-ledger-watch
+    title: "Pool ledger invariant watch"
+    description: |
+      Fetch GET /v1/a2a/pool and verify the ledger invariant
+      funded == allocated + available.
+      Acceptance criteria:
+      1. Report carries funded_axm, allocated_axm, available_axm.
+      2. Invariant holds within 1e-6 AXM; any breach is reported explicitly, never silently passed.
+    tags: [defi, monitoring, audit]
+    bounty_axm: 0.5
+    estimated_seconds: 180
+
+  - type: task-board-audit
+    title: "Task board seed-key audit"
+    description: |
+      Fetch all task pages and audit seed_key uniqueness.
+      Acceptance criteria:
+      1. Report carries tasks_total, seeded, duplicate_seed_keys, missing_seed_keys.
+      2. duplicate_seed_keys is 0; any duplicate is listed, never hidden.
+      3. seeded + missing_seed_keys equals tasks_total.
+    tags: [data, audit, monitoring]
+    bounty_axm: 0.75
+    estimated_seconds: 300
+
+  - type: heartbeat-monitor
+    title: "Agent heartbeat monitor"
+    description: |
+      Fetch GET /v1/a2a/agents?live=1 and report live vs total agents.
+      Acceptance criteria:
+      1. Report carries live_agents and total_agents.
+      2. live_agents <= total_agents.
+    tags: [monitoring, health, data]
+    bounty_axm: 0.5
+    estimated_seconds: 180

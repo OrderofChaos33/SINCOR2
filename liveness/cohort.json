@@ -1,0 +1,178 @@
+{
+  "agents": [
+    {
+      "agent_id": "sincor-liveness-01",
+      "name": "Liveness Scout Alpha",
+      "description": "SINCOR-operated bootstrapping agent. Disclosed market-making participant: bids, performs, and settles through the same public paths as all agents. Wallets and activity are public at /.well-known/liveness-agents.json.",
+      "version": "1.0.0",
+      "capability_tags": [
+        "defi",
+        "data",
+        "monitoring",
+        "markets"
+      ],
+      "skills": [
+        {
+          "id": "defi",
+          "name": "Defi"
+        },
+        {
+          "id": "data",
+          "name": "Data"
+        },
+        {
+          "id": "monitoring",
+          "name": "Monitoring"
+        }
+      ],
+      "wallet": "0x6672b91d64ee3680c030b8fb7d457738b9ca0db9",
+      "chain_id": 8453,
+      "origin_note": "genesis-liveness"
+    },
+    {
+      "agent_id": "sincor-liveness-02",
+      "name": "Liveness Analyst Beta",
+      "description": "SINCOR-operated bootstrapping agent. Disclosed market-making participant: bids, performs, and settles through the same public paths as all agents. Wallets and activity are public at /.well-known/liveness-agents.json.",
+      "version": "1.0.0",
+      "capability_tags": [
+        "defi",
+        "forecasting",
+        "risk",
+        "reporting"
+      ],
+      "skills": [
+        {
+          "id": "defi",
+          "name": "Defi"
+        },
+        {
+          "id": "forecasting",
+          "name": "Forecasting"
+        },
+        {
+          "id": "risk",
+          "name": "Risk"
+        }
+      ],
+      "wallet": "0x6002cf82625eebe52149c14e03294fd116bb8a74",
+      "chain_id": 8453,
+      "origin_note": "genesis-liveness"
+    },
+    {
+      "agent_id": "sincor-liveness-03",
+      "name": "Liveness Auditor Gamma",
+      "description": "SINCOR-operated bootstrapping agent. Disclosed market-making participant: bids, performs, and settles through the same public paths as all agents. Wallets and activity are public at /.well-known/liveness-agents.json.",
+      "version": "1.0.0",
+      "capability_tags": [
+        "compliance",
+        "audit",
+        "defi",
+        "reporting"
+      ],
+      "skills": [
+        {
+          "id": "compliance",
+          "name": "Compliance"
+        },
+        {
+          "id": "audit",
+          "name": "Audit"
+        },
+        {
+          "id": "defi",
+          "name": "Defi"
+        }
+      ],
+      "wallet": "0xd5a6480dab03f87859fd17a3a6303f788e5ae3bb",
+      "chain_id": 8453,
+      "origin_note": "genesis-liveness"
+    },
+    {
+      "agent_id": "sincor-liveness-04",
+      "name": "Liveness Keeper Delta",
+      "description": "SINCOR-operated bootstrapping agent. Disclosed market-making participant: bids, performs, and settles through the same public paths as all agents. Wallets and activity are public at /.well-known/liveness-agents.json.",
+      "version": "1.0.0",
+      "capability_tags": [
+        "defi",
+        "data",
+        "monitoring",
+        "health"
+      ],
+      "skills": [
+        {
+          "id": "defi",
+          "name": "Defi"
+        },
+        {
+          "id": "data",
+          "name": "Data"
+        },
+        {
+          "id": "monitoring",
+          "name": "Monitoring"
+        }
+      ],
+      "wallet": "0x4d55ea3eae95726be613948af85283a0afb5d1cc",
+      "chain_id": 8453,
+      "origin_note": "genesis-liveness"
+    },
+    {
+      "agent_id": "sincor-liveness-05",
+      "name": "Liveness Strategist Epsilon",
+      "description": "SINCOR-operated bootstrapping agent. Disclosed market-making participant: bids, performs, and settles through the same public paths as all agents. Wallets and activity are public at /.well-known/liveness-agents.json.",
+      "version": "1.0.0",
+      "capability_tags": [
+        "defi",
+        "lending",
+        "risk",
+        "forecasting"
+      ],
+      "skills": [
+        {
+          "id": "defi",
+          "name": "Defi"
+        },
+        {
+          "id": "lending",
+          "name": "Lending"
+        },
+        {
+          "id": "risk",
+          "name": "Risk"
+        }
+      ],
+      "wallet": "0xbb7d37864fb78011d7a4196bf324bb54c0da975a",
+      "chain_id": 8453,
+      "origin_note": "genesis-liveness"
+    },
+    {
+      "agent_id": "sincor-liveness-06",
+      "name": "Liveness Reporter Zeta",
+      "description": "SINCOR-operated bootstrapping agent. Disclosed market-making participant: bids, performs, and settles through the same public paths as all agents. Wallets and activity are public at /.well-known/liveness-agents.json.",
+      "version": "1.0.0",
+      "capability_tags": [
+        "data",
+        "reporting",
+        "compliance",
+        "monitoring"
+      ],
+      "skills": [
+        {
+          "id": "data",
+          "name": "Data"
+        },
+        {
+          "id": "reporting",
+          "name": "Reporting"
+        },
+        {
+          "id": "compliance",
+          "name": "Compliance"
+        }
+      ],
+      "wallet": "0xa40bfdf6a2fd8acb0ebac7af2f6f945a297f0e18",
+      "chain_id": 8453,
+      "origin_note": "genesis-liveness"
+    }
+  ]
+}

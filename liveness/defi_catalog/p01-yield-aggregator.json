@@ -1,0 +1,478 @@
+[
+ {
+  "task_key": "p01-vault-architecture-spec",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "spec",
+  "title": "Draft vault architecture spec with numeric gate table",
+  "description": "Deliverable: docs/p01/ARCHITECTURE.md ratifying every number in the spec parameter table — 10 bps fee on realized yield, adapter caps (Morpho 60%, SharedVault 30%, cash floor 10%), 8h rebalance epoch with 500 bps drift / 150 bps APR-move triggers, hedge kill rules (funding basis < −10 bps for 2 epochs; margin < 300% of maintenance), and the dry_run_default intent-only rule. Acceptance criteria: (1) every catalog gate (dry_run_default, risk_budget, single_strategy_cap) maps to an enforcing contract/function; (2) cap table proves total allocation cannot exceed 100% of TVL under any weight vector; (3) the delta-neutral LST/short loop flow (deposit LST → borrow native → exact matching perp short → instant unwind on negative basis) is drawn with data flows; (4) fee path traces 10 bps from harvest to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Numeric constraints: risk budget ≤ 85% TVL deployed; treasury address as in catalog.py. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-architecture-spec",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p01-vault-interface-definitions",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "spec",
+  "title": "Define vault, adapter, and agent interfaces",
+  "description": "Deliverable: onchain/src/hooks/IYieldAggregatorVault.sol (deposit/withdraw, allocate(strategyId, amount), rebalance(epoch), openHedge/closeHedge, accrueFees/sweepFees; events Allocated, Rebalanced, HedgeOpened, FeeSwept; error enum) plus src/sincor2/defi/p01/interfaces.py (Python mirrors, event schemas) and a storage-layout sketch. Acceptance criteria: (1) Solidity compiles under solc 0.8.24 with zero warnings on interface files; (2) Python module is mypy-clean and every downstream core task imports from it (no duplicate signatures); (3) interfaces are frozen — any later change requires a spec amendment note. Numeric constraints: function-level NatSpec on 100% of public entries; event fields fixed-width (uint256/bytes32) for indexing. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-interface-definitions",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "spec",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p01-vault-economic-fee-model",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "spec",
+  "title": "Specify economic and fee model with worked example",
+  "description": "Deliverable: docs/p01/ECONOMICS.md — 10 bps protocol fee computed on realized yield only (never principal), swept to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac on every rebalance and unwind; per-strategy performance accounting; risk-budget table; funding-rate premium capture model for the hedge sleeve; negative-basis kill-rule economics. Acceptance criteria: (1) worked $10k deposit cycle shows fee math to the wei at 6.2% APR (expected annual harvest $620, fee $0.62); (2) cap table proves no allocation vector can breach single_strategy_cap (60/30/100); (3) kill-rule economics show the unwind cost vs the bleed of holding through negative funding for 7 days. Numeric constraints: fee exactly 10 bps; rounding always vault-favourable (down on shares). Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-economic-fee-model",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "spec",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-architecture-spec"
+  ]
+ },
+ {
+  "task_key": "p01-vault-repo-scaffold",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "scaffold",
+  "title": "Create repo layout and stub interfaces",
+  "description": "Deliverable: directory tree onchain/src/hooks/p01/ (with adapters/), src/sincor2/defi/p01/, agents/defi/p01/, tests/pytest/test_p01_*.py stubs, docs/p01/ with README; agent YAML skeleton agents/defi/p01/yield_rebalancer.yaml (name, budgets, memory fields per repo convention); empty strategy registry JSON with the three strategy IDs and their caps. Acceptance criteria: (1) tree committed; every stub imports cleanly (forge build + pytest collect with zero errors); (2) YAML skeleton validates against the repo agent-schema; (3) CI lints pass on empty bodies. Numeric constraints: registry JSON pins caps 60/30/100 from day one so later tasks cannot drift. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-repo-scaffold",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-interface-definitions"
+  ]
+ },
+ {
+  "task_key": "p01-vault-boilerplate-starter",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "scaffold",
+  "title": "Write compilable boilerplate starter code",
+  "description": "Deliverable: YieldAggregatorVault.sol boilerplate extending SharedLiquidityHook with ReentrancyGuard + SafeERC20 imports and non-bricking try/catch around every external strategy call; p01 Python package with config loader, structured logging, and TOA hook entry points. Acceptance criteria: (1) forge build succeeds on the hook; (2) pytest collects the stub tests with zero import errors; (3) no unresolved stub markers (TODO/FIXME/...) remain in any public function body — verified by grep in CI. Numeric constraints: none yet; structure only. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-boilerplate-starter",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-repo-scaffold"
+  ]
+ },
+ {
+  "task_key": "p01-vault-hook-skeleton",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "core",
+  "title": "Implement vault hook skeleton with ERC-4626 accounting",
+  "description": "Deliverable: onchain/src/hooks/p01/YieldAggregatorVault.sol — ERC-4626-style share accounting with _decimalsOffset()=6 (first-deposit inflation guard) and 100 USDC minimum initial deposit; strategy registry mapping (strategyId → adapter, cap, active flag); deposit/withdraw with ReentrancyGuard and SafeERC20; before/after hook entry points delegating to SharedLiquidityHook. Acceptance criteria: (1) compiles under solc 0.8.24 via the repo pipeline; (2) documented invariant assets == Σ(strategy balances) + cash holds in unit tests; (3) the 1-wei-deposit + large-donation attack cannot dilute a subsequent 100 USDC deposit by more than 0.01%. Numeric constraints: decimals offset exactly 6; share math rounds down (vault-favourable). Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-hook-skeleton",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "core",
+   "solidity"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p01-vault-boilerplate-starter"
+  ]
+ },
+ {
+  "task_key": "p01-vault-strategy-adapters",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "core",
+  "title": "Build Morpho / cash / shared-vault strategy adapters",
+  "description": "Deliverable: three adapters behind IStrategyAdapter — MorphoAdapter (supply/withdraw to the Gauntlet USDC MetaMorpho vault on Base; refuses supply when the Blue market utilization > 90%), CashAdapter (idle USDC buffer), SharedVaultAdapter (delegates to SharedLiquidityHook vault). Each enforces its single_strategy_cap (60/30/100) and returns standardized position reports (assets, APR, utilization). Acceptance criteria: (1) each adapter deploys standalone; (2) cap enforcement proven in unit tests — over-cap supply reverts; (3) the vault registry accepts all three with distinct caps and rejects a duplicate strategyId. Numeric constraints: utilization guard 90%; position report APR expressed in bps. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-strategy-adapters",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "core",
+   "solidity"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p01-vault-hook-skeleton"
+  ]
+ },
+ {
+  "task_key": "p01-vault-delta-neutral-hedge",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "core",
+  "title": "Implement delta-neutral LST/short hedge module",
+  "description": "Deliverable: HedgeManager.sol (LST collateral ledger, borrowed-native ledger, exact matching perp short notional) + src/sincor2/defi/p01/hedge_agent.py (opens/closes shorts via the Hyperliquid SDK adapter; sizes to keep |net delta| ≤ 2% of sleeve NAV; triggers instant unwind when funding basis < −10 bps annualized for 2 consecutive 8h epochs or margin ratio < 300% of maintenance). Acceptance criteria: (1) hedge math test — a 10% spot move changes net sleeve NAV by < 0.5%; (2) unwind path closes the short (reduce-only) and repays the borrow in one atomic sequence on fork; (3) partial fill < 95% retries with 50 bps slippage widening, max 5 attempts, then pages the guardian. Numeric constraints: delta band 2%; kill thresholds as above. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-delta-neutral-hedge",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "core",
+   "hedging"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p01-vault-strategy-adapters"
+  ]
+ },
+ {
+  "task_key": "p01-vault-rebalancer-agent",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "core",
+  "title": "Build 8-hour funding-epoch rebalancer agent",
+  "description": "Deliverable: src/sincor2/defi/p01/rebalancer.py — cron-scheduled (8h) agent pulling Morpho market APYs, Aave v3 Base APYs, and TOA forecasts; computes optimal allocation across the three adapters within the risk budget (≤ 85% TVL deployed, cash ≥ 10%); emits rebalance intents only when drift > 500 bps or any APR moved > 150 bps. In dry_run_default mode intents are logged to the audit log and no transaction is ever built. Acceptance criteria: (1) runs against recorded subgraph fixtures and produces a valid allocation plan; (2) dry-run assertion — zero transactions built across 10 simulated epochs; (3) full error handling with exponential backoff and heartbeat. Numeric constraints: epoch 8h ±15 min; stale inputs (> 60 blocks) rejected, agent holds previous allocation. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-rebalancer-agent",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "core",
+   "agent"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p01-vault-strategy-adapters"
+  ]
+ },
+ {
+  "task_key": "p01-vault-fee-logic",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "core",
+  "title": "Implement 10 bps fee accrual and treasury routing",
+  "description": "Deliverable: accrueFees()/sweepFees() in the vault — per-strategy harvest accounting, 10 bps protocol cut computed on realized yield only (floored at 0), minted as shares to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac on every rebalance and unwind; try/catch around the treasury transfer so a misbehaving recipient can never brick harvest; Python fee_ledger.py mirroring FeeSwept events for the dashboard. Acceptance criteria: (1) fee math test — a 6.2% APR harvest routes exactly 10 bps to the wei; (2) zero-yield epochs mint zero fee shares; (3) treasury-as-contract with reverting receive() does not brick accrueFees(). Numeric constraints: fee exactly 10 bps; 1-hour harvest cooldown (harvest-sandwich mitigation). Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-fee-logic",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "core",
+   "fees"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-hook-skeleton"
+  ]
+ },
+ {
+  "task_key": "p01-vault-access-control",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "core",
+  "title": "Implement access control and liquidation guards",
+  "description": "Deliverable: role-based access — REBALANCER_ROLE (agent intents), GUARDIAN_ROLE (pause deposits, force unwind), DEFAULT_ADMIN (founder multisig); Python-side liquidation-threshold monitor paging the guardian and auto-triggering unwind when the perp-leg margin ratio approaches 300% of maintenance; contract circuit breaker pausing deposits (never withdrawals) when any adapter reports > 200 bps loss in one epoch. Acceptance criteria: (1) unauthorized rebalance reverts; (2) guardian pause blocks deposits but withdrawals still succeed; (3) margin-ratio breach triggers the full atomic unwind on fork. Numeric constraints: loss circuit-breaker 200 bps/epoch; margin trigger 300%. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-access-control",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "core",
+   "security"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p01-vault-hook-skeleton",
+   "p01-vault-delta-neutral-hedge"
+  ]
+ },
+ {
+  "task_key": "p01-vault-edge-cases",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "core",
+  "title": "Handle edge cases: caps, slippage, oracle staleness",
+  "description": "Deliverable: edge-case handling with a code comment citing the rule for each — (a) deposit when yield adapters are full → partial fill into cash + PartialFill event, deposit never reverts; (b) rebalance during negative funding basis → forced unwind instead of reallocation; (c) stale subgraph data (> 60 blocks) → reject allocation, hold previous weights; (d) Morpho utilization > 90% → defer to cash; (e) first-deposit share-price manipulation → virtual-share offset + 100 USDC minimum. Acceptance criteria: (1) each case has a dedicated test; (2) none can lock user funds — withdrawals always succeed; (3) rule citations present in code comments. Numeric constraints: staleness 60 blocks; utilization 90%; min deposit 100 USDC. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-edge-cases",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "core",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-fee-logic",
+   "p01-vault-access-control",
+   "p01-vault-rebalancer-agent"
+  ]
+ },
+ {
+  "task_key": "p01-vault-unit-tests",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "testing",
+  "title": "Write unit tests for vault and adapters",
+  "description": "Deliverable: tests/pytest/test_p01_vault_units.py + Foundry tests under onchain/test/p01/ covering share accounting (incl. rounding direction), cap enforcement, fee math to the wei, role reverts, and adapter supply/withdraw flows with a mocked Morpho vault. Acceptance criteria: (1) 24/24 tests pass; (2) every public function has at least one test; (3) each test names the invariant it guards in its docstring. Numeric constraints: fee assertions exact to 1 wei; cap tests at cap−1, cap, cap+1. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-unit-tests",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "testing",
+   "unit"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p01-vault-integration-tests",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "testing",
+  "title": "Write integration tests across vault + agents",
+  "description": "Deliverable: tests/pytest/test_p01_vault_integration.py — full cycle: deposit → allocate across three adapters → funding-epoch rebalance (agent, dry-run) → harvest → fee sweep → withdraw; plus hedge open/close sequence with a mocked Hyperliquid SDK. Acceptance criteria: (1) end-to-end cycle completes with the expected share price (±1 wei); (2) treasury FeeSwept events emitted with exact 10 bps amounts; (3) suite green in CI; (4) dry-run rebalance produces zero on-chain state changes. Numeric constraints: cycle uses 10,000 USDC fixture; hedge sleeve 30% of TVL. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-integration-tests",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "testing",
+   "integration"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p01-vault-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p01-vault-invariant-fuzz",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "testing",
+  "title": "Invariant and fuzz tests on share math and hedge",
+  "description": "Deliverable: Foundry invariant suite + docs/p01/INVARIANTS.md — (a) share price never decreases on deposit/withdraw modulo fees; (b) totalAssets == Σ strategy balances + cash under arbitrary sequences (±1 wei/op rounding dust); (c) hedge |delta| stays ≤ 2% under fuzzed price moves; (d) unwind always repays borrows fully. Acceptance criteria: (1) 10,000 runs per invariant, zero counterexamples; (2) any counterexample found is fixed and recorded; (3) INVARIANTS.md documents each invariant and its bound. Numeric constraints: 10k runs; delta bound 2%; dust tolerance 1 wei. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-invariant-fuzz",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "testing",
+   "fuzz"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-integration-tests"
+  ]
+ },
+ {
+  "task_key": "p01-vault-fork-simulation",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "testing",
+  "title": "Base mainnet-fork simulation of full vault cycle",
+  "description": "Deliverable: fork Base mainnet at a pinned block; run the full vault cycle against the real Gauntlet USDC MetaMorpho vault and Aave v3 data; simulate a funding-rate flip to prove the instant-unwind path; publish docs/p01/FORK_SIM.md. Acceptance criteria: (1) report records the pinned block number, gas used per step (deposit/allocate/rebalance/harvest/unwind/withdraw), and unwind latency in blocks (target ≤ 6 blocks from second confirmation); (2) unwind repays borrows and returns LST; (3) simulation is re-runnable from the documented block pin. Numeric constraints: pinned block documented; gas table per function. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-fork-simulation",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "testing",
+   "fork"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-invariant-fuzz"
+  ]
+ },
+ {
+  "task_key": "p01-vault-audit-prep",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "audit",
+  "title": "Assemble audit-prep package",
+  "description": "Deliverable: docs/p01/AUDIT.md — threat model (share inflation, cap bypass, hedge basis risk, keeper centralization, harvest sandwich), privileged-role matrix, 100% NatSpec coverage on public/external functions, deployment parameters (caps, thresholds, treasury address), known-limitations list; code frozen under audit with a tagged commit. Acceptance criteria: (1) package passes the repo audit checklist; (2) every external call annotated trust/no-trust with rationale; (3) NatSpec coverage verified at 100% by CI. Numeric constraints: none beyond checklist completeness. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-audit-prep",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p01-vault-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p01-vault-findings-remediation",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "audit",
+  "title": "Remediate audit findings with regression tests",
+  "description": "Deliverable: triaged findings, fixes for all High/Critical severity items, documented accepted risks with rationale for Medium/Low, one regression test per finding, docs/p01/FINDINGS.md ledger. Acceptance criteria: (1) auditor sign-off on fixes recorded; (2) FINDINGS.md shows every item closed or explicitly accepted with rationale; (3) full test suite (unit + invariant) green after fixes. Numeric constraints: zero open High/Critical. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-findings-remediation",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "audit",
+   "remediation"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p01-vault-audit-prep"
+  ]
+ },
+ {
+  "task_key": "p01-vault-gas-optimization",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "audit",
+  "title": "Gas optimization pass on hot paths",
+  "description": "Deliverable: profile deposit/rebalance/withdraw/unwind on the Base fork; pack storage slots, cache array lengths, minimize SSTOREs in hot paths; docs/p01/GAS.md before/after report. Acceptance criteria: (1) ≥ 15% gas improvement on the rebalance path; (2) zero behavior change — the 10k-run fuzz suite re-run green; (3) per-function before/after table published. Numeric constraints: improvement measured in gas units per function, ≥ 15% on rebalance. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-gas-optimization",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "audit",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p01-vault-findings-remediation"
+  ]
+ },
+ {
+  "task_key": "p01-vault-technical-docs",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "docs",
+  "title": "Write technical documentation",
+  "description": "Deliverable: docs/p01/TECHNICAL.md — architecture diagrams, strategy adapter spec, hedge lifecycle, fee math (10 bps on realized yield, worked to the wei), role descriptions, upgrade path (immutable instances; migration via new deployment). Acceptance criteria: (1) a competent Solidity dev can reimplement the vault from this doc alone; (2) all diagrams current with final code (verified in review); (3) every numeric parameter from the spec table appears with its enforcing location. Numeric constraints: doc completeness, not code. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-technical-docs",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-gas-optimization"
+  ]
+ },
+ {
+  "task_key": "p01-vault-agent-config-runbook",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "docs",
+  "title": "Ship agent YAML configs and ops runbook",
+  "description": "Deliverable: finalized agents/defi/p01/yield_rebalancer.yaml and hedge_executor.yaml (budgets, memory fields, alert thresholds: basis, delta, margin ratio) plus docs/p01/RUNBOOK.md — cron schedule (8h), funding-epoch checklist, negative-basis unwind procedure, key rotation, incident escalation. Acceptance criteria: (1) agents boot from the YAMLs with no code changes; (2) runbook walked through in a dry-run rehearsal with timestamps logged; (3) alert thresholds match the spec table (basis −10 bps, delta 2%, margin 300%). Numeric constraints: thresholds as specified; rehearsal log retained. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-agent-config-runbook",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "docs",
+   "ops"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p01-vault-dashboard-monitoring",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "docs",
+  "title": "Build dashboard and monitoring hooks",
+  "description": "Deliverable: src/sincor2/defi/p01/monitor.py emitting structured metrics (TVL, per-strategy APR, hedge delta, funding basis, fees swept) to the SINCOR dashboard schema; alert rules for basis flip, margin-ratio band breach, adapter cap hits, and share-price drift. Acceptance criteria: (1) dashboard panel renders live fork-sim data; (2) alerts fire on the simulated funding-flip scenario; (3) share-price drift alert triggers at > 50 bps/day decline. Numeric constraints: alert thresholds — basis crossing 0, delta > 1.5% (pre-breach), cap hit at 100% of cap. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-dashboard-monitoring",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "docs",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-agent-config-runbook"
+  ]
+ },
+ {
+  "task_key": "p01-vault-testnet-deploy",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "deploy",
+  "title": "Write and execute Base Sepolia deploy scripts",
+  "description": "Deliverable: scripts/p01/deploy_testnet.sh + onchain/script/p01/Deploy.s.sol deploying the vault, three adapters, and the hedge manager to Base Sepolia; Basescan verification; seed with test capital and run one full rebalance cycle (stays in dry_run_default until audit completes — intents logged, no live allocation). Acceptance criteria: (1) verified contracts linked in docs/p01/DEPLOY.md; (2) cycle transaction hashes recorded; (3) fee-sweep path exercised with fees observed landing at 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Numeric constraints: seed capital documented; dry-run gate still engaged on testnet. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-testnet-deploy",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p01-vault-dashboard-monitoring"
+  ]
+ },
+ {
+  "task_key": "p01-vault-mainnet-readiness",
+  "project_id": "P01",
+  "project_name": "Yield Aggregator Vault",
+  "phase": "deploy",
+  "title": "Mainnet readiness checklist and sign-off",
+  "description": "Deliverable: docs/p01/MAINNET_CHECKLIST.md — audit sign-off, multisig ownership transfer plan, 48h timelock parameters, cap values ratified (60/30/100), monitoring/alerting live, incident runbook rehearsed, rollback plan (new-deployment migration, since instances are immutable), go/no-go sign-off table. Acceptance criteria: (1) every item signed by the assigned role; (2) no unchecked box may remain before any mainnet deploy; (3) dry-run lift recorded as a separate founder-multisig transaction hash. Numeric constraints: checklist completeness is binary — 100% signed. Per specs/p01-yield-aggregator.md §Acceptance criteria.",
+  "skill": "p01-vault-mainnet-readiness",
+  "tags": [
+   "defi",
+   "yield-aggregator",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p01-vault-testnet-deploy"
+  ]
+ }
+]
