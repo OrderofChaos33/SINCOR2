@@ -45,6 +45,11 @@ QUEUE_PATH = os.path.join(STATE_DIR, "performance_queue.json")
 BID_FRACTION_LO, BID_FRACTION_HI = 0.85, 0.98
 COMMIT_SAFETY_MS = 30_000
 REVEAL_SAFETY_MS = 10_000
+# The server enforces a 60s heartbeat TTL on every bid action
+# (commit/reveal): ts - last_heartbeat > 60_000 -> 403 "agent heartbeat
+# expired".  Refresh sooner than that so clock skew between runner and
+# server can never turn a fresh heartbeat stale at the gate.
+HEARTBEAT_FRESH_MS = 45_000
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +153,10 @@ class Runner:
         self.by_id = {a["agent_id"]: a for a in cohort}
         self.commits = load_commits()
         self.now_ms = int(time.time() * 1000)
+        # agent_id -> wall-clock ms of the last heartbeat POST this
+        # process made.  In-pass dedupe only; the server is the source
+        # of truth for TTL.  See ensure_heartbeat().
+        self._hb_at = {}
         # Flips to False on any partial failure (e.g. one agent's
         # heartbeat dies).  one_pass()/main() turn this into a nonzero
         # process exit code so cron can detect a degraded pass.
@@ -159,32 +168,62 @@ class Runner:
         self.pass_ok = False
 
     # -- step 1: heartbeats -------------------------------------------------
+    def ensure_heartbeat(self, agent) -> bool:
+        """Refresh this agent's heartbeat so the next bid action passes
+        the server's 60s TTL check.
+
+        A pass heartbeats at step 1 but can run for many minutes
+        (paginated task fetches under truncation retries), so those
+        heartbeats are expired by the time the commit/reveal sweep runs.
+        Calling this immediately before each commit/reveal closes the
+        TTL-vs-pass-duration skew.  Heartbeats are cheap, idempotent,
+        and not rate-limited; an in-pass 45s dedupe guard avoids
+        spamming one per task when an agent bids often.
+
+        404 (unknown agent — e.g. the registry was wiped by a restart)
+        triggers the idempotent re-register path, then one heartbeat
+        retry.  Any other failure returns False; callers treat the
+        refresh as best-effort and proceed with the bid action unchanged
+        so a heartbeat transport failure never changes bidding semantics.
+        """
+        aid = agent["agent_id"]
+        now = int(time.time() * 1000)
+        if now - self._hb_at.get(aid, 0) < HEARTBEAT_FRESH_MS:
+            return True
+        try:
+            post_json(self.base_url, "/v1/a2a/heartbeat", {"agent_id": aid})
+        except HttpError as e:
+            if e.status == 404:
+                # self-heal: re-register a missing agent (idempotent:
+                # reputation/registered_at/origin are preserved server-side)
+                log(f"heartbeat 404 for {aid}: re-registering")
+                try:
+                    post_json(self.base_url, "/v1/a2a/register",
+                              register_agent_body(agent))
+                    post_json(self.base_url, "/v1/a2a/heartbeat",
+                              {"agent_id": aid})
+                except HttpError as e2:
+                    log(f"  re-register failed for {aid}: {e2}")
+                    return False
+                except Exception as e2:
+                    log(f"  re-register transport failure for {aid}: {e2}")
+                    return False
+            else:
+                log(f"heartbeat refresh failed for {aid}: {e}")
+                return False
+        except Exception as e:
+            # Transport failure AFTER net.py exhausted its retries
+            # (truncated read, connection reset, ...).
+            log(f"heartbeat refresh transport failure for {aid}: {e}")
+            return False
+        self._hb_at[aid] = int(time.time() * 1000)
+        return True
+
     def heartbeat_all(self):
         for agent in self.cohort:
-            aid = agent["agent_id"]
-            try:
-                post_json(self.base_url, "/v1/a2a/heartbeat", {"agent_id": aid})
-            except HttpError as e:
-                if e.status == 404:
-                    # self-heal: re-register a missing agent
-                    log(f"heartbeat 404 for {aid}: re-registering")
-                    try:
-                        post_json(self.base_url, "/v1/a2a/register",
-                                  register_agent_body(agent))
-                        post_json(self.base_url, "/v1/a2a/heartbeat",
-                                  {"agent_id": aid})
-                    except HttpError as e2:
-                        self.note_failure(f"  re-register failed for {aid}: {e2}")
-                    except Exception as e2:
-                        self.note_failure(
-                            f"  re-register transport failure for {aid}: {e2}")
-                else:
-                    self.note_failure(f"heartbeat failed for {aid}: {e}")
-            except Exception as e:
-                # Transport failure AFTER net.py exhausted its retries
-                # (truncated read, connection reset, ...).  Isolate it to
-                # this agent: log, mark the pass degraded, keep going.
-                self.note_failure(f"heartbeat transport failure for {aid}: {e}")
+            if not self.ensure_heartbeat(agent):
+                self.note_failure(
+                    f"heartbeat failed for {agent['agent_id']}")
 
     # -- steps 2-5: auction lifecycle ---------------------------------------
     def _task_index(self):
@@ -225,6 +264,11 @@ class Runner:
             "nonce": entry["salt_hex"],
             "estimated_seconds": entry["estimated_seconds"],
         }
+        # Same 60s TTL gate as commit: refresh best-effort before the
+        # reveal POST; existing error handling covers a failed refresh.
+        agent = self.by_id.get(aid)
+        if agent is not None:
+            self.ensure_heartbeat(agent)
         try:
             post_json(self.base_url, "/v1/a2a/bids/reveal", body)
             entry["status"] = "revealed"
@@ -288,6 +332,12 @@ class Runner:
         # leave a commit the runner doesn't know how to reveal.
         self.commits.setdefault(task_id, {})[aid] = entry
         save_commits(self.commits)
+        # The server requires a heartbeat fresher than 60s at commit
+        # time; the pass-start heartbeat is long expired by the time the
+        # sweep runs.  Refresh best-effort — a failed refresh must not
+        # change bidding semantics, so the commit attempt proceeds
+        # regardless and existing error handling applies.
+        self.ensure_heartbeat(agent)
         try:
             post_json(self.base_url, "/v1/a2a/bids/commit",
                       {"task_id": task_id, "agent_id": aid,
