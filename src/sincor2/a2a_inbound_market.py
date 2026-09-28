@@ -270,6 +270,17 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:
+        # seed_key is the documented dedupe key for standing listings: if a
+        # live (open/auction) task already carries this seed_key, return it
+        # instead of creating a duplicate. Concurrent posters racing the
+        # same catalog must converge on one row, not N.
+        if seed_key:
+            for existing in fabric.tasks.values():
+                if (existing.get("seed_key") == seed_key
+                        and existing.get("state") in ("open", "auction")):
+                    snap = dict(existing)
+                    snap["_dedupe_hit"] = True
+                    return snap
         open_n = sum(1 for t in fabric.tasks.values() if t.get("state") in ("open", "auction"))
         if open_n >= MAX_OPEN_TASKS:
             raise OverflowError("too many open auctions")
@@ -864,9 +875,52 @@ def attach_market_routes(bp: Blueprint) -> None:
             task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=body.get("poster_id") or body.get("agent_id"),
                              seed_key=str(body.get("seed_key") or "") or None, auto_refresh=bool(body.get("auto_refresh")),
                              title=body.get("title"), description=body.get("description"))
-            return jsonify(task), 201
+            deduped = bool(task.pop("_dedupe_hit", False))
+            return jsonify(task), (200 if deduped else 201)
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
+
+    @bp.delete("/v1/a2a/tasks/<task_id>")
+    def v1_task_delete(task_id):
+        """Admin-only task removal (delist a bad/duplicate posting).
+
+        Releases any pool allocation on the task, then removes the row.
+        Refuses tasks that already carry bids/commits — those need the
+        auction lifecycle, not deletion. Admin-gated like the pool writes.
+        """
+        denied = _require_pool_admin()
+        if denied is not None:
+            return denied
+        task_id = str(task_id or "")
+        fabric = get_fabric()
+        with fabric.lock:
+            task = fabric.tasks.get(task_id)
+            if task is None:
+                return _http_error("unknown task", 404)
+            if any(b.get("task_id") == task_id for b in fabric.bids.values()):
+                return _http_error("task has bids; close the auction instead", 409)
+            released = []
+            try:
+                from sincor2.a2a_bounty_pool import bounty_pool
+                pool = bounty_pool()
+                for alloc in pool.allocations_for_task(task_id):
+                    try:
+                        pool.release(alloc["allocation_id"])
+                        released.append(alloc["allocation_id"])
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            fabric.tasks.pop(task_id, None)
+            snap = dict(task)
+        _save_tasks(fabric)
+        try:
+            fabric.publish("task.deleted", snap.get("tags") or [],
+                           {"task_id": task_id, "seed_key": snap.get("seed_key"),
+                            "released_allocations": released})
+        except Exception:
+            pass
+        return jsonify({"deleted": task_id, "released_allocations": released}), 200
 
     @bp.get("/v1/a2a/tasks/<task_id>")
     def v1_task_detail(task_id):

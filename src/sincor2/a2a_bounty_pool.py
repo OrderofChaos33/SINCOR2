@@ -248,6 +248,13 @@ class BountyPool:
             self._save()
             return self._public_alloc(alloc)
 
+    def allocations_for_task(self, task_id: str) -> List[Dict[str, Any]]:
+        """Live allocations attached to one task (for admin delist)."""
+        task_id = str(task_id or "").strip()
+        with self._lock:
+            return [self._public_alloc(a) for a in self._allocations.values()
+                    if a.get("task_id") == task_id and a.get("state") == "allocated"]
+
     def _public_alloc(self, alloc: Dict[str, Any]) -> Dict[str, Any]:
         out = dict(alloc)
         out["amount_wei"] = str(int(alloc.get("amount_wei") or 0))
