@@ -2,5 +2,13 @@
   "SINCOR-DEFI-P01-VAULT": {
     "stage": "test",
     "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P02-CLMM": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P03-DARKPOOL": {
+    "stage": "test",
+    "version": "0.1.2"
   }
 }
