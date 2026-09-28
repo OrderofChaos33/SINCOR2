@@ -419,6 +419,13 @@ app.register_blueprint(_console_bp)
 if limiter:
     limiter.exempt(_console_bp)
 
+# DeFi product-arm catalog: /catalog + GET /api/defi/catalog (read-only).
+from sincor2.blueprints.defi_catalog import defi_catalog_bp as _defi_catalog_bp
+
+app.register_blueprint(_defi_catalog_bp)
+if limiter:
+    limiter.exempt(_defi_catalog_bp)
+
 
 @app.route('/health')
 @limiter.exempt if limiter else lambda f: f
