@@ -1,19 +1,34 @@
 {
   "entries": [
     {
-      "entry_id": "ev_917b1ca00bd0",
-      "sku": "SINCOR-DEFI-P01-VAULT",
-      "kind": "test_run",
-      "timestamp": 1790606983.9803748,
       "commit": "db966ddbee92f0b819ad011e92c0c9d4c2772be5",
-      "recorded_by": "xioix/track1",
       "details": {
-        "suite": "tests/pytest/test_p01_vault_units.py",
-        "passed": 24,
-        "failed": 0,
         "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p01_vault_units.py -q",
-        "scope": "yield_aggregator allocator: dry-run default, risk budget, concentration cap, treasury fee, disabled-strategy exclusion"
-      }
+        "failed": 0,
+        "passed": 24,
+        "scope": "yield_aggregator allocator: dry-run default, risk budget, concentration cap, treasury fee, disabled-strategy exclusion",
+        "suite": "tests/pytest/test_p01_vault_units.py"
+      },
+      "entry_id": "ev_917b1ca00bd0",
+      "kind": "test_run",
+      "recorded_by": "xioix/track1",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "timestamp": 1790606983.9803748
+    },
+    {
+      "commit": "55eb0972d61fdf5e133e3bf403179d717a7bd6ec",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p02_clmm_units.py -q",
+        "failed": 0,
+        "passed": 24,
+        "scope": "clmm_manager: JIT detection, tick-shift response, transient fee, proceeds distribution, vol agent, access control",
+        "suite": "tests/pytest/test_p02_clmm_units.py"
+      },
+      "entry_id": "ev_46f762d9c53b",
+      "kind": "test_run",
+      "recorded_by": "xioix/track1",
+      "sku": "SINCOR-DEFI-P02-CLMM",
+      "timestamp": 1790607038.9876513
     }
   ]
 }
