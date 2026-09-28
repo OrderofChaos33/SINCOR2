@@ -267,7 +267,8 @@ class BountyPool:
             "funded_axm": _wei_to_axm(self._funded_wei),
             "allocated_axm": _wei_to_axm(allocated),
             "available_axm": _wei_to_axm(self._funded_wei - allocated),
-            "allocation_count": len(self._allocations),
+            "allocation_count": sum(1 for a in self._allocations.values()
+                                  if a.get("state") == "allocated"),
             "allocations": [self._public_alloc(a)
                             for a in sorted(self._allocations.values(),
                                             key=lambda x: x.get("created_at") or 0)],
