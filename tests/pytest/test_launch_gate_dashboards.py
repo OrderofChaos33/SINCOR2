@@ -64,12 +64,22 @@ def test_dashboard_routes_anonymous_redirect_to_login(mvp_client):
         assert "/login" in loc and f"next={path}" in loc, path
 
 
-def test_dashboards_menu_all_hrefs_resolve(mvp_client):
+def test_dashboards_menu_retired_redirect(mvp_client):
+    """The stale /dashboards card menu is retired: it must 302 to the
+    unified command center instead of rendering dashboards_menu.html."""
     _as_admin(mvp_client)
     r = mvp_client.get("/dashboards", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["Location"].endswith("/command-center")
+
+
+def test_console_nav_hrefs_resolve(mvp_client):
+    """Every link in the unified console sidebar must resolve (no 404s)."""
+    _as_admin(mvp_client)
+    r = mvp_client.get("/agents")
     assert r.status_code == 200
     hrefs = set(re.findall(r'href="(/[^"]*)"', r.get_data(as_text=True)))
-    assert hrefs, "expected links in dashboards_menu.html"
+    assert hrefs, "expected links in the console sidebar"
     for href in sorted(hrefs):
         rr = mvp_client.get(href, follow_redirects=False)
         assert rr.status_code != 404, href

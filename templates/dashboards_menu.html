@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -132,7 +132,7 @@
             <h3 class="text-2xl font-bold text-gray-900 mb-8">Live System Status</h3>
             <div class="grid md:grid-cols-4 gap-8">
                 <div class="text-center">
-                    <div class="text-4xl font-black text-green-600 mb-3">42</div>
+                    <div class="text-4xl font-black text-green-600 mb-3"><span class="fleet-count">—</span></div>
                     <div class="text-sm font-semibold text-gray-600">AI Agents Active</div>
                     <div class="text-xs text-gray-500 mt-1">Real swarm intelligence</div>
                 </div>
@@ -155,5 +155,8 @@
         </div>
     </div>
 
+<script>
+(function(){fetch('/api/a2a/agents',{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){var n=(d&&d.agents&&typeof d.agents.length==='number')?d.agents.length:null;document.querySelectorAll('.fleet-count').forEach(function(el){el.textContent=(n===null)?'—':n;});}).catch(function(){});})();
+</script>
 </body>
 </html>

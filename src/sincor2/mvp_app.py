@@ -807,6 +807,27 @@ def _admin_cookie_response(username: str, redirect_url: str = '/admin'):
     return resp
 
 
+# Unified console pages (dashboard overhaul): /agents, /tasks, /pool.
+# Registered BEFORE the mvp blueprints on purpose: the wardrobe blueprint
+# also defines an (orphan, unlinked) /agents index, and the user-facing
+# console fleet page must win that URL. Wardrobe's /agents/<id> detail
+# pages are unaffected (distinct route rule).
+from sincor2.blueprints.console import console_bp as _console_bp
+
+app.register_blueprint(_console_bp)
+
+# /command-center page on production (GET only). Same login gate as the other
+# operator surfaces on this app (see /dashboard, /operator). The full
+# command-center API blueprint is deliberately NOT mounted here: its
+# killswitch POST is unauthenticated upstream and must not be exposed on
+# production until auth lands. The page renders; its live sections show
+# their own "unavailable" states where the APIs are absent.
+@app.get("/command-center")
+def _console_command_center_page():
+    if not (_is_admin_session() or session.get("user_email")):
+        return redirect("/login?next=/command-center")
+    return render_template("command_center.html", nav_active="command")
+
 from sincor2.mvp_blueprints import register_mvp_blueprints
 register_mvp_blueprints(app)
 

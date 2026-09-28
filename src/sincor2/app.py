@@ -404,8 +404,20 @@ def get_products():
 
 @app.route('/dashboard')
 def dashboard():
-    """SINCOR Control Center Dashboard"""
-    return render_template('dashboard.html')
+    """SINCOR Control Center Dashboard - unified console overview (live data)."""
+    return render_template('dashboard.html', nav_active='overview')
+
+
+# Unified console pages (dashboard overhaul): /agents, /tasks, /pool.
+# Read-only presentation routes; also registered on mvp_app (production).
+from sincor2.blueprints.console import console_bp as _console_bp
+
+app.register_blueprint(_console_bp)
+
+# Page routes follow the codebase convention of limiter exemption
+# (dashboard pages are exempt site-wide; the limiter guards API/write paths).
+if limiter:
+    limiter.exempt(_console_bp)
 
 
 @app.route('/health')
@@ -417,10 +429,18 @@ def health_check():
     # Check if monetization is available based on loaded systems
     monetization_available = bool(PAYPAL_AVAILABLE and MONETIZATION_AVAILABLE)
 
+    # Fleet size is read live from the skill registry, never hardcoded.
+    try:
+        from sincor2.a2a_integration import SINCOR_SKILLS
+
+        ai_agents = len(SINCOR_SKILLS)
+    except Exception:
+        ai_agents = None
+
     return jsonify({
         'status': 'healthy',
         'service': 'SINCOR Master Platform',
-        'ai_agents': 42,
+        'ai_agents': ai_agents,
         'waitlist_available': WAITLIST_AVAILABLE,
         'monetization_available': monetization_available,
         'auth_available': AUTH_AVAILABLE,
@@ -582,8 +602,8 @@ def professional_dashboard():
             'next_available': 'Tomorrow 9AM'
         },
         'agents': {
-            'coordination_score': 94,
-            'active_count': 42
+            'coordination_score': 94
+            # NOTE: fleet size is rendered live from /api/a2a/agents; never hardcoded here.
         }
     }
 
@@ -611,9 +631,9 @@ def admin_dashboard():
     }
 
     # Get agent network status
+    # NOTE: fleet size is rendered live from /api/a2a/agents; never hardcoded here.
     agents = {
         'coordination_score': 94,
-        'total_agents': 42,
         'all_online': True,
         'categories': {
             'Business Operations': {'count': 12, 'status': 'Online', 'agents': ['Sales Agent', 'Support Agent', 'Operations Manager']},
@@ -660,11 +680,7 @@ def enterprise_dashboard():
     return render_template('enterprise-dashboard.html')
 
 
-@app.route('/dashboards')
-@limiter.exempt if limiter else lambda f: f
-def dashboards_menu():
-    """Dashboards command center - Central navigation for all dashboards"""
-    return render_template('dashboards_menu.html')
+# NOTE: /dashboards is served by the console blueprint above (302 -> /command-center).
 
 
 # Route aliases for dashboard menu compatibility

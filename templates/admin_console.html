@@ -62,7 +62,7 @@
     <section class="grid kpis">
       <article class="card"><p class="k">Service</p><p class="v" id="svc">…</p></article>
       <article class="card"><p class="k">Readiness</p><p class="v" id="ready">…</p></article>
-      <article class="card"><p class="k">Agents</p><p class="v">42</p></article>
+      <article class="card"><p class="k">Agents</p><p class="v" id="agentCount">—</p></article>
       <article class="card"><p class="k">Billing</p><p class="v">SINC · AXM</p></article>
     </section>
 
@@ -100,6 +100,8 @@
         const res = await fetch('/health');
         const data = await res.json();
         document.getElementById('svc').textContent = data.service || 'SINCOR';
+        const ac = document.getElementById('agentCount');
+        if (ac) ac.textContent = (typeof data.ai_agents === 'number') ? data.ai_agents : '—';
         const ready = data.readiness && data.readiness.ready;
         document.getElementById('ready').innerHTML = '<span class="dot ' + (ready ? '' : 'warn') + '"></span>' + (data.status || 'unknown');
         const checks = data.checks || {};

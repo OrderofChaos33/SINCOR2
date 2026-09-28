@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -364,11 +364,17 @@
                         
                     } catch (error) {
                         console.error('Error loading dashboard:', error);
+                        // Fallback: use the live registry count, never a hardcoded number
+                        let liveAgentCount = null;
+                        try {
+                            const ar = await fetch('/api/a2a/agents');
+                            if (ar.ok) { const aj = await ar.json(); liveAgentCount = aj.agents ? aj.agents.length : null; }
+                        } catch (e) { /* stays null -> shown as 0/unknown */ }
                         // Set default values for demo
                         this.metrics = {
                             leads: { total_leads: 1, status: 'Active - real system data' },
                             system: { health_score: 95, health_status: 'Excellent', uptime_days: 3, uptime_percentage: 99.9 },
-                            agents: { coordination_score: 85, total_agents_available: 42, status: 'Network Ready' },
+                            agents: { coordination_score: 85, total_agents_available: liveAgentCount, status: 'Network Ready' },
                             database: { total_databases: 8, total_size_mb: 2.4, status: 'Connected' },
                             performance: { status: 'Optimal' }
                         };
@@ -489,12 +495,17 @@
             window.open('/business-intelligence', '_blank', 'width=1200,height=800');
         }
 
-        function systemOverview() {
+        async function systemOverview() {
+            let n = null;
+            try {
+                const r = await fetch('/api/a2a/agents');
+                if (r.ok) { const d = await r.json(); n = d.agents ? d.agents.length : null; }
+            } catch (e) { /* unknown */ }
             alert('⚙️ System Overview\n\n' +
                   'SINCOR Enterprise System Status:\n\n' +
                   '🔹 Core Application: Online\n' +
                   '🔹 Database Systems: 8 databases active\n' +
-                  '🔹 Agent Network: 42 agents ready\n' +
+                  '🔹 Agent Network: ' + (n === null ? 'unreachable' : n + ' agents ready') + '\n' +
                   '🔹 Lead Generation: Active\n' +
                   '🔹 Business Intelligence: Monitoring\n' +
                   '🔹 Security: All systems secure\n\n' +

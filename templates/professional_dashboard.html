@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -125,7 +125,7 @@
                         <div class="text-3xl font-bold text-green-600 mb-2">{{ agents.coordination_score }}/100</div>
                         <p class="text-gray-600">System Performance</p>
                         <div class="mt-4 p-3 bg-green-50 rounded-lg">
-                            <p class="text-sm text-green-700">✅ All {{ agents.active_count }} agents operational</p>
+                            <p class="text-sm text-green-700">✅ All <span class="fleet-count">—</span> agents operational</p>
                             <p class="text-xs text-green-600 mt-1">Lead generation, booking, follow-up active</p>
                         </div>
                     </div>
@@ -241,7 +241,7 @@
                 <a href="/agent-setup" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg font-bold text-lg inline-block">
                     🎯 Select & Configure Individual Agents
                 </a>
-                <p class="text-xs text-purple-600 mt-2">Choose from 42 specialized AI agents with adjustable capability levels</p>
+                <p class="text-xs text-purple-600 mt-2">Choose from the full fleet of specialized AI agents with adjustable capability levels</p>
             </div>
         </div>
 
@@ -282,7 +282,7 @@
             
             <div class="mt-4 p-3 bg-blue-100 rounded">
                 <p class="text-xs text-blue-800">
-                    <strong>Free Trial Includes:</strong> All integrations, unlimited data connections, and 42 AI agents working with your real business data.
+                    <strong>Free Trial Includes:</strong> All integrations, unlimited data connections, and the full SINCOR agent fleet working with your real business data.
                 </p>
             </div>
         </div>
@@ -589,5 +589,8 @@
         }
     </script>
 
+<script>
+(function(){fetch('/api/a2a/agents',{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){var n=(d&&d.agents&&typeof d.agents.length==='number')?d.agents.length:null;document.querySelectorAll('.fleet-count').forEach(function(el){el.textContent=(n===null)?'—':n;});}).catch(function(){});})();
+</script>
 </body>
 </html>

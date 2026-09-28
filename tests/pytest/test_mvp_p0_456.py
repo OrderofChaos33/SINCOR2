@@ -112,7 +112,11 @@ def test_dashboard_paid_no_fabricated_metrics(mvp_client):
     assert "1,247" not in html
     assert "Sample telemetry" not in html
     assert "Identified 47 qualified leads" not in html
-    assert "Live telemetry coming soon" in html
+    # Dashboard overhaul: the overview now shows live data (or honest "—"
+    # empty states) instead of the old "coming soon" placeholders.
+    assert "Operations overview" in html
+    assert "/v1/a2a/pool" in html
+    assert "Live telemetry coming soon" not in html
     assert "—" in html
 
 
