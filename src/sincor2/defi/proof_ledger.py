@@ -35,7 +35,18 @@ ENV_DATA_DIR = "SINCOR_DEFI_ARM_DATA_DIR"
 
 
 def default_data_dir() -> str:
-    return os.environ.get(ENV_DATA_DIR, os.path.join("data", "defi_product_arm"))
+    explicit = os.environ.get(ENV_DATA_DIR, "").strip()
+    if explicit:
+        return explicit
+    # Volume-aware: Railway /data when mounted, else the repo-local data dir.
+    # The old relative default lived on the ephemeral filesystem, so redeploys
+    # wiped product-arm state.
+    try:
+        from sincor2.data_paths import data_dir
+
+        return str(data_dir() / "defi_product_arm")
+    except Exception:
+        return os.path.join("data", "defi_product_arm")
 
 
 def default_ledger_path() -> str:

@@ -48,6 +48,23 @@ logger = logging.getLogger("sincor.market.sponsored_stake")
 
 ENABLE_ENV = "SINCOR_SPONSORED_STAKE_ENABLED"
 LEDGER_ENV = "SINCOR_SPONSORED_STAKE_LEDGER"
+
+
+def _default_ledger_path() -> str:
+    """Volume-aware default: Railway /data when mounted, else local data dir.
+
+    The old default (~/workspace/ops/sponsored_stake_ledger.json) lived on
+    Railway's ephemeral filesystem, so every redeploy wiped the ledger.
+    """
+    try:
+        from sincor2.data_paths import data_dir
+
+        return str(data_dir() / "sponsored_stake_ledger.json")
+    except Exception:
+        return os.path.expanduser("~/workspace/ops/sponsored_stake_ledger.json")
+
+
+# Kept for backwards compatibility; prefer _default_ledger_path().
 DEFAULT_LEDGER_PATH = os.path.expanduser(
     "~/workspace/ops/sponsored_stake_ledger.json")
 
@@ -82,7 +99,7 @@ class SponsoredStakeLedger:
 
     def __init__(self, path: Optional[str] = None):
         self.path = (
-            path or os.environ.get(LEDGER_ENV) or DEFAULT_LEDGER_PATH)
+            path or os.environ.get(LEDGER_ENV) or _default_ledger_path())
         self._data: Dict[str, Any] = {"agents": {}, "events": []}
         self._load()
 

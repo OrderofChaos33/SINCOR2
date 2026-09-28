@@ -119,6 +119,23 @@ def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def _default_ledger_path() -> str:
+    """Volume-aware default: Railway /data when mounted, else local data dir.
+
+    The old default (~/workspace/ops/stake_ledger.json) lived on Railway's
+    ephemeral filesystem, so every redeploy wiped all stake balances.
+    """
+    explicit = os.environ.get("SINCOR_STAKE_LEDGER_PATH", "").strip()
+    if explicit:
+        return os.path.expanduser(explicit)
+    try:
+        from sincor2.data_paths import data_dir
+
+        return str(data_dir() / "stake_ledger.json")
+    except Exception:
+        return os.path.expanduser("~/workspace/ops/stake_ledger.json")
+
+
 def _now_ts() -> int:
     return int(time.time())
 
@@ -128,8 +145,7 @@ class StakeLedger:
     challenger bonds, and poster re-auction credits.  Atomic JSON writes."""
 
     def __init__(self, path: Optional[str] = None):
-        self.path = path or os.path.expanduser(
-            "~/workspace/ops/stake_ledger.json")
+        self.path = path or _default_ledger_path()
         self._data: Dict[str, Any] = {"agents": {}, "credits": {},
                                       "events": []}
         self._load()

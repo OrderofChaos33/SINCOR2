@@ -271,9 +271,14 @@ def get_task_store() -> TaskStore:
         if _store_instance is not None:
             return _store_instance
 
-        mode = (os.getenv("A2A_TASK_STORE") or "memory").strip().lower()
+        mode = (os.getenv("A2A_TASK_STORE") or "").strip().lower()
         env = (os.getenv("FLASK_ENV") or "production").strip().lower()
         is_prod = env not in {"development", "dev", "test", "testing", "local"}
+        if not mode:
+            # Production must not default to the in-memory store: every
+            # Railway redeploy wiped the whole task board. sqlite persists via
+            # PersistentStore (/data when a Railway volume is mounted).
+            mode = "sqlite" if is_prod else "memory"
 
         if mode == "redis":
             try:
