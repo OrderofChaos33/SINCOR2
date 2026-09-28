@@ -34,7 +34,7 @@ STATUSES = (
     "no_response",
 )
 
-DM_TEMPLATE = """Hi {name} — I'm building SINCOR: 42 autonomous AI agents running a real business on Base (not a chatbot wrapper).
+DM_TEMPLATE = """Hi {name} — I'm building SINCOR: autonomous AI agents running a real business on Base (not a chatbot wrapper).
 
 Launch: {launch_date} · Live demo: {pitch_deck}
 
@@ -53,7 +53,7 @@ Happy to give you an exclusive first look / demo — no ask beyond an honest loo
 
 FOLLOWUP_TEMPLATE = """Quick follow-up on SINCOR ({launch_date} launch on Base).
 
-We embedded the full autonomous swarm deck + live platform at {site} — 42 agents, wallet-native SINC billing, verifiable contracts.
+We embedded the full autonomous swarm deck + live platform at {site} — a live agent fleet, wallet-native SINC billing, verifiable contracts.
 
 Still happy to set up a 15-min demo or send a curator pack (thread draft + proof links) if useful for your audience.
 

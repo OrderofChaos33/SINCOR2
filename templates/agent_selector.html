@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -17,7 +17,7 @@
                     <p class="text-gray-600">Select and configure your AI business automation agents</p>
                 </div>
                 <div class="text-right flex items-center gap-3">
-                    <p class="text-sm text-blue-600">🤖 42 Agents Available</p>
+                    <p class="text-sm text-blue-600">🤖 <span class="fleet-count">—</span> Agents Available</p>
                     <!-- SINC live cost badge -->
                     <div id="sinc-cost-badge" style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 12px;font-size:.78rem;font-weight:600;color:#4338ca">
                         🪙 Est. Cost: <span id="sinc-cost-value">1 SINC/call</span>
@@ -51,7 +51,7 @@
                         ✅ Accept Recommendations & Start Setup
                     </button>
                     <button onclick="showAllAgents()" class="ml-4 bg-gray-200 text-gray-700 px-6 py-2 rounded font-semibold hover:bg-gray-300">
-                        👀 Browse All 42 Agents
+                        👀 Browse All Agents
                     </button>
                 </div>
             </div>
@@ -323,7 +323,7 @@
         }
 
         function loadAllAgents() {
-            // This would load all 42 agents from the server
+            // Loads the agent roster from the live registry
             // For now, just showing the main ones
             const agentIds = ['lead_generation', 'appointment_scheduler', 'customer_follow_up', 'payment_processor', 'social_media_manager', 'reputation_manager'];
             const container = document.getElementById('agent-grid');
@@ -524,5 +524,8 @@ document.addEventListener('change', () => {
 });
 </script>
 
+<script>
+(function(){fetch('/api/a2a/agents',{headers:{'Accept':'application/json'}}).then(function(r){return r.ok?r.json():null;}).then(function(d){var n=(d&&d.agents&&typeof d.agents.length==='number')?d.agents.length:null;document.querySelectorAll('.fleet-count').forEach(function(el){el.textContent=(n===null)?'—':n;});}).catch(function(){});})();
+</script>
 </body>
 </html>

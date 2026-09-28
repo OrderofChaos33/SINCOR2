@@ -1,0 +1,117 @@
+{% extends "layouts/base.html" %}
+{% block title %}SINCOR · Tasks{% endblock %}
+{% block page_title %}Task board{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="toolbar">
+    <input class="input" id="q" type="search" placeholder="Search title, skill, or seed key…" aria-label="Search tasks">
+  </div>
+  <div class="toolbar" id="stateChips" style="margin-bottom:0"></div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h3 id="countLine"><span class="loading">Loading live board…</span></h3></div>
+  <div id="tableBox"></div>
+  <div class="pager" id="pager" style="display:none">
+    <button class="btn" id="prevBtn">← Prev</button>
+    <span id="pageLabel"></span>
+    <button class="btn" id="nextBtn">Next →</button>
+  </div>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+  var PER_PAGE = 15;
+  var tasks = [];
+  var activeState = 'all';
+  var page = 1;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtDate(ms) {
+    if (!ms) return '—';
+    var d = new Date(Number(ms));
+    return isNaN(d.getTime()) ? '—' : d.toISOString().slice(0, 10);
+  }
+  function pillFor(st) {
+    var cls = st === 'open' ? 'open' : st === 'auction' ? 'auction' : 'warn';
+    return '<span class="pill ' + cls + '">' + esc(st) + '</span>';
+  }
+
+  function filtered() {
+    var q = document.getElementById('q').value.trim().toLowerCase();
+    return tasks.filter(function (t) {
+      var st = String(t.state || 'unknown').toLowerCase();
+      if (activeState !== 'all' && st !== activeState) return false;
+      if (!q) return true;
+      var hay = ((t.title || '') + ' ' + (t.skill || '') + ' ' + (t.seed_key || '') + ' ' + (t.task_id || '')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+  }
+
+  function render() {
+    var list = filtered();
+    var pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+    if (page > pages) page = pages;
+    var slice = list.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+    document.getElementById('countLine').textContent = list.length + ' of ' + tasks.length + ' tasks';
+    document.getElementById('tableBox').innerHTML = slice.length
+      ? '<table><thead><tr><th>Task</th><th>Skill</th><th class="num">Bounty</th><th>State</th><th>Created</th></tr></thead><tbody>' +
+        slice.map(function (t) {
+          var st = String(t.state || 'unknown');
+          return '<tr><td class="truncate">' + esc(t.title || t.seed_key || t.task_id) + '</td>' +
+            '<td>' + esc(t.skill || '—') + '</td>' +
+            '<td class="num">' + esc(String(t.bounty_axm == null ? '—' : t.bounty_axm)) + '</td>' +
+            '<td>' + pillFor(st) + '</td>' +
+            '<td>' + esc(fmtDate(t.created_at)) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<p class="empty">No tasks match. Try a different search or state.</p>';
+
+    var pager = document.getElementById('pager');
+    pager.style.display = pages > 1 ? 'flex' : 'none';
+    document.getElementById('pageLabel').textContent = 'Page ' + page + ' of ' + pages;
+    document.getElementById('prevBtn').disabled = page <= 1;
+    document.getElementById('nextBtn').disabled = page >= pages;
+  }
+
+  function renderStateChips() {
+    var counts = {};
+    tasks.forEach(function (t) { var s = String(t.state || 'unknown').toLowerCase(); counts[s] = (counts[s] || 0) + 1; });
+    var states = Object.keys(counts).sort();
+    var box = document.getElementById('stateChips');
+    box.innerHTML = '<button class="chip on" data-st="all">All · ' + tasks.length + '</button>' + states.map(function (s) {
+      return '<button class="chip" data-st="' + esc(s) + '">' + esc(s) + ' · ' + counts[s] + '</button>';
+    }).join('');
+    box.querySelectorAll('.chip').forEach(function (c) {
+      c.addEventListener('click', function () {
+        box.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); });
+        c.classList.add('on');
+        activeState = c.getAttribute('data-st');
+        page = 1;
+        render();
+      });
+    });
+  }
+
+  document.getElementById('q').addEventListener('input', function () { page = 1; render(); });
+  document.getElementById('prevBtn').addEventListener('click', function () { if (page > 1) { page--; render(); } });
+  document.getElementById('nextBtn').addEventListener('click', function () { page++; render(); });
+
+  window.sincorFetch('/v1/a2a/tasks?per_page=100').then(function (d) {
+    if (!d || !d.tasks) {
+      document.getElementById('countLine').innerHTML = '<span class="pill bad">board unreachable</span>';
+      document.getElementById('tableBox').innerHTML = '<p class="empty">Could not load the task board. The API may be down — try again shortly.</p>';
+      return;
+    }
+    tasks = d.tasks;
+    renderStateChips();
+    render();
+  });
+})();
+</script>
+{% endblock %}

@@ -71,14 +71,14 @@ SINCOR_BRAND = {
     "url": "https://getsincor.com",
     "free_trial_url": "https://getsincor.com/buy",
     "sinc_buy_url": "https://getsincor.com/buy",
-    "tagline": "42 AI agents. Verified SINC on Base. Self-serve — no human sales.",
+    "tagline": "Autonomous AI agent swarm. Verified SINC on Base. Self-serve — no human sales.",
     "description": (
-        "SINCOR is a 42-agent autonomous swarm on Base with verifiable on-chain inventory. "
+        "SINCOR is an autonomous agent swarm on Base with verifiable on-chain inventory. "
         "SINC is 1B supply at a $0.15 floor ($150M FDV). Pay at /buy. "
         "Agents draft proof-of-work content; contracts handle distribution."
     ),
     "features": [
-        "42 specialized AI agents — content, ops, on-chain stats, review queue",
+        "Specialized AI agents — content, ops, on-chain stats, review queue",
         "Self-serve checkout at /buy — SINC $0.15 floor ($150M / 1B)",
         "Verifiable Base contracts: SINC token, v4 hook, Sourcify-matched source",
         "Human-in-the-loop launch review (~5 min/day) — agents draft, you approve",

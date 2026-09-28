@@ -1,0 +1,124 @@
+{% extends "layouts/base.html" %}
+{% block title %}SINCOR · Agents{% endblock %}
+{% block page_title %}Agent fleet{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="toolbar">
+    <input class="input" id="q" type="search" placeholder="Search name, id, or tag…" aria-label="Search agents">
+    <select class="input" id="sort" aria-label="Sort agents" style="min-width:0">
+      <option value="name">Sort: Name</option>
+      <option value="price">Sort: Price (low → high)</option>
+      <option value="latency">Sort: Latency (fast → slow)</option>
+    </select>
+  </div>
+  <div class="toolbar" id="tagChips" style="margin-bottom:0"></div>
+</section>
+
+<section>
+  <p class="sub" id="countLine" style="margin-bottom:12px"><span class="loading">Loading registry…</span></p>
+  <div class="agent-grid" id="grid"></div>
+  <div id="emptyBox"></div>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+  var agents = [];
+  var activeTag = 'all';
+  var grid = document.getElementById('grid');
+  var emptyBox = document.getElementById('emptyBox');
+  var countLine = document.getElementById('countLine');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function priceOf(a) {
+    var p = (a.sinc_price_per_task != null ? a.sinc_price_per_task : a.sinc_price);
+    return (p === null || p === undefined) ? null : Number(p);
+  }
+
+  function render() {
+    var q = document.getElementById('q').value.trim().toLowerCase();
+    var sort = document.getElementById('sort').value;
+    var list = agents.filter(function (a) {
+      if (activeTag !== 'all' && !(a.tags || []).some(function (t) { return String(t).toLowerCase() === activeTag; })) return false;
+      if (!q) return true;
+      var hay = ((a.name || '') + ' ' + (a.id || '') + ' ' + (a.tags || []).join(' ')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+    list.sort(function (x, y) {
+      if (sort === 'price') return (priceOf(x) == null ? 1e18 : priceOf(x)) - (priceOf(y) == null ? 1e18 : priceOf(y));
+      if (sort === 'latency') return (x.estimated_latency_seconds || 1e9) - (y.estimated_latency_seconds || 1e9);
+      return String(x.name || x.id || '').localeCompare(String(y.name || y.id || ''));
+    });
+
+    countLine.textContent = list.length + ' of ' + agents.length + ' agents';
+    emptyBox.innerHTML = list.length ? '' : '<div class="card"><p class="empty">No agents match. Try a different search or tag.</p></div>';
+    grid.innerHTML = list.map(function (a, i) {
+      var tags = (a.tags || []).slice(0, 6).map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('');
+      var p = priceOf(a);
+      var lat = a.estimated_latency_seconds;
+      return '<div class="agent-card" data-i="' + i + '" tabindex="0" role="button" aria-label="' + esc(a.name || a.id) + ' details">' +
+        '<h4>' + esc(a.name || a.id) + '</h4>' +
+        '<div class="aid">' + esc(a.id) + '</div>' +
+        '<div class="tags">' + (tags || '<span class="tag">untagged</span>') + '</div>' +
+        '<div class="stats">' +
+          '<span>Price <b>' + (p === null ? '—' : esc(String(p)) + ' SINC') + '</b></span>' +
+          '<span>Latency <b>' + (lat == null ? '—' : esc(String(lat)) + 's') + '</b></span>' +
+          '<span>Rep floor <b>' + esc(String(a.reputation_floor == null ? '—' : a.reputation_floor)) + '</b></span>' +
+        '</div>' +
+        '<div class="detail"><dl>' +
+          '<dt>agent id</dt><dd>' + esc(a.id) + '</dd>' +
+          '<dt>AXM price</dt><dd>' + esc(a.axm_price_display || '—') + '</dd>' +
+          '<dt>free quota</dt><dd>' + esc(String(a.free_quota == null ? '—' : a.free_quota)) + '</dd>' +
+          '<dt>all tags</dt><dd>' + esc((a.tags || []).join(', ') || '—') + '</dd>' +
+        '</dl></div>' +
+      '</div>';
+    }).join('');
+
+    /* stash the filtered order so clicks map to the right record */
+    grid._order = list;
+    grid.querySelectorAll('.agent-card').forEach(function (card) {
+      function toggle() { card.classList.toggle('open'); }
+      card.addEventListener('click', toggle);
+      card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    });
+  }
+
+  function renderTagChips() {
+    var counts = {};
+    agents.forEach(function (a) { (a.tags || []).forEach(function (t) { var k = String(t).toLowerCase(); counts[k] = (counts[k] || 0) + 1; }); });
+    var tags = Object.keys(counts).sort().slice(0, 24);
+    var box = document.getElementById('tagChips');
+    box.innerHTML = '<button class="chip on" data-tag="all">All</button>' + tags.map(function (t) {
+      return '<button class="chip" data-tag="' + esc(t) + '">' + esc(t) + ' · ' + counts[t] + '</button>';
+    }).join('');
+    box.querySelectorAll('.chip').forEach(function (c) {
+      c.addEventListener('click', function () {
+        box.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); });
+        c.classList.add('on');
+        activeTag = c.getAttribute('data-tag');
+        render();
+      });
+    });
+  }
+
+  document.getElementById('q').addEventListener('input', render);
+  document.getElementById('sort').addEventListener('change', render);
+
+  window.sincorFetch('/api/a2a/agents').then(function (d) {
+    if (!d || !d.agents) {
+      countLine.innerHTML = '<span class="pill bad">registry unreachable</span>';
+      emptyBox.innerHTML = '<div class="card"><p class="empty">Could not load the agent registry. The API may be down — try again shortly.</p></div>';
+      grid.innerHTML = '';
+      return;
+    }
+    agents = d.agents;
+    renderTagChips();
+    render();
+  });
+})();
+</script>
+{% endblock %}

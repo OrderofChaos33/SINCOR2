@@ -1,0 +1,77 @@
+{% extends "layouts/base.html" %}
+{% block title %}SINCOR · Bounty pool{% endblock %}
+{% block page_title %}Bounty pool{% endblock %}
+{% block content %}
+<section class="kpis">
+  <div class="card"><label>Funded</label><div class="val" id="pFunded">—</div><div class="sub">AXM · ledger-only</div></div>
+  <div class="card"><label>Allocated</label><div class="val" id="pAllocated">—</div><div class="sub" id="pAllocSub">—</div></div>
+  <div class="card"><label>Available</label><div class="val good" id="pAvailable">—</div><div class="sub">AXM ready to back tasks</div></div>
+  <div class="card"><label>Utilisation</label><div class="val" id="pUtil">—</div><div class="sub">allocated ÷ funded</div></div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h3>Allocations</h3><span class="sub" id="relNote"></span></div>
+  <div id="tableBox"><p class="loading">Loading pool ledger…</p></div>
+</section>
+
+<section class="card">
+  <h3>About this pool</h3>
+  <p class="sub">The bounty pool is an offchain AXM-denominated reservation ledger. It tracks which funds are backing which task listings; it does not move funds on any chain. Figures above are live from the pool ledger.</p>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+(function () {
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(n) {
+    if (n === null || n === undefined || isNaN(Number(n))) return '—';
+    return Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+  function shortId(id) { return id ? String(id).slice(0, 14) + '…' : '—'; }
+
+  /* task_id → human label, best effort */
+  var taskLabels = {};
+  function labelFor(taskId) { return taskLabels[taskId] || shortId(taskId); }
+
+  window.sincorFetch('/v1/a2a/tasks?per_page=100').then(function (d) {
+    if (d && d.tasks) {
+      d.tasks.forEach(function (t) {
+        taskLabels[t.task_id] = t.title || t.seed_key || t.task_id;
+      });
+    }
+    return window.sincorFetch('/v1/a2a/pool');
+  }).then(function (p) {
+    if (!p) {
+      document.getElementById('tableBox').innerHTML = '<p class="empty">Pool ledger unreachable. The API may be down — try again shortly.</p>';
+      return;
+    }
+    document.getElementById('pFunded').textContent = fmt(p.funded_axm);
+    document.getElementById('pAllocated').textContent = fmt(p.allocated_axm);
+    document.getElementById('pAvailable').textContent = fmt(p.available_axm);
+    var funded = Number(p.funded_axm) || 0;
+    var alloc = Number(p.allocated_axm) || 0;
+    document.getElementById('pUtil').textContent = funded > 0 ? (alloc / funded * 100).toFixed(1) + '%' : '—';
+
+    var all = p.allocations || [];
+    var live = all.filter(function (a) { return (a.state || 'allocated') === 'allocated'; });
+    var released = all.length - live.length;
+    document.getElementById('pAllocSub').textContent = live.length + ' active';
+    document.getElementById('relNote').textContent = released > 0 ? released + ' released (history)' : '';
+
+    var rows = live.slice().sort(function (a, b) { return (b.created_at || 0) - (a.created_at || 0); }).map(function (a) {
+      return '<tr><td class="truncate">' + esc(labelFor(a.task_id)) + '</td>' +
+        '<td class="num">' + fmt(a.amount_axm) + '</td>' +
+        '<td>' + esc(a.created_at ? new Date(Number(a.created_at)).toISOString().slice(0, 10) : '—') + '</td>' +
+        '<td class="truncate">' + esc(a.reason || '—') + '</td></tr>';
+    }).join('');
+    document.getElementById('tableBox').innerHTML = live.length
+      ? '<table><thead><tr><th>Task</th><th class="num">AXM</th><th>Allocated</th><th>Reason</th></tr></thead><tbody>' + rows + '</tbody></table>'
+      : '<p class="empty">No active allocations. The full reserve is available.</p>';
+  });
+})();
+</script>
+{% endblock %}

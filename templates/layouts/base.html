@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}SINCOR · Console{% endblock %}</title>
+  <link rel="icon" href="/static/sincor_favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── SINCOR console design system ───────────────────────── */
+    :root {
+      --bg: #070b14;
+      --panel: #0d1424;
+      --panel-2: #111a2e;
+      --line: rgba(148,163,184,.14);
+      --text: #e8eef8;
+      --muted: #8b97ab;
+      --cyan: #3ee0ff;
+      --good: #3dd68c;
+      --warn: #f5b544;
+      --bad: #ff6b7a;
+      --violet: #9f7aea;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+    body { display: flex; min-height: 100vh; overflow-x: hidden; }
+    a { color: inherit; text-decoration: none; }
+    button, input, select { font-family: inherit; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 232px; flex: 0 0 232px; background: #080d18;
+      border-right: 1px solid var(--line); padding: 20px 14px;
+      display: flex; flex-direction: column; gap: 14px; min-height: 100vh;
+      position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 8px; }
+    .brand img { width: 28px; height: 28px; }
+    .brand strong { font-size: 14px; letter-spacing: .04em; }
+    .sidebar nav { display: flex; flex-direction: column; gap: 4px; }
+    .sidebar nav a { padding: 9px 10px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+    .sidebar nav a.active, .sidebar nav a:hover { background: var(--panel-2); color: var(--text); }
+    .sidebar nav a.active { border-left: 2px solid var(--cyan); border-radius: 0 8px 8px 0; }
+    .nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 8px 10px 2px; }
+    details.legacy { border-top: 1px solid var(--line); padding-top: 8px; }
+    details.legacy summary {
+      cursor: pointer; font-size: 12px; color: var(--muted); padding: 8px 10px;
+      list-style: none; user-select: none;
+    }
+    details.legacy summary::-webkit-details-marker { display: none; }
+    details.legacy summary::before { content: "▸ "; }
+    details.legacy[open] summary::before { content: "▾ "; }
+    details.legacy summary:hover { color: var(--text); }
+    .sidebar .spacer { flex: 1; }
+    .sidebar .foot { font-size: 12px; color: var(--muted); padding: 8px; }
+    .sidebar .foot a:hover { color: var(--text); }
+
+    /* ── Main / header ── */
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    header.top {
+      height: 64px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; position: sticky; top: 0; background: var(--bg); z-index: 5;
+    }
+    header.top h1 { font-size: 16px; font-weight: 600; }
+    header.top .meta { font-size: 12px; color: var(--muted); display: flex; gap: 16px; align-items: center; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); display: inline-block; margin-right: 6px; }
+    .dot.ok { background: var(--good); }
+    .dot.degraded { background: var(--warn); }
+    .dot.checking { background: var(--dim); }
+
+    .content { padding: 28px; display: flex; flex-direction: column; gap: 22px; max-width: 1280px; width: 100%; margin: 0 auto; }
+
+    /* ── Cards / KPIs ── */
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      padding: 16px 18px; min-width: 0;
+    }
+    .card > label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+    .card .val { font-size: 28px; font-weight: 650; letter-spacing: -.02em; }
+    .card .val.good { color: var(--good); }
+    .card .val.warn { color: var(--warn); }
+    .card .sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .grid-2 { display: grid; grid-template-columns: 1.4fr .8fr; gap: 14px; }
+    .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .card-head h3 { margin-bottom: 0; }
+    .card-head a.more { font-size: 12px; color: var(--cyan); }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+    td { padding: 10px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .truncate { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Pills ── */
+    .pill {
+      display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 10px;
+      border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+      text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+    }
+    .pill.open { color: var(--cyan); border-color: rgba(62,224,255,.35); background: rgba(62,224,255,.08); }
+    .pill.auction { color: var(--violet); border-color: rgba(159,122,234,.4); background: rgba(159,122,234,.1); }
+    .pill.good { color: var(--good); border-color: rgba(61,214,140,.35); background: rgba(61,214,140,.08); }
+    .pill.warn { color: var(--warn); border-color: rgba(245,181,68,.35); background: rgba(245,181,68,.08); }
+    .pill.bad { color: var(--bad); border-color: rgba(255,107,122,.35); background: rgba(255,107,122,.08); }
+
+    /* ── Controls ── */
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .input {
+      background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+      border-radius: 8px; padding: 9px 12px; font-size: 13px; min-width: 220px;
+    }
+    .input::placeholder { color: var(--muted); }
+    .input:focus { outline: none; border-color: rgba(62,224,255,.5); }
+    .chip {
+      background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+      border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .chip:hover { color: var(--text); border-color: rgba(62,224,255,.4); }
+    .chip.on { background: rgba(62,224,255,.12); color: var(--cyan); border-color: rgba(62,224,255,.45); }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      background: #152036; color: var(--text); border: 1px solid var(--line);
+      border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+      display: inline-block;
+    }
+    .btn:hover { border-color: rgba(62,224,255,.4); }
+    .btn.primary { background: var(--cyan); color: #041018; border: none; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 12px; font-size: 12px; color: var(--muted); }
+
+    /* ── Agent cards ── */
+    .agent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .agent-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; cursor: pointer; transition: border-color .15s; }
+    .agent-card:hover { border-color: rgba(62,224,255,.4); }
+    .agent-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .agent-card .aid { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; margin-bottom: 10px; }
+    .agent-card .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .tag { font-size: 11px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+    .agent-card .stats { display: flex; gap: 16px; font-size: 12px; color: var(--muted); }
+    .agent-card .stats b { color: var(--text); font-weight: 600; }
+    .agent-card .detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+    .agent-card.open .detail { display: block; }
+    .agent-card .detail dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; }
+    .agent-card .detail dt { color: var(--muted); }
+    .agent-card .detail dd { color: var(--text); font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; }
+
+    /* ── States ── */
+    .empty { text-align: center; padding: 36px 16px; color: var(--muted); font-size: 13px; }
+    .err { background: rgba(255,107,122,.08); border: 1px solid rgba(255,107,122,.3); color: var(--bad); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 14px; }
+    .loading { color: var(--muted); animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .45; } }
+    #toast { display: none; font-size: 13px; color: var(--muted); margin-top: 12px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 1100px) {
+      .agent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 980px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; flex: none; min-height: auto; height: auto; position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
+      .sidebar nav { flex-direction: row; flex-wrap: wrap; }
+      details.legacy { border-top: none; }
+      .kpis, .grid-2 { grid-template-columns: 1fr 1fr; }
+      .agent-grid { grid-template-columns: 1fr 1fr; }
+      header.top { padding: 0 16px; }
+    }
+    @media (max-width: 640px) {
+      .kpis, .grid-2, .agent-grid { grid-template-columns: 1fr; }
+      .content { padding: 16px; }
+      header.top .meta span.hide-sm { display: none; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body data-nav="{{ nav_active|default('') }}">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="/static/sincor_nav_icon.png" alt="">
+      <strong>SINCOR</strong>
+    </div>
+    <div class="nav-label">Console</div>
+    <nav>
+      <a data-nav="overview" href="/dashboard">Overview</a>
+      <a data-nav="command" href="/command-center">Command Center</a>
+      <a data-nav="agents" href="/agents">Agents</a>
+      <a data-nav="tasks" href="/tasks">Tasks</a>
+      <a data-nav="pool" href="/pool">Pool</a>
+      <a data-nav="docs" href="/docs">Docs</a>
+    </nav>
+    <details class="legacy">
+      <summary>Legacy views</summary>
+      <nav>
+        <a href="/operator">Operator</a>
+        <a href="/executive-dashboard">Executive</a>
+        <a href="/professional-dashboard">Professional</a>
+        <a href="/admin-dashboard">Admin</a>
+        <a href="/consciousness-dashboard">Consciousness</a>
+      </nav>
+    </details>
+    <div class="spacer"></div>
+    <div class="foot"><a href="/">← Home</a></div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <h1>{% block page_title %}Console{% endblock %}</h1>
+      <div class="meta">
+        <span><span class="dot checking" id="liveDot"></span><span id="liveLabel">Checking registry…</span></span>
+        <span class="hide-sm">🤖 <span class="fleet-count">—</span> agents</span>
+        <span id="clock">—</span>
+      </div>
+    </header>
+    <div class="content">
+      {% block content %}{% endblock %}
+      <p id="toast"></p>
+    </div>
+  </div>
+  <script>
+    /* Shared console shell: clock, nav highlight, live fleet count, helpers. */
+    (function () {
+      function tick() {
+        var el = document.getElementById('clock');
+        if (el) el.textContent = new Date().toISOString().slice(11, 19) + ' UTC';
+      }
+      tick(); setInterval(tick, 1000);
+
+      var cur = document.body.getAttribute('data-nav') || '';
+      document.querySelectorAll('.sidebar nav a[data-nav]').forEach(function (a) {
+        if (a.getAttribute('data-nav') === cur) a.classList.add('active');
+      });
+
+      /* Fleet count — live from the registry; shows "—" when unreachable. Never faked. */
+      function setStatus(state, label) {
+        var dot = document.getElementById('liveDot');
+        var lbl = document.getElementById('liveLabel');
+        if (dot) dot.className = 'dot ' + state;  /* checking | ok | degraded */
+        if (lbl) lbl.textContent = label;
+      }
+      fetch('/api/a2a/agents', { headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          var n = (d && d.agents && typeof d.agents.length === 'number') ? d.agents.length : null;
+          document.querySelectorAll('.fleet-count').forEach(function (el) {
+            el.textContent = (n === null) ? '—' : n;
+          });
+          /* Narrow claim only: the registry answered. Nothing about "systems". */
+          setStatus(n === null ? 'degraded' : 'ok',
+                    n === null ? 'Registry unreachable' : 'Registry online · ' + n + ' agents');
+        })
+        .catch(function () {
+          document.querySelectorAll('.fleet-count').forEach(function (el) { el.textContent = '—'; });
+          setStatus('degraded', 'Registry unreachable');
+        });
+    })();
+
+    window.sincorSay = function (msg) {
+      var t = document.getElementById('toast');
+      if (!t) return;
+      t.style.display = 'block';
+      t.textContent = msg;
+    };
+
+    /* JSON fetch that resolves null on any failure — callers render "—"/unknown. */
+    window.sincorFetch = async function (url) {
+      try {
+        var r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) { return null; }
+    };
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>
