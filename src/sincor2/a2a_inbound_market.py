@@ -421,7 +421,8 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     # Ghosting zeroes earned reputation and restores probation. This is the
     # behavior penalty for committing without revealing; it applies to every
     # detected ghost independent of ledger accounting, and never bricks
-    # the close.
+    # the close. The wallet+card behind each ghost is tombstoned so a rebirth
+    # under a new agent_id is flagged as a probable whitewash.
     if ghosts:
         try:
             with fabric.lock:
@@ -432,6 +433,13 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
             _save_agents(fabric)
         except Exception as err:
             logger.warning("ghost reputation reset failed: %s", err)
+        for agent_id in ghosts:
+            try:
+                from sincor2.a2a_inbound_ext import _kya_flag_ghost
+
+                _kya_flag_ghost(agent_id)
+            except Exception as err:
+                logger.warning("ghost KYA flag failed for %s: %s", agent_id, err)
     if snap["state"] == "assigned":
         fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
         if snap.get("auction_id"):
