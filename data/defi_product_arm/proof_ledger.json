@@ -29,6 +29,21 @@
       "recorded_by": "xioix/track1",
       "sku": "SINCOR-DEFI-P02-CLMM",
       "timestamp": 1790607038.9876513
+    },
+    {
+      "commit": "fb94571f0ae176b7674589a0e8af4b75b6b73d57",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p03_darkpool_units.py -q",
+        "failed": 0,
+        "passed": 24,
+        "scope": "intent_dark_pool: intent lifecycle, matcher, settlement (AXM/USDC only), split solver, access control",
+        "suite": "tests/pytest/test_p03_darkpool_units.py"
+      },
+      "entry_id": "ev_03c0cad5247a",
+      "kind": "test_run",
+      "recorded_by": "xioix/track1",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "timestamp": 1790607125.8821597
     }
   ]
 }

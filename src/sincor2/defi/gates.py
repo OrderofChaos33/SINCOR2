@@ -48,6 +48,7 @@ STAGE_MAP: Dict[str, str] = {
 IMPLEMENTATIONS: Dict[str, str] = {
     "P01_YIELD_AGG": os.path.join("src", "sincor2", "defi", "yield_aggregator.py"),
     "P02_CLMM": os.path.join("src", "sincor2", "defi", "clmm_manager.py"),
+    "P03_INTENT_DARK": os.path.join("src", "sincor2", "defi", "intent_dark_pool.py"),
 }
 
 # protocol_id -> auction spec filename stem (~/workspace/sincor2-auction-tasks/specs/)
