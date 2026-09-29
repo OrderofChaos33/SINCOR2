@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perp DEX Hedging Swarm — SINCOR Products</title>
+<meta name="description" content="Delta-neutral, by design.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Derivatives</span>
+    <h1 class="sp-h1">Perp DEX Hedging Swarm<br><span class="gold">Delta-neutral, by design.</span></h1>
+    <p class="sp-lede">The Perp DEX Hedging Swarm holds market exposure while neutralizing direction — harvesting funding rates and basis with a hedged book.</p>
+    <div class="sp-cta-row">
+      <a href="/signup?plan=p06-perp-dex" class="sp-btn sp-btn-gold">Request early access →</a>
+      <a href="/products" class="sp-btn sp-btn-ghost">All 26 products</a>
+    </div>
+    <div class="sp-specs">
+      <div class="sp-spec"><div class="k">Target yield</div><div class="v">18.0%<br><small>design target</small></div></div>
+      <div class="sp-spec"><div class="k">Protocol fee</div><div class="v">0.12%%<br><small>protocol fee</small></div></div>
+      <div class="sp-spec"><div class="k">Category</div><div class="v"><small>Derivatives</small></div></div>
+      <div class="sp-spec"><div class="k">Designed for</div><div class="v"><small>$250+ allocations</small></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker">What it does</div>
+    <h2 class="sp-h2">Engineered for one job.</h2>
+    <p class="sp-sub">Directional bets are exciting until they're not. The Hedging Swarm takes the other path: hold the exposure you want, hedge the direction you don't, and harvest the funding and basis spreads that hedged books earn in every market regime.</p>
+    <p class="sp-sub">A strict delta band keeps the book neutral, funding-sign filters avoid paying to hold hedges, and a liquidation buffer stands guard. Direction is noise; structure is the trade.</p>
+    <div class="sp-feat">
+      <div>
+        <h3>How it works</h3>
+        <div class="sp-steps" style="grid-template-columns:1fr">
+          <div class="sp-step"><div class="n">1</div><h3>Measure</h3><p>Net delta is computed across every position in real time.</p></div><div class="sp-step"><div class="n">2</div><h3>Hedge</h3><p>Perp positions are sized to neutralize directional exposure within a tight band.</p></div><div class="sp-step"><div class="n">3</div><h3>Harvest</h3><p>Funding payments and basis spreads accrue to the book while neutrality is maintained.</p></div>
+        </div>
+      </div>
+      <div class="sp-visual">⚖️</div>
+    </div>
+    <h3 style="font-size:22px;margin:40px 0 6px">Capabilities</h3>
+    <ul class="sp-check">
+      <li><strong>Delta-neutral book management</strong></li><li><strong>Funding-rate harvesting</strong></li><li><strong>Tight delta-band enforcement</strong></li><li><strong>Liquidation buffer protection</strong></li>
+    </ul>
+    <h3 style="font-size:22px;margin:40px 0 14px">Who it's for</h3>
+    <div class="sp-pills">
+      <span class="sp-pill">Market-neutral funds</span><span class="sp-pill">Hedged allocators</span><span class="sp-pill">Sophisticated traders</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker sp-center">Questions</div>
+    <h2 class="sp-h2 sp-center">About Perp DEX Hedging.</h2>
+    <div class="sp-faq" style="margin-top:32px">
+      <details><summary>What happens if funding flips negative?</summary><div class="a">Funding-sign filters prevent the book from paying to stay hedged — positions unwind or flip before negative carry eats returns.</div></details><details><summary>How neutral is neutral?</summary><div class="a">Net delta is held inside a strict band and rebalanced continuously. The book has no directional opinion.</div></details>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-cta-band">
+      <h2>Get Perp DEX Hedging working for you.</h2>
+      <p>Join the priority list. We'll reach out the moment your allocation opens — early access members get first placement.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/signup?plan=p06-perp-dex" class="sp-btn sp-btn-gold">Request early access →</a>
+        <a href="/pricing" class="sp-btn sp-btn-ghost">See platform plans</a>
+      </div>
+    </div>
+    <div class="sp-center" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:8px">
+      <a href="/products/p05-defi-insurance" class="sp-card-link">← DeFi Risk Mutual</a>
+      <a href="/products/p07-bridge-optimizer" class="sp-card-link">Cross-Chain Bridge Optimizer →</a>
+    </div>
+  </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+</body>
+</html>

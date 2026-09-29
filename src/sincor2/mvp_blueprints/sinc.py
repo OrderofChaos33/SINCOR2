@@ -28,8 +28,9 @@ _bind_mvp()
 @bp.route('/sinc/vs-agent-tokens')
 @bp.route('/refer')
 def sinc_token():
-    """Bonding-curve gateway is retired. Send traffic to platform checkout."""
-    return redirect('/buy', code=302)
+    """SINC utility-access page. No sale claims, no live-deployment claims —
+    platform access positioning with the utility disclaimer."""
+    return render_template('sinc_gateway.html')
 
 
 @bp.route('/sinc/recover-hook')
