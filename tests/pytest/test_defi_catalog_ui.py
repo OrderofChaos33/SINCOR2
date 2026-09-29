@@ -62,9 +62,10 @@ def test_catalog_api_item_shape(client, arm_data):
     assert p01["evidence"][0]["entry_id"] == "ev_test0001"
     assert p01["evidence"][0]["suite"] == "tests/pytest/test_x.py"
     assert isinstance(p01["compliance_score"], (int, float))
-    # untouched SKUs stay honest: spec stage, no evidence, no fake numbers
+    # untouched SKUs stay honest: build stage (reference implementation
+    # exists in repo), no evidence, no fake numbers
     other = next(s for s in body["skus"] if s["sku"] != "SINCOR-DEFI-P01-VAULT")
-    assert other["stage"] == "spec"
+    assert other["stage"] == "build"
     assert other["evidence_count"] == 0
     assert other["evidence"] == []
 
@@ -74,8 +75,14 @@ def test_catalog_api_stage_filter(client, arm_data):
     assert body["count"] == 1
     assert all(s["stage"] == "test" for s in body["skus"])
     body = client.get("/api/defi/catalog?stage=SPEC").get_json()
+    # Fixture seeds P01 at test; every product with a real implementation
+    # (all 26 post-integration, per gates.IMPLEMENTATIONS) starts at build,
+    # so nothing is left at spec in a fresh registry.
+    assert body["count"] == 0
+    assert body["skus"] == []
+    body = client.get("/api/defi/catalog?stage=build").get_json()
     assert body["count"] == 25
-    assert all(s["stage"] == "spec" for s in body["skus"])
+    assert all(s["stage"] == "build" for s in body["skus"])
 
 
 def test_catalog_api_unknown_stage_is_empty(client, arm_data):

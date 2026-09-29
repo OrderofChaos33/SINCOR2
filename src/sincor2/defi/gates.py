@@ -43,10 +43,13 @@ STAGE_MAP: Dict[str, str] = {
 }
 
 # protocol_id -> repo-relative implementation path. P01 (yield_aggregator),
-# P04 (mev_capture), P05 (insurance_mutual), P06 (perp_hedge_swarm),
-# P08 (rwa_vaults), P10 (flash_arbitrage), P14 (prediction_markets) have
-# real strategy math; everything else is unimplemented until its
-# build-phase tasks land.
+# P02 (clmm_manager), P03 (intent_dark_pool), P04 (mev_capture),
+# P05 (insurance_mutual), P06 (perp_hedge_swarm), P07 (bridge_optimizer),
+# P08 (rwa_vaults), P09 (dao_governance), P10 (flash_arbitrage),
+# P11 (delta_neutral), P12 (twamm), P13 (avs_tranching),
+# P14 (prediction_markets), P16 (dex_aggregator), P17 (options_protocol),
+# P19 (credit_underwriting) have real strategy math; everything else is
+# unimplemented until its build-phase tasks land.
 IMPLEMENTATIONS: Dict[str, str] = {
     "P01_YIELD_AGG": os.path.join("src", "sincor2", "defi", "yield_aggregator.py"),
 "P02_CLMM": os.path.join("src", "sincor2", "defi", "clmm_manager.py"),
@@ -54,12 +57,26 @@ IMPLEMENTATIONS: Dict[str, str] = {
     "P04_MEV": os.path.join("src", "sincor2", "defi", "mev_capture.py"),
     "P05_INSURANCE": os.path.join("src", "sincor2", "defi", "insurance_mutual.py"),
     "P06_PERPS": os.path.join("src", "sincor2", "defi", "perp_hedge_swarm.py"),
+    "P07_BRIDGE": os.path.join("src", "sincor2", "defi", "bridge_optimizer.py"),
     "P08_RWA": os.path.join("src", "sincor2", "defi", "rwa_vaults.py"),
+    "P09_DAO_GOV": os.path.join("src", "sincor2", "defi", "dao_governance.py"),
     "P10_FLASH_ARB": os.path.join("src", "sincor2", "defi", "flash_arbitrage.py"),
+    "P11_DELTA_NEUTRAL": os.path.join("src", "sincor2", "defi", "delta_neutral.py"),
+    "P12_TWAMM": os.path.join("src", "sincor2", "defi", "twamm.py"),
+    "P13_AVS": os.path.join("src", "sincor2", "defi", "avs_tranching.py"),
     "P14_PREDICTION": os.path.join("src", "sincor2", "defi", "prediction_markets.py"),
+    "P15_LENDING": os.path.join("src", "sincor2", "defi", "lending_optimizer.py"),
     "P16_DEX_AGG": os.path.join("src", "sincor2", "defi", "dex_aggregator.py"),
     "P17_OPTIONS": os.path.join("src", "sincor2", "defi", "options_protocol.py"),
+    "P18_STRUCTURED": os.path.join("src", "sincor2", "defi", "structured_products.py"),
     "P19_CREDIT": os.path.join("src", "sincor2", "defi", "credit_underwriting.py"),
+    "P20_COMPLIANCE": os.path.join("src", "sincor2", "defi", "compliance_automation.py"),
+    "P21_TREASURY_DAO": os.path.join("src", "sincor2", "defi", "treasury_dao.py"),
+    "P22_STABLE_YIELD": os.path.join("src", "sincor2", "defi", "p22"),
+    "P23_NFTFI": os.path.join("src", "sincor2", "defi", "p23"),
+    "P24_SOCIALFI": os.path.join("src", "sincor2", "defi", "p24"),
+    "P25_PORTFOLIO": os.path.join("src", "sincor2", "defi", "p25"),
+    "P26_DEFI_OS": os.path.join("src", "sincor2", "defi", "p26"),
 }
 
 # protocol_id -> auction spec filename stem (~/workspace/sincor2-auction-tasks/specs/)

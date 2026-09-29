@@ -305,8 +305,14 @@ class MutualPool:
 
     # -- underwriting ----------------------------------------------------
     def buy_cover(self, buyer: str, protocol_id: str, cover_wei: int,
-                  duration_days: int, score: float,
-                  current_block: int = 0) -> Cover:
+                  duration_days: int, risk_score: RiskScore,
+                  current_block: int) -> Cover:
+        """Underwrite one cover line. The risk score must be a FRESH signed
+        publication: scores older than 7,200 blocks block new covers
+        (spec acceptance #2). A bare float cannot prove freshness, so the
+        underwrite path only accepts RiskScore records — the staleness
+        guard is enforced here, not just on Underwriter.get.
+        """
         if self.paused:
             raise MutualError("underwriting paused")
         if not self.live_underwriting:
@@ -314,7 +320,17 @@ class MutualPool:
                 "underwriting blocked: live release not presented")
         if cover_wei <= 0 or duration_days <= 0:
             raise MutualError("cover and duration must be positive")
-        premium = Underwriter.premium_wei(cover_wei, duration_days, score)
+        if risk_score.protocol_id != protocol_id:
+            raise MutualError("risk score is for a different protocol")
+        age = current_block - risk_score.published_block
+        if age > SCORE_STALENESS_BLOCKS:
+            raise StaleScoreError(
+                f"score for {protocol_id} is stale ({age} blocks old); "
+                "new covers blocked")
+        if age < 0:
+            raise MutualError("score published in the future")
+        premium = Underwriter.premium_wei(cover_wei, duration_days,
+                                          risk_score.score)
         fee = Underwriter.treasury_fee_wei(premium)
         new_outstanding = self.outstanding_cover_wei() + cover_wei
         if not self._reserve_ok_after(self.reserves_wei, new_outstanding):

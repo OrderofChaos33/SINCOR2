@@ -3,13 +3,14 @@
 Covers src/sincor2/defi/insurance_mutual.py — tiered pricing, reserve
 gate, cover lifecycle, attestation-gated claims, pro-rata shortfall,
 treasury fees, governance, timelock, pause safety, and the live gate
-behind SKU SINCOR-DEFI-P05-INSURANCE. Pure logic, no chain. 26/26 pass.
+behind SKU SINCOR-DEFI-P05-MUTUAL. Pure logic, no chain. 28/28 pass.
 """
 
 from __future__ import annotations
 
 import sys
 import time
+from dataclasses import replace as dc_replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +39,7 @@ from src.sincor2.defi.insurance_mutual import (
 )
 
 W = 1_000_000  # stablecoin wei per USD (6dp)
+_BLOCK = 1_000_000  # canonical "current" block for underwrite tests
 
 
 def funded_pool(**kw):
@@ -59,6 +61,20 @@ def pool():
     p.assessors.appoint("assessor1", weight=10**18)
     p.assessors.appoint("assessor2", weight=10**18)
     return p
+
+
+@pytest.fixture()
+def uw():
+    """Underwriter with a FRESH published score for proto-a (acceptance #2
+    wiring: buy_cover only accepts RiskScore records, so every underwrite
+    test must go through a signed, fresh publication)."""
+    u = Underwriter()
+    u.publish("proto-a", 0.3, block=_BLOCK, signer="0xuw")
+    return u
+
+
+def _fresh_score(uw, protocol_id="proto-a", block=_BLOCK):
+    return uw.get(protocol_id, current_block=block)
 
 
 # -- pricing -----------------------------------------------------------------
@@ -99,7 +115,8 @@ def test_score_weights_sum_to_one():
 
 
 def test_stale_score_blocks_cover():
-    """Acceptance #2: scores older than 7,200 blocks block new covers."""
+    """Acceptance #2: scores older than 7,200 blocks block new covers —
+    on the UNDERWRITE path, not just Underwriter.get."""
     uw = Underwriter()
     uw.publish("proto-a", 0.3, block=1_000, signer="0xuw")
     with pytest.raises(StaleScoreError):
@@ -108,28 +125,59 @@ def test_stale_score_blocks_cover():
     assert rec.score == pytest.approx(0.3)
 
 
+def test_stale_score_blocks_underwrite_path(uw):
+    """Acceptance #2 (wiring): a stale RiskScore reverts inside buy_cover."""
+    pool = MutualPool()
+    pool.deposit_capital("lp1", 1_000_000 * W)
+    pool.live_underwriting = True
+    stale = uw.get("proto-a", current_block=_BLOCK)  # fresh now
+    # Re-publish semantics: simulate staleness by shifting the record back.
+    old = dc_replace(stale, published_block=_BLOCK - 7_201)
+    with pytest.raises(StaleScoreError):
+        pool.buy_cover("buyer", "proto-a", 100_000 * W, 90, old,
+                       _BLOCK)
+    fresh = dc_replace(stale, published_block=_BLOCK - 7_200)
+    cover = pool.buy_cover("buyer", "proto-a", 100_000 * W, 90, fresh,
+                           _BLOCK)
+    assert cover.cover_wei == 100_000 * W
+
+
+def test_score_protocol_mismatch_reverts(uw):
+    """A score published for another protocol cannot price this cover."""
+    uw.publish("proto-b", 0.3, block=_BLOCK, signer="0xuw")
+    pool = MutualPool()
+    pool.deposit_capital("lp1", 1_000_000 * W)
+    pool.live_underwriting = True
+    with pytest.raises(MutualError):
+        pool.buy_cover("buyer", "proto-a", 100_000 * W, 90,
+                       uw.get("proto-b", _BLOCK), _BLOCK)
+
+
 # -- reserve gate ------------------------------------------------------------
-def test_underwrite_reverts_below_130pct():
+def test_underwrite_reverts_below_130pct(uw):
     """Acceptance #1: underwrite breaching 130% reverts."""
     pool = MutualPool()
     pool.deposit_capital("lp1", 100_000 * W)
     pool.live_underwriting = True
     # $100k reserves support at most $100k/1.3 = $76,923 of cover
     with pytest.raises(ReserveBreachError):
-        pool.buy_cover("buyer", "proto-a", 80_000 * W, 90, 0.3)
+        pool.buy_cover("buyer", "proto-a", 80_000 * W, 90,
+                       _fresh_score(uw), _BLOCK)
 
 
-def test_underwrite_ok_at_130pct():
+def test_underwrite_ok_at_130pct(uw):
     pool = MutualPool()
     pool.deposit_capital("lp1", 130_000 * W)
     pool.live_underwriting = True
-    cover = pool.buy_cover("buyer", "proto-a", 100_000 * W, 90, 0.3)
+    cover = pool.buy_cover("buyer", "proto-a", 100_000 * W, 90,
+                           _fresh_score(uw), _BLOCK)
     assert cover.cover_wei == 100_000 * W
 
 
-def test_redeem_reverts_when_it_would_breach_floor():
+def test_redeem_reverts_when_it_would_breach_floor(uw):
     pool = funded_pool()
-    pool.buy_cover("buyer", "proto-a", 100_000 * W, 90, 0.3)
+    pool.buy_cover("buyer", "proto-a", 100_000 * W, 90,
+                   _fresh_score(uw), _BLOCK)
     # reserves ~$1M + premium; redeeming everything breaches the floor
     with pytest.raises(ReserveBreachError):
         pool.redeem_capital("lp1", pool._shares["lp1"])
@@ -139,6 +187,7 @@ def test_fuzzed_op_sequences_never_breach_floor():
     """Acceptance #1: fuzzed deposits/covers/redeems never breach 130%."""
     import random
     rng = random.Random(42)
+    uw = Underwriter()
     pool = MutualPool()
     pool.deposit_capital("lp1", 2_000_000 * W)
     pool.live_underwriting = True
@@ -148,9 +197,12 @@ def test_fuzzed_op_sequences_never_breach_floor():
             if op < 0.4:
                 pool.deposit_capital("lp1", rng.randint(1, 50_000) * W)
             elif op < 0.7:
+                # vary the risk tier per underwrite (fresh publication)
+                uw.publish("proto-a", rng.choice([0.1, 0.3, 0.7]),
+                           block=_BLOCK, signer="0xuw")
                 pool.buy_cover("buyer", "proto-a",
                                rng.randint(1, 100_000) * W, 90,
-                               rng.choice([0.1, 0.3, 0.7]))
+                               _fresh_score(uw), _BLOCK)
             else:
                 pool.redeem_capital("lp1", rng.randint(1, 10_000) * W)
         except (ReserveBreachError, MutualError):
@@ -160,45 +212,46 @@ def test_fuzzed_op_sequences_never_breach_floor():
 
 
 # -- claims ------------------------------------------------------------------
-def _buy(pool, buyer="buyer", cover_wei=100_000 * W):
-    return pool.buy_cover(buyer, "proto-a", cover_wei, 90, 0.3)
+def _buy(pool, uw, buyer="buyer", cover_wei=100_000 * W):
+    return pool.buy_cover(buyer, "proto-a", cover_wei, 90,
+                          _fresh_score(uw), _BLOCK)
 
 
-def test_valid_claim_pays_out(pool):
+def test_valid_claim_pays_out(pool, uw):
     """Acceptance #3: valid attestation + in-window -> payout succeeds."""
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     claim = pool.file_claim(cover.cover_id, att(), cover.start_ts + 10)
     pool.assess_claim(claim.claim_id, {"assessor1": True, "assessor2": True})
     paid = pool.claim_payout(claim.claim_id)
     assert paid == cover.cover_wei
 
 
-def test_missing_attestation_reverts(pool):
+def test_missing_attestation_reverts(pool, uw):
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     bad = Attestation(incident_hash="0xi", loss_proof="", assessor="assessor1")
     with pytest.raises(ClaimRuleError):
         pool.file_claim(cover.cover_id, bad, cover.start_ts + 10)
 
 
-def test_unallowlisted_assessor_reverts(pool):
+def test_unallowlisted_assessor_reverts(pool, uw):
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     bad = Attestation(incident_hash="0xi", loss_proof="proof",
                       assessor="0xrandom")
     with pytest.raises(ClaimRuleError):
         pool.file_claim(cover.cover_id, bad, cover.start_ts + 10)
 
 
-def test_day_31_claim_reverts_day_30_ok(pool):
+def test_day_31_claim_reverts_day_30_ok(pool, uw):
     """Acceptance #3: filing on day 31 reverts; day 30 is accepted."""
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     incident = cover.start_ts + 5
     c30 = pool.file_claim(cover.cover_id, att(ih="0xi30"), incident,
                           filed_ts=incident + 30 * 24 * 3600)
@@ -208,29 +261,29 @@ def test_day_31_claim_reverts_day_30_ok(pool):
                         filed_ts=incident + 31 * 24 * 3600 + 1)
 
 
-def test_double_claim_reverts(pool):
+def test_double_claim_reverts(pool, uw):
     """Acceptance #3: same (cover_id, incident_hash) twice reverts."""
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     pool.file_claim(cover.cover_id, att(), cover.start_ts + 10)
     with pytest.raises(ClaimRuleError):
         pool.file_claim(cover.cover_id, att(), cover.start_ts + 11)
 
 
-def test_incident_outside_cover_period_reverts(pool):
+def test_incident_outside_cover_period_reverts(pool, uw):
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     with pytest.raises(ClaimRuleError):
         pool.file_claim(cover.cover_id, att(), cover.expiry_ts + 1)
 
 
-def test_assessor_quorum_5x_cover(pool):
+def test_assessor_quorum_5x_cover(pool, uw):
     """Nexus rule: assessor weight must exceed 5x the cover amount."""
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     claim = pool.file_claim(cover.cover_id, att(), cover.start_ts + 10)
     pool.assessors.appoint("tiny", weight=1)  # far below 5x cover
     with pytest.raises(QuorumError):
@@ -274,14 +327,14 @@ def test_shortfall_pro_rata_to_the_wei():
     assert sum(paid) == 600 * W
 
 
-def test_reverting_claimant_does_not_block_others():
+def test_reverting_claimant_does_not_block_others(uw):
     """Acceptance #4: pull pattern — one bad receiver never bricks others."""
     pool = MutualPool(reverting={"b2"})
     pool.assessors.appoint("assessor1", weight=10**18)
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    c1 = _buy(pool, buyer="b1", cover_wei=10_000 * W)
-    c2 = _buy(pool, buyer="b2", cover_wei=10_000 * W)
+    c1 = _buy(pool, uw, buyer="b1", cover_wei=10_000 * W)
+    c2 = _buy(pool, uw, buyer="b2", cover_wei=10_000 * W)
     k1 = pool.file_claim(c1.cover_id, att(ih="0xa"), c1.start_ts + 1)
     k2 = pool.file_claim(c2.cover_id, att(ih="0xb"), c2.start_ts + 1)
     pool.assess_claim(k1.claim_id, {"assessor1": True})
@@ -292,12 +345,12 @@ def test_reverting_claimant_does_not_block_others():
 
 
 # -- fees / governance / pause / live gate ------------------------------------
-def test_treasury_fee_forwarded_at_collection():
+def test_treasury_fee_forwarded_at_collection(uw):
     """Acceptance #5: 25 bps of every premium lands at treasury at collection."""
     pool = MutualPool()
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     expected_fee = cover.premium_wei * 25 // 10_000
     assert pool.treasury_collected_wei == expected_fee
     assert expected_fee > 0
@@ -335,22 +388,24 @@ def test_timelock_48h_enforced():
     gov.execute_param_change("lower-floor")  # no raise
 
 
-def test_pause_blocks_underwriting_not_claims(pool):
+def test_pause_blocks_underwriting_not_claims(pool, uw):
     """Acceptance #7: guardian pause never blocks in-window claimPayout."""
     pool.deposit_capital("lp1", 1_000_000 * W)
     pool.live_underwriting = True
-    cover = _buy(pool)
+    cover = _buy(pool, uw)
     claim = pool.file_claim(cover.cover_id, att(), cover.start_ts + 10)
     pool.assess_claim(claim.claim_id, {"assessor1": True, "assessor2": True})
     pool.pause_underwriting([ "GUARDIAN_ROLE" ])
     with pytest.raises(MutualError):
-        pool.buy_cover("buyer2", "proto-a", 1_000 * W, 90, 0.3)
+        pool.buy_cover("buyer2", "proto-a", 1_000 * W, 90,
+                       _fresh_score(uw), _BLOCK)
     assert pool.claim_payout(claim.claim_id) == cover.cover_wei  # still pays
 
 
-def test_live_gate_blocks_underwriting_by_default():
+def test_live_gate_blocks_underwriting_by_default(uw):
     """Risk gate: live_blocked — no underwriting until release."""
     pool = MutualPool()
     pool.deposit_capital("lp1", 1_000_000 * W)
     with pytest.raises(LiveBlockedError):
-        pool.buy_cover("buyer", "proto-a", 1_000 * W, 90, 0.3)
+        pool.buy_cover("buyer", "proto-a", 1_000 * W, 90,
+                       _fresh_score(uw), _BLOCK)

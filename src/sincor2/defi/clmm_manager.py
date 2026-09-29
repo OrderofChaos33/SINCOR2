@@ -244,9 +244,9 @@ class JITDetector:
 class TickShiftResponder:
     """Shifts the managed position off the JIT range.
 
-    Rules: shift by ``tick_shift_step`` per response, never exceeding
-    ``vol_band_ticks`` total, with a ``cooldown_blocks`` gap between shifts
-    and a ``max_shift_ticks`` cumulative guard. All output is a dry-run
+    Rules: shift by ``tick_shift_step`` per response, capped per-shift by
+    ``vol_band_ticks`` and cumulatively by ``max_shift_ticks``, with a
+    ``cooldown_blocks`` gap between shifts. All output is a dry-run
     intent; oscillation is impossible by construction.
     """
 

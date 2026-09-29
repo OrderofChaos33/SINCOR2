@@ -4,7 +4,7 @@ Covers src/sincor2/defi/perp_hedge_swarm.py — integer-exact sizing,
 drift-based delta band with hysteresis, funding entry/kill, liq-buffer
 ladder, live gate, oracle staleness, margin mode, fees, and unwind
 safety behind SKU SINCOR-DEFI-P06-PERPS. Pure logic, no venue, no keys.
-24/24 must pass.
+28/28 must pass.
 """
 
 from __future__ import annotations
@@ -264,6 +264,28 @@ def test_live_gate_release_path():
         eng.live_gate.assert_live()
     eng.live_gate.present_conversion_proof("founder-marker")
     eng.live_gate.assert_live()  # no raise
+
+
+def test_live_gate_blocks_rebalance_path():
+    """Acceptance #5: rebalance is a live path — reverts pre-proof.
+
+    check_in may still EMIT a rebalance intent (dry-run signal), but the
+    engine.rebalance execution path refuses until the conversion proof.
+    """
+    eng = HedgeEngine()  # live gate NOT released
+    eng.feed.update(int(2000 * P), NOW)
+    base = int(NOW // 3600) * 3600
+    for h in range(25):
+        eng.funding.record(base + h * 3600, 900)
+    # Seed a position directly (bypassing open, which is also gated).
+    from src.sincor2.defi.perp_hedge_swarm import Position
+    pos = Position("pos-1", 10 * 10**18, 21_000_000_000, int(2000 * P), NOW)
+    eng._positions[pos.position_id] = pos
+    with pytest.raises(LiveBlockedError):
+        eng.rebalance(pos.position_id, now=NOW)
+    eng.live_gate.present_conversion_proof("founder-marker")
+    out = eng.rebalance(pos.position_id, now=NOW + 61)
+    assert out.action == "rebalance"
 
 
 def test_stale_oracle_blocks_new_actions():

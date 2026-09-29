@@ -65,11 +65,14 @@ def test_all_26_registered_no_drift(isolated):
 
 def test_initial_stages(isolated):
     reg = {p["protocol_id"]: p for p in products.build_registry()}
-    # P01/P04/P05/P06 have real strategy math in the repo -> start at build
-    for pid in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
+    # Products with real strategy math in the repo -> start at build.
+    # Single source of truth: gates.IMPLEMENTATIONS; this cross-checks that
+    # products.INITIAL_STAGE_OVERRIDES stays in sync with it.
+    from src.sincor2.defi.gates import IMPLEMENTATIONS
+    for pid in IMPLEMENTATIONS:
         assert reg[pid]["stage"] == "build", pid
     for pid, p in reg.items():
-        if pid not in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
+        if pid not in IMPLEMENTATIONS:
             assert p["stage"] == "spec", pid
 
 
@@ -161,11 +164,11 @@ def test_no_stage_skipping(isolated, ledger):
 
 
 def test_build_to_test_refuses_without_implementation(isolated, ledger):
-    # NOTE: uses P07_BRIDGE as the no-implementation example. P01-P06,
-    # P08/P10/P14 and P16/P17/P19 now ship reference implementations, so they
-    # no longer exercise the "missing implementation" refusal path. Convention:
-    # lowest-numbered product without an entry in gates.IMPLEMENTATIONS.
-    p = _at_stage("SINCOR-DEFI-P07-BRIDGE", "build")
+    # All 26 products now ship reference implementations, so the refusal
+    # path is exercised with a synthetic protocol id that has no entry in
+    # gates.IMPLEMENTATIONS. The gate must refuse build->test; the registry
+    # itself is not the subject of this test.
+    p = _at_stage("SINCOR-DEFI-P26-DEFIOS", "build", protocol_id="P99_SYNTHETIC")
     res = evaluate(p, "test", ledger, products.REPO_ROOT)
     assert not res.ok
     failed = {r.check for r in res.reasons if not r.ok}
@@ -212,6 +215,12 @@ def test_unknown_sku_promote_refuses(isolated, ledger):
 
 
 def test_promote_persists_and_enforces_order(isolated, ledger):
+    # Seed P02 at spec in the isolated state dir (independent of the global
+    # INITIAL_STAGE_OVERRIDES, which now starts every implemented product at
+    # build), then exercise a real spec->build promotion.
+    isolated.mkdir(parents=True, exist_ok=True)
+    (isolated / "products_state.json").write_text(json.dumps(
+        {"SINCOR-DEFI-P02-CLMM": {"stage": "spec", "version": "0.1.0"}}))
     out = products.promote("SINCOR-DEFI-P02-CLMM", "build", ledger=ledger,
                            root=products.REPO_ROOT)
     assert out["ok"], out["reasons"]
