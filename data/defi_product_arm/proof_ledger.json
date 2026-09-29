@@ -134,6 +134,51 @@
         "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p14_prediction_units.py -q",
         "scope": "prediction_markets: ingest staleness/quality bars, Brier calibration beats naive, triple edge vetoes, quarter-Kelly x confidence^2 with 10% cap, fail-closed Polyclaw wallet adapter (treasury-key red-team), lifecycle to-the-cent PnL, risk limits + manual-only breaker reset, 15bps settled-PnL fee ledger, dry-run backtest"
       }
+    },
+    {
+      "entry_id": "ev_e31a6e69141c",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "test_run",
+      "timestamp": 1790609903.3300571,
+      "commit": null,
+      "recorded_by": "xioix/track-p16p19",
+      "details": {
+        "suite": "tests/pytest/test_p16_dexagg_units.py",
+        "passed": 26,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p16_dexagg_units.py -q",
+        "scope": "dex_aggregator optimizer: net-objective splits, min_out, 6bps fee, timelocked allowlist, TOA reweight, non-bricking settlement"
+      }
+    },
+    {
+      "entry_id": "ev_38c38368ce0d",
+      "sku": "SINCOR-DEFI-P17-OPTIONS",
+      "kind": "test_run",
+      "timestamp": 1790609903.3306725,
+      "commit": null,
+      "recorded_by": "xioix/track-p16p19",
+      "details": {
+        "suite": "tests/pytest/test_p17_options_units.py",
+        "passed": 32,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p17_options_units.py -q",
+        "scope": "options_protocol: Black-Scholes pricer, premium rails, covered-only invariant, expiry band, ITM/OTM settlement, 15bps fee, oracle staleness"
+      }
+    },
+    {
+      "entry_id": "ev_44b7ce536939",
+      "sku": "SINCOR-DEFI-P19-CREDIT",
+      "kind": "test_run",
+      "timestamp": 1790609903.331227,
+      "commit": null,
+      "recorded_by": "xioix/track-p16p19",
+      "details": {
+        "suite": "tests/pytest/test_p19_credit_units.py",
+        "passed": 39,
+        "failed": 0,
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p19_credit_units.py -q",
+        "scope": "credit_underwriting: behavioral scoring, score->LTV table, attestation freshness, no-unsecured-book draws, circuit breaker, concentration caps, 20bps fees"
+      }
     }
   ]
 }

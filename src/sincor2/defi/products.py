@@ -47,7 +47,7 @@ SLUGS: Dict[str, str] = {
     "P13_AVS": "AVS",
     "P14_PREDICTION": "PREDICT",
     "P15_LENDING": "LEND",
-    "P16_DEX_AGG": "AGG",
+    "P16_DEX_AGG": "DEXAGG",
     "P17_OPTIONS": "OPTIONS",
     "P18_STRUCTURED": "STRUCTURED",
     "P19_CREDIT": "CREDIT",

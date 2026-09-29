@@ -34,5 +34,17 @@
   "SINCOR-DEFI-P14-PREDICT": {
     "stage": "test",
     "version": "0.1.0"
+  },
+  "SINCOR-DEFI-P16-DEXAGG": {
+    "stage": "test",
+    "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P17-OPTIONS": {
+    "stage": "test",
+    "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P19-CREDIT": {
+    "stage": "test",
+    "version": "0.1.1"
   }
 }
