@@ -3,7 +3,7 @@
 Covers src/sincor2/defi/mev_capture.py — flow metering, sandwich/backrun
 detection, bid shading, capture reconciliation, treasury routing,
 protection policy, signer deny-list, live gate, and access control behind
-SKU SINCOR-DEFI-P04-MEV. Pure logic, no chain, no relay. 25/25 must pass.
+SKU SINCOR-DEFI-P04-MEV. Pure logic, no chain, no relay. 33/33 must pass.
 """
 
 from __future__ import annotations

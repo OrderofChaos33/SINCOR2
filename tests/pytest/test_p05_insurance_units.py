@@ -3,7 +3,7 @@
 Covers src/sincor2/defi/insurance_mutual.py — tiered pricing, reserve
 gate, cover lifecycle, attestation-gated claims, pro-rata shortfall,
 treasury fees, governance, timelock, pause safety, and the live gate
-behind SKU SINCOR-DEFI-P05-INSURANCE. Pure logic, no chain. 26/26 pass.
+behind SKU SINCOR-DEFI-P05-MUTUAL. Pure logic, no chain. 28/28 pass.
 """
 
 from __future__ import annotations

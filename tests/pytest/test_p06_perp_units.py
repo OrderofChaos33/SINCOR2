@@ -4,7 +4,7 @@ Covers src/sincor2/defi/perp_hedge_swarm.py — integer-exact sizing,
 drift-based delta band with hysteresis, funding entry/kill, liq-buffer
 ladder, live gate, oracle staleness, margin mode, fees, and unwind
 safety behind SKU SINCOR-DEFI-P06-PERPS. Pure logic, no venue, no keys.
-24/24 must pass.
+28/28 must pass.
 """
 
 from __future__ import annotations
