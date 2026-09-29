@@ -181,22 +181,25 @@ def test_poster_bond_returned_when_dispute_upheld(env):
     assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
 
 
-def test_poster_bond_slashed_to_poster_fund_when_rejected(env):
+def test_poster_bond_goes_to_worker_when_rejected(env):
+    # A2 fix: a rejected poster-filed dispute is NOT a self-transfer into the
+    # poster's own re-auction fund. The forfeited bond compensates the worker
+    # for the grief/hold on their payout, via the same _payout machinery.
     w3, mgr = env.w3, env.mgr
     bid = w3.to_wei(2, "ether")
     stake = bid * MIN_STAKE_BPS // 10000
     aid = new_aid(w3, "rejected")
     env.run_to_dispute(aid, bid, stake)
+    fund_before = mgr.functions.getPosterReAuctionBalance(env.poster).call()
     agent_before = w3.eth.get_balance(env.agent)
     mgr.functions.openQualityDispute(aid, b"\x66" * 32).transact(
         {"from": env.poster, "value": env.challenger_bond, **GAS})
     mgr.functions.resolveQualityDispute(aid, False).transact(
         {"from": env.adjudicator, **GAS})
-    # worker paid in full (bid + stake)
-    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake
-    # poster's own bond is slashed to the poster's re-auction fund --
-    # the SAME destination challenger bonds already go to
-    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == env.challenger_bond
+    # worker paid in full (bid + stake) PLUS the forfeited poster bond
+    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake + env.challenger_bond
+    # poster's re-auction fund did NOT increase by the bond (no self-transfer)
+    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == fund_before
     assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
 
 
@@ -248,9 +251,10 @@ def test_fast_reject_evidence_free_dispute(env):
     mgr.functions.rejectEvidenceFreeDispute(aid).transact({"from": env.anyone, **GAS})
     esc = mgr.functions.getEscrow(aid).call()
     assert esc[13] == FINALIZED and esc[14] is False
-    # worker paid in full without waiting 48h; poster's bond slashed to the fund
-    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake
-    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == env.challenger_bond
+    # worker paid in full without waiting 48h; poster's forfeited bond goes
+    # to the WORKER (A2: no self-transfer into the poster's own fund)
+    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake + env.challenger_bond
+    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == 0
     # timeout() after fast rejection has nothing left to do
     with pytest.raises(TransactionFailed):
         mgr.functions.timeout(aid).transact({"from": env.anyone, **GAS})
@@ -291,9 +295,11 @@ def test_adjudicator_can_reject_poster_dispute_immediately(env):
     mgr.functions.openQualityDispute(aid, bytes(32)).transact(
         {"from": env.poster, "value": env.challenger_bond, **GAS})
     agent_before = w3.eth.get_balance(env.agent)
-    # adjudicator needs no evidence window: immediate rejection
+    # adjudicator needs no evidence window: immediate rejection.
+    # Forfeited poster bond compensates the worker (A2).
     mgr.functions.resolveQualityDispute(aid, False).transact({"from": env.adjudicator, **GAS})
-    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake
+    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake + env.challenger_bond
+    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == 0
     assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
 
 
@@ -347,4 +353,112 @@ def test_fast_reject_ignores_challenger_evidence_free_dispute_too(env):
     agent_before = w3.eth.get_balance(env.agent)
     mgr.functions.rejectEvidenceFreeDispute(aid).transact({"from": env.anyone, **GAS})
     assert w3.eth.get_balance(env.agent) == agent_before + bid + stake
+    assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
+
+
+# ---------------------------------------------------------------------------
+# 5. Adversarial-review findings: A2 economics, B bond floor, C docs
+# ---------------------------------------------------------------------------
+
+def test_a2_rejected_poster_dispute_bond_compensates_worker(env):
+    """(i) Reviewer scenario A: poster files WITH a nonzero digest (so the
+    6h fast path cannot fire), adjudicator rejects -> the forfeited bond must
+    land with the WORKER, and the poster's re-auction fund must NOT increase
+    by the bond. The old self-transfer made grief cost gas + lockup only."""
+    w3, mgr = env.w3, env.mgr
+    bid = w3.to_wei(2, "ether")
+    stake = bid * MIN_STAKE_BPS // 10000
+    aid = new_aid(w3, "a2")
+    env.run_to_dispute(aid, bid, stake)
+    fund_before = mgr.functions.getPosterReAuctionBalance(env.poster).call()
+    agent_before = w3.eth.get_balance(env.agent)
+    mgr.functions.openQualityDispute(aid, b"\xdd" * 32).transact(
+        {"from": env.poster, "value": env.challenger_bond, **GAS})
+    mgr.functions.resolveQualityDispute(aid, False).transact(
+        {"from": env.adjudicator, **GAS})
+    # worker compensated: bid + stake + the poster's forfeited bond
+    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake + env.challenger_bond
+    # the bond did not recycle into the filer's own fund
+    fund_after = mgr.functions.getPosterReAuctionBalance(env.poster).call()
+    assert fund_after == fund_before
+    assert fund_after - fund_before != env.challenger_bond
+    assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
+
+
+def test_b_challenger_bond_floor_reverts(env):
+    """(ii) setChallengerBond has a floor: 0 (or anything below
+    MIN_CHALLENGER_BOND) must revert so the adjudicator cannot restore the
+    original zero-bond delay vuln in one tx."""
+    w3, mgr = env.w3, env.mgr
+    floor = mgr.functions.MIN_CHALLENGER_BOND().call()
+    assert floor == w3.to_wei(0.01, "ether")
+    # 0 and below-floor both revert
+    with pytest.raises(TransactionFailed):
+        mgr.functions.setChallengerBond(0).transact({"from": env.adjudicator, **GAS})
+    with pytest.raises(TransactionFailed):
+        mgr.functions.setChallengerBond(floor - 1).transact({"from": env.adjudicator, **GAS})
+    # floor itself is allowed
+    mgr.functions.setChallengerBond(floor).transact({"from": env.adjudicator, **GAS})
+    assert mgr.functions.challengerBond().call() == floor
+    # above-floor still works
+    mgr.functions.setChallengerBond(env.challenger_bond).transact({"from": env.adjudicator, **GAS})
+    assert mgr.functions.challengerBond().call() == env.challenger_bond
+
+
+def test_b_constructor_enforces_bond_floor(env):
+    """(ii, companion) the constructor enforces the same floor: deploying with
+    a sub-floor bond would bake the free-delay vuln in from genesis."""
+    w3 = env.w3
+    factory = w3.eth.contract(abi=ABI, bytecode=BYTECODE)
+    with pytest.raises(TransactionFailed):
+        factory.constructor(
+            env.core, env.adjudicator, MIN_STAKE_BPS, 0, env.guardian
+        ).transact({"from": env.deployer, **GAS})
+    # at-floor deploys fine
+    txh = factory.constructor(
+        env.core, env.adjudicator, MIN_STAKE_BPS,
+        w3.to_wei(0.01, "ether"), env.guardian,
+    ).transact({"from": env.deployer, **GAS})
+    addr = w3.eth.get_transaction_receipt(txh).contractAddress
+    assert w3.eth.contract(address=addr, abi=ABI).functions.challengerBond().call() == w3.to_wei(0.01, "ether")
+
+
+def test_third_party_reject_economics_unchanged(env):
+    """(iii) Third-party challenger reject economics are untouched by the A2
+    fix: their forfeited bond still goes to the poster's re-auction fund,
+    and the worker is paid bid + stake (no bond top-up)."""
+    w3, mgr = env.w3, env.mgr
+    bid = w3.to_wei(2, "ether")
+    stake = bid * MIN_STAKE_BPS // 10000
+    aid = new_aid(w3, "tpunch")
+    env.run_to_dispute(aid, bid, stake)
+    agent_before = w3.eth.get_balance(env.agent)
+    mgr.functions.openQualityDispute(aid, b"\xee" * 32).transact(
+        {"from": env.challenger, "value": env.challenger_bond, **GAS})
+    mgr.functions.resolveQualityDispute(aid, False).transact(
+        {"from": env.adjudicator, **GAS})
+    # worker paid bid + stake ONLY (bond goes to the fund, not the worker)
+    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake
+    # false challenger's bond -> poster's fund, as before
+    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == env.challenger_bond
+    assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
+
+
+def test_upheld_poster_dispute_refunds_bond_promptly(env):
+    """(iv) An upheld poster dispute still returns the bond promptly -- in
+    the same resolve tx, with no lockup or routing change from the A2 fix."""
+    w3, mgr = env.w3, env.mgr
+    bid = w3.to_wei(2, "ether")
+    stake = bid * MIN_STAKE_BPS // 10000
+    aid = new_aid(w3, "prompt")
+    env.run_to_dispute(aid, bid, stake)
+    mgr.functions.openQualityDispute(aid, b"\xff" * 32).transact(
+        {"from": env.poster, "value": env.challenger_bond, **GAS})
+    poster_before = w3.eth.get_balance(env.poster)
+    mgr.functions.resolveQualityDispute(aid, True).transact(
+        {"from": env.adjudicator, **GAS})
+    # bond back immediately, on top of the upheld payment refund
+    assert w3.eth.get_balance(env.poster) == poster_before + env.challenger_bond + bid
+    # and the worker took the 50% quality-miss slash
+    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == stake // 2
     assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
