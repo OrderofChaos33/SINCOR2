@@ -65,11 +65,13 @@ def test_all_26_registered_no_drift(isolated):
 
 def test_initial_stages(isolated):
     reg = {p["protocol_id"]: p for p in products.build_registry()}
-    # P01/P04/P05/P06 have real strategy math in the repo -> start at build
-    for pid in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
+    # Products with real strategy math in the repo -> start at build
+    build_start = ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS",
+                   "P09_DAO_GOV", "P11_DELTA_NEUTRAL", "P12_TWAMM", "P13_AVS")
+    for pid in build_start:
         assert reg[pid]["stage"] == "build", pid
     for pid, p in reg.items():
-        if pid not in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
+        if pid not in build_start:
             assert p["stage"] == "spec", pid
 
 

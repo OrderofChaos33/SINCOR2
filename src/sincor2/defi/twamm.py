@@ -155,18 +155,24 @@ class SliceScheduler:
         if reserve_in_cents <= 0 or reserve_out_cents <= 0:
             raise ValueError("reserves must be positive")
         # Auto-extend: double the slice count until every slice is within
-        # the impact cap, or the ceiling is hit (then refuse, fail-closed).
+        # the impact cap. The ceiling bounds auto-extension only: an
+        # explicitly requested count above the ceiling is the caller's
+        # choice and is honored when it already satisfies the cap.
         n = requested_slices
-        while n <= self.max_slices:
-            slices = self._spread(parent_cents, n)
-            worst = max(slice_impact_bps(s, reserve_in_cents) for s in slices)
-            if worst <= self.impact_cap_bps:
-                break
-            n *= 2
-        else:
-            raise ImpactCapError(
-                f"impact cap {self.impact_cap_bps}bps unsatisfiable within "
-                f"{self.max_slices} slices")
+        slices = self._spread(parent_cents, n)
+        worst = max(slice_impact_bps(s, reserve_in_cents) for s in slices)
+        if worst > self.impact_cap_bps:
+            while n <= self.max_slices:
+                n *= 2
+                slices = self._spread(parent_cents, n)
+                worst = max(slice_impact_bps(s, reserve_in_cents)
+                            for s in slices)
+                if worst <= self.impact_cap_bps:
+                    break
+            else:
+                raise ImpactCapError(
+                    f"impact cap {self.impact_cap_bps}bps unsatisfiable within "
+                    f"{self.max_slices} slices")
         total_output = sum(slice_output_cents(s, reserve_in_cents,
                                               reserve_out_cents)
                            for s in slices)

@@ -202,3 +202,15 @@ def test_empty_slices_rejected_by_constructor():
     """AC: the scheduler cannot be built with min_slices < 2."""
     with pytest.raises(ValueError):
         SliceScheduler(min_slices=1)
+
+
+def test_explicit_large_slice_count_honored_when_cap_met():
+    """AC: an explicit request above the auto-extend ceiling is honored
+    when it already satisfies the impact cap (caller's choice)."""
+    s = SliceScheduler(max_slices=4).schedule(
+        parent_cents=7_500_00, reserve_in_cents=RESERVE_IN,
+        reserve_out_cents=RESERVE_OUT, start_block=START_BLOCK,
+        requested_slices=16)
+    assert s.n_slices == 16
+    assert s.max_slice_impact_bps <= twamm.IMPACT_CAP_BPS
+    assert sum(s.slices_cents) == 7_500_00

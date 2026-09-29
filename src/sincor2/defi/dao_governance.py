@@ -152,7 +152,8 @@ class BribeAllocator:
         if bribe_cents <= 0:
             self._reject(gauge_id, "bribe must be positive")
             return None
-        cap = int(epoch_capital_cents * MAX_ALLOC_PCT)
+        # integer-exact 25% of epoch capital (no float dust on large books)
+        cap = epoch_capital_cents * int(MAX_ALLOC_PCT * 100) // 100
         if bribe_cents > cap:
             self._reject(gauge_id,
                          f"bribe {bribe_cents}c > 25% epoch-capital cap {cap}c")

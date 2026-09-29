@@ -46,5 +46,21 @@
   "SINCOR-DEFI-P19-CREDIT": {
     "stage": "test",
     "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P09-GOV": {
+    "stage": "test",
+    "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P11-DELTANEUTRAL": {
+    "stage": "test",
+    "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P12-TWAMM": {
+    "stage": "test",
+    "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P13-AVS": {
+    "stage": "test",
+    "version": "0.1.1"
   }
 }
