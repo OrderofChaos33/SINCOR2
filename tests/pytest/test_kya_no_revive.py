@@ -4,8 +4,11 @@ Covers: no-revive guard (list() of an ever-revoked kyaId reverts), the
 timelocked re-verification path (request + finalize after REVERIFY_DELAY),
 two-step owner rotation (nominate + accept by the nominee), the per-actor
 tombstone (new-kyaId same-actor verify reverts), the list()-graft guard
-(identity change via list() unverifies), and the revoke()-sibling sweep
-(live VERIFIED siblings sharing the burned hash or wallet are unverified).
+(identity change via list() unverifies), the revoke()-sibling sweep
+(live VERIFIED siblings sharing the burned hash -- the FULL hashToKya
+array, not just the agentToKya pointer target -- or the burned wallet are
+unverified, each emitting SiblingUnverified when it actually flips), and
+hashToKya index integrity across hash moves.
 
 Self-contained: compiles contracts/kya/KYARegistry.sol with solc 0.8.24,
 drives it with web3 + eth-tester (PyEVM backend). Deliberately does NOT
@@ -79,6 +82,19 @@ def _principal_ids(reg, principal):
     while True:
         try:
             ids.append(reg.functions.principalToKya(principal, i).call())
+        except Exception:
+            break
+        i += 1
+    return ids
+
+
+def _hash_ids(reg, agent_hash):
+    """Read the whole hashToKya[agent_hash] array (index getter)."""
+    ids = []
+    i = 0
+    while True:
+        try:
+            ids.append(reg.functions.hashToKya(agent_hash, i).call())
         except Exception:
             break
         i += 1
@@ -773,3 +789,186 @@ def test_readmission_after_48h_allows_verify(env):
     )
     reg.functions.verify(kya_id, b"\xbb" * 32).transact({"from": owner})
     assert reg.functions.byKya(kya_id).call()[4] is True
+
+
+# ---------------------------------------------------------------------------
+# Round-3 delta: hashToKya index + full hash-sibling sweep in revoke()
+# ---------------------------------------------------------------------------
+
+
+def test_revoke_unverifies_all_three_hash_sharers_poc_a(env):
+    """Round-3 CONFIRMED residual (PoC-A): with list(k1,H,W1),
+    list(k2,H,W2), list(k3,H,W3) ALL verified, revoke(k1) must unverify
+    ALL THREE. The re-review code only unverified the agentToKya pointer
+    target (k3, last writer wins), leaving the non-pointer sibling k2
+    verified=true while revokedAgent[H] was set."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    k1, k2, k3 = b"\xd1" * 32, b"\xd2" * 32, b"\xd3" * 32
+    H = b"\xe1" * 32
+    W1, W2, W3 = agent, nominee, stranger
+    reg.functions.list(k1, H, W1, b"\x01" * 32).transact({"from": owner})
+    reg.functions.list(k2, H, W2, b"\x02" * 32).transact({"from": owner})
+    reg.functions.list(k3, H, W3, b"\x03" * 32).transact({"from": owner})
+    for kid in (k1, k2, k3):
+        reg.functions.verify(kid, b"\x00" * 32).transact({"from": owner})
+    assert set(_hash_ids(reg, H)) == {k1, k2, k3}
+    assert reg.functions.agentToKya(H).call() == k3  # last writer wins
+    assert reg.functions.revokedAgent(H).call() is False
+
+    txh = reg.functions.revoke(k1, b"\x01" * 32).transact({"from": owner})
+    receipt = w3.eth.get_transaction_receipt(txh)
+
+    # ALL THREE are unverified now: the revoked target, the pointer
+    # target, AND the non-pointer sibling that used to slip through.
+    for kid, revoked in ((k1, True), (k2, False), (k3, False)):
+        a = reg.functions.byKya(kid).call()
+        assert a[4] is False, kid
+        assert a[5] is revoked, kid
+    assert reg.functions.revokedAgent(H).call() is True
+    assert reg.functions.revokedPrincipal(W1).call() is True
+    # The hash pointer keeps its semantics: it resolved to k3 (not the
+    # revoked kyaId), so it is kept -- verify() stays tombstone-gated.
+    assert reg.functions.agentToKya(H).call() == k3
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(k3, b"\x03" * 32).transact({"from": owner})
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(k2, b"\x02" * 32).transact({"from": owner})
+
+    # Per-sibling events: exactly the two siblings that actually flipped.
+    evts = _event_args(reg, "SiblingUnverified", receipt)
+    assert len(evts) == 2
+    by_id = {e["kyaId"]: e for e in evts}
+    assert set(by_id) == {k2, k3}
+    assert by_id[k2]["agentIdHash"] == H and by_id[k2]["principal"] == W2
+    assert by_id[k3]["agentIdHash"] == H and by_id[k3]["principal"] == W3
+
+    # No verified attestation names the burned hash.
+    for kid in _hash_ids(reg, H):
+        assert reg.functions.byKya(kid).call()[4] is False
+
+
+def test_graft_repoint_then_revoke_sweeps_earlier_sharers_poc_a2(env):
+    """PoC-A2: graft-repoint onto a hash, then revoke the grafter -- the
+    EARLIER hash-sharers must be unverified. Exercises the hashToKya
+    bucket move on graft: the grafter must leave H1's bucket and join
+    H2's, or the sweep misses the earlier sharers (stale bucket) or
+    sweeps a hash the grafter left."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    k1, k2, k3 = b"\xe1" * 32, b"\xe2" * 32, b"\xe3" * 32
+    H1, H2 = b"\xf1" * 32, b"\xf2" * 32
+    W1, W2, W3 = agent, nominee, stranger
+    reg.functions.list(k1, H1, W1, b"\x01" * 32).transact({"from": owner})
+    reg.functions.list(k2, H2, W2, b"\x02" * 32).transact({"from": owner})
+    reg.functions.list(k3, H2, W3, b"\x03" * 32).transact({"from": owner})
+    for kid in (k1, k2, k3):
+        reg.functions.verify(kid, b"\x00" * 32).transact({"from": owner})
+
+    # Graft: re-point k1 onto H2. Identity change => unverified + event,
+    # and the index moves k1 from H1's bucket to H2's.
+    txh = reg.functions.list(k1, H2, W1, b"\x11" * 32).transact({"from": owner})
+    graft_evts = _event_args(
+        reg, "SiblingUnverified", w3.eth.get_transaction_receipt(txh)
+    )
+    assert len(graft_evts) == 1
+    assert graft_evts[0]["kyaId"] == k1
+    assert graft_evts[0]["agentIdHash"] == H2
+    assert graft_evts[0]["principal"] == W1
+    assert reg.functions.byKya(k1).call()[4] is False
+    assert _hash_ids(reg, H1) == []
+    assert set(_hash_ids(reg, H2)) == {k1, k2, k3}
+    assert reg.functions.agentToKya(H1).call() == b"\x00" * 32
+    assert reg.functions.agentToKya(H2).call() == k1
+
+    # The grafter re-verifies on the new (untombstoned) hash...
+    reg.functions.verify(k1, b"\x11" * 32).transact({"from": owner})
+    assert reg.functions.byKya(k1).call()[4] is True
+
+    # ...then is revoked for cause: burns H2 and W1. The earlier sharers
+    # k2, k3 must be unverified; the grafted-away hash H1 stays clean.
+    txh = reg.functions.revoke(k1, b"\x11" * 32).transact({"from": owner})
+    sweep_evts = _event_args(
+        reg, "SiblingUnverified", w3.eth.get_transaction_receipt(txh)
+    )
+    assert {e["kyaId"] for e in sweep_evts} == {k2, k3}
+    for kid in (k2, k3):
+        a = reg.functions.byKya(kid).call()
+        assert a[4] is False and a[5] is False
+    a1 = reg.functions.byKya(k1).call()
+    assert a1[4] is False and a1[5] is True
+    assert reg.functions.revokedAgent(H2).call() is True
+    assert reg.functions.revokedPrincipal(W1).call() is True
+    assert reg.functions.revokedAgent(H1).call() is False
+    # No verified attestation names the burned hash H2.
+    for kid in _hash_ids(reg, H2):
+        assert reg.functions.byKya(kid).call()[4] is False
+
+
+def test_hash_index_integrity_on_hash_moves(env):
+    """hashToKya bucket moves: a hash change moves the kyaId between
+    buckets with no duplicates and no stale entries; metadata-only
+    updates and principal-only moves leave the hash buckets alone."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    k1, k2 = b"\xf1" * 32, b"\xf2" * 32
+    H1, H2, H3 = b"\x01" * 32, b"\x02" * 32, b"\x03" * 32
+    reg.functions.list(k1, H1, agent, b"\xaa" * 32).transact({"from": owner})
+    assert _hash_ids(reg, H1) == [k1]
+
+    # recordHash-only update: no duplicate push.
+    reg.functions.list(k1, H1, agent, b"\xbb" * 32).transact({"from": owner})
+    assert _hash_ids(reg, H1) == [k1]
+
+    # Hash move: k1 leaves H1's bucket, joins H2's.
+    reg.functions.list(k1, H2, agent, b"\xcc" * 32).transact({"from": owner})
+    assert _hash_ids(reg, H1) == []
+    assert _hash_ids(reg, H2) == [k1]
+
+    # Principal-only move: hash bucket untouched.
+    reg.functions.list(k1, H2, nominee, b"\xdd" * 32).transact({"from": owner})
+    assert _hash_ids(reg, H2) == [k1]
+
+    # Second hash move + a second kyaId joining the same bucket.
+    reg.functions.list(k1, H3, nominee, b"\xee" * 32).transact({"from": owner})
+    reg.functions.list(k2, H3, stranger, b"\xff" * 32).transact({"from": owner})
+    assert _hash_ids(reg, H2) == []
+    assert len(_hash_ids(reg, H3)) == 2  # no duplicates
+    assert set(_hash_ids(reg, H3)) == {k1, k2}
+    assert reg.functions.agentToKya(H3).call() == k2
+
+    # finalizeReverification also moves the hash bucket.
+    reg.functions.revoke(k2, b"\xff" * 32).transact({"from": owner})
+    reg.functions.requestReverification(k2).transact({"from": owner})
+    travel(tester, w3, REVERIFY_DELAY + 60)
+    reg.functions.finalizeReverification(k2, H2, stranger, b"\x10" * 32).transact(
+        {"from": owner}
+    )
+    assert _hash_ids(reg, H3) == [k1]
+    assert _hash_ids(reg, H2) == [k2]
+
+
+def test_sibling_unverified_events_wallet_side(env):
+    """Wallet-side sweep emits exactly one SiblingUnverified per sibling
+    that actually flips; an already-unverified wallet-sharer emits
+    nothing (flip-idempotent); an unrelated attestation is untouched."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    k1, k3, k4, k5 = b"\xa1" * 32, b"\xa3" * 32, b"\xa4" * 32, b"\xa5" * 32
+    H1, H3, H4, H5 = b"\x11" * 32, b"\x13" * 32, b"\x14" * 32, b"\x15" * 32
+    W1 = agent
+    reg.functions.list(k1, H1, W1, b"\x01" * 32).transact({"from": owner})
+    reg.functions.list(k3, H3, W1, b"\x03" * 32).transact({"from": owner})
+    reg.functions.list(k4, H4, stranger, b"\x04" * 32).transact({"from": owner})
+    reg.functions.list(k5, H5, W1, b"\x05" * 32).transact({"from": owner})
+    for kid in (k1, k3, k4):
+        reg.functions.verify(kid, b"\x00" * 32).transact({"from": owner})
+    # k5 shares wallet W1 but was never verified.
+
+    txh = reg.functions.revoke(k1, b"\x01" * 32).transact({"from": owner})
+    evts = _event_args(
+        reg, "SiblingUnverified", w3.eth.get_transaction_receipt(txh)
+    )
+    assert len(evts) == 1
+    assert evts[0]["kyaId"] == k3
+    assert evts[0]["agentIdHash"] == H3
+    assert evts[0]["principal"] == W1
+    assert reg.functions.byKya(k3).call()[4] is False
+    assert reg.functions.byKya(k4).call()[4] is True  # unrelated untouched
+    assert reg.functions.byKya(k5).call()[4] is False  # never verified, no event

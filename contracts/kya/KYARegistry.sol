@@ -47,6 +47,24 @@ pragma solidity ^0.8.24;
 ///         new principalToKya index); the sibling's pointer is kept --
 ///         verify() stays tombstone-gated so it cannot re-verify without
 ///         the 48h path.
+///      7. Round-3 delta (2026-09-29): hash-side sweep made COMPLETE. The
+///         re-review delta swept hash-sharing siblings via the agentToKya
+///         POINTER (at most one kyaId per hash), but list() permits
+///         unlimited kyaIds per agent hash -- with list(k1,H,W1),
+///         list(k2,H,W2), list(k3,H,W3) all verified, revoke(k1) left k2
+///         (a non-pointer sibling) verified while revokedAgent[H] was set.
+///         A new hashToKya reverse index, exactly symmetric to
+///         principalToKya (push on fresh list(), swap-and-pop move when
+///         the agent hash changes, move in finalizeReverification), lets
+///         revoke() sweep the FULL burned-hash array; agentToKya pointer
+///         semantics are unchanged (cleared only when it resolves to the
+///         revoked kyaId). Both sweep sides (hashToKya array and
+///         principalToKya array) are flip-idempotent: a sibling is
+///         unverified at most once, and SiblingUnverified(kyaId,
+///         agentIdHash, principal) is emitted whenever a sibling actually
+///         flips verified true->false; the list() graft-unverify emits it
+///         too. Sweep (live siblings) + tombstone (future kyaIds) is the
+///         airtight pair: nothing verified may name a burned identity.
 contract KYARegistry {
     struct Attestation {
         bytes32 agentIdHash;
@@ -91,12 +109,33 @@ contract KYARegistry {
     ///         siblings' verified flag. Admin-gated use only; O(n) over one
     ///         principal's kyaIds is acceptable.
     mapping(address => bytes32[]) public principalToKya;
+    /// @notice Reverse index: agent-id hash => kyaIds whose attestation
+    ///         names the hash. Maintained exactly like principalToKya but
+    ///         keyed by hash: new listings push in list(), an update that
+    ///         changes the agent hash moves the kyaId to the new hash's
+    ///         array (swap-and-pop), and finalizeReverification moves it
+    ///         too, so it is always current for live attestations;
+    ///         entries of revoked kyaIds remain but are inert (revoke()
+    ///         already set their verified=false). revoke() sweeps the
+    ///         FULL array to unverify every live VERIFIED sibling sharing
+    ///         the burned hash -- the agentToKya pointer names at most one
+    ///         kyaId per hash, but list() permits unlimited kyaIds per
+    ///         hash, so the pointer alone cannot reach them all.
+    ///         Admin-gated use only; O(n) over one hash's kyaIds is
+    ///         acceptable.
+    mapping(bytes32 => bytes32[]) public hashToKya;
     /// @notice block.timestamp of a pending re-verification request; 0 = none.
     mapping(bytes32 => uint256) public reverifyRequestedAt;
 
     event Listed(bytes32 indexed kyaId, bytes32 agentIdHash, address principal, bytes32 recordHash);
     event Verified(bytes32 indexed kyaId, bytes32 recordHash);
     event Revoked(bytes32 indexed kyaId, bytes32 recordHash);
+    /// @notice Emitted for each sibling attestation that the revoke()
+    ///         sibling sweep actually unverifies (verified true->false),
+    ///         on both the hash side and the wallet side, and for the
+    ///         graft-unverify in list(). The sibling keeps its pointers;
+    ///         verify() stays tombstone-gated.
+    event SiblingUnverified(bytes32 indexed kyaId, bytes32 indexed agentIdHash, address indexed principal);
     event ReverificationRequested(bytes32 indexed kyaId, uint64 requestedAt, uint64 readyAt);
     event Reverified(bytes32 indexed kyaId, bytes32 recordHash);
     event OwnerNominated(address indexed currentOwner, address indexed nominee);
@@ -150,6 +189,32 @@ contract KYARegistry {
         }
     }
 
+    /// @notice Remove a kyaId from one agent hash's hashToKya array
+    ///         (swap-and-pop; silently no-ops when absent). Exact mirror
+    ///         of _removeFromPrincipalIndex, keyed by agent-id hash.
+    function _removeFromHashIndex(bytes32 agentIdHash, bytes32 kyaId) internal {
+        bytes32[] storage ids = hashToKya[agentIdHash];
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (ids[i] == kyaId) {
+                ids[i] = ids[ids.length - 1];
+                ids.pop();
+                return;
+            }
+        }
+    }
+
+    /// @notice Unverify a sibling and emit SiblingUnverified, but only when
+    ///         the sibling was actually verified (flip-idempotent: each
+    ///         sibling is unverified at most once per sweep even when it
+    ///         appears on both the hash side and the wallet side).
+    function _unverifySibling(bytes32 kyaId) internal {
+        Attestation storage s = byKya[kyaId];
+        if (s.verified) {
+            s.verified = false;
+            emit SiblingUnverified(kyaId, s.agentIdHash, s.principal);
+        }
+    }
+
     /// @notice List a new attestation or update an existing active one.
     /// @dev Reverts for ever-revoked kyaIds: revoked attestations are not
     ///      revivable by direct re-listing (W-10 no-revive guard). Listing a
@@ -168,8 +233,10 @@ contract KYARegistry {
     ///
     ///      Also keeps the indexes current: clears a stale agentToKya
     ///      pointer when the update moves the attestation to a new agent
-    ///      hash, and moves the kyaId across the principalToKya index when
-    ///      the principal changes.
+    ///      hash, moves the kyaId across the principalToKya index when
+    ///      the principal changes, and moves it across the hashToKya
+    ///      index when the agent hash changes. A graft that actually
+    ///      strips verified=true emits SiblingUnverified.
     function list(
         bytes32 kyaId,
         bytes32 agentIdHash,
@@ -181,7 +248,9 @@ contract KYARegistry {
         bool existed = a.updatedAt != 0;
         bytes32 oldHash = a.agentIdHash;
         address oldPrincipal = a.principal;
-        if (existed && (oldHash != agentIdHash || oldPrincipal != principal)) {
+        bool identityChanged = existed && (oldHash != agentIdHash || oldPrincipal != principal);
+        bool wasVerified = a.verified;
+        if (identityChanged) {
             a.verified = false;
         }
         a.agentIdHash = agentIdHash;
@@ -195,9 +264,19 @@ contract KYARegistry {
         agentToKya[agentIdHash] = kyaId;
         if (!existed) {
             principalToKya[principal].push(kyaId);
-        } else if (oldPrincipal != principal) {
-            _removeFromPrincipalIndex(oldPrincipal, kyaId);
-            principalToKya[principal].push(kyaId);
+            hashToKya[agentIdHash].push(kyaId);
+        } else {
+            if (oldPrincipal != principal) {
+                _removeFromPrincipalIndex(oldPrincipal, kyaId);
+                principalToKya[principal].push(kyaId);
+            }
+            if (oldHash != agentIdHash) {
+                _removeFromHashIndex(oldHash, kyaId);
+                hashToKya[agentIdHash].push(kyaId);
+            }
+        }
+        if (identityChanged && wasVerified) {
+            emit SiblingUnverified(kyaId, agentIdHash, principal);
         }
         emit Listed(kyaId, agentIdHash, principal, recordHash);
     }
@@ -223,13 +302,18 @@ contract KYARegistry {
     ///         unused kyaId.
     /// @dev Also unverifies live VERIFIED siblings that shared the burned
     ///      identities, because the per-component tombstone alone cannot
-    ///      reach them: (a) the sibling behind agentToKya[burnedHash] is
-    ///      unverified but keeps its pointer -- verify() stays
-    ///      tombstone-gated so it cannot re-verify without the 48h path;
-    ///      (b) wallet-sharing siblings with a different agent hash are
-    ///      found through the principalToKya index and unverified. The
-    ///      pointer is cleared only when it still resolves to THIS kyaId,
-    ///      so no stale pointer survives the revocation.
+    ///      reach them: (a) EVERY sibling sharing the burned agent hash is
+    ///      found through the hashToKya index and unverified -- the
+    ///      agentToKya pointer names at most one kyaId per hash, but
+    ///      list() permits unlimited kyaIds per hash; (b) wallet-sharing
+    ///      siblings with a different agent hash are found through the
+    ///      principalToKya index and unverified. Each sibling is
+    ///      unverified at most once (flip-idempotent) and emits
+    ///      SiblingUnverified when it actually flips. The hash pointer is
+    ///      cleared only when it still resolves to THIS kyaId, so no
+    ///      stale pointer survives the revocation; verify() stays
+    ///      tombstone-gated so no sibling can re-verify without the 48h
+    ///      path.
     function revoke(bytes32 kyaId, bytes32 recordHash) external onlyOwner {
         Attestation storage a = byKya[kyaId];
         if (a.updatedAt == 0) revert NotListed();
@@ -242,17 +326,21 @@ contract KYARegistry {
         everRevoked[kyaId] = true;
         revokedAgent[burnedHash] = true;
         revokedPrincipal[burnedPrincipal] = true;
-        bytes32 hashSibling = agentToKya[burnedHash];
-        if (hashSibling == kyaId) {
+        bytes32[] storage hashSiblings = hashToKya[burnedHash];
+        for (uint256 i = 0; i < hashSiblings.length; i++) {
+            bytes32 sib = hashSiblings[i];
+            if (sib != kyaId) {
+                _unverifySibling(sib);
+            }
+        }
+        if (agentToKya[burnedHash] == kyaId) {
             delete agentToKya[burnedHash];
-        } else if (hashSibling != bytes32(0)) {
-            byKya[hashSibling].verified = false;
         }
         bytes32[] storage walletSiblings = principalToKya[burnedPrincipal];
         for (uint256 i = 0; i < walletSiblings.length; i++) {
             bytes32 sib = walletSiblings[i];
             if (sib != kyaId) {
-                byKya[sib].verified = false;
+                _unverifySibling(sib);
             }
         }
         emit Revoked(kyaId, recordHash);
@@ -299,8 +387,9 @@ contract KYARegistry {
     ///      the timelocked path, which is what makes rotation useless.
     ///
     ///      Also clears a stale agentToKya pointer when the agent hash
-    ///      changes, and moves the kyaId across the principalToKya index
-    ///      when the principal changes.
+    ///      changes, moves the kyaId across the principalToKya index
+    ///      when the principal changes, and moves it across the
+    ///      hashToKya index when the agent hash changes.
     function finalizeReverification(
         bytes32 kyaId,
         bytes32 agentIdHash,
@@ -333,6 +422,10 @@ contract KYARegistry {
         if (oldPrincipal != principal) {
             _removeFromPrincipalIndex(oldPrincipal, kyaId);
             principalToKya[principal].push(kyaId);
+        }
+        if (oldHash != agentIdHash) {
+            _removeFromHashIndex(oldHash, kyaId);
+            hashToKya[agentIdHash].push(kyaId);
         }
         emit Reverified(kyaId, recordHash);
     }
