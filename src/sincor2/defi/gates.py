@@ -60,6 +60,11 @@ IMPLEMENTATIONS: Dict[str, str] = {
     "P16_DEX_AGG": os.path.join("src", "sincor2", "defi", "dex_aggregator.py"),
     "P17_OPTIONS": os.path.join("src", "sincor2", "defi", "options_protocol.py"),
     "P19_CREDIT": os.path.join("src", "sincor2", "defi", "credit_underwriting.py"),
+    "P22_STABLE_YIELD": os.path.join("src", "sincor2", "defi", "p22"),
+    "P23_NFTFI": os.path.join("src", "sincor2", "defi", "p23"),
+    "P24_SOCIALFI": os.path.join("src", "sincor2", "defi", "p24"),
+    "P25_PORTFOLIO": os.path.join("src", "sincor2", "defi", "p25"),
+    "P26_DEFI_OS": os.path.join("src", "sincor2", "defi", "p26"),
 }
 
 # protocol_id -> auction spec filename stem (~/workspace/sincor2-auction-tasks/specs/)
