@@ -66,5 +66,21 @@
   "SINCOR-DEFI-P13-AVS": {
     "stage": "test",
     "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P15-LEND": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P18-STRUCTURED": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P20-COMPLY": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P21-TREASURY": {
+    "stage": "test",
+    "version": "0.1.2"
   }
 }

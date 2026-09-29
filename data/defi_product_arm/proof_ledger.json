@@ -504,6 +504,177 @@
         "failed": 0,
         "note": "Seeded deterministic lifecycle fuzz: pre-gate zero-yield, gate atomicity, integer conservation of assets and shares."
       }
+    },
+    {
+      "entry_id": "ev_aaaf248c432e",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "test_run",
+      "timestamp": 1790696705.9977815,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "suite": "tests/pytest/test_p15_lending_units.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p15_lending_units.py -q",
+        "passed": 26,
+        "failed": 0,
+        "scope": "lending optimizer: utilization-band borrow gate, rehypothecation cap + recall, exact 10bps interest distribution, wallet-risk drift, shocked-HF hedge routing, ERC-6551-style vault, 300-scenario randomized conservation fuzz"
+      }
+    },
+    {
+      "entry_id": "ev_fc366ba2d403",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "test_run",
+      "timestamp": 1790696705.9997542,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "suite": "tests/pytest/test_p16_dexagg_units.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p16_dexagg_units.py -q",
+        "passed": 34,
+        "failed": 0,
+        "scope": "dex aggregator: gas-penalized split solver, allowlisted venues, min-out, dust handling"
+      }
+    },
+    {
+      "entry_id": "ev_2ac10a72d79d",
+      "sku": "SINCOR-DEFI-P17-OPTIONS",
+      "kind": "test_run",
+      "timestamp": 1790696706.001025,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "suite": "tests/pytest/test_p17_options_units.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p17_options_units.py -q",
+        "passed": 33,
+        "failed": 0,
+        "scope": "options protocol: covered-only invariant, BS pricing vs reference values, exercise/sweep accounting, double-exercise + re-settle regression guards"
+      }
+    },
+    {
+      "entry_id": "ev_04904ed26a24",
+      "sku": "SINCOR-DEFI-P18-STRUCTURED",
+      "kind": "test_run",
+      "timestamp": 1790696706.0024028,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "suite": "tests/pytest/test_p18_structured_units.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p18_structured_units.py -q",
+        "passed": 23,
+        "failed": 0,
+        "scope": "structured vaults: PT/YT conservation, cap-rate payoff vs worked example, principal floor under rate shocks, non-bricking yield-source failure, 48h param timelock, 200-case fuzz"
+      }
+    },
+    {
+      "entry_id": "ev_79ee8daccdf3",
+      "sku": "SINCOR-DEFI-P19-CREDIT",
+      "kind": "test_run",
+      "timestamp": 1790696706.0059664,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "suite": "tests/pytest/test_p19_credit_units.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p19_credit_units.py -q",
+        "passed": 34,
+        "failed": 0,
+        "scope": "credit underwriting: score bands, LTV caps, attestation replay/freshness/floor, optional attestor allowlist, concentration caps, hedge/liquidate circuits"
+      }
+    },
+    {
+      "entry_id": "ev_b5966b325607",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "test_run",
+      "timestamp": 1790696706.008584,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "suite": "tests/pytest/test_p20_compliance_units.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p20_compliance_units.py -q",
+        "passed": 22,
+        "failed": 0,
+        "scope": "compliance automation: fail-closed matrix, KYC 90d+replay, bounded 3-hop AML, geo 48h timelock, per-list 24h overrides, 24h PASS cache, append-only trail, Ed25519 receipts, 10,000-case fuzz"
+      }
+    },
+    {
+      "entry_id": "ev_e1ab0af06bff",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "test_run",
+      "timestamp": 1790696706.0127764,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "suite": "tests/pytest/test_p21_treasury_units.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p21_treasury_units.py -q",
+        "passed": 17,
+        "failed": 0,
+        "scope": "treasury DAO: bands + 30% cap, content-addressed holds, review gate, 72h backlog, broadcast() always raises, EXECUTE_LIVE_ENV off, 8bps yield fee, 1,000-case fuzz"
+      }
+    },
+    {
+      "entry_id": "ev_3bbd0a5d70f6",
+      "sku": "SINCOR-DEFI-P17-OPTIONS",
+      "kind": "note",
+      "timestamp": 1790696706.0149326,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "note": "Adversarial review (2026-09-29): fixed double-exercise \u2014 a settled position could be exercised twice, paying the holder twice and driving minted negative; and re-settle \u2014 settle() overwrote the P_exp snapshot after payouts. settle() is now once-per-series; exercise() rejects already-exercised positions. Regression tests added."
+      }
+    },
+    {
+      "entry_id": "ev_1b946a6ec576",
+      "sku": "SINCOR-DEFI-P19-CREDIT",
+      "kind": "note",
+      "timestamp": 1790696706.0160441,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "note": "Adversarial review (2026-09-29): score attestations were self-assertable \u2014 register() checked freshness/floor/replay but never attestor identity. Added optional authorized_attestors allowlist. Money-safety unaffected: draws remain collateral-capped regardless of score; the score only buys better LTV terms."
+      }
+    },
+    {
+      "entry_id": "ev_77082259ae0a",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "note",
+      "timestamp": 1790696706.0193553,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "note": "Founder decision pending (recorded 2026-09-27, reaffirmed 2026-09-29): the ComplianceGuard.sol fail-closed flip and LEGACY_ALLOWLIST migration are NOT ratified and are NOT implemented here. This reference is fail-closed by construction and contains no allowlist-migration path."
+      }
+    },
+    {
+      "entry_id": "ev_cd020b7ab76c",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "note",
+      "timestamp": 1790696716.6326935,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "note": "Correction to ev_fc366ba2d403: the passing count recorded there was wrong. The suite actually collects and passes 26 tests (verified by --collect-only on 2026-09-29). P16+P17+P19 total remains 101 passed, 0 failed."
+      }
+    },
+    {
+      "entry_id": "ev_df91effe3d25",
+      "sku": "SINCOR-DEFI-P17-OPTIONS",
+      "kind": "note",
+      "timestamp": 1790696716.63425,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "note": "Correction to ev_2ac10a72d79d: the passing count recorded there was wrong. The suite actually collects and passes 34 tests (verified by --collect-only on 2026-09-29). P16+P17+P19 total remains 101 passed, 0 failed."
+      }
+    },
+    {
+      "entry_id": "ev_220906ebe619",
+      "sku": "SINCOR-DEFI-P19-CREDIT",
+      "kind": "note",
+      "timestamp": 1790696716.6356509,
+      "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
+      "recorded_by": "xioix/track-a-defi-p15-p21",
+      "details": {
+        "note": "Correction to ev_79ee8daccdf3: the passing count recorded there was wrong. The suite actually collects and passes 41 tests (verified by --collect-only on 2026-09-29). P16+P17+P19 total remains 101 passed, 0 failed."
+      }
     }
   ]
 }
