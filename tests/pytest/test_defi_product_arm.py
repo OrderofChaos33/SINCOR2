@@ -161,11 +161,11 @@ def test_no_stage_skipping(isolated, ledger):
 
 
 def test_build_to_test_refuses_without_implementation(isolated, ledger):
-    # NOTE: uses P07_BRIDGE as the no-implementation example. P01-P06,
-    # P08/P10/P14 and P16/P17/P19 now ship reference implementations, so they
+    # NOTE: uses P09_GOV as the no-implementation example. P01-P08,
+    # P10/P14 and P16/P17/P19 now ship reference implementations, so they
     # no longer exercise the "missing implementation" refusal path. Convention:
     # lowest-numbered product without an entry in gates.IMPLEMENTATIONS.
-    p = _at_stage("SINCOR-DEFI-P07-BRIDGE", "build")
+    p = _at_stage("SINCOR-DEFI-P09-GOV", "build")
     res = evaluate(p, "test", ledger, products.REPO_ROOT)
     assert not res.ok
     failed = {r.check for r in res.reasons if not r.ok}

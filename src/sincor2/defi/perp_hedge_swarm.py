@@ -307,7 +307,8 @@ class HedgeEngine:
 
     # -- gates ---------------------------------------------------------
     def _check_open_gates(self, collateral_wei: int, price_fp: int,
-                          swarm_capital_micro: int, margin_mode: str) -> int:
+                          swarm_capital_micro: int,
+                          margin_mode: str) -> Tuple[int, int]:
         if margin_mode != "isolated":
             raise MarginModeError("cross margin forbidden: isolated only")
         if self.opens_paused:
@@ -389,7 +390,13 @@ class HedgeEngine:
     def rebalance(self, position_id: str,
                   now: Optional[float] = None) -> HedgeIntent:
         """Resize the short to 105% of current spot and reset the drift
-        baseline. Returns the executed-reference intent."""
+        baseline. Returns the executed-reference intent.
+
+        Spec acceptance #5 names rebalance as a live path: it reverts
+        with liveEnabled=false. (check_in may still return rebalance
+        *intents* — intents are dry-run signals, never execution.)
+        """
+        self.live_gate.assert_live()
         now = now if now is not None else time.time()
         pos = self._positions[position_id]
         price_fp = self.feed.get(now)
