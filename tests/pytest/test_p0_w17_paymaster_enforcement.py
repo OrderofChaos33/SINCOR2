@@ -7,7 +7,8 @@ UserOp spam the moment it was funded.
 
 Enforced now, in validatePaymasterUserOp:
   1. sender explicitly allowlisted (probation[sender] == true),
-  2. sender under its per-wallet op cap (sponsoredCount < maxSponsoredOps),
+  2. sender under its per-wallet op cap, counting in-flight ops
+     (sponsoredCount + inFlight < maxSponsoredOps),
   3. global spend ceiling (sponsoredWei + reservedWei + maxCost <= maxSponsoredWei),
 with maxSponsoredWei defaulting to 0 (fail-closed).
 
@@ -16,6 +17,7 @@ Self-contained: compile + eth-tester/py-evm. Run with --noconftest.
 import os
 import pytest
 import solcx
+from eth_abi import encode as abi_encode
 from web3 import Web3
 from web3.providers.eth_tester import EthereumTesterProvider
 from web3.exceptions import ContractLogicError
@@ -165,6 +167,61 @@ def test_per_wallet_op_cap_rejected(env):
     with pytest.raises((ContractLogicError, TransactionFailed)) as ei:
         mock_ep.functions.validate(pm.address, uo, 10**15).call({"from": agent})
     assert _revert_reason(ei.value) == "op cap reached"
+
+
+def test_bundle_in_flight_op_cap_rejected(env):
+    """Adversarial-review finding: two UserOps from the same sender in one
+    EntryPoint handleOps bundle. Without the in-flight counter, both validate
+    (sponsoredCount unchanged between validates) and sponsoredCount ends 2 > cap 1.
+    The second validate in the bundle must revert."""
+    w3, mock_ep, pm, deployer, attacker, agent = env
+    pm.functions.setProbation(agent, True).transact({"from": deployer})
+    pm.functions.setMaxSponsoredWei(10**20).transact({"from": deployer})
+    pm.functions.setMaxSponsoredOps(1).transact({"from": deployer})
+    uo = make_userop(w3, agent)
+    # First op in the bundle validates and is marked in-flight (no postOp yet).
+    ctx = do_validate(mock_ep, pm, uo, 10**15, agent)
+    assert pm.functions.inFlight(agent).call() == 1
+    assert pm.functions.sponsoredCount(agent).call() == 0
+    # Second op in the same bundle: 0 settled + 1 in-flight >= cap (1) -> revert.
+    with pytest.raises((ContractLogicError, TransactionFailed)) as ei:
+        mock_ep.functions.validate(pm.address, uo, 10**15).call({"from": agent})
+    assert _revert_reason(ei.value) == "op cap reached"
+    # postOp clears the in-flight slot; the cap still holds afterwards.
+    mock_ep.functions.settle(pm.address, 0, ctx, 10**15).transact({"from": deployer})
+    assert pm.functions.inFlight(agent).call() == 0
+    assert pm.functions.sponsoredCount(agent).call() == 1
+    with pytest.raises((ContractLogicError, TransactionFailed)) as ei:
+        mock_ep.functions.validate(pm.address, uo, 10**15).call({"from": agent})
+    assert _revert_reason(ei.value) == "op cap reached"
+
+
+def test_postop_unmatched_validate_does_not_underflow(env):
+    """postOp with a context that has no matching in-flight validate must not
+    underflow the in-flight counter (guarded decrement)."""
+    w3, mock_ep, pm, deployer, attacker, agent = env
+    pm.functions.setProbation(agent, True).transact({"from": deployer})
+    pm.functions.setMaxSponsoredWei(10**20).transact({"from": deployer})
+    assert pm.functions.inFlight(agent).call() == 0
+    # Canonical context, but no validate ever reserved an in-flight slot.
+    ctx = abi_encode(["address", "uint256"], [agent, 10**15])
+    mock_ep.functions.settle(pm.address, 0, ctx, 10**14).transact({"from": deployer})
+    assert pm.functions.inFlight(agent).call() == 0
+    # The slot still works normally afterwards.
+    ctx = do_validate(mock_ep, pm, make_userop(w3, agent), 10**15, agent)
+    assert pm.functions.inFlight(agent).call() == 1
+    mock_ep.functions.settle(pm.address, 0, ctx, 10**15).transact({"from": deployer})
+    assert pm.functions.inFlight(agent).call() == 0
+
+
+def test_setprobation_rejects_zero_address(env):
+    """Reviewer suggestion: allowlisting address(0) is a footgun."""
+    w3, mock_ep, pm, deployer, attacker, agent = env
+    with pytest.raises((ContractLogicError, TransactionFailed)) as ei:
+        pm.functions.setProbation(
+            "0x0000000000000000000000000000000000000000", True
+        ).call({"from": deployer})
+    assert _revert_reason(ei.value) == "zero wallet"
 
 
 def test_global_spend_ceiling_enforced(env):
