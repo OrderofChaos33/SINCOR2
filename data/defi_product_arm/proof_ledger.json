@@ -179,6 +179,201 @@
         "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p19_credit_units.py -q",
         "scope": "credit_underwriting: behavioral scoring, score->LTV table, attestation freshness, no-unsecured-book draws, circuit breaker, concentration caps, 20bps fees"
       }
+    },
+    {
+      "entry_id": "ev_11b1b596f771",
+      "sku": "SINCOR-DEFI-P01-YIELD",
+      "kind": "test_run",
+      "timestamp": 1790696424.1111367,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p01_vault_units.py -q",
+        "passed": 24,
+        "failed": 0,
+        "suite": "test_p01_vault_units.py",
+        "scope": "vault allocator: caps, fees, risk tiers, rebalance plans, dry-run intents"
+      }
+    },
+    {
+      "entry_id": "ev_7672722ae6cc",
+      "sku": "SINCOR-DEFI-P02-CLMM",
+      "kind": "test_run",
+      "timestamp": 1790696424.115556,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p02_clmm_units.py -q",
+        "passed": 24,
+        "failed": 0,
+        "suite": "test_p02_clmm_units.py",
+        "scope": "JIT detector incl. wei-scale threshold battery, vol-aware ranges, dry-run intents"
+      }
+    },
+    {
+      "entry_id": "ev_54aa10560cef",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "kind": "test_run",
+      "timestamp": 1790696424.1171482,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p03_darkpool_units.py -q",
+        "passed": 24,
+        "failed": 0,
+        "suite": "test_p03_darkpool_units.py",
+        "scope": "limit-price matching, split routing, batch conservation, idempotency"
+      }
+    },
+    {
+      "entry_id": "ev_458992194a3b",
+      "sku": "SINCOR-DEFI-P04-MEV",
+      "kind": "test_run",
+      "timestamp": 1790696424.1182766,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p04_mev_units.py -q",
+        "passed": 33,
+        "failed": 0,
+        "suite": "test_p04_mev_units.py",
+        "scope": "sandwich/backrun detection battery, bid shading, treasury-EOA refusal, reconcile<1pct, reorg replay, 20bps fees, protection guardrails, live gate"
+      }
+    },
+    {
+      "entry_id": "ev_e27e4f64ef46",
+      "sku": "SINCOR-DEFI-P05-INSURANCE",
+      "kind": "test_run",
+      "timestamp": 1790696424.1195836,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p05_insurance_units.py -q",
+        "passed": 28,
+        "failed": 0,
+        "suite": "test_p05_insurance_units.py",
+        "scope": "stale-score enforcement in buy_cover (7,200-block rule now on the underwriting path), protocol-bound scores, claims, reserve floor, live gate"
+      }
+    },
+    {
+      "entry_id": "ev_b662e5a7feb0",
+      "sku": "SINCOR-DEFI-P06-PERPS",
+      "kind": "test_run",
+      "timestamp": 1790696424.121949,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p06_perp_units.py -q",
+        "passed": 28,
+        "failed": 0,
+        "suite": "test_p06_perp_units.py",
+        "scope": "drift banding, live-gated rebalance (assert_live added), funding/basis, test-only conversion marker"
+      }
+    },
+    {
+      "entry_id": "ev_07fdd06a32bc",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "test_run",
+      "timestamp": 1790696424.1247091,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p07_bridge_units.py -q",
+        "passed": 30,
+        "failed": 0,
+        "suite": "test_p07_bridge_units.py",
+        "scope": "allowlist, route scoring, slippage caps, security floor, async storage-proof settlement, 10bps fee exactness, capital caps, live gate"
+      }
+    },
+    {
+      "entry_id": "ev_0adf75900649",
+      "sku": "SINCOR-DEFI-P05-INSURANCE",
+      "kind": "invariant_test",
+      "timestamp": 1790696424.1259522,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/see scope -q",
+        "passed": 1,
+        "failed": 0,
+        "suite": "seeded fuzz",
+        "scope": "test_fuzzed_op_sequences_never_breach_floor: 500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused"
+      }
+    },
+    {
+      "entry_id": "ev_4aa03f332ef5",
+      "sku": "SINCOR-DEFI-P06-PERPS",
+      "kind": "invariant_test",
+      "timestamp": 1790696424.1277494,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/see scope -q",
+        "passed": 1,
+        "failed": 0,
+        "suite": "seeded fuzz",
+        "scope": "test_fuzz_10k_drift_discipline: 10,000 seeded drift samples; banding, slippage guards, live gate hold"
+      }
+    },
+    {
+      "entry_id": "ev_e366ac03e929",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "invariant_test",
+      "timestamp": 1790696424.1293256,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/see scope -q",
+        "passed": 1,
+        "failed": 0,
+        "suite": "seeded fuzz",
+        "scope": "test_fuzz_ranking_never_routes_rejected_quotes (500 iters: allowlist/ slippage-cap/security-floor never bypassed, best-first ranking, scoring identity) + test_fuzz_settlement_conservation (120 routes: settled+fee == net_out exact, treasury totals reconcile)"
+      }
+    },
+    {
+      "entry_id": "ev_bfc9a6c4fb4a",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "test_run",
+      "timestamp": 1790696440.0720947,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p01_vault_units.py -q",
+        "passed": 24,
+        "failed": 0,
+        "suite": "test_p01_vault_units.py",
+        "scope": "vault allocator: caps, fees, risk tiers, rebalance plans, dry-run intents. Supersedes mis-keyed entry recorded under SINCOR-DEFI-P01-YIELD."
+      }
+    },
+    {
+      "entry_id": "ev_686fa0a088b0",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "test_run",
+      "timestamp": 1790696440.0774152,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p05_insurance_units.py -q",
+        "passed": 28,
+        "failed": 0,
+        "suite": "test_p05_insurance_units.py",
+        "scope": "stale-score enforcement in buy_cover (7,200-block rule now on the underwriting path), protocol-bound scores, claims, reserve floor, live gate. Supersedes mis-keyed entry recorded under SINCOR-DEFI-P05-INSURANCE."
+      }
+    },
+    {
+      "entry_id": "ev_81d7599b675d",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "invariant_test",
+      "timestamp": 1790696440.0825317,
+      "commit": "560d61926cc2e99aee6f2e1fc8539652c5e85f75",
+      "recorded_by": "xioix/sku-defi-p01-p07",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p05_insurance_units.py::test_fuzzed_op_sequences_never_breach_floor -q",
+        "passed": 1,
+        "failed": 0,
+        "suite": "test_p05_insurance_units.py::test_fuzzed_op_sequences_never_breach_floor",
+        "scope": "500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused. Supersedes mis-keyed invariant entry."
+      }
     }
   ]
 }

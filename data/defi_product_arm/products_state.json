@@ -46,5 +46,9 @@
   "SINCOR-DEFI-P19-CREDIT": {
     "stage": "test",
     "version": "0.1.1"
+  },
+  "SINCOR-DEFI-P07-BRIDGE": {
+    "stage": "test",
+    "version": "0.1.2"
   }
 }
