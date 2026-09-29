@@ -65,13 +65,14 @@ def test_all_26_registered_no_drift(isolated):
 
 def test_initial_stages(isolated):
     reg = {p["protocol_id"]: p for p in products.build_registry()}
-    # Products with real strategy math in the repo -> start at build
-    build_start = ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS",
-                   "P09_DAO_GOV", "P11_DELTA_NEUTRAL", "P12_TWAMM", "P13_AVS")
-    for pid in build_start:
+    # Products with real strategy math in the repo -> start at build.
+    # Single source of truth: gates.IMPLEMENTATIONS; this cross-checks that
+    # products.INITIAL_STAGE_OVERRIDES stays in sync with it.
+    from src.sincor2.defi.gates import IMPLEMENTATIONS
+    for pid in IMPLEMENTATIONS:
         assert reg[pid]["stage"] == "build", pid
     for pid, p in reg.items():
-        if pid not in build_start:
+        if pid not in IMPLEMENTATIONS:
             assert p["stage"] == "spec", pid
 
 
@@ -214,6 +215,12 @@ def test_unknown_sku_promote_refuses(isolated, ledger):
 
 
 def test_promote_persists_and_enforces_order(isolated, ledger):
+    # Seed P02 at spec in the isolated state dir (independent of the global
+    # INITIAL_STAGE_OVERRIDES, which now starts every implemented product at
+    # build), then exercise a real spec->build promotion.
+    isolated.mkdir(parents=True, exist_ok=True)
+    (isolated / "products_state.json").write_text(json.dumps(
+        {"SINCOR-DEFI-P02-CLMM": {"stage": "spec", "version": "0.1.0"}}))
     out = products.promote("SINCOR-DEFI-P02-CLMM", "build", ledger=ledger,
                            root=products.REPO_ROOT)
     assert out["ok"], out["reasons"]

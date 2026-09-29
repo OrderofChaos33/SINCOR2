@@ -68,14 +68,34 @@ SLUGS: Dict[str, str] = {
 # tranching) joined them with tested reference builds (Track A, 2026-09-29).
 INITIAL_STAGE_OVERRIDES: Dict[str, str] = {
     "P01_YIELD_AGG": "build",
+    "P02_CLMM": "build",
+    "P03_INTENT_DARK": "build",
     "P04_MEV": "build",
     "P05_INSURANCE": "build",
     "P06_PERPS": "build",
+    "P07_BRIDGE": "build",
+    "P08_RWA": "build",
     "P09_DAO_GOV": "build",
+    "P10_FLASH_ARB": "build",
     "P11_DELTA_NEUTRAL": "build",
     "P12_TWAMM": "build",
     "P13_AVS": "build",
+    "P14_PREDICTION": "build",
+    "P15_LENDING": "build",
+    "P16_DEX_AGG": "build",
+    "P17_OPTIONS": "build",
+    "P18_STRUCTURED": "build",
+    "P19_CREDIT": "build",
+    "P20_COMPLIANCE": "build",
+    "P21_TREASURY_DAO": "build",
+    "P22_STABLE_YIELD": "build",
+    "P23_NFTFI": "build",
+    "P24_SOCIALFI": "build",
+    "P25_PORTFOLIO": "build",
+    "P26_DEFI_OS": "build",
 }
+# NOTE: this must stay in sync with gates.IMPLEMENTATIONS (every product with
+# a real implementation starts at build). test_initial_stages cross-checks them.
 
 
 def mint_sku(protocol_id: str) -> str:
