@@ -300,3 +300,21 @@ def test_worked_fee_example():
 def test_origination_fee_exact():
     assert origination_fee_usd(10_000.0) == 20.0
     assert accrual_fee_usd(800.0) == 1.6
+
+
+# -- adversarial review fixes ----------------------------------------------------------------------------
+def test_unauthorized_attestor_rejected():
+    """Review fix: with an authorized-attestor set, self-attested scores
+    from unknown attestors are rejected."""
+    reg = AttestationRegistry(authorized_attestors={"scoring-agent"})
+    reg.register(att(score=720, attestor="scoring-agent", nonce=11), NOW)
+    assert reg.live_score("b1", NOW + 60) == 720
+    with pytest.raises(AttestationInvalid):
+        reg.register(att(score=850, attestor="mallory", nonce=12), NOW + 60)
+
+
+def test_attestor_allowlist_optional():
+    """Default registry keeps the permissive reference behavior."""
+    reg = AttestationRegistry()
+    reg.register(att(score=720, attestor="anyone", nonce=21), NOW)
+    assert reg.live_score("b1", NOW + 60) == 720

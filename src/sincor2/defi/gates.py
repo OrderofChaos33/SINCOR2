@@ -57,9 +57,13 @@ IMPLEMENTATIONS: Dict[str, str] = {
     "P08_RWA": os.path.join("src", "sincor2", "defi", "rwa_vaults.py"),
     "P10_FLASH_ARB": os.path.join("src", "sincor2", "defi", "flash_arbitrage.py"),
     "P14_PREDICTION": os.path.join("src", "sincor2", "defi", "prediction_markets.py"),
+    "P15_LENDING": os.path.join("src", "sincor2", "defi", "lending_optimizer.py"),
     "P16_DEX_AGG": os.path.join("src", "sincor2", "defi", "dex_aggregator.py"),
     "P17_OPTIONS": os.path.join("src", "sincor2", "defi", "options_protocol.py"),
+    "P18_STRUCTURED": os.path.join("src", "sincor2", "defi", "structured_products.py"),
     "P19_CREDIT": os.path.join("src", "sincor2", "defi", "credit_underwriting.py"),
+    "P20_COMPLIANCE": os.path.join("src", "sincor2", "defi", "compliance_automation.py"),
+    "P21_TREASURY_DAO": os.path.join("src", "sincor2", "defi", "treasury_dao.py"),
 }
 
 # protocol_id -> auction spec filename stem (~/workspace/sincor2-auction-tasks/specs/)

@@ -40,7 +40,7 @@ import logging
 import os
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -198,17 +198,30 @@ def is_fresh(att: ScoreAttestation, now: float) -> bool:
 
 
 class AttestationRegistry:
-    """Replay protection (nonce per borrower) + freshness + floor."""
+    """Replay protection (nonce per borrower) + freshness + floor.
 
-    def __init__(self):
+    When ``authorized_attestors`` is provided, attestations from any
+    other attestor are rejected: without it the reference accepts
+    self-attested scores (the money-safety property does not depend on
+    the score — draws are always collateral-capped — but the score
+    should come from the scoring agent in production).
+    """
+
+    def __init__(self,
+                 authorized_attestors: Optional[Set[str]] = None):
         self._seen_nonces: Dict[str, set] = {}
         self._latest: Dict[str, ScoreAttestation] = {}
+        self._authorized = (set(authorized_attestors)
+                            if authorized_attestors is not None else None)
 
     def register(self, att: ScoreAttestation, now: float) -> ScoreAttestation:
         if not is_fresh(att, now):
             raise AttestationInvalid("attestation missing or stale (>72h)")
         if att.score < SCORE_FLOOR:
             raise AttestationInvalid(f"score {att.score} below floor {SCORE_FLOOR}")
+        if self._authorized is not None and att.attestor not in self._authorized:
+            raise AttestationInvalid(
+                f"attestor {att.attestor} not authorized")
         seen = self._seen_nonces.setdefault(att.borrower, set())
         if att.nonce in seen:
             raise AttestationInvalid("replayed attestation nonce")

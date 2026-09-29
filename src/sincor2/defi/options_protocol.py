@@ -285,7 +285,13 @@ class CoveredVault:
 
     # -- settlement -----------------------------------------------------------
     def settle(self, series_id: str, feed: PriceFeed, now: float) -> Dict[str, Any]:
-        """Permissionless settle: snapshot P_exp. OTM burns to zero."""
+        """Permissionless settle: snapshot P_exp. OTM burns to zero.
+
+        Settles exactly once per series: re-settling would overwrite the
+        P_exp snapshot that exercised positions were already paid
+        against."""
+        if series_id in self._settled:
+            raise OptionsError("series already settled")
         spot = feed.get_spot(now)  # reverts on staleness
         s = self._series[series_id]
         self._settled[series_id] = spot
@@ -304,6 +310,8 @@ class CoveredVault:
     ) -> Dict[str, Any]:
         """Exercise ITM options inside the 24h window. Pays to the wei."""
         series_id = position.series_id
+        if position.exercised:
+            raise OptionsError("position already exercised")
         if series_id not in self._settled:
             raise OptionsError("series not settled")
         if now > self._settled_at[series_id] + EXERCISE_WINDOW_SECONDS:

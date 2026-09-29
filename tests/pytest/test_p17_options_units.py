@@ -253,3 +253,24 @@ def test_stale_oracle_reverts_settle(vault):
     stale = PriceFeed(int(130.0 * WAD), 0.0)
     with pytest.raises(StaleOracle):
         vault.settle("C-30-100", stale, 3 * 3600.0)
+
+
+# -- adversarial review fixes ----------------------------------------------------------------------------
+def test_double_exercise_reverts(vault):
+    """Review fix: a position cannot be exercised twice (double-pay)."""
+    vault.write("w1", "C-30-100", 2)
+    _, now = _settle(vault, "C-30-100", 130.0)
+    pos = OptionPosition("buyer", "C-30-100", 2, 0)
+    out = vault.exercise(pos, PriceFeed(int(130.0 * WAD), now), now)
+    assert out["payoff_wei"] == 2 * 30 * WAD
+    with pytest.raises(OptionsError):
+        vault.exercise(pos, PriceFeed(int(130.0 * WAD), now), now)
+
+
+def test_resettle_reverts(vault):
+    """Review fix: a series settles exactly once — P_exp cannot be
+    overwritten after positions were paid against it."""
+    vault.write("w1", "C-30-100", 1)
+    _settle(vault, "C-30-100", 130.0)
+    with pytest.raises(OptionsError):
+        _settle(vault, "C-30-100", 140.0)
