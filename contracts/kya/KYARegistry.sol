@@ -37,6 +37,16 @@ pragma solidity ^0.8.24;
 ///         owner key: the key holder can cancel any nomination and
 ///         nominate an attacker address instead. A rotation timelock is a
 ///         follow-up, out of scope for W-10.
+///      6. Re-review delta (2026-09-29): (a) list() drops verified whenever
+///         the agent hash OR the principal changes -- an identity change is
+///         a new attestation and must re-verify; a grafted identity cannot
+///         inherit a VERIFIED flag from the record it overwrites.
+///         recordHash-only updates keep verified=true. (b) revoke()
+///         unverifies live VERIFIED siblings that share the burned agent
+///         hash (found via agentToKya) or the burned wallet (found via the
+///         new principalToKya index); the sibling's pointer is kept --
+///         verify() stays tombstone-gated so it cannot re-verify without
+///         the 48h path.
 contract KYARegistry {
     struct Attestation {
         bytes32 agentIdHash;
@@ -68,6 +78,19 @@ contract KYARegistry {
     ///         verify() reverts while set; cleared only by a completed
     ///         timelocked re-verification that re-admits the wallet.
     mapping(address => bool) public revokedPrincipal;
+    /// @notice Reverse index: principal wallet => kyaIds whose attestation
+    ///         names the wallet. Maintained on list() (new listings push;
+    ///         principal changes move the kyaId to the new wallet's array)
+    ///         and on finalizeReverification, so it is always current for
+    ///         live attestations; entries of revoked kyaIds remain but are
+    ///         inert (revoke() already set their verified=false).
+    ///         revoke() sweeps it to unverify live VERIFIED siblings that
+    ///         share the burned wallet under a different agent hash -- there
+    ///         is no other on-chain binding from a wallet to its kyaIds,
+    ///         and the per-component tombstone alone cannot touch those
+    ///         siblings' verified flag. Admin-gated use only; O(n) over one
+    ///         principal's kyaIds is acceptable.
+    mapping(address => bytes32[]) public principalToKya;
     /// @notice block.timestamp of a pending re-verification request; 0 = none.
     mapping(bytes32 => uint256) public reverifyRequestedAt;
 
@@ -114,13 +137,39 @@ contract KYARegistry {
         return revokedAgent[a.agentIdHash] || revokedPrincipal[a.principal];
     }
 
+    /// @notice Remove a kyaId from one wallet's principalToKya array
+    ///         (swap-and-pop; silently no-ops when absent).
+    function _removeFromPrincipalIndex(address principal, bytes32 kyaId) internal {
+        bytes32[] storage ids = principalToKya[principal];
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (ids[i] == kyaId) {
+                ids[i] = ids[ids.length - 1];
+                ids.pop();
+                return;
+            }
+        }
+    }
+
     /// @notice List a new attestation or update an existing active one.
     /// @dev Reverts for ever-revoked kyaIds: revoked attestations are not
     ///      revivable by direct re-listing (W-10 no-revive guard). Listing a
     ///      tombstoned actor is allowed -- the record is visible on-chain --
     ///      but verify() will refuse it until the timelocked path clears
-    ///      the tombstone. Also clears a stale agentToKya pointer when the
-    ///      update moves the attestation to a new agent hash.
+    ///      the tombstone.
+    ///
+    ///      Identity-change unverifies: whenever the agent hash OR the
+    ///      principal changes on an existing attestation, verified is set
+    ///      to false -- the record now attests a DIFFERENT identity and
+    ///      must re-verify. This closes the list()-graft bypass where a
+    ///      live VERIFIED attestation was re-pointed at a burned wallet
+    ///      (or burned agent hash) and instantly carried verified=true.
+    ///      recordHash-only updates (same hash, same principal) keep
+    ///      verified=true.
+    ///
+    ///      Also keeps the indexes current: clears a stale agentToKya
+    ///      pointer when the update moves the attestation to a new agent
+    ///      hash, and moves the kyaId across the principalToKya index when
+    ///      the principal changes.
     function list(
         bytes32 kyaId,
         bytes32 agentIdHash,
@@ -129,7 +178,12 @@ contract KYARegistry {
     ) external onlyOwner {
         if (everRevoked[kyaId]) revert RevokedPreviously();
         Attestation storage a = byKya[kyaId];
+        bool existed = a.updatedAt != 0;
         bytes32 oldHash = a.agentIdHash;
+        address oldPrincipal = a.principal;
+        if (existed && (oldHash != agentIdHash || oldPrincipal != principal)) {
+            a.verified = false;
+        }
         a.agentIdHash = agentIdHash;
         a.principal = principal;
         a.recordHash = recordHash;
@@ -139,6 +193,12 @@ contract KYARegistry {
             delete agentToKya[oldHash];
         }
         agentToKya[agentIdHash] = kyaId;
+        if (!existed) {
+            principalToKya[principal].push(kyaId);
+        } else if (oldPrincipal != principal) {
+            _removeFromPrincipalIndex(oldPrincipal, kyaId);
+            principalToKya[principal].push(kyaId);
+        }
         emit Listed(kyaId, agentIdHash, principal, recordHash);
     }
 
@@ -161,20 +221,39 @@ contract KYARegistry {
     ///         hash and principal wallet). Reverts for kyaIds that were
     ///         never listed, so a stray revoke cannot permanently burn an
     ///         unused kyaId.
-    /// @dev Also clears the agentToKya pointer when it still resolves to
-    ///      this kyaId, so no stale pointer survives the revocation.
+    /// @dev Also unverifies live VERIFIED siblings that shared the burned
+    ///      identities, because the per-component tombstone alone cannot
+    ///      reach them: (a) the sibling behind agentToKya[burnedHash] is
+    ///      unverified but keeps its pointer -- verify() stays
+    ///      tombstone-gated so it cannot re-verify without the 48h path;
+    ///      (b) wallet-sharing siblings with a different agent hash are
+    ///      found through the principalToKya index and unverified. The
+    ///      pointer is cleared only when it still resolves to THIS kyaId,
+    ///      so no stale pointer survives the revocation.
     function revoke(bytes32 kyaId, bytes32 recordHash) external onlyOwner {
         Attestation storage a = byKya[kyaId];
         if (a.updatedAt == 0) revert NotListed();
+        bytes32 burnedHash = a.agentIdHash;
+        address burnedPrincipal = a.principal;
         a.revoked = true;
         a.verified = false;
         a.recordHash = recordHash;
         a.updatedAt = uint64(block.timestamp);
         everRevoked[kyaId] = true;
-        revokedAgent[a.agentIdHash] = true;
-        revokedPrincipal[a.principal] = true;
-        if (agentToKya[a.agentIdHash] == kyaId) {
-            delete agentToKya[a.agentIdHash];
+        revokedAgent[burnedHash] = true;
+        revokedPrincipal[burnedPrincipal] = true;
+        bytes32 hashSibling = agentToKya[burnedHash];
+        if (hashSibling == kyaId) {
+            delete agentToKya[burnedHash];
+        } else if (hashSibling != bytes32(0)) {
+            byKya[hashSibling].verified = false;
+        }
+        bytes32[] storage walletSiblings = principalToKya[burnedPrincipal];
+        for (uint256 i = 0; i < walletSiblings.length; i++) {
+            bytes32 sib = walletSiblings[i];
+            if (sib != kyaId) {
+                byKya[sib].verified = false;
+            }
         }
         emit Revoked(kyaId, recordHash);
     }
@@ -203,10 +282,25 @@ contract KYARegistry {
     ///         elapsed since the request, replace the attestation record.
     ///         The kyaId stays marked ever-revoked (each revival needs a fresh
     ///         timelocked cycle) and the fresh record starts unverified.
-    /// @dev Clears the actor tombstone for exactly the identities named on
-    ///      the new record -- that is the re-admission. Any other tombstoned
-    ///      identities stay burned. Also clears a stale agentToKya pointer
-    ///      when the agent hash changes.
+    /// @dev Rehabilitation is PER-COMPONENT, not per-binding: the cycle
+    ///      clears exactly the tombstones on the agent hash and the
+    ///      principal wallet named on the new record (revokedAgent[h] and
+    ///      revokedPrincipal[w] set wholesale to false), so an admitted
+    ///      wallet or hash is clean for FUTURE pairings -- any other
+    ///      tombstoned identities stay burned.
+    ///
+    ///      Binding-only tombstones were deliberately NOT chosen. If
+    ///      revoke() only burned the (hash, wallet) PAIR, a revoked actor
+    ///      could rotate ONE component -- fresh hash with the burned
+    ///      wallet, or burned hash with a fresh wallet -- mint a new
+    ///      kyaId, and list()+verify() instantly, because the new binding
+    ///      was never burned. Per-component tombstones force EVERY
+    ///      pairing that touches a burned hash OR a burned wallet through
+    ///      the timelocked path, which is what makes rotation useless.
+    ///
+    ///      Also clears a stale agentToKya pointer when the agent hash
+    ///      changes, and moves the kyaId across the principalToKya index
+    ///      when the principal changes.
     function finalizeReverification(
         bytes32 kyaId,
         bytes32 agentIdHash,
@@ -223,6 +317,7 @@ contract KYARegistry {
         if (block.timestamp < readyAt) revert ReverifyDelayNotElapsed(uint64(readyAt));
         reverifyRequestedAt[kyaId] = 0;
         bytes32 oldHash = a.agentIdHash;
+        address oldPrincipal = a.principal;
         a.agentIdHash = agentIdHash;
         a.principal = principal;
         a.recordHash = recordHash;
@@ -235,6 +330,10 @@ contract KYARegistry {
             delete agentToKya[oldHash];
         }
         agentToKya[agentIdHash] = kyaId;
+        if (oldPrincipal != principal) {
+            _removeFromPrincipalIndex(oldPrincipal, kyaId);
+            principalToKya[principal].push(kyaId);
+        }
         emit Reverified(kyaId, recordHash);
     }
 

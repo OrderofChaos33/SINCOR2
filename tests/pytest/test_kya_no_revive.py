@@ -2,7 +2,10 @@
 
 Covers: no-revive guard (list() of an ever-revoked kyaId reverts), the
 timelocked re-verification path (request + finalize after REVERIFY_DELAY),
-and two-step owner rotation (nominate + accept by the nominee).
+two-step owner rotation (nominate + accept by the nominee), the per-actor
+tombstone (new-kyaId same-actor verify reverts), the list()-graft guard
+(identity change via list() unverifies), and the revoke()-sibling sweep
+(live VERIFIED siblings sharing the burned hash or wallet are unverified).
 
 Self-contained: compiles contracts/kya/KYARegistry.sol with solc 0.8.24,
 drives it with web3 + eth-tester (PyEVM backend). Deliberately does NOT
@@ -67,6 +70,19 @@ def listed(reg, w3, kya_id, sender, record):
         kya_id, b"\x11" * 32, w3.eth.accounts[1], record
     ).transact({"from": sender})
     return w3.eth.get_transaction_receipt(txh)
+
+
+def _principal_ids(reg, principal):
+    """Read the whole principalToKya[principal] array (index getter)."""
+    ids = []
+    i = 0
+    while True:
+        try:
+            ids.append(reg.functions.principalToKya(principal, i).call())
+        except Exception:
+            break
+        i += 1
+    return ids
 
 
 # ---------------------------------------------------------------------------
@@ -556,18 +572,204 @@ def test_agent_hash_change_clears_stale_pointer(env):
     assert reg.functions.agentToKya(final_h).call() == kya_id
 
 
-def test_honest_update_with_new_agent_hash_keeps_verified(env):
-    """Never-revoked actors keep the original update semantics: changing
-    the agent hash via list() keeps verified=true and repoints the index."""
+def test_update_with_new_agent_hash_unverifies(env):
+    """Corrected semantic (re-review finding 1): changing the agent hash or
+    the principal via list() is an identity change and sets verified=false
+    -- a grafted identity cannot inherit the old record's VERIFIED flag.
+    The pointer is still repointed; the honest recordHash-only path is
+    unaffected (see test_record_hash_only_update_keeps_verified)."""
     w3, tester, reg, owner, agent, nominee, stranger = env
     kya_id = b"\x71" * 32
     old_h, new_h = b"\x71" * 32, b"\x72" * 32
     reg.functions.list(kya_id, old_h, agent, b"\xaa" * 32).transact({"from": owner})
     reg.functions.verify(kya_id, b"\xaa" * 32).transact({"from": owner})
+    # Identity change (agent hash): verified drops, pointer repoints.
     reg.functions.list(kya_id, new_h, agent, b"\xbb" * 32).transact({"from": owner})
     a = reg.functions.byKya(kya_id).call()
-    assert a[4] is True and a[5] is False  # still verified, not revoked
+    assert a[4] is False and a[5] is False  # identity change => unverified
+    assert a[2] == b"\xbb" * 32
     assert reg.functions.agentToKya(old_h).call() == b"\x00" * 32
     assert reg.functions.agentToKya(new_h).call() == kya_id
+    # Identity change (principal only) also unverifies.
+    reg.functions.list(kya_id, new_h, nominee, b"\xcc" * 32).transact({"from": owner})
+    a = reg.functions.byKya(kya_id).call()
+    assert a[4] is False and a[1] == nominee
+    assert _principal_ids(reg, agent) == []
+    assert _principal_ids(reg, nominee) == [kya_id]
     assert reg.functions.revokedAgent(new_h).call() is False
     assert reg.functions.revokedPrincipal(agent).call() is False
+    assert reg.functions.revokedPrincipal(nominee).call() is False
+
+
+def test_record_hash_only_update_keeps_verified(env):
+    """Honest path preserved: list() touching only the record hash keeps
+    verified=true."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya_id = b"\xd1" * 32
+    reg.functions.list(kya_id, b"\x71" * 32, agent, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.verify(kya_id, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.list(kya_id, b"\x71" * 32, agent, b"\xbb" * 32).transact({"from": owner})
+    a = reg.functions.byKya(kya_id).call()
+    assert a[4] is True and a[5] is False
+    assert a[2] == b"\xbb" * 32
+    # The principal index is not duplicated by the metadata-only update.
+    assert _principal_ids(reg, agent) == [kya_id]
+
+
+# ---------------------------------------------------------------------------
+# Re-review delta: list()-graft guard + revoke() sibling sweep
+# ---------------------------------------------------------------------------
+
+
+def test_list_graft_of_burned_wallet_unverifies(env):
+    """Reviewer PoC (finding 1, wallet graft): list(kyaV,Hv,Wv)->verify;
+    list(kyaB,Hb,Wb)->verify->revoke(kyaB) burns Hb,Wb; grafting the live
+    VERIFIED kyaV onto the burned wallet Wb must NOT keep verified=true,
+    and verify() must revert while Wb is tombstoned."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kyaV, kyaB = b"\xa1" * 32, b"\xa2" * 32
+    Hv, Hb = b"\x51" * 32, b"\x52" * 32
+    Wv, Wb = nominee, stranger
+    reg.functions.list(kyaV, Hv, Wv, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.verify(kyaV, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.list(kyaB, Hb, Wb, b"\xbb" * 32).transact({"from": owner})
+    reg.functions.verify(kyaB, b"\xbb" * 32).transact({"from": owner})
+    reg.functions.revoke(kyaB, b"\xbb" * 32).transact({"from": owner})
+    assert reg.functions.revokedPrincipal(Wb).call() is True
+    assert reg.functions.revokedAgent(Hb).call() is True
+
+    # Graft: re-point the live VERIFIED attestation at the burned wallet.
+    reg.functions.list(kyaV, Hv, Wb, b"\xcc" * 32).transact({"from": owner})
+    a = reg.functions.byKya(kyaV).call()
+    assert a[4] is False  # identity change => unverified, instantly
+    assert a[5] is False  # not revoked, just unverified
+    assert a[1] == Wb
+    # Tombstone gate: verify() reverts -- no 48h, no Verified event.
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(kyaV, b"\xcc" * 32).transact({"from": owner})
+    assert reg.functions.byKya(kyaV).call()[4] is False
+    # The principal index moved the kyaId with the identity.
+    assert _principal_ids(reg, Wv) == []
+    assert set(_principal_ids(reg, Wb)) == {kyaB, kyaV}
+
+
+def test_list_graft_of_burned_agent_hash_unverifies(env):
+    """Reviewer PoC (finding 1, agent-hash graft): same attack via a burned
+    agent hash instead of a burned wallet."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kyaV, kyaB = b"\xa3" * 32, b"\xa4" * 32
+    Hv, Hb = b"\x53" * 32, b"\x54" * 32
+    Wv, Wb = nominee, stranger
+    reg.functions.list(kyaV, Hv, Wv, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.verify(kyaV, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.list(kyaB, Hb, Wb, b"\xbb" * 32).transact({"from": owner})
+    reg.functions.verify(kyaB, b"\xbb" * 32).transact({"from": owner})
+    reg.functions.revoke(kyaB, b"\xbb" * 32).transact({"from": owner})
+
+    # Graft: re-point the live VERIFIED attestation at the burned hash.
+    reg.functions.list(kyaV, Hb, Wv, b"\xcc" * 32).transact({"from": owner})
+    a = reg.functions.byKya(kyaV).call()
+    assert a[4] is False
+    assert a[5] is False
+    assert a[0] == Hb
+    assert reg.functions.agentToKya(Hb).call() == kyaV
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(kyaV, b"\xcc" * 32).transact({"from": owner})
+
+
+def test_revoke_unverifies_hash_sharing_sibling(env):
+    """Reviewer PoC (finding 2a): list(k1,H,W1)+list(k2,H,W2), verify both,
+    revoke(k1) burns H,W1 -- the live VERIFIED sibling k2 sharing the burned
+    hash must be unverified, but keep its agentToKya pointer (verify() stays
+    tombstone-gated)."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    k1, k2 = b"\xb1" * 32, b"\xb2" * 32
+    H = b"\x61" * 32
+    W1, W2 = agent, nominee
+    reg.functions.list(k1, H, W1, b"\x01" * 32).transact({"from": owner})
+    reg.functions.list(k2, H, W2, b"\x02" * 32).transact({"from": owner})
+    reg.functions.verify(k1, b"\x01" * 32).transact({"from": owner})
+    reg.functions.verify(k2, b"\x02" * 32).transact({"from": owner})
+    assert reg.functions.byKya(k2).call()[4] is True
+    assert reg.functions.agentToKya(H).call() == k2  # last writer wins
+
+    reg.functions.revoke(k1, b"\x01" * 32).transact({"from": owner})
+    assert reg.functions.revokedAgent(H).call() is True
+    assert reg.functions.revokedPrincipal(W1).call() is True
+
+    a2 = reg.functions.byKya(k2).call()
+    assert a2[4] is False and a2[5] is False  # unverified, not revoked
+    assert reg.functions.agentToKya(H).call() == k2  # pointer kept
+    # The sibling cannot re-verify while the hash is tombstoned.
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(k2, b"\x02" * 32).transact({"from": owner})
+    # The revoked attestation's own state is intact.
+    a1 = reg.functions.byKya(k1).call()
+    assert a1[4] is False and a1[5] is True
+
+
+def test_revoke_unverifies_wallet_sharing_sibling(env):
+    """Reviewer PoC (finding 2b): the burned wallet's other verified
+    kyaIds (different agent hash) are found through the principalToKya
+    index and unverified; an unrelated verified attestation is untouched."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    k1, k3, k4 = b"\xb3" * 32, b"\xb4" * 32, b"\xb5" * 32
+    H1, H3, H4 = b"\x61" * 32, b"\x63" * 32, b"\x64" * 32
+    W1, W4 = agent, stranger
+    # k3 shares the wallet W1 with k1 under a different hash; k4 unrelated.
+    reg.functions.list(k1, H1, W1, b"\x01" * 32).transact({"from": owner})
+    reg.functions.list(k3, H3, W1, b"\x03" * 32).transact({"from": owner})
+    reg.functions.list(k4, H4, W4, b"\x04" * 32).transact({"from": owner})
+    for kid in (k1, k3, k4):
+        reg.functions.verify(kid, b"\x00" * 32).transact({"from": owner})
+    assert set(_principal_ids(reg, W1)) == {k1, k3}
+
+    reg.functions.revoke(k1, b"\x01" * 32).transact({"from": owner})
+
+    a3 = reg.functions.byKya(k3).call()
+    assert a3[4] is False and a3[5] is False  # unverified, not revoked
+    # The wallet-sharing sibling cannot re-verify while W1 is tombstoned.
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(k3, b"\x03" * 32).transact({"from": owner})
+    # Unrelated verified attestation untouched.
+    assert reg.functions.byKya(k4).call()[4] is True
+
+
+def test_revoke_sibling_sweep_covers_hash_and_wallet_together(env):
+    """Full finding-2 shape: one revoke unverifies BOTH the hash-sharing
+    sibling and the wallet-sharing sibling at once."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    k1, k2, k3 = b"\xc1" * 32, b"\xc2" * 32, b"\xc3" * 32
+    H, H3 = b"\x71" * 32, b"\x73" * 32
+    W1, W2 = agent, nominee
+    reg.functions.list(k1, H, W1, b"\x01" * 32).transact({"from": owner})
+    reg.functions.list(k2, H, W2, b"\x02" * 32).transact({"from": owner})
+    reg.functions.list(k3, H3, W1, b"\x03" * 32).transact({"from": owner})
+    for kid in (k1, k2, k3):
+        reg.functions.verify(kid, b"\x00" * 32).transact({"from": owner})
+
+    reg.functions.revoke(k1, b"\x01" * 32).transact({"from": owner})
+
+    assert reg.functions.byKya(k2).call()[4] is False  # hash sibling
+    assert reg.functions.byKya(k3).call()[4] is False  # wallet sibling
+    assert reg.functions.agentToKya(H).call() == k2  # pointer kept for k2
+
+
+def test_readmission_after_48h_allows_verify(env):
+    """(iv) The timelocked path still works end-to-end: after 48h and
+    finalize, verify() succeeds on the admitted identities."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya_id = b"\x91" * 32
+    ah = b"\xaa" * 32
+    reg.functions.list(kya_id, ah, agent, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.revoke(kya_id, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.requestReverification(kya_id).transact({"from": owner})
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(kya_id, b"\xaa" * 32).transact({"from": owner})
+
+    travel(tester, w3, REVERIFY_DELAY + 60)
+    reg.functions.finalizeReverification(kya_id, ah, agent, b"\xbb" * 32).transact(
+        {"from": owner}
+    )
+    reg.functions.verify(kya_id, b"\xbb" * 32).transact({"from": owner})
+    assert reg.functions.byKya(kya_id).call()[4] is True
