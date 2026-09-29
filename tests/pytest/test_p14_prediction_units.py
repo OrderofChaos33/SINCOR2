@@ -361,3 +361,52 @@ def test_backtest_trades_across_iterations_not_just_first():
     traded_ids = [x["market_id"] for x in res["per_market"]]
     # markets beyond the first few must be reachable
     assert any(int(t[1:]) >= 5 for t in traded_ids), traded_ids
+
+
+# -- per-category calibration + halt (kill-switch) --------------------------------
+def test_brier_by_category_computed_per_category():
+    """Invariant: Brier is tracked per category, not just globally."""
+    engine = ForecastEngine()
+    engine.record_resolution(0.9, 0.5, 1, category="sports")
+    engine.record_resolution(0.9, 0.5, 0, category="sports")
+    engine.record_resolution(0.6, 0.5, 1, category="politics")
+    by_cat = engine.brier_by_category()
+    assert set(by_cat) == {"sports", "politics"}
+    assert by_cat["sports"] == pytest.approx(((0.1 ** 2) + (0.9 ** 2)) / 2)
+    assert by_cat["politics"] == pytest.approx(0.4 ** 2)
+
+
+def test_category_halt_triggers_above_025():
+    """Invariant: Brier > 0.25 in a traded category halts it."""
+    engine = ForecastEngine()
+    for _ in range(10):
+        engine.record_resolution(0.9, 0.5, 0, category="sports")  # always wrong
+    assert engine.brier_by_category()["sports"] > 0.25
+    assert engine.category_halted("sports") is True
+    assert engine.category_halted("politics") is False  # untraded: never halts
+
+
+def test_backtest_skips_halted_category():
+    """Invariant: the backtest takes no new positions in a halted category."""
+    import random
+    rng = random.Random(11)
+    engine = ForecastEngine()
+    # poison the "sports" category: confidently wrong on every resolution
+    for _ in range(20):
+        engine.record_resolution(0.95, 0.5, 0, category="sports")
+    assert engine.category_halted("sports")
+    markets = []
+    for i in range(20):
+        m = rng.uniform(0.4, 0.6)
+        signal = 0.08
+        p = min(max(m + signal, 0.01), 0.99)
+        outcome = 1 if rng.random() < p else 0
+        cat = "sports" if i % 2 else "politics"
+        markets.append((_snap(market_id=f"h{i}", yes_price=m, category=cat),
+                        signal, outcome))
+    res = run_backtest(markets, engine, KellySizer(), BANKROLL)
+    traded = res["per_market"]
+    assert traded, "politics markets should still trade"
+    # every traded market id h<i> with even i is politics; none are sports
+    sports_traded = [t for t in traded if int(t["market_id"][1:]) % 2 == 1]
+    assert sports_traded == []

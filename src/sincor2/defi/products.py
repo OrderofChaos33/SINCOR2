@@ -3,9 +3,10 @@
 One arm, 26 products, each minted a SKU from the canonical catalog — single
 source of truth, no drift. Lifecycle: spec -> build -> test -> audit ->
 product -> catalog, enforced by gates.py. All 26 start at ``spec`` except
-P01, P04, P05, P06, which have real strategy math in the repo
+P01, P04, P05, P06, P09, P11, P12, P13, which have real strategy math in the repo
 (src/sincor2/defi/yield_aggregator.py, mev_capture.py, insurance_mutual.py,
-perp_hedge_swarm.py) and start at ``build``.
+perp_hedge_swarm.py, dao_governance.py, delta_neutral.py, twamm.py,
+avs_tranching.py) and start at ``build``.
 
 CLI:
     python -m sincor2.defi.products status
@@ -62,12 +63,18 @@ SLUGS: Dict[str, str] = {
 
 # Products with code evidence justifying a head start. P01's yield aggregator,
 # P04's MEV capture, P05's insurance mutual, and P06's perp hedge swarm are
-# real, tested strategy math (see src/sincor2/defi/).
+# real, tested strategy math (see src/sincor2/defi/). P09 (DAO governance
+# optimizer), P11 (delta-neutral yield), P12 (TWAMM engine), and P13 (AVS
+# tranching) joined them with tested reference builds (Track A, 2026-09-29).
 INITIAL_STAGE_OVERRIDES: Dict[str, str] = {
     "P01_YIELD_AGG": "build",
     "P04_MEV": "build",
     "P05_INSURANCE": "build",
     "P06_PERPS": "build",
+    "P09_DAO_GOV": "build",
+    "P11_DELTA_NEUTRAL": "build",
+    "P12_TWAMM": "build",
+    "P13_AVS": "build",
 }
 
 
