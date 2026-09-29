@@ -247,17 +247,17 @@ venv with eth-tester/py-evm/web3/py-solc-x (solc 0.8.24 at
 `~/.solcx/solc-v0.8.24`).
 
 ```bash
-# 1. Full onchain matrix: escrow guards + selection bridge + Python bridge (63 tests)
-~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_execution_escrow.py \
+# 1. Full onchain matrix: escrow guards + selection bridge + Python bridge (58 tests)
+PYTHONPATH=src:. ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_execution_escrow.py \
   tests/pytest/test_selection_bridge.py tests/pytest/test_auction_bridge.py \
   -q --noconftest -p no:cacheprovider
 
 # 2. Gas regression tripwires (5 tests)
-~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_a2a_gas_profiling.py \
+PYTHONPATH=src:. ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_a2a_gas_profiling.py \
   -q --noconftest -p no:cacheprovider
 
 # 3. EIP-712 offchain digest differential (byte-identical eth_account digests)
-~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_eip712_differential.py \
+PYTHONPATH=src:. ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_eip712_differential.py \
   -q --noconftest -p no:cacheprovider
 ```
 
