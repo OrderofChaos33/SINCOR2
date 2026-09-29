@@ -368,3 +368,206 @@ def test_honest_list_verify_update_flow(env):
     listed(reg, w3, kya_id, owner, b"\xbb" * 32)
     a = reg.functions.byKya(kya_id).call()
     assert a[2] == b"\xbb" * 32 and a[5] is False
+
+
+# ---------------------------------------------------------------------------
+# Per-actor tombstone (adversarial-review rework of W-10)
+# ---------------------------------------------------------------------------
+
+
+def test_new_kyaid_same_actor_cannot_verify_instantly(env):
+    """Reviewer PoC 1: revoke KYA1 -> list+verify KYA2 (SAME agent hash and
+    wallet) back-to-back MUST NOT yield a verified attestation."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya1, kya2 = b"\x11" * 32, b"\x22" * 32
+    ah = b"\xaa" * 32
+    reg.functions.list(kya1, ah, agent, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.verify(kya1, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.revoke(kya1, b"\xaa" * 32).transact({"from": owner})
+
+    # The actor's identities are tombstoned and the pointer is cleared.
+    assert reg.functions.revokedAgent(ah).call() is True
+    assert reg.functions.revokedPrincipal(agent).call() is True
+    assert reg.functions.agentToKya(ah).call() == b"\x00" * 32
+
+    # Fresh kyaId, same actor: list() succeeds (record visible on-chain)...
+    reg.functions.list(kya2, ah, agent, b"\xbb" * 32).transact({"from": owner})
+    assert reg.functions.byKya(kya2).call()[4] is False  # ...but unverified.
+
+    # ...and verify() MUST revert: the actor is tombstoned.
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(kya2, b"\xbb" * 32).transact({"from": owner})
+    a = reg.functions.byKya(kya2).call()
+    assert a[4] is False and a[5] is False
+
+
+def test_tombstone_fires_on_either_identity_component(env):
+    """Same wallet + fresh agent hash, and same agent hash + fresh wallet,
+    are both blocked from instant verification; a fully fresh actor is not."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya1 = b"\x31" * 32
+    reg.functions.list(kya1, b"\xaa" * 32, agent, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.revoke(kya1, b"\xaa" * 32).transact({"from": owner})
+
+    # Same wallet, fresh agent hash.
+    reg.functions.list(b"\x32" * 32, b"\xbb" * 32, agent, b"\x01" * 32).transact(
+        {"from": owner}
+    )
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(b"\x32" * 32, b"\x01" * 32).transact({"from": owner})
+
+    # Same agent hash, fresh wallet.
+    reg.functions.list(b"\x33" * 32, b"\xaa" * 32, nominee, b"\x02" * 32).transact(
+        {"from": owner}
+    )
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(b"\x33" * 32, b"\x02" * 32).transact({"from": owner})
+
+    # Fresh agent hash AND fresh wallet: unaffected, verifies fine.
+    reg.functions.list(b"\x34" * 32, b"\xcc" * 32, stranger, b"\x03" * 32).transact(
+        {"from": owner}
+    )
+    reg.functions.verify(b"\x34" * 32, b"\x03" * 32).transact({"from": owner})
+    assert reg.functions.byKya(b"\x34" * 32).call()[4] is True
+
+
+def test_tombstoned_actor_readmitted_after_timelocked_cycle_on_new_kyaid(env):
+    """The 48h path re-admits a tombstoned actor under a FRESH kyaId and
+    clears the tombstone for exactly the admitted identities."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya1, kya2 = b"\x41" * 32, b"\x42" * 32
+    ah = b"\xaa" * 32
+    reg.functions.list(kya1, ah, agent, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.revoke(kya1, b"\xaa" * 32).transact({"from": owner})
+
+    # Re-admission under a fresh kyaId: list, request, wait 48h, finalize.
+    reg.functions.list(kya2, ah, agent, b"\xbb" * 32).transact({"from": owner})
+    with pytest.raises(TransactionFailed):
+        reg.functions.finalizeReverification(kya2, ah, agent, b"\xbb" * 32).transact(
+            {"from": owner}
+        )
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(kya2, b"\xbb" * 32).transact({"from": owner})
+
+    reg.functions.requestReverification(kya2).transact({"from": owner})
+    # verify() before the delay elapses still reverts.
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(kya2, b"\xbb" * 32).transact({"from": owner})
+
+    travel(tester, w3, REVERIFY_DELAY + 60)
+    reg.functions.finalizeReverification(kya2, ah, agent, b"\xcc" * 32).transact(
+        {"from": owner}
+    )
+
+    assert reg.functions.revokedAgent(ah).call() is False
+    assert reg.functions.revokedPrincipal(agent).call() is False
+    a = reg.functions.byKya(kya2).call()
+    assert a[5] is False and a[4] is False  # live but unverified
+
+    # Now verify() succeeds: the actor is re-admitted.
+    reg.functions.verify(kya2, b"\xcc" * 32).transact({"from": owner})
+    assert reg.functions.byKya(kya2).call()[4] is True
+    assert reg.functions.agentToKya(ah).call() == kya2
+    # The old kyaId stays burned.
+    assert reg.functions.everRevoked(kya1).call() is True
+
+
+def test_second_revocation_re_tombstones_actor(env):
+    """After a timelocked re-admission, a fresh revoke re-tombstones the
+    actor: instant re-verification under another new kyaId is blocked."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya1, kya2 = b"\x81" * 32, b"\x82" * 32
+    ah = b"\xaa" * 32
+    reg.functions.list(kya1, ah, agent, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.revoke(kya1, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.requestReverification(kya1).transact({"from": owner})
+    travel(tester, w3, REVERIFY_DELAY + 60)
+    reg.functions.finalizeReverification(kya1, ah, agent, b"\xbb" * 32).transact(
+        {"from": owner}
+    )
+    reg.functions.verify(kya1, b"\xbb" * 32).transact({"from": owner})
+    assert reg.functions.revokedAgent(ah).call() is False
+
+    # Revoked again for cause: tombstone is back, fresh-kyaId verify blocked.
+    reg.functions.revoke(kya1, b"\xbb" * 32).transact({"from": owner})
+    assert reg.functions.revokedAgent(ah).call() is True
+    reg.functions.list(kya2, ah, agent, b"\xcc" * 32).transact({"from": owner})
+    with pytest.raises(TransactionFailed):
+        reg.functions.verify(kya2, b"\xcc" * 32).transact({"from": owner})
+    assert reg.functions.byKya(kya2).call()[4] is False
+
+
+def test_reverification_path_rejects_live_attestation(env):
+    """Reviewer PoC 3: request/finalize on a LIVE (revived) attestation must
+    revert -- the timelocked path is not a silent live-record rewrite."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya_id = b"\x51" * 32
+    reg.functions.list(kya_id, b"\xa1" * 32, agent, b"\x01" * 32).transact(
+        {"from": owner}
+    )
+    reg.functions.revoke(kya_id, b"\x01" * 32).transact({"from": owner})
+    reg.functions.requestReverification(kya_id).transact({"from": owner})
+    travel(tester, w3, REVERIFY_DELAY + 60)
+    reg.functions.finalizeReverification(kya_id, b"\xa1" * 32, agent, b"\x02" * 32).transact(
+        {"from": owner}
+    )
+    reg.functions.verify(kya_id, b"\x02" * 32).transact({"from": owner})
+
+    # Attestation is live now: the re-verification path must refuse it.
+    with pytest.raises(TransactionFailed):
+        reg.functions.requestReverification(kya_id).transact({"from": owner})
+    with pytest.raises(TransactionFailed):
+        reg.functions.finalizeReverification(
+            kya_id, b"\xb2" * 32, nominee, b"\x03" * 32
+        ).transact({"from": owner})
+
+    # State untouched: principal and hash NOT swapped, still verified.
+    a = reg.functions.byKya(kya_id).call()
+    assert a[0] == b"\xa1" * 32 and a[1] == agent
+    assert a[4] is True and a[5] is False
+    assert reg.functions.agentToKya(b"\xa1" * 32).call() == kya_id
+
+
+def test_agent_hash_change_clears_stale_pointer(env):
+    """Secondary (b): a list() update moving to a new agent hash clears the
+    old agentToKya pointer; revoke() clears its pointer too."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya_id = b"\x61" * 32
+    old_h, new_h, final_h = b"\x61" * 32, b"\x62" * 32, b"\x63" * 32
+    reg.functions.list(kya_id, old_h, agent, b"\xaa" * 32).transact({"from": owner})
+    assert reg.functions.agentToKya(old_h).call() == kya_id
+
+    # Honest update to a new agent hash.
+    reg.functions.list(kya_id, new_h, agent, b"\xbb" * 32).transact({"from": owner})
+    assert reg.functions.agentToKya(old_h).call() == b"\x00" * 32
+    assert reg.functions.agentToKya(new_h).call() == kya_id
+
+    # revoke() clears the pointer as well.
+    reg.functions.revoke(kya_id, b"\xbb" * 32).transact({"from": owner})
+    assert reg.functions.agentToKya(new_h).call() == b"\x00" * 32
+
+    # finalize() with another new hash: no stale pointer left behind.
+    reg.functions.requestReverification(kya_id).transact({"from": owner})
+    travel(tester, w3, REVERIFY_DELAY + 60)
+    reg.functions.finalizeReverification(kya_id, final_h, agent, b"\xcc" * 32).transact(
+        {"from": owner}
+    )
+    assert reg.functions.agentToKya(new_h).call() == b"\x00" * 32
+    assert reg.functions.agentToKya(final_h).call() == kya_id
+
+
+def test_honest_update_with_new_agent_hash_keeps_verified(env):
+    """Never-revoked actors keep the original update semantics: changing
+    the agent hash via list() keeps verified=true and repoints the index."""
+    w3, tester, reg, owner, agent, nominee, stranger = env
+    kya_id = b"\x71" * 32
+    old_h, new_h = b"\x71" * 32, b"\x72" * 32
+    reg.functions.list(kya_id, old_h, agent, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.verify(kya_id, b"\xaa" * 32).transact({"from": owner})
+    reg.functions.list(kya_id, new_h, agent, b"\xbb" * 32).transact({"from": owner})
+    a = reg.functions.byKya(kya_id).call()
+    assert a[4] is True and a[5] is False  # still verified, not revoked
+    assert reg.functions.agentToKya(old_h).call() == b"\x00" * 32
+    assert reg.functions.agentToKya(new_h).call() == kya_id
+    assert reg.functions.revokedAgent(new_h).call() is False
+    assert reg.functions.revokedPrincipal(agent).call() is False
