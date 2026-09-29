@@ -179,6 +179,81 @@
         "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p19_credit_units.py -q",
         "scope": "credit_underwriting: behavioral scoring, score->LTV table, attestation freshness, no-unsecured-book draws, circuit breaker, concentration caps, 20bps fees"
       }
+    },
+    {
+      "entry_id": "ev_21ccbdf82631",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "test_run",
+      "timestamp": 1790697071.4063673,
+      "commit": "5cd0b9400d7d6ed7a7a1f6939111a49f6f770bf1",
+      "recorded_by": "xioix/sku-defi-p22-p26",
+      "details": {
+        "suite": "tests/pytest/test_defi_p22.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<test> JWT_SECRET_KEY=<test> ADMIN_USERNAME=admin ADMIN_PASSWORD=password123 STRIPE_SECRET_KEY=sk_test_123 ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_defi_p22.py -q",
+        "passed": 23,
+        "failed": 0,
+        "note": "acceptance suite incl. deterministic 1000-case randomized loops"
+      }
+    },
+    {
+      "entry_id": "ev_786cc80c6f0e",
+      "sku": "SINCOR-DEFI-P23-NFTFI",
+      "kind": "test_run",
+      "timestamp": 1790697071.407955,
+      "commit": "5cd0b9400d7d6ed7a7a1f6939111a49f6f770bf1",
+      "recorded_by": "xioix/sku-defi-p22-p26",
+      "details": {
+        "suite": "tests/pytest/test_defi_p23.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<test> JWT_SECRET_KEY=<test> ADMIN_USERNAME=admin ADMIN_PASSWORD=password123 STRIPE_SECRET_KEY=sk_test_123 ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_defi_p23.py -q",
+        "passed": 18,
+        "failed": 0,
+        "note": "acceptance suite incl. deterministic 1000-case randomized loops"
+      }
+    },
+    {
+      "entry_id": "ev_cfd46f4bd5ba",
+      "sku": "SINCOR-DEFI-P24-SOCIALFI",
+      "kind": "test_run",
+      "timestamp": 1790697071.409056,
+      "commit": "5cd0b9400d7d6ed7a7a1f6939111a49f6f770bf1",
+      "recorded_by": "xioix/sku-defi-p22-p26",
+      "details": {
+        "suite": "tests/pytest/test_defi_p24.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<test> JWT_SECRET_KEY=<test> ADMIN_USERNAME=admin ADMIN_PASSWORD=password123 STRIPE_SECRET_KEY=sk_test_123 ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_defi_p24.py -q",
+        "passed": 25,
+        "failed": 0,
+        "note": "acceptance suite incl. deterministic 1000-case randomized loops"
+      }
+    },
+    {
+      "entry_id": "ev_bbef8118ce69",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "test_run",
+      "timestamp": 1790697071.4104686,
+      "commit": "5cd0b9400d7d6ed7a7a1f6939111a49f6f770bf1",
+      "recorded_by": "xioix/sku-defi-p22-p26",
+      "details": {
+        "suite": "tests/pytest/test_defi_p25.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<test> JWT_SECRET_KEY=<test> ADMIN_USERNAME=admin ADMIN_PASSWORD=password123 STRIPE_SECRET_KEY=sk_test_123 ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_defi_p25.py -q",
+        "passed": 17,
+        "failed": 0,
+        "note": "acceptance suite incl. deterministic 1000-case randomized loops"
+      }
+    },
+    {
+      "entry_id": "ev_0855f981aceb",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "test_run",
+      "timestamp": 1790697071.4115899,
+      "commit": "5cd0b9400d7d6ed7a7a1f6939111a49f6f770bf1",
+      "recorded_by": "xioix/sku-defi-p22-p26",
+      "details": {
+        "suite": "tests/pytest/test_defi_p26.py",
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<test> JWT_SECRET_KEY=<test> ADMIN_USERNAME=admin ADMIN_PASSWORD=password123 STRIPE_SECRET_KEY=sk_test_123 ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_defi_p26.py -q",
+        "passed": 23,
+        "failed": 0,
+        "note": "acceptance suite incl. deterministic 1000-case randomized loops"
+      }
     }
   ]
 }
