@@ -419,6 +419,36 @@ def product_report():
     return render_template("product_report.html")
 
 
+# ---------------------------------------------------------------------------
+# SINCOR DeFi product suite: /products index + 26 SKU feature pages.
+# ---------------------------------------------------------------------------
+
+_PRODUCT_SLUGS = frozenset((
+    "p01-yield-aggregator", "p02-clmm-manager", "p03-intent-dark-pool",
+    "p04-mev-capture", "p05-defi-insurance", "p06-perp-dex",
+    "p07-bridge-optimizer", "p08-rwa-vaults", "p09-dao-governance",
+    "p10-flash-arbitrage", "p11-delta-neutral", "p12-twamm-engine",
+    "p13-avs-restaking", "p14-prediction-markets", "p15-lending-optimizer",
+    "p16-dex-aggregator", "p17-options-protocol", "p18-structured-products",
+    "p19-credit-underwriting", "p20-compliance-automation", "p21-treasury-dao",
+    "p22-stablecoin-yield", "p23-nftfi-pools", "p24-socialfi-revenue",
+    "p25-agent-portfolio", "p26-defi-os",
+))
+
+
+@bp.route("/products")
+def products_suite():
+    return render_template("products.html")
+
+
+@bp.route("/products/<slug>")
+def product_detail(slug):
+    if slug not in _PRODUCT_SLUGS:
+        from flask import abort
+        abort(404)
+    return render_template("products/%s.html" % slug)
+
+
 @bp.route("/dashboards")
 def dashboards_menu():
     if not (_is_admin_session() or session.get("user_email")):

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delta-Neutral Yield — SINCOR Products</title>
+<meta name="description" content="Yield without the chart.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Yield</span>
+    <h1 class="sp-h1">Delta-Neutral Yield<br><span class="gold">Yield without the chart.</span></h1>
+    <p class="sp-lede">Delta-Neutral Yield pairs spot holdings with perp hedges — harvesting funding rates while staying immune to market direction.</p>
+    <div class="sp-cta-row">
+      <a href="/signup?plan=p11-delta-neutral" class="sp-btn sp-btn-gold">Request early access →</a>
+      <a href="/products" class="sp-btn sp-btn-ghost">All 26 products</a>
+    </div>
+    <div class="sp-specs">
+      <div class="sp-spec"><div class="k">Target yield</div><div class="v">9.0%<br><small>design target</small></div></div>
+      <div class="sp-spec"><div class="k">Protocol fee</div><div class="v">0.12%%<br><small>protocol fee</small></div></div>
+      <div class="sp-spec"><div class="k">Category</div><div class="v"><small>Yield</small></div></div>
+      <div class="sp-spec"><div class="k">Designed for</div><div class="v"><small>$150+ allocations</small></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker">What it does</div>
+    <h2 class="sp-h2">Engineered for one job.</h2>
+    <p class="sp-sub">The best yield in crypto often comes from funding rates — but capturing it usually means taking directional risk you didn't want. This product separates the two: hold the spot, hedge the direction, keep the funding.</p>
+    <p class="sp-sub">Basis is monitored continuously, and if the trade stops paying, positions unwind automatically. You earn the carry; the market keeps its opinions.</p>
+    <div class="sp-feat">
+      <div>
+        <h3>How it works</h3>
+        <div class="sp-steps" style="grid-template-columns:1fr">
+          <div class="sp-step"><div class="n">1</div><h3>Pair</h3><p>Spot positions are matched with offsetting perp hedges sized to neutralize direction.</p></div><div class="sp-step"><div class="n">2</div><h3>Harvest</h3><p>Funding payments accrue to the book as long as the basis stays favorable.</p></div><div class="sp-step"><div class="n">3</div><h3>Unwind</h3><p>If basis turns negative, positions unwind automatically — no bag-holding a dead trade.</p></div>
+        </div>
+      </div>
+      <div class="sp-visual">🎯</div>
+    </div>
+    <h3 style="font-size:22px;margin:40px 0 6px">Capabilities</h3>
+    <ul class="sp-check">
+      <li><strong>Spot-perp hedging engine</strong></li><li><strong>Funding-rate harvesting</strong></li><li><strong>Continuous basis monitoring</strong></li><li><strong>Automatic unwind on flip</strong></li>
+    </ul>
+    <h3 style="font-size:22px;margin:40px 0 14px">Who it's for</h3>
+    <div class="sp-pills">
+      <span class="sp-pill">Yield seekers</span><span class="sp-pill">Market-neutral allocators</span><span class="sp-pill">Risk-averse traders</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker sp-center">Questions</div>
+    <h2 class="sp-h2 sp-center">About Delta-Neutral Yield.</h2>
+    <div class="sp-faq" style="margin-top:32px">
+      <details><summary>What if the market crashes?</summary><div class="a">That's the point of delta-neutral: direction is hedged out. The book earns funding regardless of which way prices move.</div></details><details><summary>When does it exit?</summary><div class="a">Automatically, when the basis turns against the trade. Capital is never left in a carry trade that stopped carrying.</div></details>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-cta-band">
+      <h2>Get Delta-Neutral Yield working for you.</h2>
+      <p>Join the priority list. We'll reach out the moment your allocation opens — early access members get first placement.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/signup?plan=p11-delta-neutral" class="sp-btn sp-btn-gold">Request early access →</a>
+        <a href="/pricing" class="sp-btn sp-btn-ghost">See platform plans</a>
+      </div>
+    </div>
+    <div class="sp-center" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:8px">
+      <a href="/products/p10-flash-arbitrage" class="sp-card-link">← Flash Loan Arbitrage Engine</a>
+      <a href="/products/p12-twamm-engine" class="sp-card-link">TWAMM Large-Order Engine →</a>
+    </div>
+  </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+</body>
+</html>

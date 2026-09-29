@@ -322,6 +322,21 @@
         return;
       }
       
+      var PRODUCT_NAMES = {
+        'p01-yield-aggregator': 'Yield Aggregator Vault', 'p02-clmm-manager': 'Concentrated Liquidity Manager',
+        'p03-intent-dark-pool': 'Intent Solver & Dark Pool', 'p04-mev-capture': 'MEV Protection & Capture',
+        'p05-defi-insurance': 'DeFi Risk Mutual', 'p06-perp-dex': 'Perp DEX Hedging Swarm',
+        'p07-bridge-optimizer': 'Cross-Chain Bridge Optimizer', 'p08-rwa-vaults': 'RWA Tokenization Vaults',
+        'p09-dao-governance': 'DAO Governance Optimizer', 'p10-flash-arbitrage': 'Flash Loan Arbitrage Engine',
+        'p11-delta-neutral': 'Delta-Neutral Yield', 'p12-twamm-engine': 'TWAMM Large-Order Engine',
+        'p13-avs-restaking': 'AVS Tranching & Restaking', 'p14-prediction-markets': 'Prediction Market Automation',
+        'p15-lending-optimizer': 'Lending Protocol Optimizer', 'p16-dex-aggregator': 'Best-Execution DEX Aggregator',
+        'p17-options-protocol': 'On-Chain Options Protocol', 'p18-structured-products': 'Structured Product Vaults',
+        'p19-credit-underwriting': 'Decentralized Credit Underwriting', 'p20-compliance-automation': 'DeFi Compliance Automation',
+        'p21-treasury-dao': 'DAO Treasury Management', 'p22-stablecoin-yield': 'Stablecoin Yield Maximizer',
+        'p23-nftfi-pools': 'NFT-Fi Liquidity Pools', 'p24-socialfi-revenue': 'SocialFi Revenue Share',
+        'p25-agent-portfolio': 'Agent-Managed Portfolio', 'p26-defi-os': 'Self-Improving DeFi OS'
+      };
       // Disable button
       submitBtn.disabled = true;
       submitBtn.textContent = 'Loading...';
@@ -341,8 +356,22 @@
           throw new Error(data.error || 'Signup failed');
         }
         
+        const donePlan = data.plan || plan || 'starter';
+        var EARLY_NAMES = Object.assign({'sinc-access': 'SINC platform access'}, PRODUCT_NAMES);
+        if (EARLY_NAMES[donePlan]) {
+          // Early-access request: confirm the priority-list spot inline.
+          document.getElementById('signupForm').innerHTML =
+            '<div style="text-align:center;padding:24px 0">'
+            + '<div style="font-size:48px;margin-bottom:16px">✓</div>'
+            + '<h2 style="margin:0 0 12px">You\'re on the priority list.</h2>'
+            + '<p style="color:var(--text-dim, #a7b0bf)">' + EARLY_NAMES[donePlan]
+            + ' — we\'ll reach out the moment your allocation opens.</p>'
+            + '<p style="margin-top:20px"><a href="/pricing" style="color:#f0c664;font-weight:700">Explore platform plans →</a></p>'
+            + '</div>';
+          return;
+        }
         // Redirect to buy page
-        const buyPlan = data.plan || plan || 'starter';
+        const buyPlan = donePlan;
         window.location.href = `/buy?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&plan=${encodeURIComponent(buyPlan)}`;
       
       } catch (err) {
