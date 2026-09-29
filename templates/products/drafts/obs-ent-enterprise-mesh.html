@@ -1,0 +1,98 @@
+<!--
+  DRAFT — NOT ROUTED. Standing rule (founder, 2026-09-29): working products
+  only. This template lives under templates/products/drafts/ and is not
+  referenced by any route, nav, pricing page, or sitemap. It may be promoted
+  to templates/products/ ONLY after gates.evaluate_publish(SKU_BY_ID["OBS-ENT"], ledger, root) returns
+  ok on verified end-to-end evidence. See docs/specs/obs-skus/OBS-ENT-spec.md §7.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise Mesh — SINCOR Products</title>
+<meta name="description" content="Fleet-grade operations for many deployments, with a named operator and defined response times.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div style="background:#3a2b00;color:#ffd97a;text-align:center;font:600 13px/1.4 Inter,system-ui;padding:10px 16px;letter-spacing:.06em">DRAFT — NOT PUBLISHED · awaiting publish-gate verification</div>
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Enterprise · Service engagement</span>
+    <h1 class="sp-h1">Enterprise Mesh<br><span class="gold">Your fleet, operated.</span></h1>
+    <p class="sp-lede">Fleet-grade operations for many deployments: a unified onboarding runbook, cross-deployment visibility, and a named SINCOR operator with defined response times.</p>
+    <div class="sp-cta-row">
+      <a href="/contact" class="sp-btn sp-btn-gold">Talk to us →</a>
+      <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+    </div>
+    <div class="sp-specs">
+      <div class="sp-spec"><div class="k">Price</div><div class="v">$2,500/mo<br><small>flat</small></div></div>
+      <div class="sp-spec"><div class="k">Delivered as</div><div class="v"><small>Service engagement</small></div></div>
+      <div class="sp-spec"><div class="k">Category</div><div class="v"><small>Enterprise</small></div></div>
+      <div class="sp-spec"><div class="k">Response</div><div class="v"><small>1h critical</small></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker">What it does</div>
+    <h2 class="sp-h2">Operations with a name on it.</h2>
+    <p class="sp-sub">Running many deployments turns operations into tribal knowledge and missed alerts. Enterprise Mesh replaces that with a service: every deployment onboarded the same way through a runbook — KYA confirmed, stake posture reviewed, audit trail on, drift watch configured, alert routing proven with a fired-and-received test before sign-off.</p>
+    <p class="sp-sub">Your named SINCOR operator keeps one operating picture across your deployments, reviews it with you weekly, and responds to incidents on defined times: one hour for critical, one business day for standard.</p>
+    <div class="sp-feat">
+      <div>
+        <h3>How it works</h3>
+        <div class="sp-steps" style="grid-template-columns:1fr">
+          <div class="sp-step"><div class="n">1</div><h3>Onboard</h3><p>Each deployment goes through the runbook in order. Nothing is signed off until alert routing is proven with a live test alert.</p></div><div class="sp-step"><div class="n">2</div><h3>Operate</h3><p>Your operator maintains one cross-deployment view — status rollups, open alerts, open disputes, upcoming stake timelocks — and reviews it with you weekly.</p></div><div class="sp-step"><div class="n">3</div><h3>Respond</h3><p>Incidents get acknowledged on SLA, triaged with the audit trail at hand, and driven through resolution with a written monthly operations summary.</p></div>
+        </div>
+      </div>
+      <div class="sp-visual">🕸️</div>
+    </div>
+    <h3 style="font-size:22px;margin:40px 0 6px">What you receive</h3>
+    <ul class="sp-check">
+      <li><strong>Runbook-driven onboarding per deployment</strong></li><li><strong>One cross-deployment operating picture</strong></li><li><strong>Weekly review + monthly written summary</strong></li><li><strong>1-hour critical / 1-business-day standard response</strong></li>
+    </ul>
+    <h3 style="font-size:22px;margin:40px 0 14px">Who it's for</h3>
+    <div class="sp-pills">
+      <span class="sp-pill">Multi-deployment enterprises</span><span class="sp-pill">Fleet owners</span><span class="sp-pill">Operations executives</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker sp-center">Questions</div>
+    <h2 class="sp-h2 sp-center">About Enterprise Mesh.</h2>
+    <div class="sp-faq" style="margin-top:32px">
+      <details><summary>What does the response SLA cover?</summary><div class="a">Acknowledgment and triage: one hour for critical incidents where funds or safety are at risk, one business day for standard issues. Your operator stays on the incident through resolution.</div></details><details><summary>Who owns my deployments?</summary><div class="a">You do — your deployments, your keys. The mesh operates and coordinates; control stays with you.</div></details>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-cta-band">
+      <h2>Put a name on your operations.</h2>
+      <p>$2,500 a month. One operator, one runbook, one operating picture across your fleet.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/contact" class="sp-btn sp-btn-gold">Talk to us →</a>
+        <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+</body>
+</html>

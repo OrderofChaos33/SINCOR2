@@ -821,6 +821,14 @@ from sincor2.blueprints.defi_catalog import defi_catalog_bp as _defi_catalog_bp
 
 app.register_blueprint(_defi_catalog_bp)
 
+# OBS-01 Agent Vitals (BETA): /obs/vitals + GET /api/obs/vitals. Read-only,
+# customer-session gated, deliberately unlinked from all public nav/pricing/
+# sitemaps (direct URL only) until the beta walkthrough passes. No money
+# path, no auth changes, no ledger writes.
+from sincor2.blueprints.vitals import vitals_bp as _vitals_bp
+
+app.register_blueprint(_vitals_bp)
+
 # /command-center page on production (GET only). Same login gate as the other
 # operator surfaces on this app (see /dashboard, /operator). The full
 # command-center API blueprint is deliberately NOT mounted here: its
