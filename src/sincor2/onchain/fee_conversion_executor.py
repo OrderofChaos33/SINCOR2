@@ -147,6 +147,23 @@ def zero_for_one(pool: PoolKey, token_in: str) -> bool:
 
 # --- Config ------------------------------------------------------------------
 
+def _default_fee_ledger_path() -> str:
+    """Volume-aware default: Railway /data when mounted, else local data dir.
+
+    The old default (~/workspace/ops/fee_conversion_ledger.json) lived on
+    Railway's ephemeral filesystem, so redeploys wiped the conversion journal.
+    """
+    explicit = os.environ.get("SINCOR_FEE_LEDGER_PATH", "").strip()
+    if explicit:
+        return os.path.expanduser(explicit)
+    try:
+        from sincor2.data_paths import data_dir
+
+        return str(data_dir() / "fee_conversion_ledger.json")
+    except Exception:
+        return os.path.expanduser("~/workspace/ops/fee_conversion_ledger.json")
+
+
 @dataclass
 class FeeConversionConfig:
     """Operator config for one executor instance."""
@@ -163,8 +180,7 @@ class FeeConversionConfig:
     target: str = "USDC"                 # "USDC" | "WETH" (fee policy lists both)
     pool_keys: Dict[Tuple[str, str], PoolKey] = field(default_factory=dict)
     armed: bool = False                  # live broadcast gate; see runbook
-    ledger_path: str = os.path.expanduser(
-        "~/workspace/ops/fee_conversion_ledger.json")
+    ledger_path: str = field(default_factory=_default_fee_ledger_path)
 
     def pool_key_for(self, token_in: str, token_out: str) -> PoolKey:
         key = (token_in.upper(), token_out.upper())
