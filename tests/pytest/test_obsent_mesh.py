@@ -198,7 +198,21 @@ class TestCoercion:
         view = m.build_fleet_view("f", [object()], now_ms=NOW)
         assert view.agents[0].status == m.STATUS_UNKNOWN
 
-    def test_sibling_modules_absent_is_fine(self):
+    def test_sibling_modules_present_after_integration(self):
+        # All six Track B branches are integrated: the siblings are real
+        # modules now, not absent.
+        assert m.vitals_module() is not None
+        assert m.audit_trail_module() is not None
+        assert m.drift_quality_module() is not None
+
+    def test_sibling_fallback_when_absent(self, monkeypatch):
+        # The defensive path still works: block the sibling imports and the
+        # accessors degrade to None so dict fixtures take over.
+        import sys
+        for name in ("sincor2.obs_skus.vitals",
+                     "sincor2.obs_skus.audit_trail",
+                     "sincor2.obs_skus.drift_quality"):
+            monkeypatch.setitem(sys.modules, name, None)
         assert m.vitals_module() is None
         assert m.audit_trail_module() is None
         assert m.drift_quality_module() is None
@@ -318,9 +332,37 @@ class TestDispatcher:
 
     def test_send_alert_dry_run_default_never_sends(self):
         cfgs = [m.AdapterConfig(name="w", kind="generic_webhook",
-                                url="http://127.0.0.1:1/nope", enabled=True)]
+                                url="http://127.0.0.1:1/nope", enabled=True,
+                                secret="test-secret")]
         results = m.send_alert_via_adapters({"summary": "x"}, cfgs)
         assert results[0].ok is True and results[0].dry_run is True
+
+    def test_empty_secret_is_fail_closed_at_dispatch(self):
+        d = m.SignedWebhookDispatcher()
+        res = d.dispatch("https://example.com/hook", {"a": 1}, "",
+                         dry_run=True)
+        assert res.ok is False
+        assert "secret" in (res.error or "").lower()
+
+    def test_send_alert_refuses_enabled_adapter_without_secret(self):
+        # Enabled + URL but no signing secret: must fail closed, never send
+        # a payload with a null HMAC key.
+        cfgs = [m.AdapterConfig(name="w", kind="generic_webhook",
+                                url="https://example.com/hook", enabled=True)]
+        results = m.send_alert_via_adapters({"summary": "x"}, cfgs)
+        assert len(results) == 1
+        assert results[0].ok is False
+        assert "secret" in (results[0].error or "").lower()
+        # healthchecks_style pings are unsigned by design: no secret needed.
+        cfgs = [m.AdapterConfig(name="hc", kind="healthchecks_style",
+                                url="https://example.com/ping", enabled=True)]
+        results = m.send_alert_via_adapters({"summary": "x"}, cfgs)
+        assert results[0].ok is True
+
+    def test_status_label_flags_missing_secret(self):
+        cfg = m.AdapterConfig(name="w", kind="generic_webhook",
+                              url="https://example.com/hook", enabled=True)
+        assert "fail closed" in cfg.status_label
 
 
 # ---------------------------------------------------------------------------

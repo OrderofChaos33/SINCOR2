@@ -87,9 +87,9 @@ def test_sibling_module_paths_declared():
     assert sibling_module_path("AUD-01") == "src/sincor2/obs_skus/forensic_audit.py"
     assert sibling_module_path("AUD-02") == "src/sincor2/obs_skus/compliance_pack.py"
     assert sibling_module_path("OBS-ENT") == "src/sincor2/obs_skus/enterprise_mesh.py"
-    # referenced lazily: sibling modules do not exist yet
+    # post-integration: every declared sibling module exists on disk
     for rel in SIBLING_MODULE_PATHS.values():
-        assert not os.path.exists(os.path.join(ROOT, rel)), f"unexpectedly exists: {rel}"
+        assert os.path.exists(os.path.join(ROOT, rel)), f"missing: {rel}"
 
 
 # -- spec files ------------------------------------------------------------
@@ -206,12 +206,16 @@ def test_spec_to_build_passes_with_draft_unwired(tmp_path):
         assert res.ok, f"{sku_id}: " + "; ".join(r.reason for r in res.reasons if not r.ok)
 
 
-def test_build_to_test_refused_until_sibling_builds(tmp_path):
-    """Honest refusal: sibling implementation modules do not exist yet."""
+def test_build_to_test_refused_until_evidence(tmp_path):
+    """Post-integration the sibling implementation modules exist, so the
+    build->test gate no longer fails on implementation_present — it refuses
+    on missing test evidence, which is the honest remaining gap."""
     ledger = ProofLedger(path=str(tmp_path / "ledger.json"))
     res = evaluate(sku("OBS-02"), "build", "test", ledger, ROOT)
     assert not res.ok
-    assert any(r.check == "implementation_present" and not r.ok for r in res.reasons)
+    by_check = {r.check: r for r in res.reasons}
+    assert by_check["implementation_present"].ok
+    assert not by_check["unit_tests_passing"].ok
 
 
 # -- publish gate: red today, green when evidence exists -------------------

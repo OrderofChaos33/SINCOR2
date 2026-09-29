@@ -591,7 +591,17 @@ class SignedWebhookDispatcher:
         ``dry_run=True`` builds the exact request (headers + canonical
         body) without touching the network — used by tests and by the
         onboarding "test fire" step before an adapter is enabled.
+
+        Fail-closed: an empty signing secret is refused outright. Signing
+        with a null HMAC key would produce a header that *looks* verified
+        but proves nothing, so the dispatch never happens.
         """
+        if not secret:
+            return DeliveryResult(
+                ok=False, adapter=adapter, url=url, status_code=None,
+                attempts=0, error="refused: empty signing secret (fail closed)",
+                payload_sha256="", dry_run=dry_run,
+            )
         payload = dict(payload)
         try:
             body = canonical_json(payload).encode("utf-8")
@@ -716,6 +726,8 @@ class AdapterConfig:
             return "disabled (default — configure an endpoint during onboarding)"
         if not self.url:
             return "enabled but missing endpoint — no alerts will be sent"
+        if self.kind != ADAPTER_HEALTHCHECKS_STYLE and not self.secret:
+            return "enabled but missing signing secret — no alerts will be sent (fail closed)"
         return "enabled — customer-configured endpoint"
 
 
@@ -852,6 +864,15 @@ def send_alert_via_adapters(
             results.append(DeliveryResult(
                 ok=False, adapter=cfg.kind, url="", status_code=None,
                 attempts=0, error=f"adapter {cfg.name!r} enabled but no endpoint configured",
+                payload_sha256="", dry_run=dry_run,
+            ))
+            continue
+        if cfg.kind != ADAPTER_HEALTHCHECKS_STYLE and not cfg.secret:
+            # Fail closed: a signed adapter with no secret must never send.
+            # (healthchecks_style pings are unsigned by design.)
+            results.append(DeliveryResult(
+                ok=False, adapter=cfg.kind, url=cfg.url, status_code=None,
+                attempts=0, error=f"adapter {cfg.name!r} enabled but no signing secret configured — refused (fail closed)",
                 payload_sha256="", dry_run=dry_run,
             ))
             continue

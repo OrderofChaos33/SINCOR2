@@ -443,3 +443,79 @@ def test_walkthrough_refuses_tampered_archive(archive_bytes):
     lines[0] = json.dumps(obj, sort_keys=True, separators=(",", ":"))
     with pytest.raises(fa.ArchiveVerificationError):
         fa.audit_pipeline(_repack(manifest, lines))
+
+
+# ---------------------------------------------------------------------------
+# B2 archive ingestion (Track B integration): the forensic ingest consumes
+# the REAL obs_skus.audit_trail archive format — keccak256 chain, per-entry
+# Ed25519 signatures, 32-zero-byte genesis.
+# ---------------------------------------------------------------------------
+
+from sincor2.obs_skus import audit_trail as obs02
+
+
+def _real_b2_archive(tmp_path, monkeypatch):
+    """Build a signed B2 audit trail and export a real archive directory."""
+    seed_hex, _vk_hex = obs02.generate_keypair()
+    monkeypatch.setenv("SINCOR_AUDIT_SIGNING_KEY", seed_hex)
+    trail = obs02.AuditTrail(log_path=tmp_path / "audit_log.jsonl",
+                             enabled=True)
+    base_ms = 1790000000000
+    trail.record("agent-001", "bid_commit",
+                 detail={"auction_id": "auc-1", "note": "commit 40 AXM"},
+                 timestamp_ms=base_ms)
+    trail.record("agent-002", "bid_reveal",
+                 detail={"auction_id": "auc-1"},
+                 timestamp_ms=base_ms + 60000)
+    trail.record("agent-001", "auction_close",
+                 detail={"auction_id": "auc-1", "commits": 1, "reveals": 1},
+                 timestamp_ms=base_ms + 120000)
+    archive_dir = tmp_path / "archive"
+    trail.export_archive(archive_dir)
+    return archive_dir
+
+
+def test_ingests_real_b2_archive(tmp_path, monkeypatch):
+    archive_dir = _real_b2_archive(tmp_path, monkeypatch)
+    archive = fa.ingest_audit_trail_archive(archive_dir)
+    # Manifest is B2's real one: keccak-256 chain, ed25519 signatures.
+    assert archive.manifest["hash_alg"] == "keccak-256"
+    assert archive.manifest["sig_alg"] == "ed25519"
+    assert archive.manifest["archive_id"].startswith("obs02-archive:")
+    assert len(archive.entries) == 3
+    # Entries adapted to the forensic shape; per-entry sigs preserved in
+    # provenance; genesis prev_hash is 32 zero bytes.
+    e0 = archive.entries[0]
+    assert e0["seq"] == 0
+    assert e0["agent_id"] == "agent-001"
+    assert e0["action"] == "bid_commit"
+    assert e0["details"]["auction_id"] == "auc-1"
+    assert e0["prev_hash"] == "00" * 32
+    assert e0["provenance"]["sig"], "per-entry Ed25519 signature kept"
+    assert e0["ts"].startswith("2026-"), e0["ts"]
+    # The full forensic pipeline runs on the adapted archive.
+    timeline = fa.reconstruct_timeline(archive)
+    assert timeline["window"]["entry_count"] == 3
+    assert set(timeline["agents"]) == {"agent-001", "agent-002"}
+    assert timeline["attribution"]["unattributed"] == 0
+    analysis = fa.failure_mode_analysis(archive)
+    assert isinstance(analysis, list)
+    checks = {c["check"] for c in archive.checks}
+    assert {"obs02_chain", "obs02_manifest_pins", "obs02_signatures"} <= checks
+
+
+def test_tampered_b2_archive_is_refused(tmp_path, monkeypatch):
+    archive_dir = _real_b2_archive(tmp_path, monkeypatch)
+    log_path = archive_dir / "audit_log.jsonl"
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+    obj = json.loads(lines[1])
+    obj["detail"]["auction_id"] = "auc-FORGED"
+    lines[1] = json.dumps(obj, sort_keys=True, separators=(",", ":"))
+    log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with pytest.raises(fa.ArchiveVerificationError):
+        fa.ingest_audit_trail_archive(archive_dir)
+
+
+def test_b2_archive_missing_members_is_refused(tmp_path):
+    with pytest.raises(fa.ArchiveVerificationError):
+        fa.ingest_audit_trail_archive(tmp_path / "does-not-exist")

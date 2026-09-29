@@ -54,12 +54,12 @@ Schema assumptions vs the sibling audit_trail.py (B2, built in parallel):
   - Assumed: manifest carries head_hash, entry_count, signer identity and an
     ed25519 signature over the manifest; entries are hash-chained with
     per-entry sha256.
-  - If B2's final schema differs, ingest_archive() refuses unknown fields
-    only where they break verification (wrong format tag, unsupported
-    chain/signature algorithm); extra manifest keys are ignored, extra entry
-    keys are ignored, and every check that runs is stated in the returned
-    verification report. A small adapter (not invented here) is the correct
-    response to schema drift - do not silently accept.
+  - RESOLVED (Track B integration, 2026-09-29): B2's real archive schema is
+    now consumed directly by ingest_audit_trail_archive(), which delegates
+    chain + manifest verification to obs_skus.audit_trail.AuditTrail
+    (keccak256 chain, 32-zero-byte genesis, per-entry Ed25519 signatures).
+    The ZIP/sha256 path above remains for archives packed by this module's
+    own pack_archive(); it is NOT used for B2 exports.
 
 Trust boundary (stated honestly):
   - Signature verification proves the manifest was signed by the private key
@@ -497,6 +497,114 @@ def ingest_archive(source: Union[str, Path, bytes]) -> VerifiedArchive:
 
     return VerifiedArchive(
         manifest=manifest, entries=entries, archive_sha256=archive_sha256,
+        verified_at=datetime.now(timezone.utc).isoformat(), checks=checks)
+
+
+# ---------------------------------------------------------------------------
+# ingest_audit_trail_archive: consume a real OBS-02 (B2) archive directory
+# ---------------------------------------------------------------------------
+
+def ingest_audit_trail_archive(archive_dir: Union[str, Path],
+                               verify_key_hex: Optional[str] = None
+                               ) -> VerifiedArchive:
+    """Load and verify an archive exported by ``obs_skus.audit_trail`` (B2).
+
+    B2's real on-disk format (``AuditTrail.export_archive``):
+
+    * directory containing ``manifest.json`` + ``audit_log.jsonl``
+    * hash chain: ``entry_hash = keccak256(prev_hash_raw || canonical(body))``
+    * genesis ``prev_hash``: 32 zero bytes
+    * per-entry Ed25519 signatures over ``entry_hash`` (``sig`` field)
+    * manifest: ``sku`` / ``format_version`` / ``hash_alg="keccak-256"`` /
+      ``sig_alg="ed25519"`` / ``entries`` / ``head_hash`` / ``verify_key`` /
+      ``exported_at_ms`` / ``manifest_sig``
+
+    Chain and manifest verification is delegated to
+    :meth:`AuditTrail.verify_archive` — the sibling module is the single
+    source of truth for its own crypto; this function only adapts the
+    verified entries into the forensic entry shape (``seq``/``ts``/
+    ``agent_id``/``action``/``details``/``prev_hash``/``entry_hash``) so
+    ``reconstruct_timeline`` and ``failure_mode_analysis`` work unchanged.
+    Any verification failure raises :class:`ArchiveVerificationError` —
+    the archive is refused, never partially trusted.
+    """
+    try:
+        from .audit_trail import AuditTrail
+    except ImportError as exc:  # pragma: no cover - sibling absent
+        raise ArchiveVerificationError(
+            "Cannot ingest OBS-02 archive: sibling module "
+            "obs_skus.audit_trail is not importable: %s" % exc,
+            [{"check": "sibling_available",
+              "detail": "obs_skus.audit_trail import failed", "seq": None}])
+
+    archive = Path(archive_dir)
+    raw_log = archive / "audit_log.jsonl"
+    archive_sha256 = (hashlib.sha256(raw_log.read_bytes()).hexdigest()
+                      if raw_log.exists() else "")
+    report = AuditTrail.verify_archive(archive, verify_key_hex)
+    failures = report.get("failures") or []
+    checks: List[Dict[str, str]] = []
+    if not failures:
+        checks.append({"check": "obs02_chain", "result": "pass",
+                       "detail": "%d entries re-hashed (keccak256), chain "
+                                 "linked from 32-zero-byte genesis"
+                                 % report.get("entries", 0)})
+        checks.append({"check": "obs02_manifest_pins", "result": "pass",
+                       "detail": "entry count + head_hash match manifest"})
+        checks.append({"check": "obs02_signatures", "result": "pass",
+                       "detail": "%d signed / %d unsigned entries; every "
+                                 "present Ed25519 signature verifies"
+                                 % (report.get("signed", 0),
+                                    report.get("unsigned", 0))})
+    if failures:
+        raise ArchiveVerificationError(
+            "OBS-02 archive refused: %d verification check(s) failed. "
+            "The archive cannot be trusted for a forensic audit."
+            % len(failures),
+            [{"check": f.get("kind", "unknown"),
+              "detail": f.get("detail", ""), "seq": f.get("seq")}
+             for f in failures])
+
+    manifest = json.loads((archive / "manifest.json").read_text(
+        encoding="utf-8"))
+    head_hash = report["head_hash"]
+    adapted_manifest = dict(manifest)
+    adapted_manifest["archive_id"] = "obs02-archive:%s" % head_hash[:16]
+    adapted_manifest["format"] = "sincor-obs02-audit-trail"
+    adapted_manifest["signed_entries"] = report.get("signed", 0)
+    adapted_manifest["unsigned_entries"] = report.get("unsigned", 0)
+
+    entries: List[Dict[str, Any]] = []
+    for line in raw_log.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        src = json.loads(line)
+        ts_ms = src.get("timestamp_ms", 0)
+        try:
+            ts = datetime.fromtimestamp(ts_ms / 1000,
+                                        tz=timezone.utc).isoformat()
+        except (TypeError, ValueError, OSError, OverflowError):
+            ts = ""
+        entries.append({
+            "seq": src.get("seq"),
+            "ts": ts,
+            "agent_id": src.get("agent_id") or "",
+            "action": src.get("action") or "",
+            "details": src.get("detail") or {},
+            "prev_hash": src.get("prev_hash") or "",
+            "entry_hash": src.get("entry_hash") or "",
+            "provenance": {
+                "sig": src.get("sig"),
+                "verify_key": src.get("verify_key"),
+                "causal_parent": src.get("causal_parent"),
+                "timestamp_ms": ts_ms,
+            },
+        })
+
+    return VerifiedArchive(
+        manifest=adapted_manifest, entries=entries,
+        archive_sha256=archive_sha256,
         verified_at=datetime.now(timezone.utc).isoformat(), checks=checks)
 
 
