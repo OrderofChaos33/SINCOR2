@@ -198,3 +198,22 @@ class LiveOrderBlocker:
         raise LiveBlockedError(
             "P12 produces slice schedules only (live_blocked=True): "
             "venue submission never leaves this module")
+
+
+# -- shared price-oracle wiring ------------------------------------------------
+# Declares this product's external price needs against the shared oracle
+# (sincor2.defi.price_oracle). Reference-backed until live feeds are wired;
+# never treated as a live integration.
+
+PRICE_ASSETS = ['ETH/USD']
+
+
+def price_feed_for(oracle):
+    """Bind the shared price oracle to this product's declared assets.
+
+    Returns a ProductPriceFeed; ``feed.price(asset, now)`` raises on any
+    oracle failure (fail-closed). Live Chainlink/Pyth feeds are NOT wired —
+    production must inject real adapters (see price_oracle module docs).
+    """
+    from .price_oracle import wiring_for
+    return wiring_for("P12_TWAMM", oracle)
