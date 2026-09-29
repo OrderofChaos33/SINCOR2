@@ -161,6 +161,8 @@ interface IExecutionEscrowManager {
     error InsufficientReAuctionBalance(uint256 required, uint256 available);
     error BondExceedsRecordableLimit(uint256 max, uint256 provided);
     error FundingMismatch(uint256 expected, uint256 provided);
+    error DisputeHasEvidence();
+    error EvidenceWindowOpen();
     error TransferFailed();
     error InvalidStakeBps();
     error NothingToWithdraw();
@@ -203,11 +205,25 @@ interface IExecutionEscrowManager {
 
     /**
      * @notice Opens a quality dispute against a submitted result.
-     * @dev The poster disputes for free (they are the harmed party). Any other
-     *      challenger must post `challengerBond`, which is returned if the
-     *      dispute is upheld and slashed to the poster's fund if rejected.
+     * @dev P0/W-24: the poster bonds exactly like any challenger -- a free
+     *      poster dispute is a zero-cost delay attack on the worker's payout.
+     *      The bond is returned if the dispute is upheld or if the
+     *      adjudicator goes dark and timeout() fires; it is slashed to the
+     *      poster's re-auction fund if the dispute is rejected.
      */
     function openQualityDispute(bytes32 auctionId, bytes32 batchDigest) external payable;
+
+    /**
+     * @notice Permissionless fast rejection of an evidence-free dispute.
+     * @dev Fires only when the dispute was filed with batchDigest ==
+     *      bytes32(0) (no evidence attached) AND the short
+     *      DISPUTE_EVIDENCE_WINDOW has passed since filing. Resolves exactly
+     *      like an adjudicator rejection -- worker paid in full, bond slashed
+     *      to the poster's fund -- but without waiting out the full
+     *      adjudication window. The adjudicator can always reject earlier
+     *      via resolveQualityDispute(auctionId, false).
+     */
+    function rejectEvidenceFreeDispute(bytes32 auctionId) external;
 
     /**
      * @notice Adjudicator resolves an active dispute.

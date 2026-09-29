@@ -21,6 +21,11 @@ import "./security/ScopedPausable.sol";
  *        clocks, so a permissionless timeout() can never steamroll an open
  *        dispute -- it can only fire after the resolution deadline passes,
  *        and then it defaults to the optimistic (worker-favor) outcome.
+ *      - The poster bonds on disputes exactly like any challenger: a free
+ *        poster dispute is a zero-cost delay attack on the worker's payout.
+ *        Disputes filed with no evidence can be fast-rejected after a short
+ *        evidence window instead of stalling through the full adjudication
+ *        window.
  */
 contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     /// @notice The sealed-bid core; the only caller allowed to initialize escrows.
@@ -31,6 +36,13 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     uint256 public immutable minStakeBps;
     /// @notice Bond required of non-poster challengers opening a dispute.
     uint256 public challengerBond;
+    /// @notice Short window after a dispute is opened during which the
+    ///         challenger is expected to have evidence attached to it. If a
+    ///         dispute is still evidence-free when this window passes, anyone
+    ///         may fast-reject it via rejectEvidenceFreeDispute() instead of
+    ///         waiting out the full adjudication window -- a zero-evidence
+    ///         dispute would otherwise stall the worker's payout for days.
+    uint32 public constant DISPUTE_EVIDENCE_WINDOW = 6 hours;
 
     mapping(bytes32 => Escrow) public escrows;
     mapping(bytes32 => Dispute) public disputes;
@@ -167,14 +179,14 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
             revert DisputeWindowExpired();
         }
 
-        uint96 bond = 0;
-        if (msg.sender == esc.poster) {
-            // Poster disputes free; forbid accidental ETH lockup.
-            if (msg.value != 0) revert FundingMismatch(0, msg.value);
-        } else {
-            if (msg.value < challengerBond) revert InsufficientBond(challengerBond, msg.value);
-            bond = uint96(msg.value);
-        }
+        // P0/W-24: EVERYONE bonds, the poster included. A zero-cost poster
+        // dispute stalls the worker's payout through the whole adjudication
+        // window for free (griefer's delay attack), so the poster posts the
+        // same challengerBond with the same economics as the challenger path:
+        // returned if the dispute is upheld or if the adjudicator goes dark,
+        // slashed to the poster's re-auction fund if the dispute is rejected.
+        if (msg.value < challengerBond) revert InsufficientBond(challengerBond, msg.value);
+        uint96 bond = uint96(msg.value);
 
         esc.disputeActive = true;
         uint32 disputeTimestamp = uint32(block.timestamp);
@@ -199,6 +211,20 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
         } else {
             _resolveDisputeReject(esc, auctionId);
         }
+    }
+
+    /// @inheritdoc IExecutionEscrowManager
+    function rejectEvidenceFreeDispute(bytes32 auctionId) external override {
+        Escrow storage esc = escrows[auctionId];
+        if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
+        Dispute memory d = disputes[auctionId];
+        // A dispute with a batch digest already carries evidence attached;
+        // the fast path is only for disputes that were filed with none.
+        if (d.batchDigest != bytes32(0)) revert DisputeHasEvidence();
+        if (block.timestamp <= uint256(d.disputeTimestamp) + DISPUTE_EVIDENCE_WINDOW) {
+            revert EvidenceWindowOpen();
+        }
+        _resolveDisputeReject(esc, auctionId);
     }
 
     /**
@@ -246,8 +272,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
      *      (bidAmount + stake). A false challenger's bond is slashed to the
      *      poster's fund as the anti-griefing penalty.
      */
-    function _resolveDisputeReject(Escrow storage esc, bytes32 auctionId) internal {
-        Escrow memory m = esc;
+    function _resolveDisputeReject(Escrow storage esc, bytes32 auctionId) internal {        Escrow memory m = esc;
         Dispute memory d = disputes[auctionId];
         if (d.challengerBond > 0) {
             posterReAuctionBalances[m.poster] += d.challengerBond;
