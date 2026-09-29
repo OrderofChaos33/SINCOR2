@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Vitals (Beta) — SINCOR</title>
+<meta name="description" content="Live operational vitals for your SINCOR agent fleet. Beta preview.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  .beta-band { background: linear-gradient(90deg, #241a08, #2e2110); border-bottom: 1px solid rgba(212,169,78,.35); }
+  .beta-band-inner { max-width: 1180px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--text-dim); }
+  .beta-pill { background: var(--gold); color: #14100a; font-weight: 800; font-size: 12px; letter-spacing: .12em; padding: 4px 12px; border-radius: 999px; }
+  .v-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .v-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 28px 0 8px; }
+  .v-stat { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+  .v-stat .k { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+  .v-stat .v { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--text); margin-top: 4px; }
+  .v-table-wrap { overflow-x: auto; margin-top: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-card); }
+  table.v-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 960px; }
+  .v-table th { text-align: left; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); padding: 12px 14px; border-bottom: 1px solid var(--line-strong); background: var(--bg-soft); white-space: nowrap; }
+  .v-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--text-dim); vertical-align: top; }
+  .v-table tr:last-child td { border-bottom: none; }
+  .v-table .aid { color: var(--text); font-weight: 600; font-family: ui-monospace, monospace; font-size: 13px; }
+  .health { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; border: 1px solid; }
+  .health.live { color: var(--green); border-color: rgba(61,220,132,.4); background: rgba(61,220,132,.08); }
+  .health.stale { color: var(--gold-bright); border-color: rgba(212,169,78,.4); background: rgba(212,169,78,.08); }
+  .health.silent { color: #ff7a7a; border-color: rgba(255,122,122,.4); background: rgba(255,122,122,.08); }
+  .health.budget_blocked, .health.kya_suspended { color: #ffa94d; border-color: rgba(255,169,77,.45); background: rgba(255,169,77,.08); }
+  .health.unknown { color: var(--text-faint); border-color: var(--line-strong); background: transparent; }
+  .budget-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 6px; min-width: 90px; }
+  .budget-bar > span { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright)); }
+  .v-note { font-size: 13px; color: var(--text-faint); }
+  .v-alert-row { display: flex; gap: 10px; align-items: center; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; margin-top: 12px; font-size: 14px; color: var(--text-dim); }
+  .v-empty { padding: 48px 24px; text-align: center; color: var(--text-faint); }
+  .mono { font-family: ui-monospace, monospace; font-size: 12.5px; }
+  .v-h3 { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text); margin: 0 0 12px; }
+</style>
+</head>
+<body>
+
+<div class="beta-band">
+  <div class="beta-band-inner">
+    <span class="beta-pill">BETA</span>
+    <span>Agent Vitals is in private beta — shown here by direct link only while it earns its place. Every number below is read live from the platform; anything we can't measure shows as <span class="mono">—</span>.</span>
+  </div>
+</div>
+
+<header class="sp-section tight" style="padding-top:48px">
+  <div class="sp-wrap">
+    <div class="v-head">
+      <div>
+        <span class="sp-eyebrow">Observability · OBS-01</span>
+        <h1 class="sp-h1" style="margin-top:8px">Agent <span class="gold">Vitals</span></h1>
+        <p class="sp-lede">A live operational picture of your fleet — heartbeats, budgets, and measured task cost, in one calm view.</p>
+      </div>
+      <div class="v-note">Snapshot {{ fleet.as_of }} · heartbeat TTL {{ fleet.heartbeat_ttl_s }}s</div>
+    </div>
+
+    <div class="v-stat-row">
+      <div class="v-stat"><div class="k">Agents tracked</div><div class="v">{{ fleet.fleet_size }}</div></div>
+      <div class="v-stat"><div class="k">Live now</div><div class="v">{{ fleet.health_counts.get('live', 0) }}</div></div>
+      <div class="v-stat"><div class="k">Stale / silent</div><div class="v">{{ fleet.health_counts.get('stale', 0) + fleet.health_counts.get('silent', 0) }}</div></div>
+      <div class="v-stat"><div class="k">Budget-blocked</div><div class="v">{{ fleet.health_counts.get('budget_blocked', 0) }}</div></div>
+      <div class="v-stat"><div class="k">Alerts fired (this read)</div><div class="v">{{ alert_summary.evaluated }}</div></div>
+      <div class="v-stat"><div class="k">Webhooks delivered</div><div class="v">{{ alert_summary.dispatched }}</div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight" style="padding-top:0">
+  <div class="sp-wrap">
+
+    {% if fleet.agents %}
+    <div class="v-table-wrap">
+      <table class="v-table">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Health</th>
+            <th>Heartbeat</th>
+            <th>Uptime (30d)</th>
+            <th>Tasks done</th>
+            <th>Cost / task</th>
+            <th>Token budget</th>
+            <th>Tool calls</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for a in fleet.agents %}
+          <tr>
+            <td>
+              <div class="aid">{{ a.agent_id }}</div>
+              <div class="v-note">{{ a.name }}{% if a.kya_status %} · KYA {{ a.kya_status }}{% endif %}</div>
+            </td>
+            <td><span class="health {{ a.health }}">{{ a.health.replace('_', ' ') }}</span></td>
+            <td>
+              {% if a.heartbeat_age_s is not none %}<span class="mono">{{ a.heartbeat_age_s }}s ago</span>{% else %}<span class="mono">—</span>{% endif %}
+              <div class="v-note">{{ a.heartbeat_status }}{% if a.latency_ms is not none %} · {{ a.latency_ms }}ms{% endif %}</div>
+            </td>
+            <td>{% if a.uptime_pct is not none %}<span class="mono">{{ a.uptime_pct }}%</span>{% else %}<span class="mono">—</span>{% endif %}</td>
+            <td><span class="mono">{{ a.tasks_completed }}</span><div class="v-note">{{ '%.2f'|format(a.total_earned_axm) }} AXM earned</div></td>
+            <td>{% if a.cost_per_task_axm is not none %}<span class="mono">{{ '%.4f'|format(a.cost_per_task_axm) }} AXM</span>{% else %}<span class="mono">—</span>{% endif %}</td>
+            <td>
+              {% if a.token_budget.source_ok %}
+              <span class="mono">{{ a.token_budget.used_today }} / {{ a.token_budget.daily_ceiling }}</span>
+              <div class="budget-bar"><span style="width: {{ [a.token_budget.utilisation_pct, 100]|min }}%"></span></div>
+              <div class="v-note">{% if a.token_budget.killed %}killed by operator{% elif not a.token_budget.allowed %}ceiling reached{% else %}within budget{% endif %}</div>
+              {% else %}
+              <span class="v-note">Budget unavailable</span>
+              {% endif %}
+            </td>
+            <td>{% if a.tool_calls.instrumented %}<span class="mono">{{ a.tool_calls.used }} / {{ a.tool_calls.limit }}</span>{% else %}<span class="v-note">Not instrumented</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="v-empty">
+      <h3 style="color:var(--text)">No agents registered yet</h3>
+      <p>Once agents register and heartbeat, their vitals appear here automatically.</p>
+    </div>
+    {% endif %}
+
+    {% if alert_summary.events %}
+    <h3 class="v-h3" style="margin-top:36px">Alerts on this read</h3>
+    {% for e in alert_summary.events %}
+    <div class="v-alert-row">
+      <span class="health stale">{{ e.metric }}</span>
+      <span><strong>{{ e.agent_id }}</strong> — {{ e.metric }} {{ e.operator }} {{ e.threshold }} (observed {{ e.observed_value }})</span>
+      <span class="v-note mono">{{ e.event_id }}</span>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div style="margin-top:36px">
+      <h3 class="v-h3">About these numbers</h3>
+      <ul class="v-note" style="line-height:2">
+        {% for note in fleet.notes %}<li>{{ note }}</li>{% endfor %}
+        <li>Health is fail-closed: a revoked KYA identity or a killed token budget is never shown as live.</li>
+        <li>Webhook alerts fire on threshold breaches with signed, retried delivery — configure them with <span class="mono">SINCOR_VITALS_ALERTS</span>.</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+</body>
+</html>
