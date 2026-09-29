@@ -68,8 +68,10 @@ def _pass_reveal_deadline(task_id):
 
 
 def test_sdk_commitment_matches_server_utility():
-    """The SDK's commitment (via bidder_client) must equal the server's
-    sealed_commitment byte-for-byte — one preimage, both paths."""
+    """The SDK's commitment must equal the server's offchain
+    sealed_commitment byte-for-byte — one preimage, both paths. (The SDK
+    targets the OFFCHAIN API; the onchain scheme adds auctionId+chainId
+    bindings and is covered by the bidder-client tests.)"""
     salt = bytes.fromhex("ab" * 32)
     mine = SincorAgentSDK.make_commitment(0.9, salt, AGENT)
     theirs = "0x" + sealed_commitment(int(0.9 * 1e18), salt, AGENT).hex()
