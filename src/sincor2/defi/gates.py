@@ -43,7 +43,8 @@ STAGE_MAP: Dict[str, str] = {
 }
 
 # protocol_id -> repo-relative implementation path. P01 (yield_aggregator),
-# P04 (mev_capture), P05 (insurance_mutual), P06 (perp_hedge_swarm) have
+# P04 (mev_capture), P05 (insurance_mutual), P06 (perp_hedge_swarm),
+# P08 (rwa_vaults), P10 (flash_arbitrage), P14 (prediction_markets) have
 # real strategy math; everything else is unimplemented until its
 # build-phase tasks land.
 IMPLEMENTATIONS: Dict[str, str] = {
@@ -53,6 +54,9 @@ IMPLEMENTATIONS: Dict[str, str] = {
     "P04_MEV": os.path.join("src", "sincor2", "defi", "mev_capture.py"),
     "P05_INSURANCE": os.path.join("src", "sincor2", "defi", "insurance_mutual.py"),
     "P06_PERPS": os.path.join("src", "sincor2", "defi", "perp_hedge_swarm.py"),
+    "P08_RWA": os.path.join("src", "sincor2", "defi", "rwa_vaults.py"),
+    "P10_FLASH_ARB": os.path.join("src", "sincor2", "defi", "flash_arbitrage.py"),
+    "P14_PREDICTION": os.path.join("src", "sincor2", "defi", "prediction_markets.py"),
 }
 
 # protocol_id -> auction spec filename stem (~/workspace/sincor2-auction-tasks/specs/)
