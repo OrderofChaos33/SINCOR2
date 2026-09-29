@@ -45,10 +45,11 @@ STAGE_MAP: Dict[str, str] = {
 # protocol_id -> repo-relative implementation path. P01 (yield_aggregator),
 # P02 (clmm_manager), P03 (intent_dark_pool), P04 (mev_capture),
 # P05 (insurance_mutual), P06 (perp_hedge_swarm), P07 (bridge_optimizer),
-# P08 (rwa_vaults), P10 (flash_arbitrage), P14 (prediction_markets),
-# P16 (dex_aggregator), P17 (options_protocol), P19 (credit_underwriting)
-# have real strategy math; everything else is unimplemented until its
-# build-phase tasks land.
+# P08 (rwa_vaults), P09 (dao_governance), P10 (flash_arbitrage),
+# P11 (delta_neutral), P12 (twamm), P13 (avs_tranching),
+# P14 (prediction_markets), P16 (dex_aggregator), P17 (options_protocol),
+# P19 (credit_underwriting) have real strategy math; everything else is
+# unimplemented until its build-phase tasks land.
 IMPLEMENTATIONS: Dict[str, str] = {
     "P01_YIELD_AGG": os.path.join("src", "sincor2", "defi", "yield_aggregator.py"),
 "P02_CLMM": os.path.join("src", "sincor2", "defi", "clmm_manager.py"),
@@ -58,7 +59,11 @@ IMPLEMENTATIONS: Dict[str, str] = {
     "P06_PERPS": os.path.join("src", "sincor2", "defi", "perp_hedge_swarm.py"),
     "P07_BRIDGE": os.path.join("src", "sincor2", "defi", "bridge_optimizer.py"),
     "P08_RWA": os.path.join("src", "sincor2", "defi", "rwa_vaults.py"),
+    "P09_DAO_GOV": os.path.join("src", "sincor2", "defi", "dao_governance.py"),
     "P10_FLASH_ARB": os.path.join("src", "sincor2", "defi", "flash_arbitrage.py"),
+    "P11_DELTA_NEUTRAL": os.path.join("src", "sincor2", "defi", "delta_neutral.py"),
+    "P12_TWAMM": os.path.join("src", "sincor2", "defi", "twamm.py"),
+    "P13_AVS": os.path.join("src", "sincor2", "defi", "avs_tranching.py"),
     "P14_PREDICTION": os.path.join("src", "sincor2", "defi", "prediction_markets.py"),
     "P16_DEX_AGG": os.path.join("src", "sincor2", "defi", "dex_aggregator.py"),
     "P17_OPTIONS": os.path.join("src", "sincor2", "defi", "options_protocol.py"),

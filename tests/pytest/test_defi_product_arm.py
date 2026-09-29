@@ -65,11 +65,13 @@ def test_all_26_registered_no_drift(isolated):
 
 def test_initial_stages(isolated):
     reg = {p["protocol_id"]: p for p in products.build_registry()}
-    # P01/P04/P05/P06 have real strategy math in the repo -> start at build
-    for pid in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
+    # Products with real strategy math in the repo -> start at build
+    build_start = ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS",
+                   "P09_DAO_GOV", "P11_DELTA_NEUTRAL", "P12_TWAMM", "P13_AVS")
+    for pid in build_start:
         assert reg[pid]["stage"] == "build", pid
     for pid, p in reg.items():
-        if pid not in ("P01_YIELD_AGG", "P04_MEV", "P05_INSURANCE", "P06_PERPS"):
+        if pid not in build_start:
             assert p["stage"] == "spec", pid
 
 
@@ -161,11 +163,11 @@ def test_no_stage_skipping(isolated, ledger):
 
 
 def test_build_to_test_refuses_without_implementation(isolated, ledger):
-    # NOTE: uses P09_GOV as the no-implementation example. P01-P08,
-    # P10/P14 and P16/P17/P19 now ship reference implementations, so they
-    # no longer exercise the "missing implementation" refusal path. Convention:
-    # lowest-numbered product without an entry in gates.IMPLEMENTATIONS.
-    p = _at_stage("SINCOR-DEFI-P09-GOV", "build")
+    # All 26 products now ship reference implementations, so the refusal
+    # path is exercised with a synthetic protocol id that has no entry in
+    # gates.IMPLEMENTATIONS. The gate must refuse build->test; the registry
+    # itself is not the subject of this test.
+    p = _at_stage("SINCOR-DEFI-P26-DEFIOS", "build", protocol_id="P99_SYNTHETIC")
     res = evaluate(p, "test", ledger, products.REPO_ROOT)
     assert not res.ok
     failed = {r.check for r in res.reasons if not r.ok}

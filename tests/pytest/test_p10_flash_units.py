@@ -301,3 +301,20 @@ def test_no_loss_making_execution_in_fuzz():
             assert s.net_cents >= 0 and not s.reverted
         except SafetyAbort:
             pass  # abort is the safe outcome
+
+
+def test_scanner_net_is_single_sourced():
+    """Regression: net_cents deducts each cost exactly once — scan() owns
+    swap fees, flash premium, and slippage; check() subtracts only gas.
+    (Previously check() re-subtracted premium + slippage: conservative
+    but inconsistent with the spec's net formula.)"""
+    c = OpportunityScanner().scan(_quotes(), NOTIONAL, block_number=100)[0]
+    gross = int(NOTIONAL * c.gross_edge)
+    swap = NOTIONAL * (30 + 30) // 10_000
+    premium = NOTIONAL * 5 // 10_000
+    slip = NOTIONAL * 2 * 50 // 10_000
+    assert c.net_cents == gross - swap - premium - slip
+    filt = ProfitFloorFilter()
+    d = filt.check(c, gas_cost_cents=1_200)
+    assert d.net_cents == c.net_cents - 1_200
+    assert d.passed  # 348_800c net clears the 150_000c floor

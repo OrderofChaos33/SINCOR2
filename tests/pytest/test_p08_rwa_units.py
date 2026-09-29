@@ -337,3 +337,104 @@ def test_dry_run_mirrors_deposits_to_the_wei(vault):
     assets, shares = vault.dry_run.totals()
     assert assets == 111_111_11 + 222_222_22
     assert shares == a + b
+
+
+# -- randomized lifecycle fuzz (seeded, deterministic) ---------------------------
+def test_fuzz_random_lifecycle_preserves_invariants():
+    """AC1/AC2/AC4: over a randomized deposit/gate/revoke/accrue/redeem
+    lifecycle, the load-bearing invariants hold on every step:
+    (a) pre-gate accrued yield is exactly zero and every yield-bearing
+        path raises; (b) the gate opens only when all four checks pass;
+    (c) integer conservation: total_assets == deposits - requested
+        principal - claimed yield + distributed net, to the cent;
+    (d) shares: total_supply == DEAD_SHARES + minted - burned."""
+    import random
+    rng = random.Random(20260929)
+    addrs = [ALICE, BOB, EVIL, "0xCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCc"]
+    kyc = KYCRegistry()
+    oracle = NAVOracle(initial_nav_cents=100_00, now=NOW)
+    gate = ComplianceGate(kyc, oracle)
+    vault = RWAVault(oracle, kyc, gate)
+
+    deposits = 0
+    requested_principal = 0
+    claimed = 0
+    minted = 0
+    burned = 0
+    pending = []
+
+    for step in range(400):
+        now = NOW + step * 3600
+        op = rng.choice(["deposit", "attest", "revoke", "pack", "accrue",
+                         "claim", "withdraw", "settle", "nav"])
+        a = rng.choice(addrs)
+        if op == "deposit":
+            amt = rng.randint(1, 50_000_00)
+            shares = vault.deposit(a, amt)
+            deposits += amt
+            minted += shares
+        elif op == "attest":
+            kyc.attest(a)
+        elif op == "revoke":
+            kyc.revoke(a)
+        elif op == "pack":
+            # random pack: sometimes valid, sometimes not — promotion must
+            # succeed iff all four checks pass, decided by evaluate(), not
+            # by the caller
+            for x in addrs:
+                if rng.random() < 0.7:
+                    kyc.attest(x)
+            pack = CompliancePack(
+                depositor_addresses=tuple(rng.sample(addrs, 2)),
+                custodian_attested_at=now - rng.choice([0, 3600, 100_000]),
+                nav_reference_cents=100_00,
+                sanctions_blocklist=(EVIL,) if rng.random() < 0.3 else ())
+            checks = vault.promote_to_live(pack, now)
+            if not any(c.name == "already_live" for c in checks):
+                assert vault.is_live == all(c.ok for c in checks)
+        elif op == "accrue":
+            if vault.is_live and not oracle.paused:
+                d = vault.accrue_yield(rng.randint(1, 10_000_00))
+                assert d.fee_cents == d.total_cents * 15 // 10_000
+                assert d.fee_to == TREASURY
+            else:
+                with pytest.raises((GateClosedError, AccrualPausedError)):
+                    vault.accrue_yield(rng.randint(1, 10_000_00))
+        elif op == "claim":
+            if vault.is_live and kyc.is_eligible(a) and not oracle.paused:
+                claimed += vault.claim_yield(a)
+            else:
+                with pytest.raises((GateClosedError, KYCRevokedError,
+                                    AccrualPausedError)):
+                    vault.claim_yield(a)
+        elif op == "withdraw":
+            bal = vault.balance_of(a)
+            if bal > 0:
+                take = rng.randint(1, bal)
+                pw = vault.request_withdraw(a, take, now)
+                requested_principal += pw.principal_cents
+                burned += take
+                pending.append(pw)
+        elif op == "settle":
+            ready = [p for p in pending if not p.settled and now >= p.due_at]
+            for p in ready:
+                vault.settle_withdrawal(p, now)
+        elif op == "nav":
+            # small moves only: a >5% drop would pause accrual, which is
+            # covered by dedicated tests; keep the fuzz on the live path
+            oracle.update(max(1, 100_00 + rng.randint(-400, 400)), now, now)
+
+        # invariant (a): pre-gate yield is exactly zero everywhere
+        if not vault.is_live:
+            assert all(vault.accrued_yield_of(x) == 0 for x in addrs)
+            assert vault.treasury_fees_cents() == 0
+        # invariant (c): integer conservation of assets
+        net_dist = sum(d.net_cents for d in vault.distributions())
+        assert vault.total_assets_cents == (deposits - requested_principal
+                                            - claimed + net_dist)
+        # invariant (d): integer conservation of shares
+        assert vault.total_supply == rwa.DEAD_SHARES + minted - burned
+
+    # dry-run ledger mirrors deposits regardless of gate outcome
+    assets, _ = vault.dry_run.totals()
+    assert assets == deposits

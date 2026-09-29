@@ -115,9 +115,18 @@ class OpportunityScanner:
             score = gross_edge - swap_fees - premium - slippage
             if score <= 0:
                 continue
+            # Single-sourced net (integer cents): every cost deducted exactly
+            # once. Gas is unknown at scan time, so the floor filter subtracts
+            # it later — nothing is ever subtracted twice.
+            gross_cents = int(notional_cents * gross_edge)
+            swap_fee_cents = (notional_cents
+                              * (buy.fee_bps + sell.fee_bps) // 10_000)
             flash_fee = notional_cents * self.flash_premium_bps // 10_000
             slip_cents = notional_cents * 2 * self.slippage_bps_per_leg // 10_000
-            # minOut committed at build time from the observed quotes
+            net_cents = gross_cents - swap_fee_cents - flash_fee - slip_cents
+            # minOut committed at build time from the observed quotes.
+            # Units: centi-base (notional_cents / price), consistent with the
+            # safety dry-run's comparison — scan math only.
             min_out_buy = int(notional_cents / buy.price
                               * (1 - self.slippage_bps_per_leg / 10_000))
             min_out_sell = int(notional_cents / sell.price
@@ -128,7 +137,7 @@ class OpportunityScanner:
                 notional_cents=notional_cents, gross_edge=gross_edge,
                 score=score, flash_fee_cents=flash_fee,
                 gas_cost_cents=0, slippage_cents=slip_cents,
-                net_cents=int(notional_cents * score),
+                net_cents=net_cents,
                 min_out_buy_leg=min_out_buy, min_out_sell_leg=min_out_sell,
                 created_block=block_number))
         self._emitted.extend(out)
@@ -166,8 +175,10 @@ class ProfitFloorFilter:
     def check(self, candidate: ArbCandidate,
               gas_cost_cents: int) -> FloorDecision:
         floor = self.floor_for(candidate.notional_cents)
-        net = (candidate.net_cents - candidate.flash_fee_cents
-               - gas_cost_cents - candidate.slippage_cents)
+        # candidate.net_cents already deducts swap fees, flash premium, and
+        # slippage at scan time: only gas is subtracted here. Single-sourced,
+        # never double-counted.
+        net = candidate.net_cents - gas_cost_cents
         ok = net >= floor
         decision = FloorDecision(ok, net, floor,
                                  "pass" if ok else

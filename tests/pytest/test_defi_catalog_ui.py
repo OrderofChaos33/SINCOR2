@@ -74,8 +74,14 @@ def test_catalog_api_stage_filter(client, arm_data):
     assert body["count"] == 1
     assert all(s["stage"] == "test" for s in body["skus"])
     body = client.get("/api/defi/catalog?stage=SPEC").get_json()
-    assert body["count"] == 25
+    # 26 SKUs: 1 test (fixture-seeded P01), 7 build (P04/P05/P06/P09/P11/
+    # P12/P13 have real strategy math in the repo; P01 is overridden to
+    # test by the fixture state), rest spec.
+    assert body["count"] == 18
     assert all(s["stage"] == "spec" for s in body["skus"])
+    body = client.get("/api/defi/catalog?stage=build").get_json()
+    assert body["count"] == 7
+    assert all(s["stage"] == "build" for s in body["skus"])
 
 
 def test_catalog_api_unknown_stage_is_empty(client, arm_data):

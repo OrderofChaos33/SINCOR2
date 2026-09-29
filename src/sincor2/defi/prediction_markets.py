@@ -132,7 +132,8 @@ class ForecastEngine:
 
     def __init__(self, model_bias: float = 0.0) -> None:
         self.model_bias = model_bias
-        self._outcomes: List[Tuple[float, float, int]] = []  # (p_model, p_market, outcome)
+        # (p_model, p_market, outcome, category)
+        self._outcomes: List[Tuple[float, float, int, str]] = []
 
     def predict(self, snap: MarketSnapshot,
                 signal: float = 0.0) -> Forecast:
@@ -144,9 +145,10 @@ class ForecastEngine:
         confidence = min(0.5 + abs(signal) * 4.0, 0.95)
         return Forecast(p_yes=p, confidence=confidence)
 
-    def record_resolution(self, p_model: float, p_market: float, outcome: int) -> None:
+    def record_resolution(self, p_model: float, p_market: float, outcome: int,
+                          category: str = "general") -> None:
         assert outcome in (0, 1)
-        self._outcomes.append((p_model, p_market, outcome))
+        self._outcomes.append((p_model, p_market, outcome, category))
 
     @staticmethod
     def _brier(pairs: List[Tuple[float, int]]) -> float:
@@ -155,16 +157,30 @@ class ForecastEngine:
         return sum((p - o) ** 2 for p, o in pairs) / len(pairs)
 
     def brier_score(self) -> float:
-        return self._brier([(p, o) for p, _, o in self._outcomes])
+        return self._brier([(p, o) for p, _, o, _ in self._outcomes])
 
     def naive_brier_score(self) -> float:
-        return self._brier([(m, o) for _, m, o in self._outcomes])
+        return self._brier([(m, o) for _, m, o, _ in self._outcomes])
 
     def beats_naive(self) -> bool:
         return self.brier_score() < self.naive_brier_score()
 
     def brier_by_category(self) -> Dict[str, float]:
-        return {"all": self.brier_score()}
+        """Per-category calibration. Drives the category halt kill-switch:
+        any traded category with Brier > BRIER_HALT (0.25) stops taking
+        new positions until recalibrated."""
+        cats: Dict[str, List[Tuple[float, int]]] = {}
+        for p, _, o, c in self._outcomes:
+            cats.setdefault(c, []).append((p, o))
+        return {c: self._brier(pairs) for c, pairs in cats.items()}
+
+    def category_halted(self, category: str) -> bool:
+        """Kill-switch: Brier > 0.25 in a traded category halts new
+        positions there. Categories with no resolutions never halt."""
+        brier = self.brier_by_category().get(category)
+        if brier is None or math.isnan(brier):
+            return False
+        return brier > BRIER_HALT
 
 
 # -- edge check ------------------------------------------------------------------
@@ -474,6 +490,9 @@ def run_backtest(markets: List[Tuple[MarketSnapshot, float, int]],
             snap = feed.ingest(snap, now)
         except (StaleDataError, EdgeVeto):
             continue
+        if engine.category_halted(snap.category):
+            # Kill-switch: miscalibrated category takes no new positions.
+            continue
         fc = engine.predict(snap, signal=signal)
         decision = check_edge(fc.p_yes, snap.yes_price, fc.confidence)
         if not decision.trade:
@@ -490,7 +509,8 @@ def run_backtest(markets: List[Tuple[MarketSnapshot, float, int]],
         risk.register_fill(snap, size.stake_cents)
         pnl = lifecycle.resolve(pos, outcome == 1)
         risk.register_settlement(snap.market_id, pnl, size.stake_cents)
-        engine.record_resolution(fc.p_yes, snap.yes_price, outcome)
+        engine.record_resolution(fc.p_yes, snap.yes_price, outcome,
+                                  category=snap.category)
         equity_curve.append(equity_curve[-1] + pnl)
         per_market.append({"market_id": snap.market_id, "pnl_cents": pnl,
                            "stake_cents": size.stake_cents})

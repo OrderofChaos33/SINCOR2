@@ -374,6 +374,136 @@
         "suite": "test_p05_insurance_units.py::test_fuzzed_op_sequences_never_breach_floor",
         "scope": "500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused. Supersedes mis-keyed invariant entry."
       }
+    },
+    {
+      "entry_id": "ev_d740dfcb359b",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "test_run",
+      "timestamp": 1790696418.770657,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p08_rwa_units.py -q",
+        "suite": "tests/pytest/test_p08_rwa_units.py",
+        "scope": "unit",
+        "passed": 25,
+        "failed": 0,
+        "note": "Track A build-and-test 2026-09-29: pure-Python reference models, integer cents, explicit time, no network/keys."
+      }
+    },
+    {
+      "entry_id": "ev_55e82e5a69e8",
+      "sku": "SINCOR-DEFI-P09-GOV",
+      "kind": "test_run",
+      "timestamp": 1790696418.771829,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p09_dao_units.py -q",
+        "suite": "tests/pytest/test_p09_dao_units.py",
+        "scope": "unit",
+        "passed": 18,
+        "failed": 0,
+        "note": "Track A build-and-test 2026-09-29: pure-Python reference models, integer cents, explicit time, no network/keys."
+      }
+    },
+    {
+      "entry_id": "ev_38205b11f6d2",
+      "sku": "SINCOR-DEFI-P10-FLASHARB",
+      "kind": "test_run",
+      "timestamp": 1790696418.7752721,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p10_flash_units.py -q",
+        "suite": "tests/pytest/test_p10_flash_units.py",
+        "scope": "unit",
+        "passed": 26,
+        "failed": 0,
+        "note": "Track A build-and-test 2026-09-29: pure-Python reference models, integer cents, explicit time, no network/keys."
+      }
+    },
+    {
+      "entry_id": "ev_a31ff16c192a",
+      "sku": "SINCOR-DEFI-P11-DELTANEUTRAL",
+      "kind": "test_run",
+      "timestamp": 1790696418.7785032,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p11_delta_units.py -q",
+        "suite": "tests/pytest/test_p11_delta_units.py",
+        "scope": "unit",
+        "passed": 16,
+        "failed": 0,
+        "note": "Track A build-and-test 2026-09-29: pure-Python reference models, integer cents, explicit time, no network/keys."
+      }
+    },
+    {
+      "entry_id": "ev_aed95ed051cd",
+      "sku": "SINCOR-DEFI-P12-TWAMM",
+      "kind": "test_run",
+      "timestamp": 1790696418.7821386,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p12_twamm_units.py -q",
+        "suite": "tests/pytest/test_p12_twamm_units.py",
+        "scope": "unit",
+        "passed": 16,
+        "failed": 0,
+        "note": "Track A build-and-test 2026-09-29: pure-Python reference models, integer cents, explicit time, no network/keys."
+      }
+    },
+    {
+      "entry_id": "ev_014a231a2eda",
+      "sku": "SINCOR-DEFI-P13-AVS",
+      "kind": "test_run",
+      "timestamp": 1790696418.7847872,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p13_avs_units.py -q",
+        "suite": "tests/pytest/test_p13_avs_units.py",
+        "scope": "unit",
+        "passed": 20,
+        "failed": 0,
+        "note": "Track A build-and-test 2026-09-29: pure-Python reference models, integer cents, explicit time, no network/keys."
+      }
+    },
+    {
+      "entry_id": "ev_b603f4a9e85c",
+      "sku": "SINCOR-DEFI-P14-PREDICT",
+      "kind": "test_run",
+      "timestamp": 1790696418.78723,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p14_prediction_units.py -q",
+        "suite": "tests/pytest/test_p14_prediction_units.py",
+        "scope": "unit",
+        "passed": 32,
+        "failed": 0,
+        "note": "Track A build-and-test 2026-09-29: pure-Python reference models, integer cents, explicit time, no network/keys."
+      }
+    },
+    {
+      "entry_id": "ev_d18452dc90f6",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "invariant_test",
+      "timestamp": 1790696647.0086255,
+      "commit": "5e68cf6edaecf775f6fc077e4055bc5bb2e6f0c0",
+      "recorded_by": "xioix/track-a",
+      "details": {
+        "command": "PYTHONPATH=src:. python -m pytest tests/pytest/test_p08_rwa_units.py::test_fuzz_random_lifecycle_preserves_invariants -q",
+        "suite": "tests/pytest/test_p08_rwa_units.py::test_fuzz_random_lifecycle_preserves_invariants",
+        "scope": "invariant",
+        "iterations": 400,
+        "seed": 20260929,
+        "passed": 1,
+        "failed": 0,
+        "note": "Seeded deterministic lifecycle fuzz: pre-gate zero-yield, gate atomicity, integer conservation of assets and shares."
+      }
     }
   ]
 }
