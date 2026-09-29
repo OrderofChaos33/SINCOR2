@@ -82,5 +82,25 @@
   "SINCOR-DEFI-P21-TREASURY": {
     "stage": "test",
     "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P22-STABLEYIELD": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P23-NFTFI": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P24-SOCIALFI": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P25-PORTFOLIO": {
+    "stage": "test",
+    "version": "0.1.2"
+  },
+  "SINCOR-DEFI-P26-DEFIOS": {
+    "stage": "test",
+    "version": "0.1.2"
   }
 }
