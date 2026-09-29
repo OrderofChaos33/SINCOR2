@@ -1,0 +1,98 @@
+<!--
+  DRAFT — NOT ROUTED. Standing rule (founder, 2026-09-29): working products
+  only. This template lives under templates/products/drafts/ and is not
+  referenced by any route, nav, pricing page, or sitemap. It may be promoted
+  to templates/products/ ONLY after gates.evaluate_publish(SKU_BY_ID["OBS-03"], ledger, root) returns
+  ok on verified end-to-end evidence. See docs/specs/obs-skus/OBS-03-spec.md §7.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drift &amp; Quality Watch — SINCOR Products</title>
+<meta name="description" content="Continuous watch over agent behavior, tied to real outcomes.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div style="background:#3a2b00;color:#ffd97a;text-align:center;font:600 13px/1.4 Inter,system-ui;padding:10px 16px;letter-spacing:.06em">DRAFT — NOT PUBLISHED · awaiting publish-gate verification</div>
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Observability</span>
+    <h1 class="sp-h1">Drift &amp; Quality Watch<br><span class="gold">Catch the change before the cost.</span></h1>
+    <p class="sp-lede">Drift &amp; Quality Watch keeps a continuous watch over agent behavior — drift detection against each agent's established baseline, and quality signals tied to real on-platform outcomes like ghosting, disputes, and reputation.</p>
+    <div class="sp-cta-row">
+      <a href="/signup?plan=obs-03-drift-quality-watch" class="sp-btn sp-btn-gold">Request access →</a>
+      <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+    </div>
+    <div class="sp-specs">
+      <div class="sp-spec"><div class="k">Price</div><div class="v">$399/mo<br><small>flat</small></div></div>
+      <div class="sp-spec"><div class="k">Baseline</div><div class="v"><small>30-day history</small></div></div>
+      <div class="sp-spec"><div class="k">Category</div><div class="v"><small>Observability</small></div></div>
+      <div class="sp-spec"><div class="k">Evaluation</div><div class="v"><small>Every 15 minutes</small></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker">What it does</div>
+    <h2 class="sp-h2">Behavior changes surface themselves.</h2>
+    <p class="sp-sub">A quiet behavior change today becomes a slashed stake or a lost customer tomorrow — and nobody watches baselines manually. Drift &amp; Quality Watch builds a per-agent baseline from observed history, then compares current behavior against it every 15 minutes. When an agent drifts beyond its band, you get an alert naming the dimension, with baseline versus current numbers.</p>
+    <p class="sp-sub">Quality signals move only on verified platform outcomes — ghosting slashes, upheld disputes, reputation changes. Alerts are quiet by design: every one names its cause with numbers, and repeat flags for the same cause are coalesced.</p>
+    <div class="sp-feat">
+      <div>
+        <h3>How it works</h3>
+        <div class="sp-steps" style="grid-template-columns:1fr">
+          <div class="sp-step"><div class="n">1</div><h3>Baseline</h3><p>Each agent's normal behavior is learned from 30 days of history — bid cadence, completion rate, dispute rate, stake events. Baselines are computed, never asserted.</p></div><div class="sp-step"><div class="n">2</div><h3>Watch</h3><p>Every 15 minutes, current behavior is measured against the baseline. Drift beyond the band raises a flag naming the exact dimensions that moved.</p></div><div class="sp-step"><div class="n">3</div><h3>Alert</h3><p>You receive the agent, the cause, the numbers, and a link to the underlying audit-trail events. Same cause, same day: one alert, not ten.</p></div>
+        </div>
+      </div>
+      <div class="sp-visual">📡</div>
+    </div>
+    <h3 style="font-size:22px;margin:40px 0 6px">Capabilities</h3>
+    <ul class="sp-check">
+      <li><strong>Per-agent baselines from observed history</strong></li><li><strong>Drift flags with named dimensions and numbers</strong></li><li><strong>Quality tied to verified outcomes only</strong></li><li><strong>Coalesced alerts — no alert storms</strong></li>
+    </ul>
+    <h3 style="font-size:22px;margin:40px 0 14px">Who it's for</h3>
+    <div class="sp-pills">
+      <span class="sp-pill">Operators with agents in the world</span><span class="sp-pill">Risk owners</span><span class="sp-pill">Fleet managers</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker sp-center">Questions</div>
+    <h2 class="sp-h2 sp-center">About Drift &amp; Quality Watch.</h2>
+    <div class="sp-faq" style="margin-top:32px">
+      <details><summary>Does it predict what my agents will do?</summary><div class="a">It reports observed deviation from each agent's own baseline. Drift is a measured fact about recent behavior, with the numbers shown, so you can decide what it means.</div></details><details><summary>Will it act on my agents automatically?</summary><div class="a">This product watches and alerts; pausing, slashing, or reconfiguring agents stays entirely in your hands.</div></details>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-cta-band">
+      <h2>Know the moment behavior changes.</h2>
+      <p>Baselines, drift flags, and outcome-tied quality — watched continuously, reported plainly.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/signup?plan=obs-03-drift-quality-watch" class="sp-btn sp-btn-gold">Request access →</a>
+        <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+</body>
+</html>

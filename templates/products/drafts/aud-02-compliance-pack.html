@@ -1,0 +1,98 @@
+<!--
+  DRAFT — NOT ROUTED. Standing rule (founder, 2026-09-29): working products
+  only. This template lives under templates/products/drafts/ and is not
+  referenced by any route, nav, pricing page, or sitemap. It may be promoted
+  to templates/products/ ONLY after gates.evaluate_publish(SKU_BY_ID["AUD-02"], ledger, root) returns
+  ok on verified end-to-end evidence. See docs/specs/obs-skus/AUD-02-spec.md §7.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compliance Pack — SINCOR Products</title>
+<meta name="description" content="Ongoing compliance support for regulated deployments, with a standing reviewer.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div style="background:#3a2b00;color:#ffd97a;text-align:center;font:600 13px/1.4 Inter,system-ui;padding:10px 16px;letter-spacing:.06em">DRAFT — NOT PUBLISHED · awaiting publish-gate verification</div>
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Audit · Service engagement</span>
+    <h1 class="sp-h1">Compliance Pack<br><span class="gold">Your controls, evidenced monthly.</span></h1>
+    <p class="sp-lede">Ongoing compliance support for regulated deployments: evidence templates mapped to your controls, a monthly review cadence, and a standing SINCOR reviewer who knows your stack.</p>
+    <div class="sp-cta-row">
+      <a href="/contact" class="sp-btn sp-btn-gold">Talk to us →</a>
+      <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+    </div>
+    <div class="sp-specs">
+      <div class="sp-spec"><div class="k">Price</div><div class="v">$999/mo<br><small>+ $2,500 setup</small></div></div>
+      <div class="sp-spec"><div class="k">Delivered as</div><div class="v"><small>Service engagement</small></div></div>
+      <div class="sp-spec"><div class="k">Category</div><div class="v"><small>Audit</small></div></div>
+      <div class="sp-spec"><div class="k">Cadence</div><div class="v"><small>Monthly review</small></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker">What it does</div>
+    <h2 class="sp-h2">Compliance as a standing practice.</h2>
+    <p class="sp-sub">Mapping controls to evidence — and re-assembling the evidence every month — is specialist work that rots when it's nobody's job. The Compliance Pack makes it somebody's job: a scoping workshop maps your controls to platform records, evidence templates show exactly what each month's proof looks like, and a named reviewer assembles and walks the pack with you monthly.</p>
+    <p class="sp-sub">Controls with no platform evidence are named as gaps with a manual-collection procedure — never hidden. Platform changes that affect your mapped controls are flagged before they take effect.</p>
+    <div class="sp-feat">
+      <div>
+        <h3>How it works</h3>
+        <div class="sp-steps" style="grid-template-columns:1fr">
+          <div class="sp-step"><div class="n">1</div><h3>Map</h3><p>The setup workshop maps your controls to the platform records that satisfy them — audit exports, KYA records, dispute rulings, stake-ledger entries. Gaps are named explicitly.</p></div><div class="sp-step"><div class="n">2</div><h3>Template</h3><p>Each control gets an evidence template: what the monthly proof looks like and where it comes from, so the pack is reproducible.</p></div><div class="sp-step"><div class="n">3</div><h3>Review</h3><p>Every month your reviewer assembles the cumulative evidence pack, walks it with you, and logs each control as satisfied, gap-open, or gap-closed.</p></div>
+        </div>
+      </div>
+      <div class="sp-visual">📋</div>
+    </div>
+    <h3 style="font-size:22px;margin:40px 0 6px">What you receive</h3>
+    <ul class="sp-check">
+      <li><strong>Control-to-evidence map for your deployment</strong></li><li><strong>Monthly cumulative evidence pack</strong></li><li><strong>Named gaps with manual-collection procedures</strong></li><li><strong>Change watch on mapped controls</strong></li>
+    </ul>
+    <h3 style="font-size:22px;margin:40px 0 14px">Who it's for</h3>
+    <div class="sp-pills">
+      <span class="sp-pill">Regulated deployments</span><span class="sp-pill">Compliance leads</span><span class="sp-pill">Enterprise buyers</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker sp-center">Questions</div>
+    <h2 class="sp-h2 sp-center">About the Compliance Pack.</h2>
+    <div class="sp-faq" style="margin-top:32px">
+      <details><summary>Is this a certification?</summary><div class="a">The pack is evidence assembly and review support done properly — your auditor still audits. What it gives you is a standing, citable answer to "show me your controls."</div></details><details><summary>What if a control has no platform evidence?</summary><div class="a">It is named as a gap in your control map, with a manual-collection procedure defined at setup. Gaps are tracked month to month until closed.</div></details>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-cta-band">
+      <h2>Make compliance a practice, not a scramble.</h2>
+      <p>$2,500 setup, $999 a month. A reviewer who knows your stack, and a pack that grows every month.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/contact" class="sp-btn sp-btn-gold">Talk to us →</a>
+        <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+</body>
+</html>
