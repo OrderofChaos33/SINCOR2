@@ -750,6 +750,363 @@
         "failed": 0,
         "note": "acceptance suite incl. deterministic 1000-case randomized loops"
       }
+    },
+    {
+      "entry_id": "ev_ca355ae68495",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3634617,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault state -> plan_rebalance invariants on live numbers",
+        "result": "vault share price $1.113271/share (USDC 6dp), totalAssets $415,344,699, 3 allocations, blended APR 2.4935%, max risk 0.15",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_287a01f2e4b9",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3698535,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM/USDC treasury balances -> submit/match/settle/claim flow with 8bps fee conservation against live balance snapshots",
+        "result": "live treasury AXM 978,745,764 (USDC leg bounded by live vault liquidity; treasury USDC wallet is ~empty); matched 100.00 USDC <-> 100.0000 AXM; fees {'USDC': 80000, 'AXM': 80000000000000000} at 8bps; conservation exact",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_354f46a89ebf",
+      "sku": "SINCOR-DEFI-P04-MEV",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.376491,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "real USDC Transfer logs from the last 50 forked blocks -> MEVDetector flow accounting consistency",
+        "result": "5244 USDC transfers over 50 blocks; busiest block 51970215 had 258 transfers; detector ran clean, 0 sandwich flags, flow accounting exact",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_a05f5c13ddb8",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3827662,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance -> underwrite/publish/premium reserve adequacy at the pinned block",
+        "result": "live protocol reserve $415,344,699.47 (treasury USDC wallet holds 733 wei); score 0.80 -> tier 2; 30d premium on 1% cover = 13655.17 USDC + treasury fee 34.1379; reserve adequate",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_ad2bf440a5a2",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3871431,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance as capital cap -> bridge quote ranking never routes more than available",
+        "result": "live protocol liquidity 415,344,699.47 USDC; ranked 2 quotes on 50.00 USDC; best-first order, no value created, within live capital",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_29752e58913d",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3918045,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault share price -> RWA NAV oracle ingests the forked reference price",
+        "result": "live vault price $1.113271/share; oracle NAV 111c tracks the forked reference with zero deviation",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_db8aa2e25c89",
+      "sku": "SINCOR-DEFI-P09-GOV",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3954036,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM supply + treasury voting weight -> governance quorum math on live token state",
+        "result": "live AXM supply 1,000,000,000; treasury holds 978,745,764 (97.87%); quorum 4% -> met (majority for)",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_426a6d8e67a7",
+      "sku": "SINCOR-DEFI-P12-TWAMM",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4043972,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "real inter-block times from the last 20 forked blocks -> TWAMM slice schedule on live chain timing",
+        "result": "20 live blocks: avg 2.0s spacing; scheduled $10,000.00 into 8 slices; exact-sum and beats-dump hold on live timing",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_80cd38582c82",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4073026,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault state -> accrue() simple-interest-exact on the live-implied rate; live venue gate accepts only the eligible id",
+        "result": "live share price $1.113271; implied rate 11.3271%/yr; accrue monotonic and simple-interest-exact; live-eligible venue passes live gate, unpinned venue rejected",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_391a5102fbf3",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.411891,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance as capital -> DEX-agg split optimizer plan verified within live capital",
+        "result": "live capital $415,344,699.47; live-implied APR 11.3271%; plan weights {'morpho_usdc_vault': 0.1, 'CASH_USDC': 0.9}; verify_plan passed, routed $41,534,469.95 <= live capital",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_c2fbc3f0e602",
+      "sku": "SINCOR-DEFI-P18-STRUCTURED",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4169118,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho share price as the underlier -> structured-note payoff bounds on the live reference return",
+        "result": "live underlier return 1132bps; payoff 1056600.00 USDC on 1000000 deposit; floor 1000000.00 held, cap not binding",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_d3f04518d823",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4222493,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury code classification -> AML screen pipeline on the live counterparty profile",
+        "result": "live getCode(treasury) = 23 bytes -> contract; AML screen on the live classification: PASS (reference config)",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_ffc35113cf84",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4274857,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM/USDC/SINC treasury balances -> the 30% per-venue hard cap fires on the live concentrated composition",
+        "result": "live units AXM 978,745,764 / USDC 0.0007 / SINC 99,731,069; live composition -> {'axm_live': 9076, 'usdc_live': 0, 'sinc_live': 924}; RiskOfficer correctly rejected it: 'axm_live at 9076 bps exceeds 30% per-venue cap'",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_dc10717015c3",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.43018,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault TWAP inputs -> stable-yield optimizer quote plan",
+        "result": "live vault $415,344,699 @ $1.113271/share; capital $415,344,699.47; plan {'morpho_usdc_vault': 0.1, 'CASH_USDC': 0.9} verified",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_c1d155a78be1",
+      "sku": "SINCOR-DEFI-P24-SOCIALFI",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4346628,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM treasury balance as fee base -> P24 fee-split conservation at live scale",
+        "result": "live AXM 978,745,764; fee base 978.745764 AXM -> creator 483500407505578847800 / platform 483500407505578847800 / treasury 11744949170176004400; conservation exact",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_0b982f3a6554",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.443944,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live balances hash as the signal feed -> portfolio allocator on live chain time",
+        "result": "live feed hash 164014002a59; 3 eligible protocols; blended risk 0.277 <= 0.28; weights sum 1.0 at live block time",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_abf2c49e3440",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.449451,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live chain head -> DeFi-OS telemetry recorded against live block time",
+        "result": "live block 51970261 ts 1790729869; AUM $415,344,699; fee+roi observations recorded at live chain time; realized-data checks pass",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
     }
   ]
 }
