@@ -72,6 +72,7 @@ from sincor2.onchain.constants import (
 from sincor2.schema_gate import compile_skill_schemas, validate_skill_input
 from sincor2 import treasury_inflow as _treasury_inflow
 from sincor2.treasury_settlement import record_platform_fee_inflow
+from sincor2.a2a_idempotency import idempotent
 
 logger = logging.getLogger("sincor.a2a")
 
@@ -1957,6 +1958,7 @@ class A2ARouter:
 
         # ── Proof-of-settlement endpoint ──────────────────────────────────────
         @bp.route("/api/a2a/settle", methods=["POST"])
+        @idempotent("settle", error=_a2a_idempotency_error)
         def settle():
             """
             Accept a completed task's payment tx hash and return a signed
@@ -2086,6 +2088,16 @@ def _err(message: str, code: int = -32603, rpc_id: Any = None, data: Any = None)
         "id":      rpc_id,
         "error":   error,
     }
+
+
+def _a2a_idempotency_error(message: str, status: int):
+    """Error envelope for idempotency-key rejections on A2A JSON-RPC routes.
+
+    Matches this blueprint's ``jsonify(_err(...))`` style (used by
+    ``/api/a2a/settle``).
+    """
+    from flask import jsonify
+    return jsonify(_err(message, code=-32603)), status
 
 
 def _sse_event(data: Dict[str, Any]) -> str:
