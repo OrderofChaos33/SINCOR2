@@ -11,12 +11,53 @@ task input).
 """
 
 import time
+import uuid
 
 import pytest
 
 from sincor2 import a2a_integration as ai
 
 SKILL_ID = "lead-enrichment"
+
+# The merged tree (w06, caller ownership) enforces EIP-191 create-auth on
+# every message/send — unsigned sends are rejected 401 before quota logic
+# runs. The w18-only tree has no auth gate, so the create-auth fields added
+# below are simply ignored there. Tests that send *without* create-auth
+# therefore see a different (but equally "no free work") rejection per tree;
+# those assertions branch on this flag with both behaviors pinned.
+_STRICT_CREATE_AUTH = hasattr(ai, "_verify_create_auth")
+
+# w06's exact task-create message domain. Kept as a literal (not imported)
+# because the w18-only tree does not define _auth_create_message; the merged
+# tree verifies against this identical string.
+_CREATE_AUTH_DOMAIN = "SINCOR-A2A task-create"
+
+
+def _create_auth_fields(acct, caller_id, skill_id=SKILL_ID):
+    """w06-style EIP-191 create-auth fields for a message/send.
+
+    Signed by the same wallet as the quota signature so the quota identity
+    is unchanged. Each call mints a fresh nonce: the merged tree's replay
+    guard is single-use per (message, signature) digest.
+    """
+    from eth_account.messages import encode_defunct
+
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    message = (
+        f"{_CREATE_AUTH_DOMAIN}\n"
+        f"agent_id:{caller_id}\n"
+        f"skill_id:{skill_id}\n"
+        f"timestamp:{ts}\n"
+        f"nonce:{nonce}"
+    )
+    sig = acct.sign_message(encode_defunct(text=message)).signature.hex()
+    return {
+        "authSignature": "0x" + sig,
+        "authTimestamp": ts,
+        "authNonce": nonce,
+        "ownerWallet": acct.address,
+    }
 
 
 def _skill():
@@ -49,22 +90,33 @@ def _sign_quote(acct, ts=None, skill_id=SKILL_ID):
     return {"signature": "0x" + sig, "quota_ts": str(ts), "wallet": acct.address}
 
 
-def _send_body(input_text, caller_id, sig_fields=None, skill_id=SKILL_ID):
+def _send_body(input_text, caller_id, sig_fields=None, skill_id=SKILL_ID,
+               auth_acct=None):
+    """Build a message/send body.
+
+    ``auth_acct``: when given, w06-style create-auth fields signed by that
+    account are added to params (required by the merged tree's strict
+    send-auth; ignored on the w18-only tree). Pass the same account used for
+    the quota signature so quota identity is unchanged.
+    """
     metadata = dict(sig_fields or {})
+    params = {
+        "skillId": skill_id,
+        "callerId": caller_id,
+        "message": {
+            "role": "user",
+            "parts": [{"text": input_text}],
+            "contextId": f"ctx-{caller_id}",
+            "metadata": metadata,
+        },
+    }
+    if auth_acct is not None:
+        params.update(_create_auth_fields(auth_acct, caller_id, skill_id))
     return {
         "jsonrpc": "2.0",
         "id": 1,
         "method": "message/send",
-        "params": {
-            "skillId": skill_id,
-            "callerId": caller_id,
-            "message": {
-                "role": "user",
-                "parts": [{"text": input_text}],
-                "contextId": f"ctx-{caller_id}",
-                "metadata": metadata,
-            },
-        },
+        "params": params,
     }
 
 
@@ -191,7 +243,8 @@ def test_rotating_caller_ids_share_one_quota(client):
     skill = _skill()
     for i in range(skill.free_quota):
         text = f"enrich company number {i}"
-        resp = client.post("/api/a2a", json=_send_body(text, f"rotating-{i}", _sign_send(acct, text)))
+        resp = client.post("/api/a2a", json=_send_body(
+            text, f"rotating-{i}", _sign_send(acct, text), auth_acct=acct))
         assert resp.status_code == 200
         result = resp.get_json()["result"]
         assert result["metadata"]["free_call"] is True
@@ -200,7 +253,8 @@ def test_rotating_caller_ids_share_one_quota(client):
     # Quota exhausted: in the test env the task is still created (dev payment
     # bypass) but it is NOT a free call.
     text = "one call too many"
-    resp = client.post("/api/a2a", json=_send_body(text, "rotating-final", _sign_send(acct, text)))
+    resp = client.post("/api/a2a", json=_send_body(
+        text, "rotating-final", _sign_send(acct, text), auth_acct=acct))
     assert resp.status_code == 200
     assert resp.get_json()["result"]["metadata"]["free_call"] is False
 
@@ -217,12 +271,14 @@ def test_distinct_wallets_have_independent_quotas(client):
     skill = _skill()
     for i in range(skill.free_quota):
         text = f"drain A {i}"
-        resp = client.post("/api/a2a", json=_send_body(text, f"drain-a-{i}", _sign_send(acct_a, text)))
+        resp = client.post("/api/a2a", json=_send_body(
+            text, f"drain-a-{i}", _sign_send(acct_a, text), auth_acct=acct_a))
         assert resp.get_json()["result"]["metadata"]["free_call"] is True
 
     # B is untouched.
     text = "fresh wallet call"
-    resp = client.post("/api/a2a", json=_send_body(text, "wallet-b-caller", _sign_send(acct_b, text)))
+    resp = client.post("/api/a2a", json=_send_body(
+        text, "wallet-b-caller", _sign_send(acct_b, text), auth_acct=acct_b))
     assert resp.get_json()["result"]["metadata"]["free_call"] is True
     assert resp.get_json()["result"]["metadata"]["quota_identity"] == acct_b.address.lower()
 
@@ -231,13 +287,23 @@ def test_distinct_wallets_have_independent_quotas(client):
 
 
 def test_unsigned_caller_gets_no_free_quota(client):
-    """A fresh caller_id with no signature is not free — the G2.6 bypass is closed."""
+    """A caller with no signature gets no free work — the G2.6 bypass is closed.
+
+    w18-only tree: the unsigned send reaches quota logic and is denied a free
+    call (200, free_call=False). Merged tree (w06): the send never reaches
+    quota logic — strict create-auth rejects it first (401, -32010). Either
+    way, no signature means no free work.
+    """
     text = "unsigned attempt"
     resp = client.post("/api/a2a", json=_send_body(text, "brand-new-caller-xyz"))
-    assert resp.status_code == 200
-    meta = resp.get_json()["result"]["metadata"]
-    assert meta["free_call"] is False
-    assert "quota_identity" not in meta
+    if _STRICT_CREATE_AUTH:
+        assert resp.status_code == 401
+        assert resp.get_json()["error"]["code"] == -32010
+    else:
+        assert resp.status_code == 200
+        meta = resp.get_json()["result"]["metadata"]
+        assert meta["free_call"] is False
+        assert "quota_identity" not in meta
 
     q = client.post("/api/a2a/quote", json={"skill_id": SKILL_ID, "caller_id": "brand-new-caller-xyz"})
     data = q.get_json()
@@ -255,7 +321,8 @@ def test_signed_quote_reports_remaining(client):
     assert data["axm_price_wei"] == "0"
 
     text = "use one"
-    client.post("/api/a2a", json=_send_body(text, "qc-1", _sign_send(acct, text)))
+    client.post("/api/a2a", json=_send_body(text, "qc-1", _sign_send(acct, text),
+                                           auth_acct=acct))
     q = client.post("/api/a2a/quote", json=_quote_body(_sign_quote(acct)))
     assert q.get_json()["free_quota_remaining"] == _skill().free_quota - 1
 
@@ -267,13 +334,15 @@ def test_quota_exhaustion_returns_payment_required(client, monkeypatch):
     skill = _skill()
     for i in range(skill.free_quota):
         text = f"prod probe {i}"
-        resp = client.post("/api/a2a", json=_send_body(text, f"prod-{i}", _sign_send(acct, text)))
+        resp = client.post("/api/a2a", json=_send_body(
+            text, f"prod-{i}", _sign_send(acct, text), auth_acct=acct))
         body = resp.get_json()
         assert resp.status_code == 200, body
         assert "error" not in body, body
 
     text = "over the limit"
-    resp = client.post("/api/a2a", json=_send_body(text, "prod-final", _sign_send(acct, text)))
+    resp = client.post("/api/a2a", json=_send_body(
+        text, "prod-final", _sign_send(acct, text), auth_acct=acct))
     body = resp.get_json()
     assert resp.status_code == 200  # JSON-RPC envelope convention on this route
     assert body["error"]["code"] == -32000
@@ -281,10 +350,20 @@ def test_quota_exhaustion_returns_payment_required(client, monkeypatch):
 
 
 def test_unsigned_send_in_production_requires_payment(client, monkeypatch):
+    """An unsigned send in production gets no free work.
+
+    w18-only tree: rejected at the payment gate (-32000). Merged tree (w06):
+    rejected earlier at the create-auth gate (401, -32010). Either way the
+    unsigned caller cannot reach task creation.
+    """
     monkeypatch.setenv("FLASK_ENV", "production")
     resp = client.post("/api/a2a", json=_send_body("no sig", "anon-prod"))
     body = resp.get_json()
-    assert body["error"]["code"] == -32000
+    if _STRICT_CREATE_AUTH:
+        assert resp.status_code == 401
+        assert body["error"]["code"] == -32010
+    else:
+        assert body["error"]["code"] == -32000
 
 
 def test_legacy_tasks_send_enforces_quota(client, monkeypatch):
@@ -292,20 +371,27 @@ def test_legacy_tasks_send_enforces_quota(client, monkeypatch):
     monkeypatch.setenv("FLASK_ENV", "production")
     acct = _wallet()
     text = "legacy signed"
-    ok = client.post("/api/a2a/tasks/send", json=_send_body(text, "legacy-1", _sign_send(acct, text)))
+    ok = client.post("/api/a2a/tasks/send", json=_send_body(
+        text, "legacy-1", _sign_send(acct, text), auth_acct=acct))
     assert ok.status_code == 202
     assert ok.get_json()["result"]["metadata"]["free_call"] is True
 
     denied = client.post("/api/a2a/tasks/send", json=_send_body("legacy unsigned", "legacy-2"))
-    assert denied.status_code == 400
-    assert denied.get_json()["error"]["code"] == -32000
+    if _STRICT_CREATE_AUTH:
+        # Merged tree (w06): the unsigned send is rejected at the create-auth
+        # gate before quota/payment logic runs.
+        assert denied.status_code == 401
+        assert denied.get_json()["error"]["code"] == -32010
+    else:
+        assert denied.status_code == 400
+        assert denied.get_json()["error"]["code"] == -32000
 
 
 def test_non_free_skill_never_free_even_signed(client):
     acct = _wallet()
     text = "compliance check"
     body = _send_body(text, "sbom-caller", _sign_send(acct, text, skill_id="compliance-sbom"),
-                      skill_id="compliance-sbom")
+                      skill_id="compliance-sbom", auth_acct=acct)
     resp = client.post("/api/a2a", json=body)
     assert resp.get_json()["result"]["metadata"]["free_call"] is False
 
