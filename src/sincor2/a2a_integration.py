@@ -73,6 +73,7 @@ from sincor2.onchain.constants import (
 from sincor2.schema_gate import compile_skill_schemas, validate_skill_input
 from sincor2 import treasury_inflow as _treasury_inflow
 from sincor2.treasury_settlement import record_platform_fee_inflow
+from sincor2.defi.p24 import skill as _p24_issuance_skill
 
 logger = logging.getLogger("sincor.a2a")
 
@@ -1062,6 +1063,24 @@ SINCOR_SKILLS: List[AgentSkill] = [
         axm_price_wei=0,  # payment-verification skill itself is free
         sinc_price=0,
         estimated_latency_seconds=5,
+    ),
+    # ── P24 SocialFi issuance (agent-triggered, dry-run until live block) ──
+    AgentSkill(
+        id=_p24_issuance_skill.SKILL_ID,
+        name="P24 Creator Token Issuance",
+        description=_p24_issuance_skill.CATALOG_DESCRIPTION,
+        tags=["p24", "socialfi", "issuance", "creator-token", "token"],
+        examples=[
+            "Issue a creator token named 'Auriga' with symbol AURIGA for agent E-Auriga-01.",
+            "Dry-run a P24 creator token issuance to check content-policy screening.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema=dict(_p24_issuance_skill.CATALOG_INPUT_SCHEMA),
+        output_schema=dict(_p24_issuance_skill.CATALOG_OUTPUT_SCHEMA),
+        estimated_latency_seconds=10,
+        reputation_floor=0,
+        free_quota=0,
     ),
 ]
 
