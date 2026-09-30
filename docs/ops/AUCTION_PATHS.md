@@ -9,7 +9,7 @@ Operator reference for SINCOR2's task-market auction code. Last verified 2026-09
   reservation) → invite → sealed (one EIP-712 envelope per agent, 120s TTL) →
   cleared/failed. Lowest valid price wins; winner is **paid the second-lowest
   price**. Prices are integer micro-AXM. Entry: `ContractNetEngine.run()`.
-- **QUALITY path — `src/sincor2/bidding_engine.py`**: `BiddingEngine`
+- **QUALITY path — `archive/bidding_engine.py`** (quarantined 2026-09-29; zero callers — `marketplace/contract_net/` is the canonical sealed-bid money path): `BiddingEngine`
   multi-criteria scoring for non-priced allocation — 40% confidence, 25%
   reputation, 20% cost efficiency, 10% plan quality, 5% archetype fit. Every bid
   is evaluated in isolation so one crashing bidder cannot kill the round.

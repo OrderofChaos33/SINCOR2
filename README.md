@@ -209,7 +209,7 @@ flowchart TD
 | Predictive analytics | `src/sincor2/predictive_analytics_engine.py` | Trend forecasting, risk scoring, multi-scenario planning |
 | Quality scoring | `src/sincor2/quality_scoring_engine.py` | Multi-dimensional self-improving quality assessment |
 | Cortecs core | `src/sincor2/cortecs_core.py` | Claude API integration for complex reasoning tasks |
-| Lifecycle system | `src/sincor2/lifecycle_system.py` | Agent health rhythms, shift budgets, off-duty cycles |
+| Lifecycle system | `archive/lifecycle_system.py` (quarantined 2026-09-29) | Agent health rhythms, shift budgets, off-duty cycles |
 | Vertical dispatch | `src/sincor2/vertical_dispatch.py` | Skill-id routing to vertical packs and kernel tasks |
 | Polyclaw scheduler | `src/sincor2/polyclaw_scheduler.py` | Autonomous Polymarket arbitrage scanning via APScheduler |
 | Outreach engine | `src/sincor2/outreach_engine.py` | Yelp/Google Places lead fetch + Resend cold outreach |

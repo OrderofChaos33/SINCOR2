@@ -13,7 +13,7 @@ Transition scaffolding for A2A marketplace mechanics.
 
 ## Contract-Net (additive)
 
-The first-price scoring engine in `src/sincor2/bidding_engine.py` is unchanged.
+The first-price scoring engine in `archive/bidding_engine.py` (quarantined 2026-09-29; zero callers) is unchanged.
 New work goes through `ContractNetEngine`:
 
 1. Hash skill/requirement tokens into 64-d vectors and invite only the top 3–5
