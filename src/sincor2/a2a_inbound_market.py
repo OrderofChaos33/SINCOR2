@@ -28,6 +28,9 @@ from sincor2.a2a_inbound import (
     get_fabric,
 )
 from sincor2.a2a_timeouts import assignment_deadline_ms
+# Grandfathered plaintext scoring for non-sealed tasks (pre-shim clients).
+# Canonical money path is marketplace.contract_net — see
+# docs/architecture/CANONICAL_PATHS.md §1.
 from sincor2.contract_net import calculate_bid_score, stage_payout
 
 logger = logging.getLogger("sincor.a2a.inbound")

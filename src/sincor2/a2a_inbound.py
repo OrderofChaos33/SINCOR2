@@ -32,10 +32,8 @@ AUCTION_WINDOW_MS = 500
 MERIT_THRESHOLD_AXM = 5.0
 MAX_AGENTS = 10000
 MAX_OPEN_TASKS = 200
-DEMO_SECRET = os.environ.get("SINCOR_A2A_SECRET", "sincor-a2a-demo")
 _AGENT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _WALLET_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-_REGISTERED = False
 _FABRIC = None
 _FABRIC_LOCK = threading.Lock()
 _PLATFORM_AGENT_ID = "sincor-agent-swarm"
@@ -110,7 +108,14 @@ def _slug(value: str) -> str:
     return (re.sub(r"[^a-z0-9]+", "-", (value or "agent").lower()).strip("-") or "agent")[:80]
 
 
-def sign_payload(payload: Dict[str, Any], secret: str = DEMO_SECRET) -> str:
+def sign_payload(payload: Dict[str, Any], secret: str) -> str:
+    """HMAC-SHA256 sign a canonicalised payload.
+
+    ``secret`` is mandatory: there is deliberately no module-level default.
+    A hardcoded fallback secret shipped here until 2026-09-30 and was
+    removed (no route ever used it). Callers must supply their own secret
+    from configuration; never commit one to the repo.
+    """
     body = json.dumps({k: payload[k] for k in sorted(payload) if k != "signature"}, separators=(",", ":"), sort_keys=True)
     return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
@@ -394,6 +399,13 @@ def ensure_platform_agent() -> Dict[str, Any]:
     return _impl()
 
 
-def register(app: Flask) -> None:
+def register(app: Flask) -> bool:
+    """Mount the inbound A2A blueprint — idempotent.
+
+    Delegates to :func:`sincor2.a2a_inbound_ext.mount`, which skips
+    re-registration when the ``a2a_inbound`` blueprint is already on
+    *app*. Returns True when this call mounted the routes, False when
+    they were already present.
+    """
     from sincor2.a2a_inbound_ext import mount
-    mount(app)
+    return mount(app)
