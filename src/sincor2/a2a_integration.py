@@ -14,9 +14,6 @@ AXIOM (AXM) is the settlement token for every inter-agent transaction:
     of each paid task routes 100 % to the SINCOR treasury.  No burn.
     Realized AXM/SINC fees are converted to USDC/WETH before treasury
     deposit (policy lock 2026-09-26; swap executor pending).
-  • DEX trading fees: 80 % of Uniswap V4 AXM/WETH pool trading fees are
-    routed (off-chain team commitment, publicly auditable on Basescan) to
-    the ecosystem treasury.  These two fee streams are independent.
 
 A2A wire format (v1.0.1)
 -------------------------
