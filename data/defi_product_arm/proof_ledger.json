@@ -756,7 +756,7 @@
       "sku": "SINCOR-DEFI-P04-MEV",
       "kind": "invariant_test",
       "timestamp": 1790798655.3994365,
-      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "commit": "a46ad7cb5f4189b54968c053c2cf4d26d0995309",
       "recorded_by": "xioix/buildout-56-defi-invariant-record",
       "details": {
         "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p04_mev_fuzz_invariants.py -q",
@@ -773,7 +773,7 @@
       "sku": "SINCOR-DEFI-P09-GOV",
       "kind": "invariant_test",
       "timestamp": 1790798655.3994365,
-      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "commit": "a46ad7cb5f4189b54968c053c2cf4d26d0995309",
       "recorded_by": "xioix/buildout-56-defi-invariant-record",
       "details": {
         "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p09_dao_fuzz_invariants.py -q",
@@ -790,7 +790,7 @@
       "sku": "SINCOR-DEFI-P12-TWAMM",
       "kind": "invariant_test",
       "timestamp": 1790798655.3994365,
-      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "commit": "a46ad7cb5f4189b54968c053c2cf4d26d0995309",
       "recorded_by": "xioix/buildout-56-defi-invariant-record",
       "details": {
         "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p12_twamm_fuzz_invariants.py -q",
@@ -807,7 +807,7 @@
       "sku": "SINCOR-DEFI-P13-AVS",
       "kind": "invariant_test",
       "timestamp": 1790798655.3994365,
-      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "commit": "a46ad7cb5f4189b54968c053c2cf4d26d0995309",
       "recorded_by": "xioix/buildout-56-defi-invariant-record",
       "details": {
         "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p13_avs_fuzz_invariants.py -q",
@@ -824,7 +824,7 @@
       "sku": "SINCOR-DEFI-P17-OPTIONS",
       "kind": "invariant_test",
       "timestamp": 1790798655.3994365,
-      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "commit": "a46ad7cb5f4189b54968c053c2cf4d26d0995309",
       "recorded_by": "xioix/buildout-56-defi-invariant-record",
       "details": {
         "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p17_options_fuzz_invariants.py -q",
@@ -841,7 +841,7 @@
       "sku": "SINCOR-DEFI-P19-CREDIT",
       "kind": "invariant_test",
       "timestamp": 1790798655.3994365,
-      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "commit": "a46ad7cb5f4189b54968c053c2cf4d26d0995309",
       "recorded_by": "xioix/buildout-56-defi-invariant-record",
       "details": {
         "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p19_credit_fuzz_invariants.py -q",
@@ -858,7 +858,7 @@
       "sku": "SINCOR-DEFI-P26-DEFIOS",
       "kind": "invariant_test",
       "timestamp": 1790798655.3994365,
-      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "commit": "a46ad7cb5f4189b54968c053c2cf4d26d0995309",
       "recorded_by": "xioix/buildout-56-defi-invariant-record",
       "details": {
         "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p26_defios_fuzz_invariants.py -q",
