@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -53,45 +52,10 @@ def record_platform_payment(
         "burn_tx": None,
     }
 
-    if token.upper() == "SINC" and os.environ.get("AGENT_BURN_AUTO", "false").lower() == "true":
-        from sincor2.safety_locks import onchain_writes_allowed
-
-        if onchain_writes_allowed():
-            burn_result = _attempt_auto_burn(amount_atomic, tx_hash)
-            entry["burn_attempt"] = burn_result
-        else:
-            entry["burn_attempt"] = {
-                "ok": False,
-                "skipped": True,
-                "reason": "production_safety_lock",
-            }
-
     with _log_path().open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
     return entry
-
-
-def _attempt_auto_burn(amount_atomic: int, source_tx: str) -> dict[str, Any]:
-    """Optional forwarder burn — blocked in production unless SAFETY_OVERRIDE=true."""
-    from sincor2.safety_locks import onchain_writes_allowed
-
-    if not onchain_writes_allowed():
-        return {"ok": False, "skipped": True, "reason": "production_safety_lock"}
-
-    key = os.environ.get("BILLING_FORWARDER_PRIVATE_KEY", "").strip()
-    if not key:
-        return {"ok": False, "skipped": True, "reason": "no_forwarder_key"}
-
-    # Signing requires web3/eth-account — not deployed; never sign from the web app.
-    return {
-        "ok": False,
-        "skipped": True,
-        "reason": "forwarder_signing_not_deployed",
-        "note": "Set AGENT_BURN_AUTO=false until forwarder wallet script is run locally",
-        "would_burn_atomic": amount_atomic // 2,
-        "source_tx": source_tx,
-    }
 
 
 def _chain_burn_total() -> float:
