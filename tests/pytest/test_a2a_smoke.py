@@ -3,6 +3,8 @@
 """A2A integration smoke tests — covers the new skill catalogue, pricing,
 quote endpoint, settlement proof, leaderboard, and reputation routing."""
 
+import time
+
 
 def _signed_params(extra: dict) -> dict:
     """P3 item 14: message/send requires an EIP-191 caller signature.
@@ -134,15 +136,45 @@ def test_a2a_quote_get_unknown_skill(client):
 
 
 def test_a2a_quote_free_quota_skill(client):
-    """Lead-enrichment has a free quota; first call for a new caller should be free."""
+    """Lead-enrichment has a free quota; a signed wallet's first call is free.
+
+    (G2.6: free quota is keyed on the verified wallet, not caller_id —
+    an unsigned caller_id no longer grants free calls.)
+    """
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+    from sincor2 import a2a_integration
+
+    acct = Account.create()
+    ts = int(time.time() * 1000)
+    message = a2a_integration.quota_message_for_quote("lead-enrichment", ts)
+    sig = acct.sign_message(encode_defunct(text=message)).signature.hex()
     response = client.post(
         "/api/a2a/quote",
-        json={"skill_id": "lead-enrichment", "caller_id": "test-caller-free-001"},
+        json={
+            "skill_id": "lead-enrichment",
+            "caller_id": "test-caller-free-001",
+            "signature": "0x" + sig,
+            "quota_ts": str(ts),
+            "wallet": acct.address,
+        },
     )
     assert response.status_code == 200
     data = response.get_json()
     assert data.get("is_free") is True
     assert data.get("free_quota_remaining", 0) > 0
+
+
+def test_a2a_quote_unsigned_caller_id_not_free(client):
+    """Self-declared caller_id alone grants no free quota (G2.6)."""
+    response = client.post(
+        "/api/a2a/quote",
+        json={"skill_id": "lead-enrichment", "caller_id": "test-caller-free-unsigned"},
+    )
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data.get("is_free") is False
+    assert data.get("free_quota_remaining", 0) == 0
 
 
 def test_a2a_quote_non_free_skill(client):
