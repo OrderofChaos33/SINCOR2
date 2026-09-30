@@ -63,14 +63,28 @@ def _adjudicator_env(monkeypatch, adjudicator):
     monkeypatch.setenv(ADJUDICATOR_ENV, adjudicator.address)
 
 
+_REGISTER_KEYS = {}
+
+
 def _register(client, agent_id, **extra):
+    # Each test agent gets a real key: first registration uses its address
+    # as the wallet; re-registration is proof-gated (G2.2), so the helper
+    # attaches an EIP-191 signature by the registered wallet.
+    key = _REGISTER_KEYS.setdefault(agent_id, Account.create())
     body = {
         "agent_id": agent_id,
         "capability_tags": ["lead-enrichment"],
         "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "11" * 20,
+        "wallet": key.address,
     }
     body.update(extra)
+    if agent_id in get_fabric().agents:
+        from sincor2.a2a_inbound import build_reregistration_message
+        ts = _now_ms()
+        message = build_reregistration_message(body, ts)
+        sig = key.sign_message(encode_defunct(text=message)).signature
+        body["registration_ts"] = ts
+        body["registration_signature"] = "0x" + bytes(sig).hex()
     r = client.post("/v1/a2a/register", json=body)
     assert r.status_code in (200, 201), r.get_json()
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id})
@@ -198,11 +212,8 @@ def test_reregistration_preserves_earned_reputation(client):
     assert agent["probation"] is False
     assert agent["status"] == "live"
     # Re-register *with* a declared 1.0: still cannot overwrite earned value.
-    r = client.post("/v1/a2a/register", json={
-        "agent_id": "honest-1", "capability_tags": ["lead-enrichment"],
-        "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "11" * 20, "reputation": 1.0})
-    assert r.status_code in (200, 201), r.get_json()
+    # (Re-registration is proof-gated, so it goes through the signed helper.)
+    r = _register(client, "honest-1", reputation=1.0)
     assert fabric.agents["honest-1"]["reputation"] == pytest.approx(0.4)
 
 

@@ -112,10 +112,18 @@ class SincorAgentSDK:
                  capability_tags: list,
                  wallet: str = "", rpc_callback: str = "",
                  description: str = "", version: str = "1.0.0",
-                 skills: Optional[list] = None) -> Dict[str, Any]:
+                 skills: Optional[list] = None,
+                 signer: Any = None) -> Dict[str, Any]:
         """Register an agent. Reputation is earned-only: any ``reputation``
-        you send is ignored; new agents start at 0.0 (probation)."""
-        return self.t.post("/v1/a2a/register", {
+        you send is ignored; new agents start at 0.0 (probation).
+
+        Re-registration of an existing record is proof-gated server-side:
+        pass ``signer`` (an eth_account Account holding the *registered*
+        wallet's key) and the SDK attaches an EIP-191
+        ``registration_signature`` + ``registration_ts`` authorizing the
+        update. First-time registration ignores the signature fields.
+        """
+        body: Dict[str, Any] = {
             "agent_id": agent_id,
             "name": name,
             "description": description,
@@ -124,7 +132,16 @@ class SincorAgentSDK:
             "skills": list(skills or []),
             "rpc_callback": rpc_callback,
             "wallet": wallet,
-        })
+        }
+        if signer is not None:
+            from sincor2.a2a_inbound import _now_ms, build_reregistration_message
+            from eth_account.messages import encode_defunct
+            ts = _now_ms()
+            message = build_reregistration_message(body, ts)
+            sig = signer.sign_message(encode_defunct(text=message)).signature
+            body["registration_ts"] = ts
+            body["registration_signature"] = "0x" + bytes(sig).hex()
+        return self.t.post("/v1/a2a/register", body)
 
     def heartbeat(self, agent_id: str) -> Dict[str, Any]:
         """Refresh liveness (TTL 60s). Bid/commit/reveal require a fresh

@@ -13,6 +13,9 @@ from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_AGENTS,
     MERIT_THRESHOLD_AXM,
+    REGISTRATION_PROOF_FRESHNESS_MS,
+    REREGISTRATION_DOMAIN,
+    RegistrationAuthError,
     _AGENT_ID_RE,
     _HEARTBEAT_STOP,
     _PLATFORM_AGENT_ID,
@@ -20,6 +23,7 @@ from sincor2.a2a_inbound import (
     _http_error,
     _normalize_registration,
     _now_ms,
+    _reregistration_message_from_parsed,
     _save_agents,
     _apply_reputation,
     get_fabric,
@@ -78,6 +82,61 @@ def _live_kya_statuses() -> Dict[str, str]:
         return {}
 
 
+def _recover_registration_signer(message: str, signature: str) -> str:
+    """Recover the EIP-191 signer address of a re-registration proof.
+
+    Fail-closed: if eth_account is unavailable the proof cannot be checked,
+    so verification (and therefore the mutation) is refused.
+    """
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise RegistrationAuthError(
+            "signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise RegistrationAuthError("bad registration signature") from exc
+
+
+def _require_reregistration_proof(existing: Dict[str, Any],
+                                  parsed: Dict[str, Any],
+                                  body: Dict[str, Any]) -> None:
+    """Enforce proof-of-control before an existing agent record is mutated
+    (G2.2). The caller must present an EIP-191 signature, made by the
+    currently registered wallet, over the exact new record contents plus a
+    fresh timestamp. Raises RegistrationAuthError (→ HTTP 403) otherwise."""
+    signature = body.get("registration_signature") or ""
+    ts_raw = body.get("registration_ts")
+    if not signature or ts_raw is None:
+        raise RegistrationAuthError(
+            "re-registration requires an EIP-191 signature by the registered "
+            "wallet (body fields: registration_signature, registration_ts)")
+    try:
+        ts_ms = int(ts_raw)
+    except (TypeError, ValueError) as exc:
+        raise RegistrationAuthError(
+            "registration_ts must be an integer unix-ms timestamp") from exc
+    if abs(_now_ms() - ts_ms) > REGISTRATION_PROOF_FRESHNESS_MS:
+        raise RegistrationAuthError(
+            "registration proof expired; sign a fresh challenge")
+    registered_wallet = (existing.get("wallet") or "").strip().lower()
+    if not registered_wallet:
+        # No cryptographic identity is bound to this record, so control
+        # cannot be proven. Fail closed rather than let anyone claim it:
+        # the owner registers a new agent_id with a wallet.
+        raise RegistrationAuthError(
+            "this record has no wallet bound, so control cannot be proven; "
+            "register a new agent_id with a wallet")
+    message = _reregistration_message_from_parsed(parsed, ts_ms)
+    signer = _recover_registration_signer(message, str(signature)).lower()
+    if signer != registered_wallet:
+        raise RegistrationAuthError(
+            "registration signature is not from the registered wallet")
+
+
 def register_agent_record(body: Dict[str, Any],
                           _internal_reputation: Optional[float] = None) -> Dict[str, Any]:
     """Register (or re-register) an agent record.
@@ -88,6 +147,12 @@ def register_agent_record(body: Dict[str, Any],
     preserves already-earned reputation. The only path that assigns
     reputation at registration time is the internal platform seed, via
     ``_internal_reputation`` — the HTTP route never passes it.
+
+    Re-registration (any update to an existing record) requires proof of
+    control: an EIP-191 signature by the currently registered wallet over
+    the exact new record contents plus a fresh ``registration_ts``
+    (see ``build_reregistration_message`` in ``sincor2.a2a_inbound``).
+    Without it the update is refused with ``RegistrationAuthError``.
     """
     parsed = _normalize_registration(body)
     agent_id = parsed["agent_id"]
@@ -106,6 +171,8 @@ def register_agent_record(body: Dict[str, Any],
         if agent_id not in fabric.agents and len(fabric.agents) >= MAX_AGENTS:
             raise OverflowError("directory full")
         existing = fabric.agents.get(agent_id) or {}
+        if existing and _internal_reputation is None:
+            _require_reregistration_proof(existing, parsed, body)
         if _internal_reputation is not None:
             reputation = float(_internal_reputation)
         else:
@@ -247,6 +314,8 @@ def mount(app: Flask) -> None:
         body = request.get_json(silent=True) or {}
         try:
             agent = register_agent_record(body)
+        except RegistrationAuthError as err:
+            return _http_error(str(err), 403)
         except ValueError as err:
             return _http_error(str(err), 400)
         except OverflowError as err:
@@ -260,6 +329,16 @@ def mount(app: Flask) -> None:
             "stream_url": "/v1/a2a/stream",
             "kya_id": agent.get("kya_id"),
             "kya_status": agent.get("kya_status"),
+            # Re-registration is proof-gated: any later update to this
+            # record must carry registration_signature (EIP-191, by the
+            # registered wallet) + registration_ts over the message built
+            # by sincor2.a2a_inbound.build_reregistration_message().
+            "reregistration": {
+                "requires": "EIP-191 signature by the registered wallet",
+                "fields": ["registration_signature", "registration_ts"],
+                "domain": REREGISTRATION_DOMAIN,
+                "freshness_ms": REGISTRATION_PROOF_FRESHNESS_MS,
+            },
         }), 201
 
     @bp.post("/v1/a2a/heartbeat")
