@@ -43,6 +43,7 @@ Why per-class policies instead of the global default (1000/day, 200/hour):
 from __future__ import annotations
 
 import time
+import threading
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Deque, Dict, List, Tuple
@@ -225,12 +226,40 @@ class SlidingWindowLimiter:
 
 import math
 
-_ENFORCER = SlidingWindowLimiter()
+from sincor2.a2a_shared_state import (
+    SharedSlidingWindowLimiter,
+    StateStoreUnavailable,
+    get_shared_state,
+)
+
+# Process-wide enforcer, built lazily so tests can set A2A_STATE_STORE /
+# FLASK_ENV before first use. Storage moved to the shared backend
+# (P3 wave 15, G2.8): N workers now agree on counters and restarts
+# preserve them. SlidingWindowLimiter above remains the executable spec.
+_ENFORCER: SharedSlidingWindowLimiter | None = None
+_ENFORCER_LOCK = threading.Lock()
+
+
+def _policy_tuples() -> Dict[str, List[Tuple[float, float]]]:
+    return {
+        name: [(float(w.seconds), float(w.max_hits)) for w in wins]
+        for name, wins in A2A_RATE_POLICIES.items()
+    }
+
+
+def _get_enforcer() -> SharedSlidingWindowLimiter:
+    global _ENFORCER
+    if _ENFORCER is None:
+        with _ENFORCER_LOCK:
+            if _ENFORCER is None:
+                _ENFORCER = SharedSlidingWindowLimiter(
+                    get_shared_state(), _policy_tuples())
+    return _ENFORCER
 
 
 def reset_a2a_limits() -> None:
     """Clear all recorded hits. Test isolation hook — call between tests."""
-    _ENFORCER._hits.clear()
+    _get_enforcer().reset()
 
 
 def _client_ip() -> str:
@@ -269,7 +298,20 @@ def a2a_rate_limit_check():
         # so key on client IP — same get_remote_address the app limiter uses.
         client_key = a2a_client_key(ip=_client_ip())
 
-    allowed, info = _ENFORCER.check(policy, client_key)
+    try:
+        allowed, info = _get_enforcer().check(policy, client_key)
+    except StateStoreUnavailable:
+        # Fail closed (G2.8): the configured shared store is unreachable.
+        # Deny the request rather than silently resetting counters.
+        resp = jsonify({
+            "error": "state_store_unavailable",
+            "status": 503,
+            "policy": policy,
+            "detail": "shared rate-limit store unreachable; request denied",
+        })
+        resp.status_code = 503
+        resp.headers["Retry-After"] = "5"
+        return resp
     if allowed:
         return None
 
