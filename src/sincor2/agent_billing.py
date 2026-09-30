@@ -1,4 +1,6 @@
-"""Record SINC platform revenue and burn statistics (spec §5.3)."""
+"""Record SINC platform revenue; historical burn audit (spec §5.3).
+Locked policy: 5% platform fee to treasury, converted to USDC/WETH before
+deposit. No burn — burn counters below are historical-only."""
 
 from __future__ import annotations
 
@@ -35,7 +37,7 @@ def record_platform_payment(
     plan_id: str = "",
     payment_id: str = "",
 ) -> dict[str, Any]:
-    """Append treasury payment to public burn/revenue log."""
+    """Append treasury payment to the platform payment log."""
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "type": "platform_payment",
@@ -88,6 +90,8 @@ def _chain_burn_total() -> float:
 
 
 def fetch_burn_stats() -> dict[str, Any]:
+    """Internal-only historical stats. The public /api/sinc/burn-stats route
+    is retired; on-chain burn totals are historical. Locked policy: no burn."""
     log_file = _log_path()
     payments: list[dict[str, Any]] = []
     sinc_volume = 0.0
