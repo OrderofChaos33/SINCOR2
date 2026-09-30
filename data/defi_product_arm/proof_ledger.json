@@ -750,6 +750,291 @@
         "failed": 0,
         "note": "acceptance suite incl. deterministic 1000-case randomized loops"
       }
+    },
+    {
+      "entry_id": "ev_92a361a13585",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7241359,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p01_audit_invariants.py -q",
+        "suite": "tests/pytest/test_p01_audit_invariants.py",
+        "scope": "vault invariants: conservation/weights-cap fuzz, eligible-set monotonicity in budget, sequential deposit/withdraw flows, adversarial tables never crash or execute, zero-expectation cash fallback, dust capital conserved, cap waterfill regression",
+        "passed": 7,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_811e22867a2f",
+      "sku": "SINCOR-DEFI-P02-CLMM",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7273068,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p02_audit_invariants.py -q",
+        "suite": "tests/pytest/test_p02_audit_invariants.py",
+        "scope": "CLMM MEV detector: precision regression (no float false positives), boundary exact on/off, threshold matches exact rule fuzz, sensitivity env parsing exact, no-swap never flags fuzz, two-block sequences never flag fuzz, sub-threshold never flags fuzz, adversarial event amounts no crash, shift-sequence invariants fuzz, extreme ticks no crash",
+        "passed": 14,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_da6f5a8c970b",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7292213,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p03_audit_invariants.py -q",
+        "suite": "tests/pytest/test_p03_audit_invariants.py",
+        "scope": "dark pool: proceeds conservation fuzz, treasury cut minimum 15bps fuzz, fee cap + nonbricking fuzz, pause/unpause sequence fuzz, commitment deterministic and binding, record carries commitment-only fuzz, nonce sequence fuzz, match soundness fuzz, settlement conservation + fee fuzz (incl. max-uint), asset gate no-state-change fuzz, replay/double-ops, lifecycle status-machine fuzz, split-solver invariants fuzz, pause-guard interleaved fuzz",
+        "passed": 13,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_691d3c8facdb",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.730974,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p05_insurance_units.py::test_fuzzed_op_sequences_never_breach_floor -q",
+        "suite": "tests/pytest/test_p05_insurance_units.py::test_fuzzed_op_sequences_never_breach_floor",
+        "scope": "seeded fuzz re-run 2026-09-30: 500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused. Re-verifies earlier canonical entry ev_81d7599b675d",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_bc2ed37082c6",
+      "sku": "SINCOR-DEFI-P06-PERPS",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7334743,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p06_perp_units.py::test_fuzz_10k_drift_discipline -q",
+        "suite": "tests/pytest/test_p06_perp_units.py::test_fuzz_10k_drift_discipline",
+        "scope": "seeded fuzz re-run 2026-09-30: 10,000 seeded drift samples; banding, slippage guards, live gate hold. Re-verifies earlier canonical entry ev_4aa03f332ef5",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_d9e0be34917a",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7354393,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p07_bridge_units.py::test_fuzz_ranking_never_routes_rejected_quotes, test_fuzz_settlement_conservation -q",
+        "suite": "tests/pytest/test_p07_bridge_units.py::test_fuzz_ranking_never_routes_rejected_quotes, test_fuzz_settlement_conservation",
+        "scope": "seeded fuzz re-run 2026-09-30: ranking never routes rejected quotes (500 iters: allowlist/slippage-cap/security-floor never bypassed, best-first ranking) + settlement conservation (settled+fee == net_out exact, treasury totals reconcile). Re-verifies earlier canonical entry ev_e366ac03e929",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_c94b13c65d74",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.737489,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p08_rwa_units.py::test_fuzz_random_lifecycle_preserves_invariants -q",
+        "suite": "tests/pytest/test_p08_rwa_units.py::test_fuzz_random_lifecycle_preserves_invariants",
+        "scope": "seeded lifecycle fuzz re-run 2026-09-30 (400 iters): pre-gate zero-yield, gate atomicity, integer conservation of assets and shares. Re-verifies earlier canonical entry ev_d18452dc90f6",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_e86c5167ec45",
+      "sku": "SINCOR-DEFI-P10-FLASHARB",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7414699,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p10_flash_units.py::test_no_loss_making_execution_in_fuzz -q",
+        "suite": "tests/pytest/test_p10_flash_units.py::test_no_loss_making_execution_in_fuzz",
+        "scope": "flash arb fuzz: no loss-making execution under fuzzed inputs",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_d1ab9d56b41d",
+      "sku": "SINCOR-DEFI-P11-DELTANEUTRAL",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7431579,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p11_delta_units.py::test_principal_invariant_under_price_move -q",
+        "suite": "tests/pytest/test_p11_delta_units.py::test_principal_invariant_under_price_move",
+        "scope": "delta-neutral: principal preserved under price moves",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_1234c35cbaff",
+      "sku": "SINCOR-DEFI-P14-PREDICT",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7450306,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p14_prediction_units.py::test_kelly_never_negative_or_over_cap_in_fuzz -q",
+        "suite": "tests/pytest/test_p14_prediction_units.py::test_kelly_never_negative_or_over_cap_in_fuzz",
+        "scope": "prediction: kelly fraction stays within [0, cap] under fuzzed inputs",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_5999d785a84e",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7469757,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p15_lending_units.py::test_rehypothecation_round_trip_holds_invariants, test_fuzz_invariants -q",
+        "suite": "tests/pytest/test_p15_lending_units.py::test_rehypothecation_round_trip_holds_invariants, test_fuzz_invariants",
+        "scope": "lending: rehypothecation round-trip preserves invariants + general fuzz invariants",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_20fe1b0c6f9f",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.748741,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p16_dexagg_units.py::test_net_beats_best_single_venue -q",
+        "suite": "tests/pytest/test_p16_dexagg_units.py::test_net_beats_best_single_venue",
+        "scope": "DEX aggregator: 30 seeded randomized venue sets; split net output >= best single-venue net on every draw",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_98709d21f942",
+      "sku": "SINCOR-DEFI-P18-STRUCTURED",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7507539,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p18_structured_units.py::test_fuzz_invariants -q",
+        "suite": "tests/pytest/test_p18_structured_units.py::test_fuzz_invariants",
+        "scope": "structured products: fuzz invariants hold",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_225460d37e08",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7535408,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p20_compliance_units.py::test_fuzz_decision_matrix -q",
+        "suite": "tests/pytest/test_p20_compliance_units.py::test_fuzz_decision_matrix",
+        "scope": "compliance: fuzzed decision matrix stays within policy",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_e6d2ffdf8fa3",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7561789,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p21_treasury_units.py::test_fuzz_allocations -q",
+        "suite": "tests/pytest/test_p21_treasury_units.py::test_fuzz_allocations",
+        "scope": "treasury DAO: fuzzed allocations stay within policy bounds",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_3a96964a1d65",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7577193,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p22.py::test_ac1_fuzzed_assets_1000_rejected, test_ac2_fuzz_1000_quote_sets -q",
+        "suite": "tests/pytest/test_defi_p22.py::test_ac1_fuzzed_assets_1000_rejected, test_ac2_fuzz_1000_quote_sets",
+        "scope": "stable yield: 1000 fuzzed assets rejected + 1000 fuzzed quote sets within bounds",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_ed35b1a75e53",
+      "sku": "SINCOR-DEFI-P23-NFTFI",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.759221,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p23.py::test_ac1_fuzz_1000_addresses_rejected, test_ac2_fuzz_1000_sequences -q",
+        "suite": "tests/pytest/test_defi_p23.py::test_ac1_fuzz_1000_addresses_rejected, test_ac2_fuzz_1000_sequences",
+        "scope": "NFT-fi: 1000 fuzzed addresses rejected + 1000 fuzzed sequences preserve invariants",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_9b4baf145f92",
+      "sku": "SINCOR-DEFI-P24-SOCIALFI",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7608936,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p24.py::test_ac1_fuzz_1000_fee_values, test_ac4_fuzz_1000_matcher_mutations_still_blocked -q",
+        "suite": "tests/pytest/test_defi_p24.py::test_ac1_fuzz_1000_fee_values, test_ac4_fuzz_1000_matcher_mutations_still_blocked",
+        "scope": "socialfi: 1000 fuzzed fee values + 1000 matcher mutations still blocked",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_649681686cae",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7624037,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p25.py::test_ac1_fuzz_1000_signal_sets -q",
+        "suite": "tests/pytest/test_defi_p25.py::test_ac1_fuzz_1000_signal_sets",
+        "scope": "agent portfolio: 1000 fuzzed signal sets handled within bounds",
+        "passed": 1,
+        "failed": 0
+      }
     }
   ]
 }
