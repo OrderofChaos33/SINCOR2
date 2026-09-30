@@ -591,6 +591,20 @@ class StakeLedger:
         return {"agent_id": agent_id, "task_id": task_id, "upheld": False,
                 "released_wei": str(released)}
 
+    def task_was_adjudicated(self, task_id: str) -> bool:
+        """True if this task has an adjudication/slash record (pure read).
+
+        Used by the settlement-proof route: adjudicated tasks may only settle
+        with an adjudicator-signed ruling.
+        """
+        for event in self._data.get("events", []):
+            if not isinstance(event, dict):
+                continue
+            if event.get("kind") in ("adjudicated", "slash") \
+                    and str(event.get("task_id") or "") == str(task_id):
+                return True
+        return False
+
 
 # --- process-wide singleton (overridable in tests) -----------------------------
 
