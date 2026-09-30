@@ -150,16 +150,62 @@ class SincorAgentSDK:
     # -- tasks ------------------------------------------------------------
     def post_task(self, skill: str, tags: list, bounty_axm: float,
                   sealed: bool = True,
-                  poster_id: Optional[str] = None) -> Dict[str, Any]:
+                  poster_id: Optional[str] = None,
+                  agent_id: Optional[str] = None,
+                  auth_signature: Optional[str] = None,
+                  auth_timestamp: Optional[int] = None,
+                  auth_nonce: Optional[str] = None) -> Dict[str, Any]:
         """Post a task (poster side). Sealed tasks run the commit/reveal
         auction; ``commit_deadline``/``reveal_deadline`` are stamped at
-        creation."""
+        creation.
+
+        Poster attribution is SERVER-BOUND (P3 item 14): the server ignores
+        any bare ``poster_id`` for attribution. To have the task attributed
+        to your wallet (and receive ghost-slash re-auction credit), sign
+        the market task-create message — see ``make_poster_auth`` — and pass
+        the resulting ``auth_signature``/``auth_timestamp``/``auth_nonce``
+        (plus your ``agent_id`` label). Unsigned posts are anonymous.
+        """
         payload: Dict[str, Any] = {
             "skill": skill, "tags": list(tags),
             "bounty_axm": float(bounty_axm), "sealed": bool(sealed)}
         if poster_id:
             payload["poster_id"] = poster_id
+        if agent_id:
+            payload["agent_id"] = agent_id
+        if auth_signature:
+            payload["auth_signature"] = auth_signature
+        if auth_timestamp is not None:
+            payload["auth_timestamp"] = int(auth_timestamp)
+        if auth_nonce:
+            payload["auth_nonce"] = auth_nonce
         return self.t.post("/v1/a2a/tasks", payload)
+
+    @staticmethod
+    def make_poster_auth(agent_id: str, skill: str, timestamp: int,
+                         sign_text, nonce: Optional[str] = None) -> Dict[str, Any]:
+        """Build the signed poster-auth fields for :meth:`post_task`.
+
+        ``sign_text`` is a caller-supplied callable taking the canonical
+        message text and returning the EIP-191 ``personal_sign`` signature
+        as hex (``0x`` prefix optional) — e.g.
+        ``lambda m: Account.sign_message(encode_defunct(text=m)).signature.hex()``.
+        The SDK never sees private keys. A fresh ``nonce`` is generated per
+        call unless given; it is returned in the dict (the server requires
+        it to rebuild the signed message, and signatures are single-use).
+        """
+        import secrets
+
+        from sincor2.a2a_integration import _auth_market_create_message
+        nonce = nonce or secrets.token_hex(8)
+        message = _auth_market_create_message(str(skill).strip().lower(),
+                                              int(timestamp), nonce)
+        return {
+            "agent_id": str(agent_id),
+            "auth_signature": sign_text(message),
+            "auth_timestamp": int(timestamp),
+            "auth_nonce": nonce,
+        }
 
     def get_task(self, task_id: str) -> Dict[str, Any]:
         """Public task view (sealed-safe: no bid/commit details)."""

@@ -872,7 +872,17 @@ def attach_market_routes(bp: Blueprint) -> None:
     def v1_tasks():
         body = request.get_json(silent=True) or {}
         try:
-            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=body.get("poster_id") or body.get("agent_id"),
+            # P3 item 14 / G2.15: poster identity is SERVER-BOUND. Only a
+            # valid EIP-191 signature over the market task-create message
+            # attributes the task to a wallet; client-supplied poster_id /
+            # agent_id are ignored for attribution (they remain accepted in
+            # the body for backward compatibility but carry no trust).
+            # Unsigned posts are anonymous (poster_id=None) — ghost-slash
+            # re-auction credit then falls back to the platform, and no
+            # attacker can steer slash proceeds to an arbitrary identity.
+            from sincor2.a2a_integration import _server_bound_poster_id
+            poster_id = _server_bound_poster_id(body)
+            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=poster_id,
                              seed_key=str(body.get("seed_key") or "") or None, auto_refresh=bool(body.get("auto_refresh")),
                              title=body.get("title"), description=body.get("description"))
             deduped = bool(task.pop("_dedupe_hit", False))
