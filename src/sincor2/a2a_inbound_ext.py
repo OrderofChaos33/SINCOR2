@@ -236,9 +236,14 @@ def list_agents(live_only: bool = False) -> List[Dict[str, Any]]:
 
 def mount(app: Flask) -> None:
     from flask import Blueprint
+    from sincor2.a2a_errors import register_a2a_error_handlers
     from sincor2.a2a_inbound_market import attach_market_routes, seed_probation_tasks
 
     bp = Blueprint("a2a_inbound", __name__)
+    # G2.11: every error on this blueprint is a JSON envelope, never an
+    # HTML 500 page (covers market, pool, sponsored-stake and recovery
+    # routes — they all attach to this same blueprint below).
+    register_a2a_error_handlers(bp)
 
     @bp.post("/api/marketplace/register")
     @bp.post("/v1/a2a/register")
