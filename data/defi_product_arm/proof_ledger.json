@@ -192,7 +192,11 @@
         "passed": 24,
         "failed": 0,
         "suite": "test_p01_vault_units.py",
-        "scope": "vault allocator: caps, fees, risk tiers, rebalance plans, dry-run intents"
+        "scope": "vault allocator: caps, fees, risk tiers, rebalance plans, dry-run intents",
+        "status": "superseded",
+        "superseded_by": "SINCOR-DEFI-P01-VAULT",
+        "supersede_reason": "pre-canon SKU from xioix/sku-defi-p01-p07; P01's canonical SKU is P01-VAULT per products.SLUGS",
+        "superseded_by_wave": "xioix/buildout-26-ledger-hygiene"
       }
     },
     {
@@ -252,7 +256,11 @@
         "passed": 28,
         "failed": 0,
         "suite": "test_p05_insurance_units.py",
-        "scope": "stale-score enforcement in buy_cover (7,200-block rule now on the underwriting path), protocol-bound scores, claims, reserve floor, live gate"
+        "scope": "stale-score enforcement in buy_cover (7,200-block rule now on the underwriting path), protocol-bound scores, claims, reserve floor, live gate",
+        "status": "superseded",
+        "superseded_by": "SINCOR-DEFI-P05-MUTUAL",
+        "supersede_reason": "pre-canon SKU from xioix/sku-defi-p01-p07; P05's canonical SKU is P05-MUTUAL per products.SLUGS",
+        "superseded_by_wave": "xioix/buildout-26-ledger-hygiene"
       }
     },
     {
@@ -297,7 +305,11 @@
         "passed": 1,
         "failed": 0,
         "suite": "seeded fuzz",
-        "scope": "test_fuzzed_op_sequences_never_breach_floor: 500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused"
+        "scope": "test_fuzzed_op_sequences_never_breach_floor: 500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused",
+        "status": "superseded",
+        "superseded_by": "SINCOR-DEFI-P05-MUTUAL",
+        "supersede_reason": "pre-canon SKU from xioix/sku-defi-p01-p07; P05's canonical SKU is P05-MUTUAL per products.SLUGS",
+        "superseded_by_wave": "xioix/buildout-26-ledger-hygiene"
       }
     },
     {
@@ -1364,6 +1376,30 @@
         "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
         "date": "2026-09-29T23:30:00-05:00",
         "notes": "Automated walkthrough of the real compliance_pack module (C1-C6 live, all green): PHI redaction profile, deterministic paginated exports, Ed25519 chain-of-custody, setup checklist, honest-boundary scans, and the combined AUD-01+AUD-02 custody chain. Checklist boxes NOT ticked because: (a) spec requires founder-conducted \u2014 this was worker-automated; (b) control-map walk (10+ controls traced to platform records) not exercisable \u2014 no control->evidence map tooling exists in the built module; (c) monthly-pack delta box not exercisable \u2014 no pack assembly tooling exists; (d) change-watch box not exercisable \u2014 not implemented; (e) delivery receipt box needs founder as stand-in signatory; (f) CTA clicks founder-manual (/contact IS routed GET/POST \u2014 statically verified); (g) 'read copy aloud' founder-manual (mechanical banned-phrase scan passed: clean). Acceptance criteria 1-7 AS WRITTEN are unmet by the built tooling (no playbook file, no control-map/monthly-pack/change-watch tooling, no founder-signed receipt). The built module is real working guardrails+exports+custody software \u2014 the gap is spec-vs-build scope, flagged to parent: either build the engagement tooling or revise the spec criteria."
+      }
+    },
+    {
+      "entry_id": "ev_56a90bcd033a",
+      "sku": "SINCOR-DEFI-P01-YIELD",
+      "kind": "note",
+      "timestamp": 1790729521.3542407,
+      "commit": null,
+      "recorded_by": "xioix/buildout-26-ledger-hygiene",
+      "details": {
+        "note": "Ledger hygiene (2026-09-30, xioix/buildout-26-ledger-hygiene): all 1 entries under stale SKU SINCOR-DEFI-P01-YIELD marked superseded -> SINCOR-DEFI-P01-VAULT. The underlying test runs were genuine (see details); only the SKU key was pre-canonical. Canonical SKU holds re-recorded evidence (waves 20/21). Gates match canonical SKUs only and now explicitly exclude status='superseded' entries via gates._is_superseded.",
+        "superseded_by": "SINCOR-DEFI-P01-VAULT"
+      }
+    },
+    {
+      "entry_id": "ev_7d0e2500be32",
+      "sku": "SINCOR-DEFI-P05-INSURANCE",
+      "kind": "note",
+      "timestamp": 1790729521.355849,
+      "commit": null,
+      "recorded_by": "xioix/buildout-26-ledger-hygiene",
+      "details": {
+        "note": "Ledger hygiene (2026-09-30, xioix/buildout-26-ledger-hygiene): all 2 entries under stale SKU SINCOR-DEFI-P05-INSURANCE marked superseded -> SINCOR-DEFI-P05-MUTUAL. The underlying test runs were genuine (see details); only the SKU key was pre-canonical. Canonical SKU holds re-recorded evidence (waves 20/21). Gates match canonical SKUs only and now explicitly exclude status='superseded' entries via gates._is_superseded.",
+        "superseded_by": "SINCOR-DEFI-P05-MUTUAL"
       }
     }
   ]
