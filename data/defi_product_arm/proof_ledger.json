@@ -1365,6 +1365,958 @@
         "date": "2026-09-29T23:30:00-05:00",
         "notes": "Automated walkthrough of the real compliance_pack module (C1-C6 live, all green): PHI redaction profile, deterministic paginated exports, Ed25519 chain-of-custody, setup checklist, honest-boundary scans, and the combined AUD-01+AUD-02 custody chain. Checklist boxes NOT ticked because: (a) spec requires founder-conducted \u2014 this was worker-automated; (b) control-map walk (10+ controls traced to platform records) not exercisable \u2014 no control->evidence map tooling exists in the built module; (c) monthly-pack delta box not exercisable \u2014 no pack assembly tooling exists; (d) change-watch box not exercisable \u2014 not implemented; (e) delivery receipt box needs founder as stand-in signatory; (f) CTA clicks founder-manual (/contact IS routed GET/POST \u2014 statically verified); (g) 'read copy aloud' founder-manual (mechanical banned-phrase scan passed: clean). Acceptance criteria 1-7 AS WRITTEN are unmet by the built tooling (no playbook file, no control-map/monthly-pack/change-watch tooling, no founder-signed receipt). The built module is real working guardrails+exports+custody software \u2014 the gap is spec-vs-build scope, flagged to parent: either build the engagement tooling or revise the spec criteria."
       }
+    },
+    {
+      "entry_id": "ev_w58_870ae1bc16d7",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "audit_report",
+      "timestamp": 1790798671.6791136,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/yield_aggregator.py (397 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "weight cap water-fill: conservation of weights verified; cap-yield-to-conservation precedence documented",
+          "fail-safe path: _safest_cash picks lowest-risk enabled cash row (prior fuzz-found bug fixed in comments)",
+          "EXECUTE_LIVE only emits intents; signing/broadcast external; default dry_run",
+          "eligible-set risk filter + min-liquidity gating"
+        ],
+        "findings": [
+          {
+            "severity": "low",
+            "finding": "env-derived numeric params (YIELD_MAX_SINGLE_STRATEGY_PCT, YIELD_MAX_SLIPPAGE_BPS, YIELD_MIN_CAPITAL_USD) are parsed without validation; a negative or zero YIELD_MAX_SINGLE_STRATEGY_PCT would break the cap water-fill logic. Harden: clamp/validate at import.",
+            "status": "open"
+          },
+          {
+            "severity": "info",
+            "finding": "YieldAggregator(strategies=[]) silently falls back to DEFAULT_STRATEGIES ('strategies or DEFAULT_STRATEGIES', yield_aggregator.py:179): an explicitly empty table means 'allocate everything' instead of 'allocate nothing' \u2014 a fail-open config wart. Recommend 'if strategies is None'. Constructor semantics, needs product decision.",
+            "status": "open"
+          }
+        ],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 2,
+        "invariant_evidence": "tests/pytest/test_p01_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": "Disabled SharedLiquidityVault strategy correctly excluded from eligible set; MORPHO_USDC_VAULT is the live-intent vault."
+      }
+    },
+    {
+      "entry_id": "ev_w58_5be25b13c92d",
+      "sku": "SINCOR-DEFI-P02-CLMM",
+      "kind": "audit_report",
+      "timestamp": 1790798671.6824896,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/clmm_manager.py (499 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "CaptureDistributor.distribute: exact conservation assert (distributed + treasury_total == proceeds); dust floors to treasury",
+          "claim(): pull-based, double-claim returns 0, never pushes",
+          "VolRangeAgent.open_live_position: hard-blocked unless auditor gate flips; else NotImplementedError",
+          "JIT detection math + fee surcharge caps; AccessControl role-gated pause"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p02_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_9ab418073baa",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "kind": "audit_report",
+      "timestamp": 1790798671.6856956,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/intent_dark_pool.py (531 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "Settlement.settle: per-asset conservation assert (paid_out + fees == gross, exact wei)",
+          "batch replay protection: _settled_batches set + mark_settling/mark_settled lifecycle",
+          "claim(): pull-based; failed transfer never bricks (funds stay claimable, error recorded)",
+          "settlement-asset gate enforced before any state change; fee cap + pause sequence"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p03_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_4a7db1327465",
+      "sku": "SINCOR-DEFI-P04-MEV",
+      "kind": "audit_report",
+      "timestamp": 1790798671.6889648,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/mev_capture.py (597 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "LiveGate: live capture blocked until founder-signed release; release() requires non-empty marker",
+          "Bidder: proceeds-funded only, min float floor, 2x gas-reserve stand-down, 3x bid shading",
+          "submit_live: gate check then NotImplementedError (execution path absent by construction)",
+          "sandwich/backrun detectors + SignerRegistry fail-closed construction"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p04_audit_invariants.py green (wave 21)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_2e956a76213d",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "audit_report",
+      "timestamp": 1790798671.6938915,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/insurance_mutual.py (516 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "deposit_capital: 1:1 genesis share math; subsequent deposits pro-rata on reserves",
+          "redeem_capital: 130% reserve-floor guard (redeem blocked on breach)",
+          "buy_cover: fresh risk-score requirement; claim flow assessor quorum + slashing",
+          "buy_cover reserve check; pending-payout pull pattern"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p05_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_a24453c06dff",
+      "sku": "SINCOR-DEFI-P06-PERPS",
+      "kind": "audit_report",
+      "timestamp": 1790798671.69872,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/perp_hedge_swarm.py (463 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "isolated margin only; cross-margin constructor arg rejected",
+          "opens_paused when liq buffer < 1.5x; $250 min; 15% swarm-cap sizing; funding-sign gate",
+          "price feed staleness raises (fail-static); conversion proof gate before live",
+          "fee on realized PnL only"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p06_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_7828864a6451",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "audit_report",
+      "timestamp": 1790798671.7091053,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/bridge_optimizer.py (493 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "settle(): conservation assert (payout + treasury_fee == net_out, exact wei)",
+          "settle deadline enforced; idempotent on already-settled route",
+          "storage-proof verification against route commitment before payout",
+          "non-bricking reverting-recipient path: funds parked, pull-claimable; LiveGate release-gated"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p07_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_f3cba36faeb5",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "audit_report",
+      "timestamp": 1790798671.7190702,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/rwa_vaults.py (437 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "ERC-4626 inflation-attack guard: DEAD_SHARES floor minted to burn address on first deposit",
+          "accrue_yield: gate-open + promoted + oracle-unpaused required; 15 bps treasury fee; pro-rata over eligible supply",
+          "KYC-revoked yield frozen (never seized); principal always redeemable (T+2)",
+          "NAV oracle pause circuit breaker; compliance gate pack evaluation"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p08_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_d1074a9f00a0",
+      "sku": "SINCOR-DEFI-P09-GOV",
+      "kind": "audit_report",
+      "timestamp": 1790798671.728273,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/dao_governance.py (289 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "VoteBroadcaster.broadcast_vote always raises BroadcastBlockedError (sim-only, fail-closed)",
+          "proposal execute: quorum check + 48h timelock enforced; snapshot immutable after close (StaleVoteError)",
+          "bribe plan: 25% max per gauge, $10 epoch floor, 5 bps treasury fee on captured rewards",
+          "net-yield computed after bribe/vote-rental/bridge-slippage/gas"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p09_audit_invariants.py green (wave 21)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_65e653d54ad5",
+      "sku": "SINCOR-DEFI-P10-FLASHARB",
+      "kind": "audit_report",
+      "timestamp": 1790798671.736136,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/flash_arbitrage.py (391 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "OS RUNTIME CONTRACT: scan-only; ScanOnlyGate makes any live execution path revert by construction",
+          "safety dry-run aborts unsafe candidates; callback bound to provider (CallbackTheftError)",
+          "money in integer cents; profit floor $50 + 0.15% notional; $25 gas ceiling; 2-block TTL",
+          "settlement accounting: 30 bps treasury fee on net profit"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p10_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_ae92633d4e0d",
+      "sku": "SINCOR-DEFI-P11-DELTANEUTRAL",
+      "kind": "audit_report",
+      "timestamp": 1790798671.7450955,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/delta_neutral.py (235 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "HedgeSizer validates max_ltv in (0,1); LTV-breach sizing refused",
+          "net_delta_units exact by construction (lst - short); funding-flip kill switch",
+          "basis-negative refused; live venue calls blocked (simulation only)"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p11_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_aab69944f0d8",
+      "sku": "SINCOR-DEFI-P12-TWAMM",
+      "kind": "audit_report",
+      "timestamp": 1790798671.758305,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/twamm.py (200 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "slice schedule: min 4 slices enforced (single-block dumps rejected)",
+          "impact-cap auto-extension with 512-slice ceiling; ImpactCapError when unsatisfiable",
+          "integer remainder distributed to earliest slices; schedule sums exactly to parent",
+          "8 bps treasury fee; LiveOrderBlocker.submit always raises",
+          "re-ran wave-21 floor-bound reasoning: per-slice flooring can make total_output up to n_slices cents below dump output; fuzz held the bound"
+        ],
+        "findings": [
+          {
+            "severity": "low",
+            "finding": "module docstring still states the slicing invariant as absolute ('never underperforms a single dump'), but integer per-slice flooring can make total_output up to n_slices cents below dump output (wave-21 fuzz: 12c on 21 slices; bound held). Tighten docstring to state the flooring bound.",
+            "status": "open"
+          }
+        ],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 1,
+        "invariant_evidence": "tests/pytest/test_p12_audit_invariants.py green (wave 21)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_0d2a1fe3f9c0",
+      "sku": "SINCOR-DEFI-P13-AVS",
+      "kind": "audit_report",
+      "timestamp": 1790798671.7687783,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/avs_tranching.py (235 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "SlashOracle: staleness limit raises on stale reads",
+          "junior-cap + cover-breach guards on allocation; slashing applies to tranches per oracle",
+          "LiveRestakeBlocker: live restake raises; yield distribution pro-rata"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p13_audit_invariants.py green (wave 21)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_ab10002cdb48",
+      "sku": "SINCOR-DEFI-P14-PREDICT",
+      "kind": "audit_report",
+      "timestamp": 1790798671.7818244,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/prediction_markets.py (532 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "KellySizer: quarter-Kelly x confidence^2, hard-clamped to 10% bankroll; zero size on no edge",
+          "Brier score tracking with beats-naive gate; category risk halt",
+          "edge veto on insufficient confidence; stale-data rejection",
+          "PolyclawWalletAdapter: ONLY live path; treasury key label hard-blocked; dry_run default"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p14_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_29880c5159c2",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "audit_report",
+      "timestamp": 1790798671.7972612,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/lending_optimizer.py (692 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "_accrue_interest: largest-remainder distribution so sum(balances) == total_supply exactly; fee 10 bps pull-claimable",
+          "utilization band gate on borrow; solvency guard on withdraw (supply - withdrawn >= borrows)",
+          "allowlisted venues only; live execution blocked; rehypothecation caps + liquidity buffer",
+          "wallet feature model + health-factor checks"
+        ],
+        "findings": [
+          {
+            "severity": "low",
+            "finding": "LendingPool.set_band() has no access control in the reference model (any caller can tighten/loosen the utilization band). Code comments mark it as an 'audited admin path in production'. Deployment must gate this behind the admin role.",
+            "status": "open"
+          }
+        ],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 1,
+        "invariant_evidence": "tests/pytest/test_p15_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_d04bb574bc6f",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "audit_report",
+      "timestamp": 1790798671.8149683,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/dex_aggregator.py (503 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "SplitOptimizer: net-out math with per-venue fee deduction; renormalization keeps legs summing to request",
+          "min-out enforcement on simulated execution; allowlisted venues only",
+          "live execution blocked; forecast adapter injects scores without changing math"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p16_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_8d52575c5ed4",
+      "sku": "SINCOR-DEFI-P17-OPTIONS",
+      "kind": "audit_report",
+      "timestamp": 1790798671.831311,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/options_protocol.py (378 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "covered-only invariant: minted <= lockedCollateral asserted on every write; NakedShortAttempt raised",
+          "series OI cap 10k + per-writer cap; expiry band 7d-90d fixed tenors",
+          "premium rails (floor/cap) + $1 dust floor reject bad BS quotes; stale-oracle reverts",
+          "permissionless settle exactly once per series; exercise within window",
+          "re-ran wave-21 float-dust reasoning: BS model can return slightly negative dust; premium rails reject it downstream (verified)"
+        ],
+        "findings": [
+          {
+            "severity": "info",
+            "finding": "Black-Scholes float dust can be slightly negative (wave-21 fuzz finding); premium rails reject it downstream. No action needed; recorded for the audit trail.",
+            "status": "accepted"
+          }
+        ],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p17_audit_invariants.py green (wave 21)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_62331a7f4dd1",
+      "sku": "SINCOR-DEFI-P18-STRUCTURED",
+      "kind": "audit_report",
+      "timestamp": 1790798671.848594,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/structured_products.py (504 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "TrancheLedger.check_conservation on deposit; PT/YT minted 1:1 with deposit",
+          "yield sources allowlisted per product; harvest non-bricking on source failure",
+          "param changes behind lister role + timelock; pause gating",
+          "protection sleeve math: floor x discount factor; fee exceeds-sleeve refused"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p18_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_1a87c8168c22",
+      "sku": "SINCOR-DEFI-P19-CREDIT",
+      "kind": "audit_report",
+      "timestamp": 1790798671.8629029,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/credit_underwriting.py (367 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "validate_ltv_table: monotonicity enforced on updates (descending score, non-decreasing LTV)",
+          "score floor: below-floor scores ineligible (LTV 0); attestation freshness + registry",
+          "unsecured draw refused; concentration caps; health-factor circuit actions",
+          "re-ran wave-21 findings: still present as documented (see findings)"
+        ],
+        "findings": [
+          {
+            "severity": "low",
+            "finding": "validate_ltv_table range-checks LTV only from the second row onward; the first row's LTV is not range-validated (wave-21 fuzz finding, still present).",
+            "status": "open"
+          },
+          {
+            "severity": "info",
+            "finding": "documented 850 score ceiling is unreachable: feature weights cap the score at 800 (wave-21 fuzz finding). Doc mismatch only; scoring behaves as weighted.",
+            "status": "accepted"
+          }
+        ],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 1,
+        "invariant_evidence": "tests/pytest/test_p19_audit_invariants.py green (wave 21)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_9e8051a0e2ea",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "audit_report",
+      "timestamp": 1790798671.8711514,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/compliance_automation.py (596 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "KYC verify: issuer allowlist, HMAC compare_digest, nonce-replay rejection, 90d validity cap, expiry -> STALE",
+          "AML screen: mixer/darknet/scam tags, hop-limit, fail-closed on unreachable provider",
+          "geo registry timelock on updates; reentrancy guard pattern on deposit path",
+          "HMAC is explicitly demo-only per repo policy (real attestations use secp256k1 elsewhere)"
+        ],
+        "findings": [
+          {
+            "severity": "low",
+            "finding": "_consumed_nonces is per-process memory: nonce-replay protection does not survive a process restart. Production must back this with durable storage (wave-15 shared-state interface).",
+            "status": "open"
+          }
+        ],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 1,
+        "invariant_evidence": "tests/pytest/test_p20_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_c894c8bd84bd",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "audit_report",
+      "timestamp": 1790798671.8826847,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/treasury_dao.py (308 lines, read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "Executor.broadcast always raises BroadcastForbidden; even with EXECUTE_LIVE_ENV only reviewed+approved holds dispatch to an approved external executor",
+          "publish: review required; unreviewed holds > 72h raise StaleHold; content-id verified against payload",
+          "RiskOfficer band validation on every publish; 8 bps fee on positive realized yield only"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p21_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_b7e29dff52c1",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "audit_report",
+      "timestamp": 1790798671.8899164,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/p22/*.py (optimizer, gate, twap, scanner, adapters, fees, interfaces; read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "optimize(): per-venue caps on allocation; verify_plan re-checks conservation",
+          "rotation decisions require threshold breach; gate module blocks live moves",
+          "TWAP scanner fixture-injected; fee accounting to treasury"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p22_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_ce90a965f840",
+      "sku": "SINCOR-DEFI-P23-NFTFI",
+      "kind": "audit_report",
+      "timestamp": 1790798671.8989499,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/p23/*.py (vault, registry, oracle, manager, fees, live_block; read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "live_block.guard_live raises on every live-intent entrypoint (live-blocked by catalog design)",
+          "FractionalVault.deposit: ERC-4626 inflation-attack guard (minimum shares to burn address on first deposit)",
+          "oracle deposits-frozen + no-price paths raise; collection allowlist required",
+          "lending sleeve utilization-capped; absorb_default books losses; epoch snapshots"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p23_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_953da3c75074",
+      "sku": "SINCOR-DEFI-P24-SOCIALFI",
+      "kind": "audit_report",
+      "timestamp": 1790798671.9078307,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/p24/*.py (factory, curve, policy, accrual, split, fees, onboarding, live_block, primitives; read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "factory.issue: requires screened=True (content-policy screen); name/symbol required; symbol uniqueness",
+          "transfer_creator_tokens: only vested tokens move (transferable_wei)",
+          "curve: exact-sum marginal pricing on buy/sell; inventory cap 500M; one-way graduation",
+          "fee split + revenue accrual mirror; live_block by catalog design"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p24_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_deca023e6699",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "audit_report",
+      "timestamp": 1790798671.9149768,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/p25/*.py (allocator, rebalancer, guards, risk, ingestor, fees, api; read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "guards.require_cash_floor: rebalance refused below cash floor",
+          "plan_rebalance: delta trades sized within risk bands; no leverage beyond configured max",
+          "ingestor fixture-injected; risk module drawdown circuit"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p25_audit_invariants.py green (wave 20)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
+    },
+    {
+      "entry_id": "ev_w58_e6f489e50062",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "audit_report",
+      "timestamp": 1790798671.9221623,
+      "commit": "fd96801",
+      "recorded_by": "xioix/buildout-58-defi-audit-record",
+      "details": {
+        "event_type": "audit_report",
+        "auditor": "internal",
+        "report_type": "internal_review",
+        "not_a_third_party_audit": true,
+        "date": "2026-09-30",
+        "audited_base": "fd96801",
+        "recorded_on_branch": "xioix/buildout-58-defi-audit-record",
+        "scope": [
+          "src/sincor2/defi/p26/*.py (ranker, killswitch, toa_loop, proof_hooks, registry_wrap, telemetry, api; read in full)"
+        ],
+        "method": "internal manual review cross-verified by xioix/buildout-58-defi-audit-record (2026-09-30) against the fd96801 tree; primary pass by xioix/buildout-28-audit-artifacts whose module claims were re-grounded (all module line counts matched exactly; all findings re-verified in code). Checklist: money math (conservation, integer dust, share issuance), access control / live-block enforcement, input validation, replay and double-spend guards, error handling, and consistency with documented load-bearing invariants. Cross-checked against the wave-20/wave-21 invariant and fuzz suites already on record in the proof ledger. NOT a CertiK Token Scan, NOT a Skynet score, NOT a formal third-party audit.",
+        "checks": [
+          "ranker: reads the proof ledger by canonical SKU (gate_stage_evidence); ranks on real evidence only",
+          "killswitch: ROI/loss thresholds trigger kill decisions with reason records",
+          "TOA feedback loop appends telemetry; proof_hooks record evidence entries",
+          "no self-modification of product code; registry wrapper is read-only over catalog"
+        ],
+        "findings": [],
+        "open_critical": 0,
+        "open_criticals": 0,
+        "open_high": 0,
+        "open_low_or_info": 0,
+        "invariant_evidence": "tests/pytest/test_p26_audit_invariants.py green (wave 21)",
+        "gate_decision": "stays in test: audit clean (0 open criticals); product-stage promotion still requires invariant/fuzz evidence, fork-sim evidence, and founder live-block decisions per the lifecycle gates",
+        "note": ""
+      }
     }
   ]
 }
