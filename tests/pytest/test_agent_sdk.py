@@ -8,6 +8,8 @@ deterministic instead of sleeping through protocol windows.
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 from flask import Flask
 
@@ -45,7 +47,7 @@ def _onboard(sdk, agent_id=AGENT, stake_axm=2.0):
         agent_id, "SDK Agent", TAGS, wallet=WALLET,
         rpc_callback="https://sdk-agent.example/rpc")
     assert reg["status"] == "registered"
-    hb = sdk.heartbeat(agent_id)
+    hb = sdk.heartbeat(agent_id, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     assert hb["ok"] is True
     dep = sdk.deposit_stake(agent_id, stake_axm)
     assert dep["agent_id"] == agent_id
@@ -89,7 +91,7 @@ def test_sdk_sealed_round_trip(sdk):
     assert bal["locked_wei"] == str(int(0.75 * 1e18))
 
     _open_reveal_window(task_id)
-    sdk.heartbeat(AGENT)
+    sdk.heartbeat(AGENT, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     revealed = sdk.sealed_reveal(bid, estimated_seconds=600)
     assert revealed["revealed"] is True
     assert revealed["bid_axm"] == 0.9
@@ -106,7 +108,7 @@ def test_sdk_full_settlement_releases_stake_and_earns_reputation(sdk):
     task_id = _sealed_task(sdk)
     bid = sdk.sealed_commit(task_id, AGENT, 0.9)
     _open_reveal_window(task_id)
-    sdk.heartbeat(AGENT)
+    sdk.heartbeat(AGENT, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     sdk.sealed_reveal(bid)
     _pass_reveal_deadline(task_id)
     sdk.close_auction(task_id)
@@ -140,7 +142,7 @@ def test_sdk_commitment_mismatch_rejected(sdk):
     task_id = _sealed_task(sdk)
     bid = sdk.sealed_commit(task_id, AGENT, 0.9)
     _open_reveal_window(task_id)
-    sdk.heartbeat(AGENT)
+    sdk.heartbeat(AGENT, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     bid.bid_axm = 1.1  # tamper: reveal a different price than committed
     with pytest.raises(SDKError) as exc:
         sdk.sealed_reveal(bid)
@@ -150,7 +152,7 @@ def test_sdk_commitment_mismatch_rejected(sdk):
 
 def test_sdk_commit_without_stake_rejected(sdk):
     sdk.register(AGENT, "Broke Agent", TAGS, wallet=WALLET)
-    sdk.heartbeat(AGENT)
+    sdk.heartbeat(AGENT, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     task_id = _sealed_task(sdk)
     with pytest.raises(SDKError) as exc:
         sdk.sealed_commit(task_id, AGENT, 0.9)

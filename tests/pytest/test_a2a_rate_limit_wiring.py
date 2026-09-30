@@ -19,6 +19,8 @@ boundary rather than on business-logic outcomes.
 
 from __future__ import annotations
 
+from conftest import hb_headers
+
 import pytest
 from flask import Flask
 
@@ -178,7 +180,7 @@ def test_unmapped_routes_not_limited(client):
     # Heartbeat and proof submission have no policy; hammering them must
     # never produce a 429.
     for _ in range(10):
-        r = client.post("/v1/a2a/heartbeat", json={"agent_id": "ghost"})
+        r = client.post("/v1/a2a/heartbeat", json={"agent_id": "ghost"}, headers=hb_headers())
         assert r.status_code == 404, r.status_code
     for _ in range(35):
         r = client.post(

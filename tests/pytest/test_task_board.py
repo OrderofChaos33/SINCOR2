@@ -8,6 +8,8 @@ policy coverage for the new routes.
 """
 from __future__ import annotations
 
+from conftest import hb_headers
+
 import json
 import os
 
@@ -245,7 +247,8 @@ def test_commit_after_stale_window_refreshes_not_kills(board_client):
     })
     assert r.status_code in (200, 201), r.get_json()
     assert board_client.post(
-        "/v1/a2a/heartbeat", json={"agent_id": "board-bidder"}).status_code == 200
+        "/v1/a2a/heartbeat", json={"agent_id": "board-bidder"},
+        headers=hb_headers()).status_code == 200
     stake_ledger().deposit("board-bidder", 10 * 10**18)
 
     r = board_client.post("/v1/a2a/tasks", json={
