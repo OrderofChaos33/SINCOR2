@@ -1035,6 +1035,99 @@
         "passed": 1,
         "failed": 0
       }
+    },
+    {
+      "entry_id": "ev_b37cafdbf2dd",
+      "sku": "OBS-01",
+      "kind": "acceptance_run",
+      "timestamp": 1790741008.9879432,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker (W1)",
+      "details": {
+        "criterion": 5,
+        "passed": true,
+        "evidence": "Probe /tmp/obs01_probe_c56.py on the REAL route: logged-in customer GET /obs/vitals -> 200; rendered HTML contains data-as-of element 'Snapshot 2026-09-30T04:01:40.090191+00:00' (template templates/vitals_dashboard.html). Template test in test_obs01_vitals.py also asserts BETA/agent/noindex render."
+      }
+    },
+    {
+      "entry_id": "ev_b5dc2608b8d8",
+      "sku": "OBS-01",
+      "kind": "acceptance_run",
+      "timestamp": 1790741008.9899027,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker (W1)",
+      "details": {
+        "criterion": 6,
+        "passed": true,
+        "evidence": "Same probe: two renders 61s apart returned different data-as-of timestamps (2026-09-30T04:01:40.090191+00:00 then 2026-09-30T04:02:41.127703+00:00); no frozen page served as fresh."
+      }
+    },
+    {
+      "entry_id": "ev_04f97d918467",
+      "sku": "OBS-02",
+      "kind": "acceptance_run",
+      "timestamp": 1790741008.9917178,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker (W1)",
+      "details": {
+        "criterion": 1,
+        "passed": true,
+        "evidence": "Probe /tmp/obs02_probe_1000.py: 1000 Ed25519-signed entries appended to temp trail (SINCOR_AUDIT_TRAIL_ENABLED=1); single-byte flip inside entry_hash of seq 500 detected by verify_chain at the store layer \u2014 failure kinds hash_mismatch/bad_signature/link_break, exact seq 500 reported (cascade link_break at 501). No file edit is refused at store layer; detection is what the spec's test asserts."
+      }
+    },
+    {
+      "entry_id": "ev_af5cd0620ad0",
+      "sku": "OBS-02",
+      "kind": "acceptance_run",
+      "timestamp": 1790741008.9933507,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker (W1)",
+      "details": {
+        "criterion": 2,
+        "passed": true,
+        "evidence": "Same 1000-entry probe: verify_chain returned ok=True, entries=1000, signed=1000, unsigned=0 before tamper; after the 1-byte tamper at entry 500, ok=False with failures carrying the exact seq 500 (hash_mismatch + bad_signature). Unmodified chain replays intact."
+      }
+    },
+    {
+      "entry_id": "ev_46afb7bc8b34",
+      "sku": "OBS-02",
+      "kind": "acceptance_run",
+      "timestamp": 1790741008.994671,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker (W1)",
+      "details": {
+        "criterion": 6,
+        "passed": true,
+        "evidence": "scripts/obs02_audit_trail_walkthrough.py (green): export_archive wrote manifest pinning head_hash + verify_key + manifest_sig; after deleting SINCOR_AUDIT_SIGNING_KEY from env, AuditTrail.verify_archive with verify key alone returned ok=True, entries=3 \u2014 bundle independently re-verifies."
+      }
+    },
+    {
+      "entry_id": "ev_c5a3d4709bc2",
+      "sku": "OBS-01",
+      "kind": "walkthrough",
+      "timestamp": 1790741008.9959855,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker (W1)",
+      "details": {
+        "all_boxes_ticked": false,
+        "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
+        "date": "2026-09-30T04:01:00+00:00",
+        "notes": "Automated publish-ceremony evidence step only; NOT founder-conducted (spec requires founder). GREEN E2E run of scripts/obs01_vitals_e2e.py: real app boot; logged-in customer GET /api/obs/vitals -> 200 with live agent health=live, 15-min-stale agent health=silent, real token budget 250/1000, measured cost-per-task 2.5 AXM from the settled task, honest null for no-settled agent; alert rule heartbeat_age_s>300 evaluated on read; exactly 1 real HMAC-SHA256-signed webhook delivery to local receiver (schema sincor.vitals.alert/1, observed 905.3s, wrong-secret rejected); /obs/vitals -> 200, BETA label, both agents rendered, noindex meta; unlisted from /,/pricing,/products; anonymous 302 page / 401 API. Boxes NOT exercised (need founder / staging / manual judgment): 3-agent customer fleet (active/idle>300s/revoked) with panel showing active/unknown/revoked \u2014 the route has NO per-customer scoping (fabric seeds an internal 'sincor-agent-swarm' agent visible to any logged-in user); revoke-mid-session refresh; signal-disconnect drill; CTA clicks on the draft page; copy-aloud of the draft. SPEC/BUILD DIVERGENCE flagged: built module exposes build_agent_snapshot (not snapshot(agent_id)); health vocabulary is live/stale/silent/unknown/kya_suspended (not active/idle/revoked); stale signal renders 'silent' not 'unknown'; default heartbeat TTL observed 60s (not 300s). Criteria 1-4,7,8 as written cannot be ticked until the spec and build are reconciled. No box ticked that was not exercised."
+      }
+    },
+    {
+      "entry_id": "ev_a7d4f7d42e81",
+      "sku": "OBS-02",
+      "kind": "walkthrough",
+      "timestamp": 1790741008.9974802,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker (W1)",
+      "details": {
+        "all_boxes_ticked": false,
+        "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
+        "date": "2026-09-30T04:00:00+00:00",
+        "notes": "Automated publish-ceremony evidence step only; NOT founder-conducted (spec requires founder). Walkthrough scripts/obs02_audit_trail_walkthrough.py GREEN: Ed25519 key ceremony in-process (32-byte seed, nothing to disk); 3 attributed entries recorded (1 via the real observability span hook); chain verifies with all 3 signed; export_archive manifest pins head_hash + verify_key + manifest_sig; offline re-verification with verify key alone -> ok=True entries=3; 1-bit flip in archived entry_hash detected (hash_mismatch, bad_signature, link_break) and rejected. Boxes NOT exercised (need founder / staging / manual judgment): real auction cycle on staging with trail entries per step; tamper drill on the staging store; export re-verified on a SECOND machine; second-customer cross-deployment query; CTA clicks on the draft page; copy-aloud of the draft (esp. no claim that entries are signed \u2014 v1 signs via the shipped Ed25519 layer, not the deferred sibling stack). SPEC/BUILD DIVERGENCE flagged: built audit_trail.py is an agent-attributed signed hash chain (record(agent_id, action, causal_parent, detail)); it has NO deployment_id field, NO query() API, NO pagination, NO retention/export-or-purge \u2014 spec criteria 3/4/5/7/8 have no implementation yet. No box ticked that was not exercised."
+      }
     }
   ]
 }
