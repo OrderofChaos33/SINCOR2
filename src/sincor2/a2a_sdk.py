@@ -147,6 +147,26 @@ class SincorAgentSDK:
     def stake_balance(self, agent_id: str) -> Dict[str, Any]:
         return self.t.get(f"/v1/a2a/stake/{agent_id}")
 
+    # -- socialfi ---------------------------------------------------------
+    def issue_creator_token(self, agent_id: str, name: str, symbol: str,
+                            creator_id: Optional[str] = None,
+                            description: str = "", bio: str = "",
+                            dry_run: bool = True) -> Dict[str, Any]:
+        """Request P24 creator-token issuance for a registered agent.
+
+        Metadata is screened against the content-policy deny-list
+        server-side (violation -> 400 with the ruleset version). P24 is
+        live-blocked, so only dry-run issuance is served until the founder
+        releases the live block; pass dry_run=False only when live
+        issuance is authorized (currently refused with 403)."""
+        payload: Dict[str, Any] = {
+            "agent_id": agent_id, "name": name, "symbol": symbol,
+            "description": description, "bio": bio,
+            "dry_run": bool(dry_run)}
+        if creator_id:
+            payload["creator_id"] = creator_id
+        return self.t.post("/v1/a2a/socialfi/issue", payload)
+
     # -- tasks ------------------------------------------------------------
     def post_task(self, skill: str, tags: list, bounty_axm: float,
                   sealed: bool = True,
