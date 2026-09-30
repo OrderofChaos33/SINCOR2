@@ -36,8 +36,11 @@ Reputation-weighted collateral (2026-09-28):
   for upheld disputes); ghosting resets it to zero.  Vickrey selection is
   untouched — reputation buys bidding capacity, never wins.
 
-This is the Python accounting layer.  On-chain stake deposits / slashing via
-ExecutionEscrowManager are the later wiring step once contracts deploy.
+This is the Python accounting layer.  On-chain stake deposits / slashing
+are wired via StakeSlashManager (contracts/StakeSlashManager.sol) through
+src/sincor2/onchain/stake_bridge.py — see the "onchain wiring" section at
+the bottom of this module.  Until the founder-authorized deployment, the
+wiring is dry-run only (eth_call): no funds move.
 """
 
 from __future__ import annotations
@@ -604,6 +607,117 @@ class StakeLedger:
                     and str(event.get("task_id") or "") == str(task_id):
                 return True
         return False
+
+
+    # -- onchain wiring (StakeSlashManager) -----------------------------------
+    # Dry-run only until the founder-authorized deployment (see
+    # docs/ops/STAKE_SLASH_DEPLOY_RUNBOOK.md).  The bridge module never
+    # imports eth_account and never sees keys: every builder returns an
+    # unsigned tx dict; the caller signs and broadcasts with their own
+    # signer.  Slash rulings are adjudicator-signed EIP-191 digests over a
+    # domain-bound struct hash (contract address + chainid); the contract
+    # enforces the signature, the per-agent nonce, and the expiry.
+    def onchain_bridge(self):
+        """Return a configured StakeSlashBridge, or raise if undeployed."""
+        from sincor2.onchain.stake_bridge import (
+            StakeSlashBridge,
+            StakeSlashNotConfiguredError,
+        )
+        bridge = StakeSlashBridge()
+        try:
+            bridge._require_configured()
+        except StakeSlashNotConfiguredError:
+            raise StakeSlashNotConfiguredError(
+                "StakeSlashManager is not deployed/configured: set "
+                "STAKE_SLASH_ADDRESS and STAKE_RPC_URL after the "
+                "founder-authorized deploy ceremony"
+            )
+        return bridge
+
+    def build_onchain_deposit(self, agent_wallet: str, amount_wei: int,
+                              sender: Optional[str] = None) -> Dict[str, Any]:
+        """Unsigned stake() tx dict for an exact on-chain deposit.
+
+        The agent must approve the manager for ``amount_wei`` first
+        (bridge.build_approve_tx).  After the caller signs and broadcasts,
+        record it with record_onchain_deposit(agent_id, amount_wei, tx_hash).
+        """
+        if int(amount_wei) <= 0:
+            raise ValueError("amount_wei must be positive")
+        bridge = self.onchain_bridge()
+        return bridge.build_stake_tx(agent_wallet, int(amount_wei),
+                                     sender or agent_wallet)
+
+    def dry_run_onchain_deposit(self, agent_wallet: str, amount_wei: int,
+                                sender: Optional[str] = None) -> Dict[str, Any]:
+        """eth_call dry-run of the deposit tx. Green means the calldata is
+        exact and the deposit would succeed on the configured chain."""
+        bridge = self.onchain_bridge()
+        tx = self.build_onchain_deposit(agent_wallet, amount_wei, sender)
+        return bridge.dry_run(tx)
+
+    def record_onchain_deposit(self, agent_id: str, amount_wei: int,
+                               tx_hash: str) -> Dict[str, Any]:
+        """Reconcile a broadcast on-chain deposit into the offchain ledger.
+
+        The tx hash is stored as the deposit's reference; the ledger never
+        moves funds itself.
+        """
+        if not str(tx_hash or "").startswith("0x"):
+            raise ValueError("tx_hash must be a 0x transaction hash")
+        return self.deposit(agent_id, amount_wei, reference=str(tx_hash))
+
+    def quote_slash_ruling(self, agent_id: str, agent_wallet: str,
+                           poster_wallet: str, task_id: str, slash_bps: int,
+                           reason: str, nonce: int, expiry: int) -> Dict[str, Any]:
+        """Build the ruling fields for an adjudicator-signed slash.
+
+        Read-only: computes the slash amount from the agent's locked stake
+        for ``task_id`` and the senior treasury cut from the sponsored
+        ledger's outstanding front (min(slashed, outstanding)).  Nothing is
+        mutated; the actual accounting happens in slash()/slash_ghost()
+        after the ruling executes on-chain.  The returned dict feeds
+        ``stake_bridge.SlashRuling``; the adjudicator signs
+        ``slash_struct_hash(...)`` with their own tooling (canonicalized
+        low-S via ``stake_bridge.canonicalize_signature``).
+        """
+        if reason not in ("ghost", "quality"):
+            raise ValueError("reason must be 'ghost' or 'quality'")
+        if not 0 < int(slash_bps) <= BPS_DENOM:
+            raise ValueError("slash_bps must be within (0, 10000]")
+        rec = self._agent(agent_id)
+        locked = int(rec["locks"].get(task_id, "0"))
+        if locked <= 0:
+            raise InsufficientStake(f"no locked stake for {agent_id}/{task_id}")
+        slashed = locked * int(slash_bps) // BPS_DENOM
+        try:
+            from sincor2.sponsored_stake import sponsored_ledger
+            outstanding = int(sponsored_ledger().outstanding_wei(agent_id))
+        except Exception:
+            outstanding = 0
+        treasury_cut = min(slashed, outstanding)
+        return {"agent": agent_wallet, "poster": poster_wallet,
+                "amount_wei": slashed, "treasury_cut_wei": treasury_cut,
+                "nonce": int(nonce), "expiry": int(expiry), "reason": reason}
+
+    def build_onchain_slash_tx(self, ruling: Dict[str, Any],
+                               signature: tuple,
+                               sender: str) -> Dict[str, Any]:
+        """Unsigned slash() tx dict for an adjudicator-signed ruling.
+
+        ``ruling`` is the dict from quote_slash_ruling (or equivalent);
+        ``signature`` is the (v, r, s) triple over
+        ``slash_struct_hash(...)``.  Anyone may submit the tx — the contract
+        enforces the adjudicator signature, nonce, and expiry on-chain.
+        """
+        from sincor2.onchain.stake_bridge import SlashRuling
+        bridge = self.onchain_bridge()
+        return bridge.build_slash_tx(SlashRuling(**ruling), signature, sender)
+
+    def note_onchain_tx(self, kind: str, tx_hash: str, **detail: Any) -> None:
+        """Append an on-chain broadcast reference to the ledger event log."""
+        self._event("onchain_tx", kind=kind, tx_hash=str(tx_hash), **detail)
+        self._save()
 
 
 # --- process-wide singleton (overridable in tests) -----------------------------
