@@ -131,9 +131,13 @@ class SADASOrchestrator:
         amount = 180.0 + (float(str(anomaly.get("discovered_mismatch_pct", "5")).replace("%", "")) * 12)
         from_token = "AXM"
         receiving_wallet = "TREASURY"
-        adjusted, target, converted = convert_before_treasury_if_needed(amount, from_token, receiving_wallet)
-        if converted:
-            print(f"[TREASURY] Converted {amount:.0f} {from_token} → {target}")
+        decision = convert_before_treasury_if_needed(amount, from_token, receiving_wallet)
+        if decision.converted:
+            print(f"[TREASURY] Converted {amount:.0f} {from_token} → {decision.target_asset}")
+        else:
+            # Fail-closed (item 34): never report a conversion that didn't happen.
+            print(f"[TREASURY] NOT converted ({decision.reason}): "
+                  f"{amount:.0f} {from_token} held pending conversion")
 
     def stay_awake_scan(self) -> List[str]:
         signals = []

@@ -602,6 +602,25 @@ class FeeConversionExecutor:
 
 # --- convenience -------------------------------------------------------------
 
+def pending_conversion_id(token: str, amount_wei: int,
+                          source: Optional[Dict[str, Any]] = None
+                          ) -> str:
+    """Deterministic obligation id for a fee inflow (idempotency key).
+
+    Shared with the fee-event listener so it can tell newly recorded
+    obligations apart from idempotent re-encounters on rescans.  When the
+    source carries a ``log_index`` (event-sourced obligations), it is part
+    of the id so two identical transfers inside one transaction record two
+    obligations instead of collapsing into one.
+    """
+    source = source or {}
+    tx_hash = source.get("tx_hash") or source.get("receipt_tx") or "adhoc"
+    oid = f"feeconv-{token.upper()}-{tx_hash[:16]}-{amount_wei}"
+    if "log_index" in source:
+        oid = f"{oid}-log{source['log_index']}"
+    return oid
+
+
 def record_pending_conversion(ledger: ConversionLedger, token: str,
                               amount_wei: int,
                               source: Optional[Dict[str, Any]] = None
@@ -609,7 +628,5 @@ def record_pending_conversion(ledger: ConversionLedger, token: str,
     """Bridge from fee recording (record_axm_receipt / settle-proof builders)
     into the executor ledger.  The obligation id is derived from the source
     tx when present, so re-recording is idempotent."""
-    source = source or {}
-    tx_hash = source.get("tx_hash") or source.get("receipt_tx") or "adhoc"
-    oid = f"feeconv-{token.upper()}-{tx_hash[:16]}-{amount_wei}"
+    oid = pending_conversion_id(token, amount_wei, source)
     return ledger.record(oid, token, amount_wei, source)
