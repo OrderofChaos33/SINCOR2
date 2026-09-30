@@ -50,6 +50,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -58,7 +59,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Protocol, Tuple
 
 from sincor2.base_agentkit import build_base_commerce_profile
 from sincor2.onchain.constants import (
@@ -1431,42 +1432,278 @@ _reputation_ledger = ReputationLedger()
 
 
 # ---------------------------------------------------------------------------
-# Free-quota tracker  (in-memory; caller_id + skill_id → used count)
+# Free-quota identity + tracker  (G2.6)
 # ---------------------------------------------------------------------------
+# The free quota used to be keyed on the self-declared ``caller_id`` request
+# field, so rotating caller IDs granted unlimited free calls on the top-5
+# subsidised skills. The quota is now keyed on a *verified* identity: the
+# wallet address recovered from an EIP-191 personal signature over a
+# canonical quota message. This reuses the codebase's existing EIP-191
+# recovery primitive (dispute route, KYA registry) — no new identity scheme.
+#
+# Canonical messages (signed off-chain with the caller's wallet):
+#   send:  "SINCOR-QUOTA|<skill_id>|<input_hash_hex>|<timestamp_ms>"
+#   quote: "SINCOR-QUOTA-QUOTE|<skill_id>|<timestamp_ms>"
+# ``input_hash_hex`` binds the signature to the exact task input so a
+# captured signature cannot be replayed for a different task. ``timestamp_ms``
+# must be within QUOTA_SIGNATURE_MAX_SKEW_MS of server time.
+#
+# Counters live behind the QuotaStore protocol so the durable-state wave can
+# swap the in-memory backend for a shared (Redis) one without touching call
+# sites.
 
-class _FreeQuotaTracker:
+QUOTA_MESSAGE_PREFIX = "SINCOR-QUOTA"
+QUOTA_QUOTE_MESSAGE_PREFIX = "SINCOR-QUOTA-QUOTE"
+# Freshness window for quota signatures (matches the re-registration window).
+QUOTA_SIGNATURE_MAX_SKEW_MS = 5 * 60 * 1000
+
+_QUOTA_ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+
+class QuotaStore(Protocol):
+    """Counter backend for free-quota usage.
+
+    Keyed on the verified quota identity (lowercased wallet address) plus
+    skill id. Implementations must be safe for concurrent use; ``try_consume``
+    must be atomic (check-and-increment under one lock / one Lua script) so
+    concurrent requests cannot overshoot the quota.
     """
-    Tracks how many free calls each caller has used for each free-quota skill.
-    Thread-safe; resets on restart (intentional — prevents abuse across deployments).
+
+    def get(self, identity_key: str, skill_id: str) -> int:
+        """Return consumed free-call count for this identity + skill (0 if unknown)."""
+        ...
+
+    def try_consume(self, identity_key: str, skill_id: str, limit: int) -> bool:
+        """Atomically consume one free call iff used < limit. Return True if consumed."""
+        ...
+
+
+class _MemoryQuotaStore:
+    """Process-local QuotaStore (matches existing in-memory conventions).
+
+    Thread-safe; resets on restart. The durable-state wave replaces this
+    with a shared backend — call sites only see the QuotaStore protocol.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._usage: Dict[Tuple[str, str], int] = {}
 
-    def is_free(self, caller_id: str, skill: AgentSkill) -> bool:
-        """Return True if this caller still has free quota for the given skill."""
+    def get(self, identity_key: str, skill_id: str) -> int:
+        with self._lock:
+            return self._usage.get((identity_key, skill_id), 0)
+
+    def try_consume(self, identity_key: str, skill_id: str, limit: int) -> bool:
+        if limit <= 0:
+            return False
+        key = (identity_key, skill_id)
+        with self._lock:
+            used = self._usage.get(key, 0)
+            if used >= limit:
+                return False
+            self._usage[key] = used + 1
+            return True
+
+    def clear(self) -> None:
+        """Drop all counters (tests / ops only)."""
+        with self._lock:
+            self._usage.clear()
+
+
+class _FreeQuotaTracker:
+    """Free-call quota keyed on verified identity (recovered wallet address).
+
+    ``identity_key`` must be the lowercased wallet recovered from a fresh
+    EIP-191 quota signature (see _resolve_quota_identity). Never pass the
+    self-declared ``caller_id`` — that was the G2.6 bypass.
+    """
+
+    def __init__(self, store: Optional[QuotaStore] = None) -> None:
+        self._store: QuotaStore = store if store is not None else _MemoryQuotaStore()
+
+    def is_free(self, identity_key: str, skill: AgentSkill) -> bool:
+        """Best-effort read: does this identity still have free quota? (Display only.)"""
+        if not identity_key:
+            return False
         if skill.free_quota <= 0 or skill.id not in FREE_QUOTA_SKILLS:
             return False
-        key = (caller_id, skill.id)
-        with self._lock:
-            used = self._usage.get(key, 0)
-        return used < skill.free_quota
+        return self._store.get(identity_key, skill.id) < skill.free_quota
 
-    def consume(self, caller_id: str, skill_id: str) -> None:
-        """Increment free-quota usage for this caller + skill pair."""
-        key = (caller_id, skill_id)
-        with self._lock:
-            self._usage[key] = self._usage.get(key, 0) + 1
+    def consume_if_available(self, identity_key: str, skill: AgentSkill) -> bool:
+        """Atomically consume one free call iff quota remains. The send path's decision."""
+        if not identity_key:
+            return False
+        if skill.free_quota <= 0 or skill.id not in FREE_QUOTA_SKILLS:
+            return False
+        return self._store.try_consume(identity_key, skill.id, skill.free_quota)
 
-    def remaining(self, caller_id: str, skill: AgentSkill) -> int:
-        key = (caller_id, skill.id)
-        with self._lock:
-            used = self._usage.get(key, 0)
-        return max(0, skill.free_quota - used)
+    def remaining(self, identity_key: str, skill: AgentSkill) -> int:
+        """Free calls left for this identity (display only)."""
+        if not identity_key:
+            return 0
+        return max(0, skill.free_quota - self._store.get(identity_key, skill.id))
 
 
 _free_quota_tracker = _FreeQuotaTracker()
+
+
+def _keccak256(data: bytes) -> bytes:
+    """keccak256 with the codebase's standard fallback (mirrors a2a_inbound_market)."""
+    try:
+        from eth_hash.auto import keccak
+        return keccak(data)
+    except Exception:
+        from sha3 import keccak_256  # type: ignore
+        return keccak_256(data).digest()
+
+
+def _recover_quota_signer(message: str, signature: str) -> str:
+    """Recover the signer address of an EIP-191 quota message.
+
+    Same primitive as the dispute route and the KYA registry (lazy
+    eth_account import keeps this module importable without the dependency).
+    """
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
+
+
+def quota_message_for_send(skill_id: str, input_text: str, timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to claim free quota on send.
+
+    Binds skill + exact task input + timestamp: a captured signature cannot
+    be replayed for a different task or skill.
+    """
+    input_hash = _keccak256((input_text or "").encode("utf-8")).hex()
+    return "|".join([QUOTA_MESSAGE_PREFIX, str(skill_id), input_hash, str(int(timestamp_ms))])
+
+
+def quota_message_for_quote(skill_id: str, timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to query free quota."""
+    return "|".join([QUOTA_QUOTE_MESSAGE_PREFIX, str(skill_id), str(int(timestamp_ms))])
+
+
+def _resolve_quota_identity(
+    *,
+    skill_id: str,
+    params: Any = None,
+    msg_obj: Any = None,
+    input_text: Optional[str] = None,
+) -> Optional[str]:
+    """Resolve the verified quota identity for a request.
+
+    Returns the lowercased wallet address recovered from a fresh EIP-191
+    quota signature, or None when the caller presented none / an invalid one.
+    Callers without a valid signature are NOT eligible for free quota (G2.6):
+    the free quota subsidises *verified* external callers.
+
+    Accepted fields (first non-empty wins):
+      signature: params.message.metadata.signature | params.signature |
+                 params.callerSignature | params.caller_signature
+      quota_ts:  params.message.metadata.quota_ts | params.quota_ts |
+                 params.quotaTs | params.quota_timestamp
+      wallet:    params.message.metadata.wallet | params.wallet (REQUIRED;
+                 must equal the recovered signer — ECDSA recovery returns *some*
+                 address for any message/signature pair, so without this check a
+                 single signature would validate against arbitrary messages and
+                 mint fresh quota buckets)
+
+    ``input_text=None`` selects the quote-shape message (no input to bind).
+    """
+    meta: Dict[str, Any] = {}
+    if isinstance(msg_obj, dict):
+        maybe_meta = msg_obj.get("metadata")
+        if isinstance(maybe_meta, dict):
+            meta = maybe_meta
+    getter = getattr(params, "get", None)
+
+    def _param(*names: str) -> Any:
+        for name in names:
+            value = meta.get(name)
+            if value:
+                return value
+        if callable(getter):
+            for name in names:
+                try:
+                    value = getter(name)
+                except Exception:
+                    value = None
+                if value:
+                    return value
+        return None
+
+    signature = _param("signature", "quota_signature", "callerSignature", "caller_signature")
+    if not signature:
+        return None
+    ts_raw = _param("quota_ts", "quotaTs", "quota_timestamp")
+    claimed_wallet = _param("wallet")
+    if not claimed_wallet or not _QUOTA_ADDRESS_RE.match(str(claimed_wallet).strip()):
+        # The wallet claim is mandatory: ECDSA recovery yields *some* address
+        # for any message/signature pair, so the recovered address is only
+        # meaningful when checked against the caller's claimed wallet.
+        logger.warning("A2A quota identity rejected: missing/invalid wallet claim")
+        return None
+    try:
+        timestamp_ms = int(str(ts_raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("A2A quota identity rejected: bad quota_ts %r", ts_raw)
+        return None
+    now_ms = int(time.time() * 1000)
+    if abs(now_ms - timestamp_ms) > QUOTA_SIGNATURE_MAX_SKEW_MS:
+        logger.warning(
+            "A2A quota identity rejected: quota_ts outside freshness window (skew=%dms)",
+            now_ms - timestamp_ms,
+        )
+        return None
+    if input_text is None:
+        message = quota_message_for_quote(skill_id, timestamp_ms)
+    else:
+        message = quota_message_for_send(skill_id, input_text, timestamp_ms)
+    try:
+        recovered = _recover_quota_signer(message, str(signature)).lower()
+    except ValueError as exc:
+        logger.warning("A2A quota identity rejected: %s", exc)
+        return None
+    if str(claimed_wallet).lower() != recovered:
+        logger.warning("A2A quota identity rejected: claimed wallet != recovered signer")
+        return None
+    return recovered
+
+
+def _quota_quote_note(
+    *,
+    skill: AgentSkill,
+    is_free_call: bool,
+    free_remaining: int,
+    current_axm_price: int,
+) -> str:
+    """Human-readable quota/payment note for the quote endpoint."""
+    if is_free_call:
+        return (
+            f"FREE — {free_remaining} free call(s) left for this signed wallet "
+            "(no txHash needed)."
+        )
+    if skill.id in FREE_QUOTA_SKILLS:
+        return (
+            f"Free quota ({skill.free_quota} calls per wallet) requires a wallet "
+            "signature: EIP-191 personal_sign over "
+            f"\"{QUOTA_QUOTE_MESSAGE_PREFIX}|{skill.id}|<timestamp_ms>\" for quotes, "
+            f"\"{QUOTA_MESSAGE_PREFIX}|{skill.id}|<keccak256(input)>|<timestamp_ms>\" "
+            "for tasks/send (freshness 5 min). Include signature + quota_ts + wallet "
+            "in the request. Unsigned callers pay AXM."
+        )
+    return (
+        f"AXM-only. Pay {current_axm_price / 10**18:.4f} AXM "
+        f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request. "
+        f"Platform fee {A2A_PLATFORM_FEE_BPS} bps routes to treasury {TREASURY_WALLET}."
+    )
 
 
 def _now() -> str:
@@ -1893,11 +2130,14 @@ class A2ARouter:
             from flask import jsonify, request
             if request.method == "GET":
                 skill_id = _resolve_skill_id(request.args)
-                caller_id = request.args.get("caller_id") or request.args.get("callerId") or "anonymous"
+                src = request.args
+                msg_obj = {}
             else:
                 body = request.get_json(force=True, silent=True) or {}
                 skill_id = _resolve_skill_id(body)
-                caller_id = body.get("caller_id") or body.get("callerId") or "anonymous"
+                src = body
+                msg_obj = body.get("message") or {}
+            caller_id = src.get("caller_id") or src.get("callerId") or "anonymous"
 
             skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
             if not skill:
@@ -1905,12 +2145,17 @@ class A2ARouter:
 
             current_axm_price = _price_engine.get_price(skill_id)
             _price_engine.record_quote(skill_id)
-            free_remaining = _free_quota_tracker.remaining(caller_id, skill)
-            is_free_call = free_remaining > 0
+            # G2.6: quota is keyed on the verified wallet, never on caller_id.
+            quota_identity = _resolve_quota_identity(
+                skill_id=skill_id, params=src, msg_obj=msg_obj, input_text=None,
+            )
+            free_remaining = _free_quota_tracker.remaining(quota_identity or "", skill)
+            is_free_call = quota_identity is not None and free_remaining > 0
 
             logger.info(
-                "A2A quote  skill=%s  caller=%s  axm=%.4f AXM  free_remaining=%d",
-                skill_id, caller_id, current_axm_price / 10**18, free_remaining,
+                "A2A quote  skill=%s  caller=%s  quota_id=%s  axm=%.4f AXM  free_remaining=%d",
+                skill_id, caller_id, quota_identity or "-",
+                current_axm_price / 10**18, free_remaining,
             )
             platform_fee_wei = _compute_platform_fee_wei(current_axm_price) if not is_free_call else 0
 
@@ -1946,12 +2191,11 @@ class A2ARouter:
                 "is_free":                  is_free_call,
                 "input_schema":             skill.input_schema,
                 "output_schema":            skill.output_schema,
-                "note": (
-                    "FREE — include caller_id in your tasks/send request (no txHash needed)."
-                    if is_free_call else
-                    f"AXM-only. Pay {current_axm_price / 10**18:.4f} AXM "
-                    f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request. "
-                    f"Platform fee {A2A_PLATFORM_FEE_BPS} bps routes to treasury {TREASURY_WALLET}."
+                "note": _quota_quote_note(
+                    skill=skill,
+                    is_free_call=is_free_call,
+                    free_remaining=free_remaining,
+                    current_axm_price=current_axm_price,
                 ),
             })
 
@@ -2247,8 +2491,15 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     caller_reputation = _reputation_ledger.score(caller_id)
     is_high_rep = caller_reputation >= REPUTATION_HIGH_THRESHOLD
 
-    # --- Free-quota check ------------------------------------------------
-    free_call = _free_quota_tracker.is_free(caller_id, skill)
+    # --- Free-quota check (G2.6: verified identity, not caller_id) ---------
+    # The self-declared caller_id no longer grants free calls — rotating it
+    # was an unlimited-free-call bypass. Only a fresh EIP-191 quota signature
+    # from the caller's wallet establishes quota identity, and the quota is
+    # consumed atomically so concurrent requests cannot overshoot it.
+    quota_identity = _resolve_quota_identity(
+        skill_id=skill_id, params=params, msg_obj=msg_obj, input_text=input_text,
+    )
+    free_call = _free_quota_tracker.consume_if_available(quota_identity or "", skill)
 
     # --- Payment gate (skip for free calls, axiom-payment skill, and dev) --
     env = os.getenv("FLASK_ENV", "production").lower()
@@ -2257,6 +2508,15 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     if not skip_payment and skill_id != "axiom-payment":
         skill_price = _price_engine.get_price(skill_id)
         if not tx_hash:
+            if quota_identity is not None and skill.id in FREE_QUOTA_SKILLS:
+                return _err(
+                    f"Free quota exhausted for this wallet on skill '{skill_id}' "
+                    f"({skill.free_quota} free calls per wallet). Pay "
+                    f"{skill_price / 10**18:.4f} AXM to continue: call "
+                    "/api/a2a/quote for the amount and treasury address, send "
+                    "the transfer on Base, then include txHash.",
+                    code=-32000, rpc_id=rpc_id,
+                )
             return _err(
                 "Payment required. Call /api/a2a/quote to get the AXM amount and "
                 "treasury address, send the transfer on Base, then include txHash. "
@@ -2270,10 +2530,6 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
                 code=-32001, rpc_id=rpc_id,
             )
 
-    # Consume free quota before dispatch
-    if free_call:
-        _free_quota_tracker.consume(caller_id, skill_id)
-
     # --- Create task & enqueue (never block the gunicorn worker) ----------
     task = _new_task(
         skill_id=skill_id,
@@ -2283,12 +2539,15 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         axm_paid=axm_paid,
         tx_hash=tx_hash,
     )
-    # Annotate high-rep and free-call status in metadata
+    # Annotate high-rep, free-call, and verified quota identity in metadata
     task.metadata["high_rep_caller"] = is_high_rep
     task.metadata["free_call"] = free_call
+    if quota_identity:
+        task.metadata["quota_identity"] = quota_identity
     logger.info(
-        "A2A task %s created  skill=%s caller=%s rep=%d high_rep=%s free=%s",
+        "A2A task %s created  skill=%s caller=%s rep=%d high_rep=%s free=%s quota_id=%s",
         task.id, skill_id, caller_id, caller_reputation, is_high_rep, free_call,
+        quota_identity or "-",
     )
 
     try:
