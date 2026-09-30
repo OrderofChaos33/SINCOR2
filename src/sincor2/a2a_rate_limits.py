@@ -69,6 +69,10 @@ A2A_RATE_POLICIES: Dict[str, List[Window]] = {
     "quote": [Window(60, 60), Window(2000, 3600)],
     # Adjudicator-signed already; backstop only.
     "dispute": [Window(5, 3600), Window(20, 86400)],
+    # P24 creator-token issuance: high-value, spam-prone write. Strictest
+    # tier, same abuse class as registration. Keyed per agent_id; the
+    # registration tier (5/hour/IP) backstops agent_id rotation.
+    "issuance": [Window(5, 3600), Window(20, 86400)],
     # Bulk reads: auctions list, bidder-kit, cards, directory, agents.
     "read": [Window(120, 60), Window(5000, 3600)],
 }
@@ -92,6 +96,8 @@ ENDPOINT_POLICY: Dict[str, str] = {
     "POST /v1/a2a/bids/reveal": "bid",
     # disputes (attach_market_routes)
     "POST /v1/a2a/disputes": "dispute",
+    # P24 socialfi issuance (attach_market_routes)
+    "POST /v1/a2a/socialfi/issue": "issuance",
     # quotes (A2ARouter, a2a_integration.py)
     "GET /api/a2a/quote": "quote",
     "POST /api/a2a/quote": "quote",
@@ -257,7 +263,7 @@ def a2a_rate_limit_check():
     if policy is None:
         return None
 
-    if policy == "bid":
+    if policy in ("bid", "issuance"):
         # Per-agent keying: agents behind one NAT egress must not share a
         # bucket. Falls back to IP when the body carries no agent_id.
         body = request.get_json(silent=True) or {}
