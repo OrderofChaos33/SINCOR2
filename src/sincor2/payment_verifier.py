@@ -51,6 +51,7 @@ class PaymentVerifier:
     _TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
     _verified: Dict[str, bool] = {}
+    _amounts: Dict[str, int] = {}
     _lock: threading.Lock = threading.Lock()
     _web3_pool: Dict[str, Any] = {}
     _web3_lock: threading.Lock = threading.Lock()
@@ -94,7 +95,6 @@ class PaymentVerifier:
     @classmethod
     def _cache_key(cls, tx_hash: str, expected_to: str, expected_amount_wei: int) -> str:
         return f"payverify:{tx_hash.lower()}:{expected_to.lower()}:{expected_amount_wei}"
-
     @classmethod
     def _cache_get(cls, key: str) -> Optional[bool]:
         with cls._lock:
@@ -132,6 +132,45 @@ class PaymentVerifier:
             }))
         except Exception as err:
             logger.debug("PaymentVerifier cache write failed: %s", err)
+
+    @classmethod
+    def _amount_cache_key(cls, tx_hash: str, expected_to: str) -> str:
+        return f"payamount:{tx_hash.lower()}:{expected_to.lower()}"
+
+    @classmethod
+    def _amount_cache_get(cls, key: str) -> Optional[int]:
+        with cls._lock:
+            if key in cls._amounts:
+                return cls._amounts[key]
+        try:
+            from sincor2.persistent_store import get_store
+            raw = get_store().kv_get(key)
+            if not raw:
+                return None
+            payload = json.loads(raw)
+            if float(payload.get("exp", 0)) < time.time():
+                return None
+            amount = int(payload.get("amount", 0))
+            with cls._lock:
+                cls._amounts[key] = amount
+            return amount
+        except Exception as err:
+            logger.debug("PaymentVerifier amount cache read failed: %s", err)
+            return None
+
+    @classmethod
+    def _amount_cache_set(cls, key: str, amount: int) -> None:
+        with cls._lock:
+            cls._amounts[key] = int(amount)
+        try:
+            from sincor2.persistent_store import get_store
+            get_store().kv_set(key, json.dumps({
+                "amount": int(amount),
+                "exp": time.time() + cls._CACHE_TTL_SECONDS,
+                "ts": time.time(),
+            }))
+        except Exception as err:
+            logger.debug("PaymentVerifier amount cache write failed: %s", err)
 
     @classmethod
     def _get_web3(cls, rpc_url: str) -> Any:
@@ -290,19 +329,21 @@ class PaymentVerifier:
         )
 
     @classmethod
-    def _validate_transfer_log(
+    def _sum_transfer_value(
         cls,
         logs: List[Dict[str, Any]],
         expected_to: str,
-        expected_amount_wei: int,
-    ) -> bool:
+    ) -> int:
         """
-        Scan the receipt logs for an ERC-20 Transfer from the AXM contract
-        whose `to` address matches *expected_to* and whose value is at least
-        *expected_amount_wei*.
+        Sum of AXM Transfer values to *expected_to* across all receipt logs.
+
+        Only Transfer(address,address,uint256) events emitted by the AXM
+        contract with `to` == *expected_to* count. This is the actual amount
+        the treasury received in the transaction — never a caller claim.
         """
         axm_addr = AXIOM_CONTRACT.lower()
         expected_to_norm = expected_to.lower()
+        total = 0
         for log in logs:
             addr = (log.get("address") or "").lower()
             if addr != axm_addr:
@@ -324,11 +365,102 @@ class PaymentVerifier:
                 value = int(raw_value, 16)
             except ValueError:
                 continue
-            if value >= expected_amount_wei:
-                return True
-        logger.warning(
-            "PaymentVerifier: no qualifying AXM Transfer log found in tx; "
-            "expected >=%d wei to %s from contract %s",
-            expected_amount_wei, expected_to, AXIOM_CONTRACT,
+            total += value
+        return total
+
+    @classmethod
+    def _validate_transfer_log(
+        cls,
+        logs: List[Dict[str, Any]],
+        expected_to: str,
+        expected_amount_wei: int,
+    ) -> bool:
+        """
+        Scan the receipt logs for an ERC-20 Transfer from the AXM contract
+        whose `to` address matches *expected_to* and whose value is at least
+        *expected_amount_wei*.
+        """
+        ok = cls._sum_transfer_value(logs, expected_to) >= expected_amount_wei
+        if not ok:
+            logger.warning(
+                "PaymentVerifier: no qualifying AXM Transfer log found in tx; "
+                "expected >=%d wei to %s from contract %s",
+                expected_amount_wei, expected_to, AXIOM_CONTRACT,
+            )
+        return ok
+
+    @classmethod
+    def verified_amount_wei(
+        cls,
+        tx_hash: str,
+        expected_to: str = TREASURY_WALLET,
+    ) -> Optional[int]:
+        """
+        Return the actual AXM wei transferred to *expected_to* in *tx_hash*,
+        read from the confirmed receipt's Transfer logs.
+
+        Returns None when the amount cannot be determined without chain
+        access: non-production env (dev/test bypass), simulated tx, malformed
+        hash, or a failed receipt. Raises PaymentRpcError when every provider
+        fails transiently (caller must fail closed, not fall back to a claim).
+        """
+        env = os.getenv("FLASK_ENV", "production").lower()
+        if env in _DEV_ENVS:
+            return None
+
+        if not tx_hash or not str(tx_hash).startswith("0x"):
+            logger.warning("PaymentVerifier: invalid tx_hash %r", tx_hash)
+            return None
+
+        if str(tx_hash).startswith("0xSIMULATED"):
+            return None
+
+        cache_key = cls._amount_cache_key(tx_hash, expected_to)
+        cached = cls._amount_cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        urls = cls._rpc_urls()
+        if not urls:
+            logger.error("PaymentVerifier: no RPC URLs configured")
+            raise cls.PaymentRpcError("no RPC URLs configured")
+
+        transient_errors: List[str] = []
+        for rpc_url in urls:
+            for attempt in range(1, cls._MAX_ATTEMPTS + 1):
+                try:
+                    receipt = cls._fetch_receipt(rpc_url, tx_hash)
+                    if not receipt:
+                        transient_errors.append(f"{rpc_url}: receipt null (attempt {attempt})")
+                        time.sleep(cls._BACKOFF_BASE * (2 ** (attempt - 1)))
+                        continue
+                    status = str(receipt.get("status", "")).lower()
+                    if status not in ("0x1", "1"):
+                        logger.warning(
+                            "PaymentVerifier: tx %s not successful (status=%s) via %s",
+                            tx_hash, status, rpc_url,
+                        )
+                        return None
+                    amount = cls._sum_transfer_value(
+                        receipt.get("logs") or [], expected_to,
+                    )
+                    cls._amount_cache_set(cache_key, amount)
+                    logger.info(
+                        "PaymentVerifier: tx %s amount %d wei verified via %s",
+                        tx_hash, amount, rpc_url,
+                    )
+                    return amount
+                except Exception as err:
+                    msg = f"{rpc_url} attempt {attempt}: {err}"
+                    transient_errors.append(msg)
+                    logger.warning("PaymentVerifier RPC error: %s", msg)
+                    time.sleep(cls._BACKOFF_BASE * (2 ** (attempt - 1)))
+
+        logger.error(
+            "PaymentVerifier: all RPC providers failed transiently for amount "
+            "read of %s: %s",
+            tx_hash, "; ".join(transient_errors[-6:]),
         )
-        return False
+        raise cls.PaymentRpcError(
+            f"unable to read payment amount for {tx_hash}: all RPC providers failed"
+        )
