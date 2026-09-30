@@ -1,6 +1,8 @@
 """Contract-Net orchestrator: cosine invite → sealed Vickrey → ε-greedy juniors.
 
-This module is additive. It does not replace ``sincor2.bidding_engine.BiddingEngine.run_auction``.
+This module is additive. It implements the sealed-bid Vickrey money path;
+the legacy multi-criteria evaluator lives in ``sincor2.contract_net``, and
+``sincor2.bidding_engine.BiddingEngine`` has no production callers.
 """
 
 from __future__ import annotations
