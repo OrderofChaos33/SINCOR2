@@ -1035,6 +1035,32 @@
         "passed": 1,
         "failed": 0
       }
+    },
+    {
+      "entry_id": "ev_64ca01823fe3",
+      "sku": "OBS-ENT",
+      "kind": "walkthrough",
+      "timestamp": 1790740983.8102677,
+      "commit": "fd96801",
+      "recorded_by": "sku-ship-24-7 worker W3",
+      "details": {
+        "all_boxes_ticked": false,
+        "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
+        "date": "2026-09-29",
+        "boxes": {
+          "rehearsal_onboarding_walk": "NOT DONE \u2014 no staging account, no rehearsal conducted. Mechanism verified: real signed dispatch to local stub HTTP endpoint, 2/2 payloads received with server-side HMAC-SHA256 verify, tampered payload rejected; empty-secret dispatch refused fail-closed (attempts=0, zero network bytes).",
+          "mesh_view_one_screen": "EXERCISED by worker (not founder-confirmed): render test built fleet view over 3 deployment groups (6 agents: dep-alpha healthy/degraded, dep-beta critical + stale-heartbeat-unknown, dep-gamma healthy), 2 open incidents incl. 1 open dispute escalation, 1 drift alert \u2014 single serialized document. sha256=c4c96be7a502d7f4f666d1e1437d5ed2ac46779433359dcad843dc33b403e196, artifact goals/sincor-speculative-defi-product-arm/hidden_files/obsent-walkthrough-mesh-view.json. Fixture data \u2014 NOT a staging rehearsal.",
+          "rehearsal_incidents_sla": "NOT DONE \u2014 no rehearsal incidents exist. Mechanism verified: alert-latency SLA evaluates occurrence->alerted timestamps on fixtures (p95=10.0s, met); uptime evaluator counts unknown/stale time as down (fixture window measured 4.167%, breached \u2014 conservative by design).",
+          "monthly_summary_signed": "NOT DONE \u2014 requires founder stand-in signature; no rehearsal conducted.",
+          "cta_destinations": "PARTIAL \u2014 both draft CTA hrefs (/contact, /products) resolve to real routes in mvp_blueprints/pages.py (route decorators verified). GAP: engagement NOT pre-identified (bare hrefs, no ?sku= param) \u2014 flagged for B6/founder, not fixed by this worker.",
+          "draft_copy_read_aloud": "PARTIAL \u2014 mechanical scan clean: zero banned phrases, no 24/7 claims, no instant-resolution claims. Read-aloud + positive-framing judgment requires founder.",
+          "ledger_record": "DONE \u2014 this entry (all_boxes_ticked=false)."
+        },
+        "mechanism_checks": "13/14 live checks passed (script: goals/.../hidden_files/obsent-walkthrough-script.py). 1 genuine gap: CTA engagement pre-identification.",
+        "suite": "tests/pytest/test_obsent_mesh.py 54/54 passed; obs_skus suites (mesh+registry+vitals+audit_trail+drift_quality) 184/184 passed; neighbors test_defi_product_arm.py + test_defi_catalog_ui.py 36/36 passed. All on origin/main @ fd96801.",
+        "acceptance_criteria": "0 of 7 marked passed. C1: playbook file docs/specs/obs-skus/OBS-ENT-playbook.md missing (module's generate_runbook is a per-customer support artifact, not the engagement playbook). C2: no ordered onboarding runbook (KYA->stake->audit->drift->alert-proof) with no-skip test. C3-C7: rehearsal never conducted (staging account, founder stand-in, signed summary, second operator) \u2014 these need founder, not a worker.",
+        "notes": "Software mechanisms verified end-to-end on fixtures; engagement/rehearsal components remain open. Publish gate stays red by design \u2014 no promotion."
+      }
     }
   ]
 }
