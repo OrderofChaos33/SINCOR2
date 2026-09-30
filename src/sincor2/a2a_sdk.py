@@ -69,9 +69,11 @@ class RequestsTransport:
             raise SDKError(resp.status_code, body)
         return body
 
-    def post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def post(self, path: str, payload: Dict[str, Any],
+             headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         resp = self._session.post(
-            self.base_url + path, json=payload, timeout=self._timeout)
+            self.base_url + path, json=payload, timeout=self._timeout,
+            headers=headers or {})
         return self._raise(resp)
 
     def get(self, path: str) -> Dict[str, Any]:
@@ -94,8 +96,10 @@ class FlaskTestTransport:
             raise SDKError(resp.status_code, body)
         return body or {}
 
-    def post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        return self._raise(self._client.post(path, json=payload))
+    def post(self, path: str, payload: Dict[str, Any],
+             headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        return self._raise(self._client.post(path, json=payload,
+                                             headers=headers or {}))
 
     def get(self, path: str) -> Dict[str, Any]:
         return self._raise(self._client.get(path))
@@ -143,10 +147,29 @@ class SincorAgentSDK:
             body["registration_signature"] = "0x" + bytes(sig).hex()
         return self.t.post("/v1/a2a/register", body)
 
-    def heartbeat(self, agent_id: str) -> Dict[str, Any]:
+    def heartbeat(self, agent_id: str, signer: Any = None,
+                  heartbeat_token: Optional[str] = None) -> Dict[str, Any]:
         """Refresh liveness (TTL 60s). Bid/commit/reveal require a fresh
-        heartbeat — call again before each phase of a long auction."""
-        return self.t.post("/v1/a2a/heartbeat", {"agent_id": agent_id})
+        heartbeat — call again before each phase of a long auction.
+
+        Heartbeats are authenticated (G2.3): pass ``signer`` — an eth_account
+        Account of the agent's *registered* wallet — to attach an EIP-191
+        proof, or ``heartbeat_token`` (the operator ``AGENT_HEARTBEAT_TOKEN``)
+        for first-party/ops agents. With neither, the server answers 401.
+        """
+        payload: Dict[str, Any] = {"agent_id": agent_id}
+        headers: Optional[Dict[str, str]] = None
+        if signer is not None:
+            from eth_account.messages import encode_defunct
+            from sincor2.a2a_inbound_ext import build_heartbeat_message
+            ts = int(time.time() * 1000)
+            sig = signer.sign_message(
+                encode_defunct(text=build_heartbeat_message(agent_id, ts)))
+            payload["signature"] = sig.signature.hex()
+            payload["ts"] = ts
+        if heartbeat_token:
+            headers = {"X-Sincor-Heartbeat": heartbeat_token}
+        return self.t.post("/v1/a2a/heartbeat", payload, headers=headers)
 
     # -- stake ------------------------------------------------------------
     def deposit_stake(self, agent_id: str, amount_axm: float,

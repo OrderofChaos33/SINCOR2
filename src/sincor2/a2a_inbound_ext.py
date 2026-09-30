@@ -1,6 +1,8 @@
 """A2A inbound routes + agent operations. Imported by a2a_inbound.register."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import os
 import threading
@@ -32,6 +34,90 @@ from sincor2.a2a_inbound import (
 
 logger = logging.getLogger("sincor.a2a.inbound")
 _HEARTBEAT_THREAD = None
+
+HEARTBEAT_PROOF_DOMAIN = "SINCOR-HEARTBEAT"
+HEARTBEAT_PROOF_FRESHNESS_MS = 5 * 60 * 1000
+
+
+class HeartbeatAuthError(ValueError):
+    """A heartbeat carried no usable proof of identity (→ HTTP 401)."""
+
+
+def build_heartbeat_message(agent_id: str, ts_ms: int) -> str:
+    """Canonical EIP-191 message an agent signs to prove heartbeat ownership.
+
+    Binds the agent_id and a millisecond timestamp so the signature cannot
+    be replayed as another agent's heartbeat or outside the freshness window.
+    """
+    return f"{HEARTBEAT_PROOF_DOMAIN}\n{agent_id}\n{int(ts_ms)}"
+
+
+def _recover_heartbeat_signer(message: str, signature: str) -> str:
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise HeartbeatAuthError("signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise HeartbeatAuthError("bad heartbeat signature") from exc
+
+
+def _operator_heartbeat_token_ok() -> bool:
+    """Shared-operator heartbeat credential — the same mechanism as the
+    wardrobe ``/api/a2a/heartbeat``. Lets first-party/ops agents (including
+    the liveness runner) heartbeat without holding wallet keys. The token is
+    env-only (``AGENT_HEARTBEAT_TOKEN``) and header-only; it is never read
+    from the request body."""
+    expected = (os.environ.get("AGENT_HEARTBEAT_TOKEN") or "").strip()
+    if not expected:
+        return False
+    got = (
+        request.headers.get("X-Sincor-Heartbeat")
+        or request.headers.get("Authorization", "").removeprefix("Bearer ")
+        or ""
+    ).strip()
+    if not got:
+        return False
+    return hmac.compare_digest(
+        hashlib.sha256(got.encode()).digest(),
+        hashlib.sha256(expected.encode()).digest(),
+    )
+
+
+def _require_heartbeat_auth(agent_id: str, body: Dict[str, Any]) -> None:
+    """Fail-closed heartbeat authentication.
+
+    Accepts either the operator heartbeat token or an EIP-191
+    (``personal_sign``) signature by the agent's *registered* wallet over
+    ``build_heartbeat_message(agent_id, ts)`` with a fresh timestamp.
+    Anything else → :class:`HeartbeatAuthError` (→ HTTP 401).
+    """
+    if _operator_heartbeat_token_ok():
+        return
+    signature = str(body.get("signature") or "").strip()
+    ts_raw = body.get("ts") if body.get("ts") is not None else body.get("timestamp")
+    if not signature or ts_raw is None:
+        raise HeartbeatAuthError(
+            "heartbeat requires an EIP-191 signature or the operator heartbeat token")
+    try:
+        ts = int(ts_raw)
+    except (TypeError, ValueError) as exc:
+        raise HeartbeatAuthError("bad heartbeat timestamp") from exc
+    if abs(_now_ms() - ts) > HEARTBEAT_PROOF_FRESHNESS_MS:
+        raise HeartbeatAuthError("stale heartbeat proof")
+    fabric = get_fabric()
+    with fabric.lock:
+        agent = fabric.agents.get(agent_id)
+    wallet = str((agent or {}).get("wallet") or "").strip()
+    if not wallet:
+        raise HeartbeatAuthError(
+            "agent has no registered wallet; heartbeat requires the operator token")
+    signer = _recover_heartbeat_signer(build_heartbeat_message(agent_id, ts), signature)
+    if signer.lower() != wallet.lower():
+        raise HeartbeatAuthError("heartbeat signature is not from the registered wallet")
 
 
 def _kya_listed(agent: Dict[str, Any]) -> None:
@@ -216,7 +302,10 @@ def register_agent_record(body: Dict[str, Any],
     return snapshot
 
 
-def heartbeat_agent(agent_id: str, signature: str = "") -> Dict[str, Any]:
+def heartbeat_agent(agent_id: str) -> Dict[str, Any]:
+    """Mark an agent alive. Authentication happens at the HTTP layer
+    (``v1_heartbeat`` → ``_require_heartbeat_auth``); direct callers here are
+    server-side (platform bootstrap, liveness sweep) and already trusted."""
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:
@@ -347,6 +436,10 @@ def mount(app: Flask) -> None:
         agent_id = str(body.get("agent_id") or request.args.get("agent_id") or "").strip()
         if not agent_id:
             return _http_error("agent_id is required", 400)
+        try:
+            _require_heartbeat_auth(agent_id, body)
+        except HeartbeatAuthError as err:
+            return _http_error(str(err), 401)
         try:
             return jsonify(heartbeat_agent(agent_id))
         except KeyError:

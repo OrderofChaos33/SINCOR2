@@ -7,6 +7,8 @@ winner's lock survives until proof settlement.
 
 from __future__ import annotations
 
+from conftest import hb_headers
+
 import pytest
 from eth_account import Account
 from eth_account.messages import encode_defunct
@@ -49,7 +51,7 @@ def _register(client, agent_id, stake_axm=10):
         },
     )
     assert r.status_code in (200, 201), r.get_json()
-    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id})
+    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
     if stake_axm:
         stake_ledger().deposit(agent_id, int(stake_axm * ONE_AXM))
