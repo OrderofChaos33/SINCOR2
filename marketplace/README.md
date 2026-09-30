@@ -13,9 +13,11 @@ Transition scaffolding for A2A marketplace mechanics.
 
 ## Contract-Net (additive)
 
-The first-price scoring engine in `src/sincor2/bidding_engine.py` is unchanged
-but **dormant** — it has zero production callers (see
-`docs/architecture/CANONICAL_PATHS.md` §1); do not build on it.
+The first-price scoring engine in `src/sincor2/bidding_engine.py` is the
+**live** P0-hardened module (EIP-712 chain binding, PR #304) — the old
+"dormant" claim is stale. `archive/bidding_engine.py` is the quarantined
+copy (byte-identical quarantine record; zero callers); do not build on the
+archive copy.
 New work goes through `ContractNetEngine`:
 
 1. Hash skill/requirement tokens into 64-d vectors and invite only the top 3–5
