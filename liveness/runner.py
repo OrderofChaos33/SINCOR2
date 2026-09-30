@@ -66,7 +66,14 @@ def _keccak256(data: bytes) -> bytes:
 
 
 def sealed_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
-    """keccak256(abi.encodePacked(bytes32(price), salt, keccak256(agent_id)))."""
+    """Offchain sealed-bid commitment:
+    keccak256(abi.encodePacked(bytes32(price), salt, keccak256(agent_id))).
+
+    Byte-identical to the server's offchain ``sealed_commitment``; this is
+    for the OFFCHAIN API flow only. It is NOT the onchain scheme (which
+    additionally binds auctionId and chainId) and must never be submitted
+    to ``CommitRevealAuction.commit()``.
+    """
     if price_wei <= 0:
         raise ValueError("price_wei must be positive")
     if len(salt) != 32:

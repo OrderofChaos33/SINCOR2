@@ -7,12 +7,15 @@ the copy-pasteable reference implementation of that flow — pure functions
 plus a thin ``BidderClient`` wrapper, no platform imports.
 
 Commitment scheme (mirrors the contract EXACTLY):
-    commitHash = keccak256(abi.encodePacked(bytes32(price), salt,
-                                           agentIdHash))
+    commitHash = keccak256(abi.encodePacked(auctionId, block.chainid,
+                                           bytes32(price), salt, agentIdHash))
 where ``price`` is the bid in wei as a 32-byte big-endian integer, ``salt``
 is a 32-byte bidder-chosen nonce, and
 ``agentIdHash = keccak256(utf8(agent_id))`` links the onchain bid to the
-bidder's registered platform identity.  Prices are bounded to uint96
+bidder's registered platform identity. ``auctionId`` (bytes32) binds the
+commitment to one auction — a commitment observed on auction A cannot be
+revealed on auction B (W-4, cross-auction replay). ``chain_id``
+(``block.chainid``) blocks cross-chain replay. Prices are bounded to uint96
 (the contract reverts ``PriceTooLarge`` above it).
 
 Currency note: the onchain auction settles in native ETH.  Prices here are
@@ -48,13 +51,18 @@ def random_salt() -> bytes:
     return secrets.token_bytes(32)
 
 
-def commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
+def commitment(price_wei: int, salt: bytes, agent_id: str, auction_id: bytes,
+               chain_id: int) -> bytes:
     """Compute the commit hash for a bid.
 
     Mirrors ``CommitRevealAuction.reveal`` byte-for-byte:
-    ``keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash))``.
-    Raises ``ValueError`` on out-of-domain inputs instead of letting the
-    contract revert after gas is spent.
+    ``keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+    salt, agentIdHash))``. Raises ``ValueError`` on out-of-domain inputs
+    instead of letting the contract revert after gas is spent.
+
+    ``auction_id`` must be the exact bytes32 auction id (binds the
+    commitment to one auction); ``chain_id`` must be the id of the chain
+    the commitment will be revealed on (binds it to one chain).
     """
     price_wei = int(price_wei)
     if price_wei < 0:
@@ -66,8 +74,18 @@ def commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
     salt = bytes(salt)
     if len(salt) != 32:
         raise ValueError("salt must be exactly 32 bytes")
+    auction_id = bytes(auction_id)
+    if len(auction_id) != 32:
+        raise ValueError("auction_id must be exactly 32 bytes")
+    chain_id = int(chain_id)
+    if chain_id < 0:
+        raise ValueError("chain_id must be non-negative")
     return _keccak(
-        price_wei.to_bytes(32, "big") + salt + agent_id_hash(agent_id))
+        auction_id
+        + chain_id.to_bytes(32, "big")
+        + price_wei.to_bytes(32, "big")
+        + salt
+        + agent_id_hash(agent_id))
 
 
 def auction_id_for(task_id: str) -> bytes:
@@ -113,8 +131,13 @@ class BidderClient:
     def commit(self, auction_id: bytes, price_wei: int, salt: bytes,
                agent_id: str) -> Dict[str, Any]:
         """Submit a sealed commitment. Returns the values to keep secret
-        until the reveal window (price, salt) plus the tx receipt."""
-        commit_hash = commitment(price_wei, salt, agent_id)
+        until the reveal window (price, salt) plus the tx receipt.
+
+        The commitment is bound to this auction and this chain
+        (``keccak256(abi.encodePacked(auctionId, block.chainid, ...))``)
+        and cannot be replayed onto another auction or chain."""
+        commit_hash = commitment(price_wei, salt, agent_id, auction_id,
+                                 self.w3.eth.chain_id)
         result = self._send(
             self.contract.functions.commit(auction_id, commit_hash))
         result.update({"auction_id": "0x" + bytes(auction_id).hex(),

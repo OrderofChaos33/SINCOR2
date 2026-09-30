@@ -117,6 +117,9 @@ class Env:
                  "value": self.w3.to_wei(1, "ether"), **TX})
             self.scale_bidders.append(acct.address)
 
+        # eth-tester's chain id == the contract's block.chainid on this chain
+        self.chain_id = self.w3.eth.chain_id
+
         self.secrets = {}  # (aid, bidder) -> (price, salt, agentIdHash)
 
     # -- helpers ---------------------------------------------------------
@@ -136,8 +139,10 @@ class Env:
     def commit(self, aid, bidder, price):
         salt = self.w3.keccak(text=f"salt-{aid.hex()}-{bidder}")
         agent_id = self.w3.keccak(text=f"agent-{bidder}")
+        # W-4: preimage binds auctionId + chainId
         commitment = self.w3.solidity_keccak(
-            ["uint256", "bytes32", "bytes32"], [price, salt, agent_id])
+            ["bytes32", "uint256", "uint256", "bytes32", "bytes32"],
+            [aid, self.chain_id, price, salt, agent_id])
         self.auction.functions.commit(aid, commitment).transact({"from": bidder, **TX})
         self.secrets[(aid, bidder)] = (price, salt, agent_id)
 
@@ -398,7 +403,9 @@ def test_no_escrow_manager_reverts_but_timeout_still_works(env):
     orphan.functions.openAuction(aid, 60, 60).transact({"from": env.poster, **TX})
     salt = env.w3.keccak(text="s"); agent_id = env.w3.keccak(text="a")
     price = env.w3.to_wei(1, "ether")
-    com = env.w3.solidity_keccak(["uint256", "bytes32", "bytes32"], [price, salt, agent_id])
+    com = env.w3.solidity_keccak(
+        ["bytes32", "uint256", "uint256", "bytes32", "bytes32"],
+        [aid, env.chain_id, price, salt, agent_id])
     orphan.functions.commit(aid, com).transact({"from": env.bidders[0], **TX})
     a = orphan.functions.auctions(aid).call()
     env.travel_past(a[3])

@@ -3,10 +3,10 @@
 Thin wrapper over the REAL platform endpoints — register -> heartbeat ->
 stake deposit -> sealed commit -> wait -> reveal -> close -> proof — so an
 external agent can go from zero to a settled sealed-bid auction with a few
-calls. The sealed commitment reuses the existing eth_hash-backed
-``sincor2.onchain.bidder_client.commitment`` (the ratified signing-utility
-path, byte-identical to what the server verifies and to what the onchain
-contracts will verify later). No new signing backend.
+calls. The sealed commitment reuses ``sincor2.a2a_inbound_market.
+sealed_commitment`` — the offchain shim the server verifies against. (The
+onchain scheme additionally binds auctionId and chainId; see
+``sincor2.onchain.bidder_client``.) No new signing backend.
 
 Rate limits the SDK respects (see sincor2.a2a_rate_limits):
   * registration: 5/hour per IP — register once, re-register rarely.
@@ -25,7 +25,6 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
-from sincor2.onchain.bidder_client import commitment as _commitment
 from sincor2.onchain.bidder_client import random_salt as _random_salt
 
 
@@ -169,12 +168,17 @@ class SincorAgentSDK:
     @staticmethod
     def make_commitment(bid_axm: float, salt: bytes,
                         agent_id: str) -> str:
-        """Compute the commitment with the existing ratified utility:
-        keccak256(price_wei || salt || keccak256(agent_id))."""
+        """Compute the commitment for the OFFCHAIN sealed-bid API
+        (``POST /v1/a2a/bids/commit``): the server-side shim scheme
+        ``keccak256(price_wei || salt || keccak256(agent_id))``, exactly what
+        ``sincor2.a2a_inbound_market.sealed_commitment`` computes. This is
+        NOT an onchain commitment — the onchain scheme additionally binds
+        auctionId and chainId (see ``sincor2.onchain.bidder_client``)."""
+        from sincor2.a2a_inbound_market import sealed_commitment as _shim
         if float(bid_axm) <= 0:
             raise ValueError("bid_axm must be positive")
         price_wei = int(round(float(bid_axm) * 1e18))
-        return "0x" + _commitment(price_wei, bytes(salt), agent_id).hex()
+        return "0x" + _shim(price_wei, bytes(salt), agent_id).hex()
 
     def sealed_commit(self, task_id: str, agent_id: str,
                       bid_axm: float) -> SealedBid:

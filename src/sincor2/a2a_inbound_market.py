@@ -40,17 +40,23 @@ logger = logging.getLogger("sincor.a2a.inbound")
 # Python wiring, so this shim implements the same commit/reveal discipline in
 # the Python task flow as a forward-compatible stepping stone.
 #
-# Commitment scheme — mirrors CommitRevealAuction.reveal EXACTLY:
+# Commitment scheme (OFFCHAIN shim):
 #     keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash))
 # where price is the bid in wei as a 32-byte big-endian integer, salt is a
 # 32-byte bidder-chosen nonce, and agentIdHash = keccak256(agent_id).
-# A client that computes commitments for this shim can reuse the identical
-# preimage when the on-chain contracts go live.
+#
+# NOTE: this is intentionally NOT the onchain scheme. The onchain
+# ``CommitRevealAuction.reveal`` preimage additionally binds the auction id
+# and the chain id —
+#     keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+#                                salt, agentIdHash))
+# (W-4). Shim hashes are therefore NOT valid onchain commitments and must
+# never be submitted to ``CommitRevealAuction.commit()``.
 #
 # Documented divergences from the contracts:
 #  * Task binding is STRUCTURAL, not cryptographic: the contract keys commits
-#    by (auctionId, msg.sender) in a mapping; the shim keys fabric.commits by
-#    (task_id, agent_id). The commitment itself does not hash the task id.
+#    by (auctionId, msg.sender) in a mapping and now also binds auctionId in
+#    the preimage; the shim keys fabric.commits by (task_id, agent_id).
 #  * Selection stays composite-score (score desc, earliest-commit tiebreak)
 #    among REVEALED bids. Vickrey (lowest wins, second-lowest funds) lives in
 #    the Solidity contracts and is intentionally NOT reimplemented here.
@@ -200,12 +206,21 @@ def _keccak256(data: bytes) -> bytes:
 
 
 def sealed_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
-    """Compute the sealed-bid commitment.
+    """Compute the sealed-bid commitment for the OFFCHAIN API.
 
-    Mirrors ``CommitRevealAuction.reveal``: ``keccak256(abi.encodePacked(
-    bytes32(price), salt, agentIdHash))``. ``salt`` must be 32 bytes;
-    ``agentIdHash`` is ``keccak256(agent_id)`` so the bidder's identity is
-    pseudonymous in the commitment itself.
+    Offchain scheme: ``keccak256(abi.encodePacked(bytes32(price), salt,
+    agentIdHash))``. ``salt`` must be 32 bytes; ``agentIdHash`` is
+    ``keccak256(agent_id)`` so the bidder's identity is pseudonymous in the
+    commitment itself.
+
+    NOTE: this is intentionally NOT the onchain scheme. The onchain
+    ``CommitRevealAuction.reveal`` preimage additionally binds the auction
+    id and the chain id —
+    ``keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+    salt, agentIdHash))`` (W-4) — so hashes from this shim are not valid
+    onchain commitments and must never be submitted to ``commit()``.
+    Offchain commits are stored keyed by (task, agent) server-side, which
+    is what stops cross-task replay here.
     """
     if price_wei <= 0:
         raise ValueError("price_wei must be positive")
@@ -1009,8 +1024,10 @@ def attach_market_routes(bp: Blueprint) -> None:
         """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}.
 
         commitment = keccak256(abi.encodePacked(bytes32(price_wei), salt,
-        keccak256(agent_id))) as 0x hex — the exact CommitRevealAuction
-        preimage, so clients can reuse it on-chain later.
+        keccak256(agent_id))) as 0x hex — the OFFCHAIN shim preimage. It is
+        NOT an onchain commitment: the onchain scheme additionally binds
+        auctionId and chainId, so shim hashes must never be submitted to
+        CommitRevealAuction.commit().
         """
         body = request.get_json(silent=True) or {}
         try:
@@ -1220,7 +1237,8 @@ def attach_market_routes(bp: Blueprint) -> None:
             "commit_deadline_ms": task.get("commit_deadline"),
             "reveal_deadline_ms": task.get("reveal_deadline"),
             "commitment_scheme": (
-                "keccak256(abi.encodePacked(bytes32(price_wei), "
+                "keccak256(abi.encodePacked(bytes32(auctionId), "
+                "uint256(block.chainid), bytes32(price_wei), "
                 "bytes32(salt), keccak256(utf8(agent_id))))"),
             "price_bounds_wei": {"min": 0, "max": str(UINT96_MAX)},
             "functions": [
