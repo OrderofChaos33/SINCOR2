@@ -1400,14 +1400,22 @@ class ReputationLedger:
             return int(row["cnt"]) if row else 0
 
     def leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Return top callers ranked by total settlements and AXM volume."""
+        """Return top callers ranked by total settlements and AXM volume.
+
+        The AXM sum is REAL-typed (``SUM(CAST(... AS REAL))``): a plain
+        integer SUM overflows sqlite's INT64 accumulator (raising
+        ``sqlite3.OperationalError: integer overflow``) once cumulative
+        settlements exceed ~9.2 AXM in wei, which would 500 the
+        leaderboard route. REAL loses integer precision past 2**53, which
+        is immaterial for a display sum rendered to 4 decimals of AXM.
+        """
         with self._lock:
             conn = self._connect()
             rows = conn.execute(
                 """
                 SELECT caller_id,
                        COUNT(*) AS total_settlements,
-                       SUM(axm_paid_wei) AS total_axm_wei
+                       SUM(CAST(axm_paid_wei AS REAL)) AS total_axm_wei
                 FROM settlements
                 GROUP BY caller_id
                 ORDER BY total_settlements DESC, total_axm_wei DESC

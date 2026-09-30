@@ -10,10 +10,17 @@ Covers:
   distinct wallets are independent; reset() zeroes a wallet (ghost penalty).
 - End-to-end via the Flask client: a signed send accrues reputation under
   wallet:<addr>; an unsigned caller declaring the victim's wallet address as
-  caller_id does NOT inherit the victim's score.
+  caller_id does NOT inherit the victim's score (on the integrated tree the
+  unsigned send is rejected with 401 by w06's strict create-auth before any
+  quota/reputation logic runs).
+- The end-to-end sends also carry w06-style EIP-191 create-auth
+  (authSignature/authTimestamp/authNonce/ownerWallet) so they pass the
+  strict send auth on the integrated tree; on the w24-only tree the extra
+  fields are ignored.
 """
 
 import time
+import uuid
 
 import pytest
 from eth_account import Account
@@ -28,6 +35,37 @@ def _acct():
 
 def _sign(acct, message: str) -> str:
     return acct.sign_message(encode_defunct(text=message)).signature.hex()
+
+
+def _sign0x(acct, message: str) -> str:
+    return "0x" + _sign(acct, message)
+
+
+def _create_auth_message(agent_label: str, skill_id: str, ts: int,
+                         nonce: str) -> str:
+    """w06 task-create auth message.
+
+    Uses w06's ``_auth_create_message`` when present (integrated tree);
+    otherwise replicates its exact format so this file also runs on the
+    w24-only tree (where the auth fields are ignored). The format is the
+    w06 protocol constant — pinned here deliberately so an accidental
+    format change fails loudly.
+    """
+    real = getattr(ai, "_auth_create_message", None)
+    if real is not None:
+        return real(agent_label, skill_id, ts, nonce)
+    return (
+        "SINCOR-A2A task-create\n"
+        f"agent_id:{agent_label}\n"
+        f"skill_id:{skill_id}\n"
+        f"timestamp:{int(ts)}\n"
+        f"nonce:{nonce}"
+    )
+
+
+def _strict_create_auth_active() -> bool:
+    """True when w06's create-auth verifier is present (integrated tree)."""
+    return callable(getattr(ai, "_verify_create_auth", None))
 
 
 def _send_identity_params(acct, skill_id, input_text, skew_ms=0):
@@ -223,6 +261,40 @@ def test_reset_only_touches_target_wallet(ledger):
     assert ledger.score(k2) == 1
 
 
+def test_leaderboard_sum_overflow_safe(ledger):
+    """SUM(axm_paid_wei) must not overflow sqlite INT64 (route 500).
+
+    Regression: leaderboard() used a plain integer SUM, which raises
+    sqlite3.OperationalError("integer overflow") once cumulative
+    settlements exceed ~9.2 AXM in wei. Each value below is individually
+    storable (< INT64_MAX); their sum is not — the REAL-typed sum must
+    return it without raising.
+    """
+    INT64_MAX = 2**63 - 1
+    k = ai._reputation_key("0x7777000000000000000000000000000000000007", "whale")
+    ledger.record(k, "skill-x", "task-whale-1", axm_paid_wei=2**62)
+    ledger.record(k, "skill-x", "task-whale-2", axm_paid_wei=2**62)
+    board = ledger.leaderboard(limit=10)  # must not raise
+    assert len(board) == 1
+    total = board[0]["total_axm_wei"]
+    assert total > INT64_MAX  # an integer SUM would have raised here
+    assert total == pytest.approx(float(2**63), rel=1e-9)
+    assert board[0]["total_settlements"] == 2
+    assert board[0]["total_axm_display"].endswith("AXM")
+
+
+def test_leaderboard_single_value_near_int64_max(ledger):
+    """One settlement near INT64_MAX must be storable and summable."""
+    INT64_MAX = 2**63 - 1
+    k = ai._reputation_key("0x8888000000000000000000000000000000000008", "big")
+    ledger.record(k, "skill-x", "task-big-1", axm_paid_wei=INT64_MAX - 1000)
+    board = ledger.leaderboard(limit=10)  # must not raise
+    assert len(board) == 1
+    assert board[0]["total_axm_wei"] == pytest.approx(
+        float(INT64_MAX - 1000), rel=1e-9
+    )
+
+
 # ── Ghost penalty: settlement ledger zeroed for the ghost's wallet ──────────
 
 class _FakeFabric:
@@ -276,12 +348,22 @@ def _signed_send_body(acct, caller_id, skill_id="lead-enrichment",
                       text="Enrich Acme Corp", ctx="ctx-rep-01"):
     ts = int(time.time() * 1000)
     message = ai.identity_message_for_send(skill_id, text, ts)
+    # w06 strict create-auth: EIP-191 signature over the task-create message.
+    # Required on the integrated tree (401 otherwise); the extra fields are
+    # ignored on the w24-only tree. Fresh nonce per call (replay guard).
+    auth_ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    auth_message = _create_auth_message(caller_id, skill_id, auth_ts, nonce)
     return {
         "method": "message/send",
         "id": 1,
         "params": {
             "skillId": skill_id,
             "callerId": caller_id,
+            "ownerWallet": acct.address,
+            "authSignature": _sign0x(acct, auth_message),
+            "authTimestamp": auth_ts,
+            "authNonce": nonce,
             "message": {
                 "role": "user",
                 "parts": [{"text": text}],
@@ -349,13 +431,24 @@ def test_end_to_end_unsigned_cannot_steal_wallet_reputation(client):
         },
     }
     resp = client.post("/api/a2a", json=attacker_body)
-    assert resp.status_code == 200
-    # The attacker's own send lands in the UNTRUSTED id: namespace under the
-    # exact declared string — it can never reach the victim's wallet: rows.
-    assert ai._reputation_ledger.score(
-        ai._reputation_key(None, victim.address)
-    ) == 1  # attacker's own row, untrusted namespace
-    # Victim's wallet bucket is untouched and unreachable via the spoof.
+    if _strict_create_auth_active():
+        # Integrated tree: w06's strict create-auth rejects the unsigned
+        # send with 401 before any quota/reputation logic runs — no row is
+        # created at all, not even in the untrusted namespace.
+        assert resp.status_code == 401
+        assert ai._reputation_ledger.score(
+            ai._reputation_key(None, victim.address)
+        ) == 0
+    else:
+        # w24-only tree: the unsigned send is accepted but lands in the
+        # UNTRUSTED id: namespace under the exact declared string — it can
+        # never reach the victim's wallet: rows.
+        assert resp.status_code == 200
+        assert ai._reputation_ledger.score(
+            ai._reputation_key(None, victim.address)
+        ) == 1  # attacker's own row, untrusted namespace
+    # Invariant on both trees: the victim's wallet bucket is untouched and
+    # unreachable via the spoof.
     assert ai._reputation_ledger.score(
         ai._reputation_key(victim.address, vcid)
     ) == victim_score
