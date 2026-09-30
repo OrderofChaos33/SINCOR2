@@ -750,6 +750,505 @@
         "failed": 0,
         "note": "acceptance suite incl. deterministic 1000-case randomized loops"
       }
+    },
+    {
+      "entry_id": "ev_w57_0f7939f456a9",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1411676,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault state -> plan_rebalance invariants on live numbers",
+        "result": "vault share price $1.113377/share (USDC 6dp), totalAssets $415,155,134, 3 allocations, blended APR 2.4935%, max risk 0.15",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_1774c3bc4b6e",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.143837,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM/USDC treasury balances -> submit/match/settle/claim flow with 8bps fee conservation against live balance snapshots",
+        "result": "live treasury AXM 978,745,764 (USDC leg bounded by live vault liquidity; treasury USDC wallet is ~empty); matched 100.00 USDC <-> 100.0000 AXM; fees {'USDC': 80000, 'AXM': 80000000000000000} at 8bps; conservation exact",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_f88bec3343a9",
+      "sku": "SINCOR-DEFI-P04-MEV",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.146027,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "real USDC Transfer logs from the last 50 forked blocks -> MEVDetector flow accounting consistency",
+        "result": "4683 USDC transfers over 50 blocks; busiest block 52004648 had 203 transfers; detector ran clean, 161 sandwich flags, flow accounting exact",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_f97866ea0e95",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.147907,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance -> underwrite/publish/premium reserve adequacy at the pinned block",
+        "result": "live protocol reserve $415,155,134.05 (treasury USDC wallet holds 733 wei); score 0.80 -> tier 2; 30d premium on 1% cover = 13648.94 USDC + treasury fee 34.1223; reserve adequate",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_a38732bd3821",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1499178,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance as capital cap -> bridge quote ranking never routes more than available",
+        "result": "live protocol liquidity 415,155,134.05 USDC; ranked 2 quotes on 50.00 USDC; best-first order, no value created, within live capital",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_76280328558d",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1521008,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault share price -> RWA NAV oracle ingests the forked reference price",
+        "result": "live vault price $1.113377/share; oracle NAV 111c tracks the forked reference with zero deviation",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_f490839a47d4",
+      "sku": "SINCOR-DEFI-P09-GOV",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1545377,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM supply + treasury voting weight -> governance quorum math on live token state",
+        "result": "live AXM supply 1,000,000,000; treasury holds 978,745,764 (97.87%); quorum 4% -> met (majority for)",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_157cc1f3b277",
+      "sku": "SINCOR-DEFI-P12-TWAMM",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1564546,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "real inter-block times from the last 20 forked blocks -> TWAMM slice schedule on live chain timing",
+        "result": "20 live blocks: avg 2.0s spacing; scheduled $10,000.00 into 8 slices; exact-sum and beats-dump hold on live timing",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_50fc7aac1f71",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1586056,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault state -> accrue() simple-interest-exact on the live-implied rate; live venue gate accepts only the eligible id",
+        "result": "live share price $1.113377; implied rate 11.3377%/yr; accrue monotonic and simple-interest-exact; live-eligible venue passes live gate, unpinned venue rejected",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_ca3db421cf6c",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1607487,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance as capital -> DEX-agg split optimizer plan verified within live capital",
+        "result": "live capital $415,155,134.05; live-implied APR 11.3377%; plan weights {'morpho_usdc_vault': 0.1, 'CASH_USDC': 0.9}; verify_plan passed, routed $41,515,513.40 <= live capital",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_5c8e1b6021a0",
+      "sku": "SINCOR-DEFI-P18-STRUCTURED",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1630929,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho share price as the underlier -> structured-note payoff bounds on the live reference return",
+        "result": "live underlier return 1133bps; payoff 1056650.00 USDC on 1000000 deposit; floor 1000000.00 held, cap not binding",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_1c00f0a60606",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1652434,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury code classification -> AML screen pipeline on the live counterparty profile",
+        "result": "live getCode(treasury) = 23 bytes -> contract; AML screen on the live classification: PASS (reference config)",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_fd3d3a720bb0",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1674697,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM/USDC/SINC treasury balances -> the 30% per-venue hard cap fires on the live concentrated composition",
+        "result": "live units AXM 978,745,764 / USDC 0.0007 / SINC 99,731,069; live composition -> {'axm_live': 9076, 'usdc_live': 0, 'sinc_live': 924}; RiskOfficer correctly rejected it: 'axm_live at 9076 bps exceeds 30% per-venue cap'",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_a70e7a09a7d9",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1696842,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault TWAP inputs -> stable-yield optimizer quote plan",
+        "result": "live vault $415,155,134 @ $1.113377/share; capital $415,155,134.05; plan {'morpho_usdc_vault': 0.1, 'CASH_USDC': 0.9} verified",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_62a383088344",
+      "sku": "SINCOR-DEFI-P24-SOCIALFI",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1718874,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM treasury balance as fee base -> P24 fee-split conservation at live scale",
+        "result": "live AXM 978,745,764; fee base 978.745764 AXM -> creator 483500407505578847800 / platform 483500407505578847800 / treasury 11744949170176004400; conservation exact",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_887f0f94fbb0",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1742704,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live balances hash as the signal feed -> portfolio allocator on live chain time",
+        "result": "live feed hash 164014002a59; 3 eligible protocols; blended risk 0.277 <= 0.28; weights sum 1.0 at live block time",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_1759f8fd8426",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "fork_sim",
+      "timestamp": 1790798680.1765122,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "command": "PYTHONPATH=src:. python3 fork_sim/record_w57.py",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live chain head -> DeFi-OS telemetry recorded against live block time",
+        "result": "live block 52004659 ts 1790798665; AUM $415,155,134; fee+roi observations recorded at live chain time; realized-data checks pass",
+        "method": "read-only replay against Base mainnet state at pinned block via eth_call/eth_getLogs/eth_getBlock/eth_getCode; no signing, no broadcast, zero chain-state writes",
+        "rpc": "https://mainnet.base.org",
+        "fork_block": 52004659,
+        "fork_block_ts": 1790798665,
+        "read_only": true,
+        "no_broadcast": true,
+        "branch": "xioix/buildout-57-defi-forksim-record",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_w57_290fa44d8a9f",
+      "sku": "SINCOR-DEFI-P02-CLMM",
+      "kind": "note",
+      "timestamp": 1790798680.178917,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: Python reference model of V4 hook logic; Uniswap V4 PoolManager / position-manager addresses are not pinned anywhere in the repo. Blocked until pinned (FORK_SIM_NOTES.md).",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_7deb0a2f4d91",
+      "sku": "SINCOR-DEFI-P06-PERPS",
+      "kind": "note",
+      "timestamp": 1790798680.1812892,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: Perp venues / clearing contracts not pinned in the repo. Blocked until venue addresses are pinned.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_475f7b9f0667",
+      "sku": "SINCOR-DEFI-P10-FLASHARB",
+      "kind": "note",
+      "timestamp": 1790798680.1844182,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: DEX pool addresses for arbitrage routing not pinned in the repo. Blocked until pool addresses are pinned.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_80fef4e2065d",
+      "sku": "SINCOR-DEFI-P11-DELTANEUTRAL",
+      "kind": "note",
+      "timestamp": 1790798680.1886656,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: Perp + spot venue contracts not pinned in the repo. Blocked until venue addresses are pinned.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_e6860ec90764",
+      "sku": "SINCOR-DEFI-P13-AVS",
+      "kind": "note",
+      "timestamp": 1790798680.1914144,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: EigenLayer / AVS contracts not pinned in the repo. Blocked until AVS addresses are pinned.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_c064a958ddfc",
+      "sku": "SINCOR-DEFI-P14-PREDICT",
+      "kind": "note",
+      "timestamp": 1790798680.1938038,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: Polymarket CTF / conditional-token contracts not pinned in the repo. Blocked until market addresses are pinned.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_5dfcb00cc25a",
+      "sku": "SINCOR-DEFI-P17-OPTIONS",
+      "kind": "note",
+      "timestamp": 1790798680.1980553,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: Options venue / price-oracle contracts not pinned in the repo. Blocked until venue + oracle addresses are pinned.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_46ff9009fd6f",
+      "sku": "SINCOR-DEFI-P19-CREDIT",
+      "kind": "note",
+      "timestamp": 1790798680.2005033,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: Off-chain underwriting model; no on-chain counterpart exists to fork-read. No honest fork-sim is definable.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
+    },
+    {
+      "entry_id": "ev_w57_6e9b4d9972fd",
+      "sku": "SINCOR-DEFI-P23-NFTFI",
+      "kind": "note",
+      "timestamp": 1790798680.2029874,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-57-defi-forksim-record",
+      "details": {
+        "note": "fork_sim not applicable: NFT collection / floor-oracle contracts not pinned in the repo. Blocked until oracle + collection addresses are pinned.",
+        "branch": "xioix/buildout-57-defi-forksim-record"
+      }
     }
   ]
 }

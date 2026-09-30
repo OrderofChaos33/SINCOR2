@@ -1,0 +1,61 @@
+{
+  "rpc": "https://mainnet.base.org",
+  "passed": [
+    "P01_YIELD_AGG",
+    "P03_INTENT_DARK",
+    "P04_MEV",
+    "P05_INSURANCE",
+    "P07_BRIDGE",
+    "P08_RWA",
+    "P09_DAO_GOV",
+    "P12_TWAMM",
+    "P15_LENDING",
+    "P16_DEX_AGG",
+    "P18_STRUCTURED",
+    "P20_COMPLIANCE",
+    "P21_TREASURY_DAO",
+    "P22_STABLE_YIELD",
+    "P24_SOCIALFI",
+    "P25_PORTFOLIO",
+    "P26_DEFI_OS"
+  ],
+  "failed": [],
+  "findings": [
+    {
+      "product_id": "P02_CLMM",
+      "reason": "Python reference model of V4 hook logic; Uniswap V4 PoolManager / position-manager addresses are not pinned anywhere in the repo. Blocked until pinned (FORK_SIM_NOTES.md)."
+    },
+    {
+      "product_id": "P06_PERPS",
+      "reason": "Perp venues / clearing contracts not pinned in the repo. Blocked until venue addresses are pinned."
+    },
+    {
+      "product_id": "P10_FLASH_ARB",
+      "reason": "DEX pool addresses for arbitrage routing not pinned in the repo. Blocked until pool addresses are pinned."
+    },
+    {
+      "product_id": "P11_DELTA_NEUTRAL",
+      "reason": "Perp + spot venue contracts not pinned in the repo. Blocked until venue addresses are pinned."
+    },
+    {
+      "product_id": "P13_AVS",
+      "reason": "EigenLayer / AVS contracts not pinned in the repo. Blocked until AVS addresses are pinned."
+    },
+    {
+      "product_id": "P14_PREDICTION",
+      "reason": "Polymarket CTF / conditional-token contracts not pinned in the repo. Blocked until market addresses are pinned."
+    },
+    {
+      "product_id": "P17_OPTIONS",
+      "reason": "Options venue / price-oracle contracts not pinned in the repo. Blocked until venue + oracle addresses are pinned."
+    },
+    {
+      "product_id": "P19_CREDIT",
+      "reason": "Off-chain underwriting model; no on-chain counterpart exists to fork-read. No honest fork-sim is definable."
+    },
+    {
+      "product_id": "P23_NFTFI",
+      "reason": "NFT collection / floor-oracle contracts not pinned in the repo. Blocked until oracle + collection addresses are pinned."
+    }
+  ]
+}
