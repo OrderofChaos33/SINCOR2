@@ -183,12 +183,12 @@ def api_sinc_curve():
 @bp.route('/api/sinc/burn-stats', methods=['GET'])
 @limiter.limit("60 per minute")
 def api_sinc_burn_stats():
-    """Platform SINC revenue + burn counter (spec §5.2 / §5.3)."""
-    try:
-        from sincor2.agent_billing import fetch_burn_stats
-        return jsonify({'ok': True, **fetch_burn_stats()}), 200
-    except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)}), 500
+    """Burn-stats API retired. Locked policy: 5% platform fee to treasury, no burn."""
+    return jsonify({
+        'ok': False,
+        'error': 'burn_stats_retired',
+        'note': 'Burn mechanics are retired. Platform policy: 5% platform fee to treasury, converted to USDC/WETH before deposit. No burn.',
+    }), 410
 
 
 @bp.route('/api/x402/resources', methods=['GET'])
