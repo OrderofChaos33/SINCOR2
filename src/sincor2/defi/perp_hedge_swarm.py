@@ -262,6 +262,20 @@ class PriceFeed:
                 f"oracle price stale: {now - self._price.updated_ts:.0f}s > 120s")
         return self._price.price_fp
 
+    def sync_from_oracle(self, feed, asset: str,
+                         now: Optional[float] = None) -> int:
+        """Pull the latest shared-oracle price into this feed.
+
+        ``feed`` is a ProductPriceFeed bound to P06 (see
+        :func:`price_feed_for`). The shared oracle's guards (staleness,
+        deviation, circuit breaker) apply first; any oracle failure raises
+        and this feed is left untouched (fail-closed, fail-static).
+        """
+        now = now if now is not None else time.time()
+        price_fp = feed.price(asset, now)
+        self.update(price_fp, now)
+        return price_fp
+
 
 # -- hedge engine ------------------------------------------------------------------------
 @dataclass
@@ -461,3 +475,22 @@ class HedgeEngine:
 
 def commitment_id(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+
+
+# -- shared price-oracle wiring ------------------------------------------------
+# Declares this product's external price needs against the shared oracle
+# (sincor2.defi.price_oracle). Reference-backed until live feeds are wired;
+# never treated as a live integration.
+
+PRICE_ASSETS = ['ETH/USD', 'BTC/USD']
+
+
+def price_feed_for(oracle):
+    """Bind the shared price oracle to this product's declared assets.
+
+    Returns a ProductPriceFeed; ``feed.price(asset, now)`` raises on any
+    oracle failure (fail-closed). Live Chainlink/Pyth feeds are NOT wired —
+    production must inject real adapters (see price_oracle module docs).
+    """
+    from .price_oracle import wiring_for
+    return wiring_for("P06_PERPS", oracle)
