@@ -750,6 +750,125 @@
         "failed": 0,
         "note": "acceptance suite incl. deterministic 1000-case randomized loops"
       }
+    },
+    {
+      "entry_id": "ev_w56_2c058ee7c8da",
+      "sku": "SINCOR-DEFI-P04-MEV",
+      "kind": "invariant_test",
+      "timestamp": 1790798655.3994365,
+      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "recorded_by": "xioix/buildout-56-defi-invariant-record",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p04_mev_fuzz_invariants.py -q",
+        "passed": 12,
+        "failed": 0,
+        "suite": "tests/pytest/test_p04_mev_fuzz_invariants.py",
+        "scope": "flow_meter_fuzz: record() idempotent per (block,pool,tx_index); gas/swap==600 <= 5000 hot-path budget; threshold gate requires notional>=$1000 AND |impact|>=50bps; sandwich detector: frontrun/backrun pair, victim displacement>50bps, backrun captures >=30%; treasury EOA can never be signer \u2014 construction, check(), config audit all fail closed",
+        "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
+        "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
+      }
+    },
+    {
+      "entry_id": "ev_w56_2451e123849d",
+      "sku": "SINCOR-DEFI-P09-GOV",
+      "kind": "invariant_test",
+      "timestamp": 1790798655.3994365,
+      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "recorded_by": "xioix/buildout-56-defi-invariant-record",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p09_dao_fuzz_invariants.py -q",
+        "passed": 6,
+        "failed": 0,
+        "suite": "tests/pytest/test_p09_dao_fuzz_invariants.py",
+        "scope": "emission_fuzz: top_by_emission sorted descending; market_fuzz: rental cost exactly votes*price; allocator_fuzz: net decomposes exactly bribe+rental+bridge_slip+gas, bribes <= integer-exact 25% epoch-capital cap; recycler_fuzz: captured-costs-fee==recycled exactly",
+        "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
+        "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
+      }
+    },
+    {
+      "entry_id": "ev_w56_1560da48b217",
+      "sku": "SINCOR-DEFI-P12-TWAMM",
+      "kind": "invariant_test",
+      "timestamp": 1790798655.3994365,
+      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "recorded_by": "xioix/buildout-56-defi-invariant-record",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p12_twamm_fuzz_invariants.py -q",
+        "passed": 6,
+        "failed": 0,
+        "suite": "tests/pytest/test_p12_twamm_fuzz_invariants.py",
+        "scope": "math_fuzz: slice impact/output match documented constant-product formulas exactly (integer cents); schedule_fuzz: slice sums equal parent to the cent, worst per-slice impact <= 50bps cap, 8bps treasury fee integer-exact, deterministic; gate_fuzz: sub-floor/min-count/non-positive rejected; live_fuzz: venue submission always raises, fail-closed",
+        "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
+        "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
+      }
+    },
+    {
+      "entry_id": "ev_w56_f766cabb35c8",
+      "sku": "SINCOR-DEFI-P13-AVS",
+      "kind": "invariant_test",
+      "timestamp": 1790798655.3994365,
+      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "recorded_by": "xioix/buildout-56-defi-invariant-record",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p13_avs_fuzz_invariants.py -q",
+        "passed": 5,
+        "failed": 0,
+        "suite": "tests/pytest/test_p13_avs_fuzz_invariants.py",
+        "scope": "oracle_fuzz: stale reads raise, fail-closed; allocate_fuzz: senior+junior==total exactly, junior==int(total*junior_pct), coverage>=1.10x; slash_waterfall_fuzz: junior absorbs losses first, senior impaired only after junior wiped, survivors+losses reconcile exactly to total",
+        "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
+        "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
+      }
+    },
+    {
+      "entry_id": "ev_w56_76901b0923e6",
+      "sku": "SINCOR-DEFI-P17-OPTIONS",
+      "kind": "invariant_test",
+      "timestamp": 1790798655.3994365,
+      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "recorded_by": "xioix/buildout-56-defi-invariant-record",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p17_options_fuzz_invariants.py -q",
+        "passed": 10,
+        "failed": 0,
+        "suite": "tests/pytest/test_p17_options_fuzz_invariants.py",
+        "scope": "vol_fuzz: clamp_vol in [10%,300%] incl NaN/negative/gigantic; bs_fuzz: premiums non-negative, put-call parity holds; tenor_fuzz: only {7,14,30,60,90} pass; quote_fuzz: premium in [0.5%,50%] rails and >= $1 dust floor or QuoteRejected",
+        "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
+        "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
+      }
+    },
+    {
+      "entry_id": "ev_w56_e670b7bbf589",
+      "sku": "SINCOR-DEFI-P19-CREDIT",
+      "kind": "invariant_test",
+      "timestamp": 1790798655.3994365,
+      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "recorded_by": "xioix/buildout-56-defi-invariant-record",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p19_credit_fuzz_invariants.py -q",
+        "passed": 6,
+        "failed": 0,
+        "suite": "tests/pytest/test_p19_credit_fuzz_invariants.py",
+        "scope": "score_fuzz: score in [300,850], mixer clamps to 300, deterministic; ltv_fuzz: maxLTV 0 below 350 floor, non-decreasing, 750+->7500bps; attestation_fuzz: stale/below-floor/unauthorized/replayed refused; line_fuzz: debt never exceeds collateral*maxLTV",
+        "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
+        "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
+      }
+    },
+    {
+      "entry_id": "ev_w56_46cccae569f6",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "invariant_test",
+      "timestamp": 1790798655.3994365,
+      "commit": "7a2880d1896cdefe4a6ae0dcac836b4801cda46c",
+      "recorded_by": "xioix/buildout-56-defi-invariant-record",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=admin ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> ~/.venvs/sincor2/bin/python -m pytest tests/pytest/test_p26_defios_fuzz_invariants.py -q",
+        "passed": 8,
+        "failed": 0,
+        "suite": "tests/pytest/test_p26_defios_fuzz_invariants.py",
+        "scope": "telemetry_fuzz: latest_fee_rate exactly fee/aum of newest observation; killswitch_fuzz: negative ROI always KILL_TICK, decisions advisory (executed=False), P26 itself and unknown protocols raise; ranker_fuzz: universe exactly the other 25 protocols, sorted descending, score decomposes exactly 0.5*realized+0.3*catalog+...",
+        "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
+        "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
+      }
     }
   ]
 }
