@@ -49,7 +49,7 @@ def record_platform_payment(
         "product_name": product_name,
         "plan_id": plan_id,
         "payment_id": payment_id,
-        "burn_policy": "50% ops retention / 50% burn at treasury discretion",
+        "burn_policy": "5% platform fee to treasury, converted to USDC/WETH before deposit. No burn.",
         "burn_tx": None,
     }
 

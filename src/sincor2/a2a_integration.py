@@ -29,7 +29,10 @@ JSON-RPC  : POST /api/a2a                       → JSON-RPC 2.0 dispatcher
 Legacy    : POST /api/a2a/tasks/send   GET /api/a2a/tasks/<id>
             POST /api/a2a/tasks/cancel GET /api/a2a/agents  POST /api/a2a/quote
 
-The AgentCard advertises all 43 SINCOR agents as individual skills.
+The AgentCard advertises the SINCOR skill catalogue as individual skills
+(16 base skills plus registry-backed vertical skills — 32 total against the
+current marketplace/agent_cards.json registry; the count grows as vertical
+packs are registered).
 External agents select the skill they need and submit a task with their
 AXIOM payment commitment.  SINCOR validates the on-chain payment (or an
 off-chain signed intent), routes the task through the swarm, and returns
@@ -1087,7 +1090,7 @@ def build_agent_card() -> AgentCard:
         name=PLATFORM_NAME,
         description=(
             "SINCOR is a production-grade autonomous AI workforce platform running "
-            "43 specialised agents across 7 archetypes (Scout, Builder, Synthesizer, "
+            f"{len(SINCOR_SKILLS)} specialised skills across 7 archetypes (Scout, Builder, Synthesizer, "
             "Negotiator, Director, Auditor, Caretaker). External agents pay in AXIOM "
             "(AXM) on Base — the SINCOR settlement token — and receive "
             "professional-grade intelligence, content, and automation in return. "
