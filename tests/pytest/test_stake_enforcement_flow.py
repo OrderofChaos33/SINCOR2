@@ -8,16 +8,24 @@ winner's lock survives until proof settlement.
 from __future__ import annotations
 
 import pytest
+from eth_account import Account
+from eth_account.messages import encode_defunct
 from flask import Flask
 
 from sincor2.a2a_inbound import _now_ms, get_fabric, reset_fabric
 from sincor2.a2a_inbound import register as register_inbound
+from sincor2.a2a_integration import _auth_market_create_message
 from sincor2.a2a_inbound_market import sealed_commitment
 from sincor2.onchain.stake_ledger import reset_stake_ledger, stake_ledger
 
 ONE_AXM = 10**18
 BOUNTY = 1.5
 COMMIT_LOCK = int(BOUNTY * ONE_AXM * 5000 // 10000)  # 0.75 AXM
+
+# P3 item 14: the market poster identity is server-bound — the helper signs
+# the market task-create message so slash proceeds credit the signer wallet.
+_POSTER_ACCT = Account.from_key("0x" + "d4" * 32)
+POSTER_WALLET = _POSTER_ACCT.address.lower()
 
 
 @pytest.fixture
@@ -48,12 +56,24 @@ def _register(client, agent_id, stake_axm=10):
 
 
 def _sealed_task(client, poster_id="poster-p"):
+    import time
+    import uuid
+
+    skill = "lead-enrichment"
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    sig = _POSTER_ACCT.sign_message(
+        encode_defunct(text=_auth_market_create_message(skill, ts, nonce))
+    ).signature.hex()
     r = client.post(
         "/v1/a2a/tasks",
-        json={"skill": "lead-enrichment", "tags": ["lead-enrichment"],
-              "bounty_axm": BOUNTY, "sealed": True, "poster_id": poster_id},
+        json={"skill": skill, "tags": [skill],
+              "bounty_axm": BOUNTY, "sealed": True, "poster_id": poster_id,
+              "authSignature": "0x" + sig, "authTimestamp": ts, "authNonce": nonce},
     )
     assert r.status_code == 201, r.get_json()
+    # Spoofed poster_id is ignored: attribution is the signer wallet.
+    assert r.get_json()["poster_id"] == POSTER_WALLET
     return r.get_json()["task_id"]
 
 
@@ -140,8 +160,9 @@ def test_ghost_slashed_100_percent_at_close(client):
     ghost_bal = ledger.balance_of("ghost-b")
     assert ghost_bal["slashed_wei"] == str(COMMIT_LOCK)
     assert ghost_bal["locked_wei"] == "0"
-    # 100 % of the slash becomes poster re-auction credit.
-    assert ledger.reauction_credit("poster-p") == COMMIT_LOCK
+    # 100 % of the slash becomes poster re-auction credit — credited to the
+    # server-bound signer wallet (P3 item 14), not a self-declared poster_id.
+    assert ledger.reauction_credit(POSTER_WALLET) == COMMIT_LOCK
 
     # Loser... honest-a won; check the winner is still locked.
     assert ledger.balance_of("honest-a")["locked_wei"] == str(COMMIT_LOCK)

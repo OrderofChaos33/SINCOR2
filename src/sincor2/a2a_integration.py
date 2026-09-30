@@ -410,6 +410,7 @@ class A2ATask:
     axm_paid:       int = 0             # AXM paid in wei (18 dec)
     tx_hash:        Optional[str] = None
     metadata:       Dict[str, Any] = field(default_factory=dict)
+    owner_wallet:   str = ""            # EIP-191 recovered signer; sole owner for read/cancel/list
 
     # Keep session_id as an alias for backward compat code paths
     @property
@@ -1544,7 +1545,8 @@ def _reject_non_axm(token) -> Optional[str]:
 
 def _new_task(skill_id: str, input_text: str, caller_id: str,
               session_id: str, axm_paid: int = 0,
-              tx_hash: Optional[str] = None) -> A2ATask:
+              tx_hash: Optional[str] = None,
+              owner_wallet: str = "") -> A2ATask:
     task_id = str(uuid.uuid4())
     context_id = session_id or task_id
     # Record the initial user message in history
@@ -1561,6 +1563,7 @@ def _new_task(skill_id: str, input_text: str, caller_id: str,
         skill_id=skill_id,
         input_text=input_text,
         caller_id=caller_id,
+        owner_wallet=(owner_wallet or "").strip().lower(),
         state=TaskState.SUBMITTED,
         created_at=_now(),
         updated_at=_now(),
@@ -1570,6 +1573,7 @@ def _new_task(skill_id: str, input_text: str, caller_id: str,
         metadata={
             "skill_id": skill_id,
             "caller_id": caller_id,
+            "owner_wallet": (owner_wallet or "").strip().lower(),
             "simulation_mode": bool(
                 axm_paid and tx_hash and str(tx_hash).startswith("0xSIMULATED")
             ),
@@ -1828,7 +1832,16 @@ class A2ARouter:
                     code=-32601, rpc_id=rpc_id,
                 )), 404
 
-            return jsonify(handler(body))
+            payload = handler(body)
+            # Surface caller-auth failures as real HTTP statuses (P3 item 14).
+            try:
+                err_code = (payload.get("error") or {}).get("code")
+            except AttributeError:
+                err_code = None
+            http_status = _AUTH_HTTP_STATUS.get(err_code)
+            if http_status is not None:
+                return jsonify(payload), http_status
+            return jsonify(payload)
 
         # ── Legacy REST endpoints (backward compat) ───────────────────────────
         @bp.route("/api/a2a/tasks/send", methods=["POST"])
@@ -1837,7 +1850,7 @@ class A2ARouter:
             body = request.get_json(force=True, silent=True) or {}
             payload = _handle_send(body)
             if payload.get("error"):
-                return jsonify(payload), 400
+                return jsonify(payload), _auth_http_status(payload)
             task = payload.get("result") or {}
             task_id = task.get("id")
             return jsonify({
@@ -1849,14 +1862,32 @@ class A2ARouter:
 
         @bp.route("/api/a2a/tasks/<task_id>", methods=["GET"])
         def tasks_get_rest(task_id: str):
-            from flask import jsonify
-            return jsonify(_handle_get(task_id))
+            from flask import jsonify, request
+            # Owner auth via query params (P3 item 14 / G2.19). POST
+            # tasks/get with a JSON body is preferred; query-string auth
+            # exists for legacy GET polling.
+            auth_params = {
+                "auth_signature": request.args.get("authSignature")
+                                  or request.args.get("auth_signature"),
+                "auth_timestamp": request.args.get("authTimestamp")
+                                  or request.args.get("auth_timestamp"),
+                "auth_nonce": request.args.get("authNonce")
+                              or request.args.get("auth_nonce"),
+            }
+            payload = _handle_get(task_id, auth_params)
+            if payload.get("error"):
+                err_code = (payload.get("error") or {}).get("code")
+                return jsonify(payload), _AUTH_HTTP_STATUS.get(err_code, 200)
+            return jsonify(payload)
 
         @bp.route("/api/a2a/tasks/cancel", methods=["POST"])
         def tasks_cancel():
             from flask import jsonify, request
             body = request.get_json(force=True, silent=True) or {}
-            return jsonify(_handle_cancel(body))
+            payload = _handle_cancel(body)
+            if payload.get("error"):
+                return jsonify(payload), _auth_http_status(payload)
+            return jsonify(payload)
 
         # ── Agent registry ────────────────────────────────────────────────────
         @bp.route("/api/a2a/agents", methods=["GET"])
@@ -2092,6 +2123,313 @@ def _sse_event(data: Dict[str, Any]) -> str:
     """Format a dict as a single SSE data event."""
     return f"data: {json.dumps(data)}\n\n"
 
+
+# ---------------------------------------------------------------------------
+# Caller authentication — EIP-191 wallet signatures (P3 item 14)
+#
+# Every A2A task is bound at creation to the wallet that signed for it. The
+# caller proves control of a secp256k1 key by signing a canonical message
+# with ``personal_sign``; the server recovers the signer address and stores
+# it as the task's ``owner_wallet``. Read / cancel / list then require a
+# fresh signature from that same wallet (403 otherwise). There is no registry
+# lookup and no server-side secret: the signature IS the credential, and it
+# cannot be forged without the private key.
+#
+# ``caller_id`` remains a human-readable label (quota / reputation display).
+# It is self-declared and is NEVER trusted for ownership: the owner is always
+# the EIP-191 recovered signer address, lowercased.
+#
+# Signed message domains (domain separation blocks cross-protocol replay):
+#   task create : "SINCOR-A2A task-create\nagent_id:...\nskill_id:...\ntimestamp:...\nnonce:..."
+#   task get    : "SINCOR-A2A task-get\ntask_id:...\ntimestamp:...\nnonce:..."
+#   task cancel : "SINCOR-A2A task-cancel\ntask_id:...\ntimestamp:...\nnonce:..."
+#   task list   : "SINCOR-A2A task-list\ntask_id:\ntimestamp:...\nnonce:..."
+#   task push   : "SINCOR-A2A task-push\ntask_id:...\ntimestamp:...\nnonce:..."  (push-notification config ops)
+#   market post : "SINCOR-A2A-MARKET task-create\nskill:...\ntimestamp:...\nnonce:..."
+# Signatures are single-use within a 10-minute freshness window (per-process
+# replay cache, mirroring the rest of the in-memory task store). The nonce
+# must be unique per call: eth_account signs deterministically (RFC 6979), so
+# without a nonce two calls in the same second would produce identical
+# signatures and trip the replay guard. The create/list caller also states
+# its wallet in ownerWallet; the server only accepts the signature when the
+# recovered address EQUALS the claim (a signature over the wrong message
+# recovers to a random address, never to the claimed wallet).
+# ---------------------------------------------------------------------------
+
+# JSON-RPC server-error codes reserved for caller auth. Do NOT reuse -32000
+# (payment required), -32001 (payment unverified) or -32002 (token rejected):
+# those already have meaning on the money path.
+_ERR_AUTH_REQUIRED = -32010  # HTTP 401 — missing / invalid / stale / replayed signature
+_ERR_FORBIDDEN = -32011      # HTTP 403 — valid signature, but not the task owner
+
+# Map auth error codes to HTTP status for the REST routes and dispatcher.
+_AUTH_HTTP_STATUS = {_ERR_AUTH_REQUIRED: 401, _ERR_FORBIDDEN: 403}
+
+_AUTH_CREATE_DOMAIN = "SINCOR-A2A task-create"
+_AUTH_MARKET_CREATE_DOMAIN = "SINCOR-A2A-MARKET task-create"
+_AUTH_TASK_DOMAIN_FMT = "SINCOR-A2A task-{purpose}"  # get | cancel | list | push
+_AUTH_MAX_SKEW_S = 600      # signature freshness window, seconds
+_AUTH_REPLAY_MAX = 8192     # bounded replay cache (per-process)
+
+_auth_seen: Dict[str, float] = {}  # sha256(message + signature).hex -> expiry epoch
+_auth_lock = threading.Lock()
+
+
+def _auth_create_message(agent_label: str, skill_id: str, timestamp: int,
+                         nonce: str) -> str:
+    """Canonical task-create message for the JSON-RPC / REST task API."""
+    return (
+        f"{_AUTH_CREATE_DOMAIN}\n"
+        f"agent_id:{agent_label}\n"
+        f"skill_id:{skill_id}\n"
+        f"timestamp:{int(timestamp)}\n"
+        f"nonce:{nonce}"
+    )
+
+
+def _auth_market_create_message(skill: str, timestamp: int, nonce: str) -> str:
+    """Canonical task-create message for the marketplace POST /v1/a2a/tasks."""
+    return (
+        f"{_AUTH_MARKET_CREATE_DOMAIN}\n"
+        f"skill:{skill}\n"
+        f"timestamp:{int(timestamp)}\n"
+        f"nonce:{nonce}"
+    )
+
+
+def _auth_task_message(purpose: str, task_id: str, timestamp: int,
+                       nonce: str) -> str:
+    """Canonical task-scoped message for get / cancel / list."""
+    return (
+        _AUTH_TASK_DOMAIN_FMT.format(purpose=purpose) + "\n"
+        f"task_id:{task_id}\n"
+        f"timestamp:{int(timestamp)}\n"
+        f"nonce:{nonce}"
+    )
+
+
+# secp256k1 curve order. Signatures must be canonical low-s (EIP-2 style):
+# the (r, n-s) malleation of a valid signature recovers to the SAME address
+# with DIFFERENT bytes, which would mint a fresh replay-cache digest and
+# defeat single-use. This matters because the legacy REST GET carries the
+# signature in the query string, and query strings land in access logs —
+# without low-s enforcement, log read access would buy signature replay.
+_SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+_SECP256K1_HALF_N = _SECP256K1_N // 2
+
+
+def _canonical_signature_hex(signature: str) -> str:
+    """Canonical hex form of a signature for replay-digest purposes.
+
+    Without this, the same signature bytes submitted as "0xAB..", "ab.." or
+    " 0xab.. " would hash to different replay digests while recovering to
+    the same address — a trivial single-use bypass."""
+    sig = str(signature or "").strip()
+    if sig[:2].lower() == "0x":
+        sig = sig[2:]
+    return sig.lower()
+
+
+def _auth_digest(message: str, signature: str) -> str:
+    """Replay-cache key: canonical message + canonical signature bytes."""
+    return hashlib.sha256((message + _canonical_signature_hex(signature)).encode()).hexdigest()
+
+
+def _recover_eip191_signer(message: str, signature: str) -> Optional[str]:
+    """Recover the checksummed signer address of an EIP-191 personal_sign
+    signature. Returns None on ANY failure (bad hex, wrong length, bad v,
+    high-s malleation, missing library) — callers fail closed."""
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except ImportError:  # eth_account is a hard dependency; fail closed if absent
+        return None
+    try:
+        raw = bytes.fromhex(_canonical_signature_hex(signature))
+        if len(raw) != 65:
+            return None
+        if int.from_bytes(raw[32:64], "big") > _SECP256K1_HALF_N:
+            return None  # non-canonical high-s: possible (r, n-s) malleation
+        return str(Account.recover_message(encode_defunct(text=message), signature=raw))
+    except Exception:
+        return None
+
+
+def _extract_auth_fields(source: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Pull caller-auth fields from a params dict (camelCase or snake_case)."""
+    src = source or {}
+    return {
+        "agent_label": str(
+            src.get("agentId") or src.get("agent_id")
+            or src.get("callerId") or src.get("caller_id") or ""
+        ),
+        "signature": str(src.get("authSignature") or src.get("auth_signature") or ""),
+        "timestamp": src.get("authTimestamp", src.get("auth_timestamp")),
+        "nonce": str(src.get("authNonce") or src.get("auth_nonce") or ""),
+        # Claimed wallet for create/list: the server accepts the signature
+        # only when the recovered address equals this claim.
+        "owner_wallet": str(
+            src.get("ownerWallet") or src.get("owner_wallet") or ""
+        ).strip().lower(),
+    }
+
+
+def _parse_auth_timestamp(value: Any) -> Optional[int]:
+    """Parse a unix-epoch auth timestamp, enforcing the freshness window."""
+    try:
+        ts = int(str(value).strip())
+    except (TypeError, ValueError, AttributeError):
+        return None
+    if ts <= 0 or abs(time.time() - ts) > _AUTH_MAX_SKEW_S:
+        return None
+    return ts
+
+
+def _auth_replay_seen(digest: str) -> bool:
+    """Single-use guard: True if this exact signed message was already
+    accepted (replay). Marks fresh digests as seen."""
+    now = time.time()
+    with _auth_lock:
+        if len(_auth_seen) > _AUTH_REPLAY_MAX:
+            for key in [k for k, exp in _auth_seen.items() if exp <= now]:
+                _auth_seen.pop(key, None)
+            while len(_auth_seen) > _AUTH_REPLAY_MAX:
+                _auth_seen.pop(next(iter(_auth_seen)), None)
+        if digest in _auth_seen:
+            return True
+        _auth_seen[digest] = now + _AUTH_MAX_SKEW_S
+        return False
+
+
+def _auth_http_status(payload: Dict[str, Any]) -> int:
+    """HTTP status for an auth error payload (401/403); 400 fallback."""
+    try:
+        code = (payload.get("error") or {}).get("code")
+    except AttributeError:
+        return 400
+    return _AUTH_HTTP_STATUS.get(code, 400)
+
+
+def _verify_create_auth(params: Dict[str, Any], skill_id: str,
+                        rpc_id: Any = None) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """Authenticate a task-creation request.
+
+    Returns ``(owner_wallet, None)`` on success, or ``(None, error_payload)``
+    on failure. The owner is the EIP-191 recovered signer address — never the
+    self-declared caller_id — and it must equal the caller's ownerWallet
+    claim (a signature over any other message recovers to a random address
+    and is rejected here).
+    """
+    auth = _extract_auth_fields(params)
+    ts = _parse_auth_timestamp(auth["timestamp"])
+    if not auth["signature"] or ts is None or not auth["nonce"] or not auth["owner_wallet"]:
+        return None, _err(
+            "Caller authentication required: send authSignature + "
+            "authTimestamp + authNonce (unique per call) + ownerWallet, with "
+            "authSignature a valid EIP-191 personal_sign signature of the "
+            "task-create message by the ownerWallet key.",
+            code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id,
+        )
+    message = _auth_create_message(auth["agent_label"], skill_id, ts, auth["nonce"])
+    signer = _recover_eip191_signer(message, auth["signature"])
+    if not signer or signer.lower() != auth["owner_wallet"]:
+        return None, _err("Invalid caller signature (does not match ownerWallet).",
+                           code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
+    digest = _auth_digest(message, auth["signature"])
+    if _auth_replay_seen(digest):
+        return None, _err("Signature already used (replay rejected).",
+                           code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
+    return signer.lower(), None
+
+
+def _verify_task_auth(params: Optional[Dict[str, Any]], task: "A2ATask",
+                      purpose: str, rpc_id: Any = None) -> Optional[Dict[str, Any]]:
+    """Authorize a get/cancel on an existing task. Returns None when
+    authorized, otherwise an error payload (401 missing/bad auth, 403
+    wrong owner)."""
+    owner = (getattr(task, "owner_wallet", "") or "").strip().lower()
+    if not owner:
+        # Tasks created before caller-ownership have no verified owner; they
+        # cannot be read or cancelled through the authenticated API. (403, not
+        # 404: the task exists, the caller is just never its owner.)
+        return _err(
+            "Task predates caller-ownership and has no verified owner; "
+            "it cannot be read or cancelled through this API.",
+            code=_ERR_FORBIDDEN, rpc_id=rpc_id,
+        )
+    auth = _extract_auth_fields(params)
+    ts = _parse_auth_timestamp(auth["timestamp"])
+    if not auth["signature"] or ts is None or not auth["nonce"]:
+        return _err(
+            f"Caller authentication required: sign the task-{purpose} message "
+            "for this task_id (EIP-191 personal_sign) and send authSignature "
+            "+ authTimestamp + authNonce (unique per call).",
+            code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id,
+        )
+    message = _auth_task_message(purpose, task.id, ts, auth["nonce"])
+    signer = _recover_eip191_signer(message, auth["signature"])
+    if not signer:
+        return _err("Invalid caller signature.", code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
+    digest = _auth_digest(message, auth["signature"])
+    if _auth_replay_seen(digest):
+        return _err("Signature already used (replay rejected).",
+                    code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
+    if signer.lower() != owner:
+        return _err("Only the task owner can read or cancel this task.",
+                    code=_ERR_FORBIDDEN, rpc_id=rpc_id)
+    return None
+
+
+def _verify_list_auth(params: Optional[Dict[str, Any]],
+                      rpc_id: Any = None) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """Authenticate a tasks/list request. Returns ``(owner_wallet, None)`` or
+    ``(None, error_payload)``. The list message carries no task_id, so the
+    replay guard is what stops a captured signature from re-listing the
+    victim's tasks inside the freshness window."""
+    auth = _extract_auth_fields(params)
+    ts = _parse_auth_timestamp(auth["timestamp"])
+    if not auth["signature"] or ts is None or not auth["nonce"] or not auth["owner_wallet"]:
+        return None, _err(
+            "Caller authentication required: sign the task-list message "
+            "(EIP-191 personal_sign) and send authSignature + authTimestamp "
+            "+ authNonce (unique per call) + ownerWallet.",
+            code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id,
+        )
+    message = _auth_task_message("list", "", ts, auth["nonce"])
+    signer = _recover_eip191_signer(message, auth["signature"])
+    if not signer or signer.lower() != auth["owner_wallet"]:
+        return None, _err("Invalid caller signature (does not match ownerWallet).",
+                           code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
+    digest = _auth_digest(message, auth["signature"])
+    if _auth_replay_seen(digest):
+        return None, _err("Signature already used (replay rejected).",
+                           code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
+    return signer.lower(), None
+
+
+def _server_bound_poster_id(body: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Derive the marketplace task poster from an EIP-191 signature (P3 item
+    14 / G2.15). Returns the recovered wallet (lowercased), or None when the
+    request is unsigned, the signature is invalid/stale/replayed, or no skill
+    is present. Client-supplied poster_id / agent_id are NEVER trusted for
+    attribution — unsigned posts are anonymous and can never divert
+    ghost-slash re-auction credit."""
+    src = body or {}
+    auth = _extract_auth_fields(src)
+    ts = _parse_auth_timestamp(auth["timestamp"])
+    skill = str(src.get("skill") or src.get("skill_id") or "").strip().lower()
+    if not auth["signature"] or ts is None or not auth["nonce"] or not skill:
+        return None
+    message = _auth_market_create_message(skill, ts, auth["nonce"])
+    signer = _recover_eip191_signer(message, auth["signature"])
+    if not signer:
+        return None
+    digest = _auth_digest(message, auth["signature"])
+    if _auth_replay_seen(digest):
+        return None
+    return signer.lower()
+
+
 def _task_to_rpc(task: A2ATask, history_length: Optional[int] = None) -> Dict[str, Any]:
     """Serialise a task to the A2A v1.0.1 Task JSON shape."""
     # Build status message from most recent agent output
@@ -2116,6 +2454,7 @@ def _task_to_rpc(task: A2ATask, history_length: Optional[int] = None) -> Dict[st
     d: Dict[str, Any] = {
         "id":        task.id,
         "contextId": task.context_id,
+        "ownerWallet": task.owner_wallet,
         "status": {
             "state":     task.state.value,
             "timestamp": task.updated_at,
@@ -2197,6 +2536,14 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
 
     params = body.get("params") or body
     msg_obj = params.get("message") or {}
+
+    # --- Caller authentication (P3 item 14) ---------------------------------
+    # The task is bound to the EIP-191 recovered signer wallet; caller_id
+    # stays a display label for quota/reputation and is never trusted for
+    # ownership. Auth runs before skill/payment logic (fail fast).
+    owner_wallet, auth_err = _verify_create_auth(params, skill_id, rpc_id)
+    if auth_err:
+        return auth_err
 
     # --- Validate skill --------------------------------------------------
     skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
@@ -2282,6 +2629,7 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         session_id=context_id,
         axm_paid=axm_paid,
         tx_hash=tx_hash,
+        owner_wallet=owner_wallet,
     )
     # Annotate high-rep and free-call status in metadata
     task.metadata["high_rep_caller"] = is_high_rep
@@ -2554,6 +2902,14 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
 
     params = body.get("params") or body
     msg_obj = params.get("message") or {}
+
+    # --- Caller authentication (P3 item 14): bind the streamed task to the
+    # EIP-191 recovered signer wallet, same as message/send.
+    owner_wallet, auth_err = _verify_create_auth(params, skill_id, rpc_id)
+    if auth_err:
+        yield _sse_event(auth_err)
+        return
+
     gate = validate_skill_input(
         skill_id=skill.id,
         schema=skill.input_schema or None,
@@ -2603,6 +2959,7 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
         session_id=context_id,
         axm_paid=axm_paid,
         tx_hash=tx_hash,
+        owner_wallet=owner_wallet,
     )
     logger.info("A2A stream task %s  skill=%s caller=%s", task.id, skill_id, caller_id)
 
@@ -2656,16 +3013,28 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
     yield _sse_status(task, rpc_id, final=True)
 
 
-def _handle_get(task_id: str) -> Dict[str, Any]:
-    """Handle legacy GET /api/a2a/tasks/<task_id>."""
+def _handle_get(task_id: str, auth_params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Handle legacy GET /api/a2a/tasks/<task_id>.
+
+    P3 item 14 / G2.19: only the task's owner wallet may read it (auth via
+    query params authSignature/authTimestamp/authNonce, or snake_case
+    variants). POST tasks/get with a JSON body is preferred; query-string
+    auth exists for legacy GET polling (note: signatures in URLs can land
+    in access logs — the replay guard treats encoding variants of one
+    signature as the same use, and low-s is enforced)."""
     task = _get_task(task_id)
     if not task:
         return _err(f"Task {task_id} not found", code=-32602)
+    auth_err = _verify_task_auth(auth_params or {}, task, "get")
+    if auth_err:
+        return auth_err
     return _rpc_ok(_task_to_rpc(task))
 
 
 def _handle_get_rpc(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/get JSON-RPC call."""
+    """Handle tasks/get JSON-RPC call.
+
+    P3 item 14 / G2.19: only the task's owner wallet may read it."""
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("id") or params.get("taskId", "")
@@ -2673,17 +3042,27 @@ def _handle_get_rpc(body: Dict[str, Any]) -> Dict[str, Any]:
     task = _get_task(task_id)
     if not task:
         return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
+    auth_err = _verify_task_auth(params, task, "get", rpc_id)
+    if auth_err:
+        return auth_err
     return _rpc_ok(_task_to_rpc(task, history_length=history_length), rpc_id=rpc_id)
 
 
 def _handle_cancel(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/cancel JSON-RPC call (and legacy REST cancel)."""
+    """Handle tasks/cancel JSON-RPC call (and legacy REST cancel).
+
+    P3 item 14 / G2.1: only the task's owner wallet may cancel it. A valid
+    EIP-191 signature over the task-cancel message is required; anything
+    else is 401 (bad auth) or 403 (wrong owner)."""
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("id") or params.get("taskId")
     task    = _get_task(task_id or "")
     if not task:
         return _err("Task {task_id} not found".format(task_id=task_id), code=-32602, rpc_id=rpc_id)
+    auth_err = _verify_task_auth(params, task, "cancel", rpc_id)
+    if auth_err:
+        return auth_err
     if task.state in TaskState.terminal_states():
         return _err("Task already in terminal state, cannot cancel",
                     code=-32003, rpc_id=rpc_id)
@@ -2692,11 +3071,20 @@ def _handle_cancel(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/list JSON-RPC call."""
+    """Handle tasks/list JSON-RPC call.
+
+    P3 item 14: listing is per-caller. The request must carry a valid
+    EIP-191 signature over the task-list message, and only tasks owned by
+    the recovered wallet are returned."""
     rpc_id = body.get("id")
     params = body.get("params") or body
     context_id  = params.get("contextId")
     state_filter = params.get("state")
+
+    owner_wallet, auth_err = _verify_list_auth(params, rpc_id)
+    if auth_err:
+        return auth_err
+
     page_size   = int(params.get("pageSize") or 50)
     if page_size > TASK_LIST_MAX_PAGE:
         return _err(
@@ -2707,6 +3095,8 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
 
     with _store_lock:
         tasks = list(_tasks.values())
+    # Per-caller isolation: a caller only ever sees their own tasks.
+    tasks = [t for t in tasks if (t.owner_wallet or "").lower() == owner_wallet]
     if context_id:
         tasks = [t for t in tasks if t.context_id == context_id]
     if state_filter:
@@ -2724,10 +3114,20 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _handle_push_config_set(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/pushNotificationConfig/set."""
+    """Handle tasks/pushNotificationConfig/set.
+
+    P3 item 14: only the task owner may attach a push config (an attacker
+    must not be able to redirect a victim task's event stream to their URL).
+    """
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("taskId") or params.get("id", "")
+    task    = _get_task(task_id or "")
+    if not task:
+        return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
+    auth_err = _verify_task_auth(params, task, "push", rpc_id)
+    if auth_err:
+        return auth_err
     config  = {
         "taskId":    task_id,
         "url":       params.get("url", ""),
@@ -2743,10 +3143,19 @@ def _handle_push_config_set(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _handle_push_config_get(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/pushNotificationConfig/get."""
+    """Handle tasks/pushNotificationConfig/get.
+
+    P3 item 14: only the task owner may read the push config (it carries a
+    bearer token)."""
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("taskId") or params.get("id", "")
+    task    = _get_task(task_id or "")
+    if not task:
+        return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
+    auth_err = _verify_task_auth(params, task, "push", rpc_id)
+    if auth_err:
+        return auth_err
     with _store_lock:
         config = _push_configs.get(task_id)
     if not config:
@@ -2755,20 +3164,37 @@ def _handle_push_config_get(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _handle_push_config_delete(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/pushNotificationConfig/delete."""
+    """Handle tasks/pushNotificationConfig/delete.
+
+    P3 item 14: only the task owner may delete the push config."""
     rpc_id  = body.get("id")
     params  = body.get("params") or body
     task_id = params.get("taskId") or params.get("id", "")
+    task    = _get_task(task_id or "")
+    if not task:
+        return _err(f"Task {task_id} not found", code=-32602, rpc_id=rpc_id)
+    auth_err = _verify_task_auth(params, task, "push", rpc_id)
+    if auth_err:
+        return auth_err
     with _store_lock:
         _push_configs.pop(task_id, None)
     return _rpc_ok({}, rpc_id=rpc_id)
 
 
 def _handle_push_config_list(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle tasks/pushNotificationConfig/list."""
+    """Handle tasks/pushNotificationConfig/list.
+
+    P3 item 14: per-caller — only configs attached to the caller's own tasks
+    are returned."""
     rpc_id = body.get("id")
+    params = body.get("params") or body
+    owner_wallet, auth_err = _verify_list_auth(params, rpc_id)
+    if auth_err:
+        return auth_err
     with _store_lock:
-        configs = list(_push_configs.values())
+        owned_ids = {t.id for t in _tasks.values()
+                     if (t.owner_wallet or "").lower() == owner_wallet}
+        configs = [c for c in _push_configs.values() if c.get("taskId") in owned_ids]
     return _rpc_ok(
         {"configs": configs},
         rpc_id=rpc_id,
@@ -2786,6 +3212,12 @@ def _handle_resubscribe(body: Dict[str, Any]) -> Generator[str, None, None]:
     task    = _get_task(task_id)
     if not task:
         yield _sse_event(_err(f"Task {task_id} not found", -32602, rpc_id))
+        return
+    # P3 item 14 / G2.19: resubscribe emits task status and the final
+    # artifact — owner-only (read class, same credential as tasks/get).
+    auth_err = _verify_task_auth(params, task, "get", rpc_id)
+    if auth_err:
+        yield _sse_event(auth_err)
         return
 
     terminal = TaskState.terminal_states()
