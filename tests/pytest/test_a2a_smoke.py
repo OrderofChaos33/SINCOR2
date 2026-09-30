@@ -219,7 +219,12 @@ def test_a2a_settle_unknown_task(client):
 
 
 def test_a2a_settle_completed_task(client):
-    """Submit a task (free-quota), then call /api/a2a/settle on it."""
+    """Submit a task (free-quota), then call /api/a2a/settle on it.
+
+    Post-G2.4, settlement proofs require a paid, chain-verifiable settlement,
+    so a free-quota task is fail-closed with 400 (no on-chain payment to
+    prove).  Paid-path coverage lives in test_settlement_proofs.py.
+    """
     # Submit task using free quota (no payment needed in test env)
     send_body = {
         "method": "message/send",
@@ -244,12 +249,8 @@ def test_a2a_settle_completed_task(client):
         "/api/a2a/settle",
         json={"task_id": task_id, "tx_hash": "", "caller_id": "settle-test-caller"},
     )
-    assert settle_resp.status_code == 200
-    proof = settle_resp.get_json()
-    pos = proof.get("proof_of_settlement", {})
-    assert pos.get("task_id") == task_id
-    assert "result_hash" in pos
-    assert "settled_at" in pos
+    assert settle_resp.status_code == 400
+    assert "on-chain payment" in settle_resp.get_json()["error"]["message"]
 
 
 def test_a2a_send_rejects_non_axm_token(client):

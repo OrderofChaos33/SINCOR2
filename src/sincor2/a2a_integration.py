@@ -50,6 +50,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -140,6 +141,10 @@ REPUTATION_HIGH_THRESHOLD = int(os.getenv("A2A_REPUTATION_HIGH_THRESHOLD", "10")
 
 # Non-production environments where on-chain / payment checks are skipped
 _DEV_ENVS: frozenset = frozenset({"development", "dev", "test", "testing", "local"})
+
+# Strict tx-hash shape: 0x + 64 hex chars. Simulated tx ids ("0xSIMULATED…")
+# never match and are rejected by the settle route before this check.
+_TX_HASH_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
 
 # ---------------------------------------------------------------------------
 # A2A data models (v1.0.1)
@@ -1641,40 +1646,9 @@ class PaymentVerifier:
         if cached is not None:
             return cached
 
-        rpc_url = os.getenv("BASE_RPC_URL")
-        if not rpc_url:
-            logger.error("BASE_RPC_URL not set — cannot verify AXM payment")
-            return False
-
-        result = False
-        try:
-            payload = json.dumps({
-                "jsonrpc": "2.0", "id": 1,
-                "method":  "eth_getTransactionReceipt",
-                "params":  [tx_hash],
-            }).encode()
-            with _urllib_request.urlopen(_urllib_request.Request(
-                rpc_url,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-            ), timeout=BASE_RPC_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-            receipt = data.get("result")
-            if not receipt or receipt.get("status") != "0x1":
-                logger.warning("PaymentVerifier: tx %s not successful", tx_hash)
-            else:
-                result = cls._validate_transfer_log(
-                    receipt.get("logs", []),
-                    expected_to=expected_to,
-                    expected_amount_wei=expected_amount_wei,
-                )
-        except Exception as exc:
-            logger.error("PaymentVerifier RPC error: %s", exc)
-
-        if result:
-            with cls._lock:
-                cls._verified[tx_hash] = True
-        return result
+        record = cls.verified_tx_data(tx_hash, expected_amount_wei,
+                                      expected_to=expected_to)
+        return record is not None and bool(record.get("verified_transfer"))
 
     @classmethod
     def _validate_transfer_log(
@@ -1716,6 +1690,65 @@ class PaymentVerifier:
             expected_amount_wei, expected_to, AXIOM_CONTRACT,
         )
         return False
+
+    @classmethod
+    def verified_tx_data(cls, tx_hash: str, expected_amount_wei: int,
+                         expected_to: str = TREASURY_WALLET
+                         ) -> Optional[Dict[str, Any]]:
+        """Return chain-verified transaction data, or None if unverified.
+
+        Fetches the receipt via RPC (``BASE_RPC_URL``) and returns
+        ``{"tx_hash", "block_number", "status", "verified_transfer"}`` when
+        the receipt is successful and carries a qualifying AXM Transfer log.
+        In dev/test envs the on-chain check is bypassed and a
+        ``dev_bypass``-labeled record is returned so proofs built on it are
+        honestly marked — never mistaken for on-chain verification.
+        """
+        env = os.getenv("FLASK_ENV", "production").lower()
+        if env in _DEV_ENVS:
+            logger.warning("PaymentVerifier: skipping on-chain check "
+                           "(non-prod env)")
+            return {"tx_hash": tx_hash, "block_number": None, "status": 1,
+                    "verified_transfer": False, "verification": "dev_bypass"}
+        rpc_url = os.getenv("BASE_RPC_URL")
+        if not rpc_url:
+            logger.error("BASE_RPC_URL not set — cannot verify AXM payment")
+            return None
+        try:
+            payload = json.dumps({
+                "jsonrpc": "2.0", "id": 1,
+                "method":  "eth_getTransactionReceipt",
+                "params":  [tx_hash],
+            }).encode()
+            with _urllib_request.urlopen(_urllib_request.Request(
+                rpc_url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            ), timeout=BASE_RPC_TIMEOUT) as resp:
+                data = json.loads(resp.read())
+            receipt = data.get("result")
+            if not receipt or receipt.get("status") != "0x1":
+                logger.warning("PaymentVerifier: tx %s not successful", tx_hash)
+                return None
+            if not cls._validate_transfer_log(
+                    receipt.get("logs", []),
+                    expected_to=expected_to,
+                    expected_amount_wei=expected_amount_wei):
+                return None
+            block_raw = receipt.get("blockNumber")
+            try:
+                block_number = int(block_raw, 16) if block_raw else None
+            except (TypeError, ValueError):
+                block_number = None
+            record = {"tx_hash": tx_hash, "block_number": block_number,
+                      "status": 1, "verified_transfer": True,
+                      "verification": "onchain"}
+            with cls._lock:
+                cls._verified[tx_hash] = True
+            return record
+        except Exception as exc:  # noqa: BLE001 - RPC failure = unverified
+            logger.error("PaymentVerifier RPC error: %s", exc)
+            return None
 
 
 # ---------------------------------------------------------------------------
@@ -1989,17 +2022,43 @@ class A2ARouter:
         # ── Proof-of-settlement endpoint ──────────────────────────────────────
         @bp.route("/api/a2a/settle", methods=["POST"])
         def settle():
-            """
-            Accept a completed task's payment tx hash and return a signed
-            proof-of-settlement JSON that callers can share publicly.
+            """Return a cryptographically anchored proof-of-settlement JSON.
 
             Required body fields: task_id, tx_hash
-            Optional:            caller_id
+            Optional:            caller_id, adjudicator_ruling
+
+            Anchors (no "signed by us" fiction — the executing process holds
+            no signing key):
+              - the canonical settlement statement plus a sha256 ``proof_hash``
+                (integrity checksum over the statement fields);
+              - ``payment_verification``: ``"onchain"`` with receipt status
+                and block number, fetched server-side via ``BASE_RPC_URL``
+                (never from caller claims); in non-production envs the
+                on-chain check is bypassed and the proof is honestly labeled
+                ``"dev_bypass"``;
+              - ``adjudicator_ruling``: when the task was adjudicated
+                (quality dispute), an EIP-191 ruling signed by
+                ``SINCOR_ADJUDICATOR_ID`` binding task_id/tx_hash/amount.
+                Required for disputed tasks; fail-closed (403) when absent
+                or invalid.  A ruling supplied for any task must verify —
+                smuggled forgeries are rejected.
+
+            Fail-closed rules: unknown task → 404; non-terminal task → 400;
+            tx_hash mismatching the task's recorded payment tx → 400 (G2.18);
+            malformed tx_hash → 400; simulated/free/unpaid tasks → 400 (no
+            on-chain payment exists to prove); payment tx unverifiable on
+            chain → 400; disputed task without a valid adjudicator ruling
+            → 403.
             """
             from flask import jsonify, request
+            from sincor2.settlement_proofs import (
+                canonical_statement_hash,
+                verify_proof_of_settlement,
+                verify_settle_ruling,
+            )
             body     = request.get_json(force=True, silent=True) or {}
-            task_id  = body.get("task_id", "")
-            tx_hash  = body.get("tx_hash", "")
+            task_id  = str(body.get("task_id") or "")
+            tx_hash  = str(body.get("tx_hash") or "")
             caller_id = body.get("caller_id", "anonymous")
 
             task = _get_task(task_id)
@@ -2008,6 +2067,85 @@ class A2ARouter:
 
             if task.state not in TaskState.terminal_states():
                 return jsonify(_err("Task is not yet complete", code=-32003)), 400
+
+            # G2.18: bind tx_hash to the task's recorded payment tx.
+            if not tx_hash:
+                tx_hash = str(task.tx_hash or "")
+            if tx_hash.startswith("0xSIMULATED"):
+                return jsonify(_err(
+                    "simulated payment: no on-chain payment exists to prove",
+                    code=-32003)), 400
+            if int(task.axm_paid or 0) <= 0 \
+                    or bool(task.metadata.get("free_call")):
+                return jsonify(_err(
+                    "unpaid task: settlement proofs require a paid, "
+                    "on-chain payment tx",
+                    code=-32003)), 400
+            if not _TX_HASH_RE.match(tx_hash):
+                return jsonify(_err(
+                    "tx_hash must be 0x followed by 64 hex chars",
+                    code=-32602)), 400
+            if task.tx_hash and tx_hash.lower() != str(task.tx_hash).lower():
+                return jsonify(_err(
+                    "tx_hash does not match the task's recorded payment tx",
+                    code=-32003)), 400
+
+            # Chain verification happens server-side; the caller only names
+            # the tx.  Unverifiable payment -> no proof (fail closed).
+            # A transient RPC outage is "unavailable", not "unverified" -> 503.
+            try:
+                tx_data = PaymentVerifier.verified_tx_data(
+                    tx_hash, int(task.axm_paid), TREASURY_WALLET)
+            except Exception as exc:  # noqa: BLE001 - RPC outage
+                logger.error("settle: payment verification unavailable: %s", exc)
+                return jsonify(_err(
+                    "payment verification temporarily unavailable",
+                    code=-32003)), 503
+            if tx_data is None or (
+                    tx_data.get("verification") == "onchain"
+                    and not tx_data.get("verified_transfer")):
+                return jsonify(_err(
+                    "payment tx not verified on-chain", code=-32003)), 400
+
+            # Adjudication gate: disputed tasks settle only with a valid
+            # adjudicator-signed ruling; any supplied ruling must verify.
+            from sincor2.onchain.stake_ledger import (
+                ADJUDICATOR_ENV, stake_ledger,
+            )
+            try:
+                disputed = bool(stake_ledger().task_was_adjudicated(task_id))
+            except Exception as exc:  # noqa: BLE001 - ledger unreadable
+                logger.error("settle: stake ledger unreadable: %s", exc)
+                return jsonify(_err(
+                    "settlement state unavailable", code=-32003)), 503
+            expected_adjudicator = os.environ.get(ADJUDICATOR_ENV, "").strip()
+            ruling = body.get("adjudicator_ruling")
+            verified_ruling = None
+            if disputed or ruling is not None:
+                if not expected_adjudicator:
+                    return jsonify(_err(
+                        "adjudicator not configured", code=-32003)), 503
+                if ruling is None:
+                    return jsonify(_err(
+                        "adjudicated task requires an adjudicator-signed "
+                        "settlement ruling", code=-32003)), 403
+                ok, reason = verify_settle_ruling(
+                    ruling, task_id=task_id, tx_hash=tx_hash,
+                    axm_paid_wei=int(task.axm_paid),
+                    expected_adjudicator=expected_adjudicator)
+                if not ok:
+                    return jsonify(_err(
+                        f"invalid adjudicator ruling: {reason}",
+                        code=-32003)), 403
+                verified_ruling = {
+                    "task_id": task_id,
+                    "tx_hash": tx_hash.lower(),
+                    "axm_paid_wei": str(int(task.axm_paid)),
+                    "adjudicator_address": str(
+                        ruling.get("adjudicator_address")),
+                    "expires_at_ms": int(ruling.get("expires_at_ms")),
+                    "signature": str(ruling.get("signature")),
+                }
 
             # Build deterministic result hash
             result_content = task.output or task.error or ""
@@ -2020,32 +2158,47 @@ class A2ARouter:
             # before treasury deposit; the swap executor is pending, so the
             # obligation is recorded here.
             platform_fee_wei = _compute_platform_fee_wei(task.axm_paid)
+            statement = {
+                "task_id":        task.id,
+                "skill_id":       task.skill_id,
+                "caller_id":      task.caller_id or caller_id,
+                "tx_hash":        tx_hash,
+                "block_number":   tx_data.get("block_number"),
+                "receipt_status": tx_data.get("status"),
+                "payment_verification": tx_data.get("verification"),
+                "axm_paid_wei":   str(task.axm_paid),
+                "axm_paid_display": f"{task.axm_paid / 10**18:.4f} AXM",
+                "platform_fee_bps": A2A_PLATFORM_FEE_BPS,
+                "platform_fee_wei":  str(platform_fee_wei),
+                "burn_amount_wei":  "0",
+                "treasury_amount_wei": str(platform_fee_wei),
+                "treasury":       TREASURY_WALLET,
+                "fee_conversion": {
+                    "policy":  "convert to USDC/WETH before treasury deposit",
+                    "targets": list(FEE_CONVERSION_TARGETS),
+                    "status":  FEE_CONVERSION_STATUS_PENDING,
+                },
+                "result_hash":    result_hash,
+                "settled_at":     task.updated_at,
+                "chain_id":       CHAIN_ID,
+                "disputed":       disputed,
+                "basescan_url":   f"https://basescan.org/tx/{tx_hash}",
+            }
+            if verified_ruling is not None:
+                statement["adjudicator_ruling"] = verified_ruling
             proof = {
                 "proof_of_settlement": {
-                    "task_id":        task.id,
-                    "skill_id":       task.skill_id,
-                    "caller_id":      task.caller_id or caller_id,
-                    "tx_hash":        tx_hash or task.tx_hash or "",
-                    "axm_paid_wei":   str(task.axm_paid),
-                    "axm_paid_display": f"{task.axm_paid / 10**18:.4f} AXM",
-                    "platform_fee_bps": A2A_PLATFORM_FEE_BPS,
-                    "platform_fee_wei":  str(platform_fee_wei),
-                    "burn_amount_wei":  "0",
-                    "treasury_amount_wei": str(platform_fee_wei),
-                    "treasury":       TREASURY_WALLET,
-                    "fee_conversion": {
-                        "policy":  "convert to USDC/WETH before treasury deposit",
-                        "targets": list(FEE_CONVERSION_TARGETS),
-                        "status":  FEE_CONVERSION_STATUS_PENDING,
-                    },
-                    "result_hash":    result_hash,
-                    "settled_at":     task.updated_at,
-                    "chain_id":       CHAIN_ID,
-                    "basescan_url":   (
-                        f"https://basescan.org/tx/{tx_hash}" if tx_hash else ""
-                    ),
+                    **statement,
+                    "proof_hash": canonical_statement_hash(statement),
                 }
             }
+            # Sanity: the proof we just built must verify offline.
+            ok, reason = verify_proof_of_settlement(proof)
+            if not ok:  # pragma: no cover - internal consistency guard
+                logger.error("settle: built proof failed self-verification: %s",
+                             reason)
+                return jsonify(_err(
+                    "proof construction failed", code=-32003)), 500
 
             # Record in reputation ledger
             _reputation_ledger.record(
@@ -2056,7 +2209,7 @@ class A2ARouter:
             )
             maybe_record_a2a_platform_fee(
                 axm_paid_wei=task.axm_paid,
-                tx_hash=tx_hash or task.tx_hash,
+                tx_hash=tx_hash,
                 task_id=task.id,
                 free_call=bool(task.metadata.get("free_call")),
                 metadata=task.metadata,
