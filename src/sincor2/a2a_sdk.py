@@ -51,6 +51,18 @@ class SealedBid:
     commitment: str
 
 
+def _as_signer_account(signer: Any) -> Any:
+    """Normalize a deposit ``signer`` to an eth_account-like object.
+
+    Accepts an eth_account LocalAccount (or anything exposing ``.address``
+    and ``.sign_message``) or a raw private key (hex string or bytes).
+    """
+    if hasattr(signer, "sign_message") and hasattr(signer, "address"):
+        return signer
+    from eth_account import Account
+    return Account.from_key(signer)
+
+
 class RequestsTransport:
     """Real HTTP transport (requests)."""
 
@@ -134,12 +146,37 @@ class SincorAgentSDK:
 
     # -- stake ------------------------------------------------------------
     def deposit_stake(self, agent_id: str, amount_axm: float,
-                      tx_hash: Optional[str] = None) -> Dict[str, Any]:
+                      tx_hash: Optional[str] = None,
+                      signer: Any = None) -> Dict[str, Any]:
         """Self-service stake deposit (offchain AXM ledger). Committing a
         sealed bid locks 50% of the bounty; the commit is rejected (403)
-        when the agent cannot cover it."""
+        when the agent cannot cover it.
+
+        Deposits are identity-bound and fail-closed: ``signer`` must hold
+        the wallet registered on the agent record — an eth_account
+        LocalAccount (or any object with ``.address`` and
+        ``.sign_message``) or a raw private key. Unsigned deposits are
+        rejected by the endpoint (403).
+        """
+        from sincor2.a2a_inbound_market import stake_deposit_message
+
+        if signer is None:
+            raise SDKError(
+                0, {"error": "signer required"},
+                "deposit_stake requires signer=<eth_account account or "
+                "private key>; the endpoint rejects unsigned deposits")
+        account = _as_signer_account(signer)
+        amount_axm = float(amount_axm)
+        amount_wei = int(round(amount_axm * 1e18))
+        expires_at_ms = int(time.time() * 1000) + 5 * 60 * 1000
+        message = stake_deposit_message(agent_id, amount_wei,
+                                        account.address, expires_at_ms)
+        from eth_account.messages import encode_defunct
+        signature = account.sign_message(
+            encode_defunct(text=message)).signature.hex()
         payload: Dict[str, Any] = {
-            "agent_id": agent_id, "amount_axm": float(amount_axm)}
+            "agent_id": agent_id, "amount_axm": amount_axm,
+            "expires_at_ms": expires_at_ms, "signature": signature}
         if tx_hash:
             payload["tx_hash"] = tx_hash
         return self.t.post("/v1/a2a/stake/deposit", payload)

@@ -62,7 +62,9 @@ sdk = SincorAgentSDK(RequestsTransport("https://getsincor.com"))
 sdk.register("my-agent", "My Agent", ["lead-enrichment"],
              wallet="0xYOUR20BYTEADDRESS", rpc_callback="https://you.example/rpc")
 sdk.heartbeat("my-agent")            # loop this on ~30s in production
-sdk.deposit_stake("my-agent", 2.0)
+from eth_account import Account
+depositor = Account.from_key("0xYOURPRIVATEKEY")  # holds 0xYOUR20BYTEADDRESS
+sdk.deposit_stake("my-agent", 2.0, signer=depositor)  # signed: unsigned rejected
 
 task = sdk.post_task("lead-enrichment", ["lead-enrichment"], 1.5, sealed=True)
 bid = sdk.sealed_commit(task["task_id"], "my-agent", bid_axm=0.9)

@@ -22,7 +22,11 @@ from sincor2.a2a_sdk import (
 
 AGENT = "sdk-agent-1"
 TAGS = ["lead-enrichment"]
-WALLET = "0x" + "22" * 20
+
+
+def _signer():
+    from eth_account import Account
+    return Account.create()
 
 
 @pytest.fixture
@@ -40,14 +44,15 @@ def sdk(tmp_path):
     return SincorAgentSDK(FlaskTestTransport(app.test_client()))
 
 
-def _onboard(sdk, agent_id=AGENT, stake_axm=2.0):
+def _onboard(sdk, agent_id=AGENT, stake_axm=2.0, signer=None):
+    signer = signer or _signer()
     reg = sdk.register(
-        agent_id, "SDK Agent", TAGS, wallet=WALLET,
+        agent_id, "SDK Agent", TAGS, wallet=signer.address,
         rpc_callback="https://sdk-agent.example/rpc")
     assert reg["status"] == "registered"
     hb = sdk.heartbeat(agent_id)
     assert hb["ok"] is True
-    dep = sdk.deposit_stake(agent_id, stake_axm)
+    dep = sdk.deposit_stake(agent_id, stake_axm, signer=signer)
     assert dep["agent_id"] == agent_id
     return reg
 
@@ -149,7 +154,7 @@ def test_sdk_commitment_mismatch_rejected(sdk):
 
 
 def test_sdk_commit_without_stake_rejected(sdk):
-    sdk.register(AGENT, "Broke Agent", TAGS, wallet=WALLET)
+    sdk.register(AGENT, "Broke Agent", TAGS, wallet=_signer().address)
     sdk.heartbeat(AGENT)
     task_id = _sealed_task(sdk)
     with pytest.raises(SDKError) as exc:
@@ -164,7 +169,7 @@ def test_sdk_registration_is_earned_only(sdk, tmp_path):
     client = sdk.t._client
     r = client.post("/v1/a2a/register", json={
         "agent_id": "sdk-earned-1", "capability_tags": TAGS,
-        "wallet": WALLET, "reputation": 9.9,
+        "wallet": _signer().address, "reputation": 9.9,
     })
     assert r.status_code == 201
     agent = get_fabric().agents["sdk-earned-1"]
