@@ -48,15 +48,15 @@ def sdk(tmp_path):
     return SincorAgentSDK(FlaskTestTransport(app.test_client()))
 
 
-def _onboard(sdk, agent_id=AGENT, stake_axm=2.0, key=None):
-    key = key or _agent_key()
+def _onboard(sdk, agent_id=AGENT, stake_axm=2.0, signer=None):
+    signer = signer or _agent_key()
     reg = sdk.register(
-        agent_id, "SDK Agent", TAGS, wallet=key.address, signer=key,
+        agent_id, "SDK Agent", TAGS, wallet=signer.address, signer=signer,
         rpc_callback="https://sdk-agent.example/rpc")
     assert reg["status"] == "registered"
     hb = sdk.heartbeat(agent_id, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     assert hb["ok"] is True
-    dep = sdk.deposit_stake(agent_id, stake_axm)
+    dep = sdk.deposit_stake(agent_id, stake_axm, signer=signer)
     assert dep["agent_id"] == agent_id
     return reg
 

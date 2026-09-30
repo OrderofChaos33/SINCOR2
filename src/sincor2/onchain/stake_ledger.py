@@ -368,7 +368,8 @@ class StakeLedger:
 
     # -- deposits -----------------------------------------------------------
     def deposit(self, agent_id: str, amount_wei: int,
-                reference: Optional[str] = None) -> Dict[str, Any]:
+                reference: Optional[str] = None,
+                signature_hash: Optional[str] = None) -> Dict[str, Any]:
         """Record an exact stake deposit (on-chain movement is separate).
 
         ``reference`` is an optional opaque external reference (e.g. the
@@ -392,6 +393,11 @@ class StakeLedger:
         exclusive file lock, so concurrent identical deposits in one
         process — and across worker processes on the same file — credit
         exactly once.
+
+        ``signature_hash`` (W-51) is an optional hex digest identifying the
+        deposit authorization (EIP-191 signature) the HTTP route verified.
+        Stored on the deposit event so each authorization is single-use:
+        ``signature_hash_used`` lets the route reject in-window replays.
         """
         if amount_wei <= 0:
             raise ValueError("deposit must be positive")
@@ -413,7 +419,8 @@ class StakeLedger:
                     fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
                 self._reload_under_lock()
                 return self._deposit_locked(agent_id, amount_wei,
-                                            reference, tx_hash)
+                                            reference, tx_hash,
+                                            signature_hash=signature_hash)
             finally:
                 if lock_fh is not None:
                     try:
@@ -424,7 +431,9 @@ class StakeLedger:
 
     def _deposit_locked(self, agent_id: str, amount_wei: int,
                         reference: Optional[str],
-                        tx_hash: Optional[str]) -> Dict[str, Any]:
+                        tx_hash: Optional[str],
+                        signature_hash: Optional[str] = None
+                        ) -> Dict[str, Any]:
         """deposit() body: call with self._lock held (and file locked)."""
         tx_hashes = self._data.setdefault("tx_hashes", {})
         if tx_hash is not None:
@@ -468,12 +477,29 @@ class StakeLedger:
             tx_hashes[tx_hash] = {"agent_id": agent_id,
                                   "amount_wei": str(amount_wei),
                                   "at": _now()}
+        if signature_hash:
+            detail["signature_hash"] = str(signature_hash)
         self._event("deposit", **detail)
         self._save()
         summary = self.balance_of(agent_id)
         summary["duplicate"] = False
         summary["credited_wei"] = str(amount_wei)
         return summary
+
+    def signature_hash_used(self, signature_hash: str) -> bool:
+        """True when a deposit event already consumed this signature hash.
+
+        Used by the HTTP deposit route to make each deposit authorization
+        single-use: a signature that verifies is still rejected if an
+        earlier deposit already consumed it.  Legacy deposits recorded
+        without a signature hash never collide.
+        """
+        sig = str(signature_hash or "").strip()
+        if not sig:
+            return False
+        return any(e.get("kind") == "deposit"
+                   and e.get("signature_hash") == sig
+                   for e in self._data.get("events", []))
 
     def balance_of(self, agent_id: str) -> Dict[str, Any]:
         rec = self._agent(agent_id)

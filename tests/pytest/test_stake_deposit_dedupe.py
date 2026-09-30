@@ -22,12 +22,17 @@ These tests prove:
 from __future__ import annotations
 
 import threading
+import time
 
 import pytest
+from eth_account import Account
+from eth_account.messages import encode_defunct
 from flask import Flask
 
+from sincor2.a2a_identity import register_message
 from sincor2.a2a_inbound import register as register_inbound
 from sincor2.a2a_inbound import reset_fabric
+from sincor2.a2a_inbound_market import stake_deposit_message
 from sincor2.onchain.stake_ledger import (
     DuplicateTxHashError,
     StakeLedger,
@@ -181,27 +186,60 @@ def client(tmp_path):
 
 
 def _register(client, agent_id):
+    """Register an agent with a wallet; returns the owning eth account.
+
+    The C3 fail-closed register gate requires an EIP-191 proof for the
+    wallet claim, and the W-51 deposit route requires the wallet on the
+    agent record, so registrations here carry both.
+    """
+    account = Account.create()
+    reg_ts = int(time.time() * 1000)
+    reg_sig = "0x" + account.sign_message(
+        encode_defunct(text=register_message(agent_id, reg_ts))
+    ).signature.hex()
     r = client.post(
         "/v1/a2a/register",
         json={
             "agent_id": agent_id,
             "capability_tags": ["lead-enrichment"],
             "rpc_callback": "https://agent.example/rpc",
+            "wallet": account.address,
+            "registration_wallet": account.address,
+            "registration_ts": reg_ts,
+            "registration_signature": reg_sig,
         },
     )
     assert r.status_code in (200, 201), r.get_json()
+    return account
+
+
+def _deposit(client, agent_id, account, amount_axm, tx_hash):
+    """Post a freshly signed deposit (each signature is single-use)."""
+    amount_wei = int(round(float(amount_axm) * 1e18))
+    expires_at_ms = int(time.time() * 1000) + 5 * 60 * 1000
+    message = stake_deposit_message(agent_id, amount_wei, account.address,
+                                    expires_at_ms)
+    signature = account.sign_message(
+        encode_defunct(text=message)).signature.hex()
+    return client.post(
+        "/v1/a2a/stake/deposit",
+        json={"agent_id": agent_id, "amount_axm": amount_axm,
+              "expires_at_ms": expires_at_ms, "signature": signature,
+              "tx_hash": tx_hash},
+    )
 
 
 def test_route_retry_returns_200_duplicate(client):
-    _register(client, "agent-1")
-    body = {"agent_id": "agent-1", "amount_axm": 2, "tx_hash": TX_A}
+    acct = _register(client, "agent-1")
 
-    first = client.post("/v1/a2a/stake/deposit", json=body)
+    first = _deposit(client, "agent-1", acct, 2, TX_A)
     assert first.status_code == 201
     assert first.get_json()["duplicate"] is False
     assert first.get_json()["deposit_wei"] == str(2 * ONE_AXM)
 
-    retry = client.post("/v1/a2a/stake/deposit", json=body)
+    # Honest retry: same tx_hash, fresh authorization signature -> the
+    # tx-hash dedupe (W-36) returns 200 + duplicate instead of erroring.
+    retry = _deposit(client, "agent-1", acct, 2, TX_A)
     assert retry.status_code == 200
     payload = retry.get_json()
     assert payload["duplicate"] is True
@@ -212,41 +250,31 @@ def test_route_retry_returns_200_duplicate(client):
 
 
 def test_route_conflicting_reuse_is_400(client):
-    _register(client, "agent-1")
-    _register(client, "agent-2")
-    r = client.post("/v1/a2a/stake/deposit",
-                    json={"agent_id": "agent-1", "amount_axm": 2,
-                          "tx_hash": TX_A})
+    acct1 = _register(client, "agent-1")
+    acct2 = _register(client, "agent-2")
+    r = _deposit(client, "agent-1", acct1, 2, TX_A)
     assert r.status_code == 201
 
     # Same tx hash claimed by another agent: refused, no credit.
-    r = client.post("/v1/a2a/stake/deposit",
-                    json={"agent_id": "agent-2", "amount_axm": 2,
-                          "tx_hash": TX_A})
+    r = _deposit(client, "agent-2", acct2, 2, TX_A)
     assert r.status_code == 400
     bal = client.get("/v1/a2a/stake/agent-2").get_json()
     assert bal["deposited_wei"] == "0"
 
     # Same tx hash with a different amount: refused as well.
-    r = client.post("/v1/a2a/stake/deposit",
-                    json={"agent_id": "agent-1", "amount_axm": 9,
-                          "tx_hash": TX_A})
+    r = _deposit(client, "agent-1", acct1, 9, TX_A)
     assert r.status_code == 400
     bal = client.get("/v1/a2a/stake/agent-1").get_json()
     assert bal["deposited_wei"] == str(2 * ONE_AXM)
 
 
 def test_route_tx_hash_case_insensitive(client):
-    _register(client, "agent-1")
+    acct = _register(client, "agent-1")
     mixed = "0x" + "aA" * 32  # same hash as TX_A ("aa"*32), different case
-    r = client.post("/v1/a2a/stake/deposit",
-                    json={"agent_id": "agent-1", "amount_axm": 1,
-                          "tx_hash": mixed})
+    r = _deposit(client, "agent-1", acct, 1, mixed)
     assert r.status_code == 201
     # Same hash, different case: recognized as the same deposit.
-    r = client.post("/v1/a2a/stake/deposit",
-                    json={"agent_id": "agent-1", "amount_axm": 1,
-                          "tx_hash": TX_A})
+    r = _deposit(client, "agent-1", acct, 1, TX_A)
     assert r.status_code == 200
     assert r.get_json()["duplicate"] is True
     bal = client.get("/v1/a2a/stake/agent-1").get_json()
