@@ -1729,7 +1729,11 @@ class A2ARouter:
 
     def __init__(self) -> None:
         from flask import Blueprint
+        from sincor2.a2a_errors import register_a2a_error_handlers
         self.blueprint = Blueprint("a2a", __name__)
+        # G2.11: JSON error envelopes on this blueprint — errors are never
+        # HTML pages (this blueprint is also mounted standalone in tests).
+        register_a2a_error_handlers(self.blueprint)
         self._register_routes()
 
     def _register_routes(self) -> None:
@@ -2041,7 +2045,14 @@ class A2ARouter:
         def leaderboard():
             """Return top external A2A callers by volume and settlement count."""
             from flask import jsonify, request
-            limit = min(int(request.args.get("limit", 10)), 100)
+            from sincor2.a2a_errors import error_envelope, parse_int_param
+            try:
+                # G2.11: garbage ?limit=abc is a 400, never a 500.
+                limit = parse_int_param(
+                    request.args.get("limit"), "limit",
+                    default=10, minimum=1, maximum=100)
+            except ValueError as err:
+                return error_envelope(str(err), 400)
             return jsonify({
                 "leaderboard": _reputation_ledger.leaderboard(limit=limit),
                 "description": (
@@ -2697,13 +2708,21 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
     params = body.get("params") or body
     context_id  = params.get("contextId")
     state_filter = params.get("state")
-    page_size   = int(params.get("pageSize") or 50)
+    # G2.11: garbage pageSize/pageToken is a JSON-RPC invalid-params
+    # error (-32602), never a 500.
+    from sincor2.a2a_errors import parse_int_param
+    try:
+        page_size = parse_int_param(
+            params.get("pageSize"), "pageSize", default=50, minimum=1)
+        offset = parse_int_param(
+            params.get("pageToken"), "pageToken", default=0, minimum=0)
+    except ValueError as err:
+        return _err(str(err), code=-32602, rpc_id=rpc_id)
     if page_size > TASK_LIST_MAX_PAGE:
         return _err(
             f"pageSize exceeds maximum ({TASK_LIST_MAX_PAGE})",
             code=-32602, rpc_id=rpc_id,
         )
-    page_token  = params.get("pageToken")  # simple offset-based for now
 
     with _store_lock:
         tasks = list(_tasks.values())
@@ -2713,7 +2732,7 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
         tasks = [t for t in tasks if t.state.value == state_filter]
 
     # Pagination
-    offset = int(page_token or 0)
+    # offset validated above; slice is safe
     page   = tasks[offset: offset + page_size]
     next_token = str(offset + page_size) if offset + page_size < len(tasks) else None
 

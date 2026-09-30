@@ -10,8 +10,11 @@ Mechanics
   ``true``/``yes``). Default: off. The mechanism exists in code but never
   fronts funds unless the operator opts in — enabling it is the operator's
   call.
-* Fronting: admin-only ``POST /v1/a2a/admin/sponsored-stake``
-  (``X-Admin-Key`` header, same convention as the app's admin key check).
+* Fronting: admin-only ``POST /v1/a2a/admin/sponsored-stake``.
+  Admin credential (G2.13 — single unified A2A surface): the operator's
+  ``ADMIN_PASSWORD`` env var, presented ONLY via the ``X-Admin-Key``
+  header; never in the request body, never logged. Unset
+  ``ADMIN_PASSWORD`` denies (``_admin_key_ok`` is False) — deny-by-default.
   One active sponsorship per agent. The fronted amount is deposited into
   the stake ledger with reference ``sponsored-stake:<agent_id>`` so it is
   immediately usable for commit-time stake locks.
@@ -309,8 +312,10 @@ def recoup_sponsored_stake(agent_id: str, earnings_wei: int,
 def _admin_key_ok() -> bool:
     """Admin gate: X-Admin-Key header == ADMIN_PASSWORD (constant-time).
 
-    Same convention as the app's own admin key check; kept local so the A2A
-    blueprint does not import the full app module.
+    This is the single unified A2A admin credential (G2.13): env-only,
+    header-only, never accepted in request bodies, never logged. Shared
+    by the sponsored-stake routes and the recovery routes (recovery.py).
+    Unset ADMIN_PASSWORD -> False (deny-by-default).
     """
     expected = os.environ.get("ADMIN_PASSWORD", "")
     if not expected:
@@ -340,7 +345,7 @@ def attach_sponsored_stake_routes(bp: Any) -> None:
         sponsorship.
         """
         if not _admin_key_ok():
-            return jsonify({"error": "Unauthorized"}), 401
+            return _http_error("admin authorization required", 401)
         body = request.get_json(silent=True) or {}
         try:
             agent_id = str(body.get("agent_id") or "").strip()
@@ -371,7 +376,7 @@ def attach_sponsored_stake_routes(bp: Any) -> None:
     def v1_sponsored_status(agent_id):
         """Sponsorship status for one agent (admin only)."""
         if not _admin_key_ok():
-            return jsonify({"error": "Unauthorized"}), 401
+            return _http_error("admin authorization required", 401)
         record = sponsored_ledger().status_of(str(agent_id or "").strip())
         if record is None:
             return _http_error("no sponsorship record", 404)

@@ -31,6 +31,14 @@ history survives restarts and redeploys. Append-only event journal.
 
 Operator opt-in: SINCOR_RECOVERY_TRACK_ENABLED=1 (default off), and the
 sponsored-stake mechanism must also be enabled — it performs the front.
+
+Admin surface (G2.13 — single unified credential)
+-------------------------------------------------
+``POST /v1/a2a/admin/recovery/sponsor`` and
+``GET /v1/a2a/admin/recovery/status`` are gated by
+``sponsored_stake._admin_key_ok``: the operator's ``ADMIN_PASSWORD`` env
+var, presented ONLY via the ``X-Admin-Key`` header — never in the request
+body, never logged. Unset ``ADMIN_PASSWORD`` denies (deny-by-default).
 """
 from __future__ import annotations
 
