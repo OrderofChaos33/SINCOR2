@@ -238,6 +238,15 @@ def mount(app: Flask) -> None:
     from flask import Blueprint
     from sincor2.a2a_inbound_market import attach_market_routes, seed_probation_tasks
 
+    # Idempotent: registering the same blueprint twice on one app makes
+    # Flask raise ValueError, and re-running the mount body would stack
+    # duplicate before_request hooks and re-seed auctions. Guard on the
+    # app's own blueprint registry (not a module-global flag) so a fresh
+    # app in tests can still mount independently.
+    if "a2a_inbound" in (getattr(app, "blueprints", {}) or {}):
+        logger.info("[A2A] mount() already applied to this app; skipping re-mount")
+        return
+
     bp = Blueprint("a2a_inbound", __name__)
 
     @bp.post("/api/marketplace/register")

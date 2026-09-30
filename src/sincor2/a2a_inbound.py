@@ -31,10 +31,8 @@ AUCTION_WINDOW_MS = 500
 MERIT_THRESHOLD_AXM = 5.0
 MAX_AGENTS = 10000
 MAX_OPEN_TASKS = 200
-DEMO_SECRET = os.environ.get("SINCOR_A2A_SECRET", "sincor-a2a-demo")
 _AGENT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _WALLET_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-_REGISTERED = False
 _FABRIC = None
 _FABRIC_LOCK = threading.Lock()
 _PLATFORM_AGENT_ID = "sincor-agent-swarm"
@@ -109,7 +107,35 @@ def _slug(value: str) -> str:
     return (re.sub(r"[^a-z0-9]+", "-", (value or "agent").lower()).strip("-") or "agent")[:80]
 
 
-def sign_payload(payload: Dict[str, Any], secret: str = DEMO_SECRET) -> str:
+_A2A_SECRET_ENV = "SINCOR_A2A_SECRET"
+
+
+def _a2a_signing_secret() -> str:
+    """Resolve the A2A payload-signing secret from the environment.
+
+    FAIL-CLOSED: there is deliberately no hardcoded or demo fallback.
+    If the variable is unset or empty, signing raises instead of signing
+    with a guessable secret.
+    """
+    secret = os.environ.get(_A2A_SECRET_ENV, "").strip()
+    if not secret:
+        raise RuntimeError(
+            f"{_A2A_SECRET_ENV} is not set; refusing to sign payloads "
+            "with a fallback secret"
+        )
+    return secret
+
+
+def sign_payload(payload: Dict[str, Any], secret: Optional[str] = None) -> str:
+    """HMAC-SHA256 sign ``payload`` with ``secret``.
+
+    ``secret`` is required: when omitted it is resolved from the
+    ``SINCOR_A2A_SECRET`` environment variable, and resolution fails
+    closed (``RuntimeError``) if the variable is unset. There is no
+    hardcoded demo secret.
+    """
+    if not secret:
+        secret = _a2a_signing_secret()
     body = json.dumps({k: payload[k] for k in sorted(payload) if k != "signature"}, separators=(",", ":"), sort_keys=True)
     return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
