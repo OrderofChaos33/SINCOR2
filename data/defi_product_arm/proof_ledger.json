@@ -618,7 +618,7 @@
       "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
       "recorded_by": "xioix/track-a-defi-p15-p21",
       "details": {
-        "note": "Adversarial review (2026-09-29): fixed double-exercise \u2014 a settled position could be exercised twice, paying the holder twice and driving minted negative; and re-settle \u2014 settle() overwrote the P_exp snapshot after payouts. settle() is now once-per-series; exercise() rejects already-exercised positions. Regression tests added."
+        "note": "Adversarial review (2026-09-29): fixed double-exercise — a settled position could be exercised twice, paying the holder twice and driving minted negative; and re-settle — settle() overwrote the P_exp snapshot after payouts. settle() is now once-per-series; exercise() rejects already-exercised positions. Regression tests added."
       }
     },
     {
@@ -629,7 +629,7 @@
       "commit": "091eb39d5fee7eca3044dd6365052d36fe4e3568",
       "recorded_by": "xioix/track-a-defi-p15-p21",
       "details": {
-        "note": "Adversarial review (2026-09-29): score attestations were self-assertable \u2014 register() checked freshness/floor/replay but never attestor identity. Added optional authorized_attestors allowlist. Money-safety unaffected: draws remain collateral-capped regardless of score; the score only buys better LTV terms."
+        "note": "Adversarial review (2026-09-29): score attestations were self-assertable — register() checked freshness/floor/replay but never attestor identity. Added optional authorized_attestors allowlist. Money-safety unaffected: draws remain collateral-capped regardless of score; the score only buys better LTV terms."
       }
     },
     {
@@ -763,7 +763,7 @@
         "passed": 12,
         "failed": 0,
         "suite": "tests/pytest/test_p04_mev_fuzz_invariants.py",
-        "scope": "flow_meter_fuzz: record() idempotent per (block,pool,tx_index); gas/swap==600 <= 5000 hot-path budget; threshold gate requires notional>=$1000 AND |impact|>=50bps; sandwich detector: frontrun/backrun pair, victim displacement>50bps, backrun captures >=30%; treasury EOA can never be signer \u2014 construction, check(), config audit all fail closed",
+        "scope": "flow_meter_fuzz: record() idempotent per (block,pool,tx_index); gas/swap==600 <= 5000 hot-path budget; threshold gate requires notional>=$1000 AND |impact|>=50bps; sandwich detector: frontrun/backrun pair, victim displacement>50bps, backrun captures >=30%; treasury EOA can never be signer — construction, check(), config audit all fail closed",
         "source": "copied from branch xioix/buildout-21-defi-fuzz-suites commit 7fa39b8 (file copy only, no merge/cherry-pick)",
         "note": "run on this worktree with ~/.venvs/sincor2, FLASK_ENV=test, PYTHONPATH=src:. 2026-09-30; deterministic seeded RNG suites; 53 tests total across 7 suites, all green"
       }
@@ -1167,18 +1167,18 @@
         "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
         "date": "2026-09-29",
         "boxes": {
-          "rehearsal_onboarding_walk": "NOT DONE \u2014 no staging account, no rehearsal conducted. Mechanism verified: real signed dispatch to local stub HTTP endpoint, 2/2 payloads received with server-side HMAC-SHA256 verify, tampered payload rejected; empty-secret dispatch refused fail-closed (attempts=0, zero network bytes).",
-          "mesh_view_one_screen": "EXERCISED by worker (not founder-confirmed): render test built fleet view over 3 deployment groups (6 agents: dep-alpha healthy/degraded, dep-beta critical + stale-heartbeat-unknown, dep-gamma healthy), 2 open incidents incl. 1 open dispute escalation, 1 drift alert \u2014 single serialized document. sha256=c4c96be7a502d7f4f666d1e1437d5ed2ac46779433359dcad843dc33b403e196, artifact goals/sincor-speculative-defi-product-arm/hidden_files/obsent-walkthrough-mesh-view.json. Fixture data \u2014 NOT a staging rehearsal.",
-          "rehearsal_incidents_sla": "NOT DONE \u2014 no rehearsal incidents exist. Mechanism verified: alert-latency SLA evaluates occurrence->alerted timestamps on fixtures (p95=10.0s, met); uptime evaluator counts unknown/stale time as down (fixture window measured 4.167%, breached \u2014 conservative by design).",
-          "monthly_summary_signed": "NOT DONE \u2014 requires founder stand-in signature; no rehearsal conducted.",
-          "cta_destinations": "PARTIAL \u2014 both draft CTA hrefs (/contact, /products) resolve to real routes in mvp_blueprints/pages.py (route decorators verified). GAP: engagement NOT pre-identified (bare hrefs, no ?sku= param) \u2014 flagged for B6/founder, not fixed by this worker.",
-          "draft_copy_read_aloud": "PARTIAL \u2014 mechanical scan clean: zero banned phrases, no 24/7 claims, no instant-resolution claims. Read-aloud + positive-framing judgment requires founder.",
-          "ledger_record": "DONE \u2014 this entry (all_boxes_ticked=false)."
+          "rehearsal_onboarding_walk": "NOT DONE — no staging account, no rehearsal conducted. Mechanism verified: real signed dispatch to local stub HTTP endpoint, 2/2 payloads received with server-side HMAC-SHA256 verify, tampered payload rejected; empty-secret dispatch refused fail-closed (attempts=0, zero network bytes).",
+          "mesh_view_one_screen": "EXERCISED by worker (not founder-confirmed): render test built fleet view over 3 deployment groups (6 agents: dep-alpha healthy/degraded, dep-beta critical + stale-heartbeat-unknown, dep-gamma healthy), 2 open incidents incl. 1 open dispute escalation, 1 drift alert — single serialized document. sha256=c4c96be7a502d7f4f666d1e1437d5ed2ac46779433359dcad843dc33b403e196, artifact goals/sincor-speculative-defi-product-arm/hidden_files/obsent-walkthrough-mesh-view.json. Fixture data — NOT a staging rehearsal.",
+          "rehearsal_incidents_sla": "NOT DONE — no rehearsal incidents exist. Mechanism verified: alert-latency SLA evaluates occurrence->alerted timestamps on fixtures (p95=10.0s, met); uptime evaluator counts unknown/stale time as down (fixture window measured 4.167%, breached — conservative by design).",
+          "monthly_summary_signed": "NOT DONE — requires founder stand-in signature; no rehearsal conducted.",
+          "cta_destinations": "PARTIAL — both draft CTA hrefs (/contact, /products) resolve to real routes in mvp_blueprints/pages.py (route decorators verified). GAP: engagement NOT pre-identified (bare hrefs, no ?sku= param) — flagged for B6/founder, not fixed by this worker.",
+          "draft_copy_read_aloud": "PARTIAL — mechanical scan clean: zero banned phrases, no 24/7 claims, no instant-resolution claims. Read-aloud + positive-framing judgment requires founder.",
+          "ledger_record": "DONE — this entry (all_boxes_ticked=false)."
         },
         "mechanism_checks": "13/14 live checks passed (script: goals/.../hidden_files/obsent-walkthrough-script.py). 1 genuine gap: CTA engagement pre-identification.",
         "suite": "tests/pytest/test_obsent_mesh.py 54/54 passed; obs_skus suites (mesh+registry+vitals+audit_trail+drift_quality) 184/184 passed; neighbors test_defi_product_arm.py + test_defi_catalog_ui.py 36/36 passed. All on origin/main @ fd96801.",
-        "acceptance_criteria": "0 of 7 marked passed. C1: playbook file docs/specs/obs-skus/OBS-ENT-playbook.md missing (module's generate_runbook is a per-customer support artifact, not the engagement playbook). C2: no ordered onboarding runbook (KYA->stake->audit->drift->alert-proof) with no-skip test. C3-C7: rehearsal never conducted (staging account, founder stand-in, signed summary, second operator) \u2014 these need founder, not a worker.",
-        "notes": "Software mechanisms verified end-to-end on fixtures; engagement/rehearsal components remain open. Publish gate stays red by design \u2014 no promotion."
+        "acceptance_criteria": "0 of 7 marked passed. C1: playbook file docs/specs/obs-skus/OBS-ENT-playbook.md missing (module's generate_runbook is a per-customer support artifact, not the engagement playbook). C2: no ordered onboarding runbook (KYA->stake->audit->drift->alert-proof) with no-skip test. C3-C7: rehearsal never conducted (staging account, founder stand-in, signed summary, second operator) — these need founder, not a worker.",
+        "notes": "Software mechanisms verified end-to-end on fixtures; engagement/rehearsal components remain open. Publish gate stays red by design — no promotion."
       }
     },
     {
@@ -1204,7 +1204,7 @@
       "details": {
         "criterion": 2,
         "passed": true,
-        "evidence": "Drift flag names the dimension and carries baseline-vs-current numbers (module's real mechanisms; spec's 'bid cadence' metric is not implemented \u2014 metrics are token_usage, latency_ms, error_rate, quality_overall plus persona drift). Observed live: token_usage spike 1200->48000 after 15-sample baseline -> status 'anomaly', metric='token_usage' named, latest=48000.0, baseline_mean=1200.0, baseline_std=0.0, iqr_flag=True. Persona drift: crafted trait collapse -> status 'drift_alert', drift=0.2206 > bound 0.20; stable control -> 'stable'; re-anchor advisory advisory_only, mutated=False; persona file sha256 unchanged (advisory never mutates). L2."
+        "evidence": "Drift flag names the dimension and carries baseline-vs-current numbers (module's real mechanisms; spec's 'bid cadence' metric is not implemented — metrics are token_usage, latency_ms, error_rate, quality_overall plus persona drift). Observed live: token_usage spike 1200->48000 after 15-sample baseline -> status 'anomaly', metric='token_usage' named, latest=48000.0, baseline_mean=1200.0, baseline_std=0.0, iqr_flag=True. Persona drift: crafted trait collapse -> status 'drift_alert', drift=0.2206 > bound 0.20; stable control -> 'stable'; re-anchor advisory advisory_only, mutated=False; persona file sha256 unchanged (advisory never mutates). L2."
       }
     },
     {
@@ -1230,7 +1230,7 @@
       "details": {
         "criterion": 4,
         "passed": true,
-        "evidence": "Time alone never moves quality: 10 degrading observations ingested, then 100 evaluation ticks with zero new observations -> dimension_trend stats byte-identical before/after (unchanged=True, slope_per_sample=-0.02 preserved). NOT implemented: the ghosting-slash quality move \u2014 this module deliberately never reads the stake ledger (passive observer of scored deliverables only); stake-ledger grounding of the quality signal remains open. L4."
+        "evidence": "Time alone never moves quality: 10 degrading observations ingested, then 100 evaluation ticks with zero new observations -> dimension_trend stats byte-identical before/after (unchanged=True, slope_per_sample=-0.02 preserved). NOT implemented: the ghosting-slash quality move — this module deliberately never reads the stake ledger (passive observer of scored deliverables only); stake-ledger grounding of the quality signal remains open. L4."
       }
     },
     {
@@ -1244,7 +1244,7 @@
         "all_boxes_ticked": false,
         "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
         "date": "2026-09-29T23:30:00-05:00",
-        "notes": "Automated walkthrough of the real drift_quality module (run_walkthrough() ALL_GREEN: drift_alert_fired, stable control, token anomaly, persona file unmutated, degrading trend; plus L1-L7 live paths incl. real SelfImprovingQualityEngine scoring 9 dimensions). Checklist boxes NOT ticked because: (a) spec requires founder-conducted walkthrough \u2014 this was worker-automated, not founder; (b) ghosting-slash box not exercisable (module does not read stake ledger; money-path actions forbidden); (c) coalescing box not exercisable (not implemented); (d) per-customer scoping box not exercisable (no customer concept in module); (e) CTA box: draft page links /signup?plan=obs-03-drift-quality-watch but NO /signup route exists anywhere in src/ (only /contact and /products are routed) \u2014 CTA target is dead; (f) 'read copy aloud' is founder-manual (mechanical banned-phrase scan passed: clean). Criteria 5 (reputation tie-in), 6 (OBS-02 trail links in alerts), 7 (coalescing), 8 (per-customer scoping) are unmet by the built module \u2014 see acceptance entries 1-4 for the honest as-built mapping."
+        "notes": "Automated walkthrough of the real drift_quality module (run_walkthrough() ALL_GREEN: drift_alert_fired, stable control, token anomaly, persona file unmutated, degrading trend; plus L1-L7 live paths incl. real SelfImprovingQualityEngine scoring 9 dimensions). Checklist boxes NOT ticked because: (a) spec requires founder-conducted walkthrough — this was worker-automated, not founder; (b) ghosting-slash box not exercisable (module does not read stake ledger; money-path actions forbidden); (c) coalescing box not exercisable (not implemented); (d) per-customer scoping box not exercisable (no customer concept in module); (e) CTA box: draft page links /signup?plan=obs-03-drift-quality-watch but NO /signup route exists anywhere in src/ (only /contact and /products are routed) — CTA target is dead; (f) 'read copy aloud' is founder-manual (mechanical banned-phrase scan passed: clean). Criteria 5 (reputation tie-in), 6 (OBS-02 trail links in alerts), 7 (coalescing), 8 (per-customer scoping) are unmet by the built module — see acceptance entries 1-4 for the honest as-built mapping."
       }
     },
     {
@@ -1257,7 +1257,7 @@
       "details": {
         "passed": true,
         "failed": 0,
-        "evidence": "Full audit_pipeline rehearsal on a REAL obs02-produced B2-native archive (not a hand-built fixture): obs02.AuditTrail with freshly generated Ed25519 keypair, 8 entries recorded, export_archive -> forensic ingest_audit_trail_archive verified keccak-256 chain (obs02_chain), manifest pins (obs02_manifest_pins), per-entry Ed25519 signatures (obs02_signatures); genesis prev_hash == 32 zero bytes; head_hash == last entry hash. Timeline: 8 items, 4 agents, 0 unattributed. Findings: 4 (R1 recurring errors, R3 unrevealed commit, R5 quality decline, R6 repeat pattern). Tampered archive refused (hash_mismatch). Second packed archive (10 entries, Ed25519-signed): verified=True, 4 findings, 100% citation coverage (9/9 evidence hashes in verified archive), 4 checkable remediations (check_steps + acceptance + owner_role + status open), markdown + HTML rendered, methodology limitations stated, 'What's working' positive framing, JSON serializable, 1 unattributed heartbeat flagged never assigned. Pack-level tamper refused (entry_hash). Incident CONTENT was fixture data \u2014 no staging environment exists for this worker; a real-staging-incident rehearsal remains a founder-side step. Live script /tmp/w2_aud01_walk.py A1-A6."
+        "evidence": "Full audit_pipeline rehearsal on a REAL obs02-produced B2-native archive (not a hand-built fixture): obs02.AuditTrail with freshly generated Ed25519 keypair, 8 entries recorded, export_archive -> forensic ingest_audit_trail_archive verified keccak-256 chain (obs02_chain), manifest pins (obs02_manifest_pins), per-entry Ed25519 signatures (obs02_signatures); genesis prev_hash == 32 zero bytes; head_hash == last entry hash. Timeline: 8 items, 4 agents, 0 unattributed. Findings: 4 (R1 recurring errors, R3 unrevealed commit, R5 quality decline, R6 repeat pattern). Tampered archive refused (hash_mismatch). Second packed archive (10 entries, Ed25519-signed): verified=True, 4 findings, 100% citation coverage (9/9 evidence hashes in verified archive), 4 checkable remediations (check_steps + acceptance + owner_role + status open), markdown + HTML rendered, methodology limitations stated, 'What's working' positive framing, JSON serializable, 1 unattributed heartbeat flagged never assigned. Pack-level tamper refused (entry_hash). Incident CONTENT was fixture data — no staging environment exists for this worker; a real-staging-incident rehearsal remains a founder-side step. Live script /tmp/w2_aud01_walk.py A1-A6."
       }
     },
     {
@@ -1309,7 +1309,7 @@
       "details": {
         "criterion": 5,
         "passed": true,
-        "evidence": "Turnaround within the 5-business-day SLA for the automated rehearsal (pipeline completes in seconds; recorded timestamps bound it). Caveat: this proves the tooling path, not a human reviewer's intake-to-delivery cadence \u2014 a real engagement SLA proof needs a founder-run rehearsal."
+        "evidence": "Turnaround within the 5-business-day SLA for the automated rehearsal (pipeline completes in seconds; recorded timestamps bound it). Caveat: this proves the tooling path, not a human reviewer's intake-to-delivery cadence — a real engagement SLA proof needs a founder-run rehearsal."
       }
     },
     {
@@ -1336,7 +1336,7 @@
         "all_boxes_ticked": false,
         "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
         "date": "2026-09-29T23:30:00-05:00",
-        "notes": "Automated walkthrough of the real forensic_audit module (A1-A6 live, all green): real B2-native archive path (keccak-256 chain + Ed25519 via repo crypto), tamper refusal on both paths, full pipeline with 100% evidence citation, checkable remediations, rendered report with stated limits. Checklist boxes NOT ticked because: (a) spec requires founder-conducted \u2014 this was worker-automated; (b) delivery receipt box needs the founder as stand-in signatory \u2014 a worker cannot sign it; (c) CTA clicks are founder-manual (/contact IS routed GET/POST; /products IS routed \u2014 statically verified); (d) 'read copy aloud' is founder-manual (mechanical banned-phrase scan passed: clean). Criterion 1 (playbook at docs/specs/obs-skus/AUD-01-playbook.md) is UNMET \u2014 the file does not exist; criterion 6 (signed delivery receipt) is UNMET \u2014 needs founder. Blocker flagged to parent."
+        "notes": "Automated walkthrough of the real forensic_audit module (A1-A6 live, all green): real B2-native archive path (keccak-256 chain + Ed25519 via repo crypto), tamper refusal on both paths, full pipeline with 100% evidence citation, checkable remediations, rendered report with stated limits. Checklist boxes NOT ticked because: (a) spec requires founder-conducted — this was worker-automated; (b) delivery receipt box needs the founder as stand-in signatory — a worker cannot sign it; (c) CTA clicks are founder-manual (/contact IS routed GET/POST; /products IS routed — statically verified); (d) 'read copy aloud' is founder-manual (mechanical banned-phrase scan passed: clean). Criterion 1 (playbook at docs/specs/obs-skus/AUD-01-playbook.md) is UNMET — the file does not exist; criterion 6 (signed delivery receipt) is UNMET — needs founder. Blocker flagged to parent."
       }
     },
     {
@@ -1349,7 +1349,7 @@
       "details": {
         "passed": true,
         "failed": 0,
-        "evidence": "Full AUD-02 tooling-chain rehearsal (B5's combined walkthrough) on real modules: PHI-bearing records -> redact_record(s) (profile sincor-phi-guardrail): all direct identifiers redacted (NAME/SSN/DOB/PHONE/EMAIL/ADDRESS/MRN/INSURANCE_ID), free-text patterns scrubbed (phone/ssn/email in notes), nested structures scrubbed, biometric fields dropped not tokenized, workforce identifiers preserved (agent_id, city, state); redaction report carries zero original values (12 touches across 2 records). Deterministic exports: export_jsonl_pages twice -> byte-identical (2 pages), export_csv twice -> byte-identical with sorted columns; page hashes unique. Chain of custody: build_custody_manifest + Ed25519 sign -> verify ok via embedded key AND pinned key; wrong-key pinning refused ('pinned key' mismatch); post-sign tamper refused; verify_export_pages ok, tampered page refused; manifest carries HIPAA boundary disclaimer. Setup checklist: sections data-sources/retention/reviewers/verification, pricing '$2,500 one-time / $999/month', not_included explicitly names certification, Legal advice, Business Associate Agreement; disclaimer mentions HIPAA. Forbidden-claim scan over all customer-facing strings (disclaimer, scope, checklist markdown, custody manifest, redaction profile): zero hits for HIPAA/SOC2/certification/compliance-guarantee claims. Combined AUD-01+AUD-02: pack -> audit_pipeline (verified=True) -> redact timeline -> deterministic export -> signed custody manifest pinning the audit head_hash -> re-verify all green. Caveat: this rehearses the guardrails+exports+custody tooling, NOT the spec's engagement flow (control->evidence maps, monthly packs, change watch are not implemented) \u2014 see walkthrough notes. Live script /tmp/w2_aud02_walk.py C1-C6."
+        "evidence": "Full AUD-02 tooling-chain rehearsal (B5's combined walkthrough) on real modules: PHI-bearing records -> redact_record(s) (profile sincor-phi-guardrail): all direct identifiers redacted (NAME/SSN/DOB/PHONE/EMAIL/ADDRESS/MRN/INSURANCE_ID), free-text patterns scrubbed (phone/ssn/email in notes), nested structures scrubbed, biometric fields dropped not tokenized, workforce identifiers preserved (agent_id, city, state); redaction report carries zero original values (12 touches across 2 records). Deterministic exports: export_jsonl_pages twice -> byte-identical (2 pages), export_csv twice -> byte-identical with sorted columns; page hashes unique. Chain of custody: build_custody_manifest + Ed25519 sign -> verify ok via embedded key AND pinned key; wrong-key pinning refused ('pinned key' mismatch); post-sign tamper refused; verify_export_pages ok, tampered page refused; manifest carries HIPAA boundary disclaimer. Setup checklist: sections data-sources/retention/reviewers/verification, pricing '$2,500 one-time / $999/month', not_included explicitly names certification, Legal advice, Business Associate Agreement; disclaimer mentions HIPAA. Forbidden-claim scan over all customer-facing strings (disclaimer, scope, checklist markdown, custody manifest, redaction profile): zero hits for HIPAA/SOC2/certification/compliance-guarantee claims. Combined AUD-01+AUD-02: pack -> audit_pipeline (verified=True) -> redact timeline -> deterministic export -> signed custody manifest pinning the audit head_hash -> re-verify all green. Caveat: this rehearses the guardrails+exports+custody tooling, NOT the spec's engagement flow (control->evidence maps, monthly packs, change watch are not implemented) — see walkthrough notes. Live script /tmp/w2_aud02_walk.py C1-C6."
       }
     },
     {
@@ -1363,7 +1363,364 @@
         "all_boxes_ticked": false,
         "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
         "date": "2026-09-29T23:30:00-05:00",
-        "notes": "Automated walkthrough of the real compliance_pack module (C1-C6 live, all green): PHI redaction profile, deterministic paginated exports, Ed25519 chain-of-custody, setup checklist, honest-boundary scans, and the combined AUD-01+AUD-02 custody chain. Checklist boxes NOT ticked because: (a) spec requires founder-conducted \u2014 this was worker-automated; (b) control-map walk (10+ controls traced to platform records) not exercisable \u2014 no control->evidence map tooling exists in the built module; (c) monthly-pack delta box not exercisable \u2014 no pack assembly tooling exists; (d) change-watch box not exercisable \u2014 not implemented; (e) delivery receipt box needs founder as stand-in signatory; (f) CTA clicks founder-manual (/contact IS routed GET/POST \u2014 statically verified); (g) 'read copy aloud' founder-manual (mechanical banned-phrase scan passed: clean). Acceptance criteria 1-7 AS WRITTEN are unmet by the built tooling (no playbook file, no control-map/monthly-pack/change-watch tooling, no founder-signed receipt). The built module is real working guardrails+exports+custody software \u2014 the gap is spec-vs-build scope, flagged to parent: either build the engagement tooling or revise the spec criteria."
+        "notes": "Automated walkthrough of the real compliance_pack module (C1-C6 live, all green): PHI redaction profile, deterministic paginated exports, Ed25519 chain-of-custody, setup checklist, honest-boundary scans, and the combined AUD-01+AUD-02 custody chain. Checklist boxes NOT ticked because: (a) spec requires founder-conducted — this was worker-automated; (b) control-map walk (10+ controls traced to platform records) not exercisable — no control->evidence map tooling exists in the built module; (c) monthly-pack delta box not exercisable — no pack assembly tooling exists; (d) change-watch box not exercisable — not implemented; (e) delivery receipt box needs founder as stand-in signatory; (f) CTA clicks founder-manual (/contact IS routed GET/POST — statically verified); (g) 'read copy aloud' founder-manual (mechanical banned-phrase scan passed: clean). Acceptance criteria 1-7 AS WRITTEN are unmet by the built tooling (no playbook file, no control-map/monthly-pack/change-watch tooling, no founder-signed receipt). The built module is real working guardrails+exports+custody software — the gap is spec-vs-build scope, flagged to parent: either build the engagement tooling or revise the spec criteria."
+      }
+    },
+    {
+      "entry_id": "ev_ca355ae68495",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3634617,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault state -> plan_rebalance invariants on live numbers",
+        "result": "vault share price $1.113271/share (USDC 6dp), totalAssets $415,344,699, 3 allocations, blended APR 2.4935%, max risk 0.15",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_287a01f2e4b9",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3698535,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM/USDC treasury balances -> submit/match/settle/claim flow with 8bps fee conservation against live balance snapshots",
+        "result": "live treasury AXM 978,745,764 (USDC leg bounded by live vault liquidity; treasury USDC wallet is ~empty); matched 100.00 USDC <-> 100.0000 AXM; fees {'USDC': 80000, 'AXM': 80000000000000000} at 8bps; conservation exact",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_354f46a89ebf",
+      "sku": "SINCOR-DEFI-P04-MEV",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.376491,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "real USDC Transfer logs from the last 50 forked blocks -> MEVDetector flow accounting consistency",
+        "result": "5244 USDC transfers over 50 blocks; busiest block 51970215 had 258 transfers; detector ran clean, 0 sandwich flags, flow accounting exact",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_a05f5c13ddb8",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3827662,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance -> underwrite/publish/premium reserve adequacy at the pinned block",
+        "result": "live protocol reserve $415,344,699.47 (treasury USDC wallet holds 733 wei); score 0.80 -> tier 2; 30d premium on 1% cover = 13655.17 USDC + treasury fee 34.1379; reserve adequate",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_ad2bf440a5a2",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3871431,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance as capital cap -> bridge quote ranking never routes more than available",
+        "result": "live protocol liquidity 415,344,699.47 USDC; ranked 2 quotes on 50.00 USDC; best-first order, no value created, within live capital",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_29752e58913d",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3918045,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault share price -> RWA NAV oracle ingests the forked reference price",
+        "result": "live vault price $1.113271/share; oracle NAV 111c tracks the forked reference with zero deviation",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_db8aa2e25c89",
+      "sku": "SINCOR-DEFI-P09-GOV",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.3954036,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM supply + treasury voting weight -> governance quorum math on live token state",
+        "result": "live AXM supply 1,000,000,000; treasury holds 978,745,764 (97.87%); quorum 4% -> met (majority for)",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_426a6d8e67a7",
+      "sku": "SINCOR-DEFI-P12-TWAMM",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4043972,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "real inter-block times from the last 20 forked blocks -> TWAMM slice schedule on live chain timing",
+        "result": "20 live blocks: avg 2.0s spacing; scheduled $10,000.00 into 8 slices; exact-sum and beats-dump hold on live timing",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_80cd38582c82",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4073026,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault state -> accrue() simple-interest-exact on the live-implied rate; live venue gate accepts only the eligible id",
+        "result": "live share price $1.113271; implied rate 11.3271%/yr; accrue monotonic and simple-interest-exact; live-eligible venue passes live gate, unpinned venue rejected",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_391a5102fbf3",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.411891,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury USDC balance as capital -> DEX-agg split optimizer plan verified within live capital",
+        "result": "live capital $415,344,699.47; live-implied APR 11.3271%; plan weights {'morpho_usdc_vault': 0.1, 'CASH_USDC': 0.9}; verify_plan passed, routed $41,534,469.95 <= live capital",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_c2fbc3f0e602",
+      "sku": "SINCOR-DEFI-P18-STRUCTURED",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4169118,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho share price as the underlier -> structured-note payoff bounds on the live reference return",
+        "result": "live underlier return 1132bps; payoff 1056600.00 USDC on 1000000 deposit; floor 1000000.00 held, cap not binding",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_d3f04518d823",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4222493,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live treasury code classification -> AML screen pipeline on the live counterparty profile",
+        "result": "live getCode(treasury) = 23 bytes -> contract; AML screen on the live classification: PASS (reference config)",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_ffc35113cf84",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4274857,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM/USDC/SINC treasury balances -> the 30% per-venue hard cap fires on the live concentrated composition",
+        "result": "live units AXM 978,745,764 / USDC 0.0007 / SINC 99,731,069; live composition -> {'axm_live': 9076, 'usdc_live': 0, 'sinc_live': 924}; RiskOfficer correctly rejected it: 'axm_live at 9076 bps exceeds 30% per-venue cap'",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_dc10717015c3",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.43018,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live Morpho vault TWAP inputs -> stable-yield optimizer quote plan",
+        "result": "live vault $415,344,699 @ $1.113271/share; capital $415,344,699.47; plan {'morpho_usdc_vault': 0.1, 'CASH_USDC': 0.9} verified",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_c1d155a78be1",
+      "sku": "SINCOR-DEFI-P24-SOCIALFI",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.4346628,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live AXM treasury balance as fee base -> P24 fee-split conservation at live scale",
+        "result": "live AXM 978,745,764; fee base 978.745764 AXM -> creator 483500407505578847800 / platform 483500407505578847800 / treasury 11744949170176004400; conservation exact",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_0b982f3a6554",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.443944,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live balances hash as the signal feed -> portfolio allocator on live chain time",
+        "result": "live feed hash 164014002a59; 3 eligible protocols; blended risk 0.277 <= 0.28; weights sum 1.0 at live block time",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_abf2c49e3440",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "fork_sim",
+      "timestamp": 1790729888.449451,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-25-fork-sim-harness",
+      "details": {
+        "command": "SINCOR_FORK_RPC_URL=<redacted> PYTHONPATH=src:. python fork_sim/run_fork_sims.py --record",
+        "suite": "fork_sim/run_fork_sims.py",
+        "scope": "live chain head -> DeFi-OS telemetry recorded against live block time",
+        "result": "live block 51970261 ts 1790729869; AUM $415,344,699; fee+roi observations recorded at live chain time; realized-data checks pass",
+        "rpc": "https://mainnet.base.org",
+        "pinned_block": 51970261,
+        "pinned_block_ts": 1790729869,
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
       }
     }
   ]
