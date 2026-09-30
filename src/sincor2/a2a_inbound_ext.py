@@ -1,4 +1,6 @@
-"""A2A inbound routes + agent operations. Imported by a2a_inbound.register."""
+"""A2A inbound routes + agent operations. Imported by a2a_inbound.register.
+
+``mount()`` is idempotent per Flask app: a second call is a safe no-op."""
 from __future__ import annotations
 
 import logging
@@ -234,7 +236,17 @@ def list_agents(live_only: bool = False) -> List[Dict[str, Any]]:
         return sorted(out, key=lambda a: a.get("registered_at") or 0, reverse=True)
 
 
-def mount(app: Flask) -> None:
+def mount(app: Flask) -> bool:
+    """Register the ``a2a_inbound`` blueprint — idempotent per app.
+
+    A second call on the same *app* is a safe no-op (returns False)
+    instead of raising Flask's duplicate-blueprint error; the platform
+    agent seed and probation-task seeding underneath are themselves
+    idempotent. Returns True when this call mounted the routes.
+    """
+    if "a2a_inbound" in (getattr(app, "blueprints", {}) or {}):
+        logger.info("[A2A] a2a_inbound already mounted; skipping re-registration")
+        return False
     from flask import Blueprint
     from sincor2.a2a_inbound_market import attach_market_routes, seed_probation_tasks
 
@@ -356,3 +368,4 @@ def mount(app: Flask) -> None:
     except Exception as err:
         logger.warning("[A2A] Probation seed skipped: %s", err)
     logger.info("[A2A] Inbound register + market + heartbeat mounted")
+    return True
