@@ -11,8 +11,12 @@ Covers:
 """
 
 import json
+import time
+import uuid
 
 import pytest
+from eth_account import Account
+from eth_account.messages import encode_defunct
 
 import sincor2.a2a_integration as ai
 from sincor2.payment_verifier import PaymentVerifier as BoundVerifier
@@ -156,6 +160,42 @@ def test_reconcile_rpc_outage_fails_closed(monkeypatch):
 
 # ── end-to-end: message/send records the chain amount ────────────────────────
 
+# ── w06 create-auth compat ─────────────────────────────────────────────────
+# The integrated tree requires strict EIP-191 create-auth on message/send:
+# unsigned sends are 401'd before payment-reconciliation runs. The signing
+# below is the legitimate forward-compatible fix (same canonical message as
+# w06's _auth_create_message); the strict auth gate itself is untouched.
+# A fresh key per send keeps quota/reputation state isolated across tests.
+# On branches without the auth gate these fields are ignored.
+
+_AUTH_CREATE_DOMAIN = "SINCOR-A2A task-create"
+
+
+def _auth_create_message(agent_label: str, skill_id: str, timestamp: int,
+                         nonce: str) -> str:
+    return (
+        f"{_AUTH_CREATE_DOMAIN}\n"
+        f"agent_id:{agent_label}\n"
+        f"skill_id:{skill_id}\n"
+        f"timestamp:{int(timestamp)}\n"
+        f"nonce:{nonce}"
+    )
+
+
+def _signed_auth_params(caller_id: str, skill_id: str) -> dict:
+    acct = Account.create()
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    message = _auth_create_message(caller_id, skill_id, ts, nonce)
+    sig = "0x" + acct.sign_message(encode_defunct(text=message)).signature.hex()
+    return {
+        "ownerWallet": acct.address,
+        "authSignature": sig,
+        "authTimestamp": ts,
+        "authNonce": nonce,
+    }
+
+
 def _send(client, monkeypatch, claimed_wei, chain_wei, tx_hash="0x" + "a1" * 32,
           skill_id="compliance-sbom", caller_id="g25-amount-test"):
     """POST message/send with a patched verifier; return (payload, task_id).
@@ -195,6 +235,7 @@ def _send(client, monkeypatch, claimed_wei, chain_wei, tx_hash="0x" + "a1" * 32,
                 "axmPaidWei": str(claimed_wei),
                 "txHash": tx_hash,
                 "message": {"parts": [{"text": "Run compliance scan"}]},
+                **_signed_auth_params(caller_id, skill_id),
             },
         },
     )
