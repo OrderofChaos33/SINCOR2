@@ -500,11 +500,19 @@ class BiddingEngine:
                 profiles_from_dicts,
                 task_from_dict,
             )
-            from marketplace.contract_net.types import ContractNetConfig, clamp_invite_k
+            from marketplace.contract_net.types import (
+                BASE_SEPOLIA_CHAIN_ID,
+                ContractNetConfig,
+                clamp_invite_k,
+            )
 
             k = clamp_invite_k(int(invite_k))
             eps = min(0.15, max(0.10, float(epsilon)))
-            engine = ContractNetEngine(ContractNetConfig(invite_k=k, epsilon=eps))
+            engine = ContractNetEngine(
+                ContractNetConfig(
+                    invite_k=k, epsilon=eps, chain_id=BASE_SEPOLIA_CHAIN_ID
+                )
+            )
             spec = task_from_dict(task)
             roster = profiles_from_dicts(agents)
             award = engine.run(spec, roster, seed=seed, force_junior=force_junior)

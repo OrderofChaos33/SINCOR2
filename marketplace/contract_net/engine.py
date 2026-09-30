@@ -33,6 +33,7 @@ from .types import (
     SealedBid,
     SigType,
     TaskSpec,
+    BASE_SEPOLIA_CHAIN_ID,
 )
 from .vickrey import clear_vickrey
 
@@ -63,7 +64,9 @@ class ContractNetEngine:
         memory_router: Optional[Any] = None,
         compliance_filter: Optional[ComplianceAttestationFilter] = None,
     ) -> None:
-        self.config = config or ContractNetConfig()
+        # W-3: chain_id is explicit per-deployment config; the default engine
+        # targets Base Sepolia (the contract deployment chain).
+        self.config = config or ContractNetConfig(chain_id=BASE_SEPOLIA_CHAIN_ID)
         self._history: List[AuctionRecord] = []
         self._nonces: Dict[str, int] = {}
         self.memory_router = memory_router

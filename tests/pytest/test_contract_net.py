@@ -70,7 +70,7 @@ def test_embed_disjoint_tokens_lower_cosine():
 def test_invite_k_is_between_three_and_five():
     roster = demo_roster()
     task = demo_tasks()[0]
-    config = ContractNetConfig(invite_k=4)
+    config = ContractNetConfig(chain_id=84532, invite_k=4)
     result = filter_swarm(task, roster, config, rng=random.Random(1), force_junior=False)
     assert 3 <= len(result.invited) <= 5
     assert result.tokens_saved == (len(roster) - len(result.invited)) * config.eval_tokens_per_bid
@@ -79,13 +79,13 @@ def test_invite_k_is_between_three_and_five():
 
 def test_invite_k_rejects_out_of_band():
     with pytest.raises(ValueError):
-        ContractNetConfig(invite_k=2)
+        ContractNetConfig(chain_id=84532, invite_k=2)
     with pytest.raises(ValueError):
-        ContractNetConfig(epsilon=0.2)
+        ContractNetConfig(chain_id=84532, epsilon=0.2)
 
 
 def test_vickrey_lowest_wins_paid_second():
-    engine = ContractNetEngine(ContractNetConfig(invite_k=4, epsilon=0.12, allow_hmac_bids=True))
+    engine = ContractNetEngine(ContractNetConfig(chain_id=84532, invite_k=4, epsilon=0.12, allow_hmac_bids=True))
     roster = demo_roster()
     task = demo_tasks()[1]  # develop / test / deploy
     award = engine.run(task, roster, seed=11, force_junior=False)
@@ -102,7 +102,7 @@ def test_vickrey_lowest_wins_paid_second():
 
 
 def test_hmac_signature_roundtrip():
-    config = ContractNetConfig()
+    config = ContractNetConfig(chain_id=84532)
     digest = typed_data_digest(
         config,
         auction_id="0x" + "ab" * 32,
@@ -120,7 +120,7 @@ def test_hmac_signature_roundtrip():
 
 
 def test_bad_signature_is_rejected():
-    engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
+    engine = ContractNetEngine(ContractNetConfig(chain_id=84532, allow_hmac_bids=True))
     roster = demo_roster()
     task = demo_tasks()[0]
     award = engine.run(task, roster, seed=3, force_junior=False)
@@ -134,7 +134,7 @@ def test_bad_signature_is_rejected():
 
 
 def test_over_max_price_rejected():
-    engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
+    engine = ContractNetEngine(ContractNetConfig(chain_id=84532, allow_hmac_bids=True))
     roster = demo_roster()
     task = TaskSpec(
         task_id="tiny-budget",
@@ -187,7 +187,7 @@ def test_uninvited_bid_rejected():
 def test_junior_reserved_pool_excludes_incumbents():
     roster = demo_roster()
     task = demo_tasks()[0]
-    engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
+    engine = ContractNetEngine(ContractNetConfig(chain_id=84532, allow_hmac_bids=True))
     award = engine.run(task, roster, seed=0, force_junior=True)
     assert award.junior_reserved is True
     assert all(invite.junior for invite in award.invites)
@@ -201,7 +201,7 @@ def test_junior_fallback_when_no_juniors():
     result = filter_swarm(
         task,
         incumbents,
-        ContractNetConfig(),
+        ContractNetConfig(chain_id=84532),
         rng=random.Random(0),
         force_junior=True,
     )
@@ -211,7 +211,7 @@ def test_junior_fallback_when_no_juniors():
 
 
 def test_epsilon_band_over_many_auctions():
-    engine = ContractNetEngine(ContractNetConfig(epsilon=0.12, invite_k=4, allow_hmac_bids=True))
+    engine = ContractNetEngine(ContractNetConfig(chain_id=84532, epsilon=0.12, invite_k=4, allow_hmac_bids=True))
     roster = demo_roster()
     tasks = demo_tasks()
     awards = engine.run_many(tasks, roster, rounds=80, seed=21)
@@ -227,8 +227,8 @@ def test_shading_cannot_steal_vickrey_win():
     """Bidding above true min cannot improve the payoff versus truthful bidding."""
     roster = demo_roster()
     task = demo_tasks()[4]
-    honest = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
-    shaded = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
+    honest = ContractNetEngine(ContractNetConfig(chain_id=84532, allow_hmac_bids=True))
+    shaded = ContractNetEngine(ContractNetConfig(chain_id=84532, allow_hmac_bids=True))
     honest_award = honest.run(task, roster, seed=5, force_junior=False)
     winner = honest_award.winner_id
     assert winner
@@ -302,7 +302,7 @@ def test_sort_valid_bids_tie_breaks_on_agent_id():
 def test_research_task_prefers_research_agents():
     roster = demo_roster()
     task = demo_tasks()[0]
-    result = filter_swarm(task, roster, ContractNetConfig(), rng=random.Random(9), force_junior=False)
+    result = filter_swarm(task, roster, ContractNetConfig(chain_id=84532), rng=random.Random(9), force_junior=False)
     invited_ids = {row.agent_id for row in result.invited}
     assert invited_ids & {"atlas-scout", "helix-synth", "spark-scout", "wick-analyst"}
     assert "moss-caretaker" not in invited_ids
