@@ -12,9 +12,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from . import policy
+from . import screener as screener_module
 from .factory import CreatorToken, CreatorTokenFactory
 from .live_block import guard_live
+from .screener import ContentScreener, ScreenerDenied
 
 
 @dataclass
@@ -40,10 +41,24 @@ class RejectionLog:
 
 
 class OnboardingAgent:
-    """Guides creator registration; screens metadata before issuance."""
+    """Guides creator registration; screens metadata before issuance.
 
-    def __init__(self, factory: CreatorTokenFactory | None = None) -> None:
+    The content screener is pluggable (see :mod:`sincor2.defi.p24.screener`).
+    The default is the standing deny-list screen; pass another
+    ``ContentScreener`` (or set ``P24_SCREENER=deferred`` process-wide) to
+    change the posture. Enforcement stays here — callers cannot bypass it.
+    """
+
+    def __init__(
+        self,
+        factory: CreatorTokenFactory | None = None,
+        screener: ContentScreener | None = None,
+    ) -> None:
         self.factory = factory or CreatorTokenFactory()
+        self.screener = (
+            screener if screener is not None
+            else screener_module.default_onboarding_screener()
+        )
         self.registrations: Dict[str, Registration] = {}
         self.rejections: List[RejectionLog] = []
 
@@ -62,8 +77,9 @@ class OnboardingAgent:
         if creator_id in self.registrations:
             raise ValueError(f"creator {creator_id!r} already registered")
         try:
-            version = policy.require_clean(name, symbol, description, bio)
-        except policy.PolicyViolation as exc:
+            version = screener_module.require_screened(
+                self.screener, creator_id, name, symbol, description, bio)
+        except ScreenerDenied as exc:
             self.rejections.append(RejectionLog(
                 creator_id=creator_id,
                 field=exc.field,
