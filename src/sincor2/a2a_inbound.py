@@ -1,4 +1,5 @@
-"""Inbound A2A engine. Agents register, heartbeat, bid, prove; AXM settles on Base."""
+"""Inbound A2A engine. Agents register, heartbeat, bid, prove; AXM-denominated
+accounting, with user-initiated transfers verified on Base."""
 from __future__ import annotations
 
 import hashlib
