@@ -284,6 +284,47 @@ def _http_error(message: str, status: int, **extra: Any):
     return jsonify(body), status
 
 
+class RegistrationAuthError(Exception):
+    """Re-registration without valid proof of control (maps to HTTP 403)."""
+
+
+# Re-registration proof (G2.2): the owner of an existing agent record proves
+# control of the registered wallet with an EIP-191 signature over the exact
+# new record contents plus a freshness timestamp. Binding the full record
+# (not just the agent_id) keeps the signature from becoming a bearer token
+# that could authorize a different wallet/callback swap.
+REREGISTRATION_DOMAIN = "SINCOR-A2A-REREGISTER-v1"
+REGISTRATION_PROOF_FRESHNESS_MS = 5 * 60 * 1000
+
+
+def _reregistration_message_from_parsed(parsed: Dict[str, Any], ts_ms: int) -> str:
+    skills = json.dumps(parsed.get("skills") or [], sort_keys=True,
+                        separators=(",", ":"))
+    return "\n".join([
+        REREGISTRATION_DOMAIN,
+        "agent_id:%s" % parsed["agent_id"],
+        "name:%s" % parsed.get("name", ""),
+        "description:%s" % parsed.get("description", ""),
+        "version:%s" % parsed.get("version", ""),
+        "capability_tags:%s" % ",".join(parsed.get("capability_tags") or []),
+        "skills:%s" % skills,
+        "rpc_callback:%s" % parsed.get("rpc_callback", ""),
+        "wallet:%s" % (parsed.get("wallet") or "").lower(),
+        "chain_id:%s" % parsed.get("chain_id", ""),
+        "sinc_stake:%s" % parsed.get("sinc_stake", 0),
+        "ts:%d" % int(ts_ms),
+    ])
+
+
+def build_reregistration_message(body: Dict[str, Any], ts_ms: int) -> str:
+    """Canonical challenge message a client signs to authorize re-registering
+    an existing agent record. Normalizes exactly like the server (same
+    function the write path uses), so both sides must produce byte-identical
+    text. Raises ValueError on invalid registration bodies."""
+    return _reregistration_message_from_parsed(_normalize_registration(body),
+                                               ts_ms)
+
+
 def _safe_url(value: Any) -> str:
     url = str(value or "").strip()
     parsed = urlparse(url)
