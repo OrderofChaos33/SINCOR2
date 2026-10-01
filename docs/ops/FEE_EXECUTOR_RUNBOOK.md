@@ -61,6 +61,11 @@ check — SINC liquidity is thin and the rogue V2 pool
 If the Universal Router build changes upstream, re-run this step before
 re-arming.
 
+See `docs/ops/FEE_EXECUTOR_FORKSIM_READINESS.md` for the Wave 53 fork-sim
+record: executor defects found and fixed (EIP-55 checksums, single-struct V4
+params, Permit2 internal allowance, no-SWEEP), the passing WETH/USDC control
+replay, and the honest `NO_POOL` blocker for AXM routes.
+
 ## 3. Dust-amount live test
 
 - Set `min_swap_wei` low, `slippage_bps` to 50 (0.5 %), `target="USDC"`.
