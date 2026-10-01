@@ -1,5 +1,5 @@
 """
-Launch partner / KOL outreach CRM for SINCOR July 7 launch.
+Launch partner / KOL outreach CRM for SINCOR November 9 launch.
 
 Targets live in config/launch_partners.yaml.
 State persists in data/launch_partners.db.
@@ -39,7 +39,7 @@ DM_TEMPLATE = """Hi {name} — I'm building SINCOR: autonomous AI agents running
 Launch: {launch_date} · Live demo: {pitch_deck}
 
 Proof in 30 seconds:
-• SINC {sinc} — CertiK {certik}, Sourcify verified
+• SINC {sinc} — Sourcify verified
 • Official curve: {curve}
 
 {angle}
@@ -59,7 +59,7 @@ Still happy to set up a 15-min demo or send a curator pack (thread draft + proof
 
 {contact_url}"""
 
-EMAIL_SUBJECT = "SINCOR July 7 launch — Base AI agent swarm (verified, not vapor)"
+EMAIL_SUBJECT = "SINCOR November 9 launch — Base AI agent swarm (verified, not vapor)"
 
 
 def _config_path() -> Path:
@@ -186,12 +186,11 @@ def render_message(partner: dict[str, Any], phase: str = "intro") -> str:
     proof = cfg.get("proof", {})
     ctx = {
         "name": partner.get("name", "there"),
-        "launch_date": cfg.get("launch_date", "2026-07-07"),
+        "launch_date": cfg.get("launch_date", "2026-11-09"),
         "pitch_deck": cfg.get("pitch_deck", "https://getsincor.com/pitch"),
         "site": cfg.get("site", "https://getsincor.com"),
         "sinc": proof.get("sinc", ""),
         "curve": proof.get("curve", ""),
-        "certik": proof.get("certik", "97/100"),
         "angle": partner.get("angle", ""),
         "ask": partner.get("ask", ""),
         "contact_url": partner.get("contact_url", cfg.get("site", "")),

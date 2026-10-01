@@ -24,12 +24,16 @@ from marketplace.contract_net.eip712 import (
     verify_hmac,
 )
 from marketplace.contract_net.keccak import keccak256
-from marketplace.contract_net.types import ContractNetConfig, SigType
+from marketplace.contract_net.types import (
+    BASE_SEPOLIA_CHAIN_ID,
+    ContractNetConfig,
+    SigType,
+)
 
 TEST_PRIVKEY = "0x" + "7f" * 32
 TEST_ADDRESS = Account.from_key(TEST_PRIVKEY).address
 
-CONFIG = ContractNetConfig()
+CONFIG = ContractNetConfig(chain_id=BASE_SEPOLIA_CHAIN_ID)
 
 VECTORS = [
     dict(

@@ -5,6 +5,7 @@ import os
 
 import pytest
 from eth_abi import decode as abi_decode
+from web3 import Web3
 
 from sincor2.onchain.fee_conversion_executor import (
     ACT_SETTLE_ALL,
@@ -25,6 +26,9 @@ from sincor2.onchain.fee_conversion_executor import (
     STATUS_FAILED,
     STATUS_PENDING,
     ZERO_HOOKS,
+    PERMIT2,
+    SEL_P2_APPROVE,
+    UNIVERSAL_ROUTER_V4,
     record_pending_conversion,
     zero_for_one,
 )
@@ -48,7 +52,7 @@ def _config(**kw):
         ledger_path=os.path.join(str(kw.pop("tmp_path", "/tmp")),
                                  "ledger.json"),
         pool_keys={("AXM", "USDC"): _pool()},
-        armed=True,
+        armed=False,  # tests never arm; live broadcast is out of scope
     )
     for k, v in kw.items():
         setattr(cfg, k, v)
@@ -75,7 +79,9 @@ def test_zero_for_one():
 
 def test_build_approve_tx_encoding():
     tx = FeeConversionExecutor.build_approve_tx("AXM", FORWARDER, 12345)
-    assert tx["to"] == AXM
+    # EIP-55 normalized for web3.py v8; same address, canonical casing.
+    assert tx["to"].lower() == AXM.lower()
+    assert tx["to"] == Web3.to_checksum_address(AXM)
     assert tx["value"] == 0 and tx["chainId"] == 8453
     data = bytes.fromhex(tx["data"][2:])
     assert data[:4] == SEL_APPROVE
@@ -100,24 +106,30 @@ def test_build_swap_tx_encoding():
     ex = FeeConversionExecutor(cfg)
     tx = ex.build_swap_tx("AXM", "USDC", 10**18, 900_000, FORWARDER,
                           deadline=1_800_000_000)
-    assert tx["to"] == cfg.universal_router
+    # EIP-55 normalized for web3.py v8; same address, canonical casing.
+    assert tx["to"].lower() == cfg.universal_router.lower()
+    assert tx["to"] == Web3.to_checksum_address(cfg.universal_router)
     data = bytes.fromhex(tx["data"][2:])
     assert data[:4] == SEL_UR_EXECUTE
     commands, inputs, deadline = abi_decode(
         ["bytes", "bytes[]", "uint256"], data[4:])
-    assert commands == bytes([CMD_V4_SWAP, CMD_SWEEP])
+    assert commands == bytes([CMD_V4_SWAP])  # no SWEEP: TAKE_ALL pays msgSender
     assert deadline == 1_800_000_000
-    assert len(inputs) == 2
+    assert len(inputs) == 1
 
     # V4_SWAP input: (actions, params)
     actions, params = abi_decode(["bytes", "bytes[]"], inputs[0])
     assert actions == bytes([ACT_SWAP_EXACT_IN_SINGLE, ACT_SETTLE_ALL,
                              ACT_TAKE_ALL])
     assert len(params) == 3
-    pool_tup, zfo, amount_in, amount_out_min, hook_data = abi_decode(
-        ["(address,address,uint24,int24,address)", "bool", "uint128",
-         "uint128", "bytes"],
+    # params[0] is a SINGLE abi-encoded ExactInputSingleParams struct
+    # (v4-periphery CalldataDecoder follows the first word as an offset).
+    (pool_tup, zfo, amount_in, amount_out_min, min_hop_price,
+     hook_data), = abi_decode(
+        ["((address,address,uint24,int24,address),bool,uint128,uint128,"
+         "uint256,bytes)"],
         params[0])
+    assert min_hop_price == 0  # per-hop price guard disabled
     assert tuple(x.lower() if isinstance(x, str) else x for x in pool_tup) == \
         (AXM.lower(), USDC.lower(), 3000, 60, ZERO_HOOKS)
     assert zfo is True            # AXM (0x4c..) < USDC (0x83..)
@@ -133,13 +145,9 @@ def test_build_swap_tx_encoding():
     take_currency, take_min = abi_decode(["address", "uint256"], params[2])
     assert take_currency.lower() == USDC.lower()
     assert take_min == 900_000
-
-    # SWEEP input: (token, recipient, amount)
-    token, recipient, amount = abi_decode(
-        ["address", "address", "uint256"], inputs[1])
-    assert token.lower() == USDC.lower()
-    assert recipient.lower() == FORWARDER.lower()
-    assert amount == 900_000
+    # No SWEEP: the deployed V4Router's TAKE_ALL does
+    # _take(currency, msgSender(), amount), so output lands directly on the
+    # forwarder (the execute() sender). A SWEEP would revert.
 
 
 def test_build_swap_tx_rejects_unknown_pool():
@@ -192,17 +200,58 @@ def test_record_pending_conversion_idempotent(tmp_path):
     assert a["id"].startswith("feeconv-AXM-")
 
 
+# --- Permit2 internal allowance ------------------------------------------------
+
+def test_build_permit2_approve_tx_encoding():
+    tx = FeeConversionExecutor.build_permit2_approve_tx(
+        "AXM", UNIVERSAL_ROUTER_V4, 10**18, 1_800_000_000)
+    assert tx["to"] == Web3.to_checksum_address(PERMIT2)
+    assert tx["value"] == 0 and tx["chainId"] == 8453
+    data = bytes.fromhex(tx["data"][2:])
+    assert data[:4] == SEL_P2_APPROVE
+    token, spender, amount, expiration = abi_decode(
+        # wire-identical widths; narrow uints trip a strict-decoder quirk
+        ["address", "address", "uint256", "uint256"], data[4:])
+    assert token.lower() == AXM.lower()
+    assert spender.lower() == UNIVERSAL_ROUTER_V4.lower()
+    assert amount == 10**18
+    assert expiration == 1_800_000_000
+
+
+def test_permit2_allowance_reads_amount_word(tmp_path):
+    # Permit2.allowance returns (uint160 amount, uint48 expiration, uint48 nonce)
+    cfg = _config(tmp_path=tmp_path)
+    ex = _StubExecutor(cfg)
+
+    calls = {}
+
+    def fake_eth_call(to, data, from_addr=None):
+        calls["to"] = to
+        assert data[:4] == bytes.fromhex("927da105")
+        return (7_000).to_bytes(32, "big") + (9_999).to_bytes(32, "big") \
+            + (3).to_bytes(32, "big")
+
+    ex._eth_call = fake_eth_call
+    # call the REAL implementation (the stub overrides permit2_allowance)
+    assert FeeConversionExecutor.permit2_allowance(
+        ex, "AXM", FORWARDER, UNIVERSAL_ROUTER_V4) == 7_000
+    assert calls["to"].lower() == \
+        Web3.to_checksum_address(
+            "0x000000000022D473030F116dDEE9F6B43aC78BA3").lower()
+
+
 # --- Executor: plan -----------------------------------------------------------
 
 class _StubExecutor(FeeConversionExecutor):
     """Executor with RPC stubbed out."""
 
     def __init__(self, config, quote_out=900_000, allowance_wei=0,
-                 balance_wei=0):
+                 balance_wei=0, p2_allowance_wei=0):
         super().__init__(config)
         self._quote_out = quote_out
         self._allowance = allowance_wei
         self._balance = balance_wei
+        self._p2_allowance = p2_allowance_wei
 
     def quote(self, token_in, token_out, amount_in_wei):
         return {"token_in": token_in, "token_out": token_out,
@@ -214,6 +263,9 @@ class _StubExecutor(FeeConversionExecutor):
 
     def allowance(self, token, owner, spender):
         return self._allowance
+
+    def permit2_allowance(self, token, owner, spender):
+        return self._p2_allowance
 
     def balance_of(self, token, owner):
         return self._balance
@@ -228,7 +280,8 @@ def test_plan_builds_approve_swap_forward(tmp_path):
     ob = ex.ledger.record("ob-plan", "AXM", 10**18)
     plan = ex.plan("ob-plan")
     kinds = [t["kind"] for t in plan["txs"]]
-    assert kinds == ["approve_permit2", "swap", "forward_to_treasury"]
+    assert kinds == ["approve_permit2", "permit2_approve", "swap",
+                     "forward_to_treasury"]
     assert plan["quote"]["token_out"] == "USDC"
     assert ex.ledger.get("ob-plan")["status"] == "quoted"
 
@@ -238,6 +291,17 @@ def test_plan_skips_approve_when_allowance_covers(tmp_path):
     ex = _StubExecutor(cfg, allowance_wei=10**30)
     ex.ledger.record("ob-noapprove", "AXM", 10**18)
     plan = ex.plan("ob-noapprove")
+    # ERC-20 approval covered, but the Permit2-internal allowance is still
+    # missing -> only the permit2_approve step remains.
+    assert [t["kind"] for t in plan["txs"]] == ["permit2_approve", "swap",
+                                               "forward_to_treasury"]
+
+
+def test_plan_skips_both_approvals_when_covered(tmp_path):
+    cfg = _config(tmp_path=tmp_path)
+    ex = _StubExecutor(cfg, allowance_wei=10**30, p2_allowance_wei=10**30)
+    ex.ledger.record("ob-noapprove2", "AXM", 10**18)
+    plan = ex.plan("ob-noapprove2")
     assert [t["kind"] for t in plan["txs"]] == ["swap", "forward_to_treasury"]
 
 
@@ -279,7 +343,9 @@ def test_execute_plan_dry_run_broadcasts_nothing(tmp_path):
 
 
 def test_execute_plan_live_happy_path(tmp_path):
-    ex = _harness(tmp_path)
+    # armed=True here is test-only: _config uses rpc_url="https://example.invalid"
+    # and fake_sign never broadcasts. Exercises the live-path logic with mocks.
+    ex = _harness(tmp_path, armed=True)
     ex.ledger.record("ob-live", "AXM", 10**18)
     plan = ex.plan("ob-live")
     seen = []
@@ -291,11 +357,13 @@ def test_execute_plan_live_happy_path(tmp_path):
     out = ex.execute_plan(plan, fake_sign, lambda h: {"status": 1})
     assert out["status"] == STATUS_EXECUTED
     kinds = [t["kind"] for t in ex.ledger.get("ob-live")["txs"]]
-    assert kinds == ["approve_permit2", "swap", "forward_to_treasury"]
+    assert kinds == ["approve_permit2", "permit2_approve", "swap",
+                     "forward_to_treasury"]
     fwd = [t for t in ex.ledger.get("ob-live")["txs"]
            if t["kind"] == "forward_to_treasury"][0]
     assert fwd["amount_wei"] == "881000"  # verified post-swap balance
-    assert seen == ["approve_permit2", "swap", "forward_to_treasury"]
+    assert seen == ["approve_permit2", "permit2_approve", "swap",
+                    "forward_to_treasury"]
 
 
 def test_execute_plan_refuses_when_disarmed(tmp_path):
@@ -307,7 +375,8 @@ def test_execute_plan_refuses_when_disarmed(tmp_path):
 
 
 def test_execute_plan_marks_failed_on_revert(tmp_path):
-    ex = _harness(tmp_path)
+    # armed=True here is test-only (see test_execute_plan_live_happy_path).
+    ex = _harness(tmp_path, armed=True)
     ex.ledger.record("ob-revert", "AXM", 10**18)
     plan = ex.plan("ob-revert")
 
@@ -322,7 +391,8 @@ def test_execute_plan_marks_failed_on_revert(tmp_path):
 
 
 def test_execute_plan_refuses_zero_post_swap_balance(tmp_path):
-    cfg = _config(tmp_path=tmp_path)
+    # armed=True here is test-only (see test_execute_plan_live_happy_path).
+    cfg = _config(tmp_path=tmp_path, armed=True)
     ex = _StubExecutor(cfg, balance_wei=0)
     ex.ledger.record("ob-zero", "AXM", 10**18)
     plan = ex.plan("ob-zero")

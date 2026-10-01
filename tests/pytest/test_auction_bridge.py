@@ -126,6 +126,8 @@ class Env:
         self.auction.functions.setEscrowManager(self.escrow.address).transact(
             {"from": self.deployer, **TX})
         self.secrets = {}
+        # eth-tester's chain id == the contract's block.chainid on this chain
+        self.chain_id = self.w3.eth.chain_id
 
     # -- lifecycle helpers ------------------------------------------------
     def travel_past(self, timestamp, buffer=5):
@@ -141,8 +143,10 @@ class Env:
     def commit(self, aid, bidder, price):
         salt = self.w3.keccak(text=f"salt-{aid.hex()}-{bidder}")
         agent_id = self.w3.keccak(text=f"agent-{bidder}")
+        # W-4: preimage binds auctionId + chainId
         commitment = self.w3.solidity_keccak(
-            ["uint256", "bytes32", "bytes32"], [price, salt, agent_id])
+            ["bytes32", "uint256", "uint256", "bytes32", "bytes32"],
+            [aid, self.chain_id, price, salt, agent_id])
         self.auction.functions.commit(aid, commitment).transact(
             {"from": bidder, **TX})
         self.secrets[(aid, bidder)] = (price, salt, agent_id)
@@ -364,7 +368,8 @@ def test_reveal_price_above_uint96_max_reverts(env):
     agent_id = env.w3.keccak(text="oversize-agent")
     too_big = UINT96_MAX + 1
     commitment = env.w3.solidity_keccak(
-        ["uint256", "bytes32", "bytes32"], [too_big, salt, agent_id])
+        ["bytes32", "uint256", "uint256", "bytes32", "bytes32"],
+        [aid, env.chain_id, too_big, salt, agent_id])
     env.auction.functions.commit(aid, commitment).transact({"from": bidder, **TX})
     a = env.auction.functions.auctions(aid).call()
     env.travel_past(a[3])

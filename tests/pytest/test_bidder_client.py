@@ -46,23 +46,42 @@ def test_agent_id_hash_is_keccak_of_utf8():
 
 
 def test_commitment_matches_contract_scheme():
+    # keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+    #                           salt, agentIdHash))
     price = 1_250_000
+    aid = bytes.fromhex("0a" * 32)
+    chain_id = 84532
     expected = keccak(
-        price.to_bytes(32, "big") + SALT_A + keccak(b"agent-7"))
-    assert commitment(price, SALT_A, "agent-7") == expected
+        aid + chain_id.to_bytes(32, "big") + price.to_bytes(32, "big")
+        + SALT_A + keccak(b"agent-7"))
+    assert commitment(price, SALT_A, "agent-7", aid, chain_id) == expected
+
+
+def test_commitment_binds_auction_and_chain():
+    # Same price/salt/agent, different auction or chain -> different hash.
+    aid_a, aid_b = bytes.fromhex("0a" * 32), bytes.fromhex("0b" * 32)
+    h_a = commitment(100, SALT_A, "a", aid_a, 84532)
+    assert commitment(100, SALT_A, "a", aid_b, 84532) != h_a
+    assert commitment(100, SALT_A, "a", aid_a, 1) != h_a
 
 
 def test_commitment_domain_bounds():
-    commitment(UINT96_MAX, SALT_A, "a")  # max is legal
-    commitment(0, SALT_A, "a")           # zero price is legal
+    aid = bytes.fromhex("0a" * 32)
+    commitment(UINT96_MAX, SALT_A, "a", aid, 84532)  # max is legal
+    commitment(0, SALT_A, "a", aid, 84532)          # zero price is legal
+    commitment(100, SALT_A, "a", aid, 0)             # chain 0 is legal
     with pytest.raises(ValueError):
-        commitment(UINT96_MAX + 1, SALT_A, "a")
+        commitment(UINT96_MAX + 1, SALT_A, "a", aid, 84532)
     with pytest.raises(ValueError):
-        commitment(-1, SALT_A, "a")
+        commitment(-1, SALT_A, "a", aid, 84532)
     with pytest.raises(ValueError):
-        commitment(100, b"short", "a")
+        commitment(100, b"short", "a", aid, 84532)
     with pytest.raises(ValueError):
-        commitment(100, b"\x00" * 33, "a")
+        commitment(100, b"\x00" * 33, "a", aid, 84532)
+    with pytest.raises(ValueError):
+        commitment(100, SALT_A, "a", b"\x00" * 31, 84532)
+    with pytest.raises(ValueError):
+        commitment(100, SALT_A, "a", aid, -1)
 
 
 def test_random_salt_is_32_bytes_and_unique():

@@ -1,6 +1,8 @@
 """Sealed-bid commit/reveal shim — commit -> reveal -> close lifecycle."""
 from __future__ import annotations
 
+from conftest import hb_headers
+
 import pytest
 from flask import Flask
 
@@ -37,7 +39,7 @@ def _register(client, agent_id):
         },
     )
     assert r.status_code in (200, 201), r.get_json()
-    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id})
+    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
     # Fund the agent so the commit-time stake lock (bounty * 50 %) succeeds.
     stake_ledger().deposit(agent_id, 10 * 10**18)
