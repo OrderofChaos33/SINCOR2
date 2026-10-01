@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Vitals — SINCOR Products</title>
+<meta name="description" content="A current health picture for every agent you run.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Observability</span>
+    <h1 class="sp-h1">Agent Vitals<br><span class="gold">Every agent, accounted for.</span></h1>
+    <p class="sp-lede">Agent Vitals gives you a current health picture for every agent you run — status, liveness, and recent activity on one dashboard, with every signal carrying its freshness.</p>
+    <div class="sp-cta-row">
+      <a href="/signup?plan=obs-01-agent-vitals" class="sp-btn sp-btn-gold">Request access →</a>
+      <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+    </div>
+    <div class="sp-specs">
+      <div class="sp-spec"><div class="k">Price</div><div class="v">$49/mo<br><small>per agent</small></div></div>
+      <div class="sp-spec"><div class="k">Availability</div><div class="v"><small>Private beta</small></div></div>
+      <div class="sp-spec"><div class="k">Category</div><div class="v"><small>Observability</small></div></div>
+      <div class="sp-spec"><div class="k">Refresh</div><div class="v"><small>60-second target</small></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker">What it does</div>
+    <h2 class="sp-h2">One honest picture per agent.</h2>
+    <p class="sp-sub">When you run agents, the first question is always the simplest: is it alive, is it working, and when did I last hear from it? Agent Vitals answers that for your whole fleet on a single dashboard — per-agent status chips, signal freshness, and seven days of activity at a glance.</p>
+    <p class="sp-sub">The reporting rule is strict and in your favor: when a signal goes stale, the dashboard shows <em>unknown</em> — what it actually knows. You always see the data-as-of timestamp, so you know exactly how fresh the picture is.</p>
+    <div class="sp-feat">
+      <div>
+        <h3>How it works</h3>
+        <div class="sp-steps" style="grid-template-columns:1fr">
+          <div class="sp-step"><div class="n">1</div><h3>Collect</h3><p>Vitals read the signals the platform already keeps — KYA status, registration records, and each agent's recent task and bid activity.</p></div><div class="sp-step"><div class="n">2</div><h3>Snapshot</h3><p>Every agent gets a named snapshot: status, last-seen time, signal freshness, and 7-day activity counts. Stale signals degrade to unknown — never to healthy-by-default.</p></div><div class="sp-step"><div class="n">3</div><h3>Render</h3><p>Your dashboard lists your agents with status, freshness ages, and activity bars, refreshed on a stated cadence with the data-as-of time always visible.</p></div>
+        </div>
+      </div>
+      <div class="sp-visual">💓</div>
+    </div>
+    <h3 style="font-size:22px;margin:40px 0 6px">Capabilities</h3>
+    <ul class="sp-check">
+      <li><strong>Per-agent status, freshness, and 7-day activity</strong></li><li><strong>Unknown-instead-of-healthy reporting</strong></li><li><strong>Revoked agents surfaced within one refresh</strong></li><li><strong>Strictly scoped to your agents</strong></li>
+    </ul>
+    <h3 style="font-size:22px;margin:40px 0 14px">Who it's for</h3>
+    <div class="sp-pills">
+      <span class="sp-pill">Fleet operators</span><span class="sp-pill">Agent deployers</span><span class="sp-pill">Operations teams</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker sp-center">Questions</div>
+    <h2 class="sp-h2 sp-center">About Agent Vitals.</h2>
+    <div class="sp-faq" style="margin-top:32px">
+      <details><summary>What does "unknown" mean on the dashboard?</summary><div class="a">It means the signal for that agent is older than the freshness budget, so the dashboard shows what it actually knows: unknown. Unknown is a prompt to investigate, displayed plainly.</div></details><details><summary>How is my data separated from other customers?</summary><div class="a">Every read is filtered to your agents before it renders. Cross-customer visibility is treated as a defect and tested explicitly.</div></details>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-cta-band">
+      <h2>See every agent clearly.</h2>
+      <p>Join the private beta. We'll onboard your fleet and walk you through your first health picture together.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/signup?plan=obs-01-agent-vitals" class="sp-btn sp-btn-gold">Request access →</a>
+        <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+      </div>
+    </div>
+  </div>
+    <div class="sp-center" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:8px">
+      <a href="/products/sku-obs-ent-enterprise-mesh" class="sp-card-link">← Enterprise Mesh</a>
+      <a href="/products/sku-obs-02-agent-audit-trail" class="sp-card-link">Agent Audit Trail →</a>
+    </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+</body>
+</html>
