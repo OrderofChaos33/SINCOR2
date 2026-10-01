@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 from .keccak import keccak256
 from .types import ContractNetConfig, SigType
@@ -34,6 +34,65 @@ BID_TYPE = (
     "string epochId,bytes32 epochRoot)"
 )
 EMPTY_EPOCH_ROOT = "0x" + "00" * 32
+
+
+class ChainIdMismatchError(ValueError):
+    """The signing domain's chainId does not match the chain we're on.
+
+    W-3: a cross-chain signature is never silently accepted; the mismatch is
+    a hard failure, never a warning.
+    """
+
+
+def rpc_chain_id(rpc: Union[int, str, Callable[[], Any], Any]) -> int:
+    """Extract the chain id from an RPC handle (or a plain value/stub).
+
+    Accepts: an int, a hex/decimal string (e.g. raw ``eth_chainId`` output),
+    a zero-arg callable returning one of those, a web3-style provider with
+    ``eth.chain_id``, or an object exposing ``eth_chainId``.
+    """
+    if callable(rpc):
+        rpc = rpc()
+    if isinstance(rpc, bool):
+        raise ValueError("chain id cannot be a bool")
+    if isinstance(rpc, int):
+        return rpc
+    if isinstance(rpc, str):
+        text = rpc.strip()
+        return int(text, 16) if text.lower().startswith("0x") else int(text)
+    eth = getattr(rpc, "eth", None)
+    if eth is not None and hasattr(eth, "chain_id"):
+        return int(eth.chain_id)
+    raw = getattr(rpc, "eth_chainId", None)
+    if raw is not None:
+        return rpc_chain_id(raw)
+    raise ValueError(f"cannot determine chain id from {type(rpc).__name__}")
+
+
+def assert_domain_matches_chain(
+    config: ContractNetConfig,
+    rpc: Union[int, str, Callable[[], Any], Any],
+) -> int:
+    """Hard-check that the EIP-712 domain binds the chain we're actually on.
+
+    Call this at signing/verification time whenever an RPC handle exists.
+    Returns the asserted chain id. Raises :class:`ChainIdMismatchError` on
+    any mismatch — fail closed, never warn-and-continue.
+    """
+    if config.chain_id is None:
+        raise ChainIdMismatchError(
+            "ContractNetConfig.chain_id is unset: refusing to sign/verify "
+            "without an explicit deployment chain (W-3)."
+        )
+    chain_id = int(config.chain_id)
+    live_id = rpc_chain_id(rpc)
+    if live_id != chain_id:
+        raise ChainIdMismatchError(
+            f"EIP-712 domain chainId={chain_id} does not match the live "
+            f"chain eth_chainId={live_id}: signature would be replayable "
+            "across chains. Aborting (W-3)."
+        )
+    return chain_id
 
 EIP712_DOMAIN_TYPEHASH = keccak256(EIP712_DOMAIN_TYPE.encode("ascii"))
 BID_TYPEHASH = keccak256(BID_TYPE.encode("ascii"))

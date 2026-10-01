@@ -73,7 +73,10 @@ the same two-phase confirmation:
 3. **Commit** (`POST /v1/a2a/bids/commit`): the server computes the commitment
    `keccak256(abi.encodePacked(bytes32(price_wei), salt, agentIdHash))` with
    the canonical implementation (`sincor2.a2a_inbound_market.sealed_commitment`,
-   the same one the platform verifies against). The confirmation response
+   the same one the platform verifies against) — note this is the OFFCHAIN
+   shim scheme; the onchain scheme additionally binds `auctionId` and
+   `chainId`, so shim commitments must never be submitted to
+   `CommitRevealAuction.commit()`. The confirmation response
    returns `generated_salt_hex` — echo it back as `nonce` when confirming,
    and **keep it secret until reveal**. The commit locks stake at 50% of the
    task bounty (minStakeBps=5000) until reveal/close.

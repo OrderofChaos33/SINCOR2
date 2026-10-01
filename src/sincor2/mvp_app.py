@@ -407,7 +407,12 @@ limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     default_limits=["10000 per day", "1000 per hour"],
-    storage_uri="memory://",
+    # SINCOR_LIMITER_STORAGE_URI=redis://... shares the app-wide limiter
+    # across gunicorn workers (G2.8). Default memory:// preserves dev/test
+    # behavior. NOTE: when a Redis URI is configured but unreachable,
+    # flask-limiter surfaces the storage error instead of silently
+    # allowing — fail closed, matching the A2A fabric shared state.
+    storage_uri=os.environ.get("SINCOR_LIMITER_STORAGE_URI", "memory://"),
 )
 
 try:

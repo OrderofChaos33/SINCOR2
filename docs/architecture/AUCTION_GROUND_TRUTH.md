@@ -84,20 +84,28 @@ function vickreyResult(bytes32 auctionId)
 
 ## Commitment preimage & onchain verification
 
-Client-side (Python):
+Client-side (Python, `sincor2.onchain.bidder_client.commitment`):
 
 ```python
 price_bytes32 = price.to_bytes(32, byteorder="big")
-commit_hash = keccak(price_bytes32 + salt + agent_id_hash)
-# == keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash))
+commit_hash = keccak(auction_id + chain_id.to_bytes(32, "big")
+                     + price_bytes32 + salt + agent_id_hash)
+# == keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+#                               salt, agentIdHash))
 # where agent_id_hash = keccak256(agent_id.encode("utf-8"))
+#
+# auctionId binds the commitment to ONE auction (W-4: cross-auction
+# commitment replay); block.chainid binds it to ONE chain (cross-chain
+# replay). The offchain sealed-bid shim omits both bindings
+# (keccak(price‖salt‖agentIdHash)); shim hashes are NOT valid onchain
+# commitments and must never be submitted to commit().
 ```
 
 Onchain (`reveal`):
 
 ```solidity
 bytes32 expected = keccak256(
-    abi.encodePacked(bytes32(price), salt, agentIdHash)
+    abi.encodePacked(auctionId, block.chainid, bytes32(price), salt, agentIdHash)
 );
 
 Commit storage entry = commits[auctionId][msg.sender];
@@ -109,9 +117,12 @@ entry.price = price;
 
 Identity binding: the caller's address is mapped to the commitment in
 contract state (`commits[auctionId][msg.sender]`); platform identity is
-bound via `agentIdHash` inside the hash preimage. `agentIdHash` is verified
-at reveal but never stored — `vickreyResult` returns the winner's
-*address*; the platform links it back to the agent identity offchain.
+bound via `agentIdHash` inside the hash preimage; the auction id and the
+chain id are likewise bound inside the preimage, so a commitment observed
+on auction A cannot be revealed on auction B (W-4) or on another chain.
+`agentIdHash` is verified at reveal but never stored — `vickreyResult`
+returns the winner's *address*; the platform links it back to the agent
+identity offchain.
 
 ## Execution architecture
 
@@ -165,8 +176,8 @@ asserts `commitHash != bytes32(0)` and
 
 **Phase 3 — Reveal window (5 minutes).** Worker key calls
 `reveal(auctionId, price, salt, agentIdHash)`. The contract derives
-`expected = keccak256(abi.encodePacked(bytes32(price), salt,
-agentIdHash))`, loads `Commit storage entry =
+`expected = keccak256(abi.encodePacked(auctionId, block.chainid,
+bytes32(price), salt, agentIdHash))`, loads `Commit storage entry =
 commits[auctionId][msg.sender]`, reverts `BadReveal()` on mismatch, then
 sets `entry.revealed = true; entry.price = price;`. Prices are bounded to
 `uint96.max` (a larger price would silently truncate in the escrow's

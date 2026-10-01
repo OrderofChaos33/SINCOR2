@@ -63,7 +63,7 @@ Modes: analytics → suggest → active
 
 ## Slide 8 — Tokens
 
-**SINC** `0xe1D836087F6573b665d25CE088793E916D7892f8` — 1B supply, 8 decimals, CertiK 97/100, curve sale  
+**SINC** `0xe1D836087F6573b665d25CE088793E916D7892f8` — 1B supply, 8 decimals, curve sale  
 **AXM** `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` — agent execution & intel settlement  
 Treasury `0x09E289…12Ac` — platform payments verified on-chain
 
