@@ -22,6 +22,7 @@ from __future__ import annotations
 import pytest
 from flask import Flask
 
+from conftest import hb_headers
 from sincor2.a2a_inbound import get_fabric, reset_fabric
 from sincor2.a2a_inbound import register as register_inbound
 from sincor2.a2a_rate_limits import reset_a2a_limits
@@ -180,10 +181,13 @@ def test_dispute_tier_429(client):
 # ---------------------------------------------------------------------------
 
 def test_heartbeat_tier_wired_429(client):
+    # Heartbeat route requires operator auth (heartbeat-auth, G2.3); the
+    # limiter counts requests before view validation, so authenticated
+    # ghost-agent posts exercise the tier boundary the same way.
     for _ in range(20):
-        r = client.post("/v1/a2a/heartbeat", json={"agent_id": "ghost"})
+        r = client.post("/v1/a2a/heartbeat", json={"agent_id": "ghost"}, headers=hb_headers())
         assert r.status_code == 404, r.status_code
-    r = client.post("/v1/a2a/heartbeat", json={"agent_id": "ghost"})
+    r = client.post("/v1/a2a/heartbeat", json={"agent_id": "ghost"}, headers=hb_headers())
     assert r.status_code == 429
     assert r.get_json()["policy"] == "heartbeat"
 
