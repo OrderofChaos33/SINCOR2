@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -27,6 +28,9 @@ from sincor2.a2a_inbound import (
     get_fabric,
 )
 from sincor2.a2a_timeouts import assignment_deadline_ms
+# Grandfathered plaintext scoring for non-sealed tasks (pre-shim clients).
+# Canonical money path is marketplace.contract_net — see
+# docs/architecture/CANONICAL_PATHS.md §1.
 from sincor2.contract_net import calculate_bid_score, stage_payout
 
 logger = logging.getLogger("sincor.a2a.inbound")
@@ -40,17 +44,23 @@ logger = logging.getLogger("sincor.a2a.inbound")
 # Python wiring, so this shim implements the same commit/reveal discipline in
 # the Python task flow as a forward-compatible stepping stone.
 #
-# Commitment scheme — mirrors CommitRevealAuction.reveal EXACTLY:
+# Commitment scheme (OFFCHAIN shim):
 #     keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash))
 # where price is the bid in wei as a 32-byte big-endian integer, salt is a
 # 32-byte bidder-chosen nonce, and agentIdHash = keccak256(agent_id).
-# A client that computes commitments for this shim can reuse the identical
-# preimage when the on-chain contracts go live.
+#
+# NOTE: this is intentionally NOT the onchain scheme. The onchain
+# ``CommitRevealAuction.reveal`` preimage additionally binds the auction id
+# and the chain id —
+#     keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+#                                salt, agentIdHash))
+# (W-4). Shim hashes are therefore NOT valid onchain commitments and must
+# never be submitted to ``CommitRevealAuction.commit()``.
 #
 # Documented divergences from the contracts:
 #  * Task binding is STRUCTURAL, not cryptographic: the contract keys commits
-#    by (auctionId, msg.sender) in a mapping; the shim keys fabric.commits by
-#    (task_id, agent_id). The commitment itself does not hash the task id.
+#    by (auctionId, msg.sender) in a mapping and now also binds auctionId in
+#    the preimage; the shim keys fabric.commits by (task_id, agent_id).
 #  * Selection stays composite-score (score desc, earliest-commit tiebreak)
 #    among REVEALED bids. Vickrey (lowest wins, second-lowest funds) lives in
 #    the Solidity contracts and is intentionally NOT reimplemented here.
@@ -200,12 +210,21 @@ def _keccak256(data: bytes) -> bytes:
 
 
 def sealed_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
-    """Compute the sealed-bid commitment.
+    """Compute the sealed-bid commitment for the OFFCHAIN API.
 
-    Mirrors ``CommitRevealAuction.reveal``: ``keccak256(abi.encodePacked(
-    bytes32(price), salt, agentIdHash))``. ``salt`` must be 32 bytes;
-    ``agentIdHash`` is ``keccak256(agent_id)`` so the bidder's identity is
-    pseudonymous in the commitment itself.
+    Offchain scheme: ``keccak256(abi.encodePacked(bytes32(price), salt,
+    agentIdHash))``. ``salt`` must be 32 bytes; ``agentIdHash`` is
+    ``keccak256(agent_id)`` so the bidder's identity is pseudonymous in the
+    commitment itself.
+
+    NOTE: this is intentionally NOT the onchain scheme. The onchain
+    ``CommitRevealAuction.reveal`` preimage additionally binds the auction
+    id and the chain id —
+    ``keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+    salt, agentIdHash))`` (W-4) — so hashes from this shim are not valid
+    onchain commitments and must never be submitted to ``commit()``.
+    Offchain commits are stored keyed by (task, agent) server-side, which
+    is what stops cross-task replay here.
     """
     if price_wei <= 0:
         raise ValueError("price_wei must be positive")
@@ -905,12 +924,52 @@ def _require_pool_admin():
     return None
 
 
+# ---------------------------------------------------------------------------
+# P24 SocialFi issuance support (route: POST /v1/a2a/socialfi/issue)
+# ---------------------------------------------------------------------------
+
+class _IssueAuthError(ValueError):
+    """Agent authentication failure -> 401."""
+
+
+class _IssueLiveBlocked(RuntimeError):
+    """Live issuance attempted while P24 is live-blocked -> 403."""
+
+
+_socialfi_onboarding_agent = None
+
+
+def _socialfi_onboarding():
+    """Process-wide P24 OnboardingAgent singleton (dedupe by creator_id)."""
+    global _socialfi_onboarding_agent
+    if _socialfi_onboarding_agent is None:
+        from sincor2.defi.p24.onboarding import OnboardingAgent
+        _socialfi_onboarding_agent = OnboardingAgent()
+    return _socialfi_onboarding_agent
+
+
+def reset_socialfi_onboarding():
+    """Test isolation hook — drop the onboarding singleton."""
+    global _socialfi_onboarding_agent
+    _socialfi_onboarding_agent = None
+
+
 def attach_market_routes(bp: Blueprint) -> None:
     @bp.post("/v1/a2a/tasks")
     def v1_tasks():
         body = request.get_json(silent=True) or {}
         try:
-            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=body.get("poster_id") or body.get("agent_id"),
+            # P3 item 14 / G2.15: poster identity is SERVER-BOUND. Only a
+            # valid EIP-191 signature over the market task-create message
+            # attributes the task to a wallet; client-supplied poster_id /
+            # agent_id are ignored for attribution (they remain accepted in
+            # the body for backward compatibility but carry no trust).
+            # Unsigned posts are anonymous (poster_id=None) — ghost-slash
+            # re-auction credit then falls back to the platform, and no
+            # attacker can steer slash proceeds to an arbitrary identity.
+            from sincor2.a2a_integration import _server_bound_poster_id
+            poster_id = _server_bound_poster_id(body)
+            task = create_task(str(body.get("skill") or body.get("skill_id") or ""), body.get("tags"), float(body.get("bounty_axm") or 1.5), sealed=bool(body.get("sealed")), poster_id=poster_id,
                              seed_key=str(body.get("seed_key") or "") or None, auto_refresh=bool(body.get("auto_refresh")),
                              title=body.get("title"), description=body.get("description"))
             deduped = bool(task.pop("_dedupe_hit", False))
@@ -1047,8 +1106,10 @@ def attach_market_routes(bp: Blueprint) -> None:
         """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}.
 
         commitment = keccak256(abi.encodePacked(bytes32(price_wei), salt,
-        keccak256(agent_id))) as 0x hex — the exact CommitRevealAuction
-        preimage, so clients can reuse it on-chain later.
+        keccak256(agent_id))) as 0x hex — the OFFCHAIN shim preimage. It is
+        NOT an onchain commitment: the onchain scheme additionally binds
+        auctionId and chainId, so shim hashes must never be submitted to
+        CommitRevealAuction.commit().
         """
         body = request.get_json(silent=True) or {}
         try:
@@ -1258,7 +1319,8 @@ def attach_market_routes(bp: Blueprint) -> None:
             "commit_deadline_ms": task.get("commit_deadline"),
             "reveal_deadline_ms": task.get("reveal_deadline"),
             "commitment_scheme": (
-                "keccak256(abi.encodePacked(bytes32(price_wei), "
+                "keccak256(abi.encodePacked(bytes32(auctionId), "
+                "uint256(block.chainid), bytes32(price_wei), "
                 "bytes32(salt), keccak256(utf8(agent_id))))"),
             "price_bounds_wei": {"min": 0, "max": str(UINT96_MAX)},
             "functions": [
@@ -1378,6 +1440,99 @@ def attach_market_routes(bp: Blueprint) -> None:
         summary = stake_ledger().balance_of(agent_id)
         summary["ledger"] = "offchain-axm"
         return jsonify(summary), 200
+
+    # -- P24 SocialFi issuance -------------------------------------------
+    # Agent-triggered creator-token issuance. This route is a CALLER of the
+    # P24 issuance flow: content-policy enforcement stays in
+    # defi/p24/onboarding.py::register, and the route never signs or holds
+    # keys. P24 is live_blocked by catalog design, so only dry-run issuance
+    # is served until the founder releases the live block.
+
+    @bp.post("/v1/a2a/socialfi/issue")
+    def v1_socialfi_issue():
+        """Issue a P24 creator token for a registered agent (dry-run only).
+
+        Body: {agent_id, name, symbol, creator_id?, description?, bio?,
+        dry_run?}. The agent must be registered (unknown agent -> 401);
+        this is membership auth, not cryptographic proof. Metadata is
+        screened against the content-policy deny-list (violation -> 400
+        with the ruleset version); duplicate creator -> 409. Live issuance
+        is refused with 403 while P24 is live-blocked; dry_run=true
+        (default) exercises the full screened issuance path without
+        broadcasting.
+        """
+        from sincor2.defi.p24 import live_block, policy
+        from sincor2.defi.p24.factory import FactoryError
+
+        body = request.get_json(silent=True) or {}
+        try:
+            agent_id = str(body.get("agent_id") or "").strip()
+            if not agent_id:
+                raise _IssueAuthError("agent authentication required")
+            fabric = get_fabric()
+            with fabric.lock:
+                if agent_id not in fabric.agents:
+                    raise _IssueAuthError("agent authentication required")
+            creator_id = str(body.get("creator_id") or agent_id).strip()
+            if not creator_id or len(creator_id) > 64:
+                raise ValueError("creator_id must be 1-64 characters")
+            name = str(body.get("name") or "").strip()
+            if not name or len(name) > 64:
+                raise ValueError("name must be 1-64 characters")
+            symbol = str(body.get("symbol") or "").strip().upper()
+            if not re.fullmatch(r"[A-Z0-9]{1,12}", symbol):
+                raise ValueError(
+                    "symbol must be 1-12 uppercase alphanumeric characters")
+            description = str(body.get("description") or "")
+            bio = str(body.get("bio") or "")
+            if len(description) > 500 or len(bio) > 500:
+                raise ValueError("description/bio must be <= 500 characters")
+            dry_run = body.get("dry_run", True)
+            if not isinstance(dry_run, bool):
+                raise ValueError("dry_run must be a boolean")
+            # Policy screen first: 400 cites the ruleset version and the
+            # matched deny-list phrase — never the submitted text.
+            version = policy.require_clean(name, symbol, description, bio)
+            if not dry_run and live_block.LIVE_BLOCKED:
+                raise _IssueLiveBlocked(
+                    "P24 is live-blocked by catalog design; live issuance "
+                    "requires a founder release (dry_run=true to rehearse)")
+            agent = _socialfi_onboarding()
+            reg = agent.register(
+                creator_id=creator_id, name=name, symbol=symbol,
+                description=description, bio=bio)
+            token = reg.token
+            return jsonify({
+                "status": "issued",
+                "creator_id": creator_id,
+                "agent_id": agent_id,
+                "name": token.name,
+                "symbol": token.symbol,
+                "issued_at": token.issued_at,
+                "total_supply_wei": str(token.total_supply_wei),
+                "policy_version": version,
+                "screened": True,
+                "dry_run": True,
+                "live_blocked": live_block.LIVE_BLOCKED,
+            }), 201
+        except _IssueAuthError as err:
+            return _http_error(str(err), 401)
+        except _IssueLiveBlocked as err:
+            return _http_error(str(err), 403)
+        except policy.PolicyViolation as err:
+            return _http_error(
+                f"content-policy violation in {err.field!r}: "
+                f"matched phrase {err.matched_phrase!r}",
+                400, field=err.field,
+                matched_phrase=err.matched_phrase,
+                ruleset_version=err.ruleset_version)
+        except FactoryError as err:
+            return _http_error(str(err), 400)
+        except ValueError as err:
+            msg = str(err)
+            if "already registered" in msg:
+                return _http_error(msg, 409)
+            return _http_error(msg, 400)
 
     # -- Launch bounty pool -------------------------------------------
     # Offchain AXM reservation ledger for external-agent launch bounties.

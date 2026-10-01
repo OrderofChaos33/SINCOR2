@@ -1,0 +1,32 @@
+{
+  "harness": "fork_sim_fee_executor/run_fee_executor_forksim.py",
+  "fork_block": 51983919,
+  "rpc_url": "https://mainnet.base.org",
+  "infra_code_present": {
+    "V4_QUOTER": true,
+    "UNIVERSAL_ROUTER_V4": true,
+    "PERMIT2": true,
+    "POOL_MANAGER": true
+  },
+  "pool_research": [
+    {
+      "route": "AXM/USDC",
+      "found": false,
+      "pool": null,
+      "detail": "no live V4 pool found for AXM->USDC (last error: ('0x6190b2b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000)"
+    },
+    {
+      "route": "AXM/WETH",
+      "found": false,
+      "pool": null,
+      "detail": "no live V4 pool found for AXM->WETH (last error: ('0x6190b2b0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000)"
+    }
+  ],
+  "operator_pins": [],
+  "dry_runs": [],
+  "anvil_replays": [],
+  "armed": false,
+  "broadcasts": 0,
+  "keys_used": 0,
+  "verdict": "NO_POOL: no liquid AXM/USDC or AXM/WETH pool exists on Uniswap V4 at the pinned block (executor discover_pool probed all candidate fee tiers). Fork-simulation of the conversion path cannot run until a pool is created/seeded and its PoolKey is pinned by the founder. Nothing was invented; nothing was broadcast; nothing was armed."
+}

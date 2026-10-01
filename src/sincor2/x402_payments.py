@@ -1,4 +1,8 @@
-"""HTTP 402 micropayments in SINC (spec §5.4)."""
+"""HTTP 402 micropayments (spec §5.4).
+
+Challenges are denominated per resource config; platform policy prefers AXM
+for new flows (SINC is legacy for residual subscription renewals only).
+"""
 
 from __future__ import annotations
 

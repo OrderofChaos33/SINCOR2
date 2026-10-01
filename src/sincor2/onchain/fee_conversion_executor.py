@@ -86,6 +86,12 @@ SEL_APPROVE = keccak(b"approve(address,uint256)")[:4]
 SEL_TRANSFER = keccak(b"transfer(address,uint256)")[:4]
 SEL_ALLOWANCE = keccak(b"allowance(address,address)")[:4]
 SEL_BALANCE_OF = keccak(b"balanceOf(address)")[:4]
+# Permit2 (AllowanceTransfer): approve(token, spender, amount, expiration) and
+# allowance(owner, token, spender). The V4 settle path pulls the fee token via
+# Permit2.transferFrom, which draws on this internal allowance — the ERC-20
+# approve(Permit2) alone is NOT sufficient.
+SEL_P2_APPROVE = keccak(b"approve(address,address,uint160,uint48)")[:4]
+SEL_P2_ALLOWANCE = keccak(b"allowance(address,address,address)")[:4]
 # V4Quoter.quoteExactInputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))
 SEL_QUOTE_EXACT_IN_SINGLE = keccak(
     b"quoteExactInputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))"
@@ -116,6 +122,18 @@ POOL_CANDIDATES: Tuple[Tuple[int, int], ...] = (
     (100, 1),      # 0.01 %
 )
 ZERO_HOOKS = "0x0000000000000000000000000000000000000000"
+
+
+# --- address hygiene -------------------------------------------------------
+# web3.py v8 validates EIP-55 checksums on every address in tx params before
+# any network I/O, and several in-repo constants (V4_QUOTER,
+# UNIVERSAL_ROUTER_V4, AXIOM_TOKEN) are not checksummed. Normalize at every
+# boundary where an address enters an RPC call or an unsigned tx dict.
+
+def _ck(addr: str) -> str:
+    from web3 import Web3
+
+    return Web3.to_checksum_address(addr)
 
 
 # --- Pool keys ---------------------------------------------------------------
@@ -320,9 +338,16 @@ class FeeConversionExecutor:
 
     def _eth_call(self, to: str, data: bytes,
                   from_addr: Optional[str] = None) -> bytes:
-        params: Dict[str, Any] = {"to": to, "data": "0x" + data.hex()}
+        # web3.py v8 rejects non-EIP-55 addresses in call params before any
+        # network I/O, and several configured addresses (V4_QUOTER,
+        # UNIVERSAL_ROUTER_V4, AXIOM_TOKEN) are not checksummed in-repo.
+        # Normalize at the RPC boundary so the read-only path works.
+        params: Dict[str, Any] = {
+            "to": self.w3.to_checksum_address(to),
+            "data": "0x" + data.hex(),
+        }
         if from_addr:
-            params["from"] = from_addr
+            params["from"] = self.w3.to_checksum_address(from_addr)
         raw = self.w3.eth.call(params, "latest")
         return bytes(raw)
 
@@ -414,7 +439,7 @@ class FeeConversionExecutor:
                          chain_id: int = BASE_CHAIN_ID) -> Dict[str, Any]:
         data = SEL_APPROVE + abi_encode(
             ["address", "uint256"], [spender, amount_wei])
-        return {"to": TOKEN_ADDRESSES[token.upper()],
+        return {"to": _ck(TOKEN_ADDRESSES[token.upper()]),
                 "data": "0x" + data.hex(), "value": 0, "chainId": chain_id}
 
     @staticmethod
@@ -422,7 +447,37 @@ class FeeConversionExecutor:
                           chain_id: int = BASE_CHAIN_ID) -> Dict[str, Any]:
         data = SEL_TRANSFER + abi_encode(
             ["address", "uint256"], [to, amount_wei])
-        return {"to": TOKEN_ADDRESSES[token.upper()],
+        return {"to": _ck(TOKEN_ADDRESSES[token.upper()]),
+                "data": "0x" + data.hex(), "value": 0, "chainId": chain_id}
+
+    def permit2_allowance(self, token: str, owner: str, spender: str) -> int:
+        """Permit2-internal allowance (owner, token, spender).
+
+        Distinct from the ERC-20 allowance: the V4 settle path calls
+        Permit2.transferFrom(payer, poolManager, ...), which checks THIS
+        allowance. Returns (amount, expiration, nonce) packed; we read amount.
+        """
+        data = SEL_P2_ALLOWANCE + abi_encode(
+            ["address", "address", "address"],
+            [owner, TOKEN_ADDRESSES[token.upper()], spender])
+        raw = self._eth_call(self.config.permit2, data)
+        # returns (uint160 amount, uint48 expiration, uint48 nonce); amount first
+        return int.from_bytes(raw[:32], "big")
+
+    @staticmethod
+    def build_permit2_approve_tx(token: str, spender: str, amount_wei: int,
+                                 expiration: int,
+                                 chain_id: int = BASE_CHAIN_ID) -> Dict[str, Any]:
+        """Unsigned Permit2.approve(token, spender, amount, expiration).
+
+        Grants the Universal Router a Permit2-internal allowance so the V4
+        settle step (Permit2.transferFrom) can pull the fee token. This is in
+        ADDITION to the ERC-20 approve(Permit2); either one alone reverts.
+        """
+        data = SEL_P2_APPROVE + abi_encode(
+            ["address", "address", "uint160", "uint48"],
+            [TOKEN_ADDRESSES[token.upper()], spender, amount_wei, expiration])
+        return {"to": _ck(PERMIT2),
                 "data": "0x" + data.hex(), "value": 0, "chainId": chain_id}
 
     # -- Universal Router V4 swap -----------------------------------------
@@ -432,11 +487,18 @@ class FeeConversionExecutor:
                       chain_id: int = BASE_CHAIN_ID) -> Dict[str, Any]:
         """Unsigned Universal Router execute() for an exact-input V4 swap.
 
-        Encodes commands [V4_SWAP, SWEEP]:
-          V4_SWAP actions = [SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL]
-          SWEEP sends the output token to ``recipient`` (the forwarder).
+        Encodes commands [V4_SWAP] with actions
+        [SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL].
+        The deployed V4Router's TAKE_ALL does
+        ``_take(currency, msgSender(), amount)`` where msgSender() is the
+        original execute() caller (the forwarder), so the output token lands
+        directly on the forwarder -- no SWEEP command is needed (and a SWEEP
+        would revert with InsufficientBalance because the router holds
+        nothing). Verified on a Base fork: take emitted
+        USDC.transfer(to=forwarder).
         A separate forward tx then moves the output to the treasury, so the
         post-swap balance can be verified before it leaves the forwarder.
+        ``recipient`` must equal the forwarder (the execute() sender).
         """
         pool = self.config.pool_key_for(token_in, token_out)
         addr_in = TOKEN_ADDRESSES[token_in.upper()]
@@ -444,26 +506,32 @@ class FeeConversionExecutor:
         zfo = zero_for_one(pool, addr_in)
 
         actions = bytes([ACT_SWAP_EXACT_IN_SINGLE, ACT_SETTLE_ALL, ACT_TAKE_ALL])
+        # SWAP_EXACT_IN_SINGLE params MUST be a single abi-encoded struct
+        # (ExactInputSingleParams), NOT flat multi-arg encoding: v4-periphery's
+        # CalldataDecoder.decodeSwapExactInSingleParams does
+        #   swapParams := add(params.offset, calldataload(params.offset))
+        # i.e. it follows the first word as an offset to the struct. Flat
+        # encoding makes the decoder read garbage and the unlock callback
+        # reverts before any sub-call. The struct also carries minHopPriceX36
+        # (0 = disabled); omitting it shifts every field.
         params = [
             abi_encode(
-                ["(address,address,uint24,int24,address)", "bool", "uint128",
-                 "uint128", "bytes"],
-                [pool.as_tuple(), zfo, amount_in_wei, amount_out_min_wei, b""]),
+                ["((address,address,uint24,int24,address),bool,uint128,"
+                 "uint128,uint256,bytes)"],
+                [[pool.as_tuple(), zfo, amount_in_wei, amount_out_min_wei,
+                  0, b""]]),
             abi_encode(["address", "uint256"], [addr_in, amount_in_wei]),
             abi_encode(["address", "uint256"], [addr_out, amount_out_min_wei]),
         ]
         v4_input = abi_encode(["bytes", "bytes[]"], [actions, params])
-        sweep_input = abi_encode(
-            ["address", "address", "uint256"],
-            [addr_out, recipient, amount_out_min_wei])
 
-        commands = bytes([CMD_V4_SWAP, CMD_SWEEP])
+        commands = bytes([CMD_V4_SWAP])
         if deadline is None:
             deadline = int(time.time()) + self.config.tx_deadline_secs
         data = SEL_UR_EXECUTE + abi_encode(
             ["bytes", "bytes[]", "uint256"],
-            [commands, [v4_input, sweep_input], deadline])
-        return {"to": self.config.universal_router,
+            [commands, [v4_input], deadline])
+        return {"to": _ck(self.config.universal_router),
                 "data": "0x" + data.hex(), "value": 0, "chainId": chain_id}
 
     # -- planning ---------------------------------------------------------
@@ -500,6 +568,18 @@ class FeeConversionExecutor:
             txs.append({"kind": "approve_permit2",
                         "unsigned": self.build_approve_tx(
                             token_in, self.config.permit2, amount_in)})
+
+        # The V4 settle step pulls the fee token via Permit2.transferFrom,
+        # which checks the Permit2-INTERNAL allowance (forwarder -> router),
+        # not the ERC-20 approval above. Without this the swap reverts at
+        # the Permit2 call (fork-sim proven).
+        p2_allowance = self.permit2_allowance(
+            token_in, self.config.forwarder, self.config.universal_router)
+        if p2_allowance < amount_in:
+            txs.append({"kind": "permit2_approve",
+                        "unsigned": self.build_permit2_approve_tx(
+                            token_in, self.config.universal_router, amount_in,
+                            expiration=int(time.time()) + 30 * 86400)})
 
         txs.append({"kind": "swap",
                     "unsigned": self.build_swap_tx(
@@ -602,6 +682,25 @@ class FeeConversionExecutor:
 
 # --- convenience -------------------------------------------------------------
 
+def pending_conversion_id(token: str, amount_wei: int,
+                          source: Optional[Dict[str, Any]] = None
+                          ) -> str:
+    """Deterministic obligation id for a fee inflow (idempotency key).
+
+    Shared with the fee-event listener so it can tell newly recorded
+    obligations apart from idempotent re-encounters on rescans.  When the
+    source carries a ``log_index`` (event-sourced obligations), it is part
+    of the id so two identical transfers inside one transaction record two
+    obligations instead of collapsing into one.
+    """
+    source = source or {}
+    tx_hash = source.get("tx_hash") or source.get("receipt_tx") or "adhoc"
+    oid = f"feeconv-{token.upper()}-{tx_hash[:16]}-{amount_wei}"
+    if "log_index" in source:
+        oid = f"{oid}-log{source['log_index']}"
+    return oid
+
+
 def record_pending_conversion(ledger: ConversionLedger, token: str,
                               amount_wei: int,
                               source: Optional[Dict[str, Any]] = None
@@ -609,7 +708,5 @@ def record_pending_conversion(ledger: ConversionLedger, token: str,
     """Bridge from fee recording (record_axm_receipt / settle-proof builders)
     into the executor ledger.  The obligation id is derived from the source
     tx when present, so re-recording is idempotent."""
-    source = source or {}
-    tx_hash = source.get("tx_hash") or source.get("receipt_tx") or "adhoc"
-    oid = f"feeconv-{token.upper()}-{tx_hash[:16]}-{amount_wei}"
+    oid = pending_conversion_id(token, amount_wei, source)
     return ledger.record(oid, token, amount_wei, source)

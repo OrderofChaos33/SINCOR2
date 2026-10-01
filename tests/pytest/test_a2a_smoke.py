@@ -3,6 +3,38 @@
 """A2A integration smoke tests — covers the new skill catalogue, pricing,
 quote endpoint, settlement proof, leaderboard, and reputation routing."""
 
+
+def _signed_params(extra: dict) -> dict:
+    """P3 item 14: message/send requires an EIP-191 caller signature.
+
+    Returns a copy of ``extra`` with ownerWallet/authSignature/authTimestamp/
+    authNonce injected (fresh signature per call — signatures are single-use).
+    """
+    import time
+    import uuid
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_integration import _auth_create_message
+
+    acct = Account.from_key("0x" + "c3" * 32)
+    skill_id = extra.get("skillId", "lead-enrichment")
+    label = extra.get("callerId", "smoke-test")
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    sig = acct.sign_message(
+        encode_defunct(text=_auth_create_message(label, skill_id, ts, nonce))
+    ).signature.hex()
+    return {
+        **extra,
+        "callerId": label,
+        "ownerWallet": acct.address,
+        "authSignature": "0x" + sig,
+        "authTimestamp": ts,
+        "authNonce": nonce,
+    }
+
 # ── Discovery ────────────────────────────────────────────────────────────────
 
 def test_agent_card_endpoint(client):
@@ -187,12 +219,17 @@ def test_a2a_settle_unknown_task(client):
 
 
 def test_a2a_settle_completed_task(client):
-    """Submit a task (free-quota), then call /api/a2a/settle on it."""
+    """Submit a task (free-quota), then call /api/a2a/settle on it.
+
+    Post-G2.4, settlement proofs require a paid, chain-verifiable settlement,
+    so a free-quota task is fail-closed with 400 (no on-chain payment to
+    prove).  Paid-path coverage lives in test_settlement_proofs.py.
+    """
     # Submit task using free quota (no payment needed in test env)
     send_body = {
         "method": "message/send",
         "id": 1,
-        "params": {
+        "params": _signed_params({
             "skillId": "lead-enrichment",
             "callerId": "settle-test-caller",
             "message": {
@@ -200,7 +237,7 @@ def test_a2a_settle_completed_task(client):
                 "parts": [{"text": "Enrich Acme Corp"}],
                 "contextId": "ctx-settle-01",
             },
-        },
+        }),
     }
     send_resp = client.post("/api/a2a", json=send_body)
     assert send_resp.status_code == 200
@@ -212,12 +249,8 @@ def test_a2a_settle_completed_task(client):
         "/api/a2a/settle",
         json={"task_id": task_id, "tx_hash": "", "caller_id": "settle-test-caller"},
     )
-    assert settle_resp.status_code == 200
-    proof = settle_resp.get_json()
-    pos = proof.get("proof_of_settlement", {})
-    assert pos.get("task_id") == task_id
-    assert "result_hash" in pos
-    assert "settled_at" in pos
+    assert settle_resp.status_code == 400
+    assert "on-chain payment" in settle_resp.get_json()["error"]["message"]
 
 
 def test_a2a_send_rejects_non_axm_token(client):
@@ -227,11 +260,11 @@ def test_a2a_send_rejects_non_axm_token(client):
             "jsonrpc": "2.0",
             "id": 8,
             "method": "message/send",
-            "params": {
+            "params": _signed_params({
                 "skillId": "compliance-sbom",
                 "token": "SINC",
                 "message": {"parts": [{"text": "Run compliance scan"}]},
-            },
+            }),
         },
     )
     assert response.status_code == 200
@@ -269,12 +302,12 @@ def test_a2a_send_records_treasury_inflow_for_fee_only(client, app, monkeypatch)
             "jsonrpc": "2.0",
             "id": 7,
             "method": "message/send",
-            "params": {
+            "params": _signed_params({
                 "skillId": "compliance-sbom",
                 "axmPaidWei": str(10**18),
                 "txHash": "0xA2AFEE01",
                 "message": {"parts": [{"text": "Run compliance scan"}]},
-            },
+            }),
         },
     )
     assert response.status_code == 200

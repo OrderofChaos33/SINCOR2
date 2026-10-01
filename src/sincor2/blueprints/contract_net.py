@@ -14,7 +14,10 @@ from marketplace.contract_net import (
     demo_tasks,
     task_from_dict,
 )
-from marketplace.contract_net.types import clamp_invite_k
+from marketplace.contract_net.types import (
+    BASE_SEPOLIA_CHAIN_ID,
+    clamp_invite_k,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +29,9 @@ def _engine() -> ContractNetEngine:
     platform = current_app.extensions.get("sincor_platform") or {}
     engine = platform.get("contract_net")
     if engine is None:
-        engine = ContractNetEngine(ContractNetConfig(allow_hmac_bids=True))
+        engine = ContractNetEngine(
+            ContractNetConfig(chain_id=BASE_SEPOLIA_CHAIN_ID, allow_hmac_bids=True)
+        )
         platform = dict(platform)
         platform["contract_net"] = engine
         current_app.extensions["sincor_platform"] = platform
@@ -40,7 +45,10 @@ def _config_from_body(body: Dict[str, Any]) -> Optional[ContractNetConfig]:
     epsilon = float(body.get("epsilon", 0.12))
     epsilon = min(0.15, max(0.10, epsilon))
     return ContractNetConfig(
-        invite_k=invite_k, epsilon=epsilon, allow_hmac_bids=True
+        invite_k=invite_k,
+        epsilon=epsilon,
+        chain_id=BASE_SEPOLIA_CHAIN_ID,
+        allow_hmac_bids=True,
     )  # demo roster signs with HMAC (demo-only)
 
 
