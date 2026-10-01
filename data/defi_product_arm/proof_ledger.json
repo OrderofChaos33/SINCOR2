@@ -750,6 +750,476 @@
         "failed": 0,
         "note": "acceptance suite incl. deterministic 1000-case randomized loops"
       }
+    },
+    {
+      "entry_id": "ev_92a361a13585",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7241359,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p01_audit_invariants.py -q",
+        "suite": "tests/pytest/test_p01_audit_invariants.py",
+        "scope": "vault invariants: conservation/weights-cap fuzz, eligible-set monotonicity in budget, sequential deposit/withdraw flows, adversarial tables never crash or execute, zero-expectation cash fallback, dust capital conserved, cap waterfill regression",
+        "passed": 7,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_811e22867a2f",
+      "sku": "SINCOR-DEFI-P02-CLMM",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7273068,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p02_audit_invariants.py -q",
+        "suite": "tests/pytest/test_p02_audit_invariants.py",
+        "scope": "CLMM MEV detector: precision regression (no float false positives), boundary exact on/off, threshold matches exact rule fuzz, sensitivity env parsing exact, no-swap never flags fuzz, two-block sequences never flag fuzz, sub-threshold never flags fuzz, adversarial event amounts no crash, shift-sequence invariants fuzz, extreme ticks no crash",
+        "passed": 14,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_da6f5a8c970b",
+      "sku": "SINCOR-DEFI-P03-DARKPOOL",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7292213,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p03_audit_invariants.py -q",
+        "suite": "tests/pytest/test_p03_audit_invariants.py",
+        "scope": "dark pool: proceeds conservation fuzz, treasury cut minimum 15bps fuzz, fee cap + nonbricking fuzz, pause/unpause sequence fuzz, commitment deterministic and binding, record carries commitment-only fuzz, nonce sequence fuzz, match soundness fuzz, settlement conservation + fee fuzz (incl. max-uint), asset gate no-state-change fuzz, replay/double-ops, lifecycle status-machine fuzz, split-solver invariants fuzz, pause-guard interleaved fuzz",
+        "passed": 13,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_691d3c8facdb",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.730974,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p05_insurance_units.py::test_fuzzed_op_sequences_never_breach_floor -q",
+        "suite": "tests/pytest/test_p05_insurance_units.py::test_fuzzed_op_sequences_never_breach_floor",
+        "scope": "seeded fuzz re-run 2026-09-30: 500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused. Re-verifies earlier canonical entry ev_81d7599b675d",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_bc2ed37082c6",
+      "sku": "SINCOR-DEFI-P06-PERPS",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7334743,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p06_perp_units.py::test_fuzz_10k_drift_discipline -q",
+        "suite": "tests/pytest/test_p06_perp_units.py::test_fuzz_10k_drift_discipline",
+        "scope": "seeded fuzz re-run 2026-09-30: 10,000 seeded drift samples; banding, slippage guards, live gate hold. Re-verifies earlier canonical entry ev_4aa03f332ef5",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_d9e0be34917a",
+      "sku": "SINCOR-DEFI-P07-BRIDGE",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7354393,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p07_bridge_units.py::test_fuzz_ranking_never_routes_rejected_quotes, test_fuzz_settlement_conservation -q",
+        "suite": "tests/pytest/test_p07_bridge_units.py::test_fuzz_ranking_never_routes_rejected_quotes, test_fuzz_settlement_conservation",
+        "scope": "seeded fuzz re-run 2026-09-30: ranking never routes rejected quotes (500 iters: allowlist/slippage-cap/security-floor never bypassed, best-first ranking) + settlement conservation (settled+fee == net_out exact, treasury totals reconcile). Re-verifies earlier canonical entry ev_e366ac03e929",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_c94b13c65d74",
+      "sku": "SINCOR-DEFI-P08-RWA",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.737489,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p08_rwa_units.py::test_fuzz_random_lifecycle_preserves_invariants -q",
+        "suite": "tests/pytest/test_p08_rwa_units.py::test_fuzz_random_lifecycle_preserves_invariants",
+        "scope": "seeded lifecycle fuzz re-run 2026-09-30 (400 iters): pre-gate zero-yield, gate atomicity, integer conservation of assets and shares. Re-verifies earlier canonical entry ev_d18452dc90f6",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_e86c5167ec45",
+      "sku": "SINCOR-DEFI-P10-FLASHARB",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7414699,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p10_flash_units.py::test_no_loss_making_execution_in_fuzz -q",
+        "suite": "tests/pytest/test_p10_flash_units.py::test_no_loss_making_execution_in_fuzz",
+        "scope": "flash arb fuzz: no loss-making execution under fuzzed inputs",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_d1ab9d56b41d",
+      "sku": "SINCOR-DEFI-P11-DELTANEUTRAL",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7431579,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p11_delta_units.py::test_principal_invariant_under_price_move -q",
+        "suite": "tests/pytest/test_p11_delta_units.py::test_principal_invariant_under_price_move",
+        "scope": "delta-neutral: principal preserved under price moves",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_1234c35cbaff",
+      "sku": "SINCOR-DEFI-P14-PREDICT",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7450306,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p14_prediction_units.py::test_kelly_never_negative_or_over_cap_in_fuzz -q",
+        "suite": "tests/pytest/test_p14_prediction_units.py::test_kelly_never_negative_or_over_cap_in_fuzz",
+        "scope": "prediction: kelly fraction stays within [0, cap] under fuzzed inputs",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_5999d785a84e",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7469757,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p15_lending_units.py::test_rehypothecation_round_trip_holds_invariants, test_fuzz_invariants -q",
+        "suite": "tests/pytest/test_p15_lending_units.py::test_rehypothecation_round_trip_holds_invariants, test_fuzz_invariants",
+        "scope": "lending: rehypothecation round-trip preserves invariants + general fuzz invariants",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_20fe1b0c6f9f",
+      "sku": "SINCOR-DEFI-P16-DEXAGG",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.748741,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p16_dexagg_units.py::test_net_beats_best_single_venue -q",
+        "suite": "tests/pytest/test_p16_dexagg_units.py::test_net_beats_best_single_venue",
+        "scope": "DEX aggregator: 30 seeded randomized venue sets; split net output >= best single-venue net on every draw",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_98709d21f942",
+      "sku": "SINCOR-DEFI-P18-STRUCTURED",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7507539,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p18_structured_units.py::test_fuzz_invariants -q",
+        "suite": "tests/pytest/test_p18_structured_units.py::test_fuzz_invariants",
+        "scope": "structured products: fuzz invariants hold",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_225460d37e08",
+      "sku": "SINCOR-DEFI-P20-COMPLY",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7535408,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p20_compliance_units.py::test_fuzz_decision_matrix -q",
+        "suite": "tests/pytest/test_p20_compliance_units.py::test_fuzz_decision_matrix",
+        "scope": "compliance: fuzzed decision matrix stays within policy",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_e6d2ffdf8fa3",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7561789,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_p21_treasury_units.py::test_fuzz_allocations -q",
+        "suite": "tests/pytest/test_p21_treasury_units.py::test_fuzz_allocations",
+        "scope": "treasury DAO: fuzzed allocations stay within policy bounds",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_3a96964a1d65",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7577193,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p22.py::test_ac1_fuzzed_assets_1000_rejected, test_ac2_fuzz_1000_quote_sets -q",
+        "suite": "tests/pytest/test_defi_p22.py::test_ac1_fuzzed_assets_1000_rejected, test_ac2_fuzz_1000_quote_sets",
+        "scope": "stable yield: 1000 fuzzed assets rejected + 1000 fuzzed quote sets within bounds",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_ed35b1a75e53",
+      "sku": "SINCOR-DEFI-P23-NFTFI",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.759221,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p23.py::test_ac1_fuzz_1000_addresses_rejected, test_ac2_fuzz_1000_sequences -q",
+        "suite": "tests/pytest/test_defi_p23.py::test_ac1_fuzz_1000_addresses_rejected, test_ac2_fuzz_1000_sequences",
+        "scope": "NFT-fi: 1000 fuzzed addresses rejected + 1000 fuzzed sequences preserve invariants",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_9b4baf145f92",
+      "sku": "SINCOR-DEFI-P24-SOCIALFI",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7608936,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p24.py::test_ac1_fuzz_1000_fee_values, test_ac4_fuzz_1000_matcher_mutations_still_blocked -q",
+        "suite": "tests/pytest/test_defi_p24.py::test_ac1_fuzz_1000_fee_values, test_ac4_fuzz_1000_matcher_mutations_still_blocked",
+        "scope": "socialfi: 1000 fuzzed fee values + 1000 matcher mutations still blocked",
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_649681686cae",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "invariant_test",
+      "timestamp": 1790728965.7624037,
+      "commit": "fd968018ce2866e756ddbfba53215b5e51db4502",
+      "recorded_by": "xioix/buildout-20-defi-invariant-ledger",
+      "details": {
+        "command": "PYTHONPATH=src:. FLASK_ENV=test SECRET_KEY=<redacted> JWT_SECRET_KEY=<redacted> ADMIN_USERNAME=<redacted> ADMIN_PASSWORD=<redacted> STRIPE_SECRET_KEY=<redacted> python -m pytest tests/pytest/test_defi_p25.py::test_ac1_fuzz_1000_signal_sets -q",
+        "suite": "tests/pytest/test_defi_p25.py::test_ac1_fuzz_1000_signal_sets",
+        "scope": "agent portfolio: 1000 fuzzed signal sets handled within bounds",
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_d219e978fefb",
+      "sku": "OBS-03",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.3654406,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 1,
+        "passed": true,
+        "evidence": "Minimum-history gating verified AS-BUILT (diverges from spec text: the module gates at ANOMALY_MIN_SAMPLES=8 and MIN_TREND_SAMPLES=5, not 50 observations, and reports 'insufficient_baseline'/'trendable:false' rather than the literal 'insufficient_history'). Observed live: anomaly detector with 1 observation -> status 'insufficient_baseline', is_anomaly=False, no flags; trend tracker with 4 observations -> trendable=False, degrading=False. Below-gate data never raises flags. Live script /tmp/w2_obs03_walk.py L1."
+      }
+    },
+    {
+      "entry_id": "ev_ca177412d765",
+      "sku": "OBS-03",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.3669913,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 2,
+        "passed": true,
+        "evidence": "Drift flag names the dimension and carries baseline-vs-current numbers (module's real mechanisms; spec's 'bid cadence' metric is not implemented \u2014 metrics are token_usage, latency_ms, error_rate, quality_overall plus persona drift). Observed live: token_usage spike 1200->48000 after 15-sample baseline -> status 'anomaly', metric='token_usage' named, latest=48000.0, baseline_mean=1200.0, baseline_std=0.0, iqr_flag=True. Persona drift: crafted trait collapse -> status 'drift_alert', drift=0.2206 > bound 0.20; stable control -> 'stable'; re-anchor advisory advisory_only, mutated=False; persona file sha256 unchanged (advisory never mutates). L2."
+      }
+    },
+    {
+      "entry_id": "ev_7c5027846223",
+      "sku": "OBS-03",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.3687646,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 3,
+        "passed": true,
+        "evidence": "No false positives on steady state. Observed live: 30 flat deliverable observations (all 9 dimensions 0.85) -> agent_overview alerts == []; anomaly detector on 15 flat latency_ms=900.0 samples then 905.0 -> status 'normal', is_anomaly=False. L3."
+      }
+    },
+    {
+      "entry_id": "ev_2afa5eded6a2",
+      "sku": "OBS-03",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.3701148,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 4,
+        "passed": true,
+        "evidence": "Time alone never moves quality: 10 degrading observations ingested, then 100 evaluation ticks with zero new observations -> dimension_trend stats byte-identical before/after (unchanged=True, slope_per_sample=-0.02 preserved). NOT implemented: the ghosting-slash quality move \u2014 this module deliberately never reads the stake ledger (passive observer of scored deliverables only); stake-ledger grounding of the quality signal remains open. L4."
+      }
+    },
+    {
+      "entry_id": "ev_6e8e7319c75a",
+      "sku": "OBS-03",
+      "kind": "walkthrough",
+      "timestamp": 1790741232.3713965,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "all_boxes_ticked": false,
+        "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
+        "date": "2026-09-29T23:30:00-05:00",
+        "notes": "Automated walkthrough of the real drift_quality module (run_walkthrough() ALL_GREEN: drift_alert_fired, stable control, token anomaly, persona file unmutated, degrading trend; plus L1-L7 live paths incl. real SelfImprovingQualityEngine scoring 9 dimensions). Checklist boxes NOT ticked because: (a) spec requires founder-conducted walkthrough \u2014 this was worker-automated, not founder; (b) ghosting-slash box not exercisable (module does not read stake ledger; money-path actions forbidden); (c) coalescing box not exercisable (not implemented); (d) per-customer scoping box not exercisable (no customer concept in module); (e) CTA box: draft page links /signup?plan=obs-03-drift-quality-watch but NO /signup route exists anywhere in src/ (only /contact and /products are routed) \u2014 CTA target is dead; (f) 'read copy aloud' is founder-manual (mechanical banned-phrase scan passed: clean). Criteria 5 (reputation tie-in), 6 (OBS-02 trail links in alerts), 7 (coalescing), 8 (per-customer scoping) are unmet by the built module \u2014 see acceptance entries 1-4 for the honest as-built mapping."
+      }
+    },
+    {
+      "entry_id": "ev_0c206c9d70b3",
+      "sku": "AUD-01",
+      "kind": "rehearsal",
+      "timestamp": 1790741232.3725905,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "passed": true,
+        "failed": 0,
+        "evidence": "Full audit_pipeline rehearsal on a REAL obs02-produced B2-native archive (not a hand-built fixture): obs02.AuditTrail with freshly generated Ed25519 keypair, 8 entries recorded, export_archive -> forensic ingest_audit_trail_archive verified keccak-256 chain (obs02_chain), manifest pins (obs02_manifest_pins), per-entry Ed25519 signatures (obs02_signatures); genesis prev_hash == 32 zero bytes; head_hash == last entry hash. Timeline: 8 items, 4 agents, 0 unattributed. Findings: 4 (R1 recurring errors, R3 unrevealed commit, R5 quality decline, R6 repeat pattern). Tampered archive refused (hash_mismatch). Second packed archive (10 entries, Ed25519-signed): verified=True, 4 findings, 100% citation coverage (9/9 evidence hashes in verified archive), 4 checkable remediations (check_steps + acceptance + owner_role + status open), markdown + HTML rendered, methodology limitations stated, 'What's working' positive framing, JSON serializable, 1 unattributed heartbeat flagged never assigned. Pack-level tamper refused (entry_hash). Incident CONTENT was fixture data \u2014 no staging environment exists for this worker; a real-staging-incident rehearsal remains a founder-side step. Live script /tmp/w2_aud01_walk.py A1-A6."
+      }
+    },
+    {
+      "entry_id": "ev_76de5f27cac4",
+      "sku": "AUD-01",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.373885,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 2,
+        "passed": true,
+        "evidence": "Rehearsal completed end-to-end: pack -> verify -> reconstruct -> analyze -> remediate -> report on real tooling (see rehearsal entry). audit_pipeline verified=True, entry_count=10, finding_count=4, remediation_count=4. Caveat: incident content was fixture data; a real-staging-incident rehearsal is still open (founder-side)."
+      }
+    },
+    {
+      "entry_id": "ev_fbfffeee9b55",
+      "sku": "AUD-01",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.375089,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 3,
+        "passed": true,
+        "evidence": "Every finding cites at least one case-file exhibit with 100% citation coverage. Observed live: all 4 findings have non-empty evidence; 9/9 evidence entry_hashes resolve inside the verified archive's hash set (citation_coverage_100=True). Module invariant: 'Findings without evidence are never emitted' (methodology.evidence_rule)."
+      }
+    },
+    {
+      "entry_id": "ev_856a7b864b04",
+      "sku": "AUD-01",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.376418,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 4,
+        "passed": true,
+        "evidence": "Report template renders all required sections; nothing droppable. Observed sections: chain_of_custody, drift_quality, engagement (sku=AUD-01), executive_summary, findings, methodology, remediations, timeline_stats, verification (+ type/version). Rendered markdown starts '# Agent Forensic Audit Report' with Remediation checklist and Chain of custody sections; HTML starts '<!DOCTYPE html>'; methodology.limitations non-empty; report JSON-serializable. Note: exhibits live as per-finding evidence citations (entry hashes) rather than a standalone exhibits-index section."
+      }
+    },
+    {
+      "entry_id": "ev_3da985a8100f",
+      "sku": "AUD-01",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.3781743,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 5,
+        "passed": true,
+        "evidence": "Turnaround within the 5-business-day SLA for the automated rehearsal (pipeline completes in seconds; recorded timestamps bound it). Caveat: this proves the tooling path, not a human reviewer's intake-to-delivery cadence \u2014 a real engagement SLA proof needs a founder-run rehearsal."
+      }
+    },
+    {
+      "entry_id": "ev_1143839ad487",
+      "sku": "AUD-01",
+      "kind": "acceptance_run",
+      "timestamp": 1790741232.3795302,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "criterion": 7,
+        "passed": true,
+        "evidence": "Confidentiality/scoping verified: forensic ingest reads ONLY the supplied archive; timeline attribution contained exactly the archive's agents (real B2 archive: 4 agents, 0 unattributed; packed archive: 1 unattributed heartbeat flagged in attribution, never assigned to an agent). No cross-archive data. Note: single-archive scope by construction; no multi-customer fixture was run."
+      }
+    },
+    {
+      "entry_id": "ev_977a317ff68e",
+      "sku": "AUD-01",
+      "kind": "walkthrough",
+      "timestamp": 1790741232.380829,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "all_boxes_ticked": false,
+        "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
+        "date": "2026-09-29T23:30:00-05:00",
+        "notes": "Automated walkthrough of the real forensic_audit module (A1-A6 live, all green): real B2-native archive path (keccak-256 chain + Ed25519 via repo crypto), tamper refusal on both paths, full pipeline with 100% evidence citation, checkable remediations, rendered report with stated limits. Checklist boxes NOT ticked because: (a) spec requires founder-conducted \u2014 this was worker-automated; (b) delivery receipt box needs the founder as stand-in signatory \u2014 a worker cannot sign it; (c) CTA clicks are founder-manual (/contact IS routed GET/POST; /products IS routed \u2014 statically verified); (d) 'read copy aloud' is founder-manual (mechanical banned-phrase scan passed: clean). Criterion 1 (playbook at docs/specs/obs-skus/AUD-01-playbook.md) is UNMET \u2014 the file does not exist; criterion 6 (signed delivery receipt) is UNMET \u2014 needs founder. Blocker flagged to parent."
+      }
+    },
+    {
+      "entry_id": "ev_812459f45ca5",
+      "sku": "AUD-02",
+      "kind": "rehearsal",
+      "timestamp": 1790741232.3823507,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "passed": true,
+        "failed": 0,
+        "evidence": "Full AUD-02 tooling-chain rehearsal (B5's combined walkthrough) on real modules: PHI-bearing records -> redact_record(s) (profile sincor-phi-guardrail): all direct identifiers redacted (NAME/SSN/DOB/PHONE/EMAIL/ADDRESS/MRN/INSURANCE_ID), free-text patterns scrubbed (phone/ssn/email in notes), nested structures scrubbed, biometric fields dropped not tokenized, workforce identifiers preserved (agent_id, city, state); redaction report carries zero original values (12 touches across 2 records). Deterministic exports: export_jsonl_pages twice -> byte-identical (2 pages), export_csv twice -> byte-identical with sorted columns; page hashes unique. Chain of custody: build_custody_manifest + Ed25519 sign -> verify ok via embedded key AND pinned key; wrong-key pinning refused ('pinned key' mismatch); post-sign tamper refused; verify_export_pages ok, tampered page refused; manifest carries HIPAA boundary disclaimer. Setup checklist: sections data-sources/retention/reviewers/verification, pricing '$2,500 one-time / $999/month', not_included explicitly names certification, Legal advice, Business Associate Agreement; disclaimer mentions HIPAA. Forbidden-claim scan over all customer-facing strings (disclaimer, scope, checklist markdown, custody manifest, redaction profile): zero hits for HIPAA/SOC2/certification/compliance-guarantee claims. Combined AUD-01+AUD-02: pack -> audit_pipeline (verified=True) -> redact timeline -> deterministic export -> signed custody manifest pinning the audit head_hash -> re-verify all green. Caveat: this rehearses the guardrails+exports+custody tooling, NOT the spec's engagement flow (control->evidence maps, monthly packs, change watch are not implemented) \u2014 see walkthrough notes. Live script /tmp/w2_aud02_walk.py C1-C6."
+      }
+    },
+    {
+      "entry_id": "ev_960bb3728bcc",
+      "sku": "AUD-02",
+      "kind": "walkthrough",
+      "timestamp": 1790741232.3837817,
+      "commit": "fd96801",
+      "recorded_by": "w2-builder (sku-ship-24-7 cron worker)",
+      "details": {
+        "all_boxes_ticked": false,
+        "conducted_by": "sku-ship-24-7 automated walkthrough 2026-09-29 (XioiX worker, not founder-conducted)",
+        "date": "2026-09-29T23:30:00-05:00",
+        "notes": "Automated walkthrough of the real compliance_pack module (C1-C6 live, all green): PHI redaction profile, deterministic paginated exports, Ed25519 chain-of-custody, setup checklist, honest-boundary scans, and the combined AUD-01+AUD-02 custody chain. Checklist boxes NOT ticked because: (a) spec requires founder-conducted \u2014 this was worker-automated; (b) control-map walk (10+ controls traced to platform records) not exercisable \u2014 no control->evidence map tooling exists in the built module; (c) monthly-pack delta box not exercisable \u2014 no pack assembly tooling exists; (d) change-watch box not exercisable \u2014 not implemented; (e) delivery receipt box needs founder as stand-in signatory; (f) CTA clicks founder-manual (/contact IS routed GET/POST \u2014 statically verified); (g) 'read copy aloud' founder-manual (mechanical banned-phrase scan passed: clean). Acceptance criteria 1-7 AS WRITTEN are unmet by the built tooling (no playbook file, no control-map/monthly-pack/change-watch tooling, no founder-signed receipt). The built module is real working guardrails+exports+custody software \u2014 the gap is spec-vs-build scope, flagged to parent: either build the engagement tooling or revise the spec criteria."
+      }
     }
   ]
 }

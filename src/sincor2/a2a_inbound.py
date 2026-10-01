@@ -1,4 +1,5 @@
-"""Inbound A2A engine. Agents register, heartbeat, bid, prove; AXM settles on Base."""
+"""Inbound A2A engine. Agents register, heartbeat, bid, prove; AXM-denominated
+accounting, with user-initiated transfers verified on Base."""
 from __future__ import annotations
 
 import hashlib
@@ -31,10 +32,8 @@ AUCTION_WINDOW_MS = 500
 MERIT_THRESHOLD_AXM = 5.0
 MAX_AGENTS = 10000
 MAX_OPEN_TASKS = 200
-DEMO_SECRET = os.environ.get("SINCOR_A2A_SECRET", "sincor-a2a-demo")
 _AGENT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _WALLET_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-_REGISTERED = False
 _FABRIC = None
 _FABRIC_LOCK = threading.Lock()
 _PLATFORM_AGENT_ID = "sincor-agent-swarm"
@@ -109,7 +108,14 @@ def _slug(value: str) -> str:
     return (re.sub(r"[^a-z0-9]+", "-", (value or "agent").lower()).strip("-") or "agent")[:80]
 
 
-def sign_payload(payload: Dict[str, Any], secret: str = DEMO_SECRET) -> str:
+def sign_payload(payload: Dict[str, Any], secret: str) -> str:
+    """HMAC-SHA256 sign a canonicalised payload.
+
+    ``secret`` is mandatory: there is deliberately no module-level default.
+    A hardcoded fallback secret shipped here until 2026-09-30 and was
+    removed (no route ever used it). Callers must supply their own secret
+    from configuration; never commit one to the repo.
+    """
     body = json.dumps({k: payload[k] for k in sorted(payload) if k != "signature"}, separators=(",", ":"), sort_keys=True)
     return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
@@ -284,6 +290,47 @@ def _http_error(message: str, status: int, **extra: Any):
     return jsonify(body), status
 
 
+class RegistrationAuthError(Exception):
+    """Re-registration without valid proof of control (maps to HTTP 403)."""
+
+
+# Re-registration proof (G2.2): the owner of an existing agent record proves
+# control of the registered wallet with an EIP-191 signature over the exact
+# new record contents plus a freshness timestamp. Binding the full record
+# (not just the agent_id) keeps the signature from becoming a bearer token
+# that could authorize a different wallet/callback swap.
+REREGISTRATION_DOMAIN = "SINCOR-A2A-REREGISTER-v1"
+REGISTRATION_PROOF_FRESHNESS_MS = 5 * 60 * 1000
+
+
+def _reregistration_message_from_parsed(parsed: Dict[str, Any], ts_ms: int) -> str:
+    skills = json.dumps(parsed.get("skills") or [], sort_keys=True,
+                        separators=(",", ":"))
+    return "\n".join([
+        REREGISTRATION_DOMAIN,
+        "agent_id:%s" % parsed["agent_id"],
+        "name:%s" % parsed.get("name", ""),
+        "description:%s" % parsed.get("description", ""),
+        "version:%s" % parsed.get("version", ""),
+        "capability_tags:%s" % ",".join(parsed.get("capability_tags") or []),
+        "skills:%s" % skills,
+        "rpc_callback:%s" % parsed.get("rpc_callback", ""),
+        "wallet:%s" % (parsed.get("wallet") or "").lower(),
+        "chain_id:%s" % parsed.get("chain_id", ""),
+        "sinc_stake:%s" % parsed.get("sinc_stake", 0),
+        "ts:%d" % int(ts_ms),
+    ])
+
+
+def build_reregistration_message(body: Dict[str, Any], ts_ms: int) -> str:
+    """Canonical challenge message a client signs to authorize re-registering
+    an existing agent record. Normalizes exactly like the server (same
+    function the write path uses), so both sides must produce byte-identical
+    text. Raises ValueError on invalid registration bodies."""
+    return _reregistration_message_from_parsed(_normalize_registration(body),
+                                               ts_ms)
+
+
 def _safe_url(value: Any) -> str:
     url = str(value or "").strip()
     parsed = urlparse(url)
@@ -352,6 +399,13 @@ def ensure_platform_agent() -> Dict[str, Any]:
     return _impl()
 
 
-def register(app: Flask) -> None:
+def register(app: Flask) -> bool:
+    """Mount the inbound A2A blueprint — idempotent.
+
+    Delegates to :func:`sincor2.a2a_inbound_ext.mount`, which skips
+    re-registration when the ``a2a_inbound`` blueprint is already on
+    *app*. Returns True when this call mounted the routes, False when
+    they were already present.
+    """
     from sincor2.a2a_inbound_ext import mount
-    mount(app)
+    return mount(app)

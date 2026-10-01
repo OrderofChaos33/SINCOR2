@@ -158,9 +158,12 @@ interface IExecutionEscrowManager {
     error InvalidResultHash();
     error InsufficientStake(uint256 required, uint256 provided);
     error InsufficientBond(uint256 required, uint256 provided);
+    error ChallengerBondBelowFloor(uint256 floor, uint256 provided);
     error InsufficientReAuctionBalance(uint256 required, uint256 available);
     error BondExceedsRecordableLimit(uint256 max, uint256 provided);
     error FundingMismatch(uint256 expected, uint256 provided);
+    error DisputeHasEvidence();
+    error EvidenceWindowOpen();
     error TransferFailed();
     error InvalidStakeBps();
     error NothingToWithdraw();
@@ -203,17 +206,46 @@ interface IExecutionEscrowManager {
 
     /**
      * @notice Opens a quality dispute against a submitted result.
-     * @dev The poster disputes for free (they are the harmed party). Any other
-     *      challenger must post `challengerBond`, which is returned if the
-     *      dispute is upheld and slashed to the poster's fund if rejected.
+     * @dev P0/W-24: the poster bonds exactly like any challenger -- a free
+     *      poster dispute is a zero-cost delay attack on the worker's payout.
+     *      The bond is returned if the dispute is upheld or if the
+     *      adjudicator goes dark and timeout() fires; it is forfeited if the
+     *      dispute is rejected (third-party challenger: slashed to the
+     *      poster's re-auction fund; poster filing on their own auction:
+     *      paid to the worker as compensation, so a rejected self-dispute
+     *      cannot recycle the "slash" into the filer's own fund).
+     * @param auctionId The escrow whose submitted result is disputed.
+     * @param batchDigest Evidence digest for the dispute. EVIDENCE IS
+     *        REQUIRED: the digest is unvalidated (only checked against
+     *        bytes32(0)), but any dispute filed with batchDigest ==
+     *        bytes32(0) is auto-rejected by ANYONE via
+     *        rejectEvidenceFreeDispute() once DISPUTE_EVIDENCE_WINDOW (6h)
+     *        passes -- no adjudication, bond forfeited. An honest challenger
+     *        (poster or third party) with a genuine grievance MUST attach a
+     *        nonzero digest, or their dispute dies at 6h without a ruling.
      */
     function openQualityDispute(bytes32 auctionId, bytes32 batchDigest) external payable;
+
+    /**
+     * @notice Permissionless fast rejection of an evidence-free dispute.
+     * @dev Fires only when the dispute was filed with batchDigest ==
+     *      bytes32(0) (no evidence attached) AND the short
+     *      DISPUTE_EVIDENCE_WINDOW has passed since filing. Resolves exactly
+     *      like an adjudicator rejection -- worker paid in full, forfeited
+     *      bond routed per the reject rule (third-party challenger: slashed
+     *      to the poster's fund; poster-filed: paid to the worker) -- but
+     *      without waiting out the full adjudication window. The adjudicator
+     *      can always reject earlier via resolveQualityDispute(auctionId, false).
+     */
+    function rejectEvidenceFreeDispute(bytes32 auctionId) external;
 
     /**
      * @notice Adjudicator resolves an active dispute.
      * @param slashWorker True: 50% of stake -> poster fund, poster refunded,
      *        worker keeps remaining 50% of stake. False: worker paid in full,
-     *        false challenger's bond -> poster fund.
+     *        forfeited bond routed per the reject rule -- false third-party
+     *        challenger's bond -> poster's fund; rejected poster-filed
+     *        dispute's bond -> the worker.
      */
     function resolveQualityDispute(bytes32 auctionId, bool slashWorker) external;
 

@@ -99,7 +99,9 @@ def test_build_commit_tx_encodes(client):
 
 def test_build_reveal_tx_encodes(client):
     salt = "0x" + "ab" * 32
-    agent_hash = "0x" + compute_commitment(10**18, bytes.fromhex("ab" * 32), "agent-1").hex()
+    aid = bytes.fromhex("01" * 32)
+    agent_hash = "0x" + compute_commitment(
+        10**18, bytes.fromhex("ab" * 32), "agent-1", aid, 8453).hex()
     tx = client.build_reveal_tx("0x" + "01" * 32, 10**18, salt, agent_hash, SENDER, **_offline())
     fn, params = client.auction.decode_function_input(tx["data"])
     assert fn.fn_name == "reveal"
@@ -138,13 +140,31 @@ def test_escrow_builders_encode(client):
     assert params["bidAmount"] == 10**18
 
 
-def test_compute_commitment_pairs_with_shim():
-    # Byte-identical to sincor2.a2a_inbound_market.sealed_commitment so shim
-    # clients can reuse commitments when the contracts go live.
+def test_compute_commitment_matches_contract_scheme():
+    # The onchain scheme now binds auctionId + chainId (W-4); it must be
+    # byte-identical to what CommitRevealAuction.reveal derives:
+    # keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+    #                           salt, agentIdHash)).
+    from eth_hash.auto import keccak as _keccak
+
+    salt = bytes.fromhex("cd" * 32)
+    aid = bytes.fromhex("07" * 32)
+    agent_id_hash = _keccak(b"agent-9")
+    expected = _keccak(
+        aid + (84532).to_bytes(32, "big")
+        + (3 * 10**18).to_bytes(32, "big") + salt + agent_id_hash)
+    assert compute_commitment(3 * 10**18, salt, "agent-9", aid, 84532) == expected
+
+
+def test_compute_commitment_diverges_from_offchain_shim():
+    # The offchain shim (sealed_commitment) intentionally omits the
+    # auctionId/chainId bindings; shim hashes must not equal onchain
+    # commitments for the same inputs.
     from sincor2.a2a_inbound_market import sealed_commitment
 
     salt = bytes.fromhex("cd" * 32)
-    assert compute_commitment(3 * 10**18, salt, "agent-9") == sealed_commitment(
+    aid = bytes.fromhex("07" * 32)
+    assert compute_commitment(3 * 10**18, salt, "agent-9", aid, 84532) != sealed_commitment(
         3 * 10**18, salt, "agent-9")
 
 

@@ -13,7 +13,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 VECTOR_DIM = 64
 MICRO_AXM = 1_000_000
-BASE_CHAIN_ID = 8453
+# Known chain ids — informational only. These are NOT config defaults:
+# ContractNetConfig requires chain_id to be set explicitly per deployment
+# (W-3: fail closed instead of silently defaulting to mainnet).
+BASE_CHAIN_ID = 8453  # Base mainnet
+BASE_SEPOLIA_CHAIN_ID = 84532  # Base Sepolia (contract deployment target)
 # Domain verifying contract: platform treasury (canonical, Base).
 # The market does not move funds itself; this binds typed-data to the chain.
 DEFAULT_VERIFYING_CONTRACT = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
@@ -54,7 +58,14 @@ class ContractNetConfig:
     junior_task_threshold: int = 3
     junior_subsidy_multiplier: float = 2.0
     eval_tokens_per_bid: int = 800  # assumed LLM tokens per unfiltered bid draft
-    chain_id: int = BASE_CHAIN_ID
+    chain_id: Optional[int] = None
+    """EIP-712 domain chain id. Required: no default on purpose.
+
+    W-3 fix: previously this silently defaulted to 8453 (Base mainnet) while
+    contracts target Base Sepolia (84532), making testnet signatures
+    byte-valid wherever the domain parameters are reused. Set this to the
+    chain the contracts actually deploy on (e.g. BASE_SEPOLIA_CHAIN_ID).
+    """
     verifying_contract: str = DEFAULT_VERIFYING_CONTRACT
     domain_name: str = DOMAIN_NAME
     domain_version: str = DOMAIN_VERSION
@@ -63,6 +74,14 @@ class ContractNetConfig:
     allow_hmac_bids: bool = False  # HMAC is demo-only; money path needs secp256k1
 
     def __post_init__(self) -> None:
+        if self.chain_id is None:
+            raise ValueError(
+                "ContractNetConfig requires an explicit chain_id per deployment "
+                "(W-3: refusing to default to a chain id). Pass chain_id=<the "
+                "chain your contracts deploy on>, e.g. BASE_SEPOLIA_CHAIN_ID."
+            )
+        if self.chain_id <= 0:
+            raise ValueError(f"chain_id must be positive, got {self.chain_id!r}")
         if not (self.invite_k_min <= self.invite_k <= self.invite_k_max):
             raise ValueError(
                 f"invite_k must be in [{self.invite_k_min}, {self.invite_k_max}], got {self.invite_k}"

@@ -66,7 +66,14 @@ def _keccak256(data: bytes) -> bytes:
 
 
 def sealed_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
-    """keccak256(abi.encodePacked(bytes32(price), salt, keccak256(agent_id)))."""
+    """Offchain sealed-bid commitment:
+    keccak256(abi.encodePacked(bytes32(price), salt, keccak256(agent_id))).
+
+    Byte-identical to the server's offchain ``sealed_commitment``; this is
+    for the OFFCHAIN API flow only. It is NOT the onchain scheme (which
+    additionally binds auctionId and chainId) and must never be submitted
+    to ``CommitRevealAuction.commit()``.
+    """
     if price_wei <= 0:
         raise ValueError("price_wei must be positive")
     if len(salt) != 32:
@@ -157,6 +164,12 @@ class Runner:
         # process made.  In-pass dedupe only; the server is the source
         # of truth for TTL.  See ensure_heartbeat().
         self._hb_at = {}
+        # Operator heartbeat token for the authenticated /v1/a2a/heartbeat
+        # (G2.3). The liveness agents don't hold their wallet keys, so they
+        # authenticate with the same shared-operator credential the wardrobe
+        # heartbeat uses. Read lazily per pass so a rotation doesn't need a
+        # runner restart.
+        self._hb_token_warned = False
         # Flips to False on any partial failure (e.g. one agent's
         # heartbeat dies).  one_pass()/main() turn this into a nonzero
         # process exit code so cron can detect a degraded pass.
@@ -190,8 +203,17 @@ class Runner:
         now = int(time.time() * 1000)
         if now - self._hb_at.get(aid, 0) < HEARTBEAT_FRESH_MS:
             return True
+        # Authenticated heartbeat (G2.3): liveness agents are first-party
+        # ops agents, so they use the operator token, not wallet signatures.
+        token = (os.environ.get("AGENT_HEARTBEAT_TOKEN") or "").strip()
+        hb_headers = {"X-Sincor-Heartbeat": token} if token else None
+        if not token and not self._hb_token_warned:
+            self._hb_token_warned = True
+            log("WARNING: AGENT_HEARTBEAT_TOKEN is not set — heartbeats "
+                "will be rejected (401) once the server enforces G2.3 auth")
         try:
-            post_json(self.base_url, "/v1/a2a/heartbeat", {"agent_id": aid})
+            post_json(self.base_url, "/v1/a2a/heartbeat", {"agent_id": aid},
+                      headers=hb_headers)
         except HttpError as e:
             if e.status == 404:
                 # self-heal: re-register a missing agent (idempotent:
@@ -201,7 +223,7 @@ class Runner:
                     post_json(self.base_url, "/v1/a2a/register",
                               register_agent_body(agent))
                     post_json(self.base_url, "/v1/a2a/heartbeat",
-                              {"agent_id": aid})
+                              {"agent_id": aid}, headers=hb_headers)
                 except HttpError as e2:
                     log(f"  re-register failed for {aid}: {e2}")
                     return False
