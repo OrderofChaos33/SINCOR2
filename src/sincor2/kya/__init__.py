@@ -10,6 +10,23 @@ from sincor2.kya.receipts import ReceiptBook, get_receipts
 from sincor2.kya.airdrop_quest import AirdropQuest, get_quest
 from sincor2.kya.merkle import MerkleTree, verify_proof
 from sincor2.kya.pricing import PRICE_BOOK
+from sincor2.kya.zk_attestations import (
+    ATTESTATION_VERSION,
+    CLAIM_KIND_CAPABILITY,
+    CLAIM_KIND_TIER,
+    DEFAULT_TTL_SEC,
+    TIER_T1,
+    TIER_T2,
+    TIER_T3,
+    KYAAttestation,
+    VerificationResult,
+    ZKAttestationIssuer,
+    batch_verify,
+    tier_of,
+    tier_satisfies,
+    validate_capability_name,
+    verify_attestation,
+)
 
 __all__ = [
     "KYARegistry",
@@ -26,4 +43,19 @@ __all__ = [
     "get_receipts",
     "get_quest",
     "PRICE_BOOK",
+    "ATTESTATION_VERSION",
+    "CLAIM_KIND_CAPABILITY",
+    "CLAIM_KIND_TIER",
+    "DEFAULT_TTL_SEC",
+    "TIER_T1",
+    "TIER_T2",
+    "TIER_T3",
+    "KYAAttestation",
+    "VerificationResult",
+    "ZKAttestationIssuer",
+    "batch_verify",
+    "tier_of",
+    "tier_satisfies",
+    "validate_capability_name",
+    "verify_attestation",
 ]

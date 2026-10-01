@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import threading
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sincor2.kya.store import JsonStore
 
@@ -26,6 +27,18 @@ def _now() -> int:
 def record_hash(obj: Any) -> str:
     blob = json.dumps(obj, separators=(",", ":"), sort_keys=True, default=str)
     return "0x" + hashlib.sha256(blob.encode()).hexdigest()
+
+
+_CAPABILITY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+
+def _clean_capabilities(raw: Any) -> List[str]:
+    out: List[str] = []
+    for item in raw or []:
+        name = str(item or "").strip().lower()
+        if name and _CAPABILITY_RE.match(name) and name not in out:
+            out.append(name)
+    return out
 
 
 class KYARegistry:
@@ -77,6 +90,7 @@ class KYARegistry:
             "created_at": _now(),
             "updated_at": _now(),
             "chain_id": CHAIN_ID,
+            "capabilities": _clean_capabilities(body.get("capabilities")),
         }
         rec["record_hash"] = record_hash(rec)
         with self.lock:
@@ -135,6 +149,41 @@ class KYARegistry:
             raise PermissionError("stake below minimum")
         rec["verified"] = True
         rec["status"] = "verified"
+        rec["updated_at"] = _now()
+        rec["record_hash"] = record_hash(rec)
+        with self.lock:
+            self.records[kya_id] = rec
+            self._persist()
+        return dict(rec)
+
+    def grant_capability(self, agent_id: str, capability: str) -> Dict[str, Any]:
+        name = str(capability or "").strip().lower()
+        if not name or not _CAPABILITY_RE.match(name):
+            raise ValueError("bad capability name")
+        rec = self.lookup(agent_id=agent_id)
+        if not rec:
+            raise KeyError("agent not listed")
+        caps = [str(c) for c in (rec.get("capabilities") or [])]
+        if name not in caps:
+            caps.append(name)
+        rec["capabilities"] = caps
+        rec["updated_at"] = _now()
+        rec["record_hash"] = record_hash(rec)
+        with self.lock:
+            self.records[rec["kya_id"]] = rec
+            self._persist()
+        return dict(rec)
+
+    def revoke(self, kya_id: str, reason: str = "") -> Dict[str, Any]:
+        """Revoke a KYA identity. Terminal: no revive path on this record."""
+        rec = self.lookup(kya_id=kya_id)
+        if not rec:
+            raise KeyError("unknown kya")
+        rec["revoked"] = True
+        rec["verified"] = False
+        rec["status"] = "revoked"
+        rec["revoked_at"] = _now()
+        rec["revoked_reason"] = str(reason or "")[:300]
         rec["updated_at"] = _now()
         rec["record_hash"] = record_hash(rec)
         with self.lock:
