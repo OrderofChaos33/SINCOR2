@@ -90,6 +90,7 @@ contract CreatorTokenFactory {
     error NotAdmin();
     error SymbolTaken();
     error NotScreened();
+    error ZeroCreator();
 
     constructor(address _admin) {
         admin = _admin;
@@ -108,6 +109,7 @@ contract CreatorTokenFactory {
     ) external returns (address token) {
         if (msg.sender != admin) revert NotAdmin();
         if (!screened) revert NotScreened();
+        if (creator == address(0)) revert ZeroCreator();
         if (tokenBySymbol[symbol_] != address(0)) revert SymbolTaken();
         token = address(new CreatorToken(name_, symbol_, creator, policyVersion, curveInventory));
         tokenBySymbol[symbol_] = token;

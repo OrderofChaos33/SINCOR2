@@ -6,8 +6,9 @@ AXIOM (AXM) is the PRIMARY and sole settlement token for all new A2A quotes,
 billing, and platform fees per CEO directive 2026-08-16 (corrected address 2026-08-18).
 SINC is retained strictly for legacy residual holders and explicit opt-in.
 
-Platform fee: 5 % of every confirmed payment is routed to the treasury.
-The remaining 95 % is recorded for the payee.
+Platform fee: 5 % of every confirmed payment is recorded for routing to the
+treasury (ledger entry; on-chain conversion/deposit happens when the swap
+executor is armed). The remaining 95 % is recorded for the payee.
 
 CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665d25CE088793E916D7892f8.
 """
@@ -111,7 +112,7 @@ class SettlementRecord:
     payee: str
     token_symbol: str
     amount: str
-    platform_fee: str       # 5 % of amount routed to treasury
+    platform_fee: str       # 5 % of amount recorded for treasury routing
     payee_amount: str       # 95 % of amount for the payee
     treasury_address: str
     status: str
@@ -210,8 +211,9 @@ class SettlementCoordinator:
     ) -> SettlementRecord:
         """Mark a quote as paid, compute the 5 % platform fee, and record the settlement.
 
-        The platform fee is routed to the treasury; the remaining 95 % is
-        recorded as the payee's amount.
+        The platform fee is recorded for routing to the treasury; the remaining
+        95 % is recorded as the payee's amount. No on-chain movement happens
+        here — conversion/deposit is the swap executor's job when armed.
         """
         if quote_id not in self.quotes:
             raise KeyError(f"Quote '{quote_id}' not found")

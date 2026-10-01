@@ -290,6 +290,96 @@ class PaymentVerifier:
         )
 
     @classmethod
+    def verified_tx_data(cls, tx_hash: str, expected_amount_wei: int,
+                         expected_to: str = TREASURY_WALLET
+                         ) -> Optional[Dict[str, Any]]:
+        """Like :meth:`is_verified`, but returns chain-verified tx data.
+
+        Returns ``{"tx_hash", "block_number", "status", "verified_transfer",
+        "verification": "onchain"}`` when the receipt is successful and
+        carries a qualifying AXM Transfer log; a ``"dev_bypass"``-labeled
+        record in non-production envs (honestly marked, never mistaken for
+        on-chain verification); or ``None`` when the payment cannot be
+        verified.  Raises :class:`PaymentRpcError` when every provider fails
+        transiently (caller should treat that as "unavailable", fail closed).
+        """
+        env = os.getenv("FLASK_ENV", "production").lower()
+        if env in _DEV_ENVS:
+            logger.warning("PaymentVerifier: skipping on-chain check (non-prod env)")
+            return {"tx_hash": tx_hash, "block_number": None, "status": 1,
+                    "verified_transfer": False, "verification": "dev_bypass"}
+
+        if not tx_hash or not str(tx_hash).startswith("0x"):
+            return None
+        if str(tx_hash).startswith("0xSIMULATED"):
+            return None
+
+        urls = cls._rpc_urls()
+        if not urls:
+            logger.error("PaymentVerifier: no RPC URLs configured")
+            raise cls.PaymentRpcError("no RPC URLs configured")
+
+        transient_errors: List[str] = []
+        hard_reject = False
+        verified_receipt: Optional[Dict[str, Any]] = None
+
+        for rpc_url in urls:
+            for attempt in range(1, cls._MAX_ATTEMPTS + 1):
+                try:
+                    receipt = cls._fetch_receipt(rpc_url, tx_hash)
+                    if not receipt:
+                        transient_errors.append(f"{rpc_url}: receipt null (attempt {attempt})")
+                        time.sleep(cls._BACKOFF_BASE * (2 ** (attempt - 1)))
+                        continue
+                    status = str(receipt.get("status", "")).lower()
+                    if status not in ("0x1", "1"):
+                        logger.warning(
+                            "PaymentVerifier: tx %s not successful (status=%s) via %s",
+                            tx_hash, status, rpc_url,
+                        )
+                        hard_reject = True
+                        break
+                    if cls._validate_transfer_log(
+                            receipt.get("logs") or [],
+                            expected_to=expected_to,
+                            expected_amount_wei=expected_amount_wei):
+                        verified_receipt = receipt
+                        break
+                    hard_reject = True
+                    break
+                except Exception as err:
+                    msg = f"{rpc_url} attempt {attempt}: {err}"
+                    transient_errors.append(msg)
+                    logger.warning("PaymentVerifier RPC error: %s", msg)
+                    time.sleep(cls._BACKOFF_BASE * (2 ** (attempt - 1)))
+            if hard_reject or verified_receipt is not None:
+                break
+
+        if verified_receipt is None:
+            if hard_reject:
+                return None
+            logger.error(
+                "PaymentVerifier: all RPC providers failed transiently for %s: %s",
+                tx_hash, "; ".join(transient_errors[-6:]),
+            )
+            raise cls.PaymentRpcError(
+                f"unable to verify payment {tx_hash}: all RPC providers failed"
+            )
+
+        block_raw = verified_receipt.get("blockNumber")
+        if isinstance(block_raw, int):
+            block_number = block_raw
+        else:
+            try:
+                block_number = int(block_raw, 16) if block_raw else None
+            except (TypeError, ValueError):
+                block_number = None
+        cls._cache_set(cls._cache_key(tx_hash, expected_to, expected_amount_wei),
+                       True)
+        return {"tx_hash": tx_hash, "block_number": block_number, "status": 1,
+                "verified_transfer": True, "verification": "onchain"}
+
+    @classmethod
     def _validate_transfer_log(
         cls,
         logs: List[Dict[str, Any]],

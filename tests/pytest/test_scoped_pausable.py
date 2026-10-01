@@ -121,8 +121,10 @@ class Env:
         bidder = bidder or self.bidder
         salt = self.w3.keccak(text=f"salt-{aid.hex()}-{bidder}")
         agent_id = self.w3.keccak(text=f"agent-{bidder}")
+        # W-4: preimage binds auctionId + chainId
         commitment = self.w3.solidity_keccak(
-            ["uint256", "bytes32", "bytes32"], [price, salt, agent_id])
+            ["bytes32", "uint256", "uint256", "bytes32", "bytes32"],
+            [aid, self.w3.eth.chain_id, price, salt, agent_id])
         self.auction.functions.commit(aid, commitment).transact(
             {"from": bidder, **TX})
         self.secrets[(aid, bidder)] = (price, salt, agent_id)

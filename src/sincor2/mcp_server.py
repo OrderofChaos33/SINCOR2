@@ -198,13 +198,18 @@ class _Denied(Exception):
 
 def _sealed_commitment(price_wei: int, salt: bytes,
                        agent_id: str) -> bytes:
-    """Compute keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash)).
+    """Compute the offchain sealed-bid commitment for the platform API.
 
-    Reuses ``sincor2.a2a_inbound_market.sealed_commitment`` — the one canonical
-    implementation (per AUCTION_GROUND_TRUTH.md) — instead of re-implementing
-    keccak here. If the import is unavailable (e.g. the MCP host cannot import
-    the platform package), the caller must supply a precomputed ``commitment``
-    hex; the bidder-kit documents the exact scheme.
+    Reuses ``sincor2.a2a_inbound_market.sealed_commitment`` — the one
+    canonical OFFCHAIN implementation (per AUCTION_GROUND_TRUTH.md) —
+    instead of re-implementing keccak here. The offchain scheme is
+    ``keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash))``; it
+    is NOT the onchain scheme (which additionally binds auctionId and
+    chainId) and must never be submitted to
+    ``CommitRevealAuction.commit()``. If the import is unavailable (e.g.
+    the MCP host cannot import the platform package), the caller must
+    supply a precomputed ``commitment`` hex; the bidder-kit documents the
+    exact offchain scheme.
     """
     try:
         from sincor2.a2a_inbound_market import sealed_commitment
@@ -337,7 +342,7 @@ TOOLS: List[Dict[str, Any]] = [
             "'auto' (default; inspects the task — sealed auctions use "
             "commit/reveal, open tasks use the legacy plaintext bid), "
             "'legacy' (POST /v1/a2a/bids), 'commit' (POST /v1/a2a/bids/commit "
-            "with a keccak256 commitment computed canonically here — the "
+            "with an offchain keccak256 commitment computed canonically here — the "
             "commit LOCKS stake at 50% of bounty per minStakeBps=5000), "
             "'reveal' (POST /v1/a2a/bids/reveal — needs the nonce/salt from "
             "your commit call). Commit returns the salt hex: keep it secret "

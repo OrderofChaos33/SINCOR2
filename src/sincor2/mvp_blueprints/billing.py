@@ -202,7 +202,7 @@ def x402_resources():
 @bp.route('/x402/<resource_id>', methods=['GET'])
 @limiter.limit("200 per hour")
 def x402_challenge(resource_id):
-    """HTTP 402 Payment Required — SINC micropayment challenge."""
+    """HTTP 402 Payment Required — token micropayment challenge."""
     if not X402_AVAILABLE:
         return jsonify({'error': 'x402_unavailable'}), 503
     from sincor2.x402_payments import access_granted, create_challenge

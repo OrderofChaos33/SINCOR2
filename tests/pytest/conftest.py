@@ -9,6 +9,9 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-char-minimum-ok"
 os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
 os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_123456789012345678901234567890")
+# Operator heartbeat credential (G2.3): tests authenticate heartbeats with
+# this token via the X-Sincor-Heartbeat header unless a test overrides it.
+os.environ.setdefault("AGENT_HEARTBEAT_TOKEN", "test-heartbeat-token")
 
 import pytest  # noqa: E402
 
@@ -34,6 +37,12 @@ def env_defaults(monkeypatch):
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123456789012345678901234567890")
+    monkeypatch.setenv("AGENT_HEARTBEAT_TOKEN", "test-heartbeat-token")
+
+
+def hb_headers() -> dict:
+    """Operator heartbeat auth header for tests (G2.3)."""
+    return {"X-Sincor-Heartbeat": os.environ.get("AGENT_HEARTBEAT_TOKEN", "")}
 
 
 @pytest.fixture(autouse=True)

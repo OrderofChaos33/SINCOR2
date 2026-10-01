@@ -31,7 +31,7 @@ def launch_review_page():
 
 @bp.route('/launch/partners')
 def launch_partners_page():
-    """KOL / curator partner outreach pipeline for July 7 launch."""
+    """KOL / curator partner outreach pipeline for November 9 launch."""
     return render_template('launch_partners.html')
 
 

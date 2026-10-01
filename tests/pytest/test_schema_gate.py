@@ -165,12 +165,33 @@ def test_run_all_has_three_surfaces() -> None:
 
 def _rpc_send(skill_id: str, message: dict, extra: dict | None = None) -> dict:
     import os
+    import time
+    import uuid
 
     os.environ.setdefault("FLASK_ENV", "test")
     os.environ.setdefault("ENVIRONMENT", "test")
-    from sincor2.a2a_integration import _handle_send
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
 
-    params = {"skillId": skill_id, "callerId": "schema-test", "message": message}
+    from sincor2.a2a_integration import _auth_create_message, _handle_send
+
+    # P3 item 14: task creation requires an EIP-191 caller signature.
+    acct = Account.from_key("0x" + "b2" * 32)
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    sig = acct.sign_message(
+        encode_defunct(text=_auth_create_message("schema-test", skill_id, ts, nonce))
+    ).signature.hex()
+
+    params = {
+        "skillId": skill_id,
+        "callerId": "schema-test",
+        "message": message,
+        "ownerWallet": acct.address,
+        "authSignature": "0x" + sig,
+        "authTimestamp": ts,
+        "authNonce": nonce,
+    }
     if extra:
         params.update(extra)
     return _handle_send({"jsonrpc": "2.0", "id": 7, "method": "message/send", "params": params})
