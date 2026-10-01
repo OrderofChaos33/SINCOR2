@@ -1,5 +1,11 @@
 """SINC payment verifier — on-chain validation of SINC transfers to treasury.
 
+**QUARANTINED (2026-09-30): zero importers — do not import.** See
+``docs/architecture/CANONICAL_PATHS.md`` §2. The canonical onchain verifier is
+``sincor2.payment_verifier.PaymentVerifier`` (AXM). This module is retained —
+not deleted — because it is the only SINC-verification implementation; removing
+it needs founder review in case SINC billing ever returns.
+
 Closes a real revenue leak: SINC is the platform's primary settlement token,
 but the A2A ``PaymentVerifier`` only ever validated **AXM** transfer logs.
 Anything quoted in SINC was effectively unverified.

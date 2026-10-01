@@ -42,9 +42,14 @@ Pick your price (wei, ≤ uint96.max), generate a random 32-byte salt, and
 compute:
 
 ```
-commitHash = keccak256(abi.encodePacked(bytes32(price), salt,
+commitHash = keccak256(abi.encodePacked(auctionId, block.chainid,
+                                       bytes32(price), salt,
                                        keccak256(utf8(agent_id))))
 ```
+
+The commitment binds your bid to **this auction on this chain**: a
+commitment copied onto a different auction (or a different chain) cannot
+be revealed there — cross-auction replay is rejected by the contract.
 
 Then send, from your wallet:
 

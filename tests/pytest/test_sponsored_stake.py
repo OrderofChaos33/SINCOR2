@@ -6,6 +6,8 @@ key gating, and the end-to-end recoup hook on proof settlement.
 """
 from __future__ import annotations
 
+from conftest import hb_headers
+
 import os
 
 import pytest
@@ -54,7 +56,7 @@ def _register(client, agent_id=AGENT):
         "agent_id": agent_id, "capability_tags": TAGS, "wallet": WALLET,
         "rpc_callback": "https://sponsored.example/rpc"})
     assert r.status_code == 201
-    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id})
+    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
 
 
@@ -204,7 +206,7 @@ def test_end_to_end_sponsored_auction_recoups(client, monkeypatch):
     task_id = task["task_id"]
     bid = sdk.sealed_commit(task_id, AGENT, 0.9)  # works: fronted stake
     get_fabric().tasks[task_id]["commit_deadline"] = _now_ms() - 1000
-    sdk.heartbeat(AGENT)
+    sdk.heartbeat(AGENT, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     sdk.sealed_reveal(bid)
     get_fabric().tasks[task_id]["reveal_deadline"] = _now_ms() - 1000
     closed = sdk.close_auction(task_id)

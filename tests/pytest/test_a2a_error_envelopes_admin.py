@@ -69,10 +69,30 @@ def test_tasks_page_garbage_is_json_400(app_client):
 
 
 def test_jsonrpc_pagesize_garbage_is_invalid_params(app_client):
+    # tasks/list now requires caller auth (main-side P3 item 14); sign the
+    # list message, then garbage pageSize must still surface as -32602.
+    import time
+    import uuid
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_integration import _auth_task_message
+
+    acct = Account.from_key("0x" + "cc" * 32)
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    sig = "0x" + acct.sign_message(
+        encode_defunct(text=_auth_task_message("list", "", ts, nonce))
+    ).signature.hex()
     r = app_client.post(
         "/api/a2a",
         json={"jsonrpc": "2.0", "id": 7, "method": "tasks/list",
-              "params": {"pageSize": "abc"}},
+              "params": {"pageSize": "abc",
+                         "ownerWallet": acct.address,
+                         "authSignature": sig,
+                         "authTimestamp": ts,
+                         "authNonce": nonce}},
     )
     assert r.status_code == 200  # JSON-RPC errors ride HTTP 200
     payload = r.get_json()
