@@ -1,5 +1,5 @@
 """
-Daily partner outreach reminder — due KOLs/curators for July 7 launch.
+Daily partner outreach reminder — due KOLs/curators for November 9 launch.
 Runs on Railway (PARTNER_OUTREACH_ENABLED) or Windows scheduled task.
 """
 

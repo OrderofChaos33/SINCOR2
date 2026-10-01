@@ -384,6 +384,37 @@ class TestMarketplaceExistingEndpoints:
 # A2A integration — settlement wired into _handle_send (dev env, no payment)
 # ---------------------------------------------------------------------------
 
+def _signed_a2a_params(skill_id: str, message: dict, extra: dict | None = None) -> dict:
+    """P3 item 14: message/send requires an EIP-191 caller signature."""
+    import time
+    import uuid
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_integration import _auth_create_message
+
+    acct = Account.from_key("0x" + "e5" * 32)
+    label = "phase1-test"
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    sig = acct.sign_message(
+        encode_defunct(text=_auth_create_message(label, skill_id, ts, nonce))
+    ).signature.hex()
+    params = {
+        "skillId": skill_id,
+        "callerId": label,
+        "message": message,
+        "ownerWallet": acct.address,
+        "authSignature": "0x" + sig,
+        "authTimestamp": ts,
+        "authNonce": nonce,
+    }
+    if extra:
+        params.update(extra)
+    return params
+
+
 class TestA2ASettlementIntegration:
     def test_a2a_task_completes_without_payment_in_dev(self, client):
         resp = client.post(
@@ -392,15 +423,15 @@ class TestA2ASettlementIntegration:
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "message/send",
-                "params": {
-                    "skillId": "healthcare-rcm",
-                    "message": {
+                "params": _signed_a2a_params(
+                    "healthcare-rcm",
+                    {
                         "parts": [{"text": json.dumps({
                             "task_type": "eligibility_verification",
                             "payload": {"patient_id": "P-A2A"},
                         })}],
                     },
-                },
+                ),
             },
         )
         assert resp.status_code == 200
@@ -441,10 +472,10 @@ class TestA2ASettlementIntegration:
                 "jsonrpc": "2.0",
                 "id": 3,
                 "method": "message/send",
-                "params": {
-                    "skillId": "nonexistent",
-                    "message": {"parts": [{"text": "test"}]},
-                },
+                "params": _signed_a2a_params(
+                    "nonexistent",
+                    {"parts": [{"text": "test"}]},
+                ),
             },
         )
         assert resp.status_code == 200

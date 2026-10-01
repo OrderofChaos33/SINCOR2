@@ -1,6 +1,10 @@
-"""A2A inbound routes + agent operations. Imported by a2a_inbound.register."""
+"""A2A inbound routes + agent operations. Imported by a2a_inbound.register.
+
+``mount()`` is idempotent per Flask app: a second call is a safe no-op."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import os
 import threading
@@ -13,6 +17,9 @@ from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_AGENTS,
     MERIT_THRESHOLD_AXM,
+    REGISTRATION_PROOF_FRESHNESS_MS,
+    REREGISTRATION_DOMAIN,
+    RegistrationAuthError,
     _AGENT_ID_RE,
     _HEARTBEAT_STOP,
     _PLATFORM_AGENT_ID,
@@ -20,6 +27,7 @@ from sincor2.a2a_inbound import (
     _http_error,
     _normalize_registration,
     _now_ms,
+    _reregistration_message_from_parsed,
     _save_agents,
     _apply_reputation,
     get_fabric,
@@ -34,6 +42,90 @@ from sincor2.a2a_identity import (
 
 logger = logging.getLogger("sincor.a2a.inbound")
 _HEARTBEAT_THREAD = None
+
+HEARTBEAT_PROOF_DOMAIN = "SINCOR-HEARTBEAT"
+HEARTBEAT_PROOF_FRESHNESS_MS = 5 * 60 * 1000
+
+
+class HeartbeatAuthError(ValueError):
+    """A heartbeat carried no usable proof of identity (→ HTTP 401)."""
+
+
+def build_heartbeat_message(agent_id: str, ts_ms: int) -> str:
+    """Canonical EIP-191 message an agent signs to prove heartbeat ownership.
+
+    Binds the agent_id and a millisecond timestamp so the signature cannot
+    be replayed as another agent's heartbeat or outside the freshness window.
+    """
+    return f"{HEARTBEAT_PROOF_DOMAIN}\n{agent_id}\n{int(ts_ms)}"
+
+
+def _recover_heartbeat_signer(message: str, signature: str) -> str:
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise HeartbeatAuthError("signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise HeartbeatAuthError("bad heartbeat signature") from exc
+
+
+def _operator_heartbeat_token_ok() -> bool:
+    """Shared-operator heartbeat credential — the same mechanism as the
+    wardrobe ``/api/a2a/heartbeat``. Lets first-party/ops agents (including
+    the liveness runner) heartbeat without holding wallet keys. The token is
+    env-only (``AGENT_HEARTBEAT_TOKEN``) and header-only; it is never read
+    from the request body."""
+    expected = (os.environ.get("AGENT_HEARTBEAT_TOKEN") or "").strip()
+    if not expected:
+        return False
+    got = (
+        request.headers.get("X-Sincor-Heartbeat")
+        or request.headers.get("Authorization", "").removeprefix("Bearer ")
+        or ""
+    ).strip()
+    if not got:
+        return False
+    return hmac.compare_digest(
+        hashlib.sha256(got.encode()).digest(),
+        hashlib.sha256(expected.encode()).digest(),
+    )
+
+
+def _require_heartbeat_auth(agent_id: str, body: Dict[str, Any]) -> None:
+    """Fail-closed heartbeat authentication.
+
+    Accepts either the operator heartbeat token or an EIP-191
+    (``personal_sign``) signature by the agent's *registered* wallet over
+    ``build_heartbeat_message(agent_id, ts)`` with a fresh timestamp.
+    Anything else → :class:`HeartbeatAuthError` (→ HTTP 401).
+    """
+    if _operator_heartbeat_token_ok():
+        return
+    signature = str(body.get("signature") or "").strip()
+    ts_raw = body.get("ts") if body.get("ts") is not None else body.get("timestamp")
+    if not signature or ts_raw is None:
+        raise HeartbeatAuthError(
+            "heartbeat requires an EIP-191 signature or the operator heartbeat token")
+    try:
+        ts = int(ts_raw)
+    except (TypeError, ValueError) as exc:
+        raise HeartbeatAuthError("bad heartbeat timestamp") from exc
+    if abs(_now_ms() - ts) > HEARTBEAT_PROOF_FRESHNESS_MS:
+        raise HeartbeatAuthError("stale heartbeat proof")
+    fabric = get_fabric()
+    with fabric.lock:
+        agent = fabric.agents.get(agent_id)
+    wallet = str((agent or {}).get("wallet") or "").strip()
+    if not wallet:
+        raise HeartbeatAuthError(
+            "agent has no registered wallet; heartbeat requires the operator token")
+    signer = _recover_heartbeat_signer(build_heartbeat_message(agent_id, ts), signature)
+    if signer.lower() != wallet.lower():
+        raise HeartbeatAuthError("heartbeat signature is not from the registered wallet")
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +223,61 @@ def _live_kya_statuses() -> Dict[str, str]:
         return {}
 
 
+def _recover_registration_signer(message: str, signature: str) -> str:
+    """Recover the EIP-191 signer address of a re-registration proof.
+
+    Fail-closed: if eth_account is unavailable the proof cannot be checked,
+    so verification (and therefore the mutation) is refused.
+    """
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise RegistrationAuthError(
+            "signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise RegistrationAuthError("bad registration signature") from exc
+
+
+def _require_reregistration_proof(existing: Dict[str, Any],
+                                  parsed: Dict[str, Any],
+                                  body: Dict[str, Any]) -> None:
+    """Enforce proof-of-control before an existing agent record is mutated
+    (G2.2). The caller must present an EIP-191 signature, made by the
+    currently registered wallet, over the exact new record contents plus a
+    fresh timestamp. Raises RegistrationAuthError (→ HTTP 403) otherwise."""
+    signature = body.get("registration_signature") or ""
+    ts_raw = body.get("registration_ts")
+    if not signature or ts_raw is None:
+        raise RegistrationAuthError(
+            "re-registration requires an EIP-191 signature by the registered "
+            "wallet (body fields: registration_signature, registration_ts)")
+    try:
+        ts_ms = int(ts_raw)
+    except (TypeError, ValueError) as exc:
+        raise RegistrationAuthError(
+            "registration_ts must be an integer unix-ms timestamp") from exc
+    if abs(_now_ms() - ts_ms) > REGISTRATION_PROOF_FRESHNESS_MS:
+        raise RegistrationAuthError(
+            "registration proof expired; sign a fresh challenge")
+    registered_wallet = (existing.get("wallet") or "").strip().lower()
+    if not registered_wallet:
+        # No cryptographic identity is bound to this record, so control
+        # cannot be proven. Fail closed rather than let anyone claim it:
+        # the owner registers a new agent_id with a wallet.
+        raise RegistrationAuthError(
+            "this record has no wallet bound, so control cannot be proven; "
+            "register a new agent_id with a wallet")
+    message = _reregistration_message_from_parsed(parsed, ts_ms)
+    signer = _recover_registration_signer(message, str(signature)).lower()
+    if signer != registered_wallet:
+        raise RegistrationAuthError(
+            "registration signature is not from the registered wallet")
+
+
 def register_agent_record(body: Dict[str, Any],
                           _internal_reputation: Optional[float] = None) -> Dict[str, Any]:
     """Register (or re-register) an agent record.
@@ -153,14 +300,15 @@ def register_agent_record(body: Dict[str, Any],
     * Unverified claims are accepted but marked ``identity="unverified"``
       (grace for existing clients); set
       ``SINCOR_REGISTRATION_PROOF_REQUIRED=1`` to refuse them outright.
-    * Re-registration of an owned record requires a fresh signature from
-      the owner wallet (PermissionError → 403 otherwise) — this closes the
-      agent-record hijack via re-registration.
-    * Grandfathered records (registered before ownership) keep working;
-      the first valid proof on re-registration claims ownership.
     * A claim on an owned id by a *different* wallet is rejected — a valid
       signature from the non-owner never transfers ownership (transfers go
       through ``transfer_agent_record``).
+
+    Re-registration (any update to an existing record) requires proof of
+    control: an EIP-191 signature by the currently registered wallet over
+    the exact new record contents plus a fresh ``registration_ts``
+    (see ``build_reregistration_message`` in ``sincor2.a2a_inbound``).
+    Without it the update is refused with ``RegistrationAuthError``.
     """
     parsed = _normalize_registration(body)
     agent_id = parsed["agent_id"]
@@ -186,31 +334,29 @@ def register_agent_record(body: Dict[str, Any],
         if agent_id not in fabric.agents and len(fabric.agents) >= MAX_AGENTS:
             raise OverflowError("directory full")
         existing = fabric.agents.get(agent_id) or {}
-        owner = str(existing.get("owner_wallet") or "").lower()
+        if existing and _internal_reputation is None:
+            _require_reregistration_proof(existing, parsed, body)
         if _internal_reputation is not None:
             # Internal platform seed: bypasses proof, identity is "internal".
+            owner = ""
             identity = "internal"
-        elif existing and owner:
-            # Owned record: only the owner wallet may re-register.
-            if not verified_wallet or verified_wallet != owner:
-                raise PermissionError(
-                    "re-registration requires the owner wallet signature")
-            identity = "verified"
         elif existing:
-            # Grandfathered record: first valid proof claims ownership.
-            if verified_wallet:
-                owner = verified_wallet
-                identity = "verified"
-            else:
-                identity = str(existing.get("identity") or "unverified")
+            # Re-registration: proof of control already enforced above via
+            # _require_reregistration_proof (fail-closed). The bound owner
+            # wallet stays with the record; identity is verified.
+            owner = str(existing.get("owner_wallet")
+                        or existing.get("wallet") or "").lower()
+            identity = "verified"
         else:
-            # New claim.
+            # New claim (wave 32 squatting control): a verified
+            # wallet-identity proof binds owner_wallet.
             if verified_wallet:
                 owner = verified_wallet
                 identity = "verified"
             elif _registration_proof_required():
                 raise PermissionError("registration proof required")
             else:
+                owner = ""
                 identity = "unverified"
         if _internal_reputation is not None:
             reputation = float(_internal_reputation)
@@ -312,7 +458,10 @@ def transfer_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
     return snapshot
 
 
-def heartbeat_agent(agent_id: str, signature: str = "") -> Dict[str, Any]:
+def heartbeat_agent(agent_id: str) -> Dict[str, Any]:
+    """Mark an agent alive. Authentication happens at the HTTP layer
+    (``v1_heartbeat`` → ``_require_heartbeat_auth``); direct callers here are
+    server-side (platform bootstrap, liveness sweep) and already trusted."""
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:
@@ -397,7 +546,17 @@ def list_agents(live_only: bool = False) -> List[Dict[str, Any]]:
         return sorted(out, key=lambda a: a.get("registered_at") or 0, reverse=True)
 
 
-def mount(app: Flask) -> None:
+def mount(app: Flask) -> bool:
+    """Register the ``a2a_inbound`` blueprint — idempotent per app.
+
+    A second call on the same *app* is a safe no-op (returns False)
+    instead of raising Flask's duplicate-blueprint error; the platform
+    agent seed and probation-task seeding underneath are themselves
+    idempotent. Returns True when this call mounted the routes.
+    """
+    if "a2a_inbound" in (getattr(app, "blueprints", {}) or {}):
+        logger.info("[A2A] a2a_inbound already mounted; skipping re-registration")
+        return False
     from flask import Blueprint
     from sincor2.a2a_inbound_market import attach_market_routes, seed_probation_tasks
 
@@ -410,6 +569,8 @@ def mount(app: Flask) -> None:
         body = request.get_json(silent=True) or {}
         try:
             agent = register_agent_record(body)
+        except RegistrationAuthError as err:
+            return _http_error(str(err), 403)
         except ValueError as err:
             return _http_error(str(err), 400)
         except PermissionError as err:
@@ -427,6 +588,16 @@ def mount(app: Flask) -> None:
             "kya_status": agent.get("kya_status"),
             "identity": agent.get("identity"),
             "owner_wallet": agent.get("owner_wallet"),
+            # Re-registration is proof-gated: any later update to this
+            # record must carry registration_signature (EIP-191, by the
+            # registered wallet) + registration_ts over the message built
+            # by sincor2.a2a_inbound.build_reregistration_message().
+            "reregistration": {
+                "requires": "EIP-191 signature by the registered wallet",
+                "fields": ["registration_signature", "registration_ts"],
+                "domain": REREGISTRATION_DOMAIN,
+                "freshness_ms": REGISTRATION_PROOF_FRESHNESS_MS,
+            },
         }), 201
 
     @bp.post("/v1/a2a/transfer")
@@ -453,6 +624,10 @@ def mount(app: Flask) -> None:
         agent_id = str(body.get("agent_id") or request.args.get("agent_id") or "").strip()
         if not agent_id:
             return _http_error("agent_id is required", 400)
+        try:
+            _require_heartbeat_auth(agent_id, body)
+        except HeartbeatAuthError as err:
+            return _http_error(str(err), 401)
         try:
             return jsonify(heartbeat_agent(agent_id))
         except KeyError:
@@ -541,3 +716,4 @@ def mount(app: Flask) -> None:
     except Exception as err:
         logger.warning("[A2A] Probation seed skipped: %s", err)
     logger.info("[A2A] Inbound register + market + heartbeat mounted")
+    return True

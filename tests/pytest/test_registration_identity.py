@@ -17,7 +17,11 @@ from eth_account.messages import encode_defunct
 
 from sincor2 import a2a_identity as ident
 from sincor2 import a2a_inbound_ext as ext
-from sincor2.a2a_inbound import reset_fabric
+from sincor2.a2a_inbound import (
+    RegistrationAuthError,
+    build_reregistration_message,
+    reset_fabric,
+)
 
 _OWNER = Account.create()
 _OWNER_WALLET = _OWNER.address
@@ -49,6 +53,18 @@ def _proof_body(agent_id: str, signer=_OWNER, wallet=None) -> dict:
                  registration_signature=sig,
                  registration_wallet=wallet,
                  registration_ts=ts)
+
+
+def _rereg_body(agent_id: str, signer, wallet, **extra) -> dict:
+    """Re-registration body in the fail-closed G2.2 format: an EIP-191
+    signature by the registered wallet over the exact new record contents
+    plus a fresh timestamp (``build_reregistration_message``)."""
+    body = _body(agent_id, wallet=wallet, **extra)
+    ts = int(time.time() * 1000)
+    message = build_reregistration_message(body, ts)
+    body["registration_ts"] = ts
+    body["registration_signature"] = _sign(message, signer)
+    return body
 
 
 class RegistrationIdentityTests(unittest.TestCase):
@@ -105,17 +121,18 @@ class RegistrationIdentityTests(unittest.TestCase):
     # -- acceptance: duplicate claim by different wallet rejected ------------
     def test_owner_re_registration_requires_owner_signature(self):
         ext.register_agent_record(_proof_body("reg-owned-01"))
-        attacker_body = _proof_body("reg-owned-01", signer=_ATTACKER)
-        with self.assertRaises(PermissionError):
+        attacker_body = _rereg_body("reg-owned-01", signer=_ATTACKER,
+                                    wallet=_OWNER_WALLET)
+        with self.assertRaises(RegistrationAuthError):
             ext.register_agent_record(attacker_body)
         # And a bare (unsigned) re-registration is rejected too.
-        with self.assertRaises(PermissionError):
+        with self.assertRaises(RegistrationAuthError):
             ext.register_agent_record(_body("reg-owned-01"))
 
     def test_owner_can_re_register_with_fresh_signature(self):
         ext.register_agent_record(_proof_body("reg-rereg-01"))
         snap = ext.register_agent_record(
-            _proof_body("reg-rereg-01", wallet=_OWNER_WALLET))
+            _rereg_body("reg-rereg-01", signer=_OWNER, wallet=_OWNER_WALLET))
         self.assertEqual(snap["identity"], "verified")
         self.assertEqual(snap["owner_wallet"], _OWNER_WALLET.lower())
 
@@ -138,24 +155,27 @@ class RegistrationIdentityTests(unittest.TestCase):
         snap = ext.register_agent_record(body)
         self.assertEqual(snap["identity"], "unverified")
 
-    # -- acceptance: grandfathered IDs still work ----------------------------
-    def test_grandfathered_record_keeps_working_unsigned(self):
+    # -- acceptance: grandfathered IDs are fail-closed on update -------------
+    def test_grandfathered_record_unsigned_reregistration_refused(self):
+        # Fail-closed re-registration (G2.2): an unsigned update to an
+        # existing record is refused, even for grandfathered ids.
         snap = ext.register_agent_record(_body("reg-grandfather-01"))
         self.assertEqual(snap["identity"], "unverified")
-        # Re-registration without a proof still works (grace period).
-        snap2 = ext.register_agent_record(
-            _body("reg-grandfather-01", description="updated"))
-        self.assertEqual(snap2["description"], "updated")
-        self.assertEqual(snap2["identity"], "unverified")
+        with self.assertRaises(RegistrationAuthError):
+            ext.register_agent_record(
+                _body("reg-grandfather-01", description="updated"))
 
     def test_grandfathered_record_claims_ownership_with_proof(self):
         ext.register_agent_record(_body("reg-claim-01"))
-        snap = ext.register_agent_record(_proof_body("reg-claim-01"))
+        snap = ext.register_agent_record(
+            _rereg_body("reg-claim-01", signer=_OWNER, wallet=_OWNER_WALLET))
         self.assertEqual(snap["identity"], "verified")
         self.assertEqual(snap["owner_wallet"], _OWNER_WALLET.lower())
         # Now the attacker is locked out.
-        with self.assertRaises(PermissionError):
-            ext.register_agent_record(_proof_body("reg-claim-01", signer=_ATTACKER))
+        with self.assertRaises(RegistrationAuthError):
+            ext.register_agent_record(
+                _rereg_body("reg-claim-01", signer=_ATTACKER,
+                            wallet=_OWNER_WALLET))
 
     # -- transfer policy ------------------------------------------------------
     def _transfer_sig(self, agent_id, new_wallet, signer, ts=None):
@@ -204,10 +224,14 @@ class RegistrationIdentityTests(unittest.TestCase):
             "agent_id": "reg-xfer-04", "new_wallet": new_acct.address,
             "transfer_signature": sig, "transfer_ts": ts})
         # Old owner's signature no longer controls the record.
-        with self.assertRaises(PermissionError):
-            ext.register_agent_record(_proof_body("reg-xfer-04", signer=_OWNER))
+        with self.assertRaises(RegistrationAuthError):
+            ext.register_agent_record(
+                _rereg_body("reg-xfer-04", signer=_OWNER,
+                            wallet=new_acct.address))
         # New owner can re-register.
-        snap = ext.register_agent_record(_proof_body("reg-xfer-04", signer=new_acct))
+        snap = ext.register_agent_record(
+            _rereg_body("reg-xfer-04", signer=new_acct,
+                        wallet=new_acct.address))
         self.assertEqual(snap["owner_wallet"], new_acct.address.lower())
 
     # -- HTTP route surface ----------------------------------------------------

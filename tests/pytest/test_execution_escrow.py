@@ -566,7 +566,7 @@ def test_upheld_dispute_splits_stake_and_restores_credit(env):
     assert resolved[0]["args"]["slashedAmount"] == slash
 
 
-def test_poster_dispute_is_free(env):
+def test_poster_dispute_requires_bond(env):
     w3, mgr = env.w3, env.mgr
     bid = w3.to_wei(2, "ether")
     stake = bid * MIN_STAKE_BPS // 10000
@@ -574,12 +574,16 @@ def test_poster_dispute_is_free(env):
     env.init_escrow(aid, env.poster, env.agent, bid, 0, bid)
     mgr.functions.depositStake(aid).transact({"from": env.agent, "value": stake, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
     mgr.functions.submitResult(aid, b"\x77" * 32).transact({"from": env.agent, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
-    # poster disputes with zero value -> opens fine
+    # P0/W-24: poster disputes with zero bond -> reverts (no free delay attack)
+    with pytest.raises(TransactionFailed):
+        mgr.functions.openQualityDispute(aid, b"\x88" * 32).transact(
+            {"from": env.poster, "value": 0, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    # poster posting the bond -> opens, bond recorded
     mgr.functions.openQualityDispute(aid, b"\x88" * 32).transact(
-        {"from": env.poster, "value": 0, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+        {"from": env.poster, "value": env.challenger_bond, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
     d = mgr.functions.getDispute(aid).call()
-    assert d[0] == env.poster and d[1] == 0
-    # poster accidentally sending ETH with a dispute -> revert (no accidental lockup)
+    assert d[0] == env.poster and d[1] == env.challenger_bond
+    # under-bonded poster dispute -> revert
     aid2 = new_aid(w3, "poster-dispute2")
     env.init_escrow(aid2, env.poster, env.agent, bid, 0, bid)
     mgr.functions.depositStake(aid2).transact({"from": env.agent, "value": stake, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
@@ -656,8 +660,9 @@ def test_dispute_gating(env):
     env.init_escrow(aid2, env.poster, env.agent, bid, 0, bid)
     mgr.functions.depositStake(aid2).transact({"from": env.agent, "value": stake, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
     mgr.functions.submitResult(aid2, b"\xff" * 32).transact({"from": env.agent, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+    # poster bonds like any challenger (P0/W-24: no free disputes)
     mgr.functions.openQualityDispute(aid2, b"\x01" * 32).transact(
-        {"from": env.poster, "value": 0, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
+        {"from": env.poster, "value": env.challenger_bond, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})
     with pytest.raises(TransactionFailed):
         mgr.functions.openQualityDispute(aid2, b"\x02" * 32).transact(
             {"from": env.challenger, "value": env.challenger_bond, "maxFeePerGas": 10_000_000_000, "maxPriorityFeePerGas": 0})

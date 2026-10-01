@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from conftest import hb_headers
+
 import json
 
 import pytest
@@ -183,7 +185,7 @@ def test_heartbeat_and_directory(client):
         "rpc_callback": "https://hb.example/rpc",
         "wallet": "0x" + "22" * 20,
     })
-    beat = client.post("/v1/a2a/heartbeat", json={"agent_id": "hb-1"})
+    beat = client.post("/v1/a2a/heartbeat", json={"agent_id": "hb-1"}, headers=hb_headers())
     assert beat.status_code == 200
     assert beat.get_json()["ok"] is True
     directory = client.get("/v1/a2a/directory")

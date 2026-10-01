@@ -1,0 +1,21 @@
+{
+    "chainId": 84532,
+    "constructorInputs.P24_ADMIN": "0x0000000000000000000000000000000000000000",
+    "constructorInputs.P24_SCREENER": "0x0000000000000000000000000000000000000000",
+    "constructorInputs.P24_TREASURY": "0x0000000000000000000000000000000000000000",
+    "contracts.ContentPolicyGuard.address": "0x0000000000000000000000000000000000000000",
+    "contracts.ContentPolicyGuard.constructorArgs": "(P24_ADMIN, P24_SCREENER)",
+    "contracts.CreatorTokenFactory.address": "0x0000000000000000000000000000000000000000",
+    "contracts.CreatorTokenFactory.constructorArgs": "(P24_ADMIN)",
+    "contracts.FeeSplitDistributor.address": "0x0000000000000000000000000000000000000000",
+    "contracts.FeeSplitDistributor.constructorArgs": "()  // TREASURY is a compiled constant",
+    "contracts.RevenueAccrual.address": "0x0000000000000000000000000000000000000000",
+    "contracts.RevenueAccrual.constructorArgs": "()",
+    "deployedAt": null,
+    "deployer": "0x0000000000000000000000000000000000000000",
+    "network": "base-sepolia",
+    "notes": "TEMPLATE: addresses are filled at ceremony time by script/07_DeployP24.s.sol (it rewrites this file). BondingCurve is per-token (constructor takes token address), deployed at issue() time. Guard links offchain via screened=true.",
+    "script": "script/07_DeployP24.s.sol",
+    "verification.Etherscan": "pending",
+    "verification.Sourcify": "pending"
+}
