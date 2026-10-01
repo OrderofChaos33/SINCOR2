@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SINCOR2 Command Center</title>
   <link rel="icon" href="/static/sincor_favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <!-- Tailwind (CDN for production-ready utility classes) -->
@@ -14,10 +16,10 @@
       theme: {
         extend: {
           colors: {
-            'cc-navy':  '#07091a',
-            'cc-dark':  '#0d1224',
-            'cc-panel': '#111827',
-            'cc-gold':  '#FFD700',
+            'cc-navy':  '#0a0c10',
+            'cc-dark':  '#10141b',
+            'cc-panel': '#141a23',
+            'cc-gold':  '#d4a94e',
             'cc-cyan':  '#00D4FF',
             'cc-green': '#00FF88',
             'cc-red':   '#FF4B5C',
@@ -29,13 +31,14 @@
     }
   </script>
   <style>
-    /* ── Base ──────────────────────────────────────────────── */
+    /* ── Base (pro-site tokens: /static/sincor-pro.css) ─────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --navy:   #07091a;
-      --dark:   #0d1224;
-      --panel:  #111827;
-      --gold:   #FFD700;
+      --navy:   #0a0c10;
+      --dark:   #10141b;
+      --panel:  #141a23;
+      --gold:   #d4a94e;
+      --gold-bright: #f0c664;
       --cyan:   #00D4FF;
       --green:  #00FF88;
       --red:    #FF4B5C;
@@ -49,20 +52,24 @@
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       font-size: 14px;
     }
+    /* Pro-site display font for headings and metric numerals */
+    header .text-lg, .cc-card-header, .metric-tile-value {
+      font-family: 'Sora', 'Inter', system-ui, sans-serif;
+    }
 
     /* ── Scrollbar ──────────────────────────────────────────── */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: var(--dark); }
-    ::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(212,169,78,0.3); border-radius: 3px; }
 
     /* ── Animated gradient header ───────────────────────────── */
     .cc-header-gradient {
-      background: linear-gradient(135deg, #07091a 0%, #0f1535 40%, #0a0f1e 100%);
-      border-bottom: 1px solid rgba(255,215,0,0.25);
+      background: linear-gradient(135deg, #0a0c10 0%, #0f1535 40%, #0a0f1e 100%);
+      border-bottom: 1px solid rgba(212,169,78,0.25);
     }
 
     /* ── Gold glow text ─────────────────────────────────────── */
-    .glow-gold  { color: var(--gold);  text-shadow: 0 0 12px rgba(255,215,0,0.6); }
+    .glow-gold  { color: var(--gold);  text-shadow: 0 0 12px rgba(212,169,78,0.6); }
     .glow-cyan  { color: var(--cyan);  text-shadow: 0 0 12px rgba(0,212,255,0.5); }
     .glow-green { color: var(--green); text-shadow: 0 0 12px rgba(0,255,136,0.5); }
     .glow-red   { color: var(--red);   text-shadow: 0 0 12px rgba(255,75,92,0.5); }
@@ -70,22 +77,22 @@
     /* ── Panel card ─────────────────────────────────────────── */
     .cc-card {
       background: var(--panel);
-      border: 1px solid rgba(255,215,0,0.12);
+      border: 1px solid rgba(212,169,78,0.12);
       border-radius: 12px;
       box-shadow: 0 4px 32px rgba(0,0,0,0.4);
       transition: border-color 0.3s;
       overflow: hidden;
     }
-    .cc-card:hover { border-color: rgba(255,215,0,0.28); }
+    .cc-card:hover { border-color: rgba(212,169,78,0.28); }
 
     /* ── Card header bar ────────────────────────────────────── */
     .cc-card-header {
       padding: 14px 20px;
-      border-bottom: 1px solid rgba(255,215,0,0.1);
+      border-bottom: 1px solid rgba(212,169,78,0.1);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: linear-gradient(90deg, rgba(255,215,0,0.06) 0%, transparent 100%);
+      background: linear-gradient(90deg, rgba(212,169,78,0.06) 0%, transparent 100%);
     }
     .cc-card-body { padding: 16px 20px; }
 
@@ -104,7 +111,7 @@
     .pill-amber  { background: rgba(255,165,0,0.12);  color: var(--amber); border: 1px solid rgba(255,165,0,0.3); }
     .pill-red    { background: rgba(255,75,92,0.12);  color: var(--red);   border: 1px solid rgba(255,75,92,0.3); }
     .pill-cyan   { background: rgba(0,212,255,0.10);  color: var(--cyan);  border: 1px solid rgba(0,212,255,0.3); }
-    .pill-gold   { background: rgba(255,215,0,0.10);  color: var(--gold);  border: 1px solid rgba(255,215,0,0.3); }
+    .pill-gold   { background: rgba(212,169,78,0.10);  color: var(--gold);  border: 1px solid rgba(212,169,78,0.3); }
     .pill-violet { background: rgba(159,122,234,0.12);color: var(--violet);border: 1px solid rgba(159,122,234,0.3); }
     .dot { width: 6px; height: 6px; border-radius: 50%; }
     .dot-green  { background: var(--green);  animation: blink 1.5s infinite; }
@@ -196,13 +203,13 @@
       box-shadow: 0 0 12px rgba(0,255,136,0.3);
     }
     .btn-gold {
-      background: linear-gradient(135deg, rgba(255,215,0,0.18), rgba(255,215,0,0.08));
+      background: linear-gradient(135deg, rgba(212,169,78,0.18), rgba(212,169,78,0.08));
       color: var(--gold);
-      border: 1px solid rgba(255,215,0,0.35);
+      border: 1px solid rgba(212,169,78,0.35);
     }
     .btn-gold:hover:not(:disabled) {
-      background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,215,0,0.15));
-      box-shadow: 0 0 14px rgba(255,215,0,0.3);
+      background: linear-gradient(135deg, rgba(212,169,78,0.3), rgba(212,169,78,0.15));
+      box-shadow: 0 0 14px rgba(212,169,78,0.3);
     }
     .btn-cyan {
       background: rgba(0,212,255,0.12);
@@ -212,7 +219,7 @@
     .btn-cyan:hover:not(:disabled) { background: rgba(0,212,255,0.22); }
 
     /* ── Tab navigation ─────────────────────────────────────── */
-    .tab-bar { display: flex; gap: 2px; border-bottom: 1px solid rgba(255,215,0,0.12); }
+    .tab-bar { display: flex; gap: 2px; border-bottom: 1px solid rgba(212,169,78,0.12); }
     .tab-btn {
       padding: 10px 18px;
       font-size: 12px; font-weight: 600;
@@ -231,7 +238,7 @@
     /* ── Grade form ─────────────────────────────────────────── */
     .form-input {
       background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,215,0,0.18);
+      border: 1px solid rgba(212,169,78,0.18);
       border-radius: 7px;
       color: #E2E8F0;
       padding: 8px 12px;
@@ -240,7 +247,7 @@
       transition: border-color 0.2s;
       outline: none;
     }
-    .form-input:focus { border-color: rgba(255,215,0,0.5); }
+    .form-input:focus { border-color: rgba(212,169,78,0.5); }
     .form-label { font-size: 11px; font-weight: 600; color: #94A3B8; margin-bottom: 5px; display: block; letter-spacing: 0.05em; text-transform: uppercase; }
 
     /* ── Scrollable list ────────────────────────────────────── */
@@ -249,7 +256,7 @@
     /* ── Metric card ────────────────────────────────────────── */
     .metric-tile {
       background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,215,0,0.1);
+      border: 1px solid rgba(212,169,78,0.1);
       border-radius: 10px;
       padding: 16px;
       display: flex;
@@ -263,7 +270,7 @@
     .scan-line {
       position: absolute;
       left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,215,0,0.4), transparent);
+      background: linear-gradient(90deg, transparent, rgba(212,169,78,0.4), transparent);
       animation: scan 4s linear infinite;
       pointer-events: none;
     }
@@ -278,7 +285,7 @@
     }
     .toast {
       background: var(--panel);
-      border: 1px solid rgba(255,215,0,0.25);
+      border: 1px solid rgba(212,169,78,0.25);
       border-radius: 10px;
       padding: 12px 18px;
       display: flex; align-items: center; gap: 10px;
@@ -537,13 +544,21 @@ function fmt(ts) {
 function fmtNum(n) { return (n == null || n === '') ? '—' : Number(n).toLocaleString(); }
 function pct(v) { return Math.round(Number(v) || 0); }
 
+/* Escape HTML in interpolated values (defense-in-depth: agent names/ids
+   originate in YAML files and feed data arrives over the market bus). */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
 function toast(msg, type='info') {
   const c = document.getElementById('toast-container');
   const el = document.createElement('div');
   const icons = {info:'ℹ️', success:'✅', warn:'⚠️', error:'🚨'};
   const colors = {info:'border-cyan-700', success:'border-green-700', warn:'border-amber-600', error:'border-red-700'};
   el.className = `toast ${colors[type]||''}`;
-  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${esc(msg)}</span>`;
   c.appendChild(el);
   setTimeout(() => { el.style.opacity='0'; el.style.transform='translateX(20px)'; el.style.transition='all 0.3s'; setTimeout(()=>el.remove(),320); }, 4000);
 }
@@ -612,20 +627,20 @@ function appendFeedItem(eventType, data) {
     detail = `${(data.active_tasks||[]).length} active tasks · ${(data.recent_transactions||[]).length} recent tx`;
     updateTopMetrics(data);
   } else if (eventType === 'task_posted') {
-    detail = `<span class="text-white font-semibold">${data.goal||data.task_id||''}</span> · Budget: ${fmtNum(data.budget_tokens)} tokens`;
+    detail = `<span class="text-white font-semibold">${esc(data.goal||data.task_id)}</span> · Budget: ${fmtNum(data.budget_tokens)} tokens`;
   } else if (eventType === 'bid_submitted') {
     const price = data.estimated_cost_tokens ? `${fmtNum(data.estimated_cost_tokens)} tok` : '';
-    detail = `<span class="glow-gold">${data.agent_id||''}</span> bid on <span class="text-cyan-400">${data.task_id||''}</span> · ${price} · conf <span class="glow-green">${pct((data.confidence||0)*100)}%</span>`;
+    detail = `<span class="glow-gold">${esc(data.agent_id)}</span> bid on <span class="text-cyan-400">${esc(data.task_id)}</span> · ${price} · conf <span class="glow-green">${pct((data.confidence||0)*100)}%</span>`;
   } else if (eventType === 'task_awarded') {
-    detail = `<span class="glow-gold">${data.winner_agent_id||''}</span> won <span class="text-cyan-400">${data.task_id||''}</span> · score ${(data.winner_score||0).toFixed(3)}`;
+    detail = `<span class="glow-gold">${esc(data.winner_agent_id)}</span> won <span class="text-cyan-400">${esc(data.task_id)}</span> · score ${(data.winner_score||0).toFixed(3)}`;
   } else if (eventType === 'task_completed') {
-    detail = `<span class="text-cyan-400">${data.task_id||''}</span> · quality ${pct((data.quality||0)*100)}% · merit +${fmtNum(data.merit_earned)}`;
+    detail = `<span class="text-cyan-400">${esc(data.task_id)}</span> · quality ${pct((data.quality||0)*100)}% · merit +${fmtNum(data.merit_earned)}`;
   } else if (eventType === 'task_graded') {
-    detail = `<span class="text-cyan-400">${data.task_id||''}</span> graded <span class="glow-gold">${data.grade}/10</span> · merit Δ${data.merit_delta>0?'+':''}${data.merit_delta}`;
+    detail = `<span class="text-cyan-400">${esc(data.task_id)}</span> graded <span class="glow-gold">${data.grade}/10</span> · merit Δ${data.merit_delta>0?'+':''}${data.merit_delta}`;
   } else if (eventType === 'agent_killed') {
-    detail = `<span class="glow-red">${data.agent_id||''}</span> KILLED — ${data.reason||'operator override'}`;
+    detail = `<span class="glow-red">${esc(data.agent_id)}</span> KILLED — ${esc(data.reason)||'operator override'}`;
   } else if (eventType === 'agent_reinstated') {
-    detail = `<span class="glow-green">${data.agent_id||''}</span> reinstated`;
+    detail = `<span class="glow-green">${esc(data.agent_id)}</span> reinstated`;
   }
 
   el.innerHTML = `
@@ -686,9 +701,9 @@ function connectSSE() {
 
 /* ─── Agent Roster ───────────────────────────────────────────────────── */
 let _rosterData = [];
-const traitColors = {O:'#9F7AEA',C:'#00D4FF',E:'#FFD700',A:'#00FF88',N:'#FF4B5C'};
+const traitColors = {O:'#9F7AEA',C:'#00D4FF',E:'#d4a94e',A:'#00FF88',N:'#FF4B5C'};
 const traitLabels = {O:'Openness',C:'Conscientiousness',E:'Extraversion',A:'Agreeableness',N:'Neuroticism'};
-const tierColors = {Hatch:'#94A3B8',Junior:'#60A5FA',Senior:'#34D399',Lead:'#FFD700',Director:'#FF6B35'};
+const tierColors = {Hatch:'#94A3B8',Junior:'#60A5FA',Senior:'#34D399',Lead:'#d4a94e',Director:'#FF6B35'};
 const tierEmoji  = {Hatch:'🥚',Junior:'⭐',Senior:'🌟',Lead:'💎',Director:'👑'};
 
 function filterRoster() {
@@ -709,16 +724,16 @@ function renderRosterTab(tab, q='') {
   if (tab === 'identity') {
     el.innerHTML = agents.map(a => `
       <div class="flex items-center gap-3 py-3 border-b border-white/5">
-        <div class="rank-badge" style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.2);">
+        <div class="rank-badge" style="background:rgba(212,169,78,0.08);border:1px solid rgba(212,169,78,0.2);">
           ${tierEmoji[a.career?.current_tier]||'🤖'}
         </div>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-semibold text-white">${a.name||a.agent_id}</span>
-            <span class="pill pill-cyan text-xs">${a.archetype||'—'}</span>
-            ${a.secondary_archetype?`<span class="pill pill-violet text-xs">${a.secondary_archetype}</span>`:''}
+            <span class="font-semibold text-white">${esc(a.name||a.agent_id)}</span>
+            <span class="pill pill-cyan text-xs">${esc(a.archetype)||'—'}</span>
+            ${a.secondary_archetype?`<span class="pill pill-violet text-xs">${esc(a.secondary_archetype)}</span>`:''}
           </div>
-          <div class="text-xs text-slate-500 mt-0.5">${a.agent_id} · ${(a.specializations||[]).slice(0,2).join(', ')||'no specializations'}</div>
+          <div class="text-xs text-slate-500 mt-0.5">${esc(a.agent_id)} · ${esc((a.specializations||[]).slice(0,2).join(', '))||'no specializations'}</div>
         </div>
         <div class="text-right flex-shrink-0">
           <div class="text-sm font-bold glow-gold">${fmtNum(a.merit_points)} pts</div>
@@ -742,8 +757,8 @@ function renderRosterTab(tab, q='') {
       return `
         <div class="py-3 border-b border-white/5">
           <div class="flex items-center gap-2 mb-3">
-            <span class="font-semibold text-white">${a.name||a.agent_id}</span>
-            <span class="pill pill-cyan text-xs">${a.archetype||'—'}</span>
+            <span class="font-semibold text-white">${esc(a.name||a.agent_id)}</span>
+            <span class="pill pill-cyan text-xs">${esc(a.archetype)||'—'}</span>
           </div>
           <div class="grid grid-cols-1 gap-2">${traits}</div>
           <div class="flex gap-4 mt-2 text-xs text-slate-500">
@@ -770,7 +785,7 @@ function renderRosterTab(tab, q='') {
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <span class="font-semibold text-white">${a.name||a.agent_id}</span>
+              <span class="font-semibold text-white">${esc(a.name||a.agent_id)}</span>
               <span class="pill text-xs" style="background:${color}22;color:${color};border:1px solid ${color}55;">${tier}</span>
             </div>
             ${c.next_tier ? `
@@ -792,12 +807,13 @@ function renderRosterTab(tab, q='') {
 function buildMemorySelect() {
   const sel = document.getElementById('memory-agent-select');
   sel.innerHTML = '<option value="">— select agent —</option>' +
-    _rosterData.map(a => `<option value="${a.agent_id}">${a.name||a.agent_id}</option>`).join('');
+    _rosterData.map(a => `<option value="${esc(a.agent_id)}">${esc(a.name||a.agent_id)}</option>`).join('');
 }
 
 async function loadRoster() {
   try {
     const r = await fetch('/api/command-center/agents');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     _rosterData = data.agents || [];
     document.getElementById('roster-count').textContent = `${_rosterData.length} agents`;
@@ -806,6 +822,16 @@ async function loadRoster() {
     buildMemorySelect();
   } catch(e) {
     toast('Roster load failed: ' + e.message, 'error');
+    /* Honest state: these APIs are intentionally absent on the production
+       app, so the panels must say "unavailable" — never sit on "Loading…"
+       forever and never show fabricated agents. */
+    const msg = '<div class="text-slate-600 text-sm py-8 text-center">Agent roster unavailable — API unreachable.</div>';
+    ['roster-identity', 'roster-personality', 'roster-career'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = msg;
+    });
+    const rc = document.getElementById('roster-count');
+    if (rc) rc.textContent = 'unavailable';
   }
 }
 
@@ -818,6 +844,7 @@ async function loadAgentMemory() {
   view.innerHTML = '<div class="text-slate-500 text-sm py-4 text-center">Loading…</div>';
   try {
     const r = await fetch(`/api/command-center/agents/${encodeURIComponent(agentId)}/memory`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     const hist = data.task_history || [];
     if (!hist.length) {
@@ -827,7 +854,7 @@ async function loadAgentMemory() {
     view.innerHTML = hist.slice().reverse().map(tx => `
       <div class="py-2 border-b border-white/5">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-mono text-slate-400">${tx.task_id||tx.transaction_id||'—'}</span>
+          <span class="text-xs font-mono text-slate-400">${esc(tx.task_id||tx.transaction_id)||'—'}</span>
           <span class="text-xs text-slate-600">${fmt(tx.recorded_at)}</span>
         </div>
         <div class="flex gap-4 text-xs">
@@ -837,7 +864,7 @@ async function loadAgentMemory() {
         </div>
       </div>`).join('');
   } catch(e) {
-    view.innerHTML = `<div class="text-red-400 text-sm py-4 text-center">Error: ${e.message}</div>`;
+    view.innerHTML = `<div class="text-red-400 text-sm py-4 text-center">Error: ${esc(e.message)}</div>`;
   }
 }
 
@@ -846,6 +873,7 @@ async function refreshKillswitch() {
   const panel = document.getElementById('killswitch-panel');
   try {
     const r = await fetch('/api/command-center/killswitch');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     const agents = data.agents || {};
     const entries = Object.values(agents);
@@ -861,7 +889,7 @@ async function refreshKillswitch() {
       return `
         <div class="py-3 border-b border-white/5">
           <div class="flex items-center gap-2 mb-2">
-            <span class="font-semibold text-white text-sm">${s.name||s.agent_id}</span>
+            <span class="font-semibold text-white text-sm">${esc(s.name||s.agent_id)}</span>
             ${killed ? '<span class="pill pill-red">KILLED</span>' : ''}
             ${pctV>=100&&!killed?'<span class="pill pill-red">CEILING HIT</span>':''}
             <span class="text-xs text-slate-500 ml-auto font-mono">${s.tokens_used_today||0} / ${s.daily_ceiling||0}</span>
@@ -873,14 +901,20 @@ async function refreshKillswitch() {
             <span class="${pctV>=90?'text-red-400':pctV>=70?'text-amber-400':'text-slate-500'}">${pctV.toFixed(1)}% used · ${fmtNum(s.tokens_remaining)} remaining</span>
             <div class="flex gap-2">
               ${killed
-                ? `<button class="btn btn-reinstate" style="padding:4px 12px;font-size:11px;" onclick="agentAction('${s.agent_id}','reinstate')">Reinstate</button>`
-                : `<button class="btn btn-kill" style="padding:4px 12px;font-size:11px;" onclick="agentAction('${s.agent_id}','kill')">Kill</button>`}
+                ? `<button class="btn btn-reinstate cc-agent-action" style="padding:4px 12px;font-size:11px;" data-agent="${esc(s.agent_id)}" data-action="reinstate">Reinstate</button>`
+                : `<button class="btn btn-kill cc-agent-action" style="padding:4px 12px;font-size:11px;" data-agent="${esc(s.agent_id)}" data-action="kill">Kill</button>`}
             </div>
           </div>
         </div>`;
     }).join('');
+    /* Delegate kill/reinstate clicks (no inline onclick with interpolated IDs). */
+    panel.querySelectorAll('.cc-agent-action').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        agentAction(btn.getAttribute('data-agent'), btn.getAttribute('data-action'));
+      });
+    });
   } catch(e) {
-    panel.innerHTML = `<div class="text-red-400 text-sm py-4 text-center">Error: ${e.message}</div>`;
+    panel.innerHTML = `<div class="text-red-400 text-sm py-4 text-center">Error: ${esc(e.message)}</div>`;
   }
 }
 
