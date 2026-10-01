@@ -2,8 +2,38 @@
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
+from eth_account import Account
+from eth_account.messages import encode_defunct
+
+
+# P3 item 14: task creation requires an EIP-191 caller signature. Fixed test
+# key — signatures are fresh per call (timestamp), so the replay guard is
+# never tripped across tests.
+_TEST_KEY = "0x" + "a1" * 32
+_TEST_ACCT = Account.from_key(_TEST_KEY)
+
+
+def _signed_send_params(caller_label: str, skill_id: str = "lead-enrichment",
+                        text: str = "Enrich Globex") -> dict:
+    import uuid
+
+    from sincor2.a2a_integration import _auth_create_message
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    message = _auth_create_message(caller_label, skill_id, ts, nonce)
+    sig = _TEST_ACCT.sign_message(encode_defunct(text=message)).signature.hex()
+    return {
+        "skillId": skill_id,
+        "callerId": caller_label,
+        "message": {"role": "user", "parts": [{"text": text}]},
+        "ownerWallet": _TEST_ACCT.address,
+        "authSignature": "0x" + sig,
+        "authTimestamp": ts,
+        "authNonce": nonce,
+    }
 
 
 @pytest.fixture
@@ -87,14 +117,7 @@ def test_rest_a2a_send_returns_202(client):
         "/api/a2a/tasks/send",
         json={
             "method": "message/send",
-            "params": {
-                "skillId": "lead-enrichment",
-                "callerId": "queue-test-caller",
-                "message": {
-                    "role": "user",
-                    "parts": [{"text": "Enrich Globex"}],
-                },
-            },
+            "params": _signed_send_params("queue-test-caller"),
         },
     )
     assert resp.status_code == 202
@@ -115,11 +138,7 @@ def test_jsonrpc_send_stays_http_200(client):
             "jsonrpc": "2.0",
             "id": 9,
             "method": "message/send",
-            "params": {
-                "skillId": "lead-enrichment",
-                "callerId": "queue-jsonrpc-caller",
-                "message": {"role": "user", "parts": [{"text": "ping"}]},
-            },
+            "params": _signed_send_params("queue-jsonrpc-caller", text="ping"),
         },
     )
     assert resp.status_code == 200

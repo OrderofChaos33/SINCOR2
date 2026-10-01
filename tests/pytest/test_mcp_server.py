@@ -8,6 +8,8 @@ default-deny: no confirmation token, no execution.
 
 from __future__ import annotations
 
+from conftest import hb_headers
+
 import json
 
 import pytest
@@ -75,7 +77,7 @@ def _register_agent(client, agent_id, tags=("lead-enrichment",)):
         "wallet": "0x" + "11" * 20,
     })
     assert r.status_code in (200, 201), r.get_json()
-    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id})
+    r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
     stake_ledger().deposit(agent_id, 10 * 10**18)
 

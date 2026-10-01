@@ -7,10 +7,12 @@ import "./security/ScopedPausable.sol";
 /// @title CommitRevealAuction
 /// @notice Sealed-bid commit/reveal with onchain deadlines, plus the
 ///         selection bridge into the execution-escrow layer.
-///         Publishes Hash(price ‖ salt ‖ keccak(agentId)) during the commit
-///         window so task parameters and bids are not MEV-readable. Reveal
-///         is a second transaction (or an off-chain message checked against
-///         this commitment).
+///         Publishes Hash(auctionId ‖ chainId ‖ price ‖ salt ‖
+///         keccak(agentId)) during the commit window so task parameters
+///         and bids are not MEV-readable. Binding auctionId and chainId
+///         into the preimage blocks cross-auction commitment replay (W-4)
+///         and cross-chain replay. Reveal is a second transaction (or an
+///         off-chain message checked against this commitment).
 ///
 ///         Timing (ratified 2026-09-25, docs/ops/AUCTION_SECURITY_DECISIONS.md):
 ///         - 5-minute commit window + 5-minute reveal window, per-auction
@@ -186,7 +188,9 @@ contract CommitRevealAuction is ScopedPausable {
         Commit storage entry = commits[auctionId][msg.sender];
         if (entry.commit == bytes32(0)) revert NoCommit();
         if (entry.revealed) revert AlreadyRevealed();
-        bytes32 expected = keccak256(abi.encodePacked(bytes32(price), salt, agentIdHash));
+        bytes32 expected = keccak256(
+            abi.encodePacked(auctionId, block.chainid, bytes32(price), salt, agentIdHash)
+        );
         if (expected != entry.commit) revert BadReveal();
         // Prices are bounded to uint96: selectWinnerAndFund downcasts the
         // Vickrey price into the escrow's uint96 bidAmount, and an explicit

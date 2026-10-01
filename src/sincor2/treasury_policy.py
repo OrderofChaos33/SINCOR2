@@ -13,7 +13,7 @@ This module centralizes the logic so every revenue path respects the policy.
 """
 
 import os
-from typing import Tuple, Optional
+from typing import NamedTuple
 
 
 # ====================== CONFIGURATION ======================
@@ -34,11 +34,14 @@ class TreasuryPolicy:
 
     Usage Examples:
         # Normal revenue path (treasury deposit)
-        adjusted_amount, target_asset, converted = convert_before_treasury_if_needed(
+        decision = convert_before_treasury_if_needed(
             amount=1250.0,
             from_token="AXM",
             receiving_wallet="TREASURY"
         )
+        # decision.converted is False until an executor is armed (item 32);
+        # decision.reason explains why.  Never treat converted=True as proof
+        # that funds moved — verify the ConversionLedger / onchain receipts.
 
         # Trading wallet syphon check
         if treasury_policy.should_syphon_native_profit(wallet_address, profit_usd=3200):
@@ -100,6 +103,34 @@ class TreasuryPolicy:
         }
 
 
+class ConversionDecision(NamedTuple):
+    """
+    Fail-closed conversion signal (build-out item 34, 2026-09-30).
+
+    ``converted`` is True ONLY when a real conversion executor is armed and
+    has performed (or is responsible for) the swap.  Until then it is False
+    and ``reason`` explains why.  No caller may treat ``converted=True`` as
+    proof that funds moved — verify the ConversionLedger / onchain receipts.
+    """
+    amount: float
+    target_asset: str
+    converted: bool
+    reason: str
+
+
+def is_conversion_executor_armed() -> bool:
+    """
+    Whether a real fee-conversion executor is armed and able to perform the
+    swap.  Fail-closed default False.
+
+    This flag may ONLY be set true by the item-32 arming ceremony
+    (docs/ops/FEE_EXECUTOR_RUNBOOK.md): pinned pool, fork-simulated
+    calldata, forwarder key in the Secure Vault.  No code path in this repo
+    sets it; until the ceremony completes it stays False.
+    """
+    return os.getenv("SINCOR_FEE_EXECUTOR_ARMED", "false").lower() == "true"
+
+
 # Singleton instance for easy import across the codebase
 treasury_policy = TreasuryPolicy()
 
@@ -108,19 +139,44 @@ def convert_before_treasury_if_needed(
     amount: float,
     from_token: str,
     receiving_wallet: str = "TREASURY"
-) -> Tuple[float, str, bool]:
+) -> ConversionDecision:
     """
     Helper used by revenue paths (SADAS, A2A tasks, trading profits, etc).
 
-    Returns:
-        (adjusted_amount, target_asset_or_original, conversion_performed)
-    """
-    if treasury_policy.should_convert_before_treasury(from_token, receiving_wallet):
-        # In production: perform actual swap here (Uniswap V4, intent solver, etc.)
-        # For now we return the signal that conversion should happen
-        return amount, treasury_policy.target_asset, True
+    FAIL-CLOSED (2026-09-30, build-out item 34): this returns
+    ``converted=False`` with a ``reason`` until a conversion executor is
+    actually armed (item 32).  No code path may believe conversion happened
+    when it didn't.
 
-    return amount, from_token, False
+    Returns:
+        ConversionDecision(amount, target_asset, converted, reason)
+    """
+    if not treasury_policy.should_convert_before_treasury(from_token, receiving_wallet):
+        return ConversionDecision(
+            amount=amount,
+            target_asset=from_token,
+            converted=False,
+            reason="conversion not required by policy "
+                   "(non-fee token or trading-wallet exception)",
+        )
+    if is_conversion_executor_armed():
+        # The armed executor owns the swap; this signal alone never proves
+        # funds moved — verify the ConversionLedger / onchain receipts.
+        return ConversionDecision(
+            amount=amount,
+            target_asset=treasury_policy.target_asset,
+            converted=True,
+            reason="conversion executor is armed; conversion is the armed "
+                   "executor's responsibility (verify onchain)",
+        )
+    return ConversionDecision(
+        amount=amount,
+        target_asset=from_token,
+        converted=False,
+        reason="conversion required by policy but the fee-conversion "
+               "executor is disarmed (item 32 not complete); no conversion "
+               "was performed — queue the obligation in the ConversionLedger",
+    )
 
 
 # ====================== USAGE EXAMPLES ======================
@@ -128,15 +184,17 @@ if __name__ == "__main__":
     print("=== Treasury Policy Examples ===\n")
 
     # Example 1: Normal SADAS / A2A revenue going to treasury
-    print("1. Normal revenue to treasury (should convert):")
-    amount, target, converted = convert_before_treasury_if_needed(1250.0, "AXM", "TREASURY")
-    print(f"   Original: 1250 AXM | After policy: {amount} {target} | Converted: {converted}\n")
+    print("1. Normal revenue to treasury (policy says convert, executor disarmed):")
+    decision = convert_before_treasury_if_needed(1250.0, "AXM", "TREASURY")
+    print(f"   Original: 1250 AXM | Target: {decision.target_asset} | "
+          f"Converted: {decision.converted} | Reason: {decision.reason}\n")
 
     # Example 2: Trading wallet (Polyclaw / TOA-44) - should NOT convert
     print("2. Trading wallet profit (should keep native):")
     trading_wallet = list(TRADING_WALLET_ADDRESSES)[0] if TRADING_WALLET_ADDRESSES else "0xTradingWallet123"
-    amount, target, converted = convert_before_treasury_if_needed(980.0, "SINC", trading_wallet)
-    print(f"   Original: 980 SINC | After policy: {amount} {target} | Converted: {converted}\n")
+    decision = convert_before_treasury_if_needed(980.0, "SINC", trading_wallet)
+    print(f"   Original: 980 SINC | Target: {decision.target_asset} | "
+          f"Converted: {decision.converted} | Reason: {decision.reason}\n")
 
     # Example 3: Syphon check for trading wallet
     print("3. Should trading wallet syphon native profit?")

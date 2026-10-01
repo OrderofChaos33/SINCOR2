@@ -94,12 +94,20 @@ def _load_abi(name: str) -> List[Dict[str, Any]]:
     return json.loads(path.read_text(encoding="utf-8"))["abi"]
 
 
-def compute_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
-    """keccak256(abi.encodePacked(bytes32(price), salt, keccak256(agent_id))).
+def compute_commitment(price_wei: int, salt: bytes, agent_id: str,
+                       auction_id: bytes, chain_id: int) -> bytes:
+    """keccak256(abi.encodePacked(auctionId, block.chainid, bytes32(price),
+    salt, keccak256(agent_id))).
 
-    The exact ``CommitRevealAuction.reveal`` preimage. Pairs with
-    ``sincor2.a2a_inbound_market.sealed_commitment`` (the Python shim); both
-    must stay byte-identical so shim clients can reuse commitments on-chain.
+    The exact ``CommitRevealAuction.reveal`` preimage. ``auction_id`` binds
+    the commitment to one auction (W-4: blocks cross-auction replay) and
+    ``chain_id`` to one chain (blocks cross-chain replay).
+
+    This is the ONCHAIN scheme. The offchain sealed-bid shim
+    (``sincor2.a2a_inbound_market.sealed_commitment``) intentionally omits
+    both bindings — offchain commits are keyed per (task, agent) server-side
+    and never touch the contract, so shim hashes are NOT valid onchain
+    commitments and are not reusable on-chain.
     """
     try:
         from eth_hash.auto import keccak
@@ -113,8 +121,18 @@ def compute_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
         raise ValueError("price_wei must be positive")
     if len(salt) != 32:
         raise ValueError("salt must be 32 bytes")
+    auction_id = bytes(auction_id)
+    if len(auction_id) != 32:
+        raise ValueError("auction_id must be 32 bytes")
+    chain_id = int(chain_id)
+    if chain_id < 0:
+        raise ValueError("chain_id must be non-negative")
     agent_id_hash = keccak(str(agent_id).encode("utf-8"))
-    return keccak(int(price_wei).to_bytes(32, "big") + bytes(salt) + agent_id_hash)
+    return keccak(auction_id
+                  + chain_id.to_bytes(32, "big")
+                  + int(price_wei).to_bytes(32, "big")
+                  + bytes(salt)
+                  + agent_id_hash)
 
 
 class AuctionClient:
