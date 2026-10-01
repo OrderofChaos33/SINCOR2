@@ -1,7 +1,7 @@
-# SINCOR July 7 launch — KOL / curator / ecosystem partner targets
+# SINCOR November 9 launch — KOL / curator / ecosystem partner targets
 # Status tracked in data/launch_partners.db via partner_outreach.py
 
-launch_date: "2026-07-07"
+launch_date: "2026-11-09"
 site: https://getsincor.com
 pitch_deck: https://getsincor.com/pitch
 whitepaper: https://getsincor.com/whitepaper
@@ -12,7 +12,6 @@ proof:
   sinc: "0xe1D836087F6573b665d25CE088793E916D7892f8"
   curve: "0x75dE341a2BC81806198364F125d4Cde36527619C"
   chain: Base 8453
-  certik: "97/100 Skynet"
   sourcify: full-match verified
 
 offer_packages:
@@ -31,8 +30,8 @@ partners:
     handle: base
     contact_url: https://discord.com/invite/buildonbase
     contact_method: discord
-    angle: "42-agent autonomous workforce live on Base — verified contracts, AgentKit-adjacent story"
-    ask: "Showcase / ecosystem spotlight for July 7 launch"
+    angle: "Autonomous AI workforce on Base — verified contracts, AgentKit-adjacent story"
+    ask: "Showcase / ecosystem spotlight for November 9 launch"
     notes: "Build on Base Discord #showcase or builder intake form"
 
   - id: coinbase-agentkit
@@ -245,8 +244,8 @@ partners:
     handle: bankless
     contact_url: https://www.bankless.com/podcast
     contact_method: form
-    angle: "AI agents on Base — live demo of 42-agent swarm"
-    ask: "Guest slot week of July 7"
+    angle: "AI agents on Base — live demo of the agent swarm"
+    ask: "Guest slot week of November 9"
 
   - id: edge-pod-base
     name: Base builder podcast circuit
@@ -269,7 +268,7 @@ partners:
     contact_url: https://warpcast.com/~/channel/ai
     contact_method: warpcast
     angle: "Agent swarm launch with proof row"
-    ask: "Pinned cast or channel post July 7"
+    ask: "Pinned cast or channel post November 9"
 
   - id: farcaster-base-channel
     name: Farcaster /base channel mods
@@ -312,8 +311,8 @@ partners:
     handle: CertiK
     contact_url: https://skynet.certik.com/
     contact_method: form
-    angle: "97/100 score — co-marketing if allowed"
-    ask: "Skynet badge amplification on launch"
+    angle: "Independent smart-contract audit engagement"
+    ask: "Audit engagement for SINCOR contracts"
 
   - id: crypto-marketing-ref
     name: Crypto KOL agencies (vet only)

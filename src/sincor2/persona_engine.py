@@ -113,8 +113,13 @@ class PersonaEngine:
             # Create from archetype defaults
             return self._create_from_archetype()
     
-    def _create_from_archetype(self) -> PersonaVector:
-        """Create persona from archetype template"""
+    def _create_from_archetype(self, persist: bool = True) -> PersonaVector:
+        """Create persona from archetype template.
+
+        ``persist=False`` builds the archetype baseline in memory only.
+        The constitutional drift anchor must use the no-save path: a drift
+        *measurement* must never overwrite the live persona file.
+        """
         
         # Default persona values by archetype
         archetype_defaults = {
@@ -169,8 +174,9 @@ class PersonaEngine:
             last_updated=datetime.now().isoformat(),
             **defaults
         )
-        
-        self._save_persona(persona)
+
+        if persist:
+            self._save_persona(persona)
         return persona
     
     def _load_constitution(self) -> List[ConstitutionalRule]:
@@ -453,8 +459,13 @@ class PersonaEngine:
         self._recursive_blend_toward_constitution()
 
     def _constitution_anchor_persona(self) -> PersonaVector:
-        """Return the archetype baseline used as the constitutional anchor."""
-        return self._create_from_archetype()
+        """Return the archetype baseline used as the constitutional anchor.
+
+        Never persists: the anchor is a read-only reference for drift
+        measurement. Persisting here used to overwrite the live persona
+        file with archetype defaults on every drift calculation.
+        """
+        return self._create_from_archetype(persist=False)
 
     def _recursive_blend_toward_constitution(self, depth: int = 0, max_depth: int = 3) -> int:
         """Blend the current persona back toward its constitution until drift is bounded."""

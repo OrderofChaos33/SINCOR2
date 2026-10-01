@@ -21,6 +21,16 @@ import "./security/ScopedPausable.sol";
  *        clocks, so a permissionless timeout() can never steamroll an open
  *        dispute -- it can only fire after the resolution deadline passes,
  *        and then it defaults to the optimistic (worker-favor) outcome.
+ *      - The poster bonds on disputes exactly like any challenger: a free
+ *        poster dispute is a zero-cost delay attack on the worker's payout.
+ *        Disputes filed with no evidence can be fast-rejected after a short
+ *        evidence window instead of stalling through the full adjudication
+ *        window. A rejected dispute forfeits the bond: from a third-party
+ *        challenger it is slashed to the poster's re-auction fund, but when
+ *        the challenger IS the poster the bond goes to the worker as
+ *        compensation instead -- otherwise the "slash" would be a
+ *        self-transfer back into the filer's own fund and grief would cost
+ *        gas + temporary lockup only.
  */
 contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     /// @notice The sealed-bid core; the only caller allowed to initialize escrows.
@@ -29,8 +39,28 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     address public adjudicator;
     /// @notice Minimum worker stake as basis points of bidAmount (e.g. 2000 = 20%).
     uint256 public immutable minStakeBps;
-    /// @notice Bond required of non-poster challengers opening a dispute.
+    /// @notice Bond required of anyone opening a dispute -- the poster
+    ///         included (P0/W-24: a free poster dispute is a zero-cost delay
+    ///         attack on the worker's payout).
     uint256 public challengerBond;
+    /// @notice Floor for challengerBond. The anti-grief property of the bond
+    ///         is that stalling a worker's payout must cost real money: at a
+    ///         zero bond the original P0/W-24 free-delay vuln comes back in a
+    ///         single setChallengerBond(0) tx, so the adjudicator can never
+    ///         take it below this. Set at 0.01 ETH -- half the 0.02 ETH
+    ///         deployment calibration: still ~2 orders of magnitude above a
+    ///         Base dispute-cycle's gas, so grief stays priced rather than
+    ///         free, while the adjudicator keeps room to tune the bond down
+    ///         for cheaper dispute classes (or up for hotter ones) without
+    ///         bricking the anti-grief guarantee.
+    uint256 public constant MIN_CHALLENGER_BOND = 0.01 ether;
+    /// @notice Short window after a dispute is opened during which the
+    ///         challenger is expected to have evidence attached to it. If a
+    ///         dispute is still evidence-free when this window passes, anyone
+    ///         may fast-reject it via rejectEvidenceFreeDispute() instead of
+    ///         waiting out the full adjudication window -- a zero-evidence
+    ///         dispute would otherwise stall the worker's payout for days.
+    uint32 public constant DISPUTE_EVIDENCE_WINDOW = 6 hours;
 
     mapping(bytes32 => Escrow) public escrows;
     mapping(bytes32 => Dispute) public disputes;
@@ -63,6 +93,9 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     ) ScopedPausable(_guardian) {
         if (_auctionCore == address(0) || _adjudicator == address(0)) revert Unauthorized();
         if (_minStakeBps == 0 || _minStakeBps > 10_000) revert InvalidStakeBps();
+        // The constructor takes the same floor as setChallengerBond: deploying
+        // with a sub-floor bond would bake the free-delay vuln in from genesis.
+        if (_challengerBond < MIN_CHALLENGER_BOND) revert ChallengerBondBelowFloor(MIN_CHALLENGER_BOND, _challengerBond);
         auctionCore = _auctionCore;
         adjudicator = _adjudicator;
         minStakeBps = _minStakeBps;
@@ -167,14 +200,18 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
             revert DisputeWindowExpired();
         }
 
-        uint96 bond = 0;
-        if (msg.sender == esc.poster) {
-            // Poster disputes free; forbid accidental ETH lockup.
-            if (msg.value != 0) revert FundingMismatch(0, msg.value);
-        } else {
-            if (msg.value < challengerBond) revert InsufficientBond(challengerBond, msg.value);
-            bond = uint96(msg.value);
-        }
+        // P0/W-24: EVERYONE bonds, the poster included. A zero-cost poster
+        // dispute stalls the worker's payout through the whole adjudication
+        // window for free (griefer's delay attack), so the poster posts the
+        // same challengerBond with the same economics as the challenger path:
+        // returned if the dispute is upheld or if the adjudicator goes dark,
+        // forfeited if the dispute is rejected. Routing on reject depends on
+        // who filed: a third-party challenger's bond is slashed to the
+        // poster's re-auction fund; a poster who disputes their OWN auction
+        // and loses forfeits the bond to the worker instead (A2: crediting
+        // the filer's own fund would make the "slash" a self-transfer).
+        if (msg.value < challengerBond) revert InsufficientBond(challengerBond, msg.value);
+        uint96 bond = uint96(msg.value);
 
         esc.disputeActive = true;
         uint32 disputeTimestamp = uint32(block.timestamp);
@@ -199,6 +236,20 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
         } else {
             _resolveDisputeReject(esc, auctionId);
         }
+    }
+
+    /// @inheritdoc IExecutionEscrowManager
+    function rejectEvidenceFreeDispute(bytes32 auctionId) external override {
+        Escrow storage esc = escrows[auctionId];
+        if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
+        Dispute memory d = disputes[auctionId];
+        // A dispute with a batch digest already carries evidence attached;
+        // the fast path is only for disputes that were filed with none.
+        if (d.batchDigest != bytes32(0)) revert DisputeHasEvidence();
+        if (block.timestamp <= uint256(d.disputeTimestamp) + DISPUTE_EVIDENCE_WINDOW) {
+            revert EvidenceWindowOpen();
+        }
+        _resolveDisputeReject(esc, auctionId);
     }
 
     /**
@@ -243,21 +294,29 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
 
     /**
      * @dev Dispute rejected: the worker did the job and is paid in full
-     *      (bidAmount + stake). A false challenger's bond is slashed to the
-     *      poster's fund as the anti-griefing penalty.
+     *      (bidAmount + stake). A false challenger's bond is forfeited as the
+     *      anti-griefing penalty: from a third-party challenger it is slashed
+     *      to the poster's re-auction fund; when the challenger IS the poster
+     *      (a rejected self-dispute) it goes to the WORKER as compensation
+     *      for the grief/hold on their payout, via the same _payout
+     *      push-try/pull-fallback machinery. Routing it to the poster's own
+     *      fund would be a self-transfer -- grief priced at gas only.
      */
     function _resolveDisputeReject(Escrow storage esc, bytes32 auctionId) internal {
         Escrow memory m = esc;
         Dispute memory d = disputes[auctionId];
+        // The credit backing was earned: it formed part of this payout.
+        uint256 payout = uint256(m.bidAmount) + m.agentStake;
         if (d.challengerBond > 0) {
-            posterReAuctionBalances[m.poster] += d.challengerBond;
-            emit ReAuctionFundCredited(auctionId, m.poster, d.challengerBond);
+            if (d.challenger == m.poster) {
+                payout += d.challengerBond;
+            } else {
+                posterReAuctionBalances[m.poster] += d.challengerBond;
+                emit ReAuctionFundCredited(auctionId, m.poster, d.challengerBond);
+            }
         }
         emit QualityDisputeResolved(auctionId, false, 0);
         emit EscrowFinalized(auctionId, m.selectedAgent, m.bidAmount, m.agentStake);
-
-        // The credit backing was earned: it formed part of this payout.
-        uint256 payout = uint256(m.bidAmount) + m.agentStake;
 
         esc.state = ExecutionState.Finalized;
         esc.disputeActive = false;
@@ -344,6 +403,9 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
 
     /// @inheritdoc IExecutionEscrowManager
     function setChallengerBond(uint256 newBond) external override onlyAdjudicator {
+        // Floor first: a sub-floor bond restores the P0/W-24 free-delay vuln
+        // (zero bond = zero-cost grief on the worker's payout) in one tx.
+        if (newBond < MIN_CHALLENGER_BOND) revert ChallengerBondBelowFloor(MIN_CHALLENGER_BOND, newBond);
         // Bound the bond so the uint96 dispute-record cast can never truncate.
         if (newBond > type(uint96).max) revert BondExceedsRecordableLimit(type(uint96).max, newBond);
         challengerBond = newBond;

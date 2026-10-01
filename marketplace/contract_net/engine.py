@@ -1,6 +1,8 @@
 """Contract-Net orchestrator: cosine invite → sealed Vickrey → ε-greedy juniors.
 
-This module is additive. It does not replace ``sincor2.bidding_engine.BiddingEngine.run_auction``.
+This module is additive. It implements the sealed-bid Vickrey money path;
+the legacy multi-criteria evaluator lives in ``sincor2.contract_net``, and
+``sincor2.bidding_engine.BiddingEngine`` has no production callers.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from .types import (
     SealedBid,
     SigType,
     TaskSpec,
+    BASE_SEPOLIA_CHAIN_ID,
 )
 from .vickrey import clear_vickrey
 
@@ -63,7 +66,9 @@ class ContractNetEngine:
         memory_router: Optional[Any] = None,
         compliance_filter: Optional[ComplianceAttestationFilter] = None,
     ) -> None:
-        self.config = config or ContractNetConfig()
+        # W-3: chain_id is explicit per-deployment config; the default engine
+        # targets Base Sepolia (the contract deployment chain).
+        self.config = config or ContractNetConfig(chain_id=BASE_SEPOLIA_CHAIN_ID)
         self._history: List[AuctionRecord] = []
         self._nonces: Dict[str, int] = {}
         self.memory_router = memory_router

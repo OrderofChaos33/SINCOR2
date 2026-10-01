@@ -1,18 +1,28 @@
-"""Contract-Net auction evaluator (sync) — LEGACY / internal use.
+"""Contract-Net auction helpers + sync evaluator.
 
 Score = (0.3 * Reputation) - (0.4 * bid^1.1) - (0.3 * minutes)
 Higher score wins. Cheaper + faster + more reputable.
 
-This evaluator is retained for the TOA self-improvement loop
-(``wardrobe/self_improve.py``) and tests. It is NOT the production auction
-path: bids and reputation are read from the store with no signature
-verification, so it is only safe with the in-process ``MemoryHashStore``.
-Passing any other store requires explicit ``allow_external_store=True``
-opt-in (see ``ContractNetEvaluator.__init__``).
+This module serves two consumer groups with different trust levels:
 
-Canonical implementations:
+- Live A2A inbound task-auction path (``a2a_inbound.py``,
+  ``a2a_inbound_ext.py``, ``a2a_inbound_market.py``): uses the
+  module-level helpers only — ``calculate_bid_score`` (bid ranking in
+  ``a2a_inbound_market.py``), ``stage_payout`` (payout staging), and
+  ``probe_base_chain`` / ``BASE_CHAIN_ID`` / ``ESCROW_ADDRESS``
+  (chain registration and probe). Reputation fed into
+  ``calculate_bid_score`` on this path comes from the agent record.
+- ``ContractNetEvaluator`` (the sync evaluator class) is LEGACY /
+  internal: retained for the TOA self-improvement loop
+  (``wardrobe/self_improve.py``) and tests. It reads bids and reputation
+  from the store with no signature verification, so it is only safe with
+  the in-process ``MemoryHashStore``. Passing any other store requires
+  explicit ``allow_external_store=True`` opt-in (see
+  ``ContractNetEvaluator.__init__``).
+
+Money-path canonical implementation:
 - ``marketplace.contract_net`` — sealed-bid Vickrey (the money path).
-- ``bidding_engine.BiddingEngine`` — multi-criteria first-price path.
+- ``sincor2.bidding_engine`` has no production callers.
 
 Redis keys (when a Redis-like store is attached)
 ------------------------------------------------
