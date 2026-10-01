@@ -1,11 +1,31 @@
 <nav class="sp-nav">
   <div class="sp-nav-inner">
     <a class="sp-brand" href="/"><img src="/static/sincor_logo.svg" alt="SINCOR">SINCOR</a>
-    <div class="sp-links">
+    <button class="sp-nav-toggle" id="sp-nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
+    <div class="sp-links" id="sp-nav-links">
       <a href="/products">Products</a>
-      <a href="/#marketplace">Marketplace</a>
+      <a href="/#agent-cards">Marketplace</a>
+      <a href="/#platform">Platform</a>
+      <a href="/#tokens">Economy</a>
+      <a href="/#defi">DeFi</a>
+      <a href="/#toa">TOA</a>
       <a href="/pricing">Pricing</a>
       <a href="/signup" class="sp-btn sp-btn-gold sp-btn-sm">Get started</a>
     </div>
   </div>
 </nav>
+<script>
+(function () {
+  var t = document.getElementById('sp-nav-toggle');
+  var l = document.getElementById('sp-nav-links');
+  if (t && l) {
+    t.addEventListener('click', function () {
+      var open = l.classList.toggle('open');
+      t.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    l.addEventListener('click', function (e) {
+      if (e.target.tagName === 'A') { l.classList.remove('open'); t.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+})();
+</script>

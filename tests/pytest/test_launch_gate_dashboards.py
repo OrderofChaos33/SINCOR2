@@ -35,7 +35,9 @@ DASHBOARDS = [
 ]
 
 GATE_MARKER = "T-minus genesis"
-HOME_MARKER = "TOA-native agent infrastructure"
+# Homepage marker: the 20,000 AXM bounty pool is stated on the restored
+# landing page (was: "TOA-native agent infrastructure", the pre-#286 title).
+HOME_MARKER = "20,000 AXM bounty pool"
 
 
 # --------------------------------------------------------------------------
