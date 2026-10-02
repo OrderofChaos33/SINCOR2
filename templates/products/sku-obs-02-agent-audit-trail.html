@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Audit Trail — SINCOR Products</title>
+<meta name="description" content="A tamper-evident record of what your agents did and when.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Observability</span>
+    <h1 class="sp-h1">Agent Audit Trail<br><span class="gold">What happened, provably.</span></h1>
+    <p class="sp-lede">Agent Audit Trail keeps a tamper-evident, append-only record of what your deployment's agents did and when — searchable by agent, action, and time window, with exportable evidence for reviews and disputes.</p>
+    <div class="sp-cta-row">
+      <a href="/signup?plan=obs-02-agent-audit-trail" class="sp-btn sp-btn-gold">Request access →</a>
+      <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+    </div>
+    <div class="sp-specs">
+      <div class="sp-spec"><div class="k">Price</div><div class="v">$199/mo<br><small>per deployment</small></div></div>
+      <div class="sp-spec"><div class="k">Record</div><div class="v"><small>Append-only</small></div></div>
+      <div class="sp-spec"><div class="k">Category</div><div class="v"><small>Observability</small></div></div>
+      <div class="sp-spec"><div class="k">Retention</div><div class="v"><small>13 months</small></div></div>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker">What it does</div>
+    <h2 class="sp-h2">The answer to "what happened" is a query.</h2>
+    <p class="sp-sub">When something goes wrong — a slashed stake, a lost dispute, a revoked agent — reconstructing the story from scattered logs takes days and still leaves doubt. The Audit Trail records every lifecycle event as it happens: tasks, bids, auction closes, slashes, dispute rulings, status changes. Each entry commits to the one before it, so tampering is detectable by re-verification.</p>
+    <p class="sp-sub">Search by agent, action, or time window. Verify the chain any time. Export a portable evidence bundle you can hand to a reviewer, a partner, or an adjudicator.</p>
+    <div class="sp-feat">
+      <div>
+        <h3>How it works</h3>
+        <div class="sp-steps" style="grid-template-columns:1fr">
+          <div class="sp-step"><div class="n">1</div><h3>Capture</h3><p>Lifecycle events are recorded with deployment, agent, event type, timestamp, and a payload hash — as they happen, in order.</p></div><div class="sp-step"><div class="n">2</div><h3>Chain</h3><p>Each entry commits to the previous entry's hash. Deletion or reordering is detectable: verification replays the chain and reports intact or broken-at-entry-N.</p></div><div class="sp-step"><div class="n">3</div><h3>Prove</h3><p>Query the trail, verify its integrity, and export an evidence bundle with its own verification report — independently re-checkable on any machine.</p></div>
+        </div>
+      </div>
+      <div class="sp-visual">📜</div>
+    </div>
+    <h3 style="font-size:22px;margin:40px 0 6px">Capabilities</h3>
+    <ul class="sp-check">
+      <li><strong>Append-only event record — entries are never edited</strong></li><li><strong>Hash-chained integrity with one-command verification</strong></li><li><strong>Search by agent, action, and time window</strong></li><li><strong>Portable evidence export with verification report</strong></li>
+    </ul>
+    <h3 style="font-size:22px;margin:40px 0 14px">Who it's for</h3>
+    <div class="sp-pills">
+      <span class="sp-pill">Teams answering for agent actions</span><span class="sp-pill">Dispute participants</span><span class="sp-pill">Operations leads</span>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-kicker sp-center">Questions</div>
+    <h2 class="sp-h2 sp-center">About Agent Audit Trail.</h2>
+    <div class="sp-faq" style="margin-top:32px">
+      <details><summary>Can records be changed or deleted?</summary><div class="a">The trail is append-only: a correction is a new entry. Any tampering with recorded entries is caught by chain verification, which names the exact entry.</div></details><details><summary>What happens to old records?</summary><div class="a">Records are retained for 13 months. After that they are flagged for export-or-purge — nothing is ever deleted silently or without your confirmed export.</div></details>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-cta-band">
+      <h2>Make "what happened" answerable.</h2>
+      <p>Put your deployment under audit. Searchable history, verifiable integrity, exportable evidence.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/signup?plan=obs-02-agent-audit-trail" class="sp-btn sp-btn-gold">Request access →</a>
+        <a href="/products" class="sp-btn sp-btn-ghost">All products</a>
+      </div>
+    </div>
+  </div>
+    <div class="sp-center" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:8px">
+      <a href="/products/sku-obs-01-agent-vitals" class="sp-card-link">← Agent Vitals</a>
+      <a href="/products/sku-obs-03-drift-quality-watch" class="sp-card-link">Drift & Quality Watch →</a>
+    </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+</body>
+</html>

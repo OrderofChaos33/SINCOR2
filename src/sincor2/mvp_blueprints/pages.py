@@ -435,6 +435,17 @@ _PRODUCT_SLUGS = frozenset((
     "p25-agent-portfolio", "p26-defi-os",
 ))
 
+# Observability / audit SKUs: live pages at templates/products/sku-*.html.
+# Copy on each page is honest build-stage framing (private beta / service
+# engagement) — none claims a live production deployment.
+_SKU_SLUGS = frozenset((
+    "sku-obs-01-agent-vitals", "sku-obs-02-agent-audit-trail",
+    "sku-obs-03-drift-quality-watch", "sku-aud-01-agent-forensic-audit",
+    "sku-aud-02-compliance-pack", "sku-obs-ent-enterprise-mesh",
+))
+
+_PRODUCT_SLUGS = _PRODUCT_SLUGS | _SKU_SLUGS
+
 
 @bp.route("/products")
 def products_suite():
