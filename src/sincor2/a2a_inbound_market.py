@@ -28,6 +28,7 @@ from sincor2.a2a_inbound import (
     get_fabric,
 )
 from sincor2.a2a_timeouts import assignment_deadline_ms
+from sincor2.a2a_idempotency import idempotent
 # Grandfathered plaintext scoring for non-sealed tasks (pre-shim clients).
 # Canonical money path is marketplace.contract_net — see
 # docs/architecture/CANONICAL_PATHS.md §1.
@@ -918,6 +919,7 @@ def reset_socialfi_onboarding():
 
 def attach_market_routes(bp: Blueprint) -> None:
     @bp.post("/v1/a2a/tasks")
+    @idempotent("tasks.create", error=_http_error)
     def v1_tasks():
         body = request.get_json(silent=True) or {}
         try:
@@ -1046,6 +1048,7 @@ def attach_market_routes(bp: Blueprint) -> None:
 
     @bp.post("/v1/a2a/bids")
     @bp.post("/api/v1/bids")
+    @idempotent("bids.place", error=_http_error)
     def v1_bids():
         body = request.get_json(silent=True) or {}
         time_est = body.get("estimated_seconds")
@@ -1064,6 +1067,7 @@ def attach_market_routes(bp: Blueprint) -> None:
             return _http_error(str(err), 409)
 
     @bp.post("/v1/a2a/bids/commit")
+    @idempotent("bids.commit", error=_http_error)
     def v1_bids_commit():
         """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}.
 
@@ -1087,6 +1091,7 @@ def attach_market_routes(bp: Blueprint) -> None:
             return _http_error(str(err), 409)
 
     @bp.post("/v1/a2a/bids/reveal")
+    @idempotent("bids.reveal", error=_http_error)
     def v1_bids_reveal():
         """Sealed-bid reveal phase. Body: {task_id, agent_id, bid_axm, nonce}
         (+ optional estimated_seconds). The commitment is recomputed and
