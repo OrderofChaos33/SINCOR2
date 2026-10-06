@@ -4,7 +4,19 @@ pragma solidity ^0.8.24;
 /// @title SINCOR ERC-4337 Paymaster (Base 8453)
 /// @notice Sponsors UserOperation gas for probation wallets so new agents
 ///         can land without ETH. Production deploy via ZeroDev/Biconomy
-///         EntryPoint. Micro-tasks (< 5 AXM) skip merit so new agents can fill.
+///         EntryPoint (ERC-4337 v0.7).
+///
+/// @dev W-34 fix: validatePaymasterUserOp now takes the ERC-4337 v0.7
+///      canonical signature
+///      validatePaymasterUserOp(PackedUserOperation, bytes32, uint256)
+///      (selector 0x52b7512c), matching the EntryPoint's IPaymaster call.
+///      The old (bytes, bytes32, uint256) form could never be invoked by a
+///      conformant EntryPoint. sender is read from userOp.sender — the
+///      raw-bytes _senderOf assembly decode path is removed.
+///      withdrawTo lets the owner (or an explicitly authorized withdrawer)
+///      pull the paymaster's EntryPoint deposit back out; funds deposited
+///      via depositTo/receive() are held by the EntryPoint, so without this
+///      they had no recovery path.
 ///
 /// @dev P0/W-17 hardening: validatePaymasterUserOp enforces, in order:
 ///      1. the caller is the EntryPoint,
@@ -37,6 +49,22 @@ pragma solidity ^0.8.24;
 interface IEntryPoint {
     function balanceOf(address account) external view returns (uint256);
     function depositTo(address account) external payable;
+    function withdrawTo(address payable withdrawAddress, uint256 amount) external;
+}
+
+/// @notice ERC-4337 v0.7 packed user operation — field order matches the
+///         canonical EntryPoint IPaymaster.validatePaymasterUserOp selector
+///         0x52b7512c.
+struct PackedUserOperation {
+    address sender;
+    uint256 nonce;
+    bytes initCode;
+    bytes callData;
+    bytes32 accountGasLimits;
+    uint256 preVerificationGas;
+    bytes32 gasFees;
+    bytes paymasterAndData;
+    bytes signature;
 }
 
 contract SincorPaymaster {
@@ -54,11 +82,16 @@ contract SincorPaymaster {
     mapping(address => uint256) public inFlight;
     /// @notice Allowlist: only wallets with probation == true get sponsored.
     mapping(address => bool) public probation;
+    /// @notice Explicitly authorized withdrawer (may differ from owner).
+    ///         address(0) = no separate withdrawer; only the owner can withdraw.
+    address public withdrawer;
 
     event Sponsored(address indexed sender, uint256 ops);
     event ProbationSet(address indexed wallet, bool on);
     event MaxSponsoredOpsSet(uint256 ops);
     event MaxSponsoredWeiSet(uint256 weiLimit);
+    event WithdrawerSet(address indexed withdrawer);
+    event Withdrawn(address indexed to, uint256 amount);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "not owner");
@@ -86,28 +119,16 @@ contract SincorPaymaster {
         emit MaxSponsoredWeiSet(weiLimit);
     }
 
-    /// @dev Decodes the sender from an unpacked ERC-4337 UserOperation
-    ///      (sender is the first 32-byte word, address right-aligned).
-    function _senderOf(bytes calldata userOp)
-        internal
-        pure
-        returns (address sender)
-    {
-        require(userOp.length >= 32, "bad userOp");
-        bytes32 word;
-        assembly {
-            word := calldataload(userOp.offset)
-        }
-        sender = address(uint160(uint256(word)));
-    }
-
+    /// @notice ERC-4337 v0.7 entry point. The EntryPoint calls this with a
+    ///         PackedUserOperation; the selector must be 0x52b7512c or the
+    ///         call never lands (W-34).
     function validatePaymasterUserOp(
-        bytes calldata userOp,
+        PackedUserOperation calldata userOp,
         bytes32 /* userOpHash */,
         uint256 maxCost
     ) external returns (bytes memory context, uint256 validationData) {
         require(msg.sender == address(entryPoint), "only EntryPoint");
-        address sender = _senderOf(userOp);
+        address sender = userOp.sender;
         require(probation[sender], "not allowlisted");
         require(
             sponsoredCount[sender] + inFlight[sender] < maxSponsoredOps,
@@ -152,5 +173,28 @@ contract SincorPaymaster {
 
     receive() external payable {
         entryPoint.depositTo{value: msg.value}(address(this));
+    }
+
+    /// @notice Authorize (or clear, with address(0)) a non-owner withdrawer.
+    function setWithdrawer(address _withdrawer) external onlyOwner {
+        withdrawer = _withdrawer;
+        emit WithdrawerSet(_withdrawer);
+    }
+
+    /// @notice Pull `amount` of the paymaster's EntryPoint deposit to `to`.
+    /// @dev Only the owner or the explicitly authorized withdrawer. The
+    ///      EntryPoint holds the deposited funds, so this is the only
+    ///      recovery path for sponsored gas capital (W-34). Event is emitted
+    ///      before the external call; an EntryPoint revert rolls everything
+    ///      back. A reentrant `to` gains nothing: it would have to already
+    ///      be the authorized caller to re-enter.
+    function withdrawTo(address payable to, uint256 amount) external {
+        require(
+            msg.sender == owner || msg.sender == withdrawer,
+            "not authorized"
+        );
+        require(to != address(0), "zero recipient");
+        emit Withdrawn(to, amount);
+        entryPoint.withdrawTo(to, amount);
     }
 }
