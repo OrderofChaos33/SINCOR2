@@ -899,6 +899,86 @@ class _IssueLiveBlocked(RuntimeError):
     """Live issuance attempted while P24 is live-blocked -> 403."""
 
 
+class _IssueBindingError(RuntimeError):
+    """Caller/creator_id binding violation -> 403."""
+
+
+# ---------------------------------------------------------------------------
+# W-38 creator-ID binding, screening, idempotency (pre-live hardening).
+#
+# The pre-hardening route let a free-registered agent dry-run issuance under
+# an ARBITRARY creator_id: no caller/KYA binding, no creator-ID screening,
+# no idempotency — so the first squatter to register a creator_id blocked
+# the legitimate creator with a 409. Three rules close the gap (issuance
+# itself stays live-blocked by catalog design; this is pre-live hardening
+# only):
+#
+# 1. BINDING: creator_id must equal the caller's registered agent_id. The
+#    route's verified identity is fabric membership (agent_id in
+#    fabric.agents) — the same identity the registration KYA hook binds to
+#    wallet/card in kya_registry.list_from_inbound. A creator_id that does
+#    not belong to the caller is REJECTED with 403 (never force-overridden:
+#    a silent rewrite would corrupt the idempotency fingerprint and hide
+#    caller intent from the audit trail).
+# 2. SCREENING: creator_id must be 1-64 chars, start with a letter/digit,
+#    and contain only [A-Za-z0-9._-] (whitespace, control characters and
+#    unicode confusables are rejected by the charset whitelist); it must
+#    not be a reserved platform identity, and must not use a deceptive
+#    official/platform prefix. Violations -> 400.
+# 3. IDEMPOTENCY: the view carries @idempotent("socialfi.issue"), so a
+#    retried request replays the original 201 instead of executing again —
+#    no duplicate registrations, no new squat windows.
+# ---------------------------------------------------------------------------
+
+CREATOR_ID_MAX_LEN = 64
+CREATOR_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+# Reserved platform identities (exact, case-insensitive): no caller may
+# claim these as their creator_id.
+CREATOR_ID_RESERVED = frozenset({
+    "sincor", "sincor2", "official", "admin", "administrator", "system",
+    "support", "treasury", "foundation", "staff", "moderator", "root",
+    "official-team", "sincor-team",
+})
+
+# Deceptive prefixes (case-insensitive): e.g. "official-team",
+# "sincor-support", "admin-help" would read as platform-endorsed.
+CREATOR_ID_IMPERSONATION_PREFIXES = (
+    "sincor-", "sincor_", "sincor.",
+    "official-", "official_", "official.",
+    "admin-", "admin_",
+)
+
+
+def _validate_creator_id(creator_id, agent_id):
+    """Enforce the creator-ID screening + caller-binding rules (W-38).
+
+    ``creator_id`` must be a screened value AND equal to the caller's
+    registered ``agent_id``. Raises _IssueBindingError (403) when the
+    creator_id does not belong to the caller; ValueError (400) on screened
+    values (empty, overlong, bad charset, reserved, or impersonating).
+    """
+    if not isinstance(creator_id, str) or not creator_id:
+        raise ValueError("creator_id must be 1-64 characters")
+    if len(creator_id) > CREATOR_ID_MAX_LEN:
+        raise ValueError("creator_id must be 1-64 characters")
+    if not CREATOR_ID_RE.fullmatch(creator_id):
+        raise ValueError(
+            "creator_id must start with a letter or digit and contain only "
+            "letters, digits, '.', '_' or '-'")
+    lowered = creator_id.lower()
+    if lowered in CREATOR_ID_RESERVED:
+        raise ValueError("creator_id is a reserved platform identity")
+    if lowered.startswith(CREATOR_ID_IMPERSONATION_PREFIXES):
+        raise ValueError(
+            "creator_id is deceptive: must not impersonate an official or "
+            "platform identity")
+    if creator_id != agent_id:
+        raise _IssueBindingError(
+            "creator_id does not belong to the caller: issuance is bound "
+            "to the caller's registered agent_id")
+
+
 _socialfi_onboarding_agent = None
 
 
@@ -1416,15 +1496,21 @@ def attach_market_routes(bp: Blueprint) -> None:
     # is served until the founder releases the live block.
 
     @bp.post("/v1/a2a/socialfi/issue")
+    @idempotent("socialfi.issue", error=_http_error)
     def v1_socialfi_issue():
         """Issue a P24 creator token for a registered agent (dry-run only).
 
         Body: {agent_id, name, symbol, creator_id?, description?, bio?,
         dry_run?}. The agent must be registered (unknown agent -> 401);
-        this is membership auth, not cryptographic proof. Metadata is
+        this is membership auth, not cryptographic proof. creator_id is
+        bound to the caller's registered agent_id (mismatch -> 403), and
+        is content-screened (empty/overlong/bad charset/reserved/
+        impersonating -> 400); see the W-38 block above. Metadata is
         screened against the content-policy deny-list (violation -> 400
-        with the ruleset version); duplicate creator -> 409. Live issuance
-        is refused with 403 while P24 is live-blocked; dry_run=true
+        with the ruleset version); duplicate creator -> 409. The route is
+        idempotency-keyed ("socialfi.issue" scope): a retry with the same
+        key replays the original response instead of re-executing. Live
+        issuance is refused with 403 while P24 is live-blocked; dry_run=true
         (default) exercises the full screened issuance path without
         broadcasting.
         """
@@ -1440,9 +1526,12 @@ def attach_market_routes(bp: Blueprint) -> None:
             with fabric.lock:
                 if agent_id not in fabric.agents:
                     raise _IssueAuthError("agent authentication required")
-            creator_id = str(body.get("creator_id") or agent_id).strip()
-            if not creator_id or len(creator_id) > 64:
-                raise ValueError("creator_id must be 1-64 characters")
+            # creator_id defaults to the caller's own agent_id when omitted;
+            # an explicitly empty value is rejected (no silent fallback).
+            raw_creator = body.get("creator_id")
+            creator_id = (agent_id if raw_creator is None
+                          else str(raw_creator).strip())
+            _validate_creator_id(creator_id, agent_id)
             name = str(body.get("name") or "").strip()
             if not name or len(name) > 64:
                 raise ValueError("name must be 1-64 characters")
@@ -1484,6 +1573,8 @@ def attach_market_routes(bp: Blueprint) -> None:
             }), 201
         except _IssueAuthError as err:
             return _http_error(str(err), 401)
+        except _IssueBindingError as err:
+            return _http_error(str(err), 403)
         except _IssueLiveBlocked as err:
             return _http_error(str(err), 403)
         except policy.PolicyViolation as err:
