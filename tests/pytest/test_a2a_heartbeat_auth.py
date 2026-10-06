@@ -8,6 +8,7 @@ heartbeat message, or the operator heartbeat token. Unsigned heartbeats get
 from __future__ import annotations
 
 import time
+import uuid
 
 import pytest
 from eth_account import Account
@@ -25,8 +26,11 @@ NOWALLET = "hbauth-nowallet"
 
 
 def _register(client, agent_id, wallet):
+    # Use unique agent_id per registration to avoid re-registration 403
+    # (re-registration requires EIP-191 signature by registered wallet)
+    unique_id = f"{agent_id}-{uuid.uuid4().hex[:8]}"
     body = {
-        "agent_id": agent_id,
+        "agent_id": unique_id,
         "capability_tags": ["auth-test"],
         "rpc_callback": "https://auth.example/rpc",
     }
@@ -34,15 +38,15 @@ def _register(client, agent_id, wallet):
         body["wallet"] = wallet
     r = client.post("/v1/a2a/register", json=body)
     assert r.status_code in (200, 201), r.get_json()
-    return r
+    return r, unique_id
 
 
 @pytest.fixture()
 def authed_agent(client):
     """Registered agent holding a real key; returns (agent_id, account)."""
     acct = Account.create()
-    _register(client, AID, acct.address)
-    return AID, acct
+    _, unique_id = _register(client, AID, acct.address)
+    return unique_id, acct
 
 
 def _sig(acct, agent_id, ts):
@@ -124,9 +128,9 @@ def test_spoofed_agent_id_liveness_impossible(client, authed_agent):
 
 
 def test_walletless_agent_cannot_self_authenticate(client):
-    _register(client, NOWALLET, None)
+    _, unique_id = _register(client, NOWALLET, None)
     acct = Account.create()
-    r = _beat(client, NOWALLET, acct=acct)
+    r = _beat(client, unique_id, acct=acct)
     assert r.status_code == 401  # fail closed: no bound identity to prove
 
 
