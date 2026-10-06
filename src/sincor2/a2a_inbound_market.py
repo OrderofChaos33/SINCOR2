@@ -1345,6 +1345,11 @@ def attach_market_routes(bp: Blueprint) -> None:
         The agent must be registered (unknown agent -> 404). A fresh
         heartbeat is NOT required: an agent with an expired heartbeat may
         still top up stake; the heartbeat gate applies at commit time.
+
+        Idempotent on tx_hash: a retry of the same deposit (same tx_hash,
+        agent, amount) returns the existing record with ``duplicate=true``
+        (HTTP 200) and credits nothing further.  A tx_hash bound to a
+        different agent or amount is rejected (HTTP 400).
         """
         body = request.get_json(silent=True) or {}
         try:
@@ -1382,10 +1387,13 @@ def attach_market_routes(bp: Blueprint) -> None:
             summary = stake_ledger().deposit(
                 agent_id, amount_wei, reference=tx_hash)
             result = dict(summary)
-            result["deposit_wei"] = str(amount_wei)
+            result["deposit_wei"] = summary["credited_wei"]
             result["tx_hash"] = tx_hash
             result["ledger"] = "offchain-axm"
-            return jsonify(result), 201
+            # Honest retries of the same deposit get 200 + duplicate=true;
+            # fresh deposits get 201.  Neither is an error.
+            status = 200 if summary.get("duplicate") else 201
+            return jsonify(result), status
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
         except KeyError as err:
