@@ -672,10 +672,17 @@ def test_dispute_gating(env):
 
 
 # ---------------------------------------------------------------------------
-# 8. Adjudicator-dark timeout: optimistic payout + bond refund
+# 8. Adjudicator-dark timeout: optimistic payout + bond FORFEITED (J4)
 # ---------------------------------------------------------------------------
 
-def test_adjudicator_dark_timeout_pays_worker_and_refunds_bond(env):
+def test_adjudicator_dark_timeout_pays_worker_and_forfeits_bond(env):
+    # J4: the old behavior refunded the challenger bond on a dark-adjudicator
+    # timeout, which made junk-digest stalling ~free (griefer net cost = gas
+    # only). A dispute that dies without an adjudicator ruling is
+    # unsubstantiated by the optimistic default, so its bond is forfeited
+    # exactly like a rejected dispute: third-party challenger -> poster's
+    # re-auction fund. An honest challenger's bond is protected by a live
+    # adjudicator's ruling, not by the timeout.
     w3, mgr = env.w3, env.mgr
     bid = w3.to_wei(2, "ether")
     stake = bid * MIN_STAKE_BPS // 10000
@@ -702,9 +709,10 @@ def test_adjudicator_dark_timeout_pays_worker_and_refunds_bond(env):
     assert esc[13] == FINALIZED and esc[14] is False
     # optimistic worker payout: bid + full stake
     assert w3.eth.get_balance(env.agent) == agent_before + bid + stake
-    # challenger bond returned (silence was not their fault); nothing slashed
-    assert w3.eth.get_balance(env.challenger) == chal_before + env.challenger_bond
-    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == 0
+    # J4: challenger bond NOT returned -- forfeited to the poster's fund,
+    # exactly like a rejected dispute. Stalling now costs the full bond.
+    assert w3.eth.get_balance(env.challenger) == chal_before
+    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == env.challenger_bond
 
 
 # ---------------------------------------------------------------------------
