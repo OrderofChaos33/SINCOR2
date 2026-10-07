@@ -194,10 +194,13 @@ class SincorAgentSDK:
         """Request P24 creator-token issuance for a registered agent.
 
         Metadata is screened against the content-policy deny-list
-        server-side (violation -> 400 with the ruleset version). P24 is
-        live-blocked, so only dry-run issuance is served until the founder
-        releases the live block; pass dry_run=False only when live
-        issuance is authorized (currently refused with 403)."""
+        server-side (violation -> 400 with the ruleset version). creator_id
+        is bound to the caller's agent_id: omit it to issue under your own
+        agent_id, or pass creator_id == agent_id; any other value is
+        rejected with 403. P24 is live-blocked, so only dry-run issuance is
+        served until the founder releases the live block; pass
+        dry_run=False only when live issuance is authorized (currently
+        refused with 403)."""
         payload: Dict[str, Any] = {
             "agent_id": agent_id, "name": name, "symbol": symbol,
             "description": description, "bio": bio,
