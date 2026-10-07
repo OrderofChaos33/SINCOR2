@@ -23,14 +23,25 @@ import "./security/ScopedPausable.sol";
  *        and then it defaults to the optimistic (worker-favor) outcome.
  *      - The poster bonds on disputes exactly like any challenger: a free
  *        poster dispute is a zero-cost delay attack on the worker's payout.
- *        Disputes filed with no evidence can be fast-rejected after a short
- *        evidence window instead of stalling through the full adjudication
- *        window. A rejected dispute forfeits the bond: from a third-party
- *        challenger it is slashed to the poster's re-auction fund, but when
- *        the challenger IS the poster the bond goes to the worker as
- *        compensation instead -- otherwise the "slash" would be a
+ *        Disputes filed with no retrievable evidence can be fast-rejected
+ *        after a short evidence window instead of stalling through the full
+ *        adjudication window. A rejected dispute forfeits the bond: from a
+ *        third-party challenger it is slashed to the poster's re-auction
+ *        fund, but when the challenger IS the poster the bond goes to the
+ *        worker as compensation instead -- otherwise the "slash" would be a
  *        self-transfer back into the filer's own fund and grief would cost
  *        gas + temporary lockup only.
+ *      - Evidence quality, not mere presence (J4): a batchDigest is only a
+ *        commitment. It counts as evidence ONLY once the matching preimage
+ *        bytes are registered on-chain via submitEvidence() within the
+ *        evidence window -- a junk non-zero digest with no preimage is
+ *        fast-rejectable as unsubstantiated, and can no longer buy a free
+ *        48h stall. A dispute that dies without an adjudicator ruling
+ *        (dark-adjudicator timeout) forfeits its bond exactly like a
+ *        rejected dispute: refunding it made junk-digest stalling ~free.
+ *        An honest challenger's bond is protected by the adjudicator's
+ *        ruling, not by the timeout -- on-chain a junk digest and a real
+ *        one are indistinguishable without adjudicator judgment.
  */
 contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     /// @notice The sealed-bid core; the only caller allowed to initialize escrows.
@@ -219,7 +230,8 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
             challenger: msg.sender,
             challengerBond: bond,
             batchDigest: batchDigest,
-            disputeTimestamp: disputeTimestamp
+            disputeTimestamp: disputeTimestamp,
+            evidenceSubmitted: false
         });
 
         uint32 resolutionDeadline = uint32(block.timestamp + esc.adjudicationWindowDuration);
@@ -239,13 +251,49 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     }
 
     /// @inheritdoc IExecutionEscrowManager
+    function submitEvidence(bytes32 auctionId, bytes calldata evidenceData) external override {
+        Escrow storage esc = escrows[auctionId];
+        if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
+        Dispute storage d = disputes[auctionId];
+        // The preimage must bind to the committed digest: the digest is a
+        // commitment, and only a matching preimage makes the evidence
+        // retrievable on-chain for the adjudicator. A junk digest whose
+        // preimage the filer cannot (or will not) produce stays
+        // unsubstantiated and fast-rejectable.
+        if (keccak256(evidenceData) != d.batchDigest) revert EvidenceDigestMismatch();
+        if (block.timestamp > uint256(d.disputeTimestamp) + DISPUTE_EVIDENCE_WINDOW) {
+            revert EvidenceWindowClosed();
+        }
+        d.evidenceSubmitted = true;
+        emit EvidenceSubmitted(auctionId, msg.sender, d.batchDigest);
+    }
+
+    /// @inheritdoc IExecutionEscrowManager
     function rejectEvidenceFreeDispute(bytes32 auctionId) external override {
         Escrow storage esc = escrows[auctionId];
         if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
         Dispute memory d = disputes[auctionId];
-        // A dispute with a batch digest already carries evidence attached;
-        // the fast path is only for disputes that were filed with none.
+        // Legacy zero-digest-only entry point: a dispute with a batch digest
+        // already claims evidence attached, so the legacy fast path does not
+        // fire on it -- the quality bar for digests lives in
+        // rejectUnsubstantiatedDispute().
         if (d.batchDigest != bytes32(0)) revert DisputeHasEvidence();
+        if (block.timestamp <= uint256(d.disputeTimestamp) + DISPUTE_EVIDENCE_WINDOW) {
+            revert EvidenceWindowOpen();
+        }
+        _resolveDisputeReject(esc, auctionId);
+    }
+
+    /// @inheritdoc IExecutionEscrowManager
+    function rejectUnsubstantiatedDispute(bytes32 auctionId) external override {
+        Escrow storage esc = escrows[auctionId];
+        if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
+        Dispute memory d = disputes[auctionId];
+        // Quality bar: a non-zero digest counts as evidence ONLY if the
+        // matching preimage was registered via submitEvidence() within the
+        // window. A bare (junk) digest with no retrievable evidence is no
+        // better than no digest at all -- the J4 bypass dies here.
+        if (d.batchDigest != bytes32(0) && d.evidenceSubmitted) revert DisputeHasEvidence();
         if (block.timestamp <= uint256(d.disputeTimestamp) + DISPUTE_EVIDENCE_WINDOW) {
             revert EvidenceWindowOpen();
         }
@@ -374,8 +422,18 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
 
         // 4. Dispute open but the adjudicator went dark past the resolution
         //    deadline: liveness over safety. Worker is paid (optimistic
-        //    assumption), and the challenger gets their bond back -- the
-        //    silence was not their fault.
+        //    assumption), and the unsubstantiated dispute FORFEITS the
+        //    challenger bond -- resolved exactly like a rejected dispute.
+        //    J4: refunding the bond here made junk-digest stalling ~free
+        //    (griefer's net cost = gas only). The bond is the anti-grief
+        //    price of delaying a worker's payout; a dispute that dies
+        //    without an adjudicator ruling is meritless by the optimistic
+        //    default, so its bond is forfeited per the reject routing
+        //    (third-party challenger -> poster's fund; poster-filer ->
+        //    worker). An honest challenger's bond is protected by a live
+        //    adjudicator's ruling (uphold -> bond returned), not by the
+        //    timeout: on-chain a junk digest and a real one are
+        //    indistinguishable without adjudicator judgment.
         if (esc.state == ExecutionState.DisputeWindow && esc.disputeActive) {
             // Resolution deadline derives from the filing timestamp: the
             // filing window and the adjudication window are separate clocks,
@@ -383,11 +441,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
             Dispute memory d = disputes[auctionId];
             uint256 resolutionDeadline = uint256(d.disputeTimestamp) + esc.adjudicationWindowDuration;
             if (block.timestamp <= resolutionDeadline) revert InvalidState();
-            esc.disputeActive = false;
-            delete disputes[auctionId];
-            // State -> Finalized BEFORE any external call (reentrancy).
-            _finalizePayout(esc, auctionId);
-            if (d.challengerBond > 0) _payout(d.challenger, d.challengerBond);
+            _resolveDisputeReject(esc, auctionId);
             return;
         }
 

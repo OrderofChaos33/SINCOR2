@@ -203,7 +203,12 @@ def test_poster_bond_goes_to_worker_when_rejected(env):
     assert mgr.functions.getEscrow(aid).call()[13] == FINALIZED
 
 
-def test_poster_bond_returned_on_dark_adjudicator_timeout(env):
+def test_poster_bond_forfeited_on_dark_adjudicator_timeout(env):
+    # J4: the old behavior refunded the bond on a dark-adjudicator timeout,
+    # which made junk-digest stalling ~free. Now the unsubstantiated dispute
+    # forfeits its bond exactly like a rejected dispute -- and per the A2
+    # routing a poster-filed dispute's forfeited bond goes to the WORKER as
+    # compensation (never back into the filer's own fund).
     w3, mgr = env.w3, env.mgr
     bid = w3.to_wei(2, "ether")
     stake = bid * MIN_STAKE_BPS // 10000
@@ -215,10 +220,14 @@ def test_poster_bond_returned_on_dark_adjudicator_timeout(env):
         {"from": env.poster, "value": env.challenger_bond, **GAS})
     filing_ts = w3.eth.get_block(w3.eth.get_transaction_receipt(txh).blockNumber).timestamp
     poster_before = w3.eth.get_balance(env.poster)
+    agent_before = w3.eth.get_balance(env.agent)
     env.travel_past(filing_ts + 600)  # adjudicationWindowDuration
     mgr.functions.timeout(aid).transact({"from": env.anyone, **GAS})
-    # bond returned: the adjudicator's silence was not the poster's fault
-    assert w3.eth.get_balance(env.poster) == poster_before + env.challenger_bond
+    # J4: bond NOT returned -- forfeited to the worker (A2 routing), so the
+    # stall cost the poster-filer the full bond instead of gas only.
+    assert w3.eth.get_balance(env.poster) == poster_before
+    assert w3.eth.get_balance(env.agent) == agent_before + bid + stake + env.challenger_bond
+    assert mgr.functions.getPosterReAuctionBalance(env.poster).call() == 0
 
 
 # ---------------------------------------------------------------------------
@@ -260,13 +269,17 @@ def test_fast_reject_evidence_free_dispute(env):
         mgr.functions.timeout(aid).transact({"from": env.anyone, **GAS})
 
 
-def test_fast_reject_reverts_when_evidence_present(env):
+def test_fast_reject_reverts_when_digest_present(env):
+    # J4 naming: a bare digest is a CLAIM of evidence, not evidence. The
+    # legacy rejectEvidenceFreeDispute() still keys on digest == 0 only, so
+    # it reverts on any non-zero digest -- the quality bar for digests
+    # (registered preimage required) lives in rejectUnsubstantiatedDispute().
     w3, mgr = env.w3, env.mgr
     bid = w3.to_wei(2, "ether")
     stake = bid * MIN_STAKE_BPS // 10000
     aid = new_aid(w3, "withevd")
     env.run_to_dispute(aid, bid, stake)
-    # dispute WITH evidence attached
+    # dispute WITH a (bare, unsubstantiated) digest attached
     txh = mgr.functions.openQualityDispute(aid, b"\xaa" * 32).transact(
         {"from": env.poster, "value": env.challenger_bond, **GAS})
     filing_ts = w3.eth.get_block(w3.eth.get_transaction_receipt(txh).blockNumber).timestamp

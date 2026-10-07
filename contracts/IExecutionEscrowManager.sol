@@ -61,6 +61,13 @@ interface IExecutionEscrowManager {
         uint96 challengerBond;
         bytes32 batchDigest;
         uint32 disputeTimestamp;
+        /// @notice True once evidence bytes whose keccak256 equals batchDigest
+        ///         have been registered on-chain via submitEvidence() within
+        ///         DISPUTE_EVIDENCE_WINDOW. A non-zero batchDigest alone is a
+        ///         mere claim; only a registered preimage counts as
+        ///         retrievable evidence (J4: a junk digest with no preimage is
+        ///         fast-rejectable as unsubstantiated).
+        bool evidenceSubmitted;
     }
 
     // --- Events ---
@@ -95,6 +102,12 @@ interface IExecutionEscrowManager {
         bytes32 batchDigest,
         uint256 bondAmount,
         uint32 resolutionDeadline
+    );
+
+    event EvidenceSubmitted(
+        bytes32 indexed auctionId,
+        address indexed submitter,
+        bytes32 evidenceHash
     );
 
     event QualityDisputeResolved(
@@ -164,6 +177,8 @@ interface IExecutionEscrowManager {
     error FundingMismatch(uint256 expected, uint256 provided);
     error DisputeHasEvidence();
     error EvidenceWindowOpen();
+    error EvidenceDigestMismatch();
+    error EvidenceWindowClosed();
     error TransferFailed();
     error InvalidStakeBps();
     error NothingToWithdraw();
@@ -215,25 +230,61 @@ interface IExecutionEscrowManager {
      *      paid to the worker as compensation, so a rejected self-dispute
      *      cannot recycle the "slash" into the filer's own fund).
      * @param auctionId The escrow whose submitted result is disputed.
-     * @param batchDigest Evidence digest for the dispute. EVIDENCE IS
-     *        REQUIRED: the digest is unvalidated (only checked against
-     *        bytes32(0)), but any dispute filed with batchDigest ==
-     *        bytes32(0) is auto-rejected by ANYONE via
-     *        rejectEvidenceFreeDispute() once DISPUTE_EVIDENCE_WINDOW (6h)
-     *        passes -- no adjudication, bond forfeited. An honest challenger
-     *        (poster or third party) with a genuine grievance MUST attach a
-     *        nonzero digest, or their dispute dies at 6h without a ruling.
+     * @param batchDigest Evidence digest for the dispute: a COMMITMENT to the
+     *        evidence bytes, which must be registered on-chain via
+     *        submitEvidence() within DISPUTE_EVIDENCE_WINDOW (6h) of filing.
+     *        The digest itself is unvalidated (only checked against
+     *        bytes32(0)) -- a non-zero digest with no registered preimage is
+     *        treated as unsubstantiated and is fast-rejectable by ANYONE via
+     *        rejectUnsubstantiatedDispute() once the window passes (J4: a junk
+     *        digest alone no longer buys a free 48h stall). An honest
+     *        challenger (poster or third party) with a genuine grievance MUST
+     *        both attach a nonzero digest AND submit the matching evidence
+     *        bytes in time, or their dispute dies at 6h without a ruling and
+     *        the bond is forfeited.
      */
     function openQualityDispute(bytes32 auctionId, bytes32 batchDigest) external payable;
 
     /**
+     * @notice Registers the evidence bytes behind a dispute's batchDigest.
+     * @dev Permissionless: anyone may supply the preimage, because it must
+     *      hash to the challenger's committed digest -- nobody can forge
+     *      *different* evidence, only make the committed evidence retrievable
+     *      for the adjudicator. Callable only while the dispute is active and
+     *      DISPUTE_EVIDENCE_WINDOW has not yet passed since filing. Sets the
+     *      dispute's evidenceSubmitted flag, which is what shields the dispute
+     *      from the unsubstantiated fast path.
+     * @param auctionId The escrow whose dispute the evidence belongs to.
+     * @param evidenceData The evidence bytes; keccak256(evidenceData) must
+     *        equal the dispute's batchDigest.
+     */
+    function submitEvidence(bytes32 auctionId, bytes calldata evidenceData) external;
+
+    /**
+     * @notice Permissionless fast rejection of an unsubstantiated dispute.
+     * @dev Fires only when the dispute carries NO retrievable evidence --
+     *      either it was filed with batchDigest == bytes32(0), or a non-zero
+     *      digest was never backed by submitEvidence() within
+     *      DISPUTE_EVIDENCE_WINDOW -- AND the window has passed since filing.
+     *      Resolves exactly like an adjudicator rejection -- worker paid in
+     *      full, forfeited bond routed per the reject rule (third-party
+     *      challenger: slashed to the poster's fund; poster-filed: paid to
+     *      the worker) -- but without waiting out the full adjudication
+     *      window. The adjudicator can always reject earlier via
+     *      resolveQualityDispute(auctionId, false).
+     */
+    function rejectUnsubstantiatedDispute(bytes32 auctionId) external;
+
+    /**
      * @notice Permissionless fast rejection of an evidence-free dispute.
-     * @dev Fires only when the dispute was filed with batchDigest ==
-     *      bytes32(0) (no evidence attached) AND the short
-     *      DISPUTE_EVIDENCE_WINDOW has passed since filing. Resolves exactly
-     *      like an adjudicator rejection -- worker paid in full, forfeited
-     *      bond routed per the reject rule (third-party challenger: slashed
-     *      to the poster's fund; poster-filed: paid to the worker) -- but
+     * @dev Legacy entry point: fires only when the dispute was filed with
+     *      batchDigest == bytes32(0) (no evidence attached) AND the short
+     *      DISPUTE_EVIDENCE_WINDOW has passed since filing. For the general
+     *      quality bar (junk digests with no registered preimage), see
+     *      rejectUnsubstantiatedDispute(). Resolves exactly like an
+     *      adjudicator rejection -- worker paid in full, forfeited bond
+     *      routed per the reject rule (third-party challenger: slashed to
+     *      the poster's fund; poster-filed: paid to the worker) -- but
      *      without waiting out the full adjudication window. The adjudicator
      *      can always reject earlier via resolveQualityDispute(auctionId, false).
      */
@@ -255,7 +306,12 @@ interface IExecutionEscrowManager {
      *         - ExecutionPhase + execution deadline passed -> 100% slash (ghosting).
      *         - DisputeWindow + window passed + NO dispute -> optimistic payout to worker.
      *         - DisputeWindow + resolution deadline passed + dispute open ->
-     *           payout to worker, challenger bond returned (adjudicator went dark).
+     *           payout to worker, challenger bond FORFEITED per the reject
+     *           routing (J4: refunding it here made junk-digest stalling
+     *           ~free -- a dispute that dies without an adjudicator ruling
+     *           is unsubstantiated, and unsubstantiated disputes forfeit
+     *           their bond exactly like rejected ones; an honest challenger
+     *           is protected by the adjudicator's ruling, not by the timeout).
      */
     function timeout(bytes32 auctionId) external;
 
