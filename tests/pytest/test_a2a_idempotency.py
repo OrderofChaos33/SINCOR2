@@ -317,15 +317,18 @@ def test_commit_idempotent(client):
 
 
 def test_commit_without_key_second_attempt_409(client):
-    """Without a key the pre-existing 'already committed' guard still fires."""
+    """Without a key the retry is idempotent: returns the existing
+    commitment (201) WITHOUT re-locking stake (VERIFIED-2 fix)."""
     agent_id = "idem-agent-2"
     _register_and_fund(client, agent_id)
     task_id = _sealed_task(client)
     body = {"task_id": task_id, "agent_id": agent_id,
             "commitment": _commitment(1.0, "bb" * 32, agent_id)}
-    assert client.post("/v1/a2a/bids/commit", json=body).status_code == 201
+    r1 = client.post("/v1/a2a/bids/commit", json=body)
+    assert r1.status_code == 201
     r2 = client.post("/v1/a2a/bids/commit", json=body)
-    assert r2.status_code == 409
+    assert r2.status_code == 201  # idempotent, NOT 409
+    assert r2.get_json() == r1.get_json()
 
 
 def test_commit_key_conflict_on_different_commitment(client):
