@@ -1,22 +1,48 @@
 # Root Foundry profile for contracts/ + test/ (session validator, escrow, v4 hooks).
 # The existing Uniswap v4 stack still lives under onchain/foundry.toml.
 #
-# First-time setup:
+# First-time setup (lib/ is gitignored; install on demand):
 #   forge install foundry-rs/forge-std@v1.9.7
 #   forge install OpenZeppelin/openzeppelin-contracts@v5.5.0
-#   forge test -vvv
+#   forge install Uniswap/v4-core@d153b048868a60c2403a3ef5b2301bb247884d46
+#   forge install OpenZeppelin/uniswap-hooks@26dc8e53f812a1ca390d470342adb6cd8c3286ad
+#   # OZ v4 copy ONLY for the legacy security/ReentrancyGuard.sol import path
+#   # used by contracts/hooks/IntentHook.sol and IntentHookV2.sol:
+#   git clone --branch v4.9.6 --depth 1 \
+#     https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts-v4
+#   forge build
+#
+# KNOWN BLOCKER (contract-level, out of scope for the toolchain pin):
+# contracts/hooks/IntentHook.sol, IntentHookV2.sol and BribeLoopHook.sol use
+# IPoolManager.SwapParams, an API removed from v4-core in Apr 2025
+# (structs moved to file-level types/PoolOperation.sol). They cannot compile
+# against the v4-core/uniswap-hooks pins above; fixing them means migrating
+# those three files to the new file-level SwapParams import (a contract
+# change, not a config change).
 
 [profile.default]
 src = "contracts"
 out = "out"
 libs = ["lib"]
 test = "test"
-solc = "0.8.27"
+solc = "0.8.30"
 optimizer = true
 optimizer_runs = 200
 evm_version = "cancun"
 via_ir = true
 fs_permissions = [{ access = "read", path = "./" }]
+remappings = [
+    # File-level remap MUST come first: solc applies the first matching
+    # prefix, and @openzeppelin/contracts/ below would otherwise shadow it.
+    # IntentHook.sol / IntentHookV2.sol import the OZ v4 path
+    # @openzeppelin/contracts/security/ReentrancyGuard.sol, which does not
+    # exist in OZ v5. Contracts themselves are untouched.
+    "@openzeppelin/contracts/security/ReentrancyGuard.sol=lib/openzeppelin-contracts-v4/contracts/security/ReentrancyGuard.sol",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@uniswap/v4-core/=lib/v4-core/",
+    "@openzeppelin/uniswap-hooks/=lib/uniswap-hooks/src/",
+    "forge-std/=lib/forge-std/src/",
+]
 
 [fuzz]
 runs = 256
