@@ -2,8 +2,8 @@
 pragma solidity ^0.8.26;
 
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
-import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {BeforeSwapDelta, toBeforeSwapDelta} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -76,7 +76,7 @@ contract IntentHook is IHooks, ReentrancyGuard {
     function beforeSwap(
         address sender,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
+        SwapParams calldata params,
         bytes calldata hookData
     ) external override returns (bytes4, BeforeSwapDelta, uint24) {
         if (hookData.length > 0) {
@@ -92,7 +92,7 @@ contract IntentHook is IHooks, ReentrancyGuard {
     function afterSwap(
         address sender,
         PoolKey calldata key,
-        IPoolManager.SwapParams calldata params,
+        SwapParams calldata params,
         BalanceDelta delta,
         bytes calldata hookData
     ) external override nonReentrant returns (bytes4, int128) {
