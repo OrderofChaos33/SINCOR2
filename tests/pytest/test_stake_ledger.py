@@ -159,3 +159,61 @@ def test_reauction_credits_accumulate(ledger):
     ledger.credit_reauction("poster-p", 100, "slash:ghosting:t1")
     ledger.credit_reauction("poster-p", 200, "slash:ghosting:t2")
     assert ledger.reauction_credit("poster-p") == 300
+
+
+# --- quote_slash_ruling evidence plumbing (J1 integration) --------------------
+
+_EVIDENCE = "0x" + "ab" * 32  # well-formed, non-zero 32-byte evidence hash
+_AGENT_WALLET = "0x" + "11" * 20
+_POSTER_WALLET = "0x" + "22" * 20
+
+
+def _quoted(ledger, evidence=_EVIDENCE, **kw):
+    ledger.deposit("agent-a", 10 * ONE_AXM)
+    ledger.lock_for_commit("agent-a", "tsk-1", 4 * ONE_AXM)  # locks 2 AXM
+    args = dict(agent_id="agent-a", agent_wallet=_AGENT_WALLET,
+                poster_wallet=_POSTER_WALLET, task_id="tsk-1",
+                slash_bps=5000, reason="ghost", nonce=7, expiry=9_999_999_999,
+                evidence_hash=evidence)
+    args.update(kw)
+    return ledger.quote_slash_ruling(**args)
+
+
+def test_quote_slash_ruling_threads_evidence_hash(ledger):
+    ruling = _quoted(ledger)
+    # The evidence hash flows from the quote parameter into the ruling
+    # dict unchanged — the exact "evidence_hash" shape the J1
+    # stake_bridge.SlashRuling expects (0x-prefixed 32-byte hex str).
+    assert ruling["evidence_hash"] == _EVIDENCE
+    # The rest of the quote is unaffected.
+    assert ruling["amount_wei"] == ONE_AXM  # 50% of the 2 AXM lock
+    assert ruling["nonce"] == 7
+    assert ruling["reason"] == "ghost"
+
+
+def test_quote_slash_ruling_evidence_is_the_digest_commitment(ledger):
+    # The 32 bytes derived from the quoted evidence_hash are exactly what
+    # StakeSlashManager.proposeSlash commits in its signed digest (J1
+    # staged flow): bytes.fromhex(evidence_hash[2:]).
+    ruling = _quoted(ledger)
+    committed = bytes.fromhex(ruling["evidence_hash"][2:])
+    assert len(committed) == 32
+    assert committed == bytes.fromhex(_EVIDENCE[2:])
+
+
+def test_quote_slash_ruling_rejects_missing_evidence(ledger):
+    with pytest.raises(ValueError, match="evidence_hash"):
+        _quoted(ledger, evidence="")
+
+
+def test_quote_slash_ruling_rejects_zero_evidence(ledger):
+    # The J1 contract reverts MissingEvidence on a zero hash; the quote
+    # fails fast instead of producing an unproposable ruling.
+    with pytest.raises(ValueError, match="non-zero"):
+        _quoted(ledger, evidence="0x" + "00" * 32)
+
+
+def test_quote_slash_ruling_rejects_malformed_evidence(ledger):
+    for bad in ("deadbeef", "0x" + "ab" * 31, "0x" + "zz" * 32, "0x" + "ab" * 33):
+        with pytest.raises(ValueError, match="evidence_hash"):
+            _quoted(ledger, evidence=bad)

@@ -825,7 +825,8 @@ class StakeLedger:
 
     def quote_slash_ruling(self, agent_id: str, agent_wallet: str,
                            poster_wallet: str, task_id: str, slash_bps: int,
-                           reason: str, nonce: int, expiry: int) -> Dict[str, Any]:
+                           reason: str, nonce: int, expiry: int,
+                           evidence_hash: str = "") -> Dict[str, Any]:
         """Build the ruling fields for an adjudicator-signed slash.
 
         Read-only: computes the slash amount from the agent's locked stake
@@ -836,11 +837,31 @@ class StakeLedger:
         ``stake_bridge.SlashRuling``; the adjudicator signs
         ``slash_struct_hash(...)`` with their own tooling (canonicalized
         low-S via ``stake_bridge.canonicalize_signature``).
+
+        ``evidence_hash`` is the 0x-prefixed 32-byte keccak256 of the
+        off-chain evidence bundle (e.g. IPFS CID bytes) that justifies the
+        slash.  It is validated here (well-formed and non-zero) and
+        threaded through unchanged into the ruling dict under the
+        ``"evidence_hash"`` key — the exact shape the J1 staged flow's
+        ``stake_bridge.SlashRuling`` (branch
+        ``xioix/j1-adjudicator-hardening``) commits into the signed
+        ``proposeSlash`` digest.  The staged contract reverts on zero
+        evidence (``MissingEvidence``), so an evidence-free quote fails
+        fast here instead of producing an unproposable ruling.
         """
         if reason not in ("ghost", "quality"):
             raise ValueError("reason must be 'ghost' or 'quality'")
         if not 0 < int(slash_bps) <= BPS_DENOM:
             raise ValueError("slash_bps must be within (0, 10000]")
+        ev = str(evidence_hash or "")
+        try:
+            ev_int = int(ev, 16)
+        except ValueError:
+            ev_int = -1
+        if not (ev.startswith("0x") and len(ev) == 66) or ev_int < 0:
+            raise ValueError("evidence_hash must be 0x-prefixed 32-byte hex")
+        if ev_int == 0:
+            raise ValueError("evidence_hash must be non-zero (evidence required)")
         rec = self._agent(agent_id)
         locked = int(rec["locks"].get(task_id, "0"))
         if locked <= 0:
@@ -854,7 +875,8 @@ class StakeLedger:
         treasury_cut = min(slashed, outstanding)
         return {"agent": agent_wallet, "poster": poster_wallet,
                 "amount_wei": slashed, "treasury_cut_wei": treasury_cut,
-                "nonce": int(nonce), "expiry": int(expiry), "reason": reason}
+                "nonce": int(nonce), "expiry": int(expiry), "reason": reason,
+                "evidence_hash": ev}
 
     def build_onchain_slash_tx(self, ruling: Dict[str, Any],
                                signature: tuple,
@@ -868,6 +890,12 @@ class StakeLedger:
         """
         from sincor2.onchain.stake_bridge import SlashRuling
         bridge = self.onchain_bridge()
+        # The legacy on-chain slash() digest has no evidenceHash field — the
+        # evidence is committed by the J1 staged flow's proposeSlash digest
+        # instead — so strip it before constructing the legacy SlashRuling.
+        # It was already validated (well-formed, non-zero) at quote time.
+        ruling = {k: v for k, v in dict(ruling).items()
+                  if k != "evidence_hash"}
         return bridge.build_slash_tx(SlashRuling(**ruling), signature, sender)
 
     def note_onchain_tx(self, kind: str, tx_hash: str, **detail: Any) -> None:
@@ -936,7 +964,8 @@ class StakeLedger:
 
     def quote_slash_ruling(self, agent_id: str, agent_wallet: str,
                            poster_wallet: str, task_id: str, slash_bps: int,
-                           reason: str, nonce: int, expiry: int) -> Dict[str, Any]:
+                           reason: str, nonce: int, expiry: int,
+                           evidence_hash: str = "") -> Dict[str, Any]:
         """Build the ruling fields for an adjudicator-signed slash.
 
         Read-only: computes the slash amount from the agent's locked stake
@@ -947,11 +976,31 @@ class StakeLedger:
         ``stake_bridge.SlashRuling``; the adjudicator signs
         ``slash_struct_hash(...)`` with their own tooling (canonicalized
         low-S via ``stake_bridge.canonicalize_signature``).
+
+        ``evidence_hash`` is the 0x-prefixed 32-byte keccak256 of the
+        off-chain evidence bundle (e.g. IPFS CID bytes) that justifies the
+        slash.  It is validated here (well-formed and non-zero) and
+        threaded through unchanged into the ruling dict under the
+        ``"evidence_hash"`` key — the exact shape the J1 staged flow's
+        ``stake_bridge.SlashRuling`` (branch
+        ``xioix/j1-adjudicator-hardening``) commits into the signed
+        ``proposeSlash`` digest.  The staged contract reverts on zero
+        evidence (``MissingEvidence``), so an evidence-free quote fails
+        fast here instead of producing an unproposable ruling.
         """
         if reason not in ("ghost", "quality"):
             raise ValueError("reason must be 'ghost' or 'quality'")
         if not 0 < int(slash_bps) <= BPS_DENOM:
             raise ValueError("slash_bps must be within (0, 10000]")
+        ev = str(evidence_hash or "")
+        try:
+            ev_int = int(ev, 16)
+        except ValueError:
+            ev_int = -1
+        if not (ev.startswith("0x") and len(ev) == 66) or ev_int < 0:
+            raise ValueError("evidence_hash must be 0x-prefixed 32-byte hex")
+        if ev_int == 0:
+            raise ValueError("evidence_hash must be non-zero (evidence required)")
         rec = self._agent(agent_id)
         locked = int(rec["locks"].get(task_id, "0"))
         if locked <= 0:
@@ -965,7 +1014,8 @@ class StakeLedger:
         treasury_cut = min(slashed, outstanding)
         return {"agent": agent_wallet, "poster": poster_wallet,
                 "amount_wei": slashed, "treasury_cut_wei": treasury_cut,
-                "nonce": int(nonce), "expiry": int(expiry), "reason": reason}
+                "nonce": int(nonce), "expiry": int(expiry), "reason": reason,
+                "evidence_hash": ev}
 
     def build_onchain_slash_tx(self, ruling: Dict[str, Any],
                                signature: tuple,
@@ -979,6 +1029,12 @@ class StakeLedger:
         """
         from sincor2.onchain.stake_bridge import SlashRuling
         bridge = self.onchain_bridge()
+        # The legacy on-chain slash() digest has no evidenceHash field — the
+        # evidence is committed by the J1 staged flow's proposeSlash digest
+        # instead — so strip it before constructing the legacy SlashRuling.
+        # It was already validated (well-formed, non-zero) at quote time.
+        ruling = {k: v for k, v in dict(ruling).items()
+                  if k != "evidence_hash"}
         return bridge.build_slash_tx(SlashRuling(**ruling), signature, sender)
 
     def note_onchain_tx(self, kind: str, tx_hash: str, **detail: Any) -> None:
