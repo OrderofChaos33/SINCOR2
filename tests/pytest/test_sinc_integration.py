@@ -201,16 +201,16 @@ class TestSINCMeter:
 # ===========================================================================
 
 class TestSettlementSINCPrimary:
-    def test_create_quote_defaults_to_sinc(self):
+    def test_create_quote_defaults_to_axiom(self):
         coordinator = SettlementCoordinator()
-        quote = coordinator.create_quote("task-1", "0xpayer", "0xpayee", Decimal("1"))
-        assert quote.token_symbol == "SINC"
-        assert quote.token_address == SINC_TOKEN
+        quote = coordinator.create_quote("task-1", "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", Decimal("1"))
+        assert quote.token_symbol == "AXIOM"
+        assert quote.token_address == AXIOM_TOKEN
 
     def test_create_quote_axiom_legacy(self):
         coordinator = SettlementCoordinator()
         quote = coordinator.create_quote(
-            "task-2", "0xpayer", "0xpayee", Decimal("1"), token_symbol="AXIOM"
+            "task-2", "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", Decimal("1"), token_symbol="AXIOM"
         )
         assert quote.token_symbol == "AXIOM"
         assert quote.token_address == AXIOM_TOKEN
@@ -218,22 +218,22 @@ class TestSettlementSINCPrimary:
     def test_sinc_amount_field_populated(self):
         coordinator = SettlementCoordinator()
         quote = coordinator.create_quote(
-            "task-3", "0xpayer", "0xpayee", Decimal("5"), token_symbol="SINC"
+            "task-3", "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", Decimal("5"), token_symbol="SINC"
         )
         assert quote.sinc_amount == "5.0000"
 
     def test_platform_fee_5_percent(self):
         coordinator = SettlementCoordinator()
-        quote = coordinator.create_quote("task-4", "0xpayer", "0xpayee", Decimal("100"))
-        coordinator.confirm_payment(quote.quote_id, "0xtxhash", Decimal("100"))
+        quote = coordinator.create_quote("task-4", "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", Decimal("100"))
+        coordinator.confirm_payment(quote.quote_id, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Decimal("100"))
         settlement = list(coordinator.settlements.values())[0]
         assert Decimal(settlement.platform_fee) == Decimal("5.0000")
         assert Decimal(settlement.payee_amount) == Decimal("95.0000")
 
     def test_treasury_journal_records_fee(self):
         coordinator = SettlementCoordinator()
-        quote = coordinator.create_quote("task-5", "0xpayer", "0xpayee", Decimal("20"))
-        coordinator.confirm_payment(quote.quote_id, "0xtxhash", Decimal("20"))
+        quote = coordinator.create_quote("task-5", "0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222", Decimal("20"))
+        coordinator.confirm_payment(quote.quote_id, "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Decimal("20"))
         assert len(coordinator.treasury_journal) == 1
         entry = coordinator.treasury_journal[0]
         assert Decimal(entry["amount"]) == Decimal("1.0000")  # 5% of 20
@@ -245,7 +245,7 @@ class TestSettlementSINCPrimary:
 
     def test_sinc_credit_deduction_records_event(self):
         coordinator = SettlementCoordinator()
-        event = coordinator.sinc_credit_deduction("0xwallet", Decimal("10"), "task-6")
+        event = coordinator.sinc_credit_deduction("0x3333333333333333333333333333333333333333", Decimal("10"), "task-6")
         assert event["type"] == "credit_deduction"
         assert Decimal(event["platform_fee"]) == Decimal("0.5000")
         assert len(coordinator.treasury_journal) == 1
@@ -253,7 +253,7 @@ class TestSettlementSINCPrimary:
     def test_confirm_payment_unknown_quote_raises(self):
         coordinator = SettlementCoordinator()
         with pytest.raises(KeyError):
-            coordinator.confirm_payment("nonexistent", "0xtx", Decimal("1"))
+            coordinator.confirm_payment("nonexistent", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Decimal("1"))
 
 
 # ===========================================================================
@@ -512,7 +512,7 @@ class TestA2AQuoteSINC:
         for agent in data.get("agents", []):
             assert "sinc_price_per_task" in agent
 
-    def test_a2a_quote_includes_sinc_amount(self, client):
+    def test_a2a_quote_includes_axiom_amount(self, client):
         # Get a valid skill ID first
         agents_res = client.get("/api/a2a/agents")
         agents = agents_res.get_json().get("agents", [])
@@ -523,4 +523,4 @@ class TestA2AQuoteSINC:
         assert res.status_code == 200
         data = res.get_json()
         assert "sinc_amount" in data
-        assert data["primary_token"] == "SINC"
+        assert data["primary_token"] == "AXIOM"
