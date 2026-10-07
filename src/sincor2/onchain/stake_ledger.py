@@ -605,6 +605,8 @@ class StakeLedger:
         Proceeds split by the subsidy-extraction invariant: the platform's
         unrecouped sponsored front is clawed back to the treasury first;
         only the remainder becomes poster re-auction credit."""
+        if not 0 < int(slash_bps) <= BPS_DENOM:
+            raise ValueError("slash_bps must be within (0, 10000]")
         caller = self._check_adjudicator(adjudicator)
         rec = self._agent(agent_id)
         locked = int(rec["locks"].pop(task_id, "0"))
