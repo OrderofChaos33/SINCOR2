@@ -633,6 +633,14 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
         if commit_deadline is not None and ts > int(commit_deadline):
             raise PermissionError("commit window closed")
         _sealed_agent_checks(fabric, task, agent_id)
+        key = _commit_key(task_id, agent_id)
+        if key in fabric.commits:
+            # Idempotent retry: already committed — return the existing
+            # record WITHOUT re-locking stake. lock_for_commit is additive,
+            # so a headerless retry must not lock twice (VERIFIED-2: a
+            # double-lock would let a later ghost-slash take 100% of the
+            # doubled amount).
+            return dict(fabric.commits[key])
         # Stake enforcement (ratified minStakeBps=5000): the bid value is
         # still sealed, so the commit locks stake against the public bounty.
         # Insufficient stake => the commit itself is rejected.
@@ -642,9 +650,6 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
             stake_ledger().lock_for_commit(agent_id, task_id, bounty_wei)
         except InsufficientStake as err:
             raise PermissionError(str(err))
-        key = _commit_key(task_id, agent_id)
-        if key in fabric.commits:
-            raise RuntimeError("already committed")
         record = {
             "task_id": task_id,
             "agent_id": agent_id,
