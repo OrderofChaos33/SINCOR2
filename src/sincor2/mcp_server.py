@@ -192,6 +192,96 @@ class _Denied(Exception):
     """A write was refused by the confirmation gate (default-deny)."""
 
 
+class PaymentRequired(Exception):
+    """A tool call needs x402 payment before it can run.
+
+    Carries the challenge fields so the dispatcher can return them as a
+    successful result (isError=True) instead of a JSON-RPC -32000 error —
+    MCP clients swallow JSON-RPC errors before the model ever sees them
+    (dev-watch item 80, ScriptMasterLabs 2026-10-02).
+    """
+
+    def __init__(self, price: str, pay_to: str,
+                 accepts: List[str] | None = None) -> None:
+        super().__init__(f"payment required: {price} to {pay_to}")
+        self.price = price
+        self.pay_to = pay_to
+        self.accepts = list(accepts) if accepts else []
+
+
+# ---------------------------------------------------------------------------
+# x402 payment challenge (dev-watch item 80)
+# ---------------------------------------------------------------------------
+#
+# MCP clients (ScriptMasterLabs, 2026-10-02) swallow JSON-RPC errors before
+# the model sees them: returning JSON-RPC error -32000 "Payment Required"
+# from tools/call means the payment challenge (accepts array, price, payTo)
+# NEVER reaches the agent. So the payment-required path returns the
+# challenge as a SUCCESSFUL result dict with isError:true — it passes
+# through result channels that drop error objects.
+
+DEFAULT_X402_PRICE = "0.01"
+DEFAULT_X402_PAY_TO = ""
+DEFAULT_X402_ACCEPTS: List[str] = ["eip3009-usdc-base"]
+
+#: Tool names that require x402 payment before execution. Production wiring
+#: registers the metered tools here (with pricing in PAID_TOOL_PRICING);
+#: the gate raises PaymentRequired unless the caller attaches a valid
+#: ``x402_access_token`` argument.
+PAID_TOOLS: set = set()
+
+#: tool name -> {"price": str, "pay_to": str, "accepts": [str]}
+PAID_TOOL_PRICING: Dict[str, Dict[str, Any]] = {}
+
+
+def register_paid_tool(name: str, *, price: str = DEFAULT_X402_PRICE,
+                       pay_to: str = DEFAULT_X402_PAY_TO,
+                       accepts: List[str] | None = None) -> None:
+    """Mark a tool as payment-gated with its x402 challenge fields."""
+    PAID_TOOLS.add(name)
+    PAID_TOOL_PRICING[name] = {
+        "price": price,
+        "pay_to": pay_to,
+        "accepts": list(accepts) if accepts else list(DEFAULT_X402_ACCEPTS),
+    }
+
+
+def payment_challenge_result(price: str, pay_to: str,
+                             accepts: List[str] | None) -> Dict[str, Any]:
+    """Build the payment challenge as a SUCCESSFUL MCP result.
+
+    Returns a result dict with ``isError: True`` (via _mcp_content) —
+    deliberately NOT a JSON-RPC error object — so the challenge (price,
+    payTo, accepts array, retry instructions) survives MCP clients that
+    drop JSON-RPC errors before the model sees them.
+    """
+    accepts_text = ", ".join(accepts) if accepts else "none specified"
+    challenge = {
+        "status": "payment_required",
+        "price": price,
+        "payTo": pay_to,
+        "accepts": list(accepts) if accepts else [],
+        "retry_instructions": (
+            "This tool requires payment before it can run. Sign an EIP-3009 "
+            f"transferWithAuthorization for {price} payable to {pay_to} "
+            f"(accepts: {accepts_text}), then retry tools/call with the "
+            "authorization attached as the 'x402_access_token' argument."
+        ),
+    }
+    return _mcp_content(challenge, is_error=True)
+
+
+def _require_x402_payment(name: str, arguments: Dict[str, Any]) -> None:
+    """Raise PaymentRequired if a payment-gated tool lacks a token."""
+    if name in PAID_TOOLS and not arguments.get("x402_access_token"):
+        pricing = PAID_TOOL_PRICING.get(name) or {}
+        raise PaymentRequired(
+            price=str(pricing.get("price", DEFAULT_X402_PRICE)),
+            pay_to=str(pricing.get("pay_to", DEFAULT_X402_PAY_TO)),
+            accepts=list(pricing.get("accepts", DEFAULT_X402_ACCEPTS)),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Sealed-bid commitment helper (reuses the canonical implementation)
 # ---------------------------------------------------------------------------
@@ -627,6 +717,7 @@ def _handle_tools_call(rpc_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     if name not in _TOOL_NAMES:
         return _rpc_error(rpc_id, -32601, f"unknown tool '{name}'")
     try:
+        _require_x402_payment(name, arguments)
         if name == "list_tasks":
             result = _tool_list_tasks(arguments)
         elif name == "get_task":
@@ -643,6 +734,12 @@ def _handle_tools_call(rpc_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
             result = _tool_submit_bid(arguments, confirmed)
         else:  # pragma: no cover — guarded by _TOOL_NAMES
             return _rpc_error(rpc_id, -32601, f"unknown tool '{name}'")
+    except PaymentRequired as exc:
+        # Item 80: return the challenge as a SUCCESSFUL result with
+        # isError:true — a JSON-RPC -32000 error would be swallowed by MCP
+        # clients before the model ever sees it.
+        return _rpc_ok(rpc_id, payment_challenge_result(
+            exc.price, exc.pay_to, exc.accepts))
     except _Denied as exc:
         return _rpc_ok(rpc_id, _mcp_content(
             {"status": "denied", "error": str(exc)}, is_error=True))
