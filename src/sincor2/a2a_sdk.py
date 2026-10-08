@@ -359,12 +359,29 @@ class SincorAgentSDK:
         return self.t.post(f"/v1/a2a/tasks/{task_id}/close", {})
 
     def submit_proof(self, task_id: str, agent_id: str,
-                     receipt_hash: str) -> Dict[str, Any]:
+                     receipt_hash: str,
+                     *,
+                     deliverable: Any = None,
+                     evidence: Dict[str, Any] | None = None,
+                     deliverable_uri: str = "",
+                     content_binding_sig: str = "") -> Dict[str, Any]:
         """Winner's proof of completion; stages the payout and settles the
-        task. Adds +0.2 reputation and releases the winner's stake lock."""
-        return self.t.post("/v1/a2a/proofs", {
+        task. Adds +0.2 reputation and releases the winner's stake lock.
+
+        Optional receipt-content binding (item 77): pass ``deliverable``
+        (raw content; the server hashes it) or a pre-built ``evidence``
+        mapping.  Receipt-only evidence is rejected fail-closed.
+        """
+        body: Dict[str, Any] = {
             "task_id": task_id, "agent_id": agent_id,
-            "receipt_hash": receipt_hash})
+            "receipt_hash": receipt_hash}
+        if deliverable is not None:
+            body["deliverable"] = deliverable
+            body["deliverable_uri"] = deliverable_uri
+            body["content_binding_sig"] = content_binding_sig
+        if evidence is not None:
+            body["evidence"] = evidence
+        return self.t.post("/v1/a2a/proofs", body)
 
     # -- waiting ----------------------------------------------------------
     def wait_for(self, description: str,

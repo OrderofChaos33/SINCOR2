@@ -227,6 +227,21 @@ def _identity_risk(agent_id: str, wallet: str, card_hash: str) -> Dict[str, Any]
     return risk
 
 
+def check_identity_risk(agent_id: str, wallet: str, card_hash: str = "") -> Dict[str, Any]:
+    """Public whitewash detector for the registration path.
+
+    Wraps :func:`_identity_risk`: is this (new) identity a rebirth of a dead
+    one? Returns the risk map — empty when nothing looks risky. Key of
+    interest to callers is ``tombstoned_wallet``: when present, the wallet
+    is dead and the registration must be refused (fail closed). Never
+    raises; a broken lookup reports {} rather than bricking registration.
+    """
+    try:
+        return _identity_risk(agent_id or "", wallet or "", card_hash or "")
+    except Exception:
+        return {}
+
+
 def _live_identities_for_wallet(wallet: str, exclude_agent_id: Optional[str] = None) -> int:
     wallet_l = wallet.lower()
     with _LOCK:

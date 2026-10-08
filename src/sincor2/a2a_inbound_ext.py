@@ -278,6 +278,46 @@ def _require_reregistration_proof(existing: Dict[str, Any],
             "registration signature is not from the registered wallet")
 
 
+def _enforce_sybil_gates(agent_id: str, wallet: str, parsed: Dict[str, Any]) -> None:
+    """Anti-sybil gates for the inbound registration path (red-team 2026-10-08).
+
+    (1) Tombstoned wallets are dead: any new registration OR re-registration
+    behind one raises ``RegistrationAuthError`` (→ HTTP 403) BEFORE the
+    record is touched — rebirth on a tombstoned wallet fails closed.
+    (2) Wallet cardinality: one wallet backs at most MAX_IDENTITIES_PER_WALLET
+    live identities. Parity with bind()'s check via the shared
+    ``_live_identities_for_wallet`` helper; the caller's own record is
+    excluded by agent_id so re-registration cannot self-trip the cap.
+    """
+    from sincor2.kya_registry import (
+        MAX_IDENTITIES_PER_WALLET,
+        _live_identities_for_wallet,
+        card_hash,
+        check_identity_risk,
+    )
+    # Card hash over the same shape list_from_inbound hashes, so the
+    # whitewash detector sees the identity the KYA layer will list.
+    ch = card_hash({
+        "id": agent_id,
+        "name": parsed.get("name"),
+        "description": parsed.get("description"),
+        "version": parsed.get("version"),
+        "skills": parsed.get("skills") or [],
+    })
+    risk = check_identity_risk(agent_id, wallet, ch)
+    tomb = risk.get("tombstoned_wallet") or {}
+    if tomb:
+        raise RegistrationAuthError(
+            "wallet is tombstoned (prior agent %s, reason: %s); "
+            "registration refused — this identity is dead"
+            % (tomb.get("prior_agent_id"), tomb.get("reason")))
+    live = _live_identities_for_wallet(wallet, exclude_agent_id=agent_id)
+    if live >= MAX_IDENTITIES_PER_WALLET:
+        raise RegistrationAuthError(
+            "wallet identity cap reached (%d live identities on this wallet); "
+            "revoke an existing identity first" % live)
+
+
 def register_agent_record(body: Dict[str, Any],
                           _internal_reputation: Optional[float] = None) -> Dict[str, Any]:
     """Register (or re-register) an agent record.
@@ -331,6 +371,8 @@ def register_agent_record(body: Dict[str, Any],
         wallet=proof["wallet"],
         timestamp_ms=proof["ts"],
     )
+    if wallet:
+        _enforce_sybil_gates(agent_id, wallet, parsed)
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:

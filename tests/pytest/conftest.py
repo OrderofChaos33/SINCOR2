@@ -69,6 +69,25 @@ def _reset_a2a_rate_limits():
     reset_a2a_limits()
 
 
+@pytest.fixture(autouse=True)
+def _isolated_kya_registry(tmp_path, monkeypatch):
+    """Hermetic KYA registry per test.
+
+    The KYA registry persists to the real store and never resets between
+    tests; the anti-sybil gates (tombstone + wallet-identity cap) make
+    that accumulation load-bearing. This fixture gives every test a
+    fresh registry so tests cannot pollute each other through shared
+    hardcoded wallets.
+    """
+    from sincor2 import kya_registry as kya
+
+    monkeypatch.setenv("KYA_STORE_PATH", str(tmp_path / "kya_test.json"))
+    monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path / "kya_data"))
+    kya.reset()
+    yield
+    kya.reset()
+
+
 @pytest.fixture
 def app(monkeypatch, isolated_waitlist_db):
     from sincor2 import app as app_module

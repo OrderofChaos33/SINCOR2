@@ -2,16 +2,50 @@
 
 Challenges are denominated per resource config; platform policy prefers AXM
 for new flows (SINC is legacy for residual subscription renewals only).
+
+Design constraint (dev-watch item 79, Payload Tools postmortem 2026-10-07):
+``verify`` is an authorization-shape check, NOT payment. ``settle`` is the
+money movement. Work must NEVER be served on a verify receipt alone — the
+postmortem documents sellers doing unpaid work on credit because verify
+passed on every attempt while settle rejected everything with
+``invalid_payload`` (token ``name`` had to be exactly "USD Coin", not
+"USDC"; a $0.001 amount minimum — neither was in the spec). The
+``SETTLE_BEFORE_SERVE`` constant is True, and ``require_settled()`` is the
+single guard every serve path must call before doing paid work. The
+batch-settlement voucher section below covers offchain promises only:
+vouchers are promises, not settlement, and batch settlement does NOT relax
+settle-before-serve.
 """
+
+# ---------------------------------------------------------------------------
+# CDP SDK integration notes (dev-watch item 78, 2026-10-08).
+#
+# CDP_SDK_PIN: there is NO cdp-sdk in requirements.txt / requirements.lock.
+# This module speaks the x402 wire protocol directly (challenge payloads)
+# and does not import the CDP SDK, so nothing is pinned here.  Pin cdp-sdk
+# in requirements BEFORE any live CdpX402Client/facilitator integration,
+# then re-run the explicit-network tests in
+# tests/pytest/test_cdp_explicit_networks.py against the pinned version.
+#
+# CDP 1.58.0 notes:
+#   * revoke-delegation moved DELETE -> POST; the old routes are deprecated
+#     and stop working 2026-10-22.  Any delegation-revocation flow built
+#     later must use POST.
+#   * new Mandates API (createMandate/getMandate/listMandates/
+#     cancelMandate/approveWalletMandate/revokeWalletMandate/
+#     authorizeMandatePaymentSession).  See MANDATES_API_WATCH below.
+# ---------------------------------------------------------------------------
 
 from __future__ import annotations
 
 import json
 import secrets
 import sqlite3
+import time
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Final, Optional, Sequence
 
 import yaml
 
@@ -117,6 +151,110 @@ def list_resources() -> list[dict[str, Any]]:
     ]
 
 
+#: Fail-closed network allowlist for x402 payment routes.  From CDP SDK
+#: 1.56.0, a route with scheme "upto" and NO explicit networks expands to
+#: BOTH Base and Solana (previously Base-only).  Every route we construct
+#: must therefore carry an explicit networks list; :func:`build_route_config`
+#: is the only sanctioned constructor and it raises on None/empty.
+X402_NETWORKS_EXPLICIT: Final = ("base",)
+
+
+class MANDATES_API_WATCH:
+    """Design note (no code yet): the CDP Mandates API (1.58.0) is the
+    wallet-layer payment-session authorization primitive candidate for
+    the session-key work item.  When that work starts, prefer
+    authorizeMandatePaymentSession-scoped mandates over long-lived
+    delegation grants: sessions bound to a mandate are revocable in one
+    call (revokeWalletMandate) and carry explicit spend/network bounds,
+    which composes with the X402_NETWORKS_EXPLICIT allowlist above.
+    Tracked here so the primitive is evaluated, not silently skipped."""
+
+
+def build_route_config(
+    *,
+    scheme: str = "exact",
+    networks: Optional[Sequence[str]] = X402_NETWORKS_EXPLICIT,
+) -> dict[str, Any]:
+    """Build an x402 route config with explicit networks, fail closed.
+
+    ``networks`` defaults to :data:`X402_NETWORKS_EXPLICIT`; passing
+    ``None`` or an empty sequence raises ``ValueError`` -- we never rely
+    on SDK defaults, which from CDP 1.56.0 expand an "upto" route with no
+    networks to Base AND Solana.  All production route construction must
+    go through this function.
+    """
+    if networks is None or len(list(networks)) == 0:
+        raise ValueError(
+            "x402 route networks must be explicit (got None/empty); "
+            "refusing to rely on CDP SDK default network expansion"
+        )
+    seen: list[str] = []
+    for net in networks:
+        net = str(net).strip().lower()
+        if not net or net in seen:
+            continue
+        seen.append(net)
+    if not seen:
+        raise ValueError("x402 route networks must be explicit (all blank)")
+    return {"scheme": str(scheme), "networks": seen}
+
+
+def facilitator_route(
+    *,
+    scheme: str = "exact",
+    networks: Optional[Sequence[str]] = None,
+) -> dict[str, Any]:
+    """Seam for the future CdpX402Client/facilitator integration.
+
+    Intercepts ``networks=None`` BEFORE it reaches the SDK and substitutes
+    :data:`X402_NETWORKS_EXPLICIT`, so the SDK's default-expansion (Base +
+    Solana from 1.56.0 on an "upto" route with no networks) can never fire
+    on our behalf.  Callers pass the returned ``networks`` list explicitly
+    to the SDK call.
+    """
+    resolved: Optional[Sequence[str]] = (
+        X402_NETWORKS_EXPLICIT if networks is None else networks
+    )
+    return build_route_config(scheme=scheme, networks=resolved)
+
+
+def build_payment_payload(
+    resource: dict[str, Any],
+    resource_id: str,
+    challenge_id: str,
+    *,
+    scheme: str = "exact",
+) -> dict[str, Any]:
+    """Build the 402 payment payload for a resource.
+
+    The route (scheme + explicit networks) always comes from
+    :func:`build_route_config`; no code path constructs a route without
+    it.  ``networks`` (the full explicit list) is included alongside the
+    legacy singular ``network`` field so facilitators honoring the x402
+    v2 route format see the binding too.
+    """
+    route = build_route_config(scheme=scheme)
+    return {
+        "x402Version": 1,
+        "scheme": route["scheme"],
+        "network": route["networks"][0],
+        "networks": route["networks"],
+        "chainId": resource["chain_id"],
+        "maxAmountRequired": resource["amount_atomic"],
+        "resource": f"/x402/{resource_id}",
+        "description": resource["description"],
+        "payTo": resource["treasury"],
+        "asset": resource["token_address"],
+        "extra": {
+            "challenge_id": challenge_id,
+            "token": resource["token"],
+            "amount_display": resource["amount_display"],
+            "decimals": resource["token_decimals"],
+            "skill_id": resource.get("skill_id", ""),
+        },
+    }
+
+
 def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, Any]:
     resource = get_resource(resource_id)
     if not resource:
@@ -144,24 +282,7 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
         )
         conn.commit()
 
-    payload = {
-        "x402Version": 1,
-        "scheme": "exact",
-        "network": "base",
-        "chainId": resource["chain_id"],
-        "maxAmountRequired": resource["amount_atomic"],
-        "resource": f"/x402/{resource_id}",
-        "description": resource["description"],
-        "payTo": resource["treasury"],
-        "asset": resource["token_address"],
-        "extra": {
-            "challenge_id": challenge_id,
-            "token": resource["token"],
-            "amount_display": resource["amount_display"],
-            "decimals": resource["token_decimals"],
-            "skill_id": resource.get("skill_id", ""),
-        },
-    }
+    payload = build_payment_payload(resource, resource_id, challenge_id)
 
     return {
         "ok": False,
@@ -327,3 +448,219 @@ def access_granted(access_token: str, resource_id: str) -> bool:
             (access_token, resource_id),
         ).fetchone()
     return bool(row)
+
+# ---------------------------------------------------------------------------
+# Settle-before-serve guard (dev-watch item 79)
+# ---------------------------------------------------------------------------
+
+#: Hard rule: a serve path may only proceed when a settle RECEIPT — not a
+#: verify receipt — exists for the payment reference. Item 79 (Payload Tools
+#: postmortem, 2026-10-07): sellers who served work on ``verify`` alone did
+#: unpaid work on credit, because verify passed on every attempt while settle
+#: rejected everything with ``invalid_payload``. Root causes were (a) the
+#: token ``name`` field had to be exactly "USD Coin", not "USDC", and (b) a
+#: $0.001 amount minimum — neither was in the spec (x402-foundation/x402#961).
+#: Every serve path MUST call :func:`require_settled` before doing paid work.
+SETTLE_BEFORE_SERVE = True
+
+_SETTLE_OK_STATUSES = {"settled", "confirmed", "success"}
+
+# intent_hash -> "settled" | "rejected": process-wide memory of settle
+# outcomes, consulted by require_settled(). This is the nonce-reuse trap
+# hedge: when settle rejects with nonce_already_used, the intent is marked
+# rejected. Minting a fresh authorization for the SAME intent afterwards
+# must NOT be treated as a new payment unless the fresh authorization has
+# its own confirmed settle receipt — otherwise the "fix" converts a replay
+# rejection into a double payment.
+_INTENT_OUTCOMES: dict[str, str] = {}
+
+
+def register_settle_outcome(intent_hash: str, outcome: str) -> None:
+    """Record a terminal settle outcome for an intent.
+
+    ``outcome`` must be ``"settled"`` or ``"rejected"``. A "rejected"
+    intent refuses verify-only serve attempts until a fresh authorization
+    for the same intent produces its own confirmed settle receipt.
+    """
+    if not intent_hash:
+        raise ValueError("intent_hash required")
+    if outcome not in ("settled", "rejected"):
+        raise ValueError("outcome must be 'settled' or 'rejected'")
+    _INTENT_OUTCOMES[intent_hash] = outcome
+
+
+def intent_outcome(intent_hash: str) -> str | None:
+    """Return the recorded settle outcome for an intent, or None."""
+    return _INTENT_OUTCOMES.get(intent_hash)
+
+
+def reset_intent_registry() -> None:
+    """Clear the intent-outcome registry. Test helper only."""
+    _INTENT_OUTCOMES.clear()
+
+
+def require_settled(payment: Any) -> bool:
+    """Serve-path guard: return True only if a settle receipt exists.
+
+    ``payment`` is a payment reference dict with keys::
+
+        {"intent_hash": str,
+         "verify": {"ok": bool, ...},
+         "settle": {"ok": bool, "status": str, "reason": str, ...}}
+
+    Rules:
+    - ``SETTLE_BEFORE_SERVE`` must be True (fail closed if ever weakened).
+    - verify alone is NEVER enough — verify passed on every attempt in the
+      item-79 postmortem while settle rejected everything.
+    - A confirmed settle receipt (``ok`` True + settled/confirmed/success
+      status) approves and records the intent as settled.
+    - A rejected settle marks the intent rejected and returns False.
+    - A verify-only reference whose intent was previously rejected (the
+      nonce-reuse trap: fresh auth minted after ``nonce_already_used``
+      without confirming the first settle) returns False. It can only be
+      approved by producing its own confirmed settle receipt.
+    """
+    if SETTLE_BEFORE_SERVE is not True:
+        return False
+    if not isinstance(payment, dict):
+        return False
+    intent = str(payment.get("intent_hash") or "")
+    verify = payment.get("verify") or {}
+    if not isinstance(verify, dict) or verify.get("ok") is not True:
+        return False
+    settle = payment.get("settle") or {}
+    if isinstance(settle, dict) and settle:
+        status = str(settle.get("status") or "").lower()
+        if settle.get("ok") is True and status in _SETTLE_OK_STATUSES:
+            if intent:
+                _INTENT_OUTCOMES[intent] = "settled"
+            return True
+        # A settle receipt exists but is not successful: record the
+        # rejection so the intent cannot be re-served on verify alone.
+        if intent:
+            _INTENT_OUTCOMES[intent] = "rejected"
+        return False
+    # Verify-only reference: blocked by the intent registry if a previous
+    # settle for this intent was rejected (nonce-reuse trap); blocked in
+    # all other cases too — verify is not settlement.
+    if intent and _INTENT_OUTCOMES.get(intent) == "rejected":
+        return False
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Batch-settlement vouchers (dev-watch item 81)
+# ---------------------------------------------------------------------------
+
+# VOUCHERS ARE PROMISES, NOT SETTLEMENT.
+#
+# Coinbase-style x402 batch settlement (2026-10-06): buyers deposit ERC-20
+# into onchain escrow and sign offchain vouchers per request; sellers verify
+# vouchers, serve, and redeem batched later. This section covers the offchain
+# voucher half ONLY. Batch settlement does NOT relax settle-before-serve:
+# ``redeem_voucher()`` records an intent to include a voucher in a future
+# batch — it creates NO settle receipt. A serve path must still call
+# ``require_settled()`` and see a confirmed batch-settlement receipt before
+# serving voucher-backed work.
+#
+# Replay surface: a voucher replayed across redemption batches, and
+# voucher-vs-settlement races. Mitigations: nonce uniqueness enforced
+# process-wide (``_REDEEMED_NONCES``), idempotent redemption (re-redeeming
+# returns the original record and never double-pays), expiry enforcement.
+
+@dataclass
+class Voucher:
+    """Offchain payment voucher for batch settlement (a promise, not money)."""
+
+    voucher_id: str
+    payer: str
+    pay_to: str
+    amount: float
+    token: str
+    nonce: str
+    expiry_ts: float
+    intent_hash: str
+
+
+# nonce -> redeemed: process-wide redemption memory. A nonce may be redeemed
+# exactly once across all batches.
+_REDEEMED_NONCES: set[str] = set()
+
+# voucher_id -> redemption record: idempotency memory for redeem_voucher().
+_REDEMPTION_RECORDS: dict[str, dict[str, Any]] = {}
+
+
+def reset_voucher_registry() -> None:
+    """Clear voucher redemption memory. Test helper only."""
+    _REDEEMED_NONCES.clear()
+    _REDEMPTION_RECORDS.clear()
+
+
+def validate_voucher(voucher: Any) -> dict[str, Any]:
+    """Validate a voucher without redeeming it.
+
+    Enforces: nonce present and never previously redeemed (across all
+    batches), expiry_ts in the future, amount > 0, payer/pay_to/intent_hash
+    present. Returns ``{"ok": True}`` or ``{"ok": False, "error": ...}``.
+    """
+    if not isinstance(voucher, Voucher):
+        return {"ok": False, "error": "not_a_voucher"}
+    if not voucher.nonce:
+        return {"ok": False, "error": "nonce_required"}
+    if voucher.nonce in _REDEEMED_NONCES:
+        return {"ok": False, "error": "nonce_already_redeemed"}
+    if not voucher.payer:
+        return {"ok": False, "error": "payer_required"}
+    if not voucher.pay_to:
+        return {"ok": False, "error": "pay_to_required"}
+    if not voucher.intent_hash:
+        return {"ok": False, "error": "intent_hash_required"}
+    if voucher.amount is None or voucher.amount <= 0:
+        return {"ok": False, "error": "invalid_amount"}
+    if voucher.expiry_ts <= time.time():
+        return {"ok": False, "error": "voucher_expired"}
+    return {"ok": True}
+
+
+def redeem_voucher(voucher: Voucher, *, batch_id: str = "") -> dict[str, Any]:
+    """Idempotently redeem a voucher for batch settlement.
+
+    First redemption of a ``voucher_id`` validates the voucher, consumes its
+    nonce, and records the redemption. Re-redeeming the same voucher (e.g.
+    replayed across batches) returns the ORIGINAL redemption record with
+    ``error: "already_redeemed"`` and ``double_pay: False`` — it never
+    double-pays.
+
+    The redemption record carries ``"settled": False`` deliberately:
+    redemption is batch inclusion intent, NOT settlement. Serving the
+    voucher-backed work still requires a confirmed batch-settlement receipt
+    via :func:`require_settled`.
+    """
+    if not isinstance(voucher, Voucher):
+        return {"ok": False, "error": "not_a_voucher", "double_pay": False}
+    if voucher.voucher_id in _REDEMPTION_RECORDS:
+        original = _REDEMPTION_RECORDS[voucher.voucher_id]
+        return {
+            "ok": False,
+            "error": "already_redeemed",
+            "double_pay": False,
+            "redemption": dict(original),
+        }
+    check = validate_voucher(voucher)
+    if not check.get("ok"):
+        return {"ok": False, "error": check["error"], "double_pay": False}
+    record = {
+        "voucher_id": voucher.voucher_id,
+        "payer": voucher.payer,
+        "pay_to": voucher.pay_to,
+        "amount": voucher.amount,
+        "token": voucher.token,
+        "nonce": voucher.nonce,
+        "intent_hash": voucher.intent_hash,
+        "batch_id": batch_id,
+        "redeemed_at": datetime.now(timezone.utc).isoformat(),
+        "settled": False,  # redemption is NOT settlement; see module docstring
+    }
+    _REDEMPTION_RECORDS[voucher.voucher_id] = record
+    _REDEEMED_NONCES.add(voucher.nonce)
+    return {"ok": True, "redemption": dict(record), "settle_pending": True}
