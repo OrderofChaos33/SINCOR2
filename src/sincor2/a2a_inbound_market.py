@@ -527,35 +527,68 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     # behavior penalty for committing without revealing; it applies to every
     # detected ghost independent of ledger accounting, and never bricks
     # the close. The wallet+card behind each ghost is tombstoned so a rebirth
-    # under a new agent_id is flagged as a probable whitewash.
+    # under a new agent_id is flagged as a probable whitewash. Shared with
+    # expire_stale_assignments() so plaintext no-shows cost exactly the same.
     if ghosts:
-        try:
-            with fabric.lock:
-                for agent_id in ghosts:
-                    agent = fabric.agents.get(agent_id)
-                    if agent is not None:
-                        _apply_reputation(agent, 0.0)
-            _save_agents(fabric)
-        except Exception as err:
-            logger.warning("ghost reputation reset failed: %s", err)
+        for agent_id in ghosts:
+            _apply_no_show_penalty(fabric, agent_id)
         # Zero the ghost wallet's settlement-ledger reputation as well, so a
         # ghost cannot keep the priority flag earned under its verified wallet
-        # (the agent registry reset above only covers earned-reputation).
-        # Never bricks the close on accounting.
+        # (the agent registry reset inside _apply_no_show_penalty only covers
+        # earned-reputation). Never bricks the close on accounting.
         _reset_ghost_settlement_reputation(fabric, ghosts)
-        for agent_id in ghosts:
-            try:
-                from sincor2.a2a_inbound_ext import _kya_flag_ghost
-
-                _kya_flag_ghost(agent_id)
-            except Exception as err:
-                logger.warning("ghost KYA flag failed for %s: %s", agent_id, err)
     if snap["state"] == "assigned":
         fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
         if snap.get("auction_id"):
             _fund_onchain_escrow(fabric, task_id)
     _save_tasks(fabric)
     return snap
+
+
+def _apply_no_show_penalty(fabric: Any, agent_id: str) -> Dict[str, Any]:
+    """Apply the ghost penalty to an agent that no-showed on an assignment.
+
+    Red-team 2026-10-08: a plaintext execution_timeout used to be
+    penalty-free while sealed-commit ghosts lost reputation and got
+    tombstoned. Both are now the same event — reputation reset to 0.0
+    (probation restored) and the wallet tombstoned via KYA so a rebirth
+    under a new agent_id is flagged as a probable whitewash. Never raises:
+    penalty accounting must not brick the caller.
+
+    Returns the penalty outcome dict (published on the task.expired event
+    and recorded on the task for audit).
+    """
+    outcome: Dict[str, Any] = {
+        "agent_id": agent_id,
+        "reputation_reset": False,
+        "wallet_tombstoned": False,
+    }
+    agent_wallet = ""
+    try:
+        with fabric.lock:
+            agent = fabric.agents.get(agent_id)
+            if agent is not None:
+                agent_wallet = str(agent.get("wallet") or "")
+                _apply_reputation(agent, 0.0)
+                outcome["reputation_reset"] = True
+        _save_agents(fabric)
+    except Exception as err:
+        logger.warning("ghost reputation reset failed for %s: %s", agent_id, err)
+    try:
+        from sincor2 import kya_registry
+
+        tomb = kya_registry.flag_ghost(agent_id)
+        if tomb is not None:
+            outcome["wallet_tombstoned"] = True
+        elif agent_wallet:
+            # No KYA record existed for this agent (the listing hook may have
+            # been skipped); write the tombstone directly from the registered
+            # wallet so the shed is still visible rather than free.
+            kya_registry._write_tombstone(agent_wallet, agent_id, "", "ghosting")
+            outcome["wallet_tombstoned"] = True
+    except Exception as err:
+        logger.warning("ghost KYA flag failed for %s: %s", agent_id, err)
+    return outcome
 
 
 def _fund_onchain_escrow(fabric: Any, task_id: str) -> None:
@@ -593,7 +626,13 @@ def _fund_onchain_escrow(fabric: Any, task_id: str) -> None:
 
 
 def expire_stale_assignments() -> List[Dict[str, Any]]:
-    """Auto-cancel assigned tasks whose execution window has elapsed."""
+    """Auto-cancel assigned tasks whose execution window has elapsed.
+
+    A no-show is ghosting: the assigned agent takes the SAME penalty as a
+    sealed-commit ghost — reputation reset to 0.0 (probation restored) and
+    the wallet tombstoned — and the penalty is recorded on the task and
+    published on the task.expired event.
+    """
     fabric = get_fabric()
     ts = _now_ms()
     expired: List[Dict[str, Any]] = []
@@ -610,10 +649,23 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
                 task["expired_at"] = ts
                 expired.append(dict(task))
     for snap in expired:
+        ghost_agent = snap.get("assigned_to")
+        penalty = (
+            _apply_no_show_penalty(fabric, ghost_agent)
+            if ghost_agent
+            else {"agent_id": None, "reputation_reset": False,
+                  "wallet_tombstoned": False}
+        )
+        snap["ghost_penalty"] = penalty
+        with fabric.lock:
+            task = fabric.tasks.get(snap["task_id"])
+            if task is not None:
+                task["ghost_penalty"] = penalty
         fabric.publish(
             "task.expired",
             list(snap.get("tags") or []),
-            {"task_id": snap["task_id"], "reason": "execution_timeout"},
+            {"task_id": snap["task_id"], "reason": "execution_timeout",
+             "ghost_penalty": penalty},
         )
     if expired:
         _save_tasks(fabric)
@@ -842,11 +894,67 @@ def reveal_bid(task_id: str, agent_id: str, bid_axm: float, nonce: Any,
     return snap
 
 
-def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, Any]:
+# Sentinel distinguishing "no deliverable argument passed" from an
+# explicitly-passed falsy deliverable (e.g. empty dict), which still
+# binds and hashes.
+_UNSET: Any = object()
+
+
+def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
+                 *,
+                 deliverable: Any = _UNSET,
+                 evidence: Optional[Dict[str, Any]] = None,
+                 deliverable_uri: str = "",
+                 content_binding_sig: str = "") -> Dict[str, Any]:
+    """Winner's proof of completion; stages the payout and settles the task.
+
+    Receipt-content binding (dev-watch item 77): a receipt proves money
+    moved, never that the deliverable has content.  Bind the deliverable
+    with one of:
+
+    * ``deliverable`` -- raw deliverable content (any JSON-safe value,
+      str, or bytes); the content hash is computed from it, so the
+      caller cannot claim a hash that mismatches the bytes;
+    * ``evidence`` -- a pre-built evidence mapping with
+      ``payment_receipt_hash``, ``deliverable_hash``, ``deliverable_uri``
+      and optional ``content_binding_sig``.  If both forms are given,
+      ``deliverable`` wins (the server computes the hash itself, so a
+      claimed hash can never drift from the content).
+
+    Either form is validated by :func:`validate_dispute_evidence`,
+    which FAILS CLOSED: evidence carrying a payment receipt but no
+    deliverable binding is rejected, and a tampered deliverable fails
+    hash verification.  The bound evidence is stored on the proof and
+    the task so the adjudicator can retrieve the deliverable and
+    recompute the hash when a quality dispute is filed.
+
+    ``receipt_hash`` alone is still accepted (legacy callers), but such
+    proofs are marked ``content_bound: False``: a bare receipt settles
+    the payout yet leaves the deliverable unattributable, and the
+    adjudicator will treat a later quality dispute accordingly.
+    """
     receipt_hash = str(receipt_hash or "").strip()
     if not receipt_hash.startswith("0x") or len(receipt_hash) < 10:
         raise ValueError("receipt_hash must be 0x-prefixed")
+    bound: Optional[DisputeEvidence] = None
+    if deliverable is not _UNSET:
+        bound = build_evidence(
+            receipt_hash, deliverable, deliverable_uri,
+            content_binding_sig=content_binding_sig)
+    elif evidence is not None:
+        bound = validate_dispute_evidence(evidence)
+        if bound.payment_receipt_hash != receipt_hash:
+            raise ValueError(
+                "evidence payment_receipt_hash does not match receipt_hash")
     fabric = get_fabric()
+    # Anti-sybil payout quarantine (2026-10-08): a shared-wallet cluster of
+    # >= 3 identities, or any tombstoned cluster member, blocks the payout
+    # entirely (fail closed) — checked BEFORE any state is mutated. Smaller
+    # clusters are flagged on the staged receipt below.
+    from sincor2.sybil_defense import quarantine_check
+    qcheck = quarantine_check(agent_id)
+    if qcheck["quarantined"]:
+        raise PermissionError("payout quarantined: %s" % qcheck["reason"])
     close_auction(task_id)
     ts = _now_ms()
     with fabric.lock:
