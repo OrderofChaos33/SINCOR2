@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, current_app, jsonify, request
@@ -24,13 +25,25 @@ logger = logging.getLogger(__name__)
 contract_net_bp = Blueprint("contract_net", __name__, url_prefix="/api/contract-net")
 
 
+def _allow_hmac_bids() -> bool:
+    """HMAC bids are demo-only (the demo roster signs with HMAC).
+
+    Default-deny (HIGH remediation, 2026-10-08): HMAC bids are rejected
+    unless explicitly enabled via SINCOR_CONTRACT_NET_ALLOW_HMAC=1. The
+    money path requires secp256k1 (see ContractNetConfig.allow_hmac_bids).
+    """
+    return os.getenv("SINCOR_CONTRACT_NET_ALLOW_HMAC", "").strip().lower() in (
+        "1", "true", "yes")
+
+
 def _engine() -> ContractNetEngine:
     """Demo/sandbox engine: the demo roster signs with HMAC (demo-only)."""
     platform = current_app.extensions.get("sincor_platform") or {}
     engine = platform.get("contract_net")
     if engine is None:
         engine = ContractNetEngine(
-            ContractNetConfig(chain_id=BASE_SEPOLIA_CHAIN_ID, allow_hmac_bids=True)
+            ContractNetConfig(chain_id=BASE_SEPOLIA_CHAIN_ID,
+                              allow_hmac_bids=_allow_hmac_bids())
         )
         platform = dict(platform)
         platform["contract_net"] = engine
@@ -48,8 +61,8 @@ def _config_from_body(body: Dict[str, Any]) -> Optional[ContractNetConfig]:
         invite_k=invite_k,
         epsilon=epsilon,
         chain_id=BASE_SEPOLIA_CHAIN_ID,
-        allow_hmac_bids=True,
-    )  # demo roster signs with HMAC (demo-only)
+        allow_hmac_bids=_allow_hmac_bids(),
+    )  # HMAC only when SINCOR_CONTRACT_NET_ALLOW_HMAC=1 (default-deny)
 
 
 @contract_net_bp.get("/health")

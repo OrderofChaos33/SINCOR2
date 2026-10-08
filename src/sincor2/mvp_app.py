@@ -416,8 +416,12 @@ limiter = Limiter(
 )
 
 try:
-    from sincor2.safety_locks import assert_production_safety
+    from sincor2.safety_locks import ProductionSafetyError, assert_production_safety
     assert_production_safety()
+except ProductionSafetyError:
+    # Fail-closed: a dangerous production config must crash startup, not
+    # just log. Re-raise so the process does not serve traffic.
+    raise
 except Exception as e:
     logger.warning('[SAFETY] Lock check failed: %s', e)
 

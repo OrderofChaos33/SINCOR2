@@ -121,11 +121,19 @@ class SincorAgentSDK:
         """Register an agent. Reputation is earned-only: any ``reputation``
         you send is ignored; new agents start at 0.0 (probation).
 
-        Re-registration of an existing record is proof-gated server-side:
-        pass ``signer`` (an eth_account Account holding the *registered*
-        wallet's key) and the SDK attaches an EIP-191
-        ``registration_signature`` + ``registration_ts`` authorizing the
-        update. First-time registration ignores the signature fields.
+        Pass ``signer`` (an eth_account Account holding the claimed
+        wallet's key) to attach the EIP-191 proof the server requires:
+
+        * first-time registration: signature over
+          ``SINCOR-REGISTER|<agent_id>|<ts>`` + ``registration_wallet``
+          (fail-closed C3: an unsigned wallet claim is rejected with 403);
+        * re-registration of an existing record: signature by the
+          *registered* wallet over the exact new record contents
+          (G2.2 proof-gated).
+
+        The SDK probes ``GET /v1/a2a/agents`` to pick the right proof
+        format. ``wallet`` must equal ``signer.address`` when both are
+        given, otherwise registration is refused client-side.
         """
         body: Dict[str, Any] = {
             "agent_id": agent_id,
@@ -138,14 +146,43 @@ class SincorAgentSDK:
             "wallet": wallet,
         }
         if signer is not None:
-            from sincor2.a2a_inbound import _now_ms, build_reregistration_message
             from eth_account.messages import encode_defunct
-            ts = _now_ms()
-            message = build_reregistration_message(body, ts)
+            signer_address = getattr(signer, "address", "")
+            if wallet and signer_address.lower() != wallet.lower():
+                raise ValueError(
+                    "signer.address must equal the claimed wallet "
+                    "(server rejects mismatched claims)")
+            wallet = wallet or signer_address
+            body["wallet"] = wallet
+            if self._agent_exists(agent_id):
+                from sincor2.a2a_inbound import _now_ms, build_reregistration_message
+                ts = _now_ms()
+                message = build_reregistration_message(body, ts)
+            else:
+                from sincor2.a2a_identity import register_message
+                import time as _time
+                ts = int(_time.time() * 1000)
+                message = register_message(agent_id, ts)
+                body["registration_wallet"] = wallet
             sig = signer.sign_message(encode_defunct(text=message)).signature
             body["registration_ts"] = ts
             body["registration_signature"] = "0x" + bytes(sig).hex()
         return self.t.post("/v1/a2a/register", body)
+
+    def _agent_exists(self, agent_id: str) -> bool:
+        """Best-effort existence probe for proof-format selection.
+
+        Fail-closed: any probe error is treated as "exists", so the SDK
+        falls back to the re-registration proof rather than minting a
+        duplicate first-registration proof.
+        """
+        try:
+            listing = self.t.get("/v1/a2a/agents")
+            agents = listing.get("agents", []) if isinstance(listing, dict) else []
+            return any(a.get("agent_id") == agent_id for a in agents
+                       if isinstance(a, dict))
+        except Exception:
+            return True
 
     def heartbeat(self, agent_id: str, signer: Any = None,
                   heartbeat_token: Optional[str] = None) -> Dict[str, Any]:

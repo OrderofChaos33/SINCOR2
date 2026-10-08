@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 
@@ -11,13 +12,28 @@ import verticals.auto_detailing.send_gate as send_gate
 from verticals.auto_detailing.send_gate import (
     APPROVED_DRY_RUN,
     KILLED,
+    NOT_SENT,
     PENDING,
+    SEND_FAILED,
     SENT,
     approve,
     edit,
     enqueue,
     kill,
 )
+
+
+def _provider_deliver(result_provider="twilio"):
+    """A real provider-shaped delivery receipt — actually delivered."""
+    def fake_deliver(_item):
+        return {
+            "ok": True,
+            "provider": result_provider,
+            "delivered": True,
+            "status": "sent",
+        }
+
+    return fake_deliver
 
 
 def test_enqueue_never_sends(store, monkeypatch):
@@ -51,7 +67,9 @@ def test_approve_without_live_flag_is_dry_run(store, monkeypatch):
 
 
 def test_approve_with_live_flag_marks_sent(store, monkeypatch):
+    """A real provider delivery still records sent/live."""
     monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    monkeypatch.setattr(send_gate, "_deliver", _provider_deliver())
     item = enqueue(
         channel="email",
         kind="quote_followup",
@@ -62,6 +80,28 @@ def test_approve_with_live_flag_marks_sent(store, monkeypatch):
     result = approve(item["id"], store=store)
     assert result["status"] == SENT
     assert result["live"] is True
+
+
+def test_approve_with_live_flag_but_no_provider_is_not_sent(store, monkeypatch):
+    """log_only truth fix: the default stub never touches the network, so
+    approve() with CHROMA_LIVE_SEND=true must NOT record sent."""
+    monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    item = enqueue(
+        channel="email",
+        kind="quote_followup",
+        body="Book the bay.",
+        to="ava@example.com",
+        store=store,
+    )
+    result = approve(item["id"], store=store)
+    assert result["status"] == NOT_SENT
+    assert result["status"] != SENT
+    assert result["live"] is False
+    # The full receipt is preserved inside the stored payload_json.
+    delivery = json.loads(store.get_outbound(item["id"])["payload_json"])["delivery"]
+    assert delivery["provider"] == "log_only"
+    assert delivery["delivered"] is False
+    assert delivery["status"] == "not_sent"
 
 
 def test_kill_blocks_later_approve(store, monkeypatch):
@@ -82,6 +122,7 @@ def test_edit_resets_to_pending(store):
 
 def test_approve_rejects_already_sent(store, monkeypatch):
     monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    monkeypatch.setattr(send_gate, "_deliver", _provider_deliver())
     item = enqueue(channel="email", kind="quote_followup", body="Book the bay.", store=store)
     first = approve(item["id"], store=store)
     assert first["status"] == SENT
@@ -92,10 +133,27 @@ def test_approve_rejects_already_sent(store, monkeypatch):
 
 def test_edit_rejects_already_sent(store, monkeypatch):
     monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+    monkeypatch.setattr(send_gate, "_deliver", _provider_deliver())
     item = enqueue(channel="email", kind="quote_followup", body="Book the bay.", store=store)
     approve(item["id"], store=store)
     with pytest.raises(ValueError, match="Already sent"):
         edit(item["id"], body="new copy", store=store)
+
+
+def test_ok_true_without_delivery_is_send_failed(store, monkeypatch):
+    """A provider-shaped result with ok=True but delivered=False must not
+    be recorded as sent — the truth check requires all three."""
+    monkeypatch.setenv("CHROMA_LIVE_SEND", "true")
+
+    def flaky_deliver(_item):
+        return {"ok": True, "provider": "twilio", "delivered": False, "status": "failed"}
+
+    monkeypatch.setattr(send_gate, "_deliver", flaky_deliver)
+    item = enqueue(channel="email", kind="quote_followup", body="Book now.", store=store)
+    result = approve(item["id"], store=store)
+    assert result["status"] == SEND_FAILED
+    assert result["status"] != SENT
+    assert result["live"] is False
 
 
 def test_concurrent_approve_delivers_once(store, monkeypatch):
@@ -106,7 +164,7 @@ def test_concurrent_approve_delivers_once(store, monkeypatch):
     def fake_deliver(_item):
         time.sleep(0.05)
         calls["count"] += 1
-        return {"ok": True}
+        return {"ok": True, "provider": "twilio", "delivered": True, "status": "sent"}
 
     monkeypatch.setattr(send_gate, "_deliver", fake_deliver)
     results = []

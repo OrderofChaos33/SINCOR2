@@ -1,10 +1,14 @@
-"""A2A registration identity proof (G2.2 / backlog item 15).
+"""A2A registration identity proof (G2.2 / backlog item 15, C3 fail-closed).
 
 Proves that re-registering an existing agent record requires proof of
 control of the registered wallet: an EIP-191 signature over the exact new
 record contents plus a fresh timestamp. Unsigned, wrong-signer, stale, or
-tampered re-registrations are refused with 403; first-time registration is
-unchanged (no signature needed).
+tampered re-registrations are refused with 403.
+
+C3 (2026-10-08): first-time registration is fail-closed on wallet claims —
+a wallet claim without a valid EIP-191 proof is refused with 403 (it used
+to be accepted as identity="unverified"). Anonymous first registration
+(no wallet claim) still needs no signature.
 """
 from __future__ import annotations
 
@@ -13,6 +17,7 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from flask import Flask
 
+from sincor2.a2a_identity import register_message
 from sincor2.a2a_inbound import (
     REGISTRATION_PROOF_FRESHNESS_MS,
     _now_ms,
@@ -58,16 +63,62 @@ def _signed_body(key, agent_id, wallet, ts_ms=None, **extra):
     return body
 
 
-def test_first_registration_needs_no_signature(client):
+def _first_signed_body(key, agent_id, ts_ms=None, **extra):
+    """First-registration body with a valid wallet-identity proof: an
+    EIP-191 signature over SINCOR-REGISTER|<agent_id>|<ts> by the claimed
+    wallet (fail-closed C3 path)."""
+    body = _body(agent_id, key.address, **extra)
+    ts = _now_ms() if ts_ms is None else ts_ms
+    message = register_message(agent_id, ts)
+    sig = key.sign_message(encode_defunct(text=message)).signature
+    body["registration_wallet"] = key.address
+    body["registration_ts"] = ts
+    body["registration_signature"] = "0x" + bytes(sig).hex()
+    return body
+
+
+# -- C3: first-time wallet claims are fail-closed ---------------------------
+
+def test_first_registration_unsigned_wallet_claim_is_403(client):
+    """C3: a first-time wallet claim without a valid EIP-191 proof is
+    rejected outright — unverified wallet claims can no longer bind
+    owner_wallet (identity spoofing adjacent to the money path)."""
     r = client.post("/v1/a2a/register",
-                    json=_body("proof-new", Account.create().address))
+                    json=_body("proof-c3-unsigned", Account.create().address))
+    assert r.status_code == 403, r.get_json()
+    assert "proof" in r.get_json()["error"].lower()
+
+
+def test_first_registration_wrong_signer_wallet_claim_is_403(client):
+    owner = Account.create()
+    attacker = Account.create()
+    body = _first_signed_body(attacker, "proof-c3-wrongsig")
+    body["wallet"] = owner.address  # claim a wallet the signer doesn't control
+    r = client.post("/v1/a2a/register", json=body)
+    assert r.status_code == 403, r.get_json()
+
+
+def test_first_registration_anonymous_needs_no_signature(client):
+    """Anonymous first registration (no wallet claim) still needs no
+    signature — there is no wallet claim to spoof."""
+    r = client.post("/v1/a2a/register", json=_body("proof-anon", ""))
     assert r.status_code == 201, r.get_json()
-    assert "reregistration" in r.get_json()
+    assert get_fabric().agents["proof-anon"]["identity"] == "unverified"
+
+
+def test_first_registration_signed_wallet_claim_is_verified(client):
+    owner = Account.create()
+    r = client.post("/v1/a2a/register",
+                    json=_first_signed_body(owner, "proof-c3-verified"))
+    assert r.status_code == 201, r.get_json()
+    agent = get_fabric().agents["proof-c3-verified"]
+    assert agent["identity"] == "verified"
+    assert agent["owner_wallet"] == owner.address.lower()
 
 
 def test_reregistration_without_signature_is_403(client):
     key = Account.create()
-    body = _body("proof-nosig", key.address)
+    body = _first_signed_body(key, "proof-nosig")
     assert client.post("/v1/a2a/register", json=body).status_code == 201
     r = client.post("/v1/a2a/register", json=_body("proof-nosig", key.address))
     assert r.status_code == 403, r.get_json()
@@ -79,7 +130,7 @@ def test_reregistration_wrong_signer_is_403(client):
     attacker = Account.create()
     agent_id = "proof-wrongsig"
     assert client.post("/v1/a2a/register",
-                       json=_body(agent_id, owner.address)).status_code == 201
+                       json=_first_signed_body(owner, agent_id)).status_code == 201
     # Attacker signs a record that swaps the wallet to their own address.
     evil = _signed_body(attacker, agent_id, attacker.address,
                         rpc_callback="https://evil.example/rpc")
@@ -94,7 +145,7 @@ def test_reregistration_with_owner_signature_succeeds(client):
     owner = Account.create()
     agent_id = "proof-ok"
     assert client.post("/v1/a2a/register",
-                       json=_body(agent_id, owner.address)).status_code == 201
+                       json=_first_signed_body(owner, agent_id)).status_code == 201
     new_wallet = Account.create().address
     # Owner rotates the wallet and callback, signing with the OLD wallet.
     update = _signed_body(owner, agent_id, new_wallet,
@@ -112,7 +163,7 @@ def test_reregistration_stale_timestamp_is_403(client):
     owner = Account.create()
     agent_id = "proof-stale"
     assert client.post("/v1/a2a/register",
-                       json=_body(agent_id, owner.address)).status_code == 201
+                       json=_first_signed_body(owner, agent_id)).status_code == 201
     stale_ts = _now_ms() - REGISTRATION_PROOF_FRESHNESS_MS - 60_000
     update = _signed_body(owner, agent_id, owner.address, ts_ms=stale_ts)
     r = client.post("/v1/a2a/register", json=update)
@@ -123,7 +174,7 @@ def test_reregistration_tampered_fields_break_signature(client):
     owner = Account.create()
     agent_id = "proof-tamper"
     assert client.post("/v1/a2a/register",
-                       json=_body(agent_id, owner.address)).status_code == 201
+                       json=_first_signed_body(owner, agent_id)).status_code == 201
     # Sign one record, submit a different one: the signature must not verify.
     signed = _signed_body(owner, agent_id, owner.address)
     tampered = dict(signed)
@@ -169,7 +220,7 @@ def test_replay_within_window_reapplies_identical_state(client):
     attacker = Account.create()
     agent_id = "proof-replay"
     assert client.post("/v1/a2a/register",
-                       json=_body(agent_id, owner.address)).status_code == 201
+                       json=_first_signed_body(owner, agent_id)).status_code == 201
     legit = _signed_body(owner, agent_id, owner.address, name="Renamed")
     assert client.post("/v1/a2a/register", json=legit).status_code == 201
     # Attacker replays the owner's signed message verbatim: the wallet

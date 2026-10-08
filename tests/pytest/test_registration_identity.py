@@ -94,9 +94,14 @@ class RegistrationIdentityTests(unittest.TestCase):
         self.assertEqual(snap["identity"], "verified")
         self.assertEqual(snap["owner_wallet"], _OWNER_WALLET.lower())
 
-    # -- acceptance: unverified claim is marked untrusted, not silently trusted
-    def test_unverified_claim_marked_untrusted(self):
-        snap = ext.register_agent_record(_body("reg-unverified-01"))
+    # -- acceptance: unverified WALLET claims are rejected outright (C3 fail-closed)
+    def test_unverified_wallet_claim_rejected(self):
+        with self.assertRaises(PermissionError):
+            ext.register_agent_record(_body("reg-unverified-01"))
+
+    # -- acceptance: anonymous claims (no wallet) are still accepted unverified
+    def test_anonymous_claim_marked_unverified(self):
+        snap = ext.register_agent_record(_body("reg-anon-01", wallet=""))
         self.assertEqual(snap["identity"], "unverified")
         self.assertEqual(snap["owner_wallet"], "")
 
@@ -139,42 +144,49 @@ class RegistrationIdentityTests(unittest.TestCase):
     def test_wallet_claim_mismatch_rejected(self):
         # Signature from the attacker, wallet claim of the owner: the
         # mandatory-claim check must refuse to mint the owner's identity.
+        # Fail-closed: the whole registration is rejected (no unverified
+        # fallback for wallet claims).
         ts = int(time.time() * 1000)
         sig = _sign(ident.register_message("reg-mismatch-01", ts), _ATTACKER)
         body = _body("reg-mismatch-01", registration_signature=sig,
                      registration_wallet=_OWNER_WALLET, registration_ts=ts)
-        snap = ext.register_agent_record(body)
-        self.assertEqual(snap["identity"], "unverified")
-        self.assertEqual(snap["owner_wallet"], "")
+        with self.assertRaises(PermissionError):
+            ext.register_agent_record(body)
 
     def test_stale_timestamp_rejected(self):
         ts = int(time.time() * 1000) - 60 * 60 * 1000  # 1h old
         sig = _sign(ident.register_message("reg-stale-01", ts), _OWNER)
         body = _body("reg-stale-01", registration_signature=sig,
                      registration_wallet=_OWNER_WALLET, registration_ts=ts)
-        snap = ext.register_agent_record(body)
-        self.assertEqual(snap["identity"], "unverified")
+        with self.assertRaises(PermissionError):
+            ext.register_agent_record(body)
 
     # -- acceptance: grandfathered IDs are fail-closed on update -------------
     def test_grandfathered_record_unsigned_reregistration_refused(self):
         # Fail-closed re-registration (G2.2): an unsigned update to an
         # existing record is refused, even for grandfathered ids.
-        snap = ext.register_agent_record(_body("reg-grandfather-01"))
+        snap = ext.register_agent_record(_body("reg-grandfather-01", wallet=""))
         self.assertEqual(snap["identity"], "unverified")
         with self.assertRaises(RegistrationAuthError):
             ext.register_agent_record(
-                _body("reg-grandfather-01", description="updated"))
+                _body("reg-grandfather-01", description="updated", wallet=""))
 
     def test_grandfathered_record_claims_ownership_with_proof(self):
-        ext.register_agent_record(_body("reg-claim-01"))
-        snap = ext.register_agent_record(
-            _rereg_body("reg-claim-01", signer=_OWNER, wallet=_OWNER_WALLET))
-        self.assertEqual(snap["identity"], "verified")
-        self.assertEqual(snap["owner_wallet"], _OWNER_WALLET.lower())
-        # Now the attacker is locked out.
+        # A proof-less (anonymous) record has no bound wallet, so control
+        # cannot be proven by re-registration — fail closed.
+        ext.register_agent_record(_body("reg-claim-01", wallet=""))
         with self.assertRaises(RegistrationAuthError):
             ext.register_agent_record(
-                _rereg_body("reg-claim-01", signer=_ATTACKER,
+                _rereg_body("reg-claim-01", signer=_OWNER,
+                            wallet=_OWNER_WALLET))
+        # Ownership is established by a first registration with a signed
+        # wallet claim; the attacker is then locked out.
+        snap = ext.register_agent_record(_proof_body("reg-claim-02"))
+        self.assertEqual(snap["identity"], "verified")
+        self.assertEqual(snap["owner_wallet"], _OWNER_WALLET.lower())
+        with self.assertRaises(RegistrationAuthError):
+            ext.register_agent_record(
+                _rereg_body("reg-claim-02", signer=_ATTACKER,
                             wallet=_OWNER_WALLET))
 
     # -- transfer policy ------------------------------------------------------
@@ -203,7 +215,7 @@ class RegistrationIdentityTests(unittest.TestCase):
                 "transfer_signature": sig, "transfer_ts": ts})
 
     def test_transfer_without_owner_rejected(self):
-        ext.register_agent_record(_body("reg-xfer-03"))  # grandfathered, no owner
+        ext.register_agent_record(_body("reg-xfer-03", wallet=""))  # no owner
         new_wallet = Account.create().address
         sig, ts = self._transfer_sig("reg-xfer-03", new_wallet, _OWNER)
         with self.assertRaises(PermissionError):

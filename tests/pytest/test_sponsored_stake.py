@@ -53,7 +53,7 @@ def client(ledgers):
 
 def _register(client, agent_id=AGENT):
     r = client.post("/v1/a2a/register", json={
-        "agent_id": agent_id, "capability_tags": TAGS, "wallet": WALLET,
+        "agent_id": agent_id, "capability_tags": TAGS,
         "rpc_callback": "https://sponsored.example/rpc"})
     assert r.status_code == 201
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())

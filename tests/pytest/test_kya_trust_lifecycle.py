@@ -233,7 +233,7 @@ class KyaRevocationPropagationTests(unittest.TestCase):
         from sincor2 import a2a_inbound_ext as ext
 
         agent_id = "trust-probe-revoked"
-        snapshot = ext.register_agent_record(dict(FABRIC_AGENT, agent_id=agent_id))
+        snapshot = ext.register_agent_record({k: v for k, v in dict(FABRIC_AGENT, agent_id=agent_id).items() if k != 'wallet'})
         kya_id = snapshot.get("kya_id")
         self.assertTrue(kya_id, "registration should create a KYA record")
 
@@ -253,7 +253,7 @@ class KyaRevocationPropagationTests(unittest.TestCase):
         from sincor2 import a2a_inbound_ext as ext
 
         agent_id = "trust-probe-revoked-live"
-        ext.register_agent_record(dict(FABRIC_AGENT, agent_id=agent_id))
+        ext.register_agent_record({k: v for k, v in dict(FABRIC_AGENT, agent_id=agent_id).items() if k != 'wallet'})
         ext.heartbeat_agent(agent_id)  # make the fabric row live
         kya_id = kya.get_by_agent(agent_id)["kya_id"]
 
@@ -270,7 +270,7 @@ class KyaRevocationPropagationTests(unittest.TestCase):
         from sincor2 import a2a_inbound_ext as ext
 
         agent_id = "trust-probe-expired"
-        snapshot = ext.register_agent_record(dict(FABRIC_AGENT, agent_id=agent_id))
+        snapshot = ext.register_agent_record({k: v for k, v in dict(FABRIC_AGENT, agent_id=agent_id).items() if k != 'wallet'})
         kya_id = snapshot.get("kya_id")
         self.assertTrue(kya_id, "registration should create a KYA record")
 
@@ -297,7 +297,7 @@ class KyaRevocationPropagationTests(unittest.TestCase):
         from sincor2 import a2a_inbound_ext as ext
 
         agent_id = "trust-probe-kya-down"
-        ext.register_agent_record(dict(FABRIC_AGENT, agent_id=agent_id))
+        ext.register_agent_record({k: v for k, v in dict(FABRIC_AGENT, agent_id=agent_id).items() if k != 'wallet'})
 
         with mock.patch(
             "sincor2.kya_registry.live_statuses",

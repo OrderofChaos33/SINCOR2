@@ -24,7 +24,13 @@ from sincor2.a2a_sdk import (
 
 AGENT = "sdk-agent-1"
 TAGS = ["lead-enrichment"]
-WALLET = "0x" + "22" * 20
+
+
+def _agent_key():
+    # Real key per agent: first-time wallet claims require a valid EIP-191
+    # proof (C3 fail-closed), so the SDK signs with the claimed wallet's key.
+    from eth_account import Account
+    return Account.create()
 
 
 @pytest.fixture
@@ -42,9 +48,10 @@ def sdk(tmp_path):
     return SincorAgentSDK(FlaskTestTransport(app.test_client()))
 
 
-def _onboard(sdk, agent_id=AGENT, stake_axm=2.0):
+def _onboard(sdk, agent_id=AGENT, stake_axm=2.0, key=None):
+    key = key or _agent_key()
     reg = sdk.register(
-        agent_id, "SDK Agent", TAGS, wallet=WALLET,
+        agent_id, "SDK Agent", TAGS, wallet=key.address, signer=key,
         rpc_callback="https://sdk-agent.example/rpc")
     assert reg["status"] == "registered"
     hb = sdk.heartbeat(agent_id, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
@@ -153,7 +160,8 @@ def test_sdk_commitment_mismatch_rejected(sdk):
 
 
 def test_sdk_commit_without_stake_rejected(sdk):
-    sdk.register(AGENT, "Broke Agent", TAGS, wallet=WALLET)
+    key = _agent_key()
+    sdk.register(AGENT, "Broke Agent", TAGS, wallet=key.address, signer=key)
     sdk.heartbeat(AGENT, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     task_id = _sealed_task(sdk)
     with pytest.raises(SDKError) as exc:
@@ -168,7 +176,7 @@ def test_sdk_registration_is_earned_only(sdk, tmp_path):
     client = sdk.t._client
     r = client.post("/v1/a2a/register", json={
         "agent_id": "sdk-earned-1", "capability_tags": TAGS,
-        "wallet": WALLET, "reputation": 9.9,
+        "reputation": 9.9,
     })
     assert r.status_code == 201
     agent = get_fabric().agents["sdk-earned-1"]

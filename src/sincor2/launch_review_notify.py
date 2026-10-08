@@ -132,7 +132,7 @@ def send_launch_review_reminder() -> dict:
             log_dir = _PROJECT_ROOT / "logs" / "ops"
             log_dir.mkdir(parents=True, exist_ok=True)
             (log_dir / "review_reminder_latest.txt").write_text(text_body, encoding="utf-8")
-            return {"ok": True, "mode": "stub", "to": to_email, "pending": count}
+            return {"ok": True, "mode": "stub", "delivered": False, "status": "not_sent", "to": to_email, "pending": count}
         return {"ok": False, "error": result.get("error"), "to": to_email}
     except Exception as e:
         logger.error("[REVIEW_REMINDER] Failed: %s", e, exc_info=True)
