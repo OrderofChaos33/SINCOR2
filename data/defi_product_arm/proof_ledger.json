@@ -192,7 +192,11 @@
         "passed": 24,
         "failed": 0,
         "suite": "test_p01_vault_units.py",
-        "scope": "vault allocator: caps, fees, risk tiers, rebalance plans, dry-run intents"
+        "scope": "vault allocator: caps, fees, risk tiers, rebalance plans, dry-run intents",
+        "status": "superseded",
+        "superseded_by": "SINCOR-DEFI-P01-VAULT",
+        "supersede_reason": "pre-canon SKU from xioix/sku-defi-p01-p07; P01's canonical SKU is P01-VAULT per products.SLUGS",
+        "superseded_by_wave": "xioix/buildout-26-ledger-hygiene"
       }
     },
     {
@@ -252,7 +256,11 @@
         "passed": 28,
         "failed": 0,
         "suite": "test_p05_insurance_units.py",
-        "scope": "stale-score enforcement in buy_cover (7,200-block rule now on the underwriting path), protocol-bound scores, claims, reserve floor, live gate"
+        "scope": "stale-score enforcement in buy_cover (7,200-block rule now on the underwriting path), protocol-bound scores, claims, reserve floor, live gate",
+        "status": "superseded",
+        "superseded_by": "SINCOR-DEFI-P05-MUTUAL",
+        "supersede_reason": "pre-canon SKU from xioix/sku-defi-p01-p07; P05's canonical SKU is P05-MUTUAL per products.SLUGS",
+        "superseded_by_wave": "xioix/buildout-26-ledger-hygiene"
       }
     },
     {
@@ -297,7 +305,11 @@
         "passed": 1,
         "failed": 0,
         "suite": "seeded fuzz",
-        "scope": "test_fuzzed_op_sequences_never_breach_floor: 500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused"
+        "scope": "test_fuzzed_op_sequences_never_breach_floor: 500 seeded op sequences; reserve floor never breached; oracle-stale and stale-score paths refused",
+        "status": "superseded",
+        "superseded_by": "SINCOR-DEFI-P05-MUTUAL",
+        "supersede_reason": "pre-canon SKU from xioix/sku-defi-p01-p07; P05's canonical SKU is P05-MUTUAL per products.SLUGS",
+        "superseded_by_wave": "xioix/buildout-26-ledger-hygiene"
       }
     },
     {
@@ -1826,6 +1838,30 @@
         "scope": "DeFi OS meta-layer: telemetry ingest/latest exactness, killswitch advisory-only fuzz (negative ROI always KILL_TICK, never executed, self/unknown fail-closed), ranker score decomposition 0.5*realized+0.3*catalog+0.2*evidence exact + honest confidence labels (no-evidence protocols 'unproven', never 'proven'), feedback weights purity, proof hooks + serializable decision package, posture partition of the 25-protocol universe. Seeded RNG 0xA02626.",
         "passed": 8,
         "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_56a90bcd033a",
+      "sku": "SINCOR-DEFI-P01-YIELD",
+      "kind": "note",
+      "timestamp": 1790729521.3542407,
+      "commit": null,
+      "recorded_by": "xioix/buildout-26-ledger-hygiene",
+      "details": {
+        "note": "Ledger hygiene (2026-09-30, xioix/buildout-26-ledger-hygiene): all 1 entries under stale SKU SINCOR-DEFI-P01-YIELD marked superseded -> SINCOR-DEFI-P01-VAULT. The underlying test runs were genuine (see details); only the SKU key was pre-canonical. Canonical SKU holds re-recorded evidence (waves 20/21). Gates match canonical SKUs only and now explicitly exclude status='superseded' entries via gates._is_superseded.",
+        "superseded_by": "SINCOR-DEFI-P01-VAULT"
+      }
+    },
+    {
+      "entry_id": "ev_7d0e2500be32",
+      "sku": "SINCOR-DEFI-P05-INSURANCE",
+      "kind": "note",
+      "timestamp": 1790729521.355849,
+      "commit": null,
+      "recorded_by": "xioix/buildout-26-ledger-hygiene",
+      "details": {
+        "note": "Ledger hygiene (2026-09-30, xioix/buildout-26-ledger-hygiene): all 2 entries under stale SKU SINCOR-DEFI-P05-INSURANCE marked superseded -> SINCOR-DEFI-P05-MUTUAL. The underlying test runs were genuine (see details); only the SKU key was pre-canonical. Canonical SKU holds re-recorded evidence (waves 20/21). Gates match canonical SKUs only and now explicitly exclude status='superseded' entries via gates._is_superseded.",
+        "superseded_by": "SINCOR-DEFI-P05-MUTUAL"
       }
     }
   ]
