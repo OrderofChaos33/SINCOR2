@@ -1862,7 +1862,11 @@ class PaymentVerifier:
     _TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
     _verified: Dict[str, bool] = {}
+    _amounts: Dict[str, int] = {}
     _lock: threading.Lock = threading.Lock()
+
+    class PaymentRpcError(RuntimeError):
+        """Raised when the payment amount cannot be read (transient RPC failure)."""
 
     @classmethod
     def is_verified(cls, tx_hash: str, expected_amount_wei: int,
@@ -1900,11 +1904,34 @@ class PaymentVerifier:
         whose `to` address matches *expected_to* and whose value is at least
         *expected_amount_wei*.
         """
+        ok = cls._sum_transfer_value(logs, expected_to) >= expected_amount_wei
+        if not ok:
+            logger.warning(
+                "PaymentVerifier: no qualifying AXM Transfer log found in tx; "
+                "expected ≥%d wei to %s from contract %s",
+                expected_amount_wei, expected_to, AXIOM_CONTRACT,
+            )
+        return ok
+
+    @classmethod
+    def _sum_transfer_value(
+        cls,
+        logs: List[Dict[str, Any]],
+        expected_to: str,
+    ) -> int:
+        """
+        Sum of AXM Transfer values to *expected_to* across all receipt logs.
+
+        Only Transfer(address,address,uint256) events emitted by the AXM
+        contract with `to` == *expected_to* count. This is the actual amount
+        the treasury received — never a caller claim.
+        """
         axm_addr = AXIOM_CONTRACT.lower()
         expected_to_norm = expected_to.lower()
         # Transfer(address indexed from, address indexed to, uint256 value)
         # topics[0] = event sig, topics[1] = from, topics[2] = to
         # data = value (32-byte big-endian hex)
+        total = 0
         for log in logs:
             if log.get("address", "").lower() != axm_addr:
                 continue
@@ -1920,14 +1947,59 @@ class PaymentVerifier:
                 value = int(raw_value, 16)
             except ValueError:
                 continue
-            if value >= expected_amount_wei:
-                return True
-        logger.warning(
-            "PaymentVerifier: no qualifying AXM Transfer log found in tx; "
-            "expected ≥%d wei to %s from contract %s",
-            expected_amount_wei, expected_to, AXIOM_CONTRACT,
-        )
-        return False
+            total += value
+        return total
+
+    @classmethod
+    def verified_amount_wei(cls, tx_hash: str,
+                            expected_to: str = TREASURY_WALLET) -> Optional[int]:
+        """
+        Return the actual AXM wei transferred to *expected_to* in *tx_hash*,
+        read from the confirmed receipt's Transfer logs.
+
+        Returns None when the amount cannot be determined without chain
+        access (non-production env, simulated tx, malformed hash, or a failed
+        receipt). Raises PaymentRpcError on transient RPC failure — callers
+        must fail closed, not fall back to a caller-supplied claim.
+        """
+        env = os.getenv("FLASK_ENV", "production").lower()
+        if env in _DEV_ENVS:
+            return None
+
+        if (not tx_hash or not str(tx_hash).startswith("0x")
+                or str(tx_hash).startswith("0xSIMULATED")):
+            return None
+
+        with cls._lock:
+            if tx_hash in cls._amounts:
+                return cls._amounts[tx_hash]
+
+        rpc_url = os.getenv("BASE_RPC_URL")
+        if not rpc_url:
+            raise cls.PaymentRpcError("BASE_RPC_URL not set")
+
+        try:
+            payload = json.dumps({
+                "jsonrpc": "2.0", "id": 1,
+                "method":  "eth_getTransactionReceipt",
+                "params":  [tx_hash],
+            }).encode()
+            with _urllib_request.urlopen(_urllib_request.Request(
+                rpc_url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            ), timeout=BASE_RPC_TIMEOUT) as resp:
+                data = json.loads(resp.read())
+            receipt = data.get("result")
+        except Exception as exc:
+            raise cls.PaymentRpcError(f"RPC error: {exc}") from exc
+
+        if not receipt or receipt.get("status") != "0x1":
+            return None
+        amount = cls._sum_transfer_value(receipt.get("logs", []), expected_to)
+        with cls._lock:
+            cls._amounts[tx_hash] = amount
+        return amount
 
     @classmethod
     def verified_tx_data(cls, tx_hash: str, expected_amount_wei: int,
@@ -2948,6 +3020,42 @@ def _extract_send_params(body: Dict[str, Any]):
             tx_hash, axm_paid, history_length)
 
 
+def _reconcile_axm_paid(tx_hash: Optional[str], claimed_wei: int,
+                       rpc_id: Any) -> tuple:
+    """Reconcile a caller-supplied axmPaidWei against the chain.
+
+    The on-chain Transfer total (via PaymentVerifier.verified_amount_wei)
+    always wins over the claim; a mismatch is corrected and logged. When the
+    chain cannot be read (dev/test bypass, simulated tx) the claim is kept.
+    A transient RPC outage fails closed with a -32001 error — never with the
+    untrusted claim.
+
+    Returns (amount_wei, error_dict_or_None).
+    """
+    if not tx_hash:
+        return claimed_wei, None
+    try:
+        chain_amount = PaymentVerifier.verified_amount_wei(tx_hash)
+    except PaymentVerifier.PaymentRpcError as exc:
+        logger.error(
+            "A2A payment amount unreadable for tx %s: %s", tx_hash, exc,
+        )
+        return None, _err(
+            f"Payment tx {tx_hash} amount could not be verified on Base. "
+            "Retry once the network is reachable.",
+            code=-32001, rpc_id=rpc_id,
+        )
+    if chain_amount is None:
+        return claimed_wei, None
+    if chain_amount != claimed_wei:
+        logger.warning(
+            "A2A payment amount corrected: caller claimed %d wei, "
+            "chain shows %d wei (tx %s)",
+            claimed_wei, chain_amount, tx_hash,
+        )
+    return chain_amount, None
+
+
 def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     """Handle message/send (and legacy tasks/send) JSON-RPC call."""
     (rpc_id, skill_id, context_id, caller_id, input_text,
@@ -3053,9 +3161,22 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
                 "Ensure the transfer is confirmed (≥1 block).",
                 code=-32001, rpc_id=rpc_id,
             )
+        # G2.5: never trust the caller's axmPaidWei — record the chain amount.
+        axm_paid, pay_err = _reconcile_axm_paid(tx_hash, axm_paid, rpc_id)
+        if pay_err:
+            return pay_err
 
     # Consume free quota before dispatch
     if free_call:
+        # G2.5: a free call carries no verified payment — recording the
+        # caller's axmPaidWei claim would be fiction (and an oversized claim
+        # overflows downstream INTEGER columns). Record zero.
+        if axm_paid:
+            logger.info(
+                "A2A free call: ignoring caller-supplied axmPaidWei=%d",
+                axm_paid,
+            )
+        axm_paid = 0
         _free_quota_tracker.consume(caller_id, skill_id)
 
     # --- Create task & enqueue (never block the gunicorn worker) ----------
@@ -3394,6 +3515,11 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
             yield _sse_event(_err(
                 f"Payment tx {tx_hash} unverified on Base.", -32001, rpc_id
             ))
+            return
+        # G2.5: never trust the caller's axmPaidWei — record the chain amount.
+        axm_paid, pay_err = _reconcile_axm_paid(tx_hash, axm_paid, rpc_id)
+        if pay_err:
+            yield _sse_event(pay_err)
             return
 
     # Verified caller identity (same EIP-191 scheme as message/send).
