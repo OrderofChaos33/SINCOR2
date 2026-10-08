@@ -55,6 +55,12 @@ from sincor2.a2a_inbound import (
     _apply_reputation,
     get_fabric,
 )
+from sincor2.a2a_rate_limits import (
+    STREAM_IDLE_TIMEOUT_S,
+    STREAM_KEEPALIVE_S,
+    STREAM_MAX_PER_CALLER,
+    check_stream_auth,
+)
 from sincor2.a2a_timeouts import assignment_deadline_ms
 from sincor2.a2a_idempotency import idempotent
 # Grandfathered plaintext scoring for non-sealed tasks (pre-shim clients).
@@ -961,6 +967,50 @@ def _require_pool_admin():
 
 
 # ---------------------------------------------------------------------------
+# SSE stream slot accounting (G2.10)
+# ---------------------------------------------------------------------------
+# Each open stream holds a worker thread for up to STREAM_IDLE_TIMEOUT_S, so
+# unauthenticated / unbounded streams are a worker-exhaustion vector. Slots
+# are tracked per authenticated caller key (see check_stream_auth) under one
+# lock; the generator releases its slot in a finally block so disconnects,
+# timeouts, and errors all free the slot. Test hook: reset_stream_slots().
+
+_STREAM_SLOTS: Dict[str, int] = {}
+_STREAM_LOCK = threading.Lock()
+
+
+def acquire_stream_slot(caller_key: str) -> bool:
+    """Take one stream slot for caller_key. False when the caller is at cap."""
+    with _STREAM_LOCK:
+        n = _STREAM_SLOTS.get(caller_key, 0)
+        if n >= STREAM_MAX_PER_CALLER:
+            return False
+        _STREAM_SLOTS[caller_key] = n + 1
+        return True
+
+
+def release_stream_slot(caller_key: str) -> None:
+    """Release one stream slot. Safe to call more often than acquire."""
+    with _STREAM_LOCK:
+        n = _STREAM_SLOTS.get(caller_key, 0)
+        if n <= 1:
+            _STREAM_SLOTS.pop(caller_key, None)
+        else:
+            _STREAM_SLOTS[caller_key] = n - 1
+
+
+def stream_slot_count(caller_key: str) -> int:
+    with _STREAM_LOCK:
+        return _STREAM_SLOTS.get(caller_key, 0)
+
+
+def reset_stream_slots() -> None:
+    """Clear all stream slots. Test isolation hook — call between tests."""
+    with _STREAM_LOCK:
+        _STREAM_SLOTS.clear()
+
+
+# ---------------------------------------------------------------------------
 # P24 SocialFi issuance support (route: POST /v1/a2a/socialfi/issue)
 # ---------------------------------------------------------------------------
 
@@ -1784,36 +1834,81 @@ def attach_market_routes(bp: Blueprint) -> None:
     @bp.get("/v1/a2a/stream")
     @bp.get("/api/v1/stream")
     def v1_stream():
+        # G2.10: the stream is authenticated and concurrency-capped. Each
+        # open connection holds a worker thread for up to
+        # STREAM_IDLE_TIMEOUT_S, so without the cap a single caller opening
+        # ~100 connections could starve the worker pool.
+        authed, caller_key = check_stream_auth()
+        if not authed:
+            return _http_error(
+                "unauthorized: stream requires the operator token "
+                "(X-Sincor-Heartbeat header or Authorization: Bearer) or a "
+                "registered agent_id (agent_id query param / X-Agent-Id header)",
+                401,
+            )
+        if not acquire_stream_slot(caller_key):
+            resp = jsonify({
+                "error": "stream_busy",
+                "status": 503,
+                "detail": (
+                    "too many concurrent streams for this caller "
+                    f"(max {STREAM_MAX_PER_CALLER})"
+                ),
+            })
+            resp.status_code = 503
+            resp.headers["Retry-After"] = "5"
+            return resp
+
         wanted = {t.strip().lower() for t in (request.args.get("tags") or "").split(",") if t.strip()}
 
-        def _gen():
-            fabric = get_fabric()
-            last = 0
-            idle = 0
-            yield ": inbound stream\n\n"
-            while idle < 120:
-                batch = []
-                with fabric.lock:
-                    for ev in fabric.events:
-                        if ev["seq"] > last:
-                            tags = {x.lower() for x in ev.get("tags") or []}
-                            if not wanted or wanted.intersection(tags):
-                                batch.append(ev)
-                            last = max(last, ev["seq"])
-                if batch:
-                    idle = 0
-                    for ev in batch:
-                        yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
-                else:
-                    idle += 1
-                    yield ": keepalive\n\n"
-                time.sleep(2)
+        # Exactly-once slot release. The generator's finally covers the
+        # normal path (server iterates to idle-timeout / disconnect), but if
+        # the WSGI server closes the response without ever iterating the
+        # generator (client gone before the first byte), the finally never
+        # runs — call_on_close covers that path. The guard prevents a
+        # double release from freeing another connection's slot.
+        stream_state = {"released": False}
 
-        return Response(
+        def _release_once() -> None:
+            if not stream_state["released"]:
+                stream_state["released"] = True
+                release_stream_slot(caller_key)
+
+        def _gen():
+            try:
+                fabric = get_fabric()
+                last = 0
+                idle = 0
+                yield ": inbound stream\n\n"
+                while idle < STREAM_IDLE_TIMEOUT_S // STREAM_KEEPALIVE_S:
+                    batch = []
+                    with fabric.lock:
+                        for ev in fabric.events:
+                            if ev["seq"] > last:
+                                tags = {x.lower() for x in ev.get("tags") or []}
+                                if not wanted or wanted.intersection(tags):
+                                    batch.append(ev)
+                                last = max(last, ev["seq"])
+                    if batch:
+                        idle = 0
+                        for ev in batch:
+                            yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
+                    else:
+                        idle += 1
+                        yield ": keepalive\n\n"
+                    time.sleep(STREAM_KEEPALIVE_S)
+            finally:
+                # Always free the slot: client disconnect, idle timeout,
+                # generator close, or an error mid-stream.
+                _release_once()
+
+        resp = Response(
             stream_with_context(_gen()),
             mimetype="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
         )
+        resp.call_on_close(_release_once)
+        return resp
 
     # Sponsored stake (genesis cohort): admin-gated, default off. The
     # mechanism lives in sincor2.sponsored_stake; the routes are attached
