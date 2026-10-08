@@ -34,6 +34,12 @@ from sincor2.a2a_inbound import (
     health_snapshot,
 )
 
+from sincor2.a2a_identity import (
+    register_message as _register_message,
+    transfer_message as _transfer_message,
+    verify_wallet_proof as _verify_wallet_proof,
+)
+
 logger = logging.getLogger("sincor.a2a.inbound")
 _HEARTBEAT_THREAD = None
 
@@ -120,6 +126,53 @@ def _require_heartbeat_auth(agent_id: str, body: Dict[str, Any]) -> None:
     signer = _recover_heartbeat_signer(build_heartbeat_message(agent_id, ts), signature)
     if signer.lower() != wallet.lower():
         raise HeartbeatAuthError("heartbeat signature is not from the registered wallet")
+
+
+# ---------------------------------------------------------------------------
+# First-registration squatting control (wave 32)
+# ---------------------------------------------------------------------------
+#
+# SOURCE OF THE PROTECTED LIST: protocol-reserved names (the platform agent id,
+# service/system names) plus obvious brand-impersonation names. The list is
+# explicit and reviewable in this module — never a hidden blocklist. It lives
+# in code (not a config file) so a change is a reviewable diff.
+PROTECTED_AGENT_IDS = frozenset({
+    # Protocol / platform reserved
+    "sincor", "sincor-platform", "sincor-agent-swarm", "sincor-team",
+    "sadas", "axiom",
+    # Service / system impersonation
+    "admin", "administrator", "system", "root", "official", "support",
+    "help", "security", "moderator", "treasury", "platform", "genesis",
+    "foundation", "team", "staff",
+})
+
+# Any agent_id that is exactly "sincor" or starts with the "sincor-" prefix
+# (case-insensitive) is reserved for the protocol, in addition to the list.
+_PROTECTED_PREFIXES = ("sincor",)
+
+
+def _is_protected_agent_id(agent_id: str) -> bool:
+    lowered = str(agent_id).strip().lower()
+    if lowered in PROTECTED_AGENT_IDS:
+        return True
+    return any(lowered == p or lowered.startswith(p + "-") or lowered.startswith(p + "_")
+               or lowered.startswith(p + ".") for p in _PROTECTED_PREFIXES)
+
+
+def _registration_proof_required() -> bool:
+    """Hard-reject mode: set SINCOR_REGISTRATION_PROOF_REQUIRED=1 in
+    production to refuse unverified claims outright. Default (unset) marks
+    unverified claims as untrusted instead, preserving existing clients."""
+    return str(os.environ.get("SINCOR_REGISTRATION_PROOF_REQUIRED") or "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _extract_registration_proof(body: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "signature": body.get("registration_signature") or body.get("signature") or "",
+        "wallet": body.get("registration_wallet") or body.get("wallet") or "",
+        "ts": body.get("registration_ts") or body.get("reg_ts") or body.get("timestamp"),
+    }
 
 
 def _kya_listed(agent: Dict[str, Any]) -> None:
@@ -236,6 +289,21 @@ def register_agent_record(body: Dict[str, Any],
     reputation at registration time is the internal platform seed, via
     ``_internal_reputation`` — the HTTP route never passes it.
 
+    First-registration squatting control (wave 32):
+
+    * Protected names (``PROTECTED_AGENT_IDS`` + the ``sincor`` prefix rule)
+      are refused for new registrations.
+    * A new claim may present a wallet-identity proof: an EIP-191 signature
+      over ``SINCOR-REGISTER|<agent_id>|<timestamp_ms>`` with a mandatory
+      wallet claim equal to the recovered signer (see ``a2a_identity``).
+      Verified claims bind ``owner_wallet`` and set ``identity="verified"``.
+    * Unverified claims are accepted but marked ``identity="unverified"``
+      (grace for existing clients); set
+      ``SINCOR_REGISTRATION_PROOF_REQUIRED=1`` to refuse them outright.
+    * A claim on an owned id by a *different* wallet is rejected — a valid
+      signature from the non-owner never transfers ownership (transfers go
+      through ``transfer_agent_record``).
+
     Re-registration (any update to an existing record) requires proof of
     control: an EIP-191 signature by the currently registered wallet over
     the exact new record contents plus a fresh ``registration_ts``
@@ -246,13 +314,20 @@ def register_agent_record(body: Dict[str, Any],
     agent_id = parsed["agent_id"]
     if not _AGENT_ID_RE.match(agent_id):
         raise ValueError("agent_id must be 1-128 chars of A-Za-z0-9._:-")
-    if agent_id == _PLATFORM_AGENT_ID and _internal_reputation is None:
+    if _internal_reputation is None and _is_protected_agent_id(agent_id):
         # The platform agent is seeded internally at startup; it cannot be
         # registered (or have its wallet/callback overwritten) via the API.
         raise ValueError("reserved agent_id")
     wallet = parsed["wallet"]
     if wallet and not _WALLET_RE.match(wallet):
         raise ValueError("wallet must be a 0x-prefixed 20-byte hex address")
+    proof = _extract_registration_proof(body)
+    verified_wallet = _verify_wallet_proof(
+        message=_register_message(agent_id, proof["ts"] or 0),
+        signature=proof["signature"],
+        wallet=proof["wallet"],
+        timestamp_ms=proof["ts"],
+    )
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:
@@ -261,6 +336,28 @@ def register_agent_record(body: Dict[str, Any],
         existing = fabric.agents.get(agent_id) or {}
         if existing and _internal_reputation is None:
             _require_reregistration_proof(existing, parsed, body)
+        if _internal_reputation is not None:
+            # Internal platform seed: bypasses proof, identity is "internal".
+            owner = ""
+            identity = "internal"
+        elif existing:
+            # Re-registration: proof of control already enforced above via
+            # _require_reregistration_proof (fail-closed). The bound owner
+            # wallet stays with the record; identity is verified.
+            owner = str(existing.get("owner_wallet")
+                        or existing.get("wallet") or "").lower()
+            identity = "verified"
+        else:
+            # New claim (wave 32 squatting control): a verified
+            # wallet-identity proof binds owner_wallet.
+            if verified_wallet:
+                owner = verified_wallet
+                identity = "verified"
+            elif _registration_proof_required():
+                raise PermissionError("registration proof required")
+            else:
+                owner = ""
+                identity = "unverified"
         if _internal_reputation is not None:
             reputation = float(_internal_reputation)
         else:
@@ -277,6 +374,10 @@ def register_agent_record(body: Dict[str, Any],
             "chain_id": parsed["chain_id"],
             "sinc_staked": parsed["sinc_stake"],
             "reputation": reputation,
+            # First-registration identity (wave 32): the wallet bound at
+            # claim time, and whether the binding was signature-verified.
+            "owner_wallet": owner,
+            "identity": identity,
             "sponsored": bool(existing.get("sponsored", True)),
             "last_heartbeat": ts,
             "registered_at": int(existing.get("registered_at") or ts),
@@ -301,6 +402,59 @@ def register_agent_record(body: Dict[str, Any],
                 live["kya_id"] = snapshot["kya_id"]
                 live["kya_status"] = snapshot.get("kya_status")
         _save_agents(fabric)
+    return snapshot
+
+
+def transfer_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Transfer an agent_id to a new owner wallet.
+
+    Transfer policy (wave 32): only the current owner wallet can initiate a
+    transfer, by presenting a fresh EIP-191 signature over the canonical
+    transfer message ``SINCOR-TRANSFER|<agent_id>|<new_wallet>|<timestamp_ms>``
+    (see ``a2a_identity``). The new wallet becomes ``owner_wallet`` and the
+    record's declared ``wallet``; ``identity`` becomes ``"verified"``.
+
+    Records without an owner (grandfathered, pre-ownership) cannot be
+    transferred until ownership is first claimed via a signed
+    re-registration. A transfer signature from any wallet other than the
+    current owner is rejected — there is no admin override path.
+
+    Raises: ValueError (bad input) → 400; PermissionError → 403;
+    KeyError (unknown agent) → 404.
+    """
+    agent_id = str(body.get("agent_id") or "").strip()
+    new_wallet = str(body.get("new_wallet") or body.get("wallet") or "").strip()
+    if not agent_id:
+        raise ValueError("agent_id is required")
+    if not new_wallet or not _WALLET_RE.match(new_wallet):
+        raise ValueError("new_wallet must be a 0x-prefixed 20-byte hex address")
+    signature = body.get("transfer_signature") or body.get("signature") or ""
+    ts = body.get("transfer_ts") or body.get("timestamp")
+    fabric = get_fabric()
+    with fabric.lock:
+        existing = fabric.agents.get(agent_id)
+        if not existing:
+            raise KeyError(agent_id)
+        owner = str(existing.get("owner_wallet") or "").lower()
+        if not owner:
+            raise PermissionError(
+                "agent_id has no owner yet; claim it with a signed re-registration first")
+        recovered = _verify_wallet_proof(
+            message=_transfer_message(agent_id, new_wallet, ts or 0),
+            signature=signature,
+            wallet=owner,
+            timestamp_ms=ts,
+        )
+        if not recovered or recovered != owner:
+            raise PermissionError("transfer requires the current owner wallet signature")
+        existing["owner_wallet"] = new_wallet.lower()
+        existing["identity"] = "verified"
+        existing["wallet"] = new_wallet.lower()
+        snapshot = dict(existing)
+    _save_agents(fabric)
+    fabric.publish("agent.transferred",
+                   list(snapshot.get("capability_tags") or []),
+                   {"agent_id": agent_id, "owner_wallet": snapshot["owner_wallet"]})
     return snapshot
 
 
@@ -424,6 +578,8 @@ def mount(app: Flask) -> bool:
             return _http_error(str(err), 403)
         except ValueError as err:
             return _http_error(str(err), 400)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
         except OverflowError as err:
             return _http_error(str(err), 503)
         return jsonify({
@@ -435,6 +591,8 @@ def mount(app: Flask) -> bool:
             "stream_url": "/v1/a2a/stream",
             "kya_id": agent.get("kya_id"),
             "kya_status": agent.get("kya_status"),
+            "identity": agent.get("identity"),
+            "owner_wallet": agent.get("owner_wallet"),
             # Re-registration is proof-gated: any later update to this
             # record must carry registration_signature (EIP-191, by the
             # registered wallet) + registration_ts over the message built
@@ -446,6 +604,24 @@ def mount(app: Flask) -> bool:
                 "freshness_ms": REGISTRATION_PROOF_FRESHNESS_MS,
             },
         }), 201
+
+    @bp.post("/v1/a2a/transfer")
+    def v1_transfer():
+        body = request.get_json(silent=True) or {}
+        try:
+            agent = transfer_agent_record(body)
+        except ValueError as err:
+            return _http_error(str(err), 400)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
+        except KeyError:
+            return _http_error("unknown agent", 404)
+        return jsonify({
+            "agent_id": agent["agent_id"],
+            "status": "transferred",
+            "owner_wallet": agent.get("owner_wallet"),
+            "identity": agent.get("identity"),
+        }), 200
 
     @bp.post("/v1/a2a/heartbeat")
     def v1_heartbeat():
