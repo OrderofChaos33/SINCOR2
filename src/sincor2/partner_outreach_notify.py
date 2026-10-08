@@ -112,7 +112,7 @@ def send_partner_outreach_reminder() -> dict:
             logger.info("[PARTNER_REMINDER] Sent to %s due=%s", to_email, count)
             return {"ok": True, "due": count, "email": to_email, "result": result}
         logger.info("[PARTNER_REMINDER] stub — %s due=%s", subject, count)
-        return {"ok": True, "stub": True, "due": count, "subject": subject}
+        return {"ok": True, "stub": True, "delivered": False, "status": "not_sent", "due": count, "subject": subject}
     except Exception as e:
         logger.error("[PARTNER_REMINDER] failed: %s", e)
         return {"ok": False, "error": str(e)}
