@@ -63,6 +63,13 @@ from sincor2.a2a_rate_limits import (
 )
 from sincor2.a2a_timeouts import assignment_deadline_ms
 from sincor2.a2a_idempotency import idempotent
+from sincor2.dispute_evidence import (
+    DisputeEvidence,
+    build_evidence,
+    evidence_to_dict,
+    validate_dispute_evidence,
+    verify_content_binding_sig,
+)
 # Grandfathered plaintext scoring for non-sealed tasks (pre-shim clients).
 # Canonical money path is marketplace.contract_net — see
 # docs/architecture/CANONICAL_PATHS.md §1.
@@ -853,11 +860,25 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
         agent = fabric.agents.get(agent_id) or {}
         amount = float(task.get("winning_bid_axm") or task.get("bounty_axm") or 0)
         wallet = str(agent.get("wallet") or agent_id)
+        if bound is not None and bound.content_binding_sig:
+            # Fail closed on forged attribution: a bound signature must
+            # recover to the agent's registered wallet.
+            verify_content_binding_sig(bound, wallet)
         proof_id = "prf_" + uuid.uuid4().hex[:10]
         task["state"] = "proof_submitted"
         task["proof_id"] = proof_id
         tags = list(task.get("tags") or [])
     receipt = stage_payout(agent_id=agent_id, wallet=wallet, amount_axm=amount, task_id=task_id, receipt_hash=receipt_hash)
+    # Funding-graph linkage: a shared-wallet cluster (>1 identity on the
+    # payout wallet) is flagged on the payout record itself. Clusters at
+    # quarantine size never reach here — they were blocked above.
+    if qcheck["flagged"]:
+        receipt["sybil"] = {
+            "flagged": True,
+            "wallet": qcheck["wallet"],
+            "cluster_size": qcheck["cluster_size"],
+            "cluster": qcheck["cluster"],
+        }
     with fabric.lock:
         task = fabric.tasks.get(task_id) or {}
         task["state"] = "settled" if receipt.get("ok") else "failed"
@@ -877,8 +898,15 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
             "submitted_at": ts,
             "settled_at": ts,
             "payout": receipt,
+            # Receipt-content binding (item 77): None when the winner
+            # submitted a bare receipt; the adjudicator then has no
+            # deliverable to recompute against.
+            "content_bound": bound is not None,
+            "evidence": evidence_to_dict(bound) if bound else None,
         }
         fabric.proofs[proof_id] = proof
+        if bound is not None:
+            task["deliverable_evidence"] = evidence_to_dict(bound)
         snap = dict(proof)
     # The winner's stake lock survives the auction; it releases here on
     # successful settlement.  A failed settlement keeps the lock so the
@@ -1445,9 +1473,22 @@ def attach_market_routes(bp: Blueprint) -> None:
     @bp.post("/v1/a2a/proofs")
     @bp.post("/api/v1/proofs")
     def v1_proofs():
+        # Body: {task_id, agent_id, receipt_hash} plus optional
+        # receipt-content binding (item 77): either `deliverable` (raw
+        # content; hash is computed server-side) or a pre-built
+        # `evidence` mapping {payment_receipt_hash, deliverable_hash,
+        # deliverable_uri, content_binding_sig?}.  Receipt-only evidence
+        # is rejected fail-closed by validate_dispute_evidence.
         body = request.get_json(silent=True) or {}
+        kwargs: Dict[str, Any] = {}
+        if "deliverable" in body:
+            kwargs["deliverable"] = body.get("deliverable")
+            kwargs["deliverable_uri"] = body.get("deliverable_uri") or ""
+            kwargs["content_binding_sig"] = body.get("content_binding_sig") or ""
+        if body.get("evidence") is not None:
+            kwargs["evidence"] = body.get("evidence")
         try:
-            proof = submit_proof(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), str(body.get("receipt_hash") or ""))
+            proof = submit_proof(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), str(body.get("receipt_hash") or ""), **kwargs)
             return jsonify(proof), 202
         except ValueError as err:
             return _http_error(str(err), 400)

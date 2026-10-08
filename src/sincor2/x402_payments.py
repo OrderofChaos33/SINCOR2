@@ -17,6 +17,25 @@ vouchers are promises, not settlement, and batch settlement does NOT relax
 settle-before-serve.
 """
 
+# ---------------------------------------------------------------------------
+# CDP SDK integration notes (dev-watch item 78, 2026-10-08).
+#
+# CDP_SDK_PIN: there is NO cdp-sdk in requirements.txt / requirements.lock.
+# This module speaks the x402 wire protocol directly (challenge payloads)
+# and does not import the CDP SDK, so nothing is pinned here.  Pin cdp-sdk
+# in requirements BEFORE any live CdpX402Client/facilitator integration,
+# then re-run the explicit-network tests in
+# tests/pytest/test_cdp_explicit_networks.py against the pinned version.
+#
+# CDP 1.58.0 notes:
+#   * revoke-delegation moved DELETE -> POST; the old routes are deprecated
+#     and stop working 2026-10-22.  Any delegation-revocation flow built
+#     later must use POST.
+#   * new Mandates API (createMandate/getMandate/listMandates/
+#     cancelMandate/approveWalletMandate/revokeWalletMandate/
+#     authorizeMandatePaymentSession).  See MANDATES_API_WATCH below.
+# ---------------------------------------------------------------------------
+
 from __future__ import annotations
 
 import json
@@ -26,7 +45,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Final, Optional, Sequence
 
 import yaml
 
@@ -132,6 +151,110 @@ def list_resources() -> list[dict[str, Any]]:
     ]
 
 
+#: Fail-closed network allowlist for x402 payment routes.  From CDP SDK
+#: 1.56.0, a route with scheme "upto" and NO explicit networks expands to
+#: BOTH Base and Solana (previously Base-only).  Every route we construct
+#: must therefore carry an explicit networks list; :func:`build_route_config`
+#: is the only sanctioned constructor and it raises on None/empty.
+X402_NETWORKS_EXPLICIT: Final = ("base",)
+
+
+class MANDATES_API_WATCH:
+    """Design note (no code yet): the CDP Mandates API (1.58.0) is the
+    wallet-layer payment-session authorization primitive candidate for
+    the session-key work item.  When that work starts, prefer
+    authorizeMandatePaymentSession-scoped mandates over long-lived
+    delegation grants: sessions bound to a mandate are revocable in one
+    call (revokeWalletMandate) and carry explicit spend/network bounds,
+    which composes with the X402_NETWORKS_EXPLICIT allowlist above.
+    Tracked here so the primitive is evaluated, not silently skipped."""
+
+
+def build_route_config(
+    *,
+    scheme: str = "exact",
+    networks: Optional[Sequence[str]] = X402_NETWORKS_EXPLICIT,
+) -> dict[str, Any]:
+    """Build an x402 route config with explicit networks, fail closed.
+
+    ``networks`` defaults to :data:`X402_NETWORKS_EXPLICIT`; passing
+    ``None`` or an empty sequence raises ``ValueError`` -- we never rely
+    on SDK defaults, which from CDP 1.56.0 expand an "upto" route with no
+    networks to Base AND Solana.  All production route construction must
+    go through this function.
+    """
+    if networks is None or len(list(networks)) == 0:
+        raise ValueError(
+            "x402 route networks must be explicit (got None/empty); "
+            "refusing to rely on CDP SDK default network expansion"
+        )
+    seen: list[str] = []
+    for net in networks:
+        net = str(net).strip().lower()
+        if not net or net in seen:
+            continue
+        seen.append(net)
+    if not seen:
+        raise ValueError("x402 route networks must be explicit (all blank)")
+    return {"scheme": str(scheme), "networks": seen}
+
+
+def facilitator_route(
+    *,
+    scheme: str = "exact",
+    networks: Optional[Sequence[str]] = None,
+) -> dict[str, Any]:
+    """Seam for the future CdpX402Client/facilitator integration.
+
+    Intercepts ``networks=None`` BEFORE it reaches the SDK and substitutes
+    :data:`X402_NETWORKS_EXPLICIT`, so the SDK's default-expansion (Base +
+    Solana from 1.56.0 on an "upto" route with no networks) can never fire
+    on our behalf.  Callers pass the returned ``networks`` list explicitly
+    to the SDK call.
+    """
+    resolved: Optional[Sequence[str]] = (
+        X402_NETWORKS_EXPLICIT if networks is None else networks
+    )
+    return build_route_config(scheme=scheme, networks=resolved)
+
+
+def build_payment_payload(
+    resource: dict[str, Any],
+    resource_id: str,
+    challenge_id: str,
+    *,
+    scheme: str = "exact",
+) -> dict[str, Any]:
+    """Build the 402 payment payload for a resource.
+
+    The route (scheme + explicit networks) always comes from
+    :func:`build_route_config`; no code path constructs a route without
+    it.  ``networks`` (the full explicit list) is included alongside the
+    legacy singular ``network`` field so facilitators honoring the x402
+    v2 route format see the binding too.
+    """
+    route = build_route_config(scheme=scheme)
+    return {
+        "x402Version": 1,
+        "scheme": route["scheme"],
+        "network": route["networks"][0],
+        "networks": route["networks"],
+        "chainId": resource["chain_id"],
+        "maxAmountRequired": resource["amount_atomic"],
+        "resource": f"/x402/{resource_id}",
+        "description": resource["description"],
+        "payTo": resource["treasury"],
+        "asset": resource["token_address"],
+        "extra": {
+            "challenge_id": challenge_id,
+            "token": resource["token"],
+            "amount_display": resource["amount_display"],
+            "decimals": resource["token_decimals"],
+            "skill_id": resource.get("skill_id", ""),
+        },
+    }
+
+
 def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, Any]:
     resource = get_resource(resource_id)
     if not resource:
@@ -159,24 +282,7 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
         )
         conn.commit()
 
-    payload = {
-        "x402Version": 1,
-        "scheme": "exact",
-        "network": "base",
-        "chainId": resource["chain_id"],
-        "maxAmountRequired": resource["amount_atomic"],
-        "resource": f"/x402/{resource_id}",
-        "description": resource["description"],
-        "payTo": resource["treasury"],
-        "asset": resource["token_address"],
-        "extra": {
-            "challenge_id": challenge_id,
-            "token": resource["token"],
-            "amount_display": resource["amount_display"],
-            "decimals": resource["token_decimals"],
-            "skill_id": resource.get("skill_id", ""),
-        },
-    }
+    payload = build_payment_payload(resource, resource_id, challenge_id)
 
     return {
         "ok": False,
