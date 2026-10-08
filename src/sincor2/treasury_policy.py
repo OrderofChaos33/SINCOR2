@@ -10,6 +10,21 @@ Exception:
     profits in native AXM/SINC at defined intervals or profit thresholds.
 
 This module centralizes the logic so every revenue path respects the policy.
+
+.. warning::
+
+    ``convert_before_treasury_if_needed()`` returns a **signal only**, and
+    is fail-closed: ``converted`` is ``False`` until an executor is armed
+    (backlog item 34, landed via PR #321). Even when ``True``, it means
+    "conversion *should* happen" — this module performs **no swap and
+    moves no funds**. The real conversion executor
+    (``sincor2.onchain.fee_conversion_executor``) ships disarmed
+    (``armed=False``) with zero production callers. The onchain fee-event
+    listener (``sincor2.onchain.fee_event_listener``) records confirmed
+    fee inflows as *pending obligations* only — it never converts.
+    Never treat a ``True`` return as settled conversion; verify the
+    ConversionLedger / onchain receipts.
+    Canonical reference: ``docs/architecture/CANONICAL_PATHS.md`` §2.
 """
 
 import os
