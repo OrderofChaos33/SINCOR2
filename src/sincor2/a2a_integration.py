@@ -1425,14 +1425,22 @@ class ReputationLedger:
             return int(row["cnt"]) if row else 0
 
     def leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Return top callers ranked by total settlements and AXM volume."""
+        """Return top callers ranked by total settlements and AXM volume.
+
+        The AXM sum is REAL-typed (``SUM(CAST(... AS REAL))``): a plain
+        integer SUM overflows sqlite's INT64 accumulator (raising
+        ``sqlite3.OperationalError: integer overflow``) once cumulative
+        settlements exceed ~9.2 AXM in wei, which would 500 the
+        leaderboard route. REAL loses integer precision past 2**53, which
+        is immaterial for a display sum rendered to 4 decimals of AXM.
+        """
         with self._lock:
             conn = self._connect()
             rows = conn.execute(
                 """
                 SELECT caller_id,
                        COUNT(*) AS total_settlements,
-                       SUM(axm_paid_wei) AS total_axm_wei
+                       SUM(CAST(axm_paid_wei AS REAL)) AS total_axm_wei
                 FROM settlements
                 GROUP BY caller_id
                 ORDER BY total_settlements DESC, total_axm_wei DESC
@@ -1452,8 +1460,213 @@ class ReputationLedger:
             ]
 
 
+    def reset(self, caller_key: str) -> int:
+        """Delete every settlement row for a caller key (ghost penalty).
+
+        Returns the number of rows removed. Used when ghosting zeroes a
+        caller's reputation: the settlement count behind the priority flag
+        must go to zero for the ghost's *verified* wallet, not just the
+        agent registry's earned-reputation field.
+        """
+        with self._lock:
+            conn = self._connect()
+            cur = conn.execute(
+                "DELETE FROM settlements WHERE caller_id = ?",
+                (caller_key,),
+            )
+            removed = cur.rowcount if cur.rowcount is not None else 0
+            conn.commit()
+            conn.close()
+            return int(removed)
+
+
 # Module-level singleton
 _reputation_ledger = ReputationLedger()
+
+
+# ---------------------------------------------------------------------------
+# Verified caller identity for reputation  (wave 24; mirrors wave 18)
+# ---------------------------------------------------------------------------
+#
+# Reputation used to be keyed on the self-declared ``caller_id`` — rotating
+# IDs evaded a bad reputation and anyone could claim a victim's ID for the
+# priority flag. Reputation is now keyed on the wallet address recovered from
+# an EIP-191 personal signature over a canonical identity message. This reuses
+# the codebase's existing EIP-191 recovery primitive (dispute route, KYA
+# registry) — no new identity scheme.
+#
+# The canonical messages are byte-identical to wave 18's quota messages, so
+# ONE signature serves both subsystems: a caller who signed for free quota
+# automatically accrues reputation under the same wallet.
+#   send:  "SINCOR-QUOTA|<skill_id>|<input_hash_hex>|<timestamp_ms>"
+#   quote: "SINCOR-QUOTA-QUOTE|<skill_id>|<timestamp_ms>"
+# ``input_hash_hex`` binds the signature to the exact task input so a
+# captured signature cannot be replayed for a different task. ``timestamp_ms``
+# must be within IDENTITY_SIGNATURE_MAX_SKEW_MS of server time.
+#
+# A task's reputation identity is fixed at send time and stored in
+# task.metadata["verified_wallet"]; settle/finalize paths use it verbatim.
+# Call sites without a verified wallet keep the old caller_id behavior but
+# are explicitly marked UNTRUSTED-INPUT KEYED (see residuals below).
+
+IDENTITY_MESSAGE_PREFIX = "SINCOR-QUOTA"
+IDENTITY_QUOTE_MESSAGE_PREFIX = "SINCOR-QUOTA-QUOTE"
+# Freshness window for identity signatures (matches the re-registration window).
+IDENTITY_SIGNATURE_MAX_SKEW_MS = 5 * 60 * 1000
+
+_IDENTITY_ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+
+def _keccak256(data: bytes) -> bytes:
+    """keccak256 with the codebase's standard fallback (mirrors a2a_inbound_market)."""
+    try:
+        from eth_hash.auto import keccak
+        return keccak(data)
+    except Exception:
+        from sha3 import keccak_256  # type: ignore
+        return keccak_256(data).digest()
+
+
+def _recover_identity_signer(message: str, signature: str) -> str:
+    """Recover the signer address of an EIP-191 identity message.
+
+    Same primitive as the dispute route and the KYA registry (lazy
+    eth_account import keeps this module importable without the dependency).
+    """
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
+
+
+def identity_message_for_send(skill_id: str, input_text: str,
+                              timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to prove wallet identity on send.
+
+    Byte-identical to wave 18's quota send message: one signature covers both.
+    """
+    input_hash = _keccak256((input_text or "").encode("utf-8")).hex()
+    return "|".join([IDENTITY_MESSAGE_PREFIX, str(skill_id), input_hash,
+                     str(int(timestamp_ms))])
+
+
+def identity_message_for_quote(skill_id: str, timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to prove wallet identity.
+
+    Byte-identical to wave 18's quota quote message: usable as a pure
+    identity proof without binding task input.
+    """
+    return "|".join([IDENTITY_QUOTE_MESSAGE_PREFIX, str(skill_id),
+                     str(int(timestamp_ms))])
+
+
+def _reputation_key(verified_wallet: Optional[str], caller_id: str) -> str:
+    """Ledger key for a caller's reputation.
+
+    Verified wallets and self-declared caller IDs live in separate trust
+    domains: an unsigned caller declaring someone else's wallet address as
+    ``caller_id`` must NOT reach that wallet's settlement rows (that would
+    steal the victim's priority flag). Legacy rows keyed on bare caller_id
+    strings (pre-migration) match neither namespace — they were
+    untrusted-input keyed and are intentionally not carried forward.
+    """
+    if verified_wallet:
+        return "wallet:" + str(verified_wallet).lower()
+    return "id:" + str(caller_id)
+
+
+def _resolve_verified_wallet(
+    *,
+    skill_id: str,
+    params: Any = None,
+    msg_obj: Any = None,
+    input_text: Optional[str] = None,
+) -> Optional[str]:
+    """Resolve the verified wallet identity for a request.
+
+    Returns the lowercased wallet address recovered from a fresh EIP-191
+    identity signature, or None when the caller presented none / an invalid
+    one. Field layout mirrors wave 18's quota identity (same fields, same
+    canonical messages) so one signature serves both.
+
+    Accepted fields (first non-empty wins):
+      signature: params.message.metadata.signature | params.signature |
+                 params.callerSignature | params.caller_signature
+      quota_ts:  params.message.metadata.quota_ts | params.quota_ts |
+                 params.quotaTs | params.quota_timestamp
+      wallet:    params.message.metadata.wallet | params.wallet (REQUIRED;
+                 must equal the recovered signer — ECDSA recovery returns *some*
+                 address for any message/signature pair, so without this check a
+                 single signature would validate against arbitrary messages and
+                 mint fresh reputation buckets)
+
+    ``input_text=None`` selects the quote-shape message (no input to bind).
+    """
+    meta: Dict[str, Any] = {}
+    if isinstance(msg_obj, dict):
+        maybe_meta = msg_obj.get("metadata")
+        if isinstance(maybe_meta, dict):
+            meta = maybe_meta
+    getter = getattr(params, "get", None)
+
+    def _param(*names: str) -> Any:
+        for name in names:
+            value = meta.get(name)
+            if value:
+                return value
+        if callable(getter):
+            for name in names:
+                try:
+                    value = getter(name)
+                except Exception:
+                    value = None
+                if value:
+                    return value
+        return None
+
+    signature = _param("signature", "quota_signature", "callerSignature",
+                       "caller_signature")
+    if not signature:
+        return None
+    ts_raw = _param("quota_ts", "quotaTs", "quota_timestamp")
+    claimed_wallet = _param("wallet")
+    if not claimed_wallet or not _IDENTITY_ADDRESS_RE.match(str(claimed_wallet).strip()):
+        # The wallet claim is mandatory: ECDSA recovery yields *some* address
+        # for any message/signature pair, so the recovered address is only
+        # meaningful when checked against the caller's claimed wallet.
+        logger.warning("A2A identity rejected: missing/invalid wallet claim")
+        return None
+    try:
+        timestamp_ms = int(str(ts_raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("A2A identity rejected: bad quota_ts %r", ts_raw)
+        return None
+    now_ms = int(time.time() * 1000)
+    if abs(now_ms - timestamp_ms) > IDENTITY_SIGNATURE_MAX_SKEW_MS:
+        logger.warning(
+            "A2A identity rejected: quota_ts outside freshness window (skew=%dms)",
+            now_ms - timestamp_ms,
+        )
+        return None
+    if input_text is None:
+        message = identity_message_for_quote(skill_id, timestamp_ms)
+    else:
+        message = identity_message_for_send(skill_id, input_text, timestamp_ms)
+    try:
+        recovered = _recover_identity_signer(message, str(signature)).lower()
+    except ValueError as exc:
+        logger.warning("A2A identity rejected: %s", exc)
+        return None
+    if str(claimed_wallet).lower() != recovered:
+        logger.warning("A2A identity rejected: claimed wallet != recovered signer")
+        return None
+    return recovered
 
 
 # ---------------------------------------------------------------------------
@@ -1571,7 +1784,8 @@ def _reject_non_axm(token) -> Optional[str]:
 def _new_task(skill_id: str, input_text: str, caller_id: str,
               session_id: str, axm_paid: int = 0,
               tx_hash: Optional[str] = None,
-              owner_wallet: str = "") -> A2ATask:
+              owner_wallet: str = "",
+              verified_wallet: Optional[str] = None) -> A2ATask:
     task_id = str(uuid.uuid4())
     context_id = session_id or task_id
     # Record the initial user message in history
@@ -1599,6 +1813,10 @@ def _new_task(skill_id: str, input_text: str, caller_id: str,
             "skill_id": skill_id,
             "caller_id": caller_id,
             "owner_wallet": (owner_wallet or "").strip().lower(),
+            # Verified EIP-191 signer wallet when the caller signed at send
+            # time; settle/finalize paths key reputation on this. None means
+            # the task's reputation falls back to caller_id (UNTRUSTED-INPUT).
+            "verified_wallet": verified_wallet,
             "simulation_mode": bool(
                 axm_paid and tx_hash and str(tx_hash).startswith("0xSIMULATED")
             ),
@@ -2225,9 +2443,15 @@ class A2ARouter:
                 return jsonify(_err(
                     "proof construction failed", code=-32003)), 500
 
-            # Record in reputation ledger
+            # Record in reputation ledger — keyed on the task's verified
+            # wallet when the caller signed at send time (wallet: namespace),
+            # else on the self-declared caller_id (id: namespace, separate
+            # trust domain — see _reputation_key).
             _reputation_ledger.record(
-                caller_id=task.caller_id or caller_id,
+                caller_id=_reputation_key(
+                    (task.metadata or {}).get("verified_wallet"),
+                    task.caller_id or caller_id,
+                ),
                 skill_id=task.skill_id,
                 task_id=task.id,
                 axm_paid_wei=task.axm_paid,
@@ -2785,8 +3009,26 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         else:
             return _err("No input text found in message.parts", code=-32602, rpc_id=rpc_id)
 
+    # --- Verified caller identity -----------------------------------------
+    # Recovered EIP-191 signer wallet (None when the caller presented no
+    # valid signature). Reputation is keyed on this wallet; the self-declared
+    # caller_id below is UNTRUSTED-INPUT KEYED (rotating IDs used to evade
+    # reputation, and anyone can claim a victim's ID for the priority flag).
+    verified_wallet = _resolve_verified_wallet(
+        skill_id=skill_id,
+        params=params if isinstance(params, dict) else None,
+        msg_obj=msg_obj if isinstance(msg_obj, dict) else None,
+        input_text=input_text,
+    )
+
     # --- Reputation score → priority flag --------------------------------
-    caller_reputation = _reputation_ledger.score(caller_id)
+    # Score under the verified wallet when present; unsigned callers fall
+    # back to caller_id in a SEPARATE trust domain (id:<caller_id>) so they
+    # can never reach another wallet's rows by declaring its address.
+    # UNTRUSTED-INPUT KEYED for the unsigned path — see _reputation_key.
+    caller_reputation = _reputation_ledger.score(
+        _reputation_key(verified_wallet, caller_id)
+    )
     is_high_rep = caller_reputation >= REPUTATION_HIGH_THRESHOLD
 
     # --- Free-quota check ------------------------------------------------
@@ -2825,10 +3067,12 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         axm_paid=axm_paid,
         tx_hash=tx_hash,
         owner_wallet=owner_wallet,
+        verified_wallet=verified_wallet,
     )
     # Annotate high-rep and free-call status in metadata
     task.metadata["high_rep_caller"] = is_high_rep
     task.metadata["free_call"] = free_call
+    task.metadata["verified_wallet"] = verified_wallet
     logger.info(
         "A2A task %s created  skill=%s caller=%s rep=%d high_rep=%s free=%s",
         task.id, skill_id, caller_id, caller_reputation, is_high_rep, free_call,
@@ -2925,8 +3169,13 @@ def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[s
 
     if (axm_paid > 0 and tx_hash) or free_call:
         _record_a2a_settlement(task, axm_paid, tx_hash or "")
+        # Reputation identity was fixed at send time in task.metadata
+        # (wallet: namespace); the caller_id fallback is UNTRUSTED-INPUT
+        # KEYED in a separate trust domain (see _reputation_key).
         _reputation_ledger.record(
-            caller_id=caller_id,
+            caller_id=_reputation_key(
+                (task.metadata or {}).get("verified_wallet"), caller_id
+            ),
             skill_id=skill_id,
             task_id=task.id,
             axm_paid_wei=axm_paid,
@@ -3147,6 +3396,14 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
             ))
             return
 
+    # Verified caller identity (same EIP-191 scheme as message/send).
+    stream_verified_wallet = _resolve_verified_wallet(
+        skill_id=skill_id,
+        params=params if isinstance(params, dict) else None,
+        msg_obj=msg_obj if isinstance(msg_obj, dict) else None,
+        input_text=input_text,
+    )
+
     task = _new_task(
         skill_id=skill_id,
         input_text=input_text,
@@ -3155,6 +3412,7 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
         axm_paid=axm_paid,
         tx_hash=tx_hash,
         owner_wallet=owner_wallet,
+        verified_wallet=stream_verified_wallet,
     )
     logger.info("A2A stream task %s  skill=%s caller=%s", task.id, skill_id, caller_id)
 

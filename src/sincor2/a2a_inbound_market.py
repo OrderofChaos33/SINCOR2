@@ -405,6 +405,39 @@ def _anchor_onchain_auction(fabric: Any, task_id: str) -> None:
             task["onchain_open_tx"] = opened["tx_hash"]
 
 
+def _reset_ghost_settlement_reputation(fabric, ghosts) -> int:
+    """Zero ghosted wallets' settlement-ledger reputation (ghost penalty).
+
+    The agent-registry reset (``_apply_reputation(agent, 0.0)``) covers
+    earned-reputation; this covers the settlements-count ledger behind the
+    priority flag, keyed on the ghost's *verified* wallet. Never raises —
+    accounting must never brick auction close. Returns rows removed.
+    """
+    removed_total = 0
+    try:
+        from sincor2.a2a_integration import _reputation_ledger
+    except Exception as err:
+        logger.warning("ghost settlement reputation reset unavailable: %s", err)
+        return 0
+    try:
+        with fabric.lock:
+            for agent_id in ghosts:
+                agent = fabric.agents.get(agent_id)
+                wallet = agent.get("wallet") if agent else None
+                if wallet:
+                    removed = _reputation_ledger.reset(
+                        "wallet:" + str(wallet).lower()
+                    )
+                    removed_total += removed
+                    logger.info(
+                        "ghost settlement reputation reset  agent=%s wallet=%s removed=%d",
+                        agent_id, wallet, removed,
+                    )
+    except Exception as err:  # never brick auction close on accounting
+        logger.warning("ghost settlement reputation reset failed: %s", err)
+    return removed_total
+
+
 def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     expire_stale_assignments()
     fabric = get_fabric()
@@ -492,6 +525,11 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
             _save_agents(fabric)
         except Exception as err:
             logger.warning("ghost reputation reset failed: %s", err)
+        # Zero the ghost wallet's settlement-ledger reputation as well, so a
+        # ghost cannot keep the priority flag earned under its verified wallet
+        # (the agent registry reset above only covers earned-reputation).
+        # Never bricks the close on accounting.
+        _reset_ghost_settlement_reputation(fabric, ghosts)
         for agent_id in ghosts:
             try:
                 from sincor2.a2a_inbound_ext import _kya_flag_ghost
