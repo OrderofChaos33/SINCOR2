@@ -628,6 +628,15 @@ def mount(app: Flask) -> bool:
     from sincor2.a2a_errors import register_a2a_error_handlers
     from sincor2.a2a_inbound_market import attach_market_routes, seed_probation_tasks
 
+    # Idempotent: registering the same blueprint twice on one app makes
+    # Flask raise ValueError, and re-running the mount body would stack
+    # duplicate before_request hooks and re-seed auctions. Guard on the
+    # app's own blueprint registry (not a module-global flag) so a fresh
+    # app in tests can still mount independently.
+    if "a2a_inbound" in (getattr(app, "blueprints", {}) or {}):
+        logger.info("[A2A] mount() already applied to this app; skipping re-mount")
+        return
+
     bp = Blueprint("a2a_inbound", __name__)
     # G2.11: every error on this blueprint is a JSON envelope, never an
     # HTML 500 page (covers market, pool, sponsored-stake and recovery

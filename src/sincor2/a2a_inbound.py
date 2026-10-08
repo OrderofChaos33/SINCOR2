@@ -108,14 +108,35 @@ def _slug(value: str) -> str:
     return (re.sub(r"[^a-z0-9]+", "-", (value or "agent").lower()).strip("-") or "agent")[:80]
 
 
-def sign_payload(payload: Dict[str, Any], secret: str) -> str:
-    """HMAC-SHA256 sign a canonicalised payload.
+_A2A_SECRET_ENV = "SINCOR_A2A_SECRET"
 
-    ``secret`` is mandatory: there is deliberately no module-level default.
-    A hardcoded fallback secret shipped here until 2026-09-30 and was
-    removed (no route ever used it). Callers must supply their own secret
-    from configuration; never commit one to the repo.
+
+def _a2a_signing_secret() -> str:
+    """Resolve the A2A payload-signing secret from the environment.
+
+    FAIL-CLOSED: there is deliberately no hardcoded or demo fallback.
+    If the variable is unset or empty, signing raises instead of signing
+    with a guessable secret.
     """
+    secret = os.environ.get(_A2A_SECRET_ENV, "").strip()
+    if not secret:
+        raise RuntimeError(
+            f"{_A2A_SECRET_ENV} is not set; refusing to sign payloads "
+            "with a fallback secret"
+        )
+    return secret
+
+
+def sign_payload(payload: Dict[str, Any], secret: Optional[str] = None) -> str:
+    """HMAC-SHA256 sign ``payload`` with ``secret``.
+
+    ``secret`` is required: when omitted it is resolved from the
+    ``SINCOR_A2A_SECRET`` environment variable, and resolution fails
+    closed (``RuntimeError``) if the variable is unset. There is no
+    hardcoded demo secret.
+    """
+    if not secret:
+        secret = _a2a_signing_secret()
     body = json.dumps({k: payload[k] for k in sorted(payload) if k != "signature"}, separators=(",", ":"), sort_keys=True)
     return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
