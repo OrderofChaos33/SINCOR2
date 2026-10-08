@@ -22,6 +22,31 @@ Every doc in this tree is reachable from this index.
 - [`superpowers/`](./superpowers/) — existing launch runbooks/plans/specs.
 - [`a2a/`](./a2a/), [`ops/`](./ops/), [`sinax/`](./sinax/), [`underwriting/`](./underwriting/) — working areas; see each dir.
 
+## Complete build-out (2026-09-30)
+
+Thirty-eight build-out waves (P1 housekeeping → P24 issuance → A2A hardening → DeFi
+lifecycle gates → AXM money path → merge/integration planning), all branched from `fd96801`, all human-gated.
+Branch inventory and wave reports: `driver-state.json` in the goal workspace.
+
+| Doc | What it is |
+|---|---|
+| [`../MERGE_PLAN.md`](../MERGE_PLAN.md) | Merge reconciliation plan — branch inventory, merge order, hunk-level conflict map, ledger entry-ID merge procedure, deploy-config checklist, secret-scan results. (Wave 29) |
+| [`../MERGE_PLAN_SUPPLEMENT.md`](../MERGE_PLAN_SUPPLEMENT.md) | Merge-plan supplement — adds the fork-sim and audit-artifact branches with the full five-branch ledger entry-ID chain. (Wave 31) |
+| Wave-26 SKU canon doc (in-flight, unmerged) | One product = one canonical SKU; gate-matching and supersede rules for the proof ledger. (Wave 26) |
+| [`architecture/SHARED_STATE_ADOPTION.md`](./architecture/SHARED_STATE_ADOPTION.md) | Merge-time guide: porting rate-limit, quota, and idempotency stores onto the shared durable-state backend. (Wave 30) |
+| [`security/REGISTRATION_IDENTITY.md`](./security/REGISTRATION_IDENTITY.md) | First-registration squatting control — agent IDs bound to verified wallets, grandfathered existing IDs, protected names; `SINCOR_REGISTRATION_PROOF_REQUIRED=1` is the recommended production posture. (Wave 32) |
+| [`architecture/P24_SCREENER_SELECTION.md`](./architecture/P24_SCREENER_SELECTION.md) | P24 content-policy screener selection — separates the Python `ContentScreener` interface from the onchain `ContentPolicyGuard.screener` role; four exact founder decisions with options and tradeoffs. (Wave 38) |
+| [`ops/PRODUCTION_DEPLOY_CHECKLIST.md`](./ops/PRODUCTION_DEPLOY_CHECKLIST.md) | Consolidated production deploy checklist — 43 checks plus a 16-row env-var table with failure consequences, four deploy ceremonies in order, smoke checks, rollback notes; money/key steps marked founder-executed. (Wave 36) |
+| [`security/PAYMENT_TX_REPLAY_DESIGN.md`](./security/PAYMENT_TX_REPLAY_DESIGN.md) | Payment-transaction replay prevention — three candidate designs (spent-tx ledger, sender-wallet binding, combined) with hook points, failure modes, and the exact founder decision (A/B/C). (Wave 37) |
+
+Evidence docs that live outside `docs/`:
+
+| Path | What it is |
+|---|---|
+| `../tests/pytest/FORK_SIM_NOTES.md` | Fork-simulation harness notes — 17/17 sims green against live Base mainnet data; 9 honest no-counterpart findings. (Wave 25) |
+| `../fork_sim_fee_executor/run_fee_executor_forksim.py` | The fork-sim harness itself (read-only, no signing surface). |
+| [`../TASK_DECOMPOSITION_SUMMARY.md`](../TASK_DECOMPOSITION_SUMMARY.md) | 1,000-task swarm decomposition — 199 done / 565 pending / 236 blocked, with parallelism notes; full machine-readable list in `../TASK_DECOMPOSITION.json`. (Wave 35) |
+
 ## Recommended reading order
 
 1. [`LOOP_SETTLEMENT.md`](./LOOP_SETTLEMENT.md)
@@ -30,6 +55,14 @@ Every doc in this tree is reachable from this index.
 4. [`architecture/overview.md`](./architecture/overview.md)
 5. [`architecture/CANONICAL_PATHS.md`](./architecture/CANONICAL_PATHS.md)
 6. [`../README.md`](../README.md)
+
+## Standing policy locks (founder-set)
+
+Docs must not contradict these. Flagged clean across all build-out-wave docs on 2026-09-30.
+
+- **Fee policy:** 5% platform fee to treasury, 100% converted to USDC/WETH before deposit, **no burn**. (See [`architecture/MONEY_FLOW.md`](./architecture/MONEY_FLOW.md).)
+- **Public framing:** positive only — SINC is utility/platform access for the A2A ecosystem; AXM is foundational. No live-operation claims until proven.
+- **Evidence honesty:** internal audits are labeled `not_a_third_party_audit`; fork sims record honest no-counterpart findings instead of fabricated passes.
 
 ## Canonical references
 
@@ -80,6 +113,7 @@ Single sources of truth. If anything disagrees with these, these win until amend
 | [`DEFI_26_PROTOCOL_BUILD_STATUS.md`](./DEFI_26_PROTOCOL_BUILD_STATUS.md) | 26-protocol build status (2026-09-12). |
 | [`DEFI_PROJECTS_COORDINATION.md`](./DEFI_PROJECTS_COORDINATION.md) | DeFi projects coordination hub. |
 | [`DEFI_SWARM_EXPANSION_PLAN.md`](./DEFI_SWARM_EXPANSION_PLAN.md) | DeFi swarm expansion plan. |
+| Wave-26 SKU canon doc (in-flight, unmerged) | Canonical SKU rule for the proof ledger (`mint_sku`); gate-matching and supersede rules. One product = one SKU. |
 
 ## Agent operations
 
@@ -138,6 +172,29 @@ Daily operating history. Newest last.
 | [`CEO_DAILY_BRIEF_2026-09-09.md`](./CEO_DAILY_BRIEF_2026-09-09.md) | [`CEO_DAILY_BRIEF_2026-09-19.md`](./CEO_DAILY_BRIEF_2026-09-19.md) |
 
 ## Housekeeping (2026-09-30)
+
+Index refresh #2 (wave 40): added the five post-wave-33 build-out docs
+(`REGISTRATION_IDENTITY.md`, `P24_SCREENER_SELECTION.md`,
+`PRODUCTION_DEPLOY_CHECKLIST.md`, `PAYMENT_TX_REPLAY_DESIGN.md`,
+`TASK_DECOMPOSITION_SUMMARY.md`). Policy scan clean on the new docs: the one
+CertiK mention is a checklist item noting current scan URLs are still pending
+(an open founder decision), not a score claim. Merge note: this file supersedes
+wave-33's `docs/README.md` — take this version at merge time (it is a superset).
+
+Index refresh (wave 33): added the 11 new build-out-wave docs
+(`MERGE_PLAN.md`, `MERGE_PLAN_SUPPLEMENT.md`, `DEFI_LEDGER_SKU_CANON.md`,
+`SHARED_STATE_ADOPTION.md`, plus wave-23's `CANONICAL_PATHS.md`/`MONEY_FLOW.md`
+and subdirectory READMEs), a standing-policy-locks section, and pointers to
+evidence docs outside `docs/`. Policy scan clean: no burn-policy, live-claim,
+or framing contradictions in any wave doc. Merge note: this file supersedes
+wave-23's `docs/README.md` — take this version at merge time (it is a superset).
+
+> Rebase note (2026-10-08): the wave-26 SKU canon doc and the original
+> `fork_sim/` harness were never merged to main; this index now marks the
+> SKU canon entry as in-flight (unmerged) and points the fork-sim entry at
+> the merged `fork_sim_fee_executor/` harness. `MERGE_PLAN.md`,
+> `MERGE_PLAN_SUPPLEMENT.md`, and `SHARED_STATE_ADOPTION.md` are on main
+> and link-checked.
 
 Previously untracked files, resolved:
 
