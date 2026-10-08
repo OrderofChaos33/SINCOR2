@@ -35,7 +35,7 @@ def board_client(tmp_path, monkeypatch):
     reset_fabric()
     monkeypatch.setenv("SINCOR_A2A_TASKS_PATH", str(tmp_path / "tasks.json"))
     monkeypatch.setenv("SINCOR_BOUNTY_POOL_PATH", str(tmp_path / "pool.json"))
-    monkeypatch.setenv("SINCOR_BOUNTY_POOL_ADMIN_KEY", "test-admin-key")
+    monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-key")
     from sincor2.a2a_bounty_pool import reset_bounty_pool
 
     reset_bounty_pool(path=str(tmp_path / "pool.json"))
@@ -340,7 +340,7 @@ def test_pool_default_zero(board_client):
 
 
 def test_pool_admin_gate(board_client, monkeypatch):
-    monkeypatch.delenv("SINCOR_BOUNTY_POOL_ADMIN_KEY", raising=False)
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
     # deny-by-default: admin surface disabled without a key
     assert board_client.post("/v1/a2a/pool/fund", json={}).status_code == 503
     assert board_client.post(
@@ -352,7 +352,7 @@ def test_pool_admin_gate(board_client, monkeypatch):
     # public status stays readable
     assert board_client.get("/v1/a2a/pool").status_code == 200
 
-    monkeypatch.setenv("SINCOR_BOUNTY_POOL_ADMIN_KEY", "right-key")
+    monkeypatch.setenv("ADMIN_PASSWORD", "right-key")
     assert board_client.post(
         "/v1/a2a/pool/fund", json={}).status_code == 401  # no key sent
     assert board_client.post(

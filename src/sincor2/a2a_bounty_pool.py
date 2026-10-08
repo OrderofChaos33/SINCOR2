@@ -22,11 +22,18 @@ Admin surface (see attach_market_routes in a2a_inbound_market.py)
   allocation record; the task's bounty is then pool-backed)
 * ``POST /v1/a2a/pool/release``   return an allocation to the pool unspent
 * ``GET  /v1/a2a/pool``           public status (reserve/funded/allocated/
-  available + allocation records)
+  available + allocation records) — intentionally unauthenticated
 
-Write endpoints are admin-gated by ``SINCOR_BOUNTY_POOL_ADMIN_KEY``
-(``X-Admin-Key`` header or ``admin_key`` body field); unset key means the
-admin surface is disabled (503), deny-by-default.
+Admin credential (G2.13 — single unified surface)
+-------------------------------------------------
+Every A2A admin-gated route (pool writes, task-board admin delete,
+sponsored-stake, recovery) uses ONE credential: the operator's
+``ADMIN_PASSWORD`` environment variable, presented ONLY via the
+``X-Admin-Key`` request header. Credentials are never accepted in request
+bodies (secret-persistence risk in logs) and the expected value is never
+logged. An unset ``ADMIN_PASSWORD`` disables the admin surface
+(deny-by-default: 503). The legacy ``SINCOR_BOUNTY_POOL_ADMIN_KEY`` is
+retired and no longer read.
 
 Persistence: JSON file with atomic writes (tmp + os.replace), following the
 fee_conversion_executor.py ledger pattern. ``SINCOR_BOUNTY_POOL_PATH``
@@ -47,7 +54,11 @@ logger = logging.getLogger("sincor.a2a.pool")
 
 RESERVE_ENV = "SINCOR_LAUNCH_BOUNTY_AXM"
 PATH_ENV = "SINCOR_BOUNTY_POOL_PATH"
-ADMIN_KEY_ENV = "SINCOR_BOUNTY_POOL_ADMIN_KEY"
+# Unified A2A admin credential (G2.13): the single admin surface for every
+# A2A admin-gated route is the operator's ADMIN_PASSWORD, presented only
+# via the X-Admin-Key header. SINCOR_BOUNTY_POOL_ADMIN_KEY is retired and
+# no longer read. Never accept admin credentials in request bodies.
+ADMIN_KEY_ENV = "ADMIN_PASSWORD"
 
 
 class PoolError(Exception):

@@ -1,4 +1,32 @@
-"""A2A task auctions, bids, proofs. Mounted from a2a_inbound_ext.mount."""
+"""A2A task auctions, bids, proofs. Mounted from a2a_inbound_ext.mount.
+
+Admin credential surface (G2.13 — single unified credential)
+------------------------------------------------------------
+Every admin-gated route in the A2A surface uses ONE credential: the
+operator's ``ADMIN_PASSWORD`` environment variable, presented ONLY via
+the ``X-Admin-Key`` request header. Credentials are never accepted in
+request bodies and the expected value is never logged. An unset
+``ADMIN_PASSWORD`` disables the admin surface (deny-by-default: 503).
+
+Routes gated by ``_require_pool_admin`` (this module):
+* ``DELETE /v1/a2a/tasks/<task_id>`` — task-board admin delete (also
+  releases pool allocations; release failures surface, G2.12)
+* ``POST /v1/a2a/pool/fund`` / ``/v1/a2a/pool/allocate`` /
+  ``/v1/a2a/pool/release`` — bounty-pool writes
+* ``GET /v1/a2a/pool`` — public status, intentionally unauthenticated
+
+Routes gated by ``sponsored_stake._admin_key_ok`` (same credential):
+* ``POST /v1/a2a/admin/sponsored-stake``,
+  ``GET /v1/a2a/admin/sponsored-stake/<agent_id>``
+* ``POST /v1/a2a/admin/recovery/sponsor``,
+  ``GET /v1/a2a/admin/recovery/status`` (recovery.py)
+
+Error contract (G2.11): JSON errorhandlers are registered on the
+``a2a_inbound`` blueprint at mount time (see ``a2a_errors``), so every
+error is a ``{"error", "status"}`` JSON envelope — never an HTML page.
+Numeric query params (``page``/``per_page``/``min_bounty``) are validated
+to 400 JSON on garbage input.
+"""
 from __future__ import annotations
 
 import json
@@ -872,22 +900,24 @@ def seed_probation_tasks() -> List[Dict[str, Any]]:
 
 
 def _require_pool_admin():
-    """Admin gate for bounty-pool write endpoints.
+    """Admin gate for bounty-pool write endpoints and task-board admin.
+
+    Single unified credential (G2.13): ``ADMIN_PASSWORD`` from the
+    environment, presented ONLY via the ``X-Admin-Key`` request header.
+    Credentials are never accepted in request bodies (secret-persistence
+    risk in logs), and the expected value is never logged. Comparison is
+    constant-time.
 
     Returns ``None`` when authorized, otherwise an error response tuple.
-    Deny-by-default: an unset ``SINCOR_BOUNTY_POOL_ADMIN_KEY`` disables the
-    admin surface (503). Key accepted via ``X-Admin-Key`` header or the
-    ``admin_key`` body field, mirroring the mvp_app admin-key pattern.
+    Deny-by-default: an unset ``ADMIN_PASSWORD`` disables the admin
+    surface (503).
     """
     from sincor2.a2a_bounty_pool import ADMIN_KEY_ENV, pool_admin_configured
     if not pool_admin_configured():
         return _http_error("bounty pool admin not configured", 503)
     key = request.headers.get("X-Admin-Key", "") or ""
-    if not key:
-        body = request.get_json(silent=True) or {}
-        key = str(body.get("admin_key") or "")
     expected = os.environ.get(ADMIN_KEY_ENV, "")
-    if not key or not _hmac.compare_digest(str(key), expected):
+    if not key or not expected or not _hmac.compare_digest(str(key), str(expected)):
         return _http_error("admin authorization required", 401)
     return None
 
@@ -1046,26 +1076,56 @@ def attach_market_routes(bp: Blueprint) -> None:
             if any(b.get("task_id") == task_id for b in fabric.bids.values()):
                 return _http_error("task has bids; close the auction instead", 409)
             released = []
+            release_failures = []
             try:
                 from sincor2.a2a_bounty_pool import bounty_pool
                 pool = bounty_pool()
-                for alloc in pool.allocations_for_task(task_id):
-                    try:
-                        pool.release(alloc["allocation_id"])
-                        released.append(alloc["allocation_id"])
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                allocations = pool.allocations_for_task(task_id)
+            except Exception as err:
+                # G2.12: a pool failure must surface, never vanish. Log it
+                # loudly and record it for the response below.
+                logger.exception(
+                    "pool lookup failed during task delete task_id=%s", task_id)
+                allocations = []
+                release_failures.append({
+                    "allocation_id": None,
+                    "error": f"pool lookup failed: {err}",
+                })
+            for alloc in allocations:
+                alloc_id = alloc.get("allocation_id")
+                try:
+                    pool.release(alloc_id)
+                    released.append(alloc_id)
+                except Exception as err:
+                    # G2.12: never swallow a release failure — the funds
+                    # stay allocated to a deleted task, which is a
+                    # money-path inconsistency the operator must repair.
+                    logger.exception(
+                        "pool release failed during task delete "
+                        "task_id=%s allocation_id=%s", task_id, alloc_id)
+                    release_failures.append({
+                        "allocation_id": alloc_id,
+                        "error": str(err),
+                    })
             fabric.tasks.pop(task_id, None)
             snap = dict(task)
         _save_tasks(fabric)
         try:
             fabric.publish("task.deleted", snap.get("tags") or [],
                            {"task_id": task_id, "seed_key": snap.get("seed_key"),
-                            "released_allocations": released})
+                            "released_allocations": released,
+                            "release_failures": release_failures})
         except Exception:
             pass
+        if release_failures:
+            # The task row is deleted, but pool money did not move back.
+            # Surface it as an error (never a clean 200) so no caller or
+            # operator can mistake this for a fully clean delete.
+            return _http_error(
+                "task deleted but pool release failed", 500,
+                deleted=task_id,
+                released_allocations=released,
+                release_failures=release_failures)
         return jsonify({"deleted": task_id, "released_allocations": released}), 200
 
     @bp.get("/v1/a2a/tasks/<task_id>")
@@ -1607,7 +1667,8 @@ def attach_market_routes(bp: Blueprint) -> None:
 
     # -- Launch bounty pool -------------------------------------------
     # Offchain AXM reservation ledger for external-agent launch bounties.
-    # Writes are admin-gated (SINCOR_BOUNTY_POOL_ADMIN_KEY); the reserve is
+    # Writes are admin-gated (unified ADMIN_PASSWORD via X-Admin-Key
+    # header — see module docstring); the reserve is
     # operator-configured via SINCOR_LAUNCH_BOUNTY_AXM (default 0 = pool
     # unconfigured, fund() refuses). Ledger-only: moves no funds on-chain.
 
