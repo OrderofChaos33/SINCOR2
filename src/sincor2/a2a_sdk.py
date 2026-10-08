@@ -208,6 +208,33 @@ class SincorAgentSDK:
             headers = {"X-Sincor-Heartbeat": heartbeat_token}
         return self.t.post("/v1/a2a/heartbeat", payload, headers=headers)
 
+    @staticmethod
+    def quota_signature_payload(skill_id: str, input_text: str = "",
+                                timestamp_ms: Optional[int] = None,
+                                for_quote: bool = False) -> Dict[str, str]:
+        """Build the canonical EIP-191 quota message for the caller to sign.
+
+        Free quota is keyed on the wallet recovered from this signature — the
+        self-declared ``caller_id`` no longer grants free calls. Sign the
+        returned ``message`` with the caller's wallet (EIP-191
+        ``personal_sign``), then send ``signature`` + ``quota_ts`` + ``wallet``
+        with the tasks/send (or quote) request. The ``wallet`` claim is
+        required: the server checks the recovered signer equals it (ECDSA
+        recovery returns *some* address for any message/signature pair, so
+        the check is what binds the signature to the message). The SDK never
+        signs: the caller's own wallet tooling (e.g. eth_account) does.
+        """
+        from sincor2.a2a_integration import (
+            quota_message_for_quote,
+            quota_message_for_send,
+        )
+        ts = int(timestamp_ms) if timestamp_ms is not None else int(time.time() * 1000)
+        if for_quote:
+            message = quota_message_for_quote(skill_id, ts)
+        else:
+            message = quota_message_for_send(skill_id, input_text, ts)
+        return {"message": message, "quota_ts": str(ts)}
+
     # -- stake ------------------------------------------------------------
     def deposit_stake(self, agent_id: str, amount_axm: float,
                       tx_hash: Optional[str] = None) -> Dict[str, Any]:
