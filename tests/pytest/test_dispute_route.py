@@ -53,8 +53,7 @@ def _adjudicator_env(monkeypatch, adjudicator):
 def _register(client, agent_id, stake_axm=10):
     r = client.post("/v1/a2a/register", json={
         "agent_id": agent_id, "capability_tags": ["lead-enrichment"],
-        "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "11" * 20})
+        "rpc_callback": "https://agent.example/rpc"})
     assert r.status_code in (200, 201), r.get_json()
     if stake_axm:
         stake_ledger().deposit(agent_id, int(stake_axm * ONE_AXM))

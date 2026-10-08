@@ -243,7 +243,6 @@ def test_commit_after_stale_window_refreshes_not_kills(board_client):
         "agent_id": "board-bidder",
         "capability_tags": ["deal-scoring"],
         "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "ab" * 20,
     })
     assert r.status_code in (200, 201), r.get_json()
     assert board_client.post(

@@ -74,7 +74,6 @@ def _register_agent(client, agent_id, tags=("lead-enrichment",)):
         "agent_id": agent_id,
         "capability_tags": list(tags),
         "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "11" * 20,
     })
     assert r.status_code in (200, 201), r.get_json()
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())

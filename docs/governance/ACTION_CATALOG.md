@@ -27,7 +27,8 @@ Machine-readable source of truth: `src/sincor2/governance/action_catalog.py`
 - `killswitch` — no route-level gate found; must be admin-gated before exposure.
 - `kya_revoke`, `kya_verify`, `kya_list`, `uw_underwrite`, `uw_settle_mandate`,
   `uw_revoke_agent` — no route-level auth visible.
-- `clear_polyclaw_dry_runs`, `grade_task`, `memory_ingest` — no route-level gate visible.
+- `grade_task`, `memory_ingest` — no route-level gate visible.
+- `clear_polyclaw_dry_runs` — REMEDIATED 2026-10-08 (C1): admin-gated via `sincor2.auth_system.admin_required` (401/403 without admin JWT).
 - `stripe_cancel_subscription` — no route-level auth visible; callers must own the subscription.
 
 ---
@@ -158,7 +159,7 @@ Notes:
 |---|---|---|---|---|---|
 | `killswitch` | POST /api/command-center/killswitch/\<id\> — `blueprints/command_center.py:461` | none visible (gap) | write-local | **critical** | reversible |
 | `grade_task` | POST /api/command-center/grade-task — `blueprints/command_center.py:497` | none visible (gap) | write-local | medium | reversible |
-| `clear_polyclaw_dry_runs` | POST /api/polyclaw/clear-dry-runs — `blueprints/monitoring.py:174` | none visible (gap) | write-local | medium | reversible |
+| `clear_polyclaw_dry_runs` | POST /api/polyclaw/clear-dry-runs — `blueprints/monitoring.py:174` | admin | write-local | medium | reversible |
 | `user_signup` | POST /api/signup — `mvp_blueprints/ops.py:159` | none (public) | write-local | medium | reversible |
 | `profile_delete` | DELETE /api/profile/delete — `mvp_blueprints/auth.py:315` | session | write-local | high | **irreversible** |
 | `auth_login` | POST /api/auth/login — `mvp_blueprints/auth.py:26` | none (credentials) | write-local | medium | reversible |

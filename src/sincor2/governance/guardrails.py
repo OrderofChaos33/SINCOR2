@@ -2371,7 +2371,10 @@ GUARDRAILS: Dict[str, Dict[str, object]] = {
             "sincor2.a2a_rate_limits.register (5/hour + 20/day per IP)",
         ],
         "approval": "auto",
-        "approval_note": "Auto: first registration open; re-registration "
+        "approval_note": "Auto: anonymous first registration is open; any "
+                         "wallet claim requires a valid EIP-191 proof "
+                         "(C3 fail-closed, 2026-10-08) — unverified wallet "
+                         "claims are rejected with 403. Re-registration "
                          "requires EIP-191 proof by the registered wallet.",
         "rate_limits": {
             "policy_class": "register",
@@ -2756,10 +2759,10 @@ GUARDRAILS: Dict[str, Dict[str, object]] = {
             "rate_limit_ok",
         ],
         "policy_checks": [
-            "POLICY-MISSING: kill-switch clear policy — AUTH GAP: no "
-            "route-level auth visible; closes simulated open trades and "
-            "releases stuck exposure. MUST be admin-gated before exposure "
-            "(see RULES_AUDIT C1)",
+            "sincor2.blueprints.monitoring._admin_gate "
+            "(sincor2.auth_system.admin_required: JWT with role=admin; 403 "
+            "otherwise; 503 fail-closed if the decorator is unavailable) — "
+            "C1 remediated 2026-10-08",
         ],
         "approval": "auto",
         "approval_note": "Auto once admin-gated. Guardrail REQUIRES the "

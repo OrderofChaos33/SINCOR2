@@ -14,7 +14,7 @@ Machine-readable source of truth: `src/sincor2/governance/guardrails.py` (`get_g
 | **low** | 17 | 17 auto | optional |
 | **total** | **111** | | |
 
-**Coverage:** 111/111 actions have guardrails (validated: 111 entries, 0 gaps, 0 orphans). **POLICY-MISSING flags:** 59 actions carry at least one `POLICY-MISSING` marker — a policy check the codebase does not yet implement as a dedicated module. Each marker names what is needed.
+**Coverage:** 111/111 actions have guardrails (validated: 111 entries, 0 gaps, 0 orphans). **POLICY-MISSING flags:** 58 actions carry at least one `POLICY-MISSING` marker — a policy check the codebase does not yet implement as a dedicated module. Each marker names what is needed.
 
 ### Approval counts (high + critical)
 
@@ -1580,13 +1580,13 @@ Entry point: `src/sincor2/mvp_blueprints/auth.py:26` · HTTP: `POST /api/auth/lo
 
 ### `clear_polyclaw_dry_runs`
 
-Entry point: `src/sincor2/blueprints/monitoring.py:174` · HTTP: `POST /api/polyclaw/clear-dry-runs` · Auth: `['none visible at route level']`
+Entry point: `src/sincor2/blueprints/monitoring.py:174` · HTTP: `POST /api/polyclaw/clear-dry-runs` · Auth: `['admin']`
 
 **Approval:** auto — Auto once admin-gated. Guardrail REQUIRES the admin gate: an unauthenticated caller must never re-arm trading.
 
 **Pre-conditions:** admin_key_present, rate_limit_ok
 
-**Policy checks:**<br>- POLICY-MISSING: kill-switch clear policy — AUTH GAP: no route-level auth visible; closes simulated open trades and releases stuck exposure. MUST be admin-gated before exposure (see RULES_AUDIT C1)
+**Policy checks:**<br>- sincor2.blueprints.monitoring._admin_gate (sincor2.auth_system.admin_required: JWT with role=admin; 403 otherwise; 503 fail-closed if the decorator is unavailable) — C1 remediated 2026-10-08
 
 **Rate limits:**<br>`admin`<br>**windows**: 30/min + 200/hour
 
@@ -1978,7 +1978,7 @@ Entry point: `src/sincor2/kya/blueprint.py:132` · HTTP: `POST /v1/quest/seed` �
 
 Entry point: `src/sincor2/a2a_inbound_ext.py:570` · HTTP: `POST /v1/a2a/register (aliases /api/v1/a2a/register, /api/marketplace/register)` · Auth: `['EIP-191 (required for re-registration)']`
 
-**Approval:** auto — Auto: first registration open; re-registration requires EIP-191 proof by the registered wallet.
+**Approval:** auto — Auto: anonymous first registration is open; any wallet claim requires a valid EIP-191 proof (C3 fail-closed, 2026-10-08) — unverified wallet claims are rejected with 403. Re-registration requires EIP-191 proof by the registered wallet.
 
 **Pre-conditions:** eip191_proof_valid, rate_limit_ok
 

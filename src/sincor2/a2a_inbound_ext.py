@@ -297,9 +297,12 @@ def register_agent_record(body: Dict[str, Any],
       over ``SINCOR-REGISTER|<agent_id>|<timestamp_ms>`` with a mandatory
       wallet claim equal to the recovered signer (see ``a2a_identity``).
       Verified claims bind ``owner_wallet`` and set ``identity="verified"``.
-    * Unverified claims are accepted but marked ``identity="unverified"``
-      (grace for existing clients); set
-      ``SINCOR_REGISTRATION_PROOF_REQUIRED=1`` to refuse them outright.
+    * A wallet claim WITHOUT a valid proof is REJECTED outright (fail-closed;
+      PermissionError → HTTP 403). Unverified wallet claims are never
+      accepted, because they let anyone bind an arbitrary wallet to an
+      agent_id. Anonymous claims (no wallet) are accepted as
+      ``identity="unverified"``; set ``SINCOR_REGISTRATION_PROOF_REQUIRED=1``
+      to refuse anonymous claims too.
     * A claim on an owned id by a *different* wallet is rejected — a valid
       signature from the non-owner never transfers ownership (transfers go
       through ``transfer_agent_record``).
@@ -351,8 +354,30 @@ def register_agent_record(body: Dict[str, Any],
             # New claim (wave 32 squatting control): a verified
             # wallet-identity proof binds owner_wallet.
             if verified_wallet:
+                # The proof's claimed wallet must equal the body's declared
+                # wallet: otherwise an attacker could display a victim's
+                # wallet while binding their own key as owner_wallet.
+                if wallet and verified_wallet != wallet.lower():
+                    raise PermissionError(
+                        "registration proof wallet does not match the "
+                        "claimed wallet")
                 owner = verified_wallet
                 identity = "verified"
+            elif wallet:
+                # Fail-closed (C3 remediation, 2026-10-08): a wallet claim
+                # WITHOUT a valid EIP-191 proof is rejected outright. An
+                # unverified claim used to be accepted and marked
+                # identity="unverified", which let anyone bind an arbitrary
+                # wallet to an agent_id (identity spoofing adjacent to the
+                # money path: stake deposits, bids). Anonymous claims (no
+                # wallet at all) are still accepted as "unverified" — there
+                # is no wallet claim to spoof. Set
+                # SINCOR_REGISTRATION_PROOF_REQUIRED=1 to refuse anonymous
+                # claims too.
+                raise PermissionError(
+                    "wallet claim requires a valid EIP-191 registration "
+                    "proof (body fields: registration_signature, "
+                    "registration_wallet, registration_ts)")
             elif _registration_proof_required():
                 raise PermissionError("registration proof required")
             else:

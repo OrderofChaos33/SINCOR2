@@ -177,8 +177,11 @@ ACTIONS: Dict[str, Dict[str, object]] = {
         "risk_tier": "medium",
         "reversibility": "reversible",
         "domain": "marketplace",
-        "notes": "First registration is open; re-registration requires an "
-                 "EIP-191 signature by the registered wallet.",
+        "notes": "First registration is open for anonymous claims; any WALLET "
+                 "claim requires a valid EIP-191 proof or the registration "
+                 "is rejected with 403 (C3 fail-closed, 2026-10-08). "
+                 "Re-registration requires an EIP-191 signature by the "
+                 "registered wallet.",
     },
     "transfer_agent_record": {
         "entry_point": "src/sincor2/a2a_inbound_ext.py:608",
@@ -899,13 +902,15 @@ ACTIONS: Dict[str, Dict[str, object]] = {
     "clear_polyclaw_dry_runs": {
         "entry_point": "src/sincor2/blueprints/monitoring.py:174",
         "http": "POST /api/polyclaw/clear-dry-runs",
-        "auth": ["none visible at route level"],
+        "auth": ["admin"],
         "side_effects": "write-local",
         "risk_tier": "medium",
         "reversibility": "reversible",
         "domain": "admin",
         "notes": "Closes simulated open trades and releases stuck exposure. "
-                 "AUTH GAP: should be admin-gated.",
+                 "Also clears the bankroll kill switch when tripped — hence "
+                 "admin-gated since 2026-10-08 (C1 remediation): unauthenticated "
+                 "calls get 401/403, never a kill-switch clear.",
     },
     "user_signup": {
         "entry_point": "src/sincor2/mvp_blueprints/ops.py:159",

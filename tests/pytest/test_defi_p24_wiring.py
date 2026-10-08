@@ -58,7 +58,6 @@ def _register(client, agent_id="issuer-1"):
         "agent_id": agent_id,
         "name": "Issuer",
         "capability_tags": ["socialfi"],
-        "wallet": "0x" + "11" * 20,
         "rpc_callback": "https://issuer.example.com/rpc",
     })
     assert resp.status_code == 201
@@ -161,9 +160,11 @@ def test_issue_bad_symbol_rejected(client):
 
 
 def test_sdk_issue_creator_token_end_to_end(client):
+    from eth_account import Account
+    issuer_key = Account.create()
     sdk = SincorAgentSDK(FlaskTestTransport(client))
     sdk.register("sdk-issuer", "Issuer", ["socialfi"],
-                 wallet="0x" + "22" * 20,
+                 wallet=issuer_key.address, signer=issuer_key,
                  rpc_callback="https://sdk-issuer.example.com/rpc")
     result = sdk.issue_creator_token(
         agent_id="sdk-issuer", name="SDK Coin", symbol="SDKC",

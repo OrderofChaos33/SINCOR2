@@ -356,6 +356,38 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
     """
     result = {'message': '', 'next_steps': [], 'email_sent': False}
 
+    # C4: route value-granting fulfillment through the effect boundary BEFORE
+    # any delivery. Fail-closed: a denied intent aborts fulfillment.
+    try:
+        from sincor2.governance.money_gate import check_money_effect
+    except ImportError:
+        try:
+            from src.sincor2.governance.money_gate import (  # type: ignore
+                check_money_effect,
+            )
+        except ImportError as exc:
+            logger.critical(
+                "[FULFILL] money gate unavailable (%s) — fulfillment DENIED "
+                "for %s (fail closed)", exc, order_id)
+            result['message'] = 'Fulfillment blocked by governance gate.'
+            return result
+    allowed, gate_reason = check_money_effect(
+        effect_type="payment.transfer",
+        payload={"order_id": order_id, "amount": amount,
+                 "order_type": order_type, "product_name": product_name},
+        agent_id="billing_fulfillment",
+        risk_tier="high",
+        idempotency_key=f"fulfill-{order_id}",
+        target="order_fulfillment",
+        estimated_cost=float(amount or 0),
+    )
+    if not allowed:
+        logger.critical(
+            "[FULFILL] effect boundary denied fulfillment for %s: %s",
+            order_id, gate_reason)
+        result['message'] = 'Fulfillment blocked by governance gate.'
+        return result
+
     # First, determine all the delivery details
     agent_count = product_info.get('agents', 10)
 

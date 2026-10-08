@@ -49,7 +49,6 @@ def _register_and_fund(client, agent_id):
         "agent_id": agent_id,
         "capability_tags": ["lead-enrichment"],
         "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "11" * 20,
     })
     assert r.status_code in (200, 201), r.get_json()
     stake_ledger().deposit(agent_id, 10 * 10**18)

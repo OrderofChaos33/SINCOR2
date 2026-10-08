@@ -70,8 +70,9 @@ _REGISTER_KEYS = {}
 
 def _register(client, agent_id, **extra):
     # Each test agent gets a real key: first registration uses its address
-    # as the wallet; re-registration is proof-gated (G2.2), so the helper
-    # attaches an EIP-191 signature by the registered wallet.
+    # as the wallet with a valid EIP-191 proof (C3 fail-closed); 
+    # re-registration is proof-gated (G2.2), so the helper attaches an
+    # EIP-191 signature by the registered wallet.
     key = _REGISTER_KEYS.setdefault(agent_id, Account.create())
     body = {
         "agent_id": agent_id,
@@ -85,6 +86,14 @@ def _register(client, agent_id, **extra):
         ts = _now_ms()
         message = build_reregistration_message(body, ts)
         sig = key.sign_message(encode_defunct(text=message)).signature
+        body["registration_ts"] = ts
+        body["registration_signature"] = "0x" + bytes(sig).hex()
+    else:
+        from sincor2.a2a_identity import register_message
+        ts = _now_ms()
+        message = register_message(agent_id, ts)
+        sig = key.sign_message(encode_defunct(text=message)).signature
+        body["registration_wallet"] = key.address
         body["registration_ts"] = ts
         body["registration_signature"] = "0x" + bytes(sig).hex()
     r = client.post("/v1/a2a/register", json=body)
@@ -159,7 +168,7 @@ def test_registration_ignores_declared_reputation(client):
     r = client.post("/v1/a2a/register", json={
         "agent_id": "evil-1", "capability_tags": ["lead-enrichment"],
         "rpc_callback": "https://evil.example/rpc",
-        "wallet": "0x" + "22" * 20, "reputation": 1.0})
+        "reputation": 1.0})
     assert r.status_code in (200, 201), r.get_json()
     agent = get_fabric().agents["evil-1"]
     assert agent["reputation"] == 0.0
@@ -177,7 +186,7 @@ def test_platform_agent_id_reserved_over_http(client):
     r = client.post("/v1/a2a/register", json={
         "agent_id": PLATFORM_AGENT_ID, "capability_tags": ["x"],
         "rpc_callback": "https://evil.example/rpc",
-        "wallet": "0x" + "33" * 20, "reputation": 1.0})
+        "reputation": 1.0})
     assert r.status_code == 400, r.get_json()
     after = get_fabric().agents[PLATFORM_AGENT_ID]
     assert after["wallet"] == before["wallet"]

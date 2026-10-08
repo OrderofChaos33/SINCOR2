@@ -165,7 +165,6 @@ def test_v1_register_manifest(client):
             "agent_id": "scout-1",
             "name": "Scout",
             "capability_tags": ["lead-enrichment"],
-            "wallet": "0x" + "11" * 20,
             "rpc_callback": "https://scout.example.com/rpc",
         },
     )
@@ -183,7 +182,6 @@ def test_heartbeat_and_directory(client):
         "agent_id": "hb-1",
         "capability_tags": ["deal-scoring"],
         "rpc_callback": "https://hb.example/rpc",
-        "wallet": "0x" + "22" * 20,
     })
     beat = client.post("/v1/a2a/heartbeat", json={"agent_id": "hb-1"}, headers=hb_headers())
     assert beat.status_code == 200
@@ -201,7 +199,6 @@ def test_probation_agent_bids_micro_task(client):
         "agent_id": "prob-1",
         "capability_tags": ["lead-enrichment"],
         "rpc_callback": "https://p.example/rpc",
-        "wallet": "0x" + "33" * 20,
     })
     task = client.post(
         "/v1/a2a/tasks",
@@ -227,7 +224,6 @@ def test_merit_gate_blocks_probation_on_large_bounty(client):
         "agent_id": "prob-2",
         "capability_tags": ["compliance-sbom"],
         "rpc_callback": "https://p2.example/rpc",
-        "wallet": "0x" + "44" * 20,
     })
     task = client.post(
         "/v1/a2a/tasks",
@@ -277,13 +273,11 @@ def test_close_auction_assigns_lowest_composite(client):
         "agent_id": "fast",
         "capability_tags": ["deal-scoring"],
         "rpc_callback": "https://a.example/rpc",
-        "wallet": "0x" + "55" * 20,
     })
     client.post("/v1/a2a/register", json={
         "agent_id": "slow",
         "capability_tags": ["deal-scoring"],
         "rpc_callback": "https://b.example/rpc",
-        "wallet": "0x" + "66" * 20,
     })
     task = client.post(
         "/v1/a2a/tasks",

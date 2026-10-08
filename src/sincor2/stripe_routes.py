@@ -288,6 +288,38 @@ def _process_payment_event(event_data):
     event_type     = event_data.get('event')
     customer_email = event_data.get('customer_email', '')
 
+    # C4: route Stripe-signed value events through the effect boundary BEFORE
+    # any provisioning. Fail-closed: a denied intent skips provisioning.
+    try:
+        from sincor2.governance.money_gate import check_money_effect
+    except ImportError:
+        try:
+            from src.sincor2.governance.money_gate import (  # type: ignore
+                check_money_effect,
+            )
+        except ImportError as exc:
+            logger.critical(
+                "[FULFILLMENT] money gate unavailable (%s) — event %s DENIED "
+                "(fail closed)", exc, event_type)
+            return
+    allowed, gate_reason = check_money_effect(
+        effect_type="payment.transfer",
+        payload={"event": event_type,
+                 "amount_total": event_data.get("amount_total"),
+                 "session_id": event_data.get("session_id", "")},
+        agent_id="stripe_payment_event",
+        risk_tier="high",
+        idempotency_key="stripe-%s-%s" % (
+            event_type, event_data.get("session_id", "nosession")),
+        target="stripe_event_provisioning",
+        estimated_cost=float((event_data.get("amount_total") or 0)) / 100,
+    )
+    if not allowed:
+        logger.critical(
+            "[FULFILLMENT] effect boundary denied Stripe event %s: %s",
+            event_type, gate_reason)
+        return
+
     if event_type == 'payment_completed':
         session_id      = event_data.get('session_id', '')
         amount          = (event_data.get('amount_total') or 0) / 100

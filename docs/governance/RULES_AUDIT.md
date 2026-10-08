@@ -176,3 +176,34 @@ These require founder decisions before launch. All five are real code paths veri
 4. Either wire `EffectBoundary` into settlement/payout paths or delete it — an unwired fail-closed gate is a false sense of security.
 5. Flip `EXECUTE_LIVE` default to off and require the arming ceremony to set it; audit who can set `SAFETY_OVERRIDE`.
 6. Decide: is HITL blocking or recording? If blocking, couple `escalate()` to a hard gate on money paths; if recording, say so.
+
+---
+
+## Remediation record — Worker 4b (2026-10-08)
+
+Findings C1–C5 and the two HIGH items were remediated in code on branch
+`xioix/agent-governance-system` (fail-closed; not merely documented).
+Founder-policy items were deliberately NOT changed (see below).
+
+| Finding | Fix | Files |
+|---|---|---|
+| C1 | `POST /api/polyclaw/clear-dry-runs` now requires an admin JWT via the canonical `sincor2.auth_system.admin_required` decorator (401/403 without it). If the decorator cannot be imported, the route serves 503 instead of running unauthenticated (fail closed). | `src/sincor2/blueprints/monitoring.py` |
+| C2 | `isAllowed()` returns `false` when no oracle is configured/disabled/zero (ratified 2026-09-29 flip, now implemented). New Foundry suite + Python source assertion. Existing `SincFluidAdapter.t.sol` installs a permissive mock oracle in setUp so its block/unblock tests keep exercising the intended path. | `onchain/src/ComplianceGuard.sol`, `onchain/test/ComplianceGuard.t.sol`, `onchain/test/mocks/MockSanctionsOracle.sol`, `tests/pytest/test_p20_compliance_oracle.py` |
+| C3 | First-time registration rejects ANY wallet claim without a valid EIP-191 proof (`PermissionError` → 403); the proof's claimed wallet must equal the body's declared wallet. Anonymous claims (no wallet) still accepted as `identity="unverified"`. The agent SDK now attaches the correct proof format (first-reg vs re-reg) when given a signer. Tests updated to the fail-closed behavior. | `src/sincor2/a2a_inbound_ext.py`, `src/sincor2/a2a_sdk.py`, `tests/pytest/test_a2a_registration_proof.py`, `tests/pytest/test_registration_identity.py`, + 13 test files with unsigned wallet claims fixed |
+| C4 | New `sincor2.governance.money_gate.check_money_effect` routes money-path intents through a process-singleton `ShadowEffectBoundary` (fail-closed: kill-switch, unknown types/tiers, and any error deny). Wired into the treasury live-intent path (`run_cycle` refuses the whole live batch on deny) and the payment value paths (`trigger_fulfillment`, Stripe `_process_payment_event`). | `src/sincor2/governance/money_gate.py`, `src/sincor2/agents/treasury_execution_agent.py`, `src/sincor2/mvp_blueprints/billing.py`, `src/sincor2/stripe_routes.py` |
+| C5 | (a) Treasury kill switch is tamper-evident: halt file must carry the `SINCOR-TREASURY-HALT-V1` marker; an armed-but-missing or content-mismatched file logs CRITICAL and counts as TRIPPED (fail closed). (b) `SAFETY_OVERRIDE=true` now requires the second key `SAFETY_OVERRIDE_CONFIRM=I_UNDERSTAND`; single-key use is ignored with a CRITICAL log; active override logs CRITICAL. (c) `assert_production_safety()` RAISES `ProductionSafetyError` on dangerous prod config (mvp_app re-raises instead of swallowing). | `src/sincor2/agents/treasury_execution_agent.py`, `src/sincor2/safety_locks.py`, `src/sincor2/mvp_app.py` |
+| HIGH (hmac) | `allow_hmac_bids=True` hardcode removed from the `/api/contract-net` blueprint; default-deny unless `SINCOR_CONTRACT_NET_ALLOW_HMAC=1`. | `src/sincor2/blueprints/contract_net.py` |
+| HIGH (safety) | Covered by the C5(c) `assert_production_safety()` change above. | `src/sincor2/safety_locks.py` |
+
+**Deliberately NOT changed (founder policy):**
+- `EXECUTE_LIVE` default remains `"1"` in `treasury_execution_agent.py` (founder HOLD lift). Live broadcast still requires key + no kill switch; the kill switch itself is now tamper-evident (C5a) and the live-intent path is gated through the effect boundary (C4).
+- The `bankroll.py` startup `_auto_clear_stuck_dry_runs` (internal, not HTTP) was left as-is; only the HTTP route was gated.
+- w51's stake-deposit identity binding is still not in this tree (unmerged upstream); C3 closes the registration-side hole, stake-ledger binding remains a merge dependency.
+
+**Central enforcement point (Part 2):** `src/sincor2/governance/__init__.py`
+now exposes `check_action(agent_id, action, context)` — unknown action
+raises `UnknownAction`; every check failure returns `(False, reason)`; a
+DecisionEvent-equivalent dict is recorded on every call; `governed`
+decorator and `governed_action` context manager provided. Evidence-based:
+the gate never invents approval; `POLICY-MISSING` guardrail entries can
+never be evidenced (fail closed until the policy is implemented).

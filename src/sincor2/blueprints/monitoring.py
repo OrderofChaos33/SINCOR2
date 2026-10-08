@@ -3,11 +3,20 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
+from functools import wraps
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from flask import Blueprint, current_app, jsonify
 from flask_jwt_extended import jwt_required
+
+try:  # canonical admin-role decorator (403 for non-admin JWT)
+    from sincor2.auth_system import admin_required
+except ImportError:  # pragma: no cover - alternate layout
+    try:
+        from src.sincor2.auth_system import admin_required  # type: ignore
+    except ImportError:  # pragma: no cover - fail closed: no auth, no route
+        admin_required = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -171,12 +180,42 @@ def polyclaw_bankroll():
         return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
 
 
+def _admin_gate():
+    """Return the admin-role decorator for sensitive routes (C1).
+
+    Uses the canonical ``sincor2.auth_system.admin_required`` (JWT + role ==
+    admin, 403 otherwise). If the decorator cannot be imported, returns a
+    stand-in that serves 503 — the route stays registered but never runs
+    unauthenticated.
+    """
+    if admin_required is not None:
+        return admin_required()
+
+    def _disabled(fn):
+        @wraps(fn)
+        def _wrapper(*args, **kwargs):
+            return jsonify({
+                "status": "error",
+                "detail": "admin auth unavailable — route disabled (fail closed)",
+            }), 503
+        return _wrapper
+    return _disabled
+
+
 @monitoring_bp.post("/api/polyclaw/clear-dry-runs")
+@_admin_gate()
 def polyclaw_clear_dry_runs():
     """Close all simulated/dry-run open trades and release stuck exposure.
 
     This is the fix when available=$0 because dry-run cycles piled up
     open exposure that never settled.
+
+    ADMIN-GATED (C1 remediation, 2026-10-08): this handler also clears the
+    bankroll kill switch when tripped. An unauthenticated caller must never
+    be able to re-arm trading after a kill-switch trip, so the route
+    requires an admin JWT (403 otherwise). If the admin decorator cannot be
+    imported, the route serves 503 instead of running unauthenticated
+    (fail closed).
     """
     try:
         from sincor2.bankroll import get_bankroll
