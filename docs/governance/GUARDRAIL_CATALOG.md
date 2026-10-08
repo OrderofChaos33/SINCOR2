@@ -2638,3 +2638,15 @@ Entry point: `src/sincor2/x402_payments.py:120` · HTTP: `GET /api/paid/<resourc
 
 **Reversibility plan:** Challenge expires unclaimed.
 
+
+## Adversarial review notes (coordinator, 2026-10-08)
+
+**Bypass attempts tested against `check_action`:**
+- Empty string action → `UnknownAction` (blocked) ✓
+- `None` action → blocked ✓
+- Case variation (`TREASURY_DAO_EXECUTE`) → `UnknownAction` (blocked) ✓
+- Whitespace-padded (`' place_bid '`) → `UnknownAction` (blocked) ✓
+- Uncatalogued action → `UnknownAction` (blocked) ✓
+- Critical action with fabricated approval dict → denied (evidence-based; unverified claims rejected) ✓
+
+**Known limitation (documented, not a vulnerability):** The `@governed` decorator uses `functools.wraps`, which exposes `__wrapped__`. A caller with a direct reference to the decorated function could invoke `__wrapped__()` to skip the check. The decorator is a developer convenience, NOT the security boundary. Real enforcement happens when route handlers call `check_action()` explicitly before performing effects. Defense in depth: the money_gate and route-level gates do not rely on the decorator.
