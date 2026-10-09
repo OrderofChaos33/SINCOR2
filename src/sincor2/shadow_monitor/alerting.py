@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import re
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -227,7 +228,16 @@ class AlertManager:
         self.failed_deliveries: List[Dict[str, Any]] = []
         self.paused_capabilities: Set[str] = set()
         self.paused_workers: Dict[str, Dict[str, Any]] = {}
-        self._seen_dedup_keys: Set[Tuple[Any, ...]] = set()
+        # WP5: bounded dedup memory. The old unbounded set grew forever;
+        # this LRU evicts the oldest keys past the cap (default 10k).
+        self._dedup_capacity: int = 10_000
+        self._seen_dedup_keys: "OrderedDict[Tuple[Any, ...], float]" = OrderedDict()
+        # WP5: delivery acknowledgment ledger. alert_id -> ack record.
+        # "delivered"   = delivery_fn returned without raising
+        # "acknowledged"= provider/recipient confirmed receipt (via acknowledge())
+        # "failed"      = delivery_fn raised
+        # "unacked"     = delivered but no ack within the window (caller checks)
+        self._delivery_acks: Dict[str, Dict[str, Any]] = {}
         self._heartbeats: Dict[str, float] = {}
         if delivery_fn is None:
             self._delivery_fn: DeliveryFn = self._default_delivery
@@ -240,12 +250,32 @@ class AlertManager:
         self.outbox.append(alert)
         return {"delivered": True, "alert_id": alert.alert_id}
 
+    def _remember_dedup_key(self, key: Tuple[Any, ...]) -> bool:
+        """Record a dedup key; return True if it was already seen.
+
+        Bounded LRU: oldest keys are evicted past the capacity cap so the
+        dedup memory cannot grow without bound on a long-lived manager.
+        """
+        if key in self._seen_dedup_keys:
+            self._seen_dedup_keys.move_to_end(key)
+            return True
+        self._seen_dedup_keys[key] = time.monotonic()
+        while len(self._seen_dedup_keys) > self._dedup_capacity:
+            self._seen_dedup_keys.popitem(last=False)
+        return False
+
     def send(self, alert: Alert) -> Dict[str, Any]:
         """Deliver an alert; return a delivery receipt dict.
 
         Alerts are deduplicated by ``dedup_key`` (``(trace_id, workflow,
         policy_reason)``): a second send with the same key returns
-        ``{"deduped": True}`` and does not re-deliver.
+        ``{"deduped": True}`` and does not re-deliver. Dedup memory is
+        bounded (LRU, 10k keys).
+
+        Every send is recorded in the delivery-ack ledger
+        (:meth:`delivery_status`): "delivered" on success, "failed" when the
+        delivery function raises. Recipient acknowledgment is tracked
+        separately via :meth:`acknowledge` ("acknowledged" vs "unacked").
 
         If the delivery function raises, the failure is recorded locally in
         ``failed_deliveries``, the ``alert_delivery`` capability is marked
@@ -253,9 +283,8 @@ class AlertManager:
         alerts are never lost.
         """
         key = tuple(alert.dedup_key)
-        if key in self._seen_dedup_keys:
+        if self._remember_dedup_key(key):
             return {"deduped": True, "alert_id": alert.alert_id}
-        self._seen_dedup_keys.add(key)
         try:
             receipt = self._delivery_fn(alert)
         except Exception as exc:  # noqa: BLE001 - record, never lose
@@ -263,6 +292,11 @@ class AlertManager:
                 {"alert": alert, "error": f"{type(exc).__name__}: {exc}"}
             )
             self.paused_capabilities.add(DELIVERY_CAPABILITY)
+            self._delivery_acks[alert.alert_id] = {
+                "status": "failed",
+                "error": f"{type(exc).__name__}: {exc}",
+                "at": _now().isoformat(),
+            }
             return {
                 "delivered": False,
                 "alert_id": alert.alert_id,
@@ -272,7 +306,60 @@ class AlertManager:
             receipt = {"delivered": True}
         receipt.setdefault("alert_id", alert.alert_id)
         receipt.setdefault("delivered", True)
+        self._delivery_acks[alert.alert_id] = {
+            "status": "delivered",
+            "at": _now().isoformat(),
+            "receipt": {k: v for k, v in receipt.items() if k != "alert"},
+        }
         return receipt
+
+    # -- WP5: delivery acknowledgments --------------------------------------
+
+    def acknowledge(self, alert_id: str, by: str = "") -> Dict[str, Any]:
+        """Record recipient acknowledgment of a delivered alert.
+
+        Raises KeyError if the alert_id was never sent through this manager.
+        Agents may not acknowledge alerts (see agent_cannot_clear_alert);
+        the ``by`` principal id is recorded for the audit trail.
+        """
+        record = self._delivery_acks.get(alert_id)
+        if record is None:
+            raise KeyError(f"unknown alert_id: {alert_id!r}")
+        if record["status"] == "failed":
+            return {"acknowledged": False, "reason": "delivery failed; nothing to ack"}
+        record["status"] = "acknowledged"
+        record["acknowledged_by"] = by
+        record["acknowledged_at"] = _now().isoformat()
+        return {"acknowledged": True, "alert_id": alert_id}
+
+    def delivery_status(self, alert_id: str) -> Dict[str, Any]:
+        """Return the ack-ledger record for an alert (copy)."""
+        record = self._delivery_acks.get(alert_id)
+        if record is None:
+            raise KeyError(f"unknown alert_id: {alert_id!r}")
+        return dict(record)
+
+    def unacknowledged(self, older_than_s: float = 0) -> List[str]:
+        """Alert ids delivered but not yet acknowledged.
+
+        ``older_than_s`` filters to alerts delivered at least that long ago
+        (0 = all unacked). The dead-man check uses this to detect a
+        silently-broken ack path.
+        """
+        now = _now()
+        out: List[str] = []
+        for alert_id, record in self._delivery_acks.items():
+            if record["status"] != "delivered":
+                continue
+            if older_than_s > 0:
+                try:
+                    sent_at = datetime.fromisoformat(record["at"])
+                    if (now - sent_at).total_seconds() < older_than_s:
+                        continue
+                except (ValueError, KeyError):
+                    pass
+            out.append(alert_id)
+        return out
 
     # -- the ONLY permitted automated response ----------------------------
 
