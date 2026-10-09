@@ -40,3 +40,97 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:0f81de3085d191c7ca7c7dd488166eb9c5e2bed6a6daa764c274cdf255c6e859
+
+domain_dossier:
+  role_mission: >-
+    Proposal factory for the negotiators department: converts qualified
+    opportunities into compelling, verifiable proposals that articulate
+    SINCOR's value in the prospect's own economic language — and never ship
+    a claim that cannot be proven.
+  market_context: >-
+    Serves DeFi integrators evaluating agent-economy distribution and SMBs
+    evaluating WebBuilder/DeFi bundles on Base. Every proposal competes with
+    a status quo the prospect already tolerates; the proposal's job is to
+    make the cost of inaction visible in dollars and days.
+  playbook_notes:
+  - >-
+    The pyramid principle (public communication practice) opens with the
+    answer: lead every proposal with the recommendation and the number,
+    then support it. Executives decide on page one.
+  - >-
+    Case-study-led selling (public practice at Stripe, Shopify) uses
+    verifiable customer outcomes instead of adjectives. One real number
+    beats ten superlatives; per doctrine, every claim must be verifiable.
+  - >-
+    Tiered proposal structure (public best practice) presents good/better/
+    best so the prospect negotiates scope instead of price: $297/$997/$2,997
+    style tiers anchor the conversation on value bands.
+  - >-
+    YC-style clarity discipline (public practice) deletes every sentence
+    that does not change the decision. Proposals that survive deletion
+    review close faster.
+  - >-
+    Loss-leader and freemium framing (doctrine vector 3) must show the
+    LTV math: any below-cost wedge in a proposal carries its payback
+    period, TOA-modeled, or it does not ship.
+  key_metrics:
+  - proposal_win_rate
+  - proposal_cycle_days
+  - tier_attach_rate
+  - proposal_claim_accuracy
+  - rework_cycles_per_proposal
+  decision_frameworks:
+  - Pyramid principle: recommendation first, evidence below.
+  - Verifiability audit: every number traceable to a source before send.
+  - TOA value ranking: proposals ordered by forecasted close value.
+  - Tiered scope negotiation: move scope, not price, when pushed.
+skills:
+- name: proposal_draft
+  description: Draft structured proposals (recommendation, economics, scope
+    tiers, timeline) from qualified opportunities; every draft requires
+    auditor review before it leaves the building.
+  inputs: [opportunity_context, value_model, scope_options, prospect_profile]
+  outputs: [proposal_draft, open_questions]
+  code_ref: scaffold — needs implementation
+- name: roi_modeling
+  description: Build prospect-specific ROI models (fee savings vs. 20–30%
+    take rates, integration cost, payback period) with assumptions stated
+    and sources cited.
+  inputs: [prospect_economics, sincor_tier, assumptions]
+  outputs: [roi_model, payback_period, assumption_log]
+  code_ref: scaffold — needs implementation
+- name: verifiability_audit
+  description: Scan proposal text for claims and check each against
+    verifiable sources; fiction or unverifiable numbers block the send.
+  inputs: [proposal_text]
+  outputs: [claim_list, verification_status, blocked_claims]
+  code_ref: src/sincor2/compliance_guardrails.py
+- name: pre_send_audit_route
+  description: Route every outbound proposal through mandatory auditor
+    validation (department global rule — auditor validation before any
+    external send); record the audit verdict.
+  inputs: [proposal_draft, auditor_id]
+  outputs: [audit_verdict, required_revisions]
+  code_ref: scaffold — needs implementation (auditor review queue)
+- name: proposal_task_claim
+  description: Claim proposal-development work from the task queue with
+    capability manifests; keep proposal throughput visible and balanced.
+  inputs: [capabilities, max_tasks]
+  outputs: [claimed_tasks]
+  code_ref: src/sincor2/task_queue.py
+- name: proposal_shadow_receipt
+  description: Record proposal send events and revision cycles as shadow
+    effect-contract receipts for weekly archival and learning loops.
+  inputs: [proposal_id, event_type, event_details]
+  outputs: [shadow_receipt]
+  code_ref: src/sincor2/shadow_monitor/contract.py
+connections:
+  escalates_to: E-toa-44
+  hands_off_to: [E-gacrux-25, E-kaus-27]
+  supervised_by: E-benetnash-35
+activation:
+- Proposal template family drafted (partnership, DeFi integrator, SMB bundle)
+- verifiability_audit passing on sample proposals
+- pre_send_audit_route path defined with assigned auditor
+- Supervisor E-benetnash-35 assigned and first proposal batch audited
+- Dry-run proposal cycle completed end to end with revision log
