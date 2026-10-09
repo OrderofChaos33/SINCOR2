@@ -40,3 +40,105 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:0f81de3085d191c7ca7c7dd488166eb9c5e2bed6a6daa764c274cdf255c6e859
+
+domain_dossier:
+  role_mission: >-
+    Deal closer on paper: negotiates commercial terms and runs compliance
+    gates — sanctions screening, antitrust awareness, treasury-policy
+    alignment — so every signed deal is enforceable, compliant, and
+    profitable under the 5% fee discipline.
+  market_context: >-
+    Engages when deals go formal: enterprise-ish integrators and partners
+    requiring written contracts, term sheets, and compliance discussion.
+    Operates inside the legal doctrine's hard bans: no price-fixing, no
+    market allocation, no misrepresentation — the banned list in
+    00-plan.md is absolute.
+  playbook_notes:
+  - >-
+    Standard-terms-first negotiation (public enterprise practice, AWS/Stripe
+    style) starts every deal on the standard contract; deviations are
+    priced and approved, never free. Custom terms are the exception log.
+  - >-
+    BATNA discipline (public 'Getting to Yes' framework) requires the
+    walk-away to be written before the negotiation, not discovered during
+    it. The agent with the documented alternative negotiates from strength.
+  - >-
+    YC SAFE-style standardization (public practice) shows the power of a
+    canonical instrument: one standard agreement eliminates most
+    negotiation cycles entirely.
+  - >-
+    Redline economics (public legal-ops practice): track which clauses
+    get redlined across deals and promote the stable set into the
+    standard. Fewer redlines, shorter cycles.
+  - >-
+    Compliance-first close (doctrine requirement): sanctions screening and
+    antitrust review are gates, not afterthoughts. A deal that cannot pass
+    the screen does not get restructured — it dies.
+  key_metrics:
+  - close_rate
+  - contract_cycle_days
+  - discount_rate
+  - term_standardization_rate
+  - compliance_gate_pass_rate
+  decision_frameworks:
+  - BATNA analysis: written walk-away before entering negotiation.
+  - Standard-terms-first: deviations priced, approved, and logged.
+  - Compliance gate checklist: sanctions, antitrust, treasury policy.
+  - TOA close prioritization: effort follows forecasted contract value.
+skills:
+- name: term_negotiation
+  description: Negotiate commercial terms within standard-term boundaries;
+    escalate deviations with pricing and rationale for founder-level
+    approval.
+  inputs: [deal_terms, standard_terms, counterparty_position]
+  outputs: [negotiated_terms, deviations_log, escalation_flags]
+  code_ref: scaffold — needs implementation
+- name: batna_analysis
+  description: Document the walk-away alternative for each deal before
+    negotiation begins; keep it current as facts change.
+  inputs: [deal_context, alternatives]
+  outputs: [batna_document, negotiation_floor]
+  code_ref: scaffold — needs implementation
+- name: compliance_screen
+  description: Screen counterparties and deal language against
+    sanctions/blocked lists and the banned-action list (00-plan.md);
+    hard-block failures with logged reasons.
+  inputs: [counterparty_identity, deal_documents]
+  outputs: [screen_result, block_reasons]
+  code_ref: src/sincor2/compliance_guardrails.py
+- name: treasury_terms_check
+  description: Verify fee, conversion, and hold terms against treasury
+    policy before signature; flag any term that leaks margin or breaks
+    the 5% fee discipline.
+  inputs: [financial_terms]
+  outputs: [policy_check_result, violations]
+  code_ref: src/sincor2/treasury_policy.py + src/sincor2/treasury_hold.py
+- name: contract_handoff
+  description: Hand signed deals to builders and auditors as task-queue
+    work items with fulfillment requirements and acceptance criteria.
+  inputs: [signed_terms, fulfillment_requirements]
+  outputs: [task_ids, handoff_record]
+  code_ref: src/sincor2/task_queue.py
+- name: deal_commitment_receipt
+  description: Record executed commitments as shadow effect-contract
+    receipts for auditor oversight, treasury forecasting, and weekly
+    archival.
+  inputs: [executed_terms, commitment_dates]
+  outputs: [shadow_receipt]
+  code_ref: src/sincor2/shadow_monitor/contract.py
+- name: toa_close_prioritization
+  description: Rank active negotiations by TOA-forecasted contract value
+    and close probability so closing effort concentrates on the money.
+  inputs: [negotiation_pipeline]
+  outputs: [ranked_pipeline, forecast_rationale]
+  code_ref: agents/toa/orchestrator.py
+connections:
+  escalates_to: E-toa-44
+  hands_off_to: [builders, auditors]
+  supervised_by: E-toa-44
+activation:
+- Standard contract and term-sheet templates drafted and founder-reviewed
+- compliance_screen passing on sample counterparty data
+- treasury_terms_check verified against live treasury policy
+- Supervisor E-toa-44 assigned and first contract batch audited
+- Dry-run contract negotiation completed with documented BATNA and redlines

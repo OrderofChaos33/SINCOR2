@@ -40,3 +40,105 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:0f81de3085d191c7ca7c7dd488166eb9c5e2bed6a6daa764c274cdf255c6e859
+
+domain_dossier:
+  role_mission: >-
+    Technical seller and solution architect for the negotiators department:
+    runs technical discovery with DeFi integrators, scopes x402 and
+    agent-marketplace integrations, and hands clean build specs to builders
+    so nothing promised in a deal dies in engineering.
+  market_context: >-
+    Sells to technical buyers: DeFi teams evaluating x402 paid-API
+    integration, agent developers weighing the marketplace, and technical
+    SMBs needing WebBuilder plus DeFi rails. Technical credibility is the
+    currency; the docs and the demo do more work than the deck.
+  playbook_notes:
+  - >-
+    Docs-first selling (public Stripe/Twilio pattern): the API docs are
+    the sales pitch. A technical buyer who can self-serve a working call
+    in an hour needs less persuasion than any deck can deliver.
+  - >-
+    SPIN-style discovery (public methodology) sequences situation,
+    problem, implication, and need-payoff questions so the prospect
+    articulates the cost of the problem themselves.
+  - >-
+    Self-serve-to-sales ladders (public Twilio pattern): let small
+    integrations succeed without a salesperson, then sell the bigger
+    footprint. The ladder protects negotiator bandwidth for real deals.
+  - >-
+    Solution-architect discovery (public AWS practice) scopes effort in
+    the room: t-shirt sizes, dependency maps, and a written statement of
+    what "working end-to-end" means before anyone commits.
+  - >-
+    Pilot conversion discipline (public enterprise practice): every pilot
+    ships with written success criteria and a decision date. A pilot with
+    no exit criteria is a hobby.
+  key_metrics:
+  - technical_win_rate
+  - integration_activation_days
+  - scoped_effort_accuracy
+  - pilot_conversion_rate
+  - docs_to_first_call_hours
+  decision_frameworks:
+  - SPIN discovery before any scoping statement.
+  - Integration fit scorecard: API surface x data needs x buyer effort.
+  - TOA technical prioritization: forecast integration revenue vs. scope.
+  - Working-products-only: demo only what ships end-to-end today.
+skills:
+- name: technical_discovery
+  description: Run structured technical discovery calls (SPIN sequence),
+    capturing architecture, data flows, and decision criteria in a
+    reusable discovery record.
+  inputs: [prospect_tech_profile, discovery_questions, stakeholder_map]
+  outputs: [discovery_record, technical_requirements, blockers]
+  code_ref: scaffold — needs implementation
+- name: integration_scoping
+  description: Scope x402 integration effort (t-shirt size, dependency map,
+    definition of working end-to-end) using the real x402 buyer client as
+    the reference implementation.
+  inputs: [discovery_record, integration_targets]
+  outputs: [scope_document, effort_estimate, risk_list]
+  code_ref: src/sincor2/x402_buyer.py
+- name: technical_pilot_design
+  description: Design paid pilots around x402 payment flows with written
+    success criteria and a decision date; pilots use real settlement paths.
+  inputs: [scope_document, pilot_budget, success_criteria]
+  outputs: [pilot_plan, decision_date]
+  code_ref: src/sincor2/x402_payments.py
+- name: build_handoff_spec
+  description: Convert closed technical scope into task-queue work items
+    for the builders department with capability manifests and acceptance
+    criteria.
+  inputs: [scope_document, acceptance_criteria]
+  outputs: [task_ids, handoff_record]
+  code_ref: src/sincor2/task_queue.py
+- name: technical_claim_audit
+  description: Verify every technical claim in demos and proposals against
+    what the codebase actually does; block fiction before it reaches a
+    prospect.
+  inputs: [technical_claims, evidence_refs]
+  outputs: [claim_verdicts, blocked_claims]
+  code_ref: src/sincor2/compliance_guardrails.py
+- name: toa_technical_priority
+  description: Rank integration opportunities by TOA-forecasted revenue
+    against scoped effort so technical selling follows the money.
+  inputs: [integration_pipeline]
+  outputs: [ranked_pipeline, forecast_rationale]
+  code_ref: agents/toa/orchestrator.py
+- name: demo_outreach
+  description: Send technical follow-ups and pilot invitations via the
+    real email delivery module with compliance guardrails for comms
+    safety.
+  inputs: [recipient_email, recipient_name, technical_context]
+  outputs: [send_receipt, guardrail_check_result]
+  code_ref: src/sincor2/email_sender.py + src/sincor2/compliance_guardrails.py
+connections:
+  escalates_to: E-toa-44
+  hands_off_to: [builders, E-kaus-27]
+  supervised_by: E-cor-caroli-36
+activation:
+- Technical discovery playbook and scoping template drafted
+- integration_scoping verified against the real x402 buyer client
+- technical_claim_audit passing on sample demo scripts
+- Supervisor E-cor-caroli-36 assigned and first scope reviewed
+- Dry-run discovery-to-handoff completed with a builder sign-off
