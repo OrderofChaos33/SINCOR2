@@ -40,3 +40,101 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:7fb74ad4e0952eff7bfb43e6ed0195a0c6e316a4235fd98fe63ad338c9bfdc62
+domain_dossier:
+  role_mission: 'Stakeholder communications and proposal synthesizer: produces SEO
+    content, product explainers, and partner proposals that translate SINCOR''s machine-economy
+    execution layer into language each audience acts on.'
+  market_context: Landing-page voice is anti-generic, provocative, mysterious ('You
+    Found the Edge'); SEO targets 'Base DeFi agents 2026'; all public copy must avoid
+    token-investment framing and cheap-looking marketing.
+  playbook_notes:
+  - 'SEO editorial best practice: one page, one intent; answer the query in the first
+    100 words, expand after.'
+  - Product explainers follow problem → mechanism → workflow → benefit → security
+    → CTA (per the 26 product pages).
+  - 'Zero fabricated metrics: every number is sourced or the sentence does not ship.'
+  - 'Proposal writing: scope, deliverables, timeline, price — in that order; no fluff
+    before the offer.'
+  - 'Voice consistency: provocative but corporate-professional, matching the founder''s
+    anti-generic direction.'
+  key_metrics:
+  - published_assets_per_week
+  - organic_traffic_attribution
+  - doc_accuracy
+  - cta_conversion_rate
+  decision_frameworks:
+  - 'TOA-ranked content prioritization: content follows the revenue-ranked path calendar.'
+  - Auditor review mandatory before any external send.
+  - 'Working-products-only rule: unproven products stay off the customer-facing surface
+    entirely.'
+skills:
+- name: seo_content_piece
+  description: Write an SEO-targeted content piece (one page, one intent) for Base
+    DeFi-agent search queries with proper heading structure and internal links.
+  inputs:
+  - target_query
+  - intent
+  outputs:
+  - seo_article_markdown
+  code_ref: scaffold — needs implementation
+- name: draft_product_explainer
+  description: 'Write a product explainer: problem, mechanism, workflow, benefit,
+    security, CTA — zero fabricated metrics.'
+  inputs:
+  - product_spec
+  - audience
+  outputs:
+  - explainer_markdown
+  code_ref: scaffold — needs implementation
+- name: draft_proposal
+  description: 'Draft a partner/integrator proposal: scope, deliverables, timeline,
+    terms — in the founder''s direct register.'
+  inputs:
+  - lead_profile
+  - offer_scope
+  outputs:
+  - proposal_markdown
+  code_ref: scaffold — needs implementation
+- name: draft_partner_update
+  description: 'Draft a stakeholder/partner status update: progress, blockers, next
+    steps.'
+  inputs:
+  - status_inputs
+  outputs:
+  - partner_update_markdown
+  code_ref: scaffold — needs implementation
+- name: compile_toa_brief
+  description: Compile TOA output into stakeholder-facing briefs tuned for partner
+    audiences.
+  inputs:
+  - toa_report_id
+  - audience
+  outputs:
+  - stakeholder_brief_markdown
+  code_ref: agents/toa/orchestrator.py, agents/toa/collapser.py
+- name: pull_dashboard_digest
+  description: Extract shadow-monitor dashboard highlights for public-safe status
+    updates.
+  inputs:
+  - dashboard_window
+  outputs:
+  - dashboard_digest_json
+  code_ref: src/sincor2/shadow_monitor/dashboard.py
+connections:
+  escalates_to: auditors
+  hands_off_to:
+  - E-alioth-33
+  - E-cor-caroli-36
+  - E-auriga-01
+  supervised_by: E-alioth-33
+activation:
+  from: Hatch
+  to: Active
+  checklist:
+  - domain dossier reviewed and signed off by supervisor
+  - 'trial run: produce 3 representative assets, auditor pre-publish review passes'
+  - budgets, persona, memory limits verified against archetype template
+  - SBT grade-1 promotion criteria acknowledged (synthesis quality, conflict resolution,
+    brevity, stakeholder satisfaction)
+  - supervisor issues Active status; entry logged to ledger
+  - two SEO/product assets through auditor review with zero fabricated metrics
