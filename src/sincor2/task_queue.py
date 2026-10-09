@@ -268,12 +268,33 @@ def update_job(job_id: str, **fields: Any) -> Optional[Job]:
 
 
 def run_job(job_id: str) -> Job:
-    """Execute a queued job. Called by Celery workers and the thread pool."""
+    """Execute a queued job. Called by Celery workers and the thread pool.
+
+    WP3 dispatch gate: the capability-manifest check runs here, at the
+    single choke point all backends (eager, Celery, thread pool) funnel
+    through. Unknown task kinds and unauthorized value-moving dispatches
+    are rejected BEFORE any handler is invoked. The originator is read
+    from the job payload (stamped by workers.gated_enqueue); raw enqueues
+    default to "background_worker".
+    """
     job = get_job(job_id)
     if not job:
         raise RuntimeError(f"job {job_id} not found")
     if job.state in _TERMINAL:
         return job
+    # --- WP3 capability-manifest gate (fail closed) ---
+    try:
+        from sincor2.workers.capability_manifest import check_dispatch
+
+        originator = str((job.payload or {}).get("_wp3_originator", "background_worker"))
+        check_dispatch(job.kind, originator)
+    except Exception as gate_err:
+        logger.warning(
+            "dispatch gate denied job=%s kind=%s: %s", job_id, job.kind, gate_err
+        )
+        update_job(job_id, state=FAILED, error=str(gate_err))
+        raise
+    # --- end WP3 gate ---
     update_job(job_id, state=RUNNING, progress=5)
     handler = get_handler(job.kind)
     if handler is None:
