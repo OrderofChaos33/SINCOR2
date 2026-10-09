@@ -233,9 +233,11 @@ def _recover_dispute_signer(message: str, signature: str) -> str:
     try:
         from eth_account import Account
         from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
     except Exception as exc:
         raise ValueError("signature verification unavailable") from exc
     try:
+        require_low_s(signature)
         return str(Account.recover_message(
             encode_defunct(text=message), signature=signature))
     except Exception as exc:
