@@ -25,6 +25,38 @@ get_orchestrator = None
 
 stripe_bp = Blueprint('stripe', __name__, url_prefix='/api/stripe')
 
+# ---------------------------------------------------------------------------
+# WP4 / D3: Legacy Stripe/fiat surfaces are NOT supported.
+# Owner decision D3 (2026-10-09): USDC + AXM ONLY.
+# The unauthenticated alternate routes below (dynamic-price checkout,
+# customer portal, session lookup, subscription cancel, revenue dashboard)
+# are DISABLED and return 403. The /webhook route stays active because it
+# is Stripe-signature-verified and needed to drain in-flight subscriptions;
+# it performs no new charges.
+# ---------------------------------------------------------------------------
+STRIPE_LEGACY_ROUTES_DISABLED = True
+
+
+def _stripe_disabled(reason: str):
+    """Decorator: return 403 for disabled legacy Stripe routes (D3)."""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if STRIPE_LEGACY_ROUTES_DISABLED:
+                logger.warning(
+                    "[STRIPE-D3] blocked disabled legacy route %s: %s",
+                    fn.__name__, reason,
+                )
+                return jsonify({
+                    'success': False,
+                    'error': 'legacy_stripe_disabled',
+                    'detail': 'Legacy Stripe/fiat surfaces are not supported. '
+                              'USDC and AXM only (owner decision D3).',
+                }), 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
 # Stripe Price IDs (live mode)
 # IMPORTANT: Update these with new price IDs after creating products in Stripe dashboard:
 #   - starter: $49 one-time (Payment, not subscription)
@@ -94,6 +126,7 @@ def init_stripe_routes(app, stripe_processor):
     """Initialize Stripe routes with Flask app"""
 
     @stripe_bp.route('/checkout', methods=['POST'])
+    @_stripe_disabled('dynamic-price checkout accepted client-supplied price_cents (D3)')
     def create_checkout():
         """Create a Stripe checkout session (subscription, supports annual billing)"""
         try:
@@ -176,6 +209,7 @@ def init_stripe_routes(app, stripe_processor):
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @stripe_bp.route('/portal', methods=['POST'])
+    @_stripe_disabled('unauthenticated customer portal for arbitrary customer_id (D3)')
     def customer_portal():
         """Create a Stripe Customer Portal session and redirect"""
         try:
@@ -196,6 +230,7 @@ def init_stripe_routes(app, stripe_processor):
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @stripe_bp.route('/session/<session_id>', methods=['GET'])
+    @_stripe_disabled('unauthenticated checkout session lookup (D3)')
     def get_session_details(session_id):
         """Get checkout session details"""
         try:
@@ -208,6 +243,7 @@ def init_stripe_routes(app, stripe_processor):
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @stripe_bp.route('/cancel/<subscription_id>', methods=['POST'])
+    @_stripe_disabled('unauthenticated subscription cancellation (D3)')
     def cancel_subscription_route(subscription_id):
         """Cancel a subscription"""
         try:
@@ -218,6 +254,17 @@ def init_stripe_routes(app, stripe_processor):
         except Exception as e:
             logger.error(f"[STRIPE] Cancellation error: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
+
+    @stripe_bp.route('/dashboard', methods=['GET'])
+    @_stripe_disabled('unauthenticated revenue metrics (D3)')
+    def revenue_dashboard():
+        """Get real-time revenue metrics"""
+        if not ORCHESTRATOR_AVAILABLE or not get_orchestrator:
+            return jsonify({'error': 'Revenue orchestrator not available'}), 503
+
+        _orch = get_orchestrator()
+        dashboard_data = _orch.get_dashboard_data()
+        return jsonify(dashboard_data), 200
 
     app.register_blueprint(stripe_bp)
 
@@ -439,15 +486,4 @@ def _process_payment_event(event_data):
 
     elif event_type == 'subscription_updated':
         logger.info(f"[BILLING] Subscription updated: {event_data.get('subscription_id')}")
-    
-    # Register dashboard endpoint
-    @stripe_bp.route('/dashboard', methods=['GET'])
-    def revenue_dashboard():
-        """Get real-time revenue metrics"""
-        if not ORCHESTRATOR_AVAILABLE or not get_orchestrator:
-            return jsonify({'error': 'Revenue orchestrator not available'}), 503
-        
-        _orch = get_orchestrator()
-        dashboard_data = _orch.get_dashboard_data()
-        return jsonify(dashboard_data), 200
 

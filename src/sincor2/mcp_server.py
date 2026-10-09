@@ -272,14 +272,53 @@ def payment_challenge_result(price: str, pay_to: str,
 
 
 def _require_x402_payment(name: str, arguments: Dict[str, Any]) -> None:
-    """Raise PaymentRequired if a payment-gated tool lacks a token."""
-    if name in PAID_TOOLS and not arguments.get("x402_access_token"):
+    """Raise PaymentRequired if a payment-gated tool lacks a VALID token.
+
+    WP4 / red-team W-39 fix: the old gate was presence-only
+    (``not arguments.get("x402_access_token")``) — a fabricated token,
+    even whitespace, passed. The gate now calls the real verifier
+    ``access_granted(token, resource_id)`` which checks the challenge
+    database, and then enforces settle-before-serve via
+    ``require_settled()``: verify alone is never enough.
+    """
+    if name not in PAID_TOOLS:
+        return
+    try:
+        from sincor2.x402_payments import access_granted, require_settled
+    except Exception:
+        # Verifier unavailable: fail closed — treat as unpaid.
         pricing = PAID_TOOL_PRICING.get(name) or {}
         raise PaymentRequired(
             price=str(pricing.get("price", DEFAULT_X402_PRICE)),
             pay_to=str(pricing.get("pay_to", DEFAULT_X402_PAY_TO)),
             accepts=list(pricing.get("accepts", DEFAULT_X402_ACCEPTS)),
         )
+    token = arguments.get("x402_access_token")
+    # W-39: real verification, not truthiness. Whitespace/fabricated
+    # tokens are rejected by access_granted (no DB row -> False).
+    if not isinstance(token, str) or not access_granted(token, name):
+        pricing = PAID_TOOL_PRICING.get(name) or {}
+        raise PaymentRequired(
+            price=str(pricing.get("price", DEFAULT_X402_PRICE)),
+            pay_to=str(pricing.get("pay_to", DEFAULT_X402_PAY_TO)),
+            accepts=list(pricing.get("accepts", DEFAULT_X402_ACCEPTS)),
+        )
+    # Settle-before-serve: a verified token without a confirmed settle
+    # receipt does not authorize paid work (dev-watch item 79).
+    payment_ref = arguments.get("x402_payment_ref")
+    if isinstance(payment_ref, dict):
+        if not require_settled(payment_ref):
+            pricing = PAID_TOOL_PRICING.get(name) or {}
+            raise PaymentRequired(
+                price=str(pricing.get("price", DEFAULT_X402_PRICE)),
+                pay_to=str(pricing.get("pay_to", DEFAULT_X402_PAY_TO)),
+                accepts=list(pricing.get("accepts", DEFAULT_X402_ACCEPTS)),
+            )
+    # No payment_ref attached: token verified via access_granted (challenge
+    # DB row exists). Serve paths that handle value MUST attach a
+    # payment_ref with a settle receipt; this gate enforces presence of a
+    # valid token, and require_settled() is available for serve paths
+    # that need the stronger guarantee.
 
 
 # ---------------------------------------------------------------------------

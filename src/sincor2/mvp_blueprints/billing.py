@@ -242,12 +242,22 @@ def x402_paid_resource(resource_id):
     """Serve paid API payloads after x402 access token presented."""
     if not X402_AVAILABLE:
         return jsonify({'error': 'x402_unavailable'}), 503
-    from sincor2.x402_payments import access_granted, execute_paid_resource
+    from sincor2.x402_payments import access_granted, execute_paid_resource, require_settled
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
     if not access_granted(token, resource_id):
         from sincor2.x402_payments import create_challenge
         ch = create_challenge(resource_id)
         return jsonify(ch), 402
+    # WP4: settle-before-serve. A verified token alone does not authorize
+    # serving paid work — require a confirmed settle receipt when the
+    # caller attaches a payment reference (dev-watch item 79: verify
+    # passed while settle rejected everything).
+    _payload_probe = request.get_json(silent=True) or {}
+    _payment_ref = _payload_probe.get('x402_payment_ref')
+    if isinstance(_payment_ref, dict) and not require_settled(_payment_ref):
+        return jsonify({'ok': False, 'error': 'payment_not_settled',
+                        'detail': 'x402 payment verified but not settled; '
+                                  'settle receipt required before serve'}), 402
     if resource_id == 'hook_status':
         try:
             from sincor2.hook_stats import fetch_hook_status

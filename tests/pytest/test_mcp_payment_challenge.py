@@ -59,12 +59,26 @@ def test_tools_call_returns_challenge_not_rpc_error(paid_get_quote):
     assert "retry_instructions" in payload
 
 
-def test_tools_call_with_token_passes_gate(paid_get_quote):
-    # A call carrying an x402 access token is not challenged; it proceeds
-    # to normal dispatch (get_quote with bad args -> -32602, proving the
-    # gate let it through instead of challenging).
+def test_tools_call_with_token_passes_gate(paid_get_quote, monkeypatch):
+    # W-39 fix: the gate now calls the real verifier (access_granted),
+    # not a truthiness check. A fabricated token ("tok") is challenged;
+    # a token the verifier confirms passes through to dispatch.
+    # 1. Fabricated token -> challenged (payment_required in result).
     response = ms._handle_tools_call(
         8, {"name": "get_quote", "arguments": {"x402_access_token": "tok"}})
+    result = response.get("result") or {}
+    assert "payment_required" in json.dumps(result)
+
+    # 2. Verifier-confirmed token -> passes gate to normal dispatch
+    # (get_quote with bad args -> -32602, proving the gate let it through).
+    import sincor2.x402_payments as x402
+
+    monkeypatch.setattr(x402, "access_granted", lambda token, rid: True)
+    # _require_x402_payment imports access_granted lazily from the module,
+    # so patching the module attribute takes effect.
+    response = ms._handle_tools_call(
+        8, {"name": "get_quote",
+            "arguments": {"x402_access_token": "tok_valid_mocked"}})
     assert response.get("error", {}).get("code") != -32000
     result = response.get("result") or {}
     assert "payment_required" not in json.dumps(result)
