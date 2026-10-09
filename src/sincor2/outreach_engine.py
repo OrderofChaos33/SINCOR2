@@ -20,9 +20,21 @@ _JUNK_EMAIL = ("example.com", "sentry.io", "wixpress.com", "cloudflare", "schema
 
 
 def _autonomous_on() -> bool:
-    master = os.environ.get("AUTONOMOUS_AGENTS", "true").lower() == "true"
-    flag = os.environ.get("OUTREACH_ENABLED", "true" if master else "false").lower()
-    return flag == "true"
+    """WP2 / D1: explicit opt-in only. Fail closed when unset.
+
+    Previous behavior defaulted to True when AUTONOMOUS_AGENTS was unset,
+    which violates fail-closed. Now requires OUTREACH_ENABLED=true
+    explicitly. AUTONOMOUS_AGENTS alone is insufficient.
+    """
+    explicit = os.environ.get("OUTREACH_ENABLED", "").strip().lower() == "true"
+    if not explicit:
+        return False
+    # Defense in depth: even with OUTREACH_ENABLED=true, require
+    # AUTONOMOUS_AGENTS to not be explicitly false.
+    master = os.environ.get("AUTONOMOUS_AGENTS", "").strip().lower()
+    if master == "false":
+        return False
+    return True
 
 
 class OutreachEngine:
@@ -153,6 +165,12 @@ class OutreachEngine:
         )
 
     def send_outreach_email(self, lead: Dict, resend_client) -> bool:
+        # WP2 / D1+D2: defense in depth. Even if called directly, refuse
+        # when not explicitly enabled. Marketing email is blocked by
+        # CommsAdapter; this is the engine-level backstop.
+        if not self.enabled:
+            logger.warning("[OUTREACH] send_outreach_email refused: not enabled (D1)")
+            return False
         email = lead.get("email", "")
         if not email:
             return False

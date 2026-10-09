@@ -1,6 +1,14 @@
 """
 SINCOR Outreach Scheduler
 Starts APScheduler. First cycle ~45s after boot, then interval.
+
+WP2 / D1: DEFAULT OFF. The scheduler only starts when outreach is
+EXPLICITLY enabled via OUTREACH_ENABLED=true. Unset, empty, or any
+other value → fail closed (no scheduler, no sends).
+
+Rationale: the previous behavior defaulted autonomous operation ON when
+AUTONOMOUS_AGENTS was unset, which violates the fail-closed principle
+and owner decision D1 (outreach scaffold-ready but default off).
 """
 
 import logging
@@ -12,8 +20,27 @@ logger = logging.getLogger("sincor2.outreach_scheduler")
 _scheduler = None
 
 
+def is_outreach_explicitly_enabled() -> bool:
+    """Return True ONLY when OUTREACH_ENABLED=true (explicit opt-in).
+
+    Fail-closed: unset, empty, "false", or any other value → False.
+    AUTONOMOUS_AGENTS is intentionally NOT consulted here; outreach
+    requires its own explicit flag (defense in depth against the old
+    default-true chain).
+    """
+    return os.environ.get("OUTREACH_ENABLED", "").strip().lower() == "true"
+
+
 def start_outreach_scheduler(app=None):
     global _scheduler
+
+    # WP2 / D1: fail closed unless explicitly enabled.
+    if not is_outreach_explicitly_enabled():
+        logger.info(
+            "[SCHEDULER] Outreach disabled: OUTREACH_ENABLED is not 'true' "
+            "(fail closed per D1)"
+        )
+        return None
 
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
