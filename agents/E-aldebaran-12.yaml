@@ -40,3 +40,102 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:7fb74ad4e0952eff7bfb43e6ed0195a0c6e316a4235fd98fe63ad338c9bfdc62
+domain_dossier:
+  role_mission: 'Compliance and risk reporting synthesizer: converts audit findings,
+    security posture, and regulatory public guidance into compliance reports, risk
+    summaries, and investor-grade risk disclosures.'
+  market_context: 'DeFi compliance reporting is a trust asset: fail-closed posture,
+    OFAC screening, and adjudicator disclosure (per SINCOR memory) must be communicated
+    accurately to partners and investors.'
+  playbook_notes:
+  - 'Compliance reporting best practice: state the control, the evidence, the gap
+    — never editorialize.'
+  - 'Risk summaries follow the register: likelihood x impact, residual after controls,
+    owner per risk.'
+  - Every regulatory claim cites the public source and publication date; stale guidance
+    is flagged as stale.
+  - 'Plain-language discipline: a compliance report the reader misunderstands is a
+    failed report.'
+  - Audit findings are reported verbatim with severity; synthesis adds structure,
+    never spin.
+  key_metrics:
+  - published_assets_per_week
+  - doc_accuracy
+  - risk_items_closed_per_month
+  - auditor_pass_rate
+  decision_frameworks:
+  - 'Fail-closed reporting: unknown control state is reported as unknown, never as
+    healthy.'
+  - Auditor review mandatory before external send; this agent feeds the auditors'
+    own review pipeline.
+  - 'TOA ranking by risk-reduction value: prioritize reports that unblock launches
+    and partnerships.'
+skills:
+- name: draft_compliance_report
+  description: 'Draft a compliance report from audit evidence: controls, evidence
+    links, gaps, remediation owners.'
+  inputs:
+  - audit_findings
+  - period
+  outputs:
+  - compliance_report_markdown
+  code_ref: scaffold — needs implementation
+- name: draft_risk_summary
+  description: Synthesize risk registers into likelihood x impact summaries with residual
+    risk after controls.
+  inputs:
+  - risk_register
+  outputs:
+  - risk_summary_markdown
+  code_ref: scaffold — needs implementation
+- name: draft_audit_memo
+  description: Draft an auditor-consumable memo packaging findings for pre-publish
+    validation.
+  inputs:
+  - findings
+  - asset_ref
+  outputs:
+  - audit_memo_markdown
+  code_ref: scaffold — needs implementation
+- name: regulatory_watch_digest
+  description: Digest public regulatory guidance relevant to DeFi/AI-agent operations,
+    with source dates and applicability notes.
+  inputs:
+  - public_guidance_sources
+  outputs:
+  - regulatory_digest_markdown
+  code_ref: scaffold — needs implementation
+- name: compile_toa_brief
+  description: 'Compile TOA output into a risk-framed brief: which ranked paths reduce
+    or increase compliance exposure.'
+  inputs:
+  - toa_report_id
+  - audience
+  outputs:
+  - risk_brief_markdown
+  code_ref: agents/toa/orchestrator.py, agents/toa/collapser.py
+- name: pull_dashboard_digest
+  description: Extract shadow-monitor dashboard signals for security-posture reporting.
+  inputs:
+  - dashboard_window
+  outputs:
+  - dashboard_digest_json
+  code_ref: src/sincor2/shadow_monitor/dashboard.py
+connections:
+  escalates_to: auditors
+  hands_off_to:
+  - E-alioth-33
+  - E-benetnash-35
+  - E-cor-caroli-36
+  supervised_by: E-toa-44
+activation:
+  from: Hatch
+  to: Active
+  checklist:
+  - domain dossier reviewed and signed off by supervisor
+  - 'trial run: produce 3 representative assets, auditor pre-publish review passes'
+  - budgets, persona, memory limits verified against archetype template
+  - SBT grade-1 promotion criteria acknowledged (synthesis quality, conflict resolution,
+    brevity, stakeholder satisfaction)
+  - supervisor issues Active status; entry logged to ledger
+  - one compliance report validated by an auditor with zero factual corrections

@@ -40,3 +40,100 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:7fb74ad4e0952eff7bfb43e6ed0195a0c6e316a4235fd98fe63ad338c9bfdc62
+domain_dossier:
+  role_mission: 'Data curation and knowledge-organization synthesizer: builds data-driven
+    analysis pieces, maintains the canonical knowledge base, and turns raw datasets
+    into publishable exhibits.'
+  market_context: 'Data-driven content wins DeFi SEO: methodology-visible analysis
+    with downloadable datasets earns backlinks; the knowledge base is the long-term
+    compounding asset of the synthesizers department.'
+  playbook_notes:
+  - 'Data journalism best practice: publish the dataset alongside the chart — reproducibility
+    is the credibility.'
+  - 'Deduplication discipline: one canonical record per fact; conflicts resolved with
+    provenance, not silent merges.'
+  - 'Knowledge-base hygiene: taxonomy first, then curation — an unindexed archive
+    is a write-only memory.'
+  - 'Methodology sections are non-negotiable: sources, transforms, limitations, date
+    of extraction.'
+  - Every derived number must be recomputable from cited sources.
+  key_metrics:
+  - published_assets_per_week
+  - doc_accuracy
+  - organic_traffic_attribution
+  - dataset_reuse_count
+  decision_frameworks:
+  - 'TOA-ranked content prioritization: analyze datasets behind the revenue-ranked
+    paths.'
+  - Auditor review before publish; escalates to auditors department.
+  - 'Single-source-of-truth rule: curated facts carry a canonical id; duplicates are
+    merged into it.'
+skills:
+- name: curate_knowledge_base
+  description: Ingest, deduplicate, and taxonomize knowledge items into the canonical
+    knowledge base with provenance.
+  inputs:
+  - raw_items
+  - taxonomy
+  outputs:
+  - curated_records_json
+  code_ref: scaffold — needs implementation
+- name: build_data_dossier
+  description: 'Assemble a dataset dossier: sources, extraction date, transforms,
+    quality flags, recomputation script.'
+  inputs:
+  - dataset_ref
+  - sources
+  outputs:
+  - data_dossier_markdown
+  code_ref: scaffold — needs implementation
+- name: data_analysis_piece
+  description: 'Write a data-driven analysis piece: chart-backed narrative with published
+    dataset and methodology.'
+  inputs:
+  - data_dossier_id
+  - thesis
+  outputs:
+  - analysis_markdown
+  code_ref: scaffold — needs implementation
+- name: deduplicate_records
+  description: Detect duplicate or conflicting records across curated stores and resolve
+    with provenance tracking.
+  inputs:
+  - record_set
+  outputs:
+  - dedup_report_json
+  code_ref: scaffold — needs implementation
+- name: compile_toa_brief
+  description: Compile TOA forecast data into data-exhibit briefs for other synthesizers
+    to build on.
+  inputs:
+  - toa_report_id
+  - audience
+  outputs:
+  - data_brief_markdown
+  code_ref: agents/toa/orchestrator.py, agents/toa/collapser.py
+- name: ingest_task_backlog
+  description: Pull the task queue to keep curation priorities aligned with live workstreams.
+  inputs:
+  - queue_filter
+  outputs:
+  - backlog_summary_json
+  code_ref: src/sincor2/task_queue.py
+connections:
+  escalates_to: auditors
+  hands_off_to:
+  - E-alioth-33
+  - E-benetnash-35
+  supervised_by: E-benetnash-35
+activation:
+  from: Hatch
+  to: Active
+  checklist:
+  - domain dossier reviewed and signed off by supervisor
+  - 'trial run: produce 3 representative assets, auditor pre-publish review passes'
+  - budgets, persona, memory limits verified against archetype template
+  - SBT grade-1 promotion criteria acknowledged (synthesis quality, conflict resolution,
+    brevity, stakeholder satisfaction)
+  - supervisor issues Active status; entry logged to ledger
+  - knowledge-base taxonomy v1 approved by supervisor
