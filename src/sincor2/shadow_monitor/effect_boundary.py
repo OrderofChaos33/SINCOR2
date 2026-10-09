@@ -377,6 +377,7 @@ class ShadowEffectBoundary:
         policy_fn: Optional[PolicyFn] = None,
         kill_switch: Optional[KillSwitch] = None,
         audit_log: Optional[List[Dict[str, Any]]] = None,
+        store_health_fn: Optional[Callable[[], Dict[str, bool]]] = None,
     ):
         self._policy_fn: PolicyFn = policy_fn or default_shadow_policy
         self.kill_switch = kill_switch or KillSwitch()
@@ -387,6 +388,11 @@ class ShadowEffectBoundary:
         # (tenant, effect_type, idempotency_key) -> (payload_hash, receipt)
         self._seen: Dict[Tuple[str, str, str], Tuple[str, EffectReceipt]] = {}
         self._lock = threading.Lock()
+        # WP5: optional store-health probe. Returns {"policy": bool,
+        # "idempotency": bool, "audit": bool}. For consequential actions
+        # (value-moving or high/critical risk), any unavailable store fails
+        # the dispatch closed with AuditFailureError.
+        self._store_health_fn = store_health_fn
 
     # -- inspection ----------------------------------------------------------
 
@@ -452,6 +458,29 @@ class ShadowEffectBoundary:
         idem_key = (intent.tenant, intent.effect_type, intent.idempotency_key)
 
         with self._lock:
+            # WP5 fail-closed: for consequential actions (value-moving or
+            # high/critical risk), every backing store must be available.
+            # An unauditable consequential dispatch is refused outright.
+            if self._store_health_fn is not None and (
+                intent.effect_type in WOULD_PAY_EFFECT_TYPES
+                or intent.risk_tier in ("high", "critical")
+            ):
+                try:
+                    health = self._store_health_fn()
+                except Exception as exc:
+                    raise AuditFailureError(
+                        f"store health probe failed for consequential action "
+                        f"(effect {intent.effect_id}): {exc}"
+                    ) from exc
+                down = [name for name, ok in health.items() if not ok]
+                if down:
+                    raise AuditFailureError(
+                        f"store(s) unavailable for consequential action "
+                        f"(effect {intent.effect_id}, "
+                        f"type={intent.effect_type!r}, risk={intent.risk_tier!r}): "
+                        f"{', '.join(sorted(down))} (fail-closed)"
+                    )
+
             seen = self._seen.get(idem_key)
             if seen is not None:
                 prior_hash, prior_receipt = seen
