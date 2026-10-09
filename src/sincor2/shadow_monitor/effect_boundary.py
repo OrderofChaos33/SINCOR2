@@ -408,6 +408,18 @@ class ShadowEffectBoundary:
 
     # -- policy ----------------------------------------------------------------
 
+    def kill_switch_blocks(self, intent: EffectIntent) -> bool:
+        """Hook: True if the kill switch currently blocks this intent.
+
+        Evaluated live on every call -- never cached.  WP1 uses this to
+        re-check the kill switch on idempotency replays (W-40 fix): a cached
+        allow must never bypass an engaged kill switch.
+        """
+        return (
+            self.kill_switch.engaged
+            and intent.effect_type in WOULD_PAY_EFFECT_TYPES
+        )
+
     def _evaluate_policy(self, intent: EffectIntent) -> Tuple[str, List[str]]:
         """Run the policy function, fail-closed on any problem.
 
@@ -459,6 +471,22 @@ class ShadowEffectBoundary:
                     raise IdempotencyConflict(
                         f"idempotency key {intent.idempotency_key!r} reused with a "
                         f"different payload_hash for {intent.effect_type!r}"
+                    )
+                # W-40 FIX: the kill switch is re-evaluated on EVERY dispatch,
+                # including idempotency replays.  A cached allow must never
+                # bypass an engaged kill switch: the replay receives a fresh
+                # blocked receipt (no duplicate queue entry, no duplicate
+                # audit event -- the original was already recorded).
+                if self.kill_switch_blocks(intent):
+                    return EffectReceipt(
+                        effect_id=intent.effect_id,
+                        status="blocked_policy",
+                        executed=False,
+                        policy_reason_codes=[
+                            "kill_switch_engaged_would_pay_blocked"
+                        ],
+                        approval_hash=None,
+                        proposal_queue_ref=prior_receipt.proposal_queue_ref,
                     )
                 # Identical retry: return the original receipt, no duplicate
                 # queue entry, no duplicate audit event.

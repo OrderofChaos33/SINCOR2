@@ -32,12 +32,23 @@ from typing import Any, Callable
 
 import pytest
 
+from sincor2.shadow_monitor.contract import EFFECT_ORIGINATORS
 from sincor2.shadow_monitor.effect_boundary import (
     EFFECT_TYPES,
     RECEIPT_STATUSES,
     EffectIntent,
     EffectReceipt,
 )
+
+
+def _originator_for(effect_type: str) -> str:
+    """A contract-valid originator: agent where allowed, else operator.
+
+    WP1: entrypoints route through the single dispatch API, which enforces
+    the frozen WP0 originator allowlist (e.g. crm.delete is operator-only).
+    """
+    allowed = EFFECT_ORIGINATORS[effect_type]
+    return "agent" if "agent" in allowed else "operator"
 
 
 _EFFECT_PAYLOADS: dict[str, dict[str, Any]] = {
@@ -196,7 +207,7 @@ def test_effect_entrypoints_only_propose_and_cannot_reach_external_sinks(
     arm_traps()
     for effect_type in sorted(EFFECT_TYPES):
         intent = _make_intent(effect_type)
-        receipt = entrypoints[effect_type](intent)
+        receipt = entrypoints[effect_type](intent, _originator_for(effect_type))
 
         assert isinstance(receipt, EffectReceipt), (
             f"{effect_type} did not return a typed shadow receipt"
@@ -218,7 +229,9 @@ def test_entrypoint_receipts_never_claim_delivery_or_settlement(shadow_runtime):
 
     forbidden_claims = {"sent", "delivered", "published", "updated", "paid", "settled"}
     for effect_type in sorted(EFFECT_TYPES):
-        receipt = entrypoints[effect_type](_make_intent(effect_type))
+        receipt = entrypoints[effect_type](
+            _make_intent(effect_type), _originator_for(effect_type)
+        )
         assert receipt.executed is False
         assert receipt.status not in forbidden_claims
         assert receipt.status in RECEIPT_STATUSES
