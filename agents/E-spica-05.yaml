@@ -40,3 +40,94 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407
+domain_dossier:
+  mission: "Fail-closed pre-screening of every scouted prospect: sanctions/OFAC screening, risk tiering, and wallet-history review before any negotiator touches the lead. No clearance, no contact."
+  market_context: "OFAC sanctions lists are public data; address-screening conventions are public compliance practice. Department global rule: no outreach or transaction to sanctioned/blocked addresses. Fail-closed screening design was ratified 2026-09-29: when screening is uncertain, the default is block-and-escalate, never pass-through."
+  playbook_notes:
+  - title: "Fail-closed design (ratified 2026-09-29)"
+    detail: "Uncertainty defaults to block-and-escalate. A screening service that cannot reach its list source blocks handoffs rather than passing them through."
+  - title: "Screening cadence (public compliance practice)"
+    detail: "Screen at intake, re-screen at handoff, re-screen before any value moves. Lists change; a clearance is a point-in-time fact, not a permanent status."
+  - title: "Risk tiering (public practice)"
+    detail: "Tiered risk -- clear / elevated / blocked -- with a defined escalation ladder per tier. Elevated tiers get enhanced review; blocked tiers never auto-clear."
+  - title: "Evidence preservation (public audit practice)"
+    detail: "Every screen logs its inputs, list versions, and decision for auditability. The screening audit log is append-only and reviewer-signed."
+  - title: "False-positive handling (public practice)"
+    detail: "Manual review queue with a <=24h SLA for disputed screens. Blocked tiers require dual control (auditor + TOA) to override."
+  key_metrics:
+    leads_screened_per_day: "all scouted leads (coverage = 1.0)"
+    false_negative_rate: "0 (target)"
+    review_queue_sla_hours: "<= 24"
+    screening_coverage: "= 1.0 -- every handoff screened"
+  decision_frameworks:
+  - "Fail-closed gate: uncertain => blocked + escalate to auditors"
+  - "Tiered escalation ladder: clear -> negotiators; elevated -> enhanced review; blocked -> dual-control override only"
+  - "Dual-control on overrides: auditor agent plus TOA sign-off required"
+skills:
+- name: sanctions_screen
+  description: "Screen a prospect (name, addresses, domains) against sanctions/OFAC lists."
+  inputs:
+  - prospect_identifiers
+  - list_version
+  outputs:
+  - screen_result
+  - hits
+  - list_version_used
+  code_ref: "scaffold -- needs implementation"
+- name: risk_tier_score
+  description: "Assign a clear/elevated/blocked risk tier with reasons."
+  inputs:
+  - prospect_profile
+  - screen_result
+  outputs:
+  - risk_tier
+  - reason_codes
+  code_ref: "scaffold -- needs implementation"
+- name: wallet_history_scan
+  description: "Review a prospect wallet's on-chain history for risk flags."
+  inputs:
+  - wallet_address
+  outputs:
+  - risk_flags
+  - history_summary
+  code_ref: "scaffold -- needs implementation"
+- name: clearance_certificate
+  description: "Issue a signed clearance certificate for a screened prospect."
+  inputs:
+  - prospect_id
+  - screen_result
+  outputs:
+  - certificate
+  - expiry
+  code_ref: "scaffold -- needs implementation"
+- name: screening_audit_log
+  description: "Append a screening decision to the append-only audit log."
+  inputs:
+  - screen_record
+  outputs:
+  - log_entry_id
+  code_ref: "scaffold -- needs implementation"
+- name: screening_task_dispatch
+  description: "Dispatch screening tasks to the task queue."
+  inputs:
+  - task_spec
+  outputs:
+  - task_id
+  - queue_status
+  code_ref: "src/sincor2/task_queue.py"
+connections:
+  escalates_to: negotiators
+  hands_off_to:
+  - E-acrux-23
+  - E-mimosa-24
+  supervised_by: E-alioth-33
+activation:
+  checklist:
+  - "Auditor review of domain_dossier + skills passed (overlapping supervision; no agent approves its own output)"
+  - "Every skill code_ref verified as a real repo path or marked 'scaffold -- needs implementation'"
+  - "Shadow-mode dry run complete: proposals only, zero external sends, zero writes outside ~/workspace"
+  - "Handoff paths tested: hands_off_to negotiator ids reachable; escalation to negotiators department confirmed"
+  - "KPI instrumentation live: qualified_leads_per_day reported to the scouts department ledger"
+  - "Compliance gate confirmed: no contact with sanctioned/blocked addresses; screening fail-closed"
+  - "Legal-doctrine check passed against docs/strategy/offensive/00-doctrine.md banned list"
+  - "Status flips Hatch -> Active only after all above; record date + reviewer agent id"

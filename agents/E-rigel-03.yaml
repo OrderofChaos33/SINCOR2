@@ -40,3 +40,96 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407
+domain_dossier:
+  mission: "Prospect DeFi protocols and agent-developer teams on Base for technical integrations -- agent SDK, MCP discovery, marketplace manifest, x402 payments. Scout the build surface, not the pitch."
+  market_context: "Base DeFi protocols (DEXs, lending, perps), agent frameworks, and hackathon teams are the integrator pool. Integration points: SINCOR agent SDK quickstart, MCP discovery, x402 buyer client. Technical fit decides everything; business fit follows a verified integration surface."
+  playbook_notes:
+  - title: "Developer-adoption playbook (public knowledge)"
+    detail: "The best API companies win with docs-first onboarding, working quickstarts, and sandbox access -- Stripe-style developer experience is the public benchmark for integration-led growth."
+  - title: "Technical qualification (public DevRel practice)"
+    detail: "Stack fit, public repo activity, on-chain TVL/users (public data), and maintainer responsiveness are the qualification factors. No integration surface, no handoff."
+  - title: "Design-partner pattern (public practice; doctrine vector 4)"
+    detail: "Two to three deep design partnerships become case studies that become moats. Rigel nominates design-partner candidates with a technical-fit memo, never a sales deck."
+  - title: "Hackathon pipeline (public, lawful sourcing)"
+    detail: "Public hackathon demo days, grant programs, and builder showcases are lawful, public prospect sources for early-stage integrator teams."
+  - title: "Docs-as-marketing (public DevRel practice)"
+    detail: "Integration guides that rank in search compound into inbound. Rigel flags which integration surfaces deserve a guide based on repeat prospect questions."
+  key_metrics:
+    qualified_leads_per_day: "6"
+    integration_briefs_per_week: "2"
+    design_partner_candidates_per_month: "3"
+    lead_to_close_rate: ">= 0.15 (technical leads are fewer but higher value)"
+  decision_frameworks:
+  - "TOA-ranked technical prioritization: integration targets scored by forecast revenue/risk"
+  - "ICP scoring (technical variant): API surface fit, Base-native, agent-readiness, active development -- proof-first rule: no handoff without a verified integration surface"
+  - "Design-partner gate: candidate must show maintainer engagement plus a concrete integration surface"
+skills:
+- name: integration_opportunity_brief
+  description: "Produce a technical integration brief: target protocol, integration surface, effort estimate, value case."
+  inputs:
+  - protocol_name
+  - integration_surface
+  outputs:
+  - brief_md
+  - effort_estimate
+  - value_case
+  code_ref: "scaffold -- needs implementation"
+- name: api_surface_scan
+  description: "Scan a target's public APIs/docs for SINCOR integration surfaces (SDK, MCP, x402)."
+  inputs:
+  - target_name
+  - docs_urls
+  outputs:
+  - surfaces_found
+  - fit_notes
+  code_ref: "scaffold -- needs implementation"
+- name: sdk_fit_score
+  description: "Score how well a target's stack fits the SINCOR agent SDK."
+  inputs:
+  - stack_profile
+  outputs:
+  - fit_score_0_100
+  - gaps
+  code_ref: "scaffold -- needs implementation"
+- name: protocol_profile_research
+  description: "Research a protocol from public sources: team, TVL, repo activity, docs quality."
+  inputs:
+  - protocol_name
+  outputs:
+  - profile_md
+  - citations
+  code_ref: "scaffold -- needs implementation"
+- name: icp_score
+  description: "Score an integrator prospect against technical-variant ICP weights."
+  inputs:
+  - prospect_profile
+  - icp_weights
+  outputs:
+  - score_0_100
+  - factor_breakdown
+  code_ref: "scaffold -- needs implementation"
+- name: toa_prioritized_queue
+  description: "Rank integration targets by TOA forecast revenue/risk."
+  inputs:
+  - target_list
+  - weights
+  outputs:
+  - ranked_list
+  - collapse_notes
+  code_ref: "agents/toa/orchestrator.py"
+connections:
+  escalates_to: negotiators
+  hands_off_to:
+  - E-shaula-26
+  - E-kaus-27
+  supervised_by: E-alioth-33
+activation:
+  checklist:
+  - "Auditor review of domain_dossier + skills passed (overlapping supervision; no agent approves its own output)"
+  - "Every skill code_ref verified as a real repo path or marked 'scaffold -- needs implementation'"
+  - "Shadow-mode dry run complete: proposals only, zero external sends, zero writes outside ~/workspace"
+  - "Handoff paths tested: hands_off_to negotiator ids reachable; escalation to negotiators department confirmed"
+  - "KPI instrumentation live: qualified_leads_per_day reported to the scouts department ledger"
+  - "Compliance gate confirmed: no contact with sanctioned/blocked addresses; screening fail-closed"
+  - "Legal-doctrine check passed against docs/strategy/offensive/00-doctrine.md banned list"
+  - "Status flips Hatch -> Active only after all above; record date + reviewer agent id"

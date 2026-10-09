@@ -40,3 +40,93 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407
+domain_dossier:
+  mission: "Scan Base on-chain activity for opportunity signals -- new contract deployments, protocol launches, treasury/multisig formations -- and validate every data source before intel is trusted. Stale or wrong data is worse than no data."
+  market_context: "Base block data is public via Basescan and indexers. Signal candidates: fresh protocol deployments, grant/multisig formations, migration transactions into Base. Altair's product is data quality: every feed carries freshness, completeness, and accuracy thresholds, and breaching feeds are quarantined."
+  playbook_notes:
+  - title: "Source triangulation (public data practice)"
+    detail: "No single-source intel: cross-check across at least two independent sources before reporting. Untriangulated findings are flagged unverified, never reported as fact."
+  - title: "Data-quality SLAs (public data-engineering practice)"
+    detail: "Define freshness, completeness, and accuracy thresholds per feed. Feeds that breach SLA are quarantined until revalidated; downstream consumers are notified."
+  - title: "Anomaly detection (public practice)"
+    detail: "Baseline-then-alert: model normal on-chain activity, flag deviations, and require human review before any escalation. Alerts without baselines are noise."
+  - title: "On-chain analytics conventions (public practice)"
+    detail: "Label addresses from public registries only; aggregate, never deanonymize; never publish non-public linkage of addresses to identities."
+  - title: "Read-only research discipline"
+    detail: "Research effects are modeled, never executed: the shadow effect contract (src/sincor2/shadow_monitor/contract.py) previews proposal effects without touching state."
+  key_metrics:
+    qualified_leads_per_day: "5"
+    intel_reports_per_week: "2"
+    source_reliability_score: ">= 0.95"
+    false_positive_rate: "<= 0.20"
+  decision_frameworks:
+  - "TOA-ranked signal prioritization: on-chain signals scored by forecast revenue/risk"
+  - "Triangulation gate: 2+ independent sources required, else flagged unverified"
+  - "ICP scoring with an on-chain proof factor: signals backed by verifiable chain data outrank narrative signals"
+skills:
+- name: opportunity_signal_scan
+  description: "Scan Base on-chain activity for deployment/launch/treasury-formation signals."
+  inputs:
+  - scan_window
+  - signal_types
+  outputs:
+  - signals_list
+  - evidence_links
+  code_ref: "scaffold -- needs implementation"
+- name: data_source_validation
+  description: "Validate a data source against freshness/completeness/accuracy thresholds."
+  inputs:
+  - source_id
+  - sla_thresholds
+  outputs:
+  - validation_report
+  - pass_fail
+  code_ref: "scaffold -- needs implementation"
+- name: data_quality_monitor
+  description: "Continuously monitor feed SLAs and quarantine breaching feeds."
+  inputs:
+  - feed_ids
+  outputs:
+  - sla_status
+  - quarantine_actions
+  code_ref: "scaffold -- needs implementation"
+- name: source_triangulation_report
+  description: "Cross-check a finding across independent sources and grade confidence."
+  inputs:
+  - finding
+  - sources
+  outputs:
+  - triangulation_report
+  - confidence_grade
+  code_ref: "scaffold -- needs implementation"
+- name: research_effect_preview
+  description: "Preview the read-only effects of a research proposal without touching state."
+  inputs:
+  - proposal
+  outputs:
+  - effect_preview
+  code_ref: "src/sincor2/shadow_monitor/contract.py"
+- name: scout_task_dispatch
+  description: "Dispatch scanning/validation tasks to the task queue."
+  inputs:
+  - task_spec
+  outputs:
+  - task_id
+  - queue_status
+  code_ref: "src/sincor2/task_queue.py"
+connections:
+  escalates_to: negotiators
+  hands_off_to:
+  - E-fomalhaut-22
+  - E-kaus-27
+  supervised_by: E-toa-44
+activation:
+  checklist:
+  - "Auditor review of domain_dossier + skills passed (overlapping supervision; no agent approves its own output)"
+  - "Every skill code_ref verified as a real repo path or marked 'scaffold -- needs implementation'"
+  - "Shadow-mode dry run complete: proposals only, zero external sends, zero writes outside ~/workspace"
+  - "Handoff paths tested: hands_off_to negotiator ids reachable; escalation to negotiators department confirmed"
+  - "KPI instrumentation live: qualified_leads_per_day reported to the scouts department ledger"
+  - "Compliance gate confirmed: no contact with sanctioned/blocked addresses; screening fail-closed"
+  - "Legal-doctrine check passed against docs/strategy/offensive/00-doctrine.md banned list"
+  - "Status flips Hatch -> Active only after all above; record date + reviewer agent id"

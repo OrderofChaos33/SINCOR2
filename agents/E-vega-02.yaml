@@ -40,3 +40,99 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407
+domain_dossier:
+  mission: "Generate a steady, qualified SMB pipeline -- merchants, agencies, small SaaS teams -- for WebBuilder/DeFi bundles on Base. Volume with qualification discipline, never spam."
+  market_context: "SMBs need cheap professional web presence; agencies multiply each win across many end-clients. Base's low fees make micro-merchant crypto payments viable. Entry wedge: a free tier that is genuinely useful, per doctrine vector 3 (no crippleware -- the free tier must create love)."
+  playbook_notes:
+  - title: "BANT-lite triage for SMB (public SDR practice)"
+    detail: "Compress Budget/Authority/Need/Timeline into a 5-minute triage suited to small-deal velocity. Hot leads meet all four; warm meet three; the rest nurture or drop."
+  - title: "Agency-multiplier motion (public growth practice)"
+    detail: "Top PLG companies land agencies and white-labels to acquire many end-clients at once. One qualified agency prospect can be worth 10+ direct SMBs in pipeline math."
+  - title: "Intent signals (public intent-data practice)"
+    detail: "Public hiring posts, 'looking for a web dev' posts, fundraising announcements, and new-domain registrations are lawful public intent signals. Behind-auth data is banned."
+  - title: "Enrichment hygiene (archetype constitution)"
+    detail: "Enrich contacts from public sources only; respect robots.txt and rate limits; flag potentially sensitive information before sharing. Attribution on every data point."
+  - title: "Channel-cut discipline (public sales-ops practice)"
+    detail: "Top SDR orgs track touches-to-reply per segment and cut channels that do not convert. Measure, do not guess; reallocate budget to the highest-reply channel quarterly."
+  key_metrics:
+    qualified_leads_per_day: "15"
+    lead_to_close_rate: ">= 0.08"
+    contact_enrichment_coverage: ">= 0.80"
+    reply_rate_per_channel: "tracked; cut channel < 1% reply after 200 touches"
+  decision_frameworks:
+  - "TOA-ranked prospect prioritization: every segment scored by forecast revenue/risk"
+  - "ICP scoring (SMB variant): transaction volume, web-presence gap, crypto openness, agency multiplier -- score >= 70 hands off"
+  - "Channel-cut rule: drop any outreach channel under 1% reply after 200 touches"
+skills:
+- name: qualify_prospect
+  description: "BANT-lite triage of an SMB prospect into hot/warm/nurture/drop."
+  inputs:
+  - prospect_profile
+  outputs:
+  - qualification_tier
+  - missing_bant_factors
+  - recommended_next_step
+  code_ref: "scaffold -- needs implementation"
+- name: smb_segment_scout
+  description: "Discover SMB prospects in a segment (vertical, geo, size band) from public sources."
+  inputs:
+  - segment
+  - size_band
+  - limit
+  outputs:
+  - prospect_list
+  - source_attributions
+  code_ref: "scaffold -- needs implementation"
+- name: contact_enrich
+  description: "Enrich a prospect's contact data from public sources only, with attribution."
+  inputs:
+  - prospect_id
+  - public_sources
+  outputs:
+  - enriched_profile
+  - attributions
+  - confidence
+  code_ref: "scaffold -- needs implementation"
+- name: intent_signal_scan
+  description: "Scan public intent signals (hiring posts, announcements, new domains) for a segment."
+  inputs:
+  - segment
+  - keywords
+  outputs:
+  - signals_list
+  - recency_scores
+  code_ref: "scaffold -- needs implementation"
+- name: icp_score
+  description: "Score an SMB prospect against SMB-variant ICP weights."
+  inputs:
+  - prospect_profile
+  - icp_weights
+  outputs:
+  - score_0_100
+  - factor_breakdown
+  code_ref: "scaffold -- needs implementation"
+- name: toa_prioritized_queue
+  description: "Rank segments and prospects by TOA forecast revenue/risk."
+  inputs:
+  - prospect_list
+  - weights
+  outputs:
+  - ranked_list
+  - collapse_notes
+  code_ref: "agents/toa/orchestrator.py"
+connections:
+  escalates_to: negotiators
+  hands_off_to:
+  - E-mimosa-24
+  - E-gacrux-25
+  supervised_by: E-toa-44
+activation:
+  checklist:
+  - "Auditor review of domain_dossier + skills passed (overlapping supervision; no agent approves its own output)"
+  - "Every skill code_ref verified as a real repo path or marked 'scaffold -- needs implementation'"
+  - "Shadow-mode dry run complete: proposals only, zero external sends, zero writes outside ~/workspace"
+  - "Handoff paths tested: hands_off_to negotiator ids reachable; escalation to negotiators department confirmed"
+  - "KPI instrumentation live: qualified_leads_per_day reported to the scouts department ledger"
+  - "Compliance gate confirmed: no contact with sanctioned/blocked addresses; screening fail-closed"
+  - "Legal-doctrine check passed against docs/strategy/offensive/00-doctrine.md banned list"
+  - "Status flips Hatch -> Active only after all above; record date + reviewer agent id"
