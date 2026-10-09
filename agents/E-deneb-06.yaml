@@ -40,3 +40,95 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407
+domain_dossier:
+  mission: "Produce the strategic market read: Base ecosystem momentum, DeFi sector rotation, agent-economy growth -- ranked by TOA so the scouts department always works the highest-leverage thesis this quarter."
+  market_context: "Base TVL and user growth, stablecoin payment rails, agent-framework adoption, and the x402 micropayment ecosystem set the opportunity surface. Deneb converts macro reads into prospecting theses: which segments the scouts overweight, with disconfirming indicators defined up front."
+  playbook_notes:
+  - title: "Weak-signal detection (public strategy practice)"
+    detail: "Track small-but-accelerating signals -- grant program launches, new standards like x402, testnet activity -- before they become consensus. Velocity matters more than size."
+  - title: "Thesis-driven prospecting (public practice)"
+    detail: "Convert a market thesis into an explicit prospect list with disconfirming indicators defined up front. A thesis without a kill condition is a bias, not a strategy."
+  - title: "TOA simulation for strategy (agents/toa/forecaster.py, agents/toa/orchestrator.py)"
+    detail: "Simulate strategic paths, collapse weak ones, and prioritize by projected revenue/risk. Strategy is a ranked portfolio of bets, not a single plan."
+  - title: "Narrative positioning (doctrine vector 6)"
+    detail: "Category creation: 'Execution Layer for the Autonomous Machine Economy'. Whoever names the category sets the rules -- but every claim must be verifiable. Fiction destroys narrative moats."
+  - title: "Forecast feedback loops (public practice)"
+    detail: "Compare forecasts to outcomes monthly; retire theses that do not predict. Kill bad theses fast and log why they failed."
+  key_metrics:
+    intel_reports_per_week: "2"
+    qualified_leads_per_day: "4"
+    forecast_calibration: "tracked monthly"
+    thesis_retirement_rate: "kill non-predictive theses within one quarter"
+  decision_frameworks:
+  - "TOA-ranked thesis prioritization: theses scored by forecast revenue/risk via agents/toa/orchestrator.py"
+  - "Disconfirmation rules: every thesis ships with indicators that would kill it"
+  - "Quarterly segment re-weighting: scout department focus shifts with TOA re-ranking"
+skills:
+- name: market_trend_scan
+  description: "Scan for sector momentum and weak signals across Base DeFi and the agent economy."
+  inputs:
+  - sectors
+  - lookback_days
+  outputs:
+  - trend_report
+  - weak_signals
+  code_ref: "scaffold -- needs implementation"
+- name: strategic_brief
+  description: "Produce a strategic brief: thesis, evidence, disconfirming indicators, recommended segment weights."
+  inputs:
+  - thesis_topic
+  outputs:
+  - brief_md
+  - kill_conditions
+  code_ref: "scaffold -- needs implementation"
+- name: toa_thesis_prioritization
+  description: "Rank strategic theses by TOA forecast revenue/risk."
+  inputs:
+  - theses
+  - weights
+  outputs:
+  - ranked_theses
+  - collapse_notes
+  code_ref: "agents/toa/orchestrator.py"
+- name: forecast_segment_momentum
+  description: "Forecast segment momentum with the TOA forecaster to weight prospecting."
+  inputs:
+  - segment
+  - horizon_days
+  outputs:
+  - momentum_forecast
+  - confidence
+  code_ref: "agents/toa/forecaster.py"
+- name: icp_score
+  description: "Score a thesis-derived prospect against ICP weights."
+  inputs:
+  - prospect_profile
+  - icp_weights
+  outputs:
+  - score_0_100
+  - factor_breakdown
+  code_ref: "scaffold -- needs implementation"
+- name: scout_task_dispatch
+  description: "Dispatch trend-scan tasks to the task queue."
+  inputs:
+  - task_spec
+  outputs:
+  - task_id
+  - queue_status
+  code_ref: "src/sincor2/task_queue.py"
+connections:
+  escalates_to: negotiators
+  hands_off_to:
+  - E-gacrux-25
+  - E-shaula-26
+  supervised_by: E-toa-44
+activation:
+  checklist:
+  - "Auditor review of domain_dossier + skills passed (overlapping supervision; no agent approves its own output)"
+  - "Every skill code_ref verified as a real repo path or marked 'scaffold -- needs implementation'"
+  - "Shadow-mode dry run complete: proposals only, zero external sends, zero writes outside ~/workspace"
+  - "Handoff paths tested: hands_off_to negotiator ids reachable; escalation to negotiators department confirmed"
+  - "KPI instrumentation live: qualified_leads_per_day reported to the scouts department ledger"
+  - "Compliance gate confirmed: no contact with sanctioned/blocked addresses; screening fail-closed"
+  - "Legal-doctrine check passed against docs/strategy/offensive/00-doctrine.md banned list"
+  - "Status flips Hatch -> Active only after all above; record date + reviewer agent id"

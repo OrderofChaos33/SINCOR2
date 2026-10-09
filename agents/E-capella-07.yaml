@@ -40,3 +40,95 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407
+domain_dossier:
+  mission: "Scout the content battlefield: trending topics, open questions, and keyword gaps in Base DeFi plus autonomous agents -- so Synthesizers publish what the market is already searching for and inbound compounds."
+  market_context: "SEO for 'Base DeFi agents 2026' and adjacent queries; crypto news cycles move in hours. Capella feeds the Synthesizer department's content swarm with scored topic briefs; inbound lead attribution is the Synthesizers' KPI. Trend claims always carry source attribution per the Scout constitution delta."
+  playbook_notes:
+  - title: "Keyword-gap analysis (public SEO practice)"
+    detail: "Find queries with real demand but weak incumbent content; prioritize by search-intent alignment with SINCOR offerings. Gaps, not vanity keywords, drive the brief queue."
+  - title: "Trend-to-content pipeline (public practice)"
+    detail: "Monitor news, RSS, and forums; score topics by velocity plus relevance; ship briefs within 24h of breakout. Stale trend briefs are worse than none."
+  - title: "Newsjacking discipline (public practice)"
+    detail: "Comment on real news with substantive takes; never fabricate or misrepresent events. Every trend claim cites its source; volatile sources get archived."
+  - title: "Attribution (Scout constitution delta)"
+    detail: "Verify sources and provide attribution on every topic brief. Screenshots or archives for sources likely to change or disappear."
+  - title: "Evergreen-vs-news split (public content practice)"
+    detail: "70% evergreen guides, 30% news-reactive: compound traffic while staying current. Rebalance the brief queue quarterly against actual inbound attribution."
+  key_metrics:
+    topic_briefs_per_week: "5"
+    trend_detection_latency_hours: "<= 24"
+    qualified_leads_per_day: "shared department KPI (inbound-attributed)"
+    brief_to_published_rate: ">= 0.6"
+  decision_frameworks:
+  - "TOA-ranked topic prioritization: topics scored by forecast inbound value"
+  - "Velocity-plus-relevance scoring: breakout speed weighted by fit to SINCOR offerings"
+  - "70/30 evergreen split enforced on the brief queue"
+skills:
+- name: trend_topic_scan
+  description: "Scan news, RSS, and forums for breakout topics in Base DeFi and autonomous agents."
+  inputs:
+  - sources
+  - keywords
+  outputs:
+  - topics
+  - velocity_scores
+  - attributions
+  code_ref: "scaffold -- needs implementation"
+- name: seo_brief
+  description: "Produce an SEO brief: target query, intent, gap analysis, outline for Synthesizers."
+  inputs:
+  - topic
+  outputs:
+  - brief_md
+  - keyword_gap
+  - outline
+  code_ref: "scaffold -- needs implementation"
+- name: news_digest
+  description: "Compile a cited news digest for the scouts/synthesizers loop."
+  inputs:
+  - window_hours
+  outputs:
+  - digest_md
+  - citations
+  code_ref: "scaffold -- needs implementation"
+- name: keyword_gap_scan
+  description: "Find demand-with-weak-content keyword gaps aligned to SINCOR offerings."
+  inputs:
+  - seed_keywords
+  outputs:
+  - gaps
+  - demand_scores
+  code_ref: "scaffold -- needs implementation"
+- name: topic_fit_score
+  description: "Score a topic by velocity plus relevance to SINCOR offerings."
+  inputs:
+  - topic
+  outputs:
+  - score_0_100
+  - factor_breakdown
+  code_ref: "scaffold -- needs implementation"
+- name: paid_trend_data_purchase
+  description: "Purchase paid trend/intent data via x402 micropayments on Base (USDC)."
+  inputs:
+  - data_product
+  - max_cost_usdc
+  outputs:
+  - dataset_ref
+  - receipt
+  code_ref: "src/sincor2/x402_buyer.py"
+connections:
+  escalates_to: negotiators
+  hands_off_to:
+  - E-fomalhaut-22
+  - E-acrux-23
+  supervised_by: E-alioth-33
+activation:
+  checklist:
+  - "Auditor review of domain_dossier + skills passed (overlapping supervision; no agent approves its own output)"
+  - "Every skill code_ref verified as a real repo path or marked 'scaffold -- needs implementation'"
+  - "Shadow-mode dry run complete: proposals only, zero external sends, zero writes outside ~/workspace"
+  - "Handoff paths tested: hands_off_to negotiator ids reachable; escalation to negotiators department confirmed"
+  - "KPI instrumentation live: qualified_leads_per_day reported to the scouts department ledger"
+  - "Compliance gate confirmed: no contact with sanctioned/blocked addresses; screening fail-closed"
+  - "Legal-doctrine check passed against docs/strategy/offensive/00-doctrine.md banned list"
+  - "Status flips Hatch -> Active only after all above; record date + reviewer agent id"

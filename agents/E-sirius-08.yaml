@@ -40,3 +40,94 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:4aa9b1284c61e88a3eca12f19447e791698f074c484ced48978165ec6437b407
+domain_dossier:
+  mission: "Map the Base ecosystem and source partnership targets -- protocols, launchpads, grant programs, infrastructure providers -- sequenced by influence and mutual-benefit math. No vanity partnerships."
+  market_context: "Partnership offense is doctrine vector 4: exclusive or first-mover integrations, design partnerships that become case studies that become moats. The Base ecosystem spans infra, DeFi, consumer, and tooling; Sirius segments it, maps relationships and dependencies, and finds the white space."
+  playbook_notes:
+  - title: "Partnership qualification (public BD practice)"
+    detail: "Every target scored on mutual benefit: what they get (distribution, fees, users) and what we get. A partnership brief must state both sides' value in numbers or it does not ship."
+  - title: "Ecosystem-mapping methodology (public practice)"
+    detail: "Segment the ecosystem (infra, DeFi, consumer, tooling), map relationships and dependencies, and identify white space. Refresh the map quarterly; stale maps mislead sequencing."
+  - title: "Design-partner moat (doctrine vector 4)"
+    detail: "Deep design partnerships produce case studies that compound into lock-in competitors cannot replicate quickly. Sirius nominates design-partner candidates with a mutual-benefit memo."
+  - title: "Influence measurement (public practice)"
+    detail: "Measure reach and relevance separately: big-but-irrelevant is noise. Influence scores combine audience size with segment overlap."
+  - title: "Sequencing (public partnership practice)"
+    detail: "Approach order matters: anchor partners first, long tail after. Early wins create the social proof that unlocks the next tier."
+  key_metrics:
+    qualified_leads_per_day: "5"
+    ecosystem_maps_per_quarter: "1"
+    partnership_briefs_per_week: "2"
+    design_partner_candidates_per_month: "2"
+  decision_frameworks:
+  - "TOA-ranked partnership sequencing: targets ordered by forecast revenue/risk"
+  - "Influence-times-fit matrix: reach weighted by segment overlap and mutual benefit"
+  - "Mutual-benefit math gate: both sides' value stated in the brief or it does not ship"
+skills:
+- name: ecosystem_map
+  description: "Build or refresh the segmented Base ecosystem map with relationships and dependencies."
+  inputs:
+  - segments
+  - refresh
+  outputs:
+  - map_md
+  - change_log
+  code_ref: "scaffold -- needs implementation"
+- name: partnership_target_brief
+  description: "Produce a partnership brief: target, mutual benefit math, sequencing rationale."
+  inputs:
+  - target_name
+  outputs:
+  - brief_md
+  - benefit_math
+  code_ref: "scaffold -- needs implementation"
+- name: influence_score
+  description: "Score a target's influence: reach times segment relevance."
+  inputs:
+  - target_profile
+  outputs:
+  - score_0_100
+  - factor_breakdown
+  code_ref: "scaffold -- needs implementation"
+- name: grant_program_scan
+  description: "Scan public grant programs for partnership and funding-alignment opportunities."
+  inputs:
+  - ecosystem
+  outputs:
+  - programs
+  - fit_notes
+  code_ref: "scaffold -- needs implementation"
+- name: icp_score
+  description: "Score a partnership prospect against partnership-variant ICP weights."
+  inputs:
+  - prospect_profile
+  - icp_weights
+  outputs:
+  - score_0_100
+  - factor_breakdown
+  code_ref: "scaffold -- needs implementation"
+- name: paid_ecosystem_data
+  description: "Purchase paid ecosystem datasets via x402 micropayments on Base (USDC)."
+  inputs:
+  - data_product
+  - max_cost_usdc
+  outputs:
+  - dataset_ref
+  - receipt
+  code_ref: "src/sincor2/x402_buyer.py"
+connections:
+  escalates_to: negotiators
+  hands_off_to:
+  - E-kaus-27
+  - E-shaula-26
+  supervised_by: E-toa-44
+activation:
+  checklist:
+  - "Auditor review of domain_dossier + skills passed (overlapping supervision; no agent approves its own output)"
+  - "Every skill code_ref verified as a real repo path or marked 'scaffold -- needs implementation'"
+  - "Shadow-mode dry run complete: proposals only, zero external sends, zero writes outside ~/workspace"
+  - "Handoff paths tested: hands_off_to negotiator ids reachable; escalation to negotiators department confirmed"
+  - "KPI instrumentation live: qualified_leads_per_day reported to the scouts department ledger"
+  - "Compliance gate confirmed: no contact with sanctioned/blocked addresses; screening fail-closed"
+  - "Legal-doctrine check passed against docs/strategy/offensive/00-doctrine.md banned list"
+  - "Status flips Hatch -> Active only after all above; record date + reviewer agent id"
