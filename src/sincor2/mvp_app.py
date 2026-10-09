@@ -30,6 +30,7 @@ from dotenv import load_dotenv
 from sincor2.data_paths import data_dir, migrate_legacy_orders_db
 from sincor2.pdf_loader import get_pdf_generator
 from sincor2.email_sender import get_email_sender
+from sincor2.shadow_monitor.runtime import build_shadow_runtime
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +58,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+
+# Agent-facing effects are proposal-only in this process. This registry does
+# not convert legacy customer-facing billing/outreach routes; those callsites
+# must be migrated separately before claiming app-wide side-effect isolation.
+app.extensions['sincor_shadow_runtime'] = build_shadow_runtime()
 
 if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('TRUST_PROXY', '').lower() in ('1', 'true', 'yes'):
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
