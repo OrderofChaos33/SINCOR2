@@ -61,6 +61,26 @@
     <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token }}"/>
     <input type="hidden" name="email" id="email_hidden" value="{{ email or '' }}"/>
     <input type="hidden" name="order_id" value="{{ order_id or '' }}"/>
+    <input type="hidden" name="challenge_id" id="challenge_id" value=""/>
+    <input type="hidden" name="otp" id="otp_hidden" value=""/>
+
+    {% if not is_admin %}
+    <div class="group" id="f-verify">
+      <label>Email *</label>
+      <input type="email" id="email_visible" placeholder="you@company.com" maxlength="254" value="{{ email or '' }}" required/>
+      <div class="error">Required</div>
+      <div style="display:flex;gap:.75rem;margin-top:.6rem;align-items:center">
+        <button type="button" class="btn" id="send-code-btn" style="width:auto;margin-top:0;padding:.6rem 1.25rem">Send verification code</button>
+        <span id="verify-status" style="font-size:.85rem;color:#94a3b8"></span>
+      </div>
+    </div>
+
+    <div class="group" id="f-otp" style="display:none">
+      <label>Verification code *</label>
+      <input type="text" id="otp_input" placeholder="6-digit code" maxlength="6" inputmode="numeric" autocomplete="one-time-code"/>
+      <div class="error">Enter the 6-digit code we emailed you</div>
+    </div>
+    {% endif %}
 
     <div class="row">
       <div class="group" id="f-fname">
@@ -173,10 +193,76 @@
 <script>
 const form = document.getElementById('intake-form');
 const btn  = document.getElementById('submit-btn');
+const emailVisible = document.getElementById('email_visible');
+const emailHidden  = document.getElementById('email_hidden');
+const sendCodeBtn  = document.getElementById('send-code-btn');
+const verifyStatus = document.getElementById('verify-status');
+const otpRow       = document.getElementById('f-otp');
+const otpInput     = document.getElementById('otp_input');
+const challengeId  = document.getElementById('challenge_id');
+const otpHidden    = document.getElementById('otp_hidden');
+
+// Email verification (skipped for admin console use)
+if (sendCodeBtn) {
+  sendCodeBtn.addEventListener('click', async () => {
+    const email = (emailVisible.value || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      verifyStatus.textContent = 'Enter a valid email first.';
+      verifyStatus.style.color = '#f87171';
+      return;
+    }
+    sendCodeBtn.disabled = true;
+    verifyStatus.textContent = 'Sending code…';
+    verifyStatus.style.color = '#94a3b8';
+    try {
+      const res = await fetch('/api/onboarding/challenge', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email})
+      });
+      const json = await res.json();
+      if (res.ok) {
+        challengeId.value = json.challenge_id;
+        otpRow.style.display = 'block';
+        verifyStatus.textContent = 'Code sent — check your inbox (expires in 15 min).';
+        verifyStatus.style.color = '#34d399';
+        emailHidden.value = email;
+      } else {
+        verifyStatus.textContent = json.error || 'Could not send the code.';
+        verifyStatus.style.color = '#f87171';
+        sendCodeBtn.disabled = false;
+      }
+    } catch(err) {
+      verifyStatus.textContent = 'Network error. Please try again.';
+      verifyStatus.style.color = '#f87171';
+      sendCodeBtn.disabled = false;
+    }
+  });
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   let valid = true;
+
+  // Sync the visible email into the submitted payload
+  if (emailVisible && emailHidden) {
+    emailHidden.value = (emailVisible.value || '').trim();
+  }
+  // Collect the one-time code into the payload
+  if (otpInput && otpHidden && challengeId) {
+    otpHidden.value = (otpInput.value || '').trim();
+    if (challengeId.value && !/^\d{6}$/.test(otpHidden.value)) {
+      otpRow.classList.add('field-error');
+      valid = false;
+    } else {
+      otpRow.classList.remove('field-error');
+    }
+    if (!challengeId.value) {
+      verifyStatus.textContent = 'Please verify your email first (Send verification code).';
+      verifyStatus.style.color = '#f87171';
+      valid = false;
+    }
+  }
 
   // Validate required fields
   form.querySelectorAll('[required]').forEach(el => {
