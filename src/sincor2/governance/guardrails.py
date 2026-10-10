@@ -1351,13 +1351,21 @@ GUARDRAILS: Dict[str, Dict[str, object]] = {
         ],
         "policy_checks": [
             "onchain payment claim verification (mvp_blueprints/billing.py)",
-            "sincor2.defi.ofac_sdn.screen_wallet_address (payer)",
-            "POLICY-MISSING: confirmation-depth policy — ad hoc in handler",
+            "sincor2.defi.ofac_sdn.screen_wallet_address (payer) — fail-closed "
+            "strict mode via PLATFORM_OFAC_STRICT (default true); sanctions "
+            "hits always block",
+            "confirmation-depth finality policy "
+            "(platform_payments.finality_confirmations; Base 8453 defaults to "
+            "12 confirmations) — orders stay pending below depth",
         ],
         "approval": "human",
         "approval_note": "Human approval required: verifies an onchain "
                          "payment claim and provisions the purchase; "
-                         "provisioning is effectively final.",
+                         "provisioning is effectively final. FOUNDER DECISION: "
+                         "jurisdiction-specific legal sign-off from qualified "
+                         "compliance counsel is still required before relying "
+                         "on the OFAC screening mechanism for any regulated "
+                         "activity.",
         "rate_limits": {
             "policy_class": "PROPOSED: money_verify",
             "per_ip": "10/min",
