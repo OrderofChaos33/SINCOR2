@@ -1,0 +1,411 @@
+{
+ "_readme": {
+  "ci_check": "tests/pytest/test_sink_manifest.py loads this file and asserts (1) every listed module_path exists on disk, (2) every file_line reference resolves to a real file. CI fails on: malformed JSON, missing module files, stale line references. To keep the manifest honest when adding a NEW sink: add the entry here with current_gateway_status='unwrapped'; the manifest is intentionally additive-only \u2014 a new effect-type sink with no entry will be caught by the 'unwrapped sink' audit sweep documented in the test docstring. Convention: prefer adding the sink AND a gateway wrapper in the same PR, then flip status to 'wrapped'.",
+  "fields": "sink_id (stable), module_path (python module), function (qualified name), file_line ('path/to/file.py:LINE'), effect_type (EffectType member in effect_gateway.py), current_gateway_status ('wrapped' | 'unwrapped'), owner (team/persona responsible), notes",
+  "generated": "2026-10-09, by code grep over src/sincor2 (smtplib/requests/urllib POST to external hosts, w3.eth.send_raw_transaction, sign_and_broadcast callbacks, open() writes outside tmp, subprocess/Popen, scheduler/task-queue enqueue of side-effect jobs). Read-only GET/RPC reads are NOT sinks and are not listed. Sweep 2026-10-09 found 5 more: p24 bridge, auction relayer, bidder client chain writes; content-agent/cortecs LLM API calls.",
+  "purpose": "Machine-readable inventory of EVERY network/write sink in the SINCOR2 codebase. Each entry is a call site that produces an externally visible effect. The canonical gateway is sincor2.effect_gateway.EffectGateway; sinks marked 'unwrapped' are called directly today and must be routed through the gateway (or through an explicitly approved legacy path) before they are considered safe for agent-driven invocation.",
+  "total_sinks": 40
+ },
+ "sinks": [
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "EMAIL_SEND",
+   "file_line": "src/sincor2/email_sender.py:200",
+   "function": "EmailSender.send_email",
+   "module_path": "sincor2.email_sender",
+   "notes": "Fan-out to Resend SDK / SendGrid SDK / stub depending on mode. Primary email sink for all agent-initiated mail.",
+   "owner": "comms",
+   "sink_id": "email-sendgrid-resend"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "EMAIL_SEND",
+   "file_line": "src/sincor2/email_sender.py:129",
+   "function": "EmailSender.send_welcome_email",
+   "module_path": "sincor2.email_sender",
+   "notes": "Delegates to send_email.",
+   "owner": "comms",
+   "sink_id": "email-welcome"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "EMAIL_SEND",
+   "file_line": "src/sincor2/email_sender.py:74",
+   "function": "EmailSender.send_thank_you_email",
+   "module_path": "sincor2.email_sender",
+   "notes": "Delegates to send_email.",
+   "owner": "comms",
+   "sink_id": "email-thank-you"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "SMS_SEND",
+   "file_line": "src/sincor2/email_sender.py:295",
+   "function": "EmailSender (twilio_client.messages.create)",
+   "module_path": "sincor2.email_sender",
+   "notes": "Twilio SMS fallback for order notifications.",
+   "owner": "comms",
+   "sink_id": "sms-twilio-order-notify"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "EMAIL_SEND",
+   "file_line": "src/sincor2/waitlist_system.py:9",
+   "function": "WaitlistSystem.notify_launch (smtplib import)",
+   "module_path": "sincor2.waitlist_system",
+   "notes": "smtplib imported at module top; no active sendmail call found in current code \u2014 latent direct-SMTP sink. Keep listed until import is removed or wrapped.",
+   "owner": "comms",
+   "sink_id": "waitlist-smtp"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "EMAIL_SEND",
+   "file_line": "src/sincor2/webbuilder_crm.py:138",
+   "function": "_notify_owner",
+   "module_path": "sincor2.webbuilder_crm",
+   "notes": "Calls EmailSender.send_email on site go-live.",
+   "owner": "webbuilder",
+   "sink_id": "webbuilder-crm-notify-owner"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CONTENT_PUBLISH",
+   "file_line": "src/sincor2/content_agent.py:710",
+   "function": "WordPressPublisher.publish",
+   "module_path": "sincor2.content_agent",
+   "notes": "HTTP POST to {api_url}/wp-json/wp/v2/posts. Guardrailed but not gateway-routed.",
+   "owner": "content",
+   "sink_id": "wordpress-publish"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CONTENT_PUBLISH",
+   "file_line": "src/sincor2/content_agent.py:781",
+   "function": "WordPressPublisher.schedule_post",
+   "module_path": "sincor2.content_agent",
+   "notes": "Delegates to publish() with future date.",
+   "owner": "content",
+   "sink_id": "wordpress-schedule"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CRM_WRITE",
+   "file_line": "src/sincor2/webbuilder_crm.py:56",
+   "function": "record_contact",
+   "module_path": "sincor2.webbuilder_crm",
+   "notes": "INSERT into webbuilder_contacts sqlite store (lead capture).",
+   "owner": "webbuilder",
+   "sink_id": "webbuilder-crm-record-contact"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CRM_WRITE",
+   "file_line": "src/sincor2/webbuilder_crm.py:94",
+   "function": "sync_on_cutover",
+   "module_path": "sincor2.webbuilder_crm",
+   "notes": "Marks contacts synced on go-live; also triggers email sink.",
+   "owner": "webbuilder",
+   "sink_id": "webbuilder-crm-sync-cutover"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CHAIN_WRITE",
+   "file_line": "src/sincor2/auction_bridge.py:172",
+   "function": "_sign_and_send",
+   "module_path": "sincor2.auction_bridge",
+   "notes": "w3.eth.send_raw_transaction + wait_for_transaction_receipt. Default dry_run=True; live only via explicit signer.",
+   "owner": "auction",
+   "sink_id": "auction-bridge-sign-and-send"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CHAIN_WRITE",
+   "file_line": "src/sincor2/onchain/fee_conversion_executor.py:601",
+   "function": "FeeConversionExecutor.execute_plan",
+   "module_path": "sincor2.onchain.fee_conversion_executor",
+   "notes": "Invokes injected sign_and_broadcast callback. Gated by legacy Config.armed (deprecated in favor of sincor2.release_policy).",
+   "owner": "treasury",
+   "sink_id": "fee-executor-broadcast"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CHAIN_WRITE",
+   "file_line": "src/sincor2/agents/treasury_execution_agent.py:378",
+   "function": "TreasuryExecutionAgent.run_cycle (live intent path)",
+   "module_path": "sincor2.agents.treasury_execution_agent",
+   "notes": "Live money intents routed through shadow effect boundary pre-queue; broadcast gated by legacy EXECUTE_LIVE env flag (deprecated in favor of sincor2.release_policy).",
+   "owner": "treasury",
+   "sink_id": "treasury-exec-live-intent"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CHAIN_WRITE",
+   "file_line": "src/sincor2/adapters/metamask_agent_wallet.py:113",
+   "function": "MetaMaskAgentWallet._run",
+   "module_path": "sincor2.adapters.metamask_agent_wallet",
+   "notes": "subprocess 'mm' CLI (MetaMask agent wallet) \u2014 can sign and send onchain. Both PROCESS_EXEC-class and CHAIN_WRITE-class; listed under CHAIN_WRITE as the higher-risk class. Kill-switch guarded.",
+   "owner": "wallet",
+   "sink_id": "metamask-wallet-cli"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "CHAIN_WRITE",
+   "file_line": "src/sincor2/x402_buyer.py:286",
+   "function": "X402BuyerClient._do_request",
+   "module_path": "sincor2.x402_buyer",
+   "notes": "Sends signed x402 payment authorization over HTTP (402 -> sign -> retry). Signature is value-moving; signer_fn is caller-injected.",
+   "owner": "payments",
+   "sink_id": "x402-buyer-signed-payment"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "FILE_WRITE",
+   "file_line": "src/sincor2/agent_billing.py:57",
+   "function": "_log_path append",
+   "module_path": "sincor2.agent_billing",
+   "notes": "Append-only billing log. Low risk; listed for completeness.",
+   "owner": "billing",
+   "sink_id": "agent-billing-log"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "FILE_WRITE",
+   "file_line": "src/sincor2/agents/treasury_execution_agent.py:142",
+   "function": "_audit / _queue_intent",
+   "module_path": "sincor2.agents.treasury_execution_agent",
+   "notes": "Append to AUDIT_LOG and INTENT_QUEUE jsonl files (lines 142 and 149).",
+   "owner": "treasury",
+   "sink_id": "treasury-exec-audit-queue"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "FILE_WRITE",
+   "file_line": "src/sincor2/treasury_inflow.py:145",
+   "function": "record_inflow (ledger append)",
+   "module_path": "sincor2.treasury_inflow",
+   "notes": "Append to fee inflow ledger jsonl.",
+   "owner": "treasury",
+   "sink_id": "treasury-inflow-ledger"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "FILE_WRITE",
+   "file_line": "src/sincor2/underwriting/store.py:33",
+   "function": "Store append",
+   "module_path": "sincor2.underwriting.store",
+   "notes": "Append to per-collection jsonl store.",
+   "owner": "underwriting",
+   "sink_id": "underwriting-store"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "FILE_WRITE",
+   "file_line": "src/sincor2/wardrobe/self_improve.py:65",
+   "function": "ledger append",
+   "module_path": "sincor2.wardrobe.self_improve",
+   "notes": "Append to daily jsonl ledger.",
+   "owner": "wardrobe",
+   "sink_id": "wardrobe-ledger"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "FILE_WRITE",
+   "file_line": "src/sincor2/obs_skus/audit_trail.py:338",
+   "function": "AuditTrail append",
+   "module_path": "sincor2.obs_skus.audit_trail",
+   "notes": "Append-only audit log. Low risk; listed for completeness.",
+   "owner": "observability",
+   "sink_id": "audit-trail-log"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "PROCESS_EXEC",
+   "file_line": "src/sincor2/acceptance_status.py:108",
+   "function": "run_whitelist_prepare",
+   "module_path": "sincor2.acceptance_status",
+   "notes": "subprocess.run([sys.executable, scripts/whitelist_token.py, 'prepare']). Fixed argv (no shell).",
+   "owner": "acceptance",
+   "sink_id": "acceptance-whitelist-prepare"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "PROCESS_EXEC",
+   "file_line": "src/sincor2/daily_ops.py:60",
+   "function": "_buyer_scan",
+   "module_path": "sincor2.daily_ops",
+   "notes": "subprocess.run([sys.executable, tools/curve_buyers.py]). Fixed argv (no shell).",
+   "owner": "ops",
+   "sink_id": "daily-ops-buyer-scan"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "PROCESS_EXEC",
+   "file_line": "src/sincor2/sinax/lemma_discovery.py:104",
+   "function": "Verifier.verify (subprocess)",
+   "module_path": "sincor2.sinax.lemma_discovery",
+   "notes": "subprocess.run of Lean verifier with timeout. Fixed argv (no shell).",
+   "owner": "sinax",
+   "sink_id": "sinax-lean-verifier"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "SCHEDULER_ENQUEUE",
+   "file_line": "src/sincor2/task_queue.py:292",
+   "function": "enqueue",
+   "module_path": "sincor2.task_queue",
+   "notes": "Enqueue async job (eager/celery/thread backend). Job kinds include side-effecting work.",
+   "owner": "platform",
+   "sink_id": "task-queue-enqueue"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "SCHEDULER_ENQUEUE",
+   "file_line": "src/sincor2/scheduler.py:100",
+   "function": "_register_jobs",
+   "module_path": "sincor2.scheduler",
+   "notes": "BackgroundScheduler job registration: _daily_ops_job, _outreach_job, _content_agent_job, _subscription_check_job \u2014 recurring side-effect jobs.",
+   "owner": "ops",
+   "sink_id": "scheduler-register-jobs"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "SCHEDULER_ENQUEUE",
+   "file_line": "src/sincor2/outreach_scheduler.py:32",
+   "function": "_run_cycle",
+   "module_path": "sincor2.outreach_scheduler",
+   "notes": "Periodic outreach cycle; triggers email sinks.",
+   "owner": "comms",
+   "sink_id": "outreach-scheduler-cycle"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "HTTP_EXTERNAL",
+   "file_line": "src/sincor2/obs_skus/enterprise_mesh.py:639",
+   "function": "webhook POST",
+   "module_path": "sincor2.obs_skus.enterprise_mesh",
+   "notes": "HTTP POST to configured webhook URL (alerts).",
+   "owner": "observability",
+   "sink_id": "enterprise-mesh-webhook"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "HTTP_EXTERNAL",
+   "file_line": "src/sincor2/obs_skus/vitals.py:596",
+   "function": "webhook POST",
+   "module_path": "sincor2.obs_skus.vitals",
+   "notes": "HTTP POST to configured webhook URL (vitals alerts).",
+   "owner": "observability",
+   "sink_id": "vitals-webhook"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "HTTP_EXTERNAL",
+   "file_line": "src/sincor2/observability.py:211",
+   "function": "ingest POST",
+   "module_path": "sincor2.observability",
+   "notes": "HTTP POST to telemetry ingest endpoint.",
+   "owner": "observability",
+   "sink_id": "observability-ingest"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "HTTP_EXTERNAL",
+   "file_line": "src/sincor2/mvp_blueprints/billing.py:1257",
+   "function": "PayPal IPN verify POST",
+   "module_path": "sincor2.mvp_blueprints.billing",
+   "notes": "HTTP POST to hardcoded PayPal IPN verification URL.",
+   "owner": "billing",
+   "sink_id": "paypal-ipn"
+  },
+  {
+   "current_gateway_status": "unwrapped",
+   "effect_type": "HTTP_EXTERNAL",
+   "file_line": "src/sincor2/sinax/integration.py:337",
+   "function": "integration POST",
+   "module_path": "sincor2.sinax.integration",
+   "notes": "HTTP POST to external integration endpoints (lines 337 and 411).",
+   "owner": "sinax",
+   "sink_id": "sinax-integration-post"
+  },
+  {
+   "sink_id": "p24-bridge-sign-and-send",
+   "module_path": "sincor2.defi.p24.bridge",
+   "function": "_sign_and_send",
+   "file_line": "src/sincor2/defi/p24/bridge.py:241",
+   "effect_type": "CHAIN_WRITE",
+   "current_gateway_status": "unwrapped",
+   "owner": "defi",
+   "notes": "w3.eth.send_raw_transaction + receipt wait. P24 issuance rails (live-blocked by design)."
+  },
+  {
+   "sink_id": "auction-relayer-send",
+   "module_path": "sincor2.onchain.auction_relayer",
+   "function": "AuctionRelayer._send",
+   "file_line": "src/sincor2/onchain/auction_relayer.py:213",
+   "effect_type": "CHAIN_WRITE",
+   "current_gateway_status": "unwrapped",
+   "owner": "auction",
+   "notes": "self.w3.eth.send_raw_transaction for auction relay txs."
+  },
+  {
+   "sink_id": "bidder-client-send",
+   "module_path": "sincor2.onchain.bidder_client",
+   "function": "BidderClient._send",
+   "file_line": "src/sincor2/onchain/bidder_client.py:127",
+   "effect_type": "CHAIN_WRITE",
+   "current_gateway_status": "unwrapped",
+   "owner": "auction",
+   "notes": "Account.sign_transaction + w3.eth.send_raw_transaction for bidder txs."
+  },
+  {
+   "sink_id": "content-agent-llm-generate",
+   "module_path": "sincor2.content_agent",
+   "function": "ContentAgent.generate_blog_post",
+   "file_line": "src/sincor2/content_agent.py:369",
+   "effect_type": "HTTP_EXTERNAL",
+   "current_gateway_status": "unwrapped",
+   "owner": "content",
+   "notes": "Anthropic claude.messages.create (billable external API call). Inference-only, no customer-visible effect by itself; the publish sink is wordpress-publish."
+  },
+  {
+   "sink_id": "cortecs-llm-complete",
+   "module_path": "sincor2.cortecs_core",
+   "function": "CortecsCore.complete",
+   "file_line": "src/sincor2/cortecs_core.py:57",
+   "effect_type": "HTTP_EXTERNAL",
+   "current_gateway_status": "unwrapped",
+   "owner": "cortecs",
+   "notes": "Anthropic claude.messages.create (async + sync variants at lines 57/85). Billable external API call; inference-only."
+  },
+  {
+   "sink_id": "stripe-checkout-session-create",
+   "module_path": "sincor2.stripe_checkout",
+   "function": "StripeCheckout.create_checkout_session",
+   "file_line": "src/sincor2/stripe_checkout.py:97",
+   "effect_type": "PAYMENT_CHARGE",
+   "current_gateway_status": "unwrapped",
+   "owner": "billing",
+   "notes": "stripe.checkout.Session.create \u2014 initiates a customer payment session."
+  },
+  {
+   "sink_id": "stripe-subscription-delete",
+   "module_path": "sincor2.stripe_checkout",
+   "function": "StripeCheckout.cancel_subscription",
+   "file_line": "src/sincor2/stripe_checkout.py:237",
+   "effect_type": "PAYMENT_CHARGE",
+   "current_gateway_status": "unwrapped",
+   "owner": "billing",
+   "notes": "stripe.Subscription.delete \u2014 cancels a live subscription (billing effect)."
+  },
+  {
+   "sink_id": "libp2p-send-message",
+   "module_path": "sincor2.adapters.libp2p_adapter",
+   "function": "Libp2pAdapter.send_message",
+   "file_line": "src/sincor2/adapters/libp2p_adapter.py:73",
+   "effect_type": "MESSAGE_SEND",
+   "current_gateway_status": "unwrapped",
+   "owner": "networking",
+   "notes": "Async libp2p peer message send. P2P network write; agent-addressable."
+  }
+ ]
+}
