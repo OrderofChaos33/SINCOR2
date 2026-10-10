@@ -20,9 +20,15 @@ _JUNK_EMAIL = ("example.com", "sentry.io", "wixpress.com", "cloudflare", "schema
 
 
 def _autonomous_on() -> bool:
-    master = os.environ.get("AUTONOMOUS_AGENTS", "true").lower() == "true"
-    flag = os.environ.get("OUTREACH_ENABLED", "true" if master else "false").lower()
-    return flag == "true"
+    """Fail-closed outreach opt-in (P1 audit #9; approach ported from WP2).
+
+    OUTREACH_ENABLED must be explicitly truthy ("1"/"true"/"yes"); unset,
+    empty, or any other value -> OFF. AUTONOMOUS_AGENTS explicitly "false"
+    overrides even an explicit opt-in. Delegates to sincor2.comms_gating so
+    the allowlist + kill-switch layers are enforced at the send sites too.
+    """
+    from sincor2.comms_gating import outreach_opted_in
+    return outreach_opted_in()
 
 
 class OutreachEngine:
@@ -153,8 +159,15 @@ class OutreachEngine:
         )
 
     def send_outreach_email(self, lead: Dict, resend_client) -> bool:
-        email = lead.get("email", "")
+        email = (lead.get("email", "") or "").strip()
         if not email:
+            return False
+        # P1 audit #9 backstop: explicit opt-in + approved-recipients allowlist
+        # + live kill-switch check, enforced even on direct calls.
+        from sincor2.comms_gating import outreach_send_allowed
+        ok, reason = outreach_send_allowed(email)
+        if not ok:
+            logger.warning("[OUTREACH] send_outreach_email refused (%s): %s", reason, email)
             return False
         try:
             from_addr = f"{self.from_name} <{self.from_email}>"

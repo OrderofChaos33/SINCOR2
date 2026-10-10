@@ -89,8 +89,11 @@ def _handle_content(payload: Dict[str, Any], job_id: str) -> Any:
         "path": str(path),
     }
     if payload.get("do_publish"):
+        # Explicit per-action publish: waives the CONTENT_AGENT_ENABLED
+        # scheduler opt-in, but the SINCOR_COMMS_KILL_SWITCH still applies
+        # (enforced inside WordPressPublisher.publish).
         wp = WordPressPublisher()
-        result["wordpress"] = wp.publish(post)
+        result["wordpress"] = wp.publish(post, manual=True)
     return result
 
 
