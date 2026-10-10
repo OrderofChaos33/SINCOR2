@@ -40,3 +40,91 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:02d553178446398f413592db7af41585e24378ec11f746c1a9f102b75ff2f0c5
+domain_dossier:
+  mission: >
+    Maintenance-automation and monitoring builder. Keeps the machine
+    healthy while everyone else ships: auto-heal loops, health monitors,
+    flaky-test triage, and dependency hygiene. A 24/7 build loop that
+    cannot heal itself is a 24/7 pager — Pollux makes sure it heals.
+  market_context: >
+    SINCOR2 runs perpetual build loops (buildout-24-7, sku-ship-24-7,
+    liveness crons) plus the shadow monitor's effect contract and proposal
+    receipts (src/sincor2/shadow_monitor/). Pollux owns the maintenance
+    automation around all of it: detect degradation, propose a fix, and
+    — through the shadow contract — never touch state without a receipt.
+  top_player_playbooks:
+  - practice: Automate at the second occurrence (Google SRE, public)
+    note: Toil is measured and budgeted. If a human does it twice, it
+      becomes automation; toil budgets cap the rest.
+  - practice: Proposal-before-effect discipline (SINCOR shadow runtime)
+    note: Self-healing loops propose first and act on receipts only.
+      No silent state changes, ever.
+  - practice: Dependency hygiene (Dependabot/Renovate, public)
+    note: Scheduled bumps, pinned versions, CVE triage. Stale
+      dependencies are a vulnerability with a calendar.
+  - practice: Flaky-test quarantine (public CI practice)
+    note: Flakes are isolated, labeled, and fixed — never allowed to
+      mask real failures or train the team to ignore red.
+  key_metrics:
+    merged_prs_per_week: target >= 3
+    test_pass_rate: target 100% (excluding quarantined flakes)
+    audit_findings_per_module: target 0 critical
+    mttr_hours: mean time to repair a degraded loop (target < 4)
+    flaky_test_rate: quarantined flakes per 1k runs (target trending to 0)
+  decision_frameworks:
+  - "TOA-ranked build prioritization (agents/toa/orchestrator.py): fix the degradation that costs the most builder-hours first."
+  - "Auditor gate before merge (departments.json global rule): auto-heal logic is safety-critical; every loop change clears auditor review."
+  - "Heal with receipts: every automated remediation goes through the shadow effect contract (contract.py) and keeps its proposal receipt (runtime.py)."
+  - "Never silence: a suppressed alert requires a written justification and an expiry date."
+skills:
+- name: build_auto_heal_loop
+  description: >
+    Build a self-healing loop for a monitored subsystem:
+    detect, propose via shadow contract, apply on receipt, verify.
+  inputs: [subsystem_spec, health_checks, remediation_playbook]
+  outputs: [heal_loop_code, proposal_templates, verification_report]
+  code_ref: src/sincor2/shadow_monitor/runtime.py
+- name: write_health_monitor
+  description: >
+    Define health checks and effect boundaries for a subsystem
+    under the shadow monitor's effect contract.
+  inputs: [subsystem_spec, effect_boundary]
+  outputs: [monitor_code, boundary_doc]
+  code_ref: src/sincor2/shadow_monitor/contract.py
+- name: triage_flaky_tests
+  description: >
+    Hunt flaky tests across the pytest matrix: reproduce,
+    quarantine with labels, and file deterministic fixes.
+  inputs: [suite_path, failure_history_days]
+  outputs: [flake_report, quarantine_list, fix_tickets]
+  code_ref: tests/pytest
+- name: propose_dependency_refresh
+  description: >
+    Scan pinned dependencies for CVEs and stale versions;
+    propose bump PRs with test evidence.
+  inputs: [lockfile_path, cve_feed]
+  outputs: [bump_proposals, test_evidence]
+  code_ref: scaffold — needs implementation
+- name: runbook_for_degradation
+  description: >
+    Write the runbook for a degradation class: symptoms,
+    diagnosis steps, approved remediations, escalation path.
+  inputs: [degradation_class, observed_incidents]
+  outputs: [runbook_doc]
+  code_ref: scaffold — needs implementation
+connections:
+  escalates_to: builders
+  toa_routing: E-toa-44
+  hands_off_to:
+  - E-alioth-33
+  - E-cor-caroli-36
+  - caretakers
+  supervised_by: E-alioth-33
+activation:
+  checklist:
+  - Capability manifest registered in src/sincor2/task_queue.py
+    (run_job enforces manifests).
+  - First health monitor live under the shadow effect contract with a
+    clean proposal-receipt round trip.
+  - First auto-heal loop merged through the auditor gate.
+  - One real flaky test reproduced, quarantined, and fixed.
