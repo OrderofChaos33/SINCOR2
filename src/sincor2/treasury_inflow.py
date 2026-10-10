@@ -96,6 +96,42 @@ class TreasurySnapshot:
         return asdict(self)
 
 
+#: Explicit allowlist for the treasury-metrics API DTO. Anything not listed
+#: here is NEVER serialized to API consumers: no treasury address, no RPC
+#: diagnostics, no per-source breakdowns, no tx hashes, notes, or raw
+#: ledger event rows.
+PUBLIC_TREASURY_SNAPSHOT_FIELDS = (
+    "timestamp",
+    "eth_balance",
+    "usdc_balance",
+    "sinc_balance",
+    "axm_balance",
+    "rpc_ok",
+    "ledger_24h_usd",
+    "ledger_events_24h",
+)
+PUBLIC_TREASURY_LEDGER_FIELDS = (
+    "events_24h",
+    "usd_total_24h",
+    "usd_realized_24h",
+    "usd_projected_24h",
+)
+
+
+def public_treasury_dto(
+    snap: "TreasurySnapshot", summary: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Build the authenticated treasury-metrics response from allowlisted fields only."""
+    snap_d = snap.to_dict() if hasattr(snap, "to_dict") else dict(snap or {})
+    summary = summary or {}
+    return {
+        "status": "ok",
+        "kpi": "treasury_inflow",
+        "snapshot": {k: snap_d.get(k) for k in PUBLIC_TREASURY_SNAPSHOT_FIELDS},
+        "ledger_24h": {k: summary.get(k) for k in PUBLIC_TREASURY_LEDGER_FIELDS},
+    }
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 

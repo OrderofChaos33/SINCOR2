@@ -460,11 +460,22 @@ def health_check():
 
 
 @app.route('/api/metrics/treasury')
-@limiter.exempt if limiter else lambda f: f
+@jwt_required()
+@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f
 def treasury_metrics():
-    """Public treasury KPI snapshot for homepage metrics."""
+    """Treasury KPI snapshot (AUTHENTICATED — audit P2-A2 remediation).
+
+    Previously public for homepage metrics; now requires a valid Bearer
+    JWT and returns an explicit field allowlist only (no raw ledger
+    internals). FOUNDER DECISION: confirm whether any subset should stay
+    intentionally public for the homepage, and if so via which surface.
+    """
     try:
-        from sincor2.treasury_inflow import get_treasury_snapshot, ledger_summary_24h
+        from sincor2.treasury_inflow import (
+            get_treasury_snapshot,
+            ledger_summary_24h,
+            public_treasury_dto,
+        )
     except ImportError as exc:
         logger.error("treasury_inflow import failed: %s", exc)
         return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
@@ -472,14 +483,7 @@ def treasury_metrics():
     try:
         snap = get_treasury_snapshot(include_onchain=True)
         summary = ledger_summary_24h()
-        return jsonify(
-            {
-                "status": "ok",
-                "kpi": "treasury_inflow",
-                "snapshot": snap.to_dict(),
-                "ledger_24h": summary,
-            }
-        ), 200
+        return jsonify(public_treasury_dto(snap, summary)), 200
     except Exception as exc:
         logger.exception("treasury metrics failed")
         return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500

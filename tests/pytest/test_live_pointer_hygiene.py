@@ -336,7 +336,10 @@ def test_run_entrypoint_serves_homepage_surface() -> None:
         "/api/a2a/quote?skill_id=lead-enrichment",
         "/api/price/official",
         "/health",
-        "/api/metrics/treasury",
     ):
         response = client.get(path)
         assert response.status_code == 200, path
+    # P2-A2 remediation: treasury metrics are authenticated-only; an
+    # unauthenticated request must NOT get a 200 with balances anymore.
+    response = client.get("/api/metrics/treasury")
+    assert response.status_code in (401, 403), "/api/metrics/treasury"
