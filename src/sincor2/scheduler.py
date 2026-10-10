@@ -1,4 +1,10 @@
-"""SINCOR2 Centralized Scheduler — autonomous jobs default ON."""
+"""SINCOR2 Centralized Scheduler.
+
+P1 audit #9: all send/publish jobs default OFF and require explicit env
+opt-in. Outreach sends additionally require a non-empty
+OUTREACH_APPROVED_RECIPIENTS allowlist; every send/publish path honors the
+SINCOR_COMMS_KILL_SWITCH (see sincor2.comms_gating).
+"""
 from __future__ import annotations
 
 import logging
@@ -112,19 +118,24 @@ def _register_jobs(sched: BackgroundScheduler) -> List[str]:
         sched.add_job(lambda: _safe_run("SADAS (startup)", _sadas_job), trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=90)), id="sadas_startup", replace_existing=True)
         jobs_registered.append("sadas_alpha_swarm")
 
-    if os.environ.get("OUTREACH_ENABLED", "true").lower() == "true":
+    # P1 audit #9: default OFF, explicit opt-in required (fail closed).
+    from sincor2.comms_gating import outreach_opted_in
+    if outreach_opted_in():
         hours = float(os.environ.get("OUTREACH_INTERVAL_HOURS", "2"))
         sched.add_job(lambda: _safe_run("Outreach", _outreach_job), trigger=IntervalTrigger(hours=hours), id="outreach_cycle", name="SINCOR Outreach Cycle", replace_existing=True, max_instances=1)
         sched.add_job(lambda: _safe_run("Outreach (startup)", _outreach_job), trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=45)), id="outreach_startup", replace_existing=True)
         jobs_registered.append("outreach_cycle")
         logger.info("[SCHEDULER] Outreach armed every %sh + 45s boot cycle", hours)
 
-    if os.environ.get("CONTENT_AGENT_ENABLED", "true").lower() == "true":
+    # P1 audit #9: default OFF, explicit opt-in required (fail closed).
+    from sincor2.comms_gating import content_opted_in
+    if content_opted_in():
         hours = float(os.environ.get("CONTENT_AGENT_INTERVAL_HOURS", "48"))
         sched.add_job(lambda: _safe_run("Content Agent", _content_agent_job), trigger=IntervalTrigger(hours=hours), id="content_agent", name="SINCOR Content Agent", replace_existing=True, max_instances=1)
         jobs_registered.append("content_agent")
 
-    if os.environ.get("LAUNCH_OPS_ENABLED", "true").lower() == "true":
+    # P1 audit #9: default OFF, explicit opt-in required (fail closed).
+    if os.environ.get("LAUNCH_OPS_ENABLED", "false").strip().lower() in ("1", "true", "yes"):
         hours = float(os.environ.get("LAUNCH_OPS_INTERVAL_HOURS", "24"))
         sched.add_job(lambda: _safe_run("Launch Content", _launch_content_job), trigger=IntervalTrigger(hours=hours), id="launch_content_cycle", name="SINCOR Launch Content", replace_existing=True, max_instances=1)
         jobs_registered.append("launch_content_cycle")
