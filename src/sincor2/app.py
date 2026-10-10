@@ -1537,7 +1537,7 @@ if __name__ == '__main__':
             print("  Password: NOT CONFIGURED — admin auth is REJECTED in production")
             print("  ⚠️  Set ADMIN_PASSWORD env var to a strong value before launch.")
         else:
-            print("  Password: changeme123  (dev default — DO NOT use in production)")
+            print("  Password: <dev default — DO NOT use in production>")
 
     if RATE_LIMIT_AVAILABLE:
         print("\nRate Limiting Active:")
