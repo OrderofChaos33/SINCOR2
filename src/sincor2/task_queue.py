@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -25,6 +26,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
+
+from flask_jwt_extended import get_jwt_identity, jwt_required, verify_jwt_in_request
 
 logger = logging.getLogger("sincor.queue")
 
@@ -41,6 +44,59 @@ Handler = Callable[[Dict[str, Any], str], Any]
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+# Matches absolute filesystem-path tokens with 2+ segments ("/app/secrets/x").
+# Used to scrub internal paths out of API-facing error text. URLs are
+# preserved: the lookbehind excludes matches that follow "://" or a word char.
+_PATH_TOKEN_RE = re.compile(r"(?<![\w:/])(?:/[\w.\-~]+){2,}")
+
+
+def _public_error_text(err: Any) -> str:
+    """Redact a job error for API responses.
+
+    First line only (never a traceback), truncated, with filesystem-path
+    tokens replaced — internal paths, provider payloads and stack frames
+    must not reach API consumers.
+    """
+    lines = str(err or "").strip().splitlines()
+    first = lines[0] if lines else ""
+    first = _PATH_TOKEN_RE.sub("[path]", first)
+    return first[:280]
+
+
+def _request_tenant() -> str:
+    """Best-effort tenant (JWT identity) for the current request, else "".
+
+    Resolution order: verified Bearer JWT -> signed ``access_token`` cookie
+    (form-login sessions) -> "". ``decode_token`` verifies the signature,
+    so the cookie path trusts nothing unverified. Never raises.
+    """
+    try:
+        from flask import has_request_context, request
+
+        if not has_request_context():
+            return ""
+        try:
+            verify_jwt_in_request(optional=True)
+            ident = get_jwt_identity()
+            if ident:
+                return str(ident).strip()
+        except Exception:
+            pass
+        try:
+            from flask_jwt_extended import decode_token
+
+            token = (request.cookies.get("access_token") or "").strip()
+            if token:
+                sub = decode_token(token).get("sub")
+                if sub:
+                    return str(sub).strip()
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return ""
 
 
 def _env_queue() -> str:
@@ -100,6 +156,10 @@ class Job:
     created_at: str = ""
     updated_at: str = ""
     celery_id: Optional[str] = None
+    # Owning tenant (JWT identity of the submitter). Jobs stamped with ""
+    # are internal/legacy and are never served over the API (fail closed).
+    # Deliberately excluded from to_public_dict().
+    tenant_id: str = ""
 
     def to_public_dict(self) -> Dict[str, Any]:
         return {
@@ -108,7 +168,7 @@ class Job:
             "status": self.state,
             "progress": self.progress,
             "result": self.result,
-            "error": self.error,
+            "error": _public_error_text(self.error),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "poll_url": f"/api/tasks/{self.id}",
@@ -122,9 +182,13 @@ class Job:
         known = {k: data.get(k) for k in (
             "id", "kind", "state", "payload", "result", "error",
             "progress", "created_at", "updated_at", "celery_id",
+            "tenant_id",
         )}
         known.setdefault("payload", {})
         known.setdefault("progress", 0)
+        if not known.get("tenant_id"):
+            # Legacy records predate tenant stamping: stay fail-closed ("").
+            known["tenant_id"] = ""
         return cls(**known)  # type: ignore[arg-type]
 
 
@@ -289,11 +353,21 @@ def run_job(job_id: str) -> Job:
         raise
 
 
-def enqueue(kind: str, payload: Optional[Dict[str, Any]] = None, *, job_id: Optional[str] = None) -> Job:
+def enqueue(
+    kind: str,
+    payload: Optional[Dict[str, Any]] = None,
+    *,
+    job_id: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+) -> Job:
     """
     Accept a job and return immediately (except eager/test).
 
     Never blocks the gunicorn worker on the real work.
+
+    ``tenant_id`` stamps job ownership. When omitted, it is derived from
+    the current request's JWT identity (or ""). Pass it explicitly from
+    background producers that act on a user's behalf.
     """
     job = Job(
         id=job_id or str(uuid.uuid4()),
@@ -302,6 +376,7 @@ def enqueue(kind: str, payload: Optional[Dict[str, Any]] = None, *, job_id: Opti
         payload=payload or {},
         created_at=_now(),
         updated_at=_now(),
+        tenant_id=tenant_id if tenant_id is not None else _request_tenant(),
     )
     put_job(job)
     backend = current_backend()
@@ -352,26 +427,44 @@ def queue_health() -> Dict[str, Any]:
 
 
 def register_flask_routes(app: Any) -> None:
-    """Attach GET /api/tasks and GET /api/tasks/<id> onto a Flask app."""
+    """Attach GET /api/tasks and GET /api/tasks/<id> onto a Flask app.
+
+    Both endpoints require a Bearer JWT and enforce tenant ownership: a
+    caller only ever sees jobs stamped with their own JWT identity.
+    Internal/legacy jobs with an empty tenant are never served (fail
+    closed). Error text is redacted to a single scrubbed line — no
+    tracebacks, internal paths, or provider payloads.
+    """
 
     @app.route("/api/tasks", methods=["GET"])
+    @jwt_required()
     def _list_queue_jobs():
         from flask import jsonify, request
 
+        tenant = str(get_jwt_identity() or "")
         try:
             limit = min(int(request.args.get("limit") or 50), 200)
         except (TypeError, ValueError):
             limit = 50
+        mine = [
+            j.to_public_dict()
+            for j in list_jobs(limit)
+            if j.tenant_id and j.tenant_id == tenant
+        ]
         return jsonify({
             "backend": current_backend(),
-            "tasks": [j.to_public_dict() for j in list_jobs(limit)],
+            "tasks": mine,
         })
 
     @app.route("/api/tasks/<job_id>", methods=["GET"])
+    @jwt_required()
     def _get_queue_job(job_id: str):
         from flask import jsonify
 
+        tenant = str(get_jwt_identity() or "")
         job = get_job(job_id)
         if not job:
             return jsonify({"error": "not_found", "task_id": job_id}), 404
+        if not job.tenant_id or job.tenant_id != tenant:
+            return jsonify({"error": "forbidden"}), 403
         return jsonify(job.to_public_dict())

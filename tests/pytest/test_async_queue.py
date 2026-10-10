@@ -98,18 +98,23 @@ def test_accepted_payload_shape(queue_mod):
     assert body["status"] in (queue_mod.COMPLETED, queue_mod.QUEUED, queue_mod.RUNNING)
 
 
-def test_poll_routes(client, queue_mod):
+def test_poll_routes(client, queue_mod, auth_headers):
+    # P2-A1: task poll endpoints require a JWT and enforce tenant ownership.
+    # The legacy test login identity is the admin username ("admin").
     queue_mod.register_handler("test.poll", lambda p, j: {"v": 1})
-    job = queue_mod.enqueue("test.poll", {})
-    resp = client.get(f"/api/tasks/{job.id}")
+    job = queue_mod.enqueue("test.poll", {}, tenant_id="admin")
+    resp = client.get(f"/api/tasks/{job.id}", headers=auth_headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["task_id"] == job.id
     assert data["status"] == "completed"
     assert data["result"]["v"] == 1
 
-    missing = client.get("/api/tasks/does-not-exist")
+    missing = client.get("/api/tasks/does-not-exist", headers=auth_headers)
     assert missing.status_code == 404
+
+    unauth = client.get(f"/api/tasks/{job.id}")
+    assert unauth.status_code == 401
 
 
 def test_rest_a2a_send_returns_202(client):
