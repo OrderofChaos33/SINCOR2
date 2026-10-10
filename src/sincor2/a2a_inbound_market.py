@@ -29,6 +29,7 @@ to 400 JSON on garbage input.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -228,8 +229,8 @@ def _dispute_message(task_id: str, agent_id: str, upheld: bool,
     ])
 
 
-def _recover_dispute_signer(message: str, signature: str) -> str:
-    """Recover the signer address of a dispute authorization (EIP-191)."""
+def _recover_eip191(message: str, signature: str) -> str:
+    """Recover the signer address of an EIP-191 personal signature."""
     try:
         from eth_account import Account
         from eth_account.messages import encode_defunct
@@ -242,6 +243,49 @@ def _recover_dispute_signer(message: str, signature: str) -> str:
             encode_defunct(text=message), signature=signature))
     except Exception as exc:
         raise ValueError("bad signature") from exc
+
+
+# Alias kept for the dispute route's historical name.
+_recover_dispute_signer = _recover_eip191
+
+
+# Stake-deposit identity binding -------------------------------------------
+#
+# POST /v1/a2a/stake/deposit is fail-closed: the deposit must carry an
+# EIP-191 signature over stake_deposit_message() produced by the wallet
+# registered on the agent record. The canonical message is built ONLY from
+# server-side values (registered wallet, parsed amount, agent_id, expiry),
+# so a caller cannot substitute a different wallet, amount, or agent into
+# a signature obtained elsewhere. Consumed signatures are recorded on the
+# deposit event (stake_ledger.signature_hash) and rejected on replay, so
+# each authorization credits stake exactly once inside the expiry window.
+STAKE_DEPOSIT_MAX_SKEW_MS = DISPUTE_MAX_SKEW_MS  # 15 minutes
+
+_DEPOSIT_LOCK = threading.Lock()
+
+
+def stake_deposit_message(agent_id: str, amount_wei: int,
+                          wallet: str, expires_at_ms: int) -> str:
+    """Canonical EIP-191 message an agent's wallet signs for a deposit.
+
+    Public so the reference SDK can build byte-identical messages; the
+    server always rebuilds it from its own registered-wallet record.
+    """
+    return "|".join([
+        "SINCOR-STAKE-DEPOSIT",
+        str(agent_id),
+        str(int(amount_wei)),
+        str(wallet).strip().lower(),
+        str(int(expires_at_ms)),
+    ])
+
+
+def _is_ethereum_address(value: Any) -> bool:
+    raw = str(value or "").strip()
+    if raw[:2].lower() == "0x":
+        raw = raw[2:]
+    return len(raw) == 40 and all(
+        c in "0123456789abcdefABCDEF" for c in raw)
 
 
 def _keccak256(data: bytes) -> bytes:
@@ -1716,10 +1760,11 @@ def attach_market_routes(bp: Blueprint) -> None:
     def v1_stake_deposit():
         """Self-service stake deposit (offchain AXM ledger — Pool 1).
 
-        Body: {agent_id, amount_axm, tx_hash?}. Records stake in the
-        process-wide stake-ledger singleton, so the deposit is visible to
-        commit_bid immediately (no reload; the flip side is that a
-        deposit is only visible to the process that received it).
+        Body: {agent_id, amount_axm, tx_hash?, expires_at_ms, signature}.
+        Records stake in the process-wide stake-ledger singleton, so the
+        deposit is visible to commit_bid immediately (no reload; the flip
+        side is that a deposit is only visible to the process that received
+        it).
 
         Currency note: this moves offchain AXM-denominated ledger
         accounting only. It does not move funds on any chain. The optional
@@ -1734,6 +1779,18 @@ def attach_market_routes(bp: Blueprint) -> None:
         agent, amount) returns the existing record with ``duplicate=true``
         (HTTP 200) and credits nothing further.  A tx_hash bound to a
         different agent or amount is rejected (HTTP 400).
+
+        Identity binding (fail-closed): the deposit must carry an EIP-191
+        signature over the canonical message
+            SINCOR-STAKE-DEPOSIT|<agent_id>|<amount_wei>|<wallet>|<expires_at_ms>
+        produced by the wallet registered on the agent record, plus
+        ``expires_at_ms`` bounding replay to a 15-minute window. Unsigned
+        deposits are rejected (403): an unattributed deposit can never
+        touch the stake ledger, so attacker-controlled attribution — e.g.
+        topping up a target's stake to shift slash economics — is
+        impossible. Each signature is single-use; in-window replays are
+        rejected (403). An agent with no (or a malformed) registered
+        wallet cannot self-deposit: re-register with a wallet address.
         """
         body = request.get_json(silent=True) or {}
         try:
@@ -1742,8 +1799,10 @@ def attach_market_routes(bp: Blueprint) -> None:
                 raise ValueError("agent_id is required")
             fabric = get_fabric()
             with fabric.lock:
-                if agent_id not in fabric.agents:
+                agent = fabric.agents.get(agent_id)
+                if agent is None:
                     raise KeyError("unknown agent")
+                wallet = str(agent.get("wallet") or "").strip()
             raw_amount = body.get("amount_axm")
             if raw_amount is None:
                 raise ValueError("amount_axm is required")
@@ -1767,9 +1826,54 @@ def attach_market_routes(bp: Blueprint) -> None:
                 except ValueError:
                     raise ValueError(
                         "tx_hash must be 0x-prefixed 32-byte hex")
+            if not _is_ethereum_address(wallet):
+                raise PermissionError(
+                    "agent has no verifiable wallet; re-register with a "
+                    "wallet address before depositing")
+            signature = str(body.get("signature") or "").strip()
+            if not signature:
+                # Fail-closed: an unsigned deposit is rejected as
+                # unauthorized, not as a malformed request.
+                raise PermissionError(
+                    "signature required: deposits must be authorized by "
+                    "the agent's registered wallet")
+            raw_expires = body.get("expires_at_ms")
+            if raw_expires is None:
+                raise ValueError("expires_at_ms is required")
+            try:
+                expires_at_ms = int(raw_expires)
+            except (TypeError, ValueError):
+                raise ValueError("expires_at_ms must be an integer")
+            now_ms = _now_ms()
+            if expires_at_ms <= now_ms:
+                raise PermissionError("deposit authorization expired")
+            if expires_at_ms - now_ms > STAKE_DEPOSIT_MAX_SKEW_MS:
+                raise ValueError("expires_at_ms too far in the future")
+            # The message is rebuilt from server-side values only: the
+            # registered wallet, the parsed amount, agent_id and expiry.
+            # A signature obtained for any other agent/amount/wallet can
+            # never satisfy this message, and caller-supplied identity
+            # fields cannot override the recovered signer.
+            message = stake_deposit_message(
+                agent_id, amount_wei, wallet, expires_at_ms)
+            try:
+                signer = _recover_eip191(message, signature)
+            except Exception:  # noqa: BLE001 - any recovery failure rejects
+                raise PermissionError("bad signature")
+            if signer.lower() != wallet.lower():
+                # Deliberately opaque: do not reveal which check failed.
+                raise PermissionError(
+                    "deposit not authorized by the registered wallet")
+            sig_hash = hashlib.sha256(
+                signature.encode("utf-8")).hexdigest()
             from sincor2.onchain.stake_ledger import stake_ledger
-            summary = stake_ledger().deposit(
-                agent_id, amount_wei, reference=tx_hash)
+            ledger = stake_ledger()
+            with _DEPOSIT_LOCK:
+                if ledger.signature_hash_used(sig_hash):
+                    raise PermissionError("deposit signature already used")
+                summary = ledger.deposit(
+                    agent_id, amount_wei, reference=tx_hash,
+                    signature_hash=sig_hash)
             result = dict(summary)
             result["deposit_wei"] = summary["credited_wei"]
             result["tx_hash"] = tx_hash
@@ -1782,6 +1886,8 @@ def attach_market_routes(bp: Blueprint) -> None:
             return _http_error(str(err), 400)
         except KeyError as err:
             return _http_error(str(err), 404)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
 
     @bp.get("/v1/a2a/stake/<agent_id>")
     def v1_stake_balance(agent_id):

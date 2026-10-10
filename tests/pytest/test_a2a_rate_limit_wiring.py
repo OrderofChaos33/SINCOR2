@@ -120,9 +120,11 @@ def test_stake_deposit_uses_bid_tier_per_agent(client):
     for _ in range(30):
         r = client.post(
             "/v1/a2a/stake/deposit",
+            # Unsigned deposits are rejected (403) by the identity-bound
+            # deposit endpoint; the rate limit applies regardless.
             json={"agent_id": "rl-depositor", "amount_axm": 0.01},
         )
-        assert r.status_code in (201, 400), r.status_code
+        assert r.status_code in (403, 400), r.status_code
     r = client.post(
         "/v1/a2a/stake/deposit",
         json={"agent_id": "rl-depositor", "amount_axm": 0.01},
