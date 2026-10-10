@@ -148,9 +148,14 @@ class StripeCheckout:
             }
             handler = handlers.get(event['type'])
             if handler:
-                return handler(data)
+                ok, event_data = handler(data)
+                # B3: propagate the raw Stripe event id so webhook handlers
+                # can dedupe deliveries (insert-or-ignore claim).
+                event_data['event_id'] = event.get('id', '')
+                return ok, event_data
             logger.info(f"[STRIPE] Unhandled event type: {event['type']}")
-            return True, {'event_type': event['type']}
+            return True, {'event_type': event['type'],
+                          'event_id': event.get('id', '')}
 
         except Exception as e:
             logger.error(f"[STRIPE] Webhook verification failed: {str(e)}")

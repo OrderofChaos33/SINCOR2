@@ -486,6 +486,7 @@ try:
         init_platform_payments_db,
         list_plans as platform_list_plans,
         list_subscriptions,
+        mark_checkout_fulfilled as platform_mark_checkout_fulfilled,
         verify_checkout as platform_verify_checkout,
     )
     init_platform_payments_db()
@@ -665,9 +666,115 @@ def init_db():
         updated_at TEXT,
         metadata TEXT
     )''')
+    db.execute('''CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        event_id TEXT PRIMARY KEY,
+        event_type TEXT,
+        received_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'claimed'
+    )''')
     db.commit()
     db.close()
     logger.info('[DB] ready at %s', DB_PATH)
+
+
+# --- B3: Stripe webhook event idempotency --------------------------------------
+# Every received Stripe event ID is persisted with a UNIQUE constraint BEFORE
+# processing (insert-or-ignore claim). Duplicate deliveries are acknowledged
+# without re-fulfillment, so fulfillment is idempotent keyed on event ID.
+# Stripe is legacy/not-supported per founder decision D3 — this makes the
+# webhook path safe IF the integration is ever enabled.
+STRIPE_EVENT_CLAIM_TTL_SEC = 300  # reclaim window for crashed (claimed, never processed) events
+
+
+def _ensure_stripe_event_schema(db) -> None:
+    db.execute('''CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        event_id TEXT PRIMARY KEY,
+        event_type TEXT,
+        received_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'claimed'
+    )''')
+
+
+def claim_stripe_webhook_event(event_id: str, event_type: str = "unknown") -> str:
+    """Atomically claim a Stripe webhook event for processing.
+
+    Insert-or-ignore on the PRIMARY KEY means exactly one concurrent delivery
+    wins the claim. Returns:
+      'claimed'             — first delivery; caller owns processing.
+      'reclaimed'           — stale 'claimed' row from a crashed attempt;
+                              caller owns processing.
+      'duplicate_processed' — already fulfilled; ack without re-processing.
+      'duplicate_inflight'  — claimed moments ago by a concurrent delivery;
+                              ack without re-processing.
+    """
+    event_id = (event_id or "").strip()
+    if not event_id:
+        return "missing"
+    db = get_db()
+    db.execute("PRAGMA busy_timeout=5000")
+    _ensure_stripe_event_schema(db)
+    now = datetime.now(timezone.utc).isoformat()
+    cur = db.execute(
+        "INSERT OR IGNORE INTO stripe_webhook_events "
+        "(event_id, event_type, received_at, status) VALUES (?, ?, ?, 'claimed')",
+        (event_id, event_type, now),
+    )
+    db.commit()
+    if cur.rowcount == 1:
+        return "claimed"
+    row = db.execute(
+        "SELECT status, received_at FROM stripe_webhook_events WHERE event_id=?",
+        (event_id,),
+    ).fetchone()
+    if row is None:
+        return "claimed"  # defensive; cannot happen without a deleter
+    if row["status"] == "processed":
+        return "duplicate_processed"
+    # Claimed but not processed: a concurrent delivery in flight, or a crashed
+    # attempt. Reclaim only after the TTL so concurrent duplicates are dropped.
+    try:
+        claimed_at = datetime.fromisoformat(
+            (row["received_at"] or "").replace("Z", "+00:00")
+        )
+        age_sec = (datetime.now(timezone.utc) - claimed_at).total_seconds()
+    except (ValueError, TypeError):
+        age_sec = 0
+    if age_sec < STRIPE_EVENT_CLAIM_TTL_SEC:
+        return "duplicate_inflight"
+    cur = db.execute(
+        "UPDATE stripe_webhook_events SET status='claimed', received_at=?, "
+        "event_type=? WHERE event_id=? AND status='claimed'",
+        (now, event_type, event_id),
+    )
+    db.commit()
+    return "reclaimed" if cur.rowcount == 1 else "duplicate_inflight"
+
+
+def mark_stripe_webhook_event_processed(event_id: str) -> None:
+    """Mark a claimed Stripe event as processed (fulfilled)."""
+    db = get_db()
+    _ensure_stripe_event_schema(db)
+    db.execute(
+        "UPDATE stripe_webhook_events SET status='processed' WHERE event_id=?",
+        ((event_id or "").strip(),),
+    )
+    db.commit()
+
+
+def release_stripe_webhook_event_claim(event_id: str) -> None:
+    """Release a 'claimed' event after a processing failure.
+
+    The failed attempt is over, so no concurrent processing is possible;
+    deleting the claim lets a redelivery claim and retry instead of being
+    acked as a duplicate.
+    """
+    db = get_db()
+    _ensure_stripe_event_schema(db)
+    db.execute(
+        "DELETE FROM stripe_webhook_events WHERE event_id=? AND status='claimed'",
+        ((event_id or "").strip(),),
+    )
+    db.commit()
 
 
 init_db()
