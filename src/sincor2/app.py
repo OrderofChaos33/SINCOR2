@@ -47,6 +47,26 @@ except ImportError as e:
     print(f"Rate limiter not available: {e}")
     RATE_LIMIT_AVAILABLE = False
 
+# Shared credential-verifier throttling (audit P2-A3): stacked IP + account
+# rate limits plus progressive backoff on the limiter's own storage backend.
+try:
+    from sincor2.login_throttle import (
+        credential_rate_limits,
+        note_login_failure,
+        note_login_success,
+    )
+    LOGIN_THROTTLE_AVAILABLE = True
+except ImportError as e:
+    print(f"Login throttle not available: {e}")
+    LOGIN_THROTTLE_AVAILABLE = False
+    credential_rate_limits = None  # type: ignore
+
+    def note_login_failure(identifier=None):  # type: ignore
+        return 0.0
+
+    def note_login_success(identifier=None):  # type: ignore
+        return None
+
 # Import security headers
 try:
     from sincor2.security_headers import SecurityHeaders
@@ -231,9 +251,9 @@ else:
 # ==================== AUTHENTICATION ROUTES ====================
 
 @app.route('/api/auth/login', methods=['POST'])
-@limiter.limit(AUTH_LIMITS) if limiter else lambda f: f
+@credential_rate_limits(limiter) if credential_rate_limits else (lambda f: f)
 def login():
-    """Authenticate and get access token (RATE LIMITED)"""
+    """Authenticate and get access token (RATE LIMITED + progressive backoff, P2-A3)"""
     if not AUTH_AVAILABLE:
         return jsonify({'error': 'Authentication system not available'}), 503
 
@@ -256,8 +276,10 @@ def login():
         result = sincor_auth.authenticate_user(username, password)
 
         if result['success']:
+            note_login_success(username)
             return jsonify(result), 200
         else:
+            note_login_failure(username)  # progressive backoff (P2-A3)
             return jsonify(result), 401
 
     except Exception as e:

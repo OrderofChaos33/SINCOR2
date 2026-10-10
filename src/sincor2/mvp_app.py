@@ -459,6 +459,14 @@ limiter = Limiter(
     storage_uri=os.environ.get("SINCOR_LIMITER_STORAGE_URI", "memory://"),
 )
 
+# Shared credential-verifier throttling (audit P2-A3). Imported here so the
+# mvp blueprints pick these up via _bind_mvp(); app.py imports them directly.
+from sincor2.login_throttle import (  # noqa: E402
+    credential_rate_limits,
+    note_login_failure,
+    note_login_success,
+)
+
 try:
     from sincor2.safety_locks import ProductionSafetyError, assert_production_safety
     assert_production_safety()
