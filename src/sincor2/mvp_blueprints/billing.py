@@ -790,12 +790,22 @@ def my_orders_page():
 def get_customer_orders(email):
     """
     Get all orders for a customer by email.
-    Returns order list with delivery status and download URLs.
-    Always returns 200 to prevent email enumeration.
+    AUDIT P1 finding 2: requires authentication. The caller must present a
+    JWT (Authorization header or access_token cookie) whose identity is the
+    requested email (case-insensitive); admins may query any email.
     """
+    identity = _request_jwt_identity()
+    if not identity:
+        return jsonify({'error': 'Authentication required'}), 401
     email = validate_email(email)
     if not email:
         return jsonify({'error': 'Invalid email format'}), 400
+    if not (_is_admin_identity(identity) or str(identity).lower() == email.lower()):
+        logger.warning(
+            "[ORDERS] Forbidden order lookup: identity=%r requested=%r from %s",
+            identity, email, request.remote_addr,
+        )
+        return jsonify({'error': 'Forbidden'}), 403
 
     db = get_db()
     rows = db.execute(
@@ -1064,7 +1074,18 @@ def crypto_verify_payment():
 @bp.route('/api/cancel-subscription', methods=['POST'])
 @limiter.limit("20 per minute")
 def cancel_subscription():
-    """Cancel subscription — wallet/SINC by default; legacy Stripe if enabled."""
+    """Cancel subscription — wallet/SINC by default; legacy Stripe if enabled.
+
+    AUDIT P1 finding 3: requires authentication. The caller's JWT identity
+    must own the subscription being cancelled (email match, case-insensitive);
+    admins may cancel any subscription. Returns 403 on owner mismatch.
+    """
+    identity = _request_jwt_identity()
+    if not identity:
+        return jsonify({'error': 'Authentication required'}), 401
+    is_admin = bool(_is_admin_identity(identity))
+    identity_email = str(identity).lower()
+
     data = request.get_json(silent=True) or {}
     email = validate_email(data.get('email', ''))
     wallet = validate_wallet(data.get('wallet', ''))
@@ -1074,7 +1095,38 @@ def cancel_subscription():
     if not email and not wallet:
         return jsonify({'error': 'email or wallet required'}), 400
 
-    logger.info(f"[CANCEL] Request email={email} wallet={wallet} sub={subscription_id} reason={reason}")
+    if not is_admin:
+        # Email-scoped requests must target the caller's own email.
+        if email and email != identity_email:
+            logger.warning(
+                "[CANCEL] Forbidden: identity=%r tried to cancel email=%r from %s",
+                identity, email, request.remote_addr,
+            )
+            return jsonify({'error': 'Forbidden'}), 403
+        # Wallet-scoped requests must target a wallet whose active
+        # subscription is registered to the caller's email.
+        if wallet:
+            try:
+                from sincor2.platform_payments import list_subscriptions
+                subs = list_subscriptions(wallet)
+                active = [s for s in subs if s.get('status') == 'active']
+                owned = [
+                    s for s in active
+                    if str(s.get('email') or '').lower() == identity_email
+                ]
+            except Exception as e:
+                logger.error(f"[CANCEL] Subscription ownership lookup failed: {e}")
+                return jsonify({'error': 'Could not verify subscription ownership'}), 503
+            if not active:
+                return jsonify({'error': 'No active subscription found for this wallet'}), 404
+            if not owned:
+                logger.warning(
+                    "[CANCEL] Forbidden: identity=%r tried to cancel wallet=%r from %s",
+                    identity, wallet, request.remote_addr,
+                )
+                return jsonify({'error': 'Forbidden'}), 403
+
+    logger.info(f"[CANCEL] Request by={identity} email={email} wallet={wallet} sub={subscription_id} reason={reason}")
 
     if not fiat_payments_enabled() and wallet and PLATFORM_PAYMENTS_AVAILABLE:
         try:

@@ -10,7 +10,7 @@ import time
 import logging
 import sqlite3
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -134,6 +134,7 @@ OAUTH_ERROR_MESSAGES = {
     'oauth_unavailable': 'Social login is temporarily unavailable. Please use email signup.',
     'oauth_failed': 'Social login failed. Please try again or use email signup.',
     'no_email': 'We could not get your email from that provider. Try another method.',
+    'email_unverified': 'That provider account has an unverified email. Verify it with the provider, then try again.',
 }
 
 
@@ -365,10 +366,27 @@ def _google_userinfo(token: dict):
     return resp.json()
 
 
-def _github_primary_email() -> str:
+def _github_email_entries() -> list:
+    """Raw /user/emails entries for the GitHub OAuth session (may be [])."""
     resp = oauth.github.get('user/emails')
     emails = resp.json() if resp.ok else []
-    if not isinstance(emails, list):
+    return emails if isinstance(emails, list) else []
+
+
+def _github_primary_email(verified_only: bool = False, _entries: list | None = None) -> str:
+    """Return the GitHub account's primary email.
+
+    With verified_only=True, only an email the provider marks verified is
+    returned (audit P1: never link an account on an unverified address).
+    """
+    emails = _entries if _entries is not None else _github_email_entries()
+    if verified_only:
+        for entry in emails:
+            if entry.get('primary') and entry.get('verified'):
+                return entry.get('email', '')
+        for entry in emails:
+            if entry.get('verified'):
+                return entry.get('email', '')
         return ''
     for entry in emails:
         if entry.get('primary') and entry.get('verified'):
@@ -380,6 +398,26 @@ def _github_primary_email() -> str:
         if entry.get('verified'):
             return entry.get('email', '')
     return emails[0].get('email', '') if emails else ''
+
+
+def _request_jwt_identity():
+    """Resolve the JWT identity (sub) for this request.
+
+    Accepts the standard Authorization: Bearer header and the httponly
+    ``access_token`` cookie the app sets on login. Returns None when no
+    usable token is present.
+    """
+    from flask_jwt_extended import decode_token
+    auth = request.headers.get('Authorization', '')
+    token = auth[7:] if auth.startswith('Bearer ') else ''
+    if not token:
+        token = request.cookies.get('access_token', '')
+    if not token:
+        return None
+    try:
+        return decode_token(token).get('sub')
+    except Exception:
+        return None
 
 
 if OAUTH_AVAILABLE:
