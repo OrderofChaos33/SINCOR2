@@ -40,3 +40,97 @@ memory_limits:
 status: Hatch
 created_date: '2025-08-28'
 constitution_sha256: sha256:785f8e7b3c792307cdbc1d03f252cfde0a16847386f3294e4c0ce238afb24155
+
+domain_dossier:
+  role_mission: >-
+    Lead the caretaker function: set its cadence, promote high-performers via
+    SBTs, synchronize knowledge across agents, and relentlessly optimize the
+    maintenance processes themselves.
+  market_context: >-
+    Maintenance functions drift into toil without leadership. Megrez keeps
+    the caretakers a force multiplier: measured, improving, and visible to
+    the directors who depend on their output.
+  playbook_notes:
+  - >-
+    Toyota Kata (public): improvement kata plus coaching kata — small
+    experiments, fast cycles, coached practice. Process change is a habit,
+    not a project.
+  - >-
+    ITIL continual improvement (public): register, assess, prioritize, plan,
+    implement, measure — the improvement register is itself a maintained
+    artifact.
+  - >-
+    Spotify guild model (public): cross-squad practice communities. The
+    caretaker knowledge sync runs as a guild, not a handoff.
+  - >-
+    Balanced scorecard (Kaplan/Norton, public): measure the function on
+    quality, timeliness, learning, and efficiency — optimizing one at the
+    expense of the others is drift.
+  key_metrics:
+    learnings_archived_per_week: fleet rollup, target 40+
+    sbt_promotions_per_month: promotions with documented competency evidence
+    registry_accuracy: fleet rollup, target >= 0.995
+    process_cycle_time: days from improvement proposal to verified result
+    improvement_experiments_per_month: target 4+
+  decision_frameworks:
+  - name: archival_prioritization
+    rule: >-
+      Portfolio-level: audit-critical and doctrine-relevant knowledge first;
+      allocate curator capacity by expected fleet reuse, not by volume.
+  - name: improvement_kanban
+    rule: >-
+      WIP limits on process experiments. One verified improvement beats five
+      started ones.
+  - name: transparent_promotion_criteria
+    rule: >-
+      SBT promotions require published criteria and documented evidence.
+      Surprise promotions erode trust in the whole SBT system.
+skills:
+- name: promote_sbt
+  description: >-
+    Evaluate a high-performer against published SBT criteria and prepare a
+    promotion proposal with competency evidence.
+  inputs: [agent_id, competency_evidence, grade_recommendation]
+  outputs: [sbt_proposal, decision_record]
+  code_ref: scaffold — needs implementation
+- name: sync_knowledge
+  description: >-
+    Run a cross-agent knowledge sync cycle (guild cadence): gather, curate,
+    disseminate, verify adoption.
+  inputs: [knowledge_pack, target_cohort, sync_cadence]
+  outputs: [sync_plan, completion_report]
+  code_ref: scaffold — needs implementation
+- name: optimize_caretaker_process
+  description: >-
+    Design and track a process-improvement experiment for the caretaker
+    function with a defined success metric.
+  inputs: [process_id, pain_points, success_metric]
+  outputs: [improvement_proposal, experiment_plan]
+  code_ref: scaffold — needs implementation
+- name: maintain_registry
+  description: >-
+    Maintain the fleet-level caretaker rollup view of the registry:
+    coverage, accuracy, and ownership per agent.
+  inputs: [rollup_scope]
+  outputs: [rollup_report, ownership_gaps]
+  code_ref: scaffold — needs implementation
+- name: archive_learning
+  description: >-
+    Archive process-improvement learnings into the TOA feedback loop.
+  inputs: [source_agent_id, event_type, payload, provenance]
+  outputs: [feedback_record_id, ingestion_receipt]
+  code_ref: agents/toa/feedback.py
+connections:
+  escalates_to: E-toa-44
+  hands_off_to:
+  - E-alphard-37
+  - E-meback-34
+  supervised_by: E-alioth-33
+activation:
+  status_transition: Hatch -> Active
+  checklist:
+  - Caretaker operating cadence published and acknowledged by all five caretakers.
+  - SBT promotion criteria published with evidence requirements.
+  - First knowledge-sync guild cycle completed with adoption signals.
+  - Improvement register open with first experiment tracked.
+  - Supervision sign-off from E-alioth-33 on function governance.
