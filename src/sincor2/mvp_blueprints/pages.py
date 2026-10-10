@@ -143,15 +143,21 @@ def login_page():
         return render_template("login.html", error="Email or username required.", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github), 400
     if _admin_credentials_match(identifier, password):
         return _admin_cookie_response(identifier, _safe_next_url(next_url, "/admin"))
-    customer = None
-    try:
-        customer = _resolve_customer(identifier)
-    except Exception as exc:
-        logger.warning("[AUTH] customer resolve failed: %s", exc)
-    if customer and customer.get("email"):
-        session["username"] = customer.get("username") or customer["email"].split("@")[0]
-        return _auth_cookie_response(customer["email"], _safe_next_url(next_url, "/dashboard"))
-    return render_template("login.html", error="Invalid credentials.", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github), 401
+    # AUDIT P1 finding 1: the customer path below granted a session on
+    # identifier alone (no password store exists for customers — admin auth
+    # is env credentials; genesis_cohort is a separate marketing claim DB).
+    # Customer password login is DISABLED until a proper credential store
+    # ships; customers authenticate via OAuth (verified email) meanwhile.
+    logger.warning(
+        "[AUTH] Disabled customer password-login attempt for identifier=%r from %s",
+        identifier, request.remote_addr,
+    )
+    return render_template(
+        "login.html",
+        error="Customer password sign-in is currently disabled. Please use Google/GitHub sign-in or contact support.",
+        next_url=next_url, identifier=identifier,
+        oauth_google=oauth_google, oauth_github=oauth_github,
+    ), 403
 
 
 @bp.route("/logout")
