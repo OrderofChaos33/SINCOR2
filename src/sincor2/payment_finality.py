@@ -30,9 +30,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional, Protocol
 
 from sincor2.payment_ledger import (
-    PaymentConflictError,
+    IllegalPaymentTransition,
     PaymentLedgerStore,
-    PaymentNotFound,
     PaymentRecord,
     PaymentState,
     is_paid_state,
@@ -201,6 +200,32 @@ def _chain_id_of(record: PaymentRecord) -> int:
         return 8453
 
 
+def _clean_result_for_state(record: PaymentRecord, payment_id: str) -> Optional[FinalityResult]:
+    """Map a non-advanceable payment state to a clean FinalityResult.
+
+    Used after a lost compare-and-swap race: the fresh state tells the
+    loser what happened, so it can report "already settled/disputed/..."
+    instead of crashing.  Returns None when the payment is still in a
+    state check_finality can advance from (caller should continue).
+    """
+    if is_paid_state(record.state):
+        return FinalityResult(
+            ok=True, status="already_settled", payment_id=payment_id,
+            detail=f"payment already in paid state {record.state.value}; no re-settle",
+        )
+    if record.state in (PaymentState.FAILED, PaymentState.REFUNDED, PaymentState.QUARANTINED):
+        return FinalityResult(
+            ok=False, status="terminal_state", payment_id=payment_id,
+            detail=f"payment is {record.state.value}; finality not applicable",
+        )
+    if record.state == PaymentState.DISPUTED:
+        return FinalityResult(
+            ok=False, status="disputed", payment_id=payment_id,
+            detail="payment is disputed; resolve the dispute before finality",
+        )
+    return None
+
+
 def check_finality(
     store: PaymentLedgerStore,
     payment_id: str,
@@ -224,13 +249,20 @@ def check_finality(
       * confirmations >= threshold -> ``finality_confirmed`` flag set,
         transition to ``settled``, entitlements granted exactly once.
 
+    Concurrency: every state advance below is an atomic compare-and-swap
+    on the expected predecessor state.  Concurrent pollers race, exactly
+    one applies each transition, and the losers reload the fresh state and
+    return a clean "already advanced" result.  check_finality NEVER raises
+    on a lost race, and entitlements are granted exactly once — only by
+    the poller whose CAS applied the final ``settled`` transition.
+
     Idempotent: calling again on an already-settled payment returns
     ``already_settled`` without re-granting entitlements or double-settling.
     """
     record = store.get(payment_id)
     tx_hash = record.provider_evidence.get("tx_hash")
 
-    # -- terminal / idempotent fast paths ---------------------------------
+    # -- terminal / idempotent fast paths (read-only; race-safe) -----------
     if is_paid_state(record.state):
         # A deep reorg can orphan even a settled tx: verify the recorded
         # block hash against the chain's current view before declaring
@@ -255,74 +287,73 @@ def check_finality(
             ok=True, status="already_settled", payment_id=payment_id,
             detail=f"payment already in paid state {record.state.value}; no re-settle",
         )
-    if record.state in (PaymentState.FAILED, PaymentState.REFUNDED, PaymentState.QUARANTINED):
-        return FinalityResult(
-            ok=False, status="terminal_state", payment_id=payment_id,
-            detail=f"payment is {record.state.value}; finality not applicable",
-        )
-    if record.state == PaymentState.DISPUTED:
-        return FinalityResult(
-            ok=False, status="disputed", payment_id=payment_id,
-            detail="payment is disputed; resolve the dispute before finality",
-        )
+    done = _clean_result_for_state(record, payment_id)
+    if done is not None:
+        return done
 
     # -- offchain path: no tx_hash means no chain finality to await --------
     if not tx_hash:
-        if record.state == PaymentState.CREATED:
-            store.transition_payment(
-                payment_id, PaymentState.PENDING_VERIFICATION,
-                actor=actor, reason="finality_check_started",
+        settled_by_me = False
+        for frm, to, reason in (
+            (PaymentState.CREATED, PaymentState.PENDING_VERIFICATION,
+             "finality_check_started"),
+            (PaymentState.PENDING_VERIFICATION, PaymentState.VERIFIED,
+             "offchain_provider_verified"),
+            (PaymentState.VERIFIED, PaymentState.SETTLED,
+             "finality_not_applicable_offchain"),
+        ):
+            applied, record = store.transition_payment_if_state(
+                payment_id, from_state=frm, to_state=to,
+                actor=actor, reason=reason,
             )
-            record = store.get(payment_id)
-        if record.state == PaymentState.PENDING_VERIFICATION:
-            store.transition_payment(
-                payment_id, PaymentState.VERIFIED,
-                actor=actor, reason="offchain_provider_verified",
-            )
-            record = store.get(payment_id)
-        try:
-            record = store.transition_payment(
-                payment_id, PaymentState.SETTLED,
-                actor=actor, reason="finality_not_applicable_offchain",
-            )
-        except PaymentConflictError:
+            if applied and to == PaymentState.SETTLED:
+                settled_by_me = True
+            # Lost race: record is the fresh state; keep stepping — a later
+            # conditional may still apply, or the fresh state maps cleanly.
+        if settled_by_me:
+            granted = _grant_entitlements(record)
             return FinalityResult(
-                ok=True, status="already_settled", payment_id=payment_id,
-                detail="lost the settlement race to a concurrent poller; no re-settle",
+                ok=True, status="settled", payment_id=payment_id,
+                detail=f"offchain payment settled; entitlements granted={granted}",
             )
-        granted = _grant_entitlements(record)
-        return FinalityResult(
-            ok=True, status="settled", payment_id=payment_id,
-            detail=f"offchain payment settled; entitlements granted={granted}",
-        )
-
-    # -- onchain path ------------------------------------------------------
-    # Concurrent pollers may race these advances; on a lost race, reload
-    # and continue with the fresh state instead of crashing.
-    if record.state == PaymentState.VERIFIED:
-        try:
-            record = store.transition_payment(
-                payment_id, PaymentState.AWAITING_FINALITY,
-                actor=actor, reason="awaiting_chain_finality",
-            )
-        except PaymentConflictError:
-            record = store.get(payment_id)
-    if record.state == PaymentState.CREATED:
-        try:
-            record = store.transition_payment(
-                payment_id, PaymentState.PENDING_VERIFICATION,
-                actor=actor, reason="finality_check_started",
-            )
-        except PaymentConflictError:
-            record = store.get(payment_id)
+        done = _clean_result_for_state(record, payment_id)
+        if done is not None:
+            return done
         return FinalityResult(
             ok=False, status="not_verified", payment_id=payment_id,
             detail="payment not yet verified; verify before finality",
         )
+
+    # -- onchain path ------------------------------------------------------
+    # Every advance is an atomic compare-and-swap on the expected
+    # predecessor state: concurrent pollers race, exactly one wins each
+    # step, the losers reload fresh state and map it to a clean result.
+    if record.state == PaymentState.VERIFIED:
+        _applied, record = store.transition_payment_if_state(
+            payment_id, from_state=PaymentState.VERIFIED,
+            to_state=PaymentState.AWAITING_FINALITY,
+            actor=actor, reason="awaiting_chain_finality",
+        )
+    if record.state == PaymentState.CREATED:
+        _applied, record = store.transition_payment_if_state(
+            payment_id, from_state=PaymentState.CREATED,
+            to_state=PaymentState.PENDING_VERIFICATION,
+            actor=actor, reason="finality_check_started",
+        )
+    done = _clean_result_for_state(record, payment_id)
+    if done is not None:
+        return done
     if record.state == PaymentState.PENDING_VERIFICATION:
         return FinalityResult(
             ok=False, status="not_verified", payment_id=payment_id,
             detail="payment not yet verified; verify before finality",
+        )
+    if record.state != PaymentState.AWAITING_FINALITY:
+        # Defensive: any other advanceable state means a concurrent poller
+        # is mid-flight; report cleanly and let the next poll continue.
+        return FinalityResult(
+            ok=False, status="not_verified", payment_id=payment_id,
+            detail=f"payment is {record.state.value}; concurrent poller mid-flight",
         )
 
     # receipt lookup — chain outage or missing receipt must not crash
@@ -339,13 +370,22 @@ def check_finality(
             detail="receipt not found; payment stays awaiting_finality",
         )
     if int(receipt.get("status", 0)) != 1:
-        record = store.transition_payment(
-            payment_id, PaymentState.FAILED,
+        _applied, record = store.transition_payment_if_state(
+            payment_id, from_state=PaymentState.AWAITING_FINALITY,
+            to_state=PaymentState.FAILED,
             actor=actor, reason="tx_reverted_onchain",
         )
-        return FinalityResult(
+        # applied or lost-the-race to a concurrent failer: either way the
+        # fresh state tells the story; anything else maps cleanly.
+        if record.state == PaymentState.FAILED:
+            return FinalityResult(
+                ok=False, status="tx_reverted", payment_id=payment_id,
+                detail="transaction reverted onchain; payment failed, no entitlement",
+            )
+        done = _clean_result_for_state(record, payment_id)
+        return done or FinalityResult(
             ok=False, status="tx_reverted", payment_id=payment_id,
-            detail="transaction reverted onchain; payment failed, no entitlement",
+            detail="transaction reverted onchain; concurrent poller moved the payment",
         )
 
     try:
@@ -402,9 +442,9 @@ def check_finality(
             detail=f"{confirmations}/{required} confirmations; no entitlement granted",
         )
 
-    # Threshold met: unlock settlement, transition, grant entitlements once.
-    # Two pollers can race here; the CAS loser gets PaymentConflictError —
-    # translate that into a clean already_settled instead of crashing.
+    # Threshold met: unlock settlement, then settle via compare-and-swap.
+    # Exactly one racing poller applies the transition and grants
+    # entitlements; the losers get a clean already_settled.
     store.mark_finality_confirmed(
         payment_id,
         block_number=block_number,
@@ -412,23 +452,24 @@ def check_finality(
         confirmations=confirmations,
         actor=actor,
     )
-    try:
-        record = store.transition_payment(
-            payment_id, PaymentState.SETTLED,
-            actor=actor,
-            reason=f"finality_confirmed_{confirmations}_of_{required}",
-            allow_finality_bypass=True,  # flag was just set by mark_finality_confirmed
-        )
-    except PaymentConflictError:
+    applied, record = store.transition_payment_if_state(
+        payment_id, from_state=PaymentState.AWAITING_FINALITY,
+        to_state=PaymentState.SETTLED,
+        actor=actor,
+        reason=f"finality_confirmed_{confirmations}_of_{required}",
+        allow_finality_bypass=True,  # flag was just set by mark_finality_confirmed
+    )
+    if applied:
+        granted = _grant_entitlements(record)
         return FinalityResult(
-            ok=True, status="already_settled", payment_id=payment_id,
-            detail="lost the settlement race to a concurrent poller; no re-settle",
+            ok=True, status="settled", payment_id=payment_id,
+            confirmations=confirmations, required=required,
+            detail=f"finality confirmed; entitlements granted={granted}",
         )
-    granted = _grant_entitlements(record)
-    return FinalityResult(
-        ok=True, status="settled", payment_id=payment_id,
-        confirmations=confirmations, required=required,
-        detail=f"finality confirmed; entitlements granted={granted}",
+    done = _clean_result_for_state(record, payment_id)
+    return done or FinalityResult(
+        ok=True, status="already_settled", payment_id=payment_id,
+        detail="lost the settlement race to a concurrent poller; no re-settle",
     )
 
 
@@ -445,43 +486,68 @@ def on_reorg(
 
     Moves the payment to ``disputed``, revokes all linked entitlements via
     the registered revokers, and persists a ``reorg_detected`` alert.
-    Idempotent: a payment already in ``disputed`` is left alone.
-    """
-    record = store.get(payment_id)
-    if record.state == PaymentState.DISPUTED:
-        return FinalityResult(
-            ok=False, status="already_disputed", payment_id=payment_id,
-            detail="payment already disputed; no duplicate alert",
-        )
 
-    record = store.transition_payment(
-        payment_id, PaymentState.DISPUTED,
-        actor=actor,
-        reason=(
-            f"reorg at height {block_number}: "
-            f"{old_block_hash} -> {new_block_hash}"
-        ),
-        allow_finality_bypass=True,
-    )
-    revoked = _revoke_entitlements(record)
-    alert = record_alert(
-        store,
-        payment_id,
-        kind="reorg_detected",
-        message=(
-            f"Reorg detected for payment {payment_id}: block {block_number} "
-            f"hash changed {old_block_hash} -> {new_block_hash}. "
-            "Payment disputed; entitlements revoked."
-        ),
-        details={
-            "block_number": block_number,
-            "old_block_hash": old_block_hash,
-            "new_block_hash": new_block_hash,
-            "revoked": revoked,
-            "previous_state": record.history[-1].from_state if record.history else None,
-        },
-    )
-    return FinalityResult(
-        ok=False, status="disputed", payment_id=payment_id,
-        detail=f"reorg -> disputed; alert={alert.alert_id}; revoked={revoked}",
+    Idempotent under concurrent pollers: the dispute itself is a
+    compare-and-swap, so exactly one caller disputes, revokes, and alerts;
+    the losers get a clean ``already_disputed`` result.  Never raises on
+    a lost race.
+    """
+    for _attempt in range(3):
+        record = store.get(payment_id)
+        if record.state == PaymentState.DISPUTED:
+            return FinalityResult(
+                ok=False, status="already_disputed", payment_id=payment_id,
+                detail="payment already disputed; no duplicate alert",
+            )
+        try:
+            applied, record = store.transition_payment_if_state(
+                payment_id, from_state=record.state,
+                to_state=PaymentState.DISPUTED,
+                actor=actor,
+                reason=(
+                    f"reorg at height {block_number}: "
+                    f"{old_block_hash} -> {new_block_hash}"
+                ),
+                allow_finality_bypass=True,
+            )
+        except IllegalPaymentTransition:
+            # The payment moved to a state disputes cannot come from
+            # (e.g. refunded by a concurrent operator action).  Report
+            # cleanly; never crash the poller.
+            record = store.get(payment_id)
+            done = _clean_result_for_state(record, payment_id)
+            return done or FinalityResult(
+                ok=False, status="dispute_not_applicable", payment_id=payment_id,
+                detail=f"payment is {record.state.value}; dispute not applicable",
+            )
+        if applied:
+            revoked = _revoke_entitlements(record)
+            alert = record_alert(
+                store,
+                payment_id,
+                kind="reorg_detected",
+                message=(
+                    f"Reorg detected for payment {payment_id}: block {block_number} "
+                    f"hash changed {old_block_hash} -> {new_block_hash}. "
+                    "Payment disputed; entitlements revoked."
+                ),
+                details={
+                    "block_number": block_number,
+                    "old_block_hash": old_block_hash,
+                    "new_block_hash": new_block_hash,
+                    "revoked": revoked,
+                    "previous_state": record.history[-1].from_state if record.history else None,
+                },
+            )
+            return FinalityResult(
+                ok=False, status="disputed", payment_id=payment_id,
+                detail=f"reorg -> disputed; alert={alert.alert_id}; revoked={revoked}",
+            )
+        # Lost the race: loop re-reads the fresh state; a concurrent
+        # disputer yields already_disputed on the next iteration.
+    record = store.get(payment_id)
+    done = _clean_result_for_state(record, payment_id)
+    return done or FinalityResult(
+        ok=False, status="dispute_deferred", payment_id=payment_id,
+        detail="concurrent pollers kept moving the payment; dispute deferred to next poll",
     )
