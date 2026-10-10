@@ -319,13 +319,20 @@ def _sign_secp256k1(digest: bytes, private_key: str) -> Optional[str]:
 
 
 def _recover_secp256k1(typed_data: Dict[str, Any], signature: str) -> Optional[str]:
-    """Recover the signer via eth_account's public typed-data API."""
+    """Recover the signer via eth_account's public typed-data API.
+
+    Fail-closed: a high-s (malleated-twin) signature is refused before
+    recovery so the (r, n-s, v^1) twin can never pass as a distinct
+    valid bid signature.
+    """
     try:
         from eth_account import Account
         from eth_account.messages import encode_typed_data
+        from sincor2.sig_canonical import require_low_s
     except Exception:
         return None
     try:
+        require_low_s(signature)  # reject (r, n-s) malleation twins
         message = encode_typed_data(full_message=typed_data)
         return Account.recover_message(message, signature=signature)
     except Exception:
