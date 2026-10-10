@@ -1,0 +1,1051 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-10-09 (branch xioix/auditph13-batch-C)",
+  "scope": [
+    "README.md",
+    "templates/**/*.html",
+    "data/sku_catalog.json",
+    "config/x402_pricing.yaml"
+  ],
+  "blocking_patterns": [
+    "24/7",
+    "zero-human",
+    "certified",
+    "guaranteed",
+    "hipaa",
+    "soc2",
+    "audited",
+    "adgm"
+  ],
+  "kinds": [
+    "assertion",
+    "disclaimer",
+    "policy",
+    "roadmap"
+  ],
+  "verdicts": [
+    "substantiated",
+    "unproven",
+    "downgrade_recommended"
+  ],
+  "notes": "kind=assertion entries with verdict != substantiated are BLOCKED by test_marketing_claims.py until the founder substantiates (add evidence, flip verdict) or rewords the copy (remove claim, drop/retire the entry). disclaimer/policy/roadmap entries are informational, not assertions of fact.",
+  "entries": [
+    {
+      "claim_id": "CR-001",
+      "pattern": "zero-human",
+      "kind": "assertion",
+      "category": "autonomy",
+      "verdict": "unproven",
+      "locations": [
+        "README.md:9"
+      ],
+      "claim_text": "Sovereign A2A (zero human) Asynchronous Billing via x402",
+      "evidence": null,
+      "downgrade_suggestion": "Automated A2A billing via x402 (human oversight available).",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-002",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "README.md:39"
+      ],
+      "claim_text": "With 43 specialized agent skills and 24/7 autonomous execution, the platform enables businesses to deploy a coordinated AI workforce",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-003",
+      "pattern": "adgm",
+      "kind": "assertion",
+      "category": "regulated",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "README.md:50"
+      ],
+      "claim_text": "this involves redesigning ADGM-compliant institutional pools, leveraging Uniswap V4 hooks for automated KYC/AML whitelisting",
+      "evidence": null,
+      "downgrade_suggestion": "Remove the ADGM-compliance implication until a licensed/advised arrangement exists; say 'institutional pool designs'.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-004",
+      "pattern": "hipaa",
+      "kind": "assertion",
+      "category": "regulated",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "README.md:373",
+        "README.md:376",
+        "README.md:458"
+      ],
+      "claim_text": "HIPAA paths go through compliance guardrails.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'HIPAA-aware handling'; do not imply a HIPAA compliance attestation.",
+      "notes": "Also README.md:373 'credentialing, HIPAA guardrails' and :376 'compliance (HIPAA, OSHA, infection control)'. src/sincor2/compliance_guardrails.py contains no HIPAA-specific handling.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-005",
+      "pattern": null,
+      "kind": "assertion",
+      "category": "performance",
+      "verdict": "unproven",
+      "locations": [
+        "README.md:34",
+        "README.md:36"
+      ],
+      "claim_text": "Production-grade A2A marketplace and multi-agent orchestration for interoperable, revenue-generating agents.",
+      "evidence": null,
+      "downgrade_suggestion": "'Production-targeted' until launch acceptance criteria are met and evidenced.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-006",
+      "pattern": null,
+      "kind": "assertion",
+      "category": "performance",
+      "verdict": "unproven",
+      "locations": [
+        "README.md:84"
+      ],
+      "claim_text": "43 live agent skills",
+      "evidence": null,
+      "downgrade_suggestion": "Cite the live skill-registry count or say 'dozens of agent skills'.",
+      "notes": "Agent-count claims are inconsistent across the repo: README says '43 live agent skills'; product pages say 8/24/42 agents; data/sku_catalog.json says 10/25/45; fleet target is 48.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-007",
+      "pattern": null,
+      "kind": "assertion",
+      "category": "autonomy",
+      "verdict": "unproven",
+      "locations": [
+        "README.md:36",
+        "README.md:52",
+        "README.md:87"
+      ],
+      "claim_text": "Engineered to operate independently of human intervention",
+      "evidence": null,
+      "downgrade_suggestion": "'With minimal human intervention' (target state).",
+      "notes": "Also :52 'entirely autonomously' and :87 'operate continuously without human intervention'.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-008",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/admin_training_vault.html:278"
+      ],
+      "claim_text": "15-minute response (24/7 Emergency Hotline)",
+      "evidence": null,
+      "downgrade_suggestion": "State actual support hours or remove the SLA claim.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-009",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/admin_training_vault.html:291"
+      ],
+      "claim_text": "1,000+ articles, searchable 24/7",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-010",
+      "pattern": "guaranteed",
+      "kind": "disclaimer",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/axiom.html:293"
+      ],
+      "claim_text": "Past performance does not guarantee future results.",
+      "evidence": {
+        "code_refs": [
+          "templates/axiom.html:293"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-011",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/buy.html:405"
+      ],
+      "claim_text": "30-Day Money-Back Guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-012",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/buy_converting.html:126",
+        "templates/buy_converting.html:332",
+        "templates/buy_converting.html:522"
+      ],
+      "claim_text": "While your competitors are sleeping, AI agents work 24/7 for them.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Also :332 'Works 24/7/365' and :522 '24/7 support'.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-013",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/buy_converting.html:404",
+        "templates/buy_converting.html:542"
+      ],
+      "claim_text": "30-day money-back guarantee.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-014",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/buy_stripe.html:73",
+        "templates/buy_stripe.html:217",
+        "templates/buy_stripe.html:242"
+      ],
+      "claim_text": "Dedicated success manager + 24/7 support",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Also bare '24/7' metric boxes at :73 and :242.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-015",
+      "pattern": "guaranteed",
+      "kind": "assertion",
+      "category": "financial",
+      "verdict": "unproven",
+      "locations": [
+        "templates/buy_stripe.html:88"
+      ],
+      "claim_text": "Zero Risk. 100% Guaranteed.",
+      "evidence": null,
+      "downgrade_suggestion": "Remove; rely on the 30-day money-back policy instead of a risk-elimination claim.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-016",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/buy_stripe.html:51",
+        "templates/buy_stripe.html:320"
+      ],
+      "claim_text": "Satisfaction Guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-017",
+      "pattern": null,
+      "kind": "assertion",
+      "category": "performance",
+      "verdict": "unproven",
+      "locations": [
+        "templates/buy_stripe.html:41",
+        "templates/buy_stripe.html:51"
+      ],
+      "claim_text": "1,247+ BUSINESSES ALREADY AUTOMATING",
+      "evidence": null,
+      "downgrade_suggestion": "Cite the real customer count or remove; also '4.9/5 Rating' on the same page needs a source.",
+      "notes": "Fabricated-metric class claim (not in the blocking pattern list, registered for completeness).",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-018",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/compelling_demo.html:172"
+      ],
+      "claim_text": "30-day money-back guarantee.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-019",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/customer_acquisition_demo.html:242"
+      ],
+      "claim_text": "Imagine what SINCOR can do working 24/7!",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-020",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/dashboards_menu.html:150"
+      ],
+      "claim_text": "24/7",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Bare '24/7' metric box with no qualifier.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-021",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/holy_grail_demo.html:330"
+      ],
+      "claim_text": "30-day money-back guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-022",
+      "pattern": "certified",
+      "kind": "disclaimer",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/home.html:352"
+      ],
+      "claim_text": "Propose, never certify",
+      "evidence": {
+        "code_refs": [
+          "templates/home.html:352"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Anti-claim: the page explicitly disclaims certification.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-023",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/home.html:511"
+      ],
+      "claim_text": "Pay in SINC on Base · 24/7 autonomous execution · Wallet-linked billing · Cancel anytime",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-024",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/home_old.html:988",
+        "templates/home_old.html:1006"
+      ],
+      "claim_text": "42 AI agents working 24/7.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "home_old.html appears to be a superseded homepage variant; confirm whether it is still served.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-025",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/home_old.html:938",
+        "templates/home_old.html:951",
+        "templates/home_old.html:1028",
+        "templates/home_old.html:1284",
+        "templates/home_old.html:1562"
+      ],
+      "claim_text": "30-day money-back guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-026",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/home_old_v2.html:282",
+        "templates/home_old_v2.html:295",
+        "templates/home_old_v2.html:312",
+        "templates/home_old_v2.html:366",
+        "templates/home_old_v2.html:378",
+        "templates/home_old_v2.html:422"
+      ],
+      "claim_text": "42 AI agents working 24/7 across research, content, outreach, sales, analytics, and retention.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Superseded homepage variant; also '24/7 autonomous execution', '24/7 intelligence gathering'.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-027",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/home_old_v2.html:366"
+      ],
+      "claim_text": "30-day money-back guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-028",
+      "pattern": "hipaa",
+      "kind": "assertion",
+      "category": "regulated",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "templates/index.html:252"
+      ],
+      "claim_text": "Battle-tested stacks for high-margin niches: HIPAA-compliant Healthcare Credentialing + RCM automation",
+      "evidence": null,
+      "downgrade_suggestion": "Remove 'HIPAA-compliant'; say 'Healthcare credentialing + RCM automation (HIPAA compliance not attested)'.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-029",
+      "pattern": "hipaa",
+      "kind": "assertion",
+      "category": "regulated",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "templates/index.html:300"
+      ],
+      "claim_text": "Production-grade safeguards: real-time compliance monitoring & guardrails (HIPAA, regulatory)",
+      "evidence": null,
+      "downgrade_suggestion": "Do not imply HIPAA attestation; describe the guardrails factually.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-030",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/payment_cancel.html:38"
+      ],
+      "claim_text": "30-day money-back guarantee - zero risk",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-031",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/payment_cancel.html:41"
+      ],
+      "claim_text": "Real AI agents working 24/7 for your business",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-032",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/pricing.html:383",
+        "templates/pricing.html:428"
+      ],
+      "claim_text": "We offer a Satisfaction Guarantee.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-033",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/product_enterprise.html:174"
+      ],
+      "claim_text": "24/7 Dedicated Support",
+      "evidence": null,
+      "downgrade_suggestion": "State actual support hours or remove the SLA claim.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-034",
+      "pattern": null,
+      "kind": "assertion",
+      "category": "autonomy",
+      "verdict": "unproven",
+      "locations": [
+        "templates/product_enterprise.html:155",
+        "templates/product_enterprise.html:257"
+      ],
+      "claim_text": "42 autonomous AI agents — full swarm",
+      "evidence": null,
+      "downgrade_suggestion": "Reconcile with the 48-agent fleet target and sku_catalog counts (45 for enterprise).",
+      "notes": "Also 'This is not software. It's an autonomous workforce.' (:155).",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-035",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/product_starter.html:6",
+        "templates/product_starter.html:158",
+        "templates/product_starter.html:174",
+        "templates/product_starter.html:287",
+        "templates/product_starter.html:326"
+      ],
+      "claim_text": "8 AI Agents Working 24/7 for $297/mo",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Also 'Running 24/7 while you sleep', '24/7 Always Working', '24/7 autonomous execution'.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-036",
+      "pattern": "certified",
+      "kind": "disclaimer",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/products/drafts/aud-02-compliance-pack.html:77"
+      ],
+      "claim_text": "Is this a certification? The pack is evidence assembly and review support done properly — your auditor still audits.",
+      "evidence": {
+        "code_refs": [
+          "templates/products/drafts/aud-02-compliance-pack.html:77"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Anti-claim: explicitly disclaims certification. Draft copy.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-037",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/products/p01-yield-aggregator.html:52"
+      ],
+      "claim_text": "Agent-operated, 24/7",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Spec-stage DeFi product page; standing rule keeps unproven products off the public surface.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-038",
+      "pattern": "guaranteed",
+      "kind": "assertion",
+      "category": "financial",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "templates/products/p03-intent-dark-pool.html:40"
+      ],
+      "claim_text": "Minimum-output protection guarantees each fill meets your bar, and settlement stays in the assets you chose.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to a design target: 'Minimum-output protection is engineered to keep fills above your bar — not yet validated on live venues.'",
+      "notes": "Financial-outcome guarantee on a spec-stage product.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-039",
+      "pattern": "audited",
+      "kind": "assertion",
+      "category": "certification",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "templates/products/p05-defi-insurance.html:45"
+      ],
+      "claim_text": "Protocols and positions are scored on audited risk factors — code, oracles, liquidity, and history.",
+      "evidence": null,
+      "downgrade_suggestion": "Cite the audit(s) or reword to 'scored on risk factors'.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-040",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/products/p15-lending-optimizer.html:52"
+      ],
+      "claim_text": "24/7 health monitoring",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Spec-stage DeFi product page.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-041",
+      "pattern": "guaranteed",
+      "kind": "assertion",
+      "category": "financial",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "templates/products/p16-dex-aggregator.html:21",
+        "templates/products/p16-dex-aggregator.html:39",
+        "templates/products/p16-dex-aggregator.html:45",
+        "templates/products/p16-dex-aggregator.html:52"
+      ],
+      "claim_text": "settles at the best achievable price — minimum-output guaranteed.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to a design target; 'best price' and 'guaranteed' minimum-output are unproven on live venues.",
+      "notes": "Also :39 'guarantees your minimum output before anything executes', :45/'52 'minimum-output guarantee'. Spec-stage product.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-042",
+      "pattern": "certified",
+      "kind": "disclaimer",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/products/sku-aud-02-compliance-pack.html:69"
+      ],
+      "claim_text": "Is this a certification? The pack is evidence assembly and review support done properly — your auditor still audits.",
+      "evidence": {
+        "code_refs": [
+          "templates/products/sku-aud-02-compliance-pack.html:69"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Anti-claim: explicitly disclaims certification.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-043",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/products_professional.html:241"
+      ],
+      "claim_text": "24 AI agents working 24/7.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-044",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/products_starter.html:230",
+        "templates/products_starter.html:263",
+        "templates/products_starter.html:291"
+      ],
+      "claim_text": "8 specialized AI agents working 24/7.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Also '24/7 Autonomous Execution'.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-045",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/real_customer_demo.html:204"
+      ],
+      "claim_text": "Imagine SINCOR working 24/7!",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-046",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/sales.html:6",
+        "templates/sales.html:156",
+        "templates/sales.html:166",
+        "templates/sales.html:176",
+        "templates/sales.html:189",
+        "templates/sales.html:207",
+        "templates/sales.html:340",
+        "templates/sales.html:348",
+        "templates/sales.html:354"
+      ],
+      "claim_text": "Your Business Runs on 42 AI Agents Working 24/7",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Also 'Agents run 24/7/365 — no breaks', 'All tiers run 24/7 on real infrastructure'.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-047",
+      "pattern": "guaranteed",
+      "kind": "assertion",
+      "category": "financial",
+      "verdict": "unproven",
+      "locations": [
+        "templates/sales.html:328"
+      ],
+      "claim_text": "Credit card required filters out non-serious inquiries and lets us guarantee quality execution for every customer.",
+      "evidence": null,
+      "downgrade_suggestion": "Remove the guarantee; describe the QA/onboarding process factually.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-048",
+      "pattern": "soc2",
+      "kind": "assertion",
+      "category": "certification",
+      "verdict": "downgrade_recommended",
+      "locations": [
+        "templates/security.html:7"
+      ],
+      "claim_text": "Data flow diagrams, PII handling, SOC 2 compliance, and enterprise security details. Coming soon.",
+      "evidence": null,
+      "downgrade_suggestion": "Clarify whether this claims SOC 2 attestation (needs an audit) or merely SOC 2 documentation on the roadmap.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-049",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/signup.html:267",
+        "templates/signup.html:279"
+      ],
+      "claim_text": "8-42 AI Agents working 24/7 for you",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "Also '24/7 support — we're here for you'.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-050",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/simple_demo.html:179"
+      ],
+      "claim_text": "Imagine what SINCOR can do with 24/7 operation.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-051",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/terms.html:83",
+        "templates/terms.html:84"
+      ],
+      "claim_text": "6.1 Subscriptions — 30-Day Money-Back Guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Includes 'This guarantee applies once per customer per subscription tier.' Policy terms, not an outcome claim.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-052",
+      "pattern": "guaranteed",
+      "kind": "disclaimer",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/terms.html:120"
+      ],
+      "claim_text": "We do not guarantee any specific business outcomes, revenue increases, or ROI from use of the Service.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:120"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-053",
+      "pattern": "guaranteed",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/thank_you_purchase_email.html:284"
+      ],
+      "claim_text": "Priority Email Support: 4-hour response guarantee",
+      "evidence": null,
+      "downgrade_suggestion": "State actual support hours or remove the SLA claim.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-054",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/thank_you_purchase_email.html:284"
+      ],
+      "claim_text": "24/7 Emergency Hotline",
+      "evidence": null,
+      "downgrade_suggestion": "State actual support hours or remove the SLA claim.",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-055",
+      "pattern": "certified",
+      "kind": "roadmap",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/whitepaper.html:169"
+      ],
+      "claim_text": "Blockscout / Superchain token list certification",
+      "evidence": {
+        "code_refs": [
+          "templates/whitepaper.html:169"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Roadmap list item — future intent, not a present-tense claim. Informational.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-056",
+      "pattern": "guaranteed",
+      "kind": "disclaimer",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/whitepaper.html:174"
+      ],
+      "claim_text": "Disclaimer: Technology in development. No income guarantees. DYOR before on-chain transactions.",
+      "evidence": {
+        "code_refs": [
+          "templates/whitepaper.html:174"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-057",
+      "pattern": "24/7",
+      "kind": "assertion",
+      "category": "uptime",
+      "verdict": "unproven",
+      "locations": [
+        "templates/working_demo.html:154"
+      ],
+      "claim_text": "Get SINCOR working for you 24/7.",
+      "evidence": null,
+      "downgrade_suggestion": "Reword to 'designed for continuous operation' or cite measured uptime evidence; do not assert 24/7 operation as fact.",
+      "notes": "",
+      "owner": "founder"
+    }
+  ]
+}
