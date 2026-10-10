@@ -4,9 +4,20 @@ Real tool bindings for AgencyKernel executor.
 
 Replaces the old _simulate_step_execution canned responses with actual:
   - web_search   (DuckDuckGo HTML / requests)
-  - python_exec  (restricted eval for simple calculations)
-  - file_read    (safe path-restricted read)
+  - python_exec  (restricted eval for simple calculations; requires explicit
+                 founder approval via SINCOR_AGENT_EXEC_APPROVED)
+  - file_read    (restricted to the agent sandbox dir; secrets redacted)
   - claude_reason / analysis / synthesis (Anthropic via existing ClaudeClient)
+
+P1 audit #10 hardening:
+  - python_exec is gated behind a founder approval env flag (it is load-bearing
+    for the executor, so it is gated rather than removed). The
+    banned-construct filter is defense-in-depth only, not the security boundary.
+  - file_read may only read inside data/agent_sandbox/ (or
+    SINCOR_AGENT_SANDBOX_DIR); repo root and /tmp are excluded. Resolved
+    realpaths are re-checked for containment (symlink/.. escapes denied).
+  - All tool outputs are scanned for secret patterns (API keys, private keys,
+    JWTs) and redacted before return.
 """
 
 from __future__ import annotations
@@ -22,23 +33,83 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("sincor.agency.tools")
 
-# Paths allowed for file_read (project + data volume)
-_ALLOWED_ROOTS = [
-    Path("/data").resolve(),
-    Path(__file__).resolve().parent.parent.parent,  # repo root
-    Path("/tmp"),
-]
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _sandbox_root() -> Path:
+    """Dedicated agent sandbox dir — the ONLY root file_read may touch.
+
+    P1 audit #10: the old roots (repo root, /tmp, /data) exposed secrets,
+    keys, and source to agent-facing reads. Override with
+    SINCOR_AGENT_SANDBOX_DIR if needed; otherwise <repo>/data/agent_sandbox.
+    The root is resolved fresh on every call so env changes take effect.
+    """
+    raw = os.environ.get("SINCOR_AGENT_SANDBOX_DIR", "")
+    if raw:
+        return Path(raw).expanduser().resolve()
+    return (_PROJECT_ROOT / "data" / "agent_sandbox").resolve()
 
 
 def _safe_path(path_str: str) -> Path:
-    p = Path(path_str).expanduser().resolve()
-    for root in _ALLOWED_ROOTS:
-        try:
-            p.relative_to(root)
-            return p
-        except ValueError:
-            continue
-    raise PermissionError(f"Path outside allowed roots: {path_str}")
+    """Resolve a requested path and enforce sandbox containment.
+
+    - Relative paths resolve against the sandbox root.
+    - Absolute paths resolve as given.
+    - The resolved realpath is re-checked for containment AFTER resolution,
+      which kills symlink escapes (e.g. sandbox/link -> /etc/passwd),
+      ".." traversal, and case-variant tricks on case-insensitive filesystems.
+    """
+    root = _sandbox_root()
+    candidate = Path(path_str).expanduser()
+    if candidate.is_absolute():
+        resolved = candidate.resolve()
+    else:
+        resolved = (root / candidate).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise PermissionError(f"Path outside agent sandbox: {path_str}")
+    return resolved
+
+
+# ---------------------------------------------------------------------------
+# Secret redaction (P1 audit #10d): scan tool outputs for secret-shaped values
+# and redact before returning. Applied to every tool's output plus a final
+# sweep over the aggregated step result in run_tools_for_step.
+# ---------------------------------------------------------------------------
+
+_SECRET_PATTERNS = [
+    (re.compile(r"sk_(live|test)_[A-Za-z0-9]{10,}"), "sk_***REDACTED***"),
+    (re.compile(r"rk_(live|test)_[A-Za-z0-9]{10,}"), "rk_***REDACTED***"),
+    (re.compile(r"ghp_[A-Za-z0-9]{20,}"), "ghp_***REDACTED***"),
+    (re.compile(r"gho_[A-Za-z0-9]{20,}"), "gho_***REDACTED***"),
+    (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), "github_pat_***REDACTED***"),
+    (re.compile(r"AKIA[0-9A-Z]{16}"), "AKIA***REDACTED***"),
+    (re.compile(r"xox[abprs]-[A-Za-z0-9-]{10,}"), "xox***REDACTED***"),
+    (re.compile(r"\bre_[A-Za-z0-9_]{24,}\b"), "re_***REDACTED***"),
+    # JWT: eyJ prefix (base64 of '{"') + three long base64url segments.
+    (re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"), "JWT***REDACTED***"),
+    (re.compile(
+        r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----"
+    ), "***PRIVATE KEY REDACTED***"),
+]
+
+
+def _redact_text(text: str) -> str:
+    for pattern, replacement in _SECRET_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+def _redact_value(value: Any) -> Any:
+    """Recursively redact secret-shaped strings in dicts/lists/tuples."""
+    if isinstance(value, str):
+        return _redact_text(value)
+    if isinstance(value, dict):
+        return {k: _redact_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_redact_value(v) for v in value)
+    return value
 
 
 def tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
@@ -70,7 +141,7 @@ def tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
             "status": "success",
             "tool": "web_search",
             "query": query,
-            "results": results,
+            "results": _redact_value(results),
             "count": len(results),
         }
     except Exception as err:
@@ -84,8 +155,36 @@ def tool_web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
         }
 
 
+def _exec_approved() -> bool:
+    """Founder approval gate for agent-facing code execution (P1 audit #10a).
+
+    python_exec is load-bearing for the AgencyKernel executor, so it is kept
+    but gated: it runs ONLY when the founder explicitly sets
+    SINCOR_AGENT_EXEC_APPROVED to a truthy value. Checked live on every call
+    (never cached, and never taken from a user/agent-supplied parameter).
+    """
+    return (os.environ.get("SINCOR_AGENT_EXEC_APPROVED", "") or "").strip().lower() in (
+        "1", "true", "yes",
+    )
+
+
 def tool_python_exec(code: str) -> Dict[str, Any]:
-    """Restricted Python execution for simple calculations / data transforms."""
+    """Restricted Python execution for simple calculations / data transforms.
+
+    P1 audit #10a: requires explicit founder approval
+    (SINCOR_AGENT_EXEC_APPROVED=true). Without it the call is refused — the
+    substring/banned-construct filter below is defense-in-depth only and is
+    not relied upon as the security boundary.
+    """
+    if not _exec_approved():
+        return {
+            "status": "failed",
+            "tool": "python_exec",
+            "error": (
+                "python_exec disabled: agent code execution requires explicit "
+                "founder approval (set SINCOR_AGENT_EXEC_APPROVED=true)"
+            ),
+        }
     banned = [
         "import os", "import sys", "import subprocess", "__import__",
         "open(", "exec(", "eval(", "compile(", "getattr", "setattr",
@@ -115,7 +214,7 @@ def tool_python_exec(code: str) -> Dict[str, Any]:
         return {
             "status": "success",
             "tool": "python_exec",
-            "outputs": outputs,
+            "outputs": _redact_value(outputs),
         }
     except Exception as err:
         return {
@@ -126,7 +225,11 @@ def tool_python_exec(code: str) -> Dict[str, Any]:
 
 
 def tool_file_read(path: str, max_bytes: int = 50_000) -> Dict[str, Any]:
-    """Read a file from an allowed root."""
+    """Read a file from the agent sandbox (the only allowed root).
+
+    P1 audit #10: repo root and /tmp are no longer readable; output is
+    secret-redacted before return.
+    """
     try:
         p = _safe_path(path)
         if not p.is_file():
@@ -140,7 +243,7 @@ def tool_file_read(path: str, max_bytes: int = 50_000) -> Dict[str, Any]:
             "status": "success",
             "tool": "file_read",
             "path": str(p),
-            "content": text,
+            "content": _redact_text(text),
             "bytes_read": len(data),
         }
     except Exception as err:
@@ -173,7 +276,7 @@ def tool_claude_reason(
         return {
             "status": "success",
             "tool": "claude_reason",
-            "output": text,
+            "output": _redact_text(text or ""),
         }
     except Exception as err:
         logger.warning("claude_reason failed: %s", err)
@@ -289,12 +392,14 @@ def run_tools_for_step(
     status = "success" if not errors else ("partial" if outputs else "failed")
     confidence = 0.85 if status == "success" else (0.45 if status == "partial" else 0.1)
 
+    # Final sweep: redact any secret-shaped values that slipped through
+    # individual tools (evidence strings, errors, merged outputs).
     return {
         "status": status,
-        "outputs": outputs,
-        "evidence": evidence,
+        "outputs": _redact_value(outputs),
+        "evidence": _redact_value(evidence),
         "citations": citations,
         "confidence": confidence,
         "resource_usage": {"tool_calls": tool_calls, "tokens": tool_calls * 200},
-        "errors": errors,
+        "errors": _redact_value(errors),
     }
