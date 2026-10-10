@@ -39,6 +39,8 @@ settle-before-serve.
 from __future__ import annotations
 
 import json
+import logging
+import os
 import secrets
 import sqlite3
 import time
@@ -71,6 +73,13 @@ def _db_path() -> Path:
     return orders_db_path()
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    """Add a column if missing (migration for DBs created before this patch)."""
+    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_x402_db() -> None:
     conn = sqlite3.connect(_db_path())
     conn.execute(
@@ -83,11 +92,30 @@ def init_x402_db() -> None:
             status TEXT NOT NULL DEFAULT 'pending',
             tx_hash TEXT,
             access_token TEXT,
+            token_expires_at TEXT,
+            token_consumed_at TEXT,
             created_at TEXT NOT NULL,
             expires_at TEXT NOT NULL,
             fulfilled_at TEXT
         )"""
     )
+    # P1-7/P1-8 migrations for DBs created before this patch.
+    _ensure_column(conn, "x402_challenges", "token_expires_at", "TEXT")
+    _ensure_column(conn, "x402_challenges", "token_consumed_at", "TEXT")
+    try:
+        # P1-8: one on-chain payment may fulfill at most one challenge.
+        # NULL tx_hash rows (pending challenges) never conflict in SQLite,
+        # so this only binds fulfilled rows.
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS x402_challenges_tx_hash_uniq "
+            "ON x402_challenges(tx_hash)"
+        )
+    except Exception as err:
+        # Rows written under the vulnerable scheme may already contain
+        # duplicate tx_hash values, which blocks index creation. Log and
+        # continue: the atomic-claim UPDATE below still performs a
+        # same-transaction pre-check as a best-effort defense.
+        logger.warning("x402: tx_hash UNIQUE index not created: %s", err)
     conn.commit()
     conn.close()
 
@@ -97,6 +125,16 @@ def _conn() -> sqlite3.Connection:
     c = sqlite3.connect(_db_path())
     c.row_factory = sqlite3.Row
     return c
+
+
+logger = logging.getLogger("sincor.x402")
+
+#: Entitlement-token lifetime in seconds. AUDIT P1-7: every fulfilled
+#: challenge stamps ``token_expires_at``; access_granted() rejects expired
+#: tokens and consumes single-use tokens. Tokens issued before the P1-7
+#: migration have NULL ``token_expires_at`` and are treated as expired
+#: (fail closed).
+ENTITLEMENT_TTL_SECONDS = int(os.getenv("X402_ENTITLEMENT_TTL_SECONDS", "3600"))
 
 
 def load_pricing() -> dict[str, Any]:
@@ -298,6 +336,11 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
     }
 
 
+def _parse_iso(ts: str) -> datetime:
+    """Parse the ISO timestamps this module stores (tolerates a Z suffix)."""
+    return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+
+
 def verify_challenge(
     challenge_id: str,
     tx_hash: str,
@@ -306,6 +349,10 @@ def verify_challenge(
 ) -> dict[str, Any]:
     if not challenge_id or not tx_hash:
         return {"ok": False, "error": "challenge_id_and_tx_hash_required"}
+
+    # P1-8: normalize before any comparison/storage so case variants of the
+    # same hash collide on the UNIQUE index instead of slipping through.
+    tx_hash = str(tx_hash).strip().lower()
 
     with _conn() as conn:
         row = conn.execute(
@@ -322,7 +369,7 @@ def verify_challenge(
             }
 
         expires = row["expires_at"]
-        if expires and datetime.fromisoformat(expires.replace("Z", "+00:00")) < datetime.now(timezone.utc):
+        if expires and _parse_iso(expires) < datetime.now(timezone.utc):
             return {"ok": False, "error": "challenge_expired"}
 
     resource = get_resource(str(row["resource_id"]))
@@ -337,15 +384,74 @@ def verify_challenge(
         return vr
 
     access_token = secrets.token_urlsafe(32)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    # P1-7: every issued entitlement token carries its own expiry.
+    token_expires = (now + timedelta(seconds=ENTITLEMENT_TTL_SECONDS)).isoformat()
 
+    # P1-8 atomic claim: the fulfill UPDATE is itself the claim. It runs in
+    # one IMMEDIATE transaction that (a) rechecks the challenge is still
+    # pending and unexpired, (b) best-effort rejects a tx_hash already
+    # claimed by another challenge (covers DBs where the UNIQUE index could
+    # not be created), and (c) relies on UNIQUE(tx_hash) as the
+    # authoritative guard under races — insert-or-fail, fulfill only if the
+    # claim won.
     with _conn() as conn:
-        conn.execute(
-            """UPDATE x402_challenges SET status='fulfilled', tx_hash=?, payer_wallet=?,
-               access_token=?, fulfilled_at=? WHERE challenge_id=?""",
-            (tx_hash, vr["payer_wallet"], access_token, now, challenge_id),
-        )
-        conn.commit()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+        except sqlite3.OperationalError:
+            return {"ok": False, "error": "store_busy"}
+        try:
+            fresh = conn.execute(
+                "SELECT * FROM x402_challenges WHERE challenge_id=?",
+                (challenge_id,),
+            ).fetchone()
+            if not fresh:
+                conn.rollback()
+                return {"ok": False, "error": "challenge_not_found"}
+            if fresh["status"] == "fulfilled":
+                conn.rollback()
+                return {
+                    "ok": True,
+                    "status": "already_fulfilled",
+                    "access_token": fresh["access_token"],
+                    "resource_id": fresh["resource_id"],
+                }
+            fresh_exp = fresh["expires_at"]
+            if fresh_exp and _parse_iso(fresh_exp) < datetime.now(timezone.utc):
+                conn.rollback()
+                return {"ok": False, "error": "challenge_expired"}
+            claimed = conn.execute(
+                "SELECT challenge_id FROM x402_challenges WHERE tx_hash=?",
+                (tx_hash,),
+            ).fetchone()
+            if claimed:
+                conn.rollback()
+                logger.warning(
+                    "x402: tx_hash %s already claimed by challenge %s; "
+                    "rejecting double-fulfillment of %s",
+                    tx_hash, claimed["challenge_id"], challenge_id)
+                return {"ok": False, "error": "tx_hash_already_used"}
+            cur = conn.execute(
+                """UPDATE x402_challenges
+                   SET status='fulfilled', tx_hash=?, payer_wallet=?,
+                       access_token=?, token_expires_at=?, fulfilled_at=?
+                   WHERE challenge_id=?""",
+                (tx_hash, vr["payer_wallet"], access_token,
+                 token_expires, now_iso, challenge_id),
+            )
+            if cur.rowcount != 1:
+                conn.rollback()
+                return {"ok": False, "error": "fulfill_conflict"}
+            conn.commit()
+        except sqlite3.IntegrityError:
+            # UNIQUE(tx_hash) fired: this on-chain payment already fulfilled
+            # another challenge. Double-fulfillment rejected.
+            conn.rollback()
+            logger.warning(
+                "x402: tx_hash %s replay rejected for challenge %s "
+                "(UNIQUE constraint)", tx_hash, challenge_id)
+            return {"ok": False, "error": "tx_hash_already_used"}
 
     return {
         "ok": True,
@@ -353,6 +459,7 @@ def verify_challenge(
         "challenge_id": challenge_id,
         "resource_id": row["resource_id"],
         "access_token": access_token,
+        "token_expires_at": token_expires,
         "tx_hash": tx_hash,
         "payer_wallet": vr["payer_wallet"],
     }
@@ -438,16 +545,50 @@ def execute_paid_resource(resource_id: str, payload: dict[str, Any] | None = Non
     }
 
 
-def access_granted(access_token: str, resource_id: str) -> bool:
-    if not access_token:
+def access_granted(access_token: str, resource_id: str, *, consume: bool = True) -> bool:
+    """Paid-resource gate with single-use, expiring entitlement tokens.
+
+    P1-7: every access check rejects expired tokens (``token_expires_at``)
+    and already-consumed tokens (``token_consumed_at``). With
+    ``consume=True`` (default — the serve path), a successful check
+    atomically stamps ``token_consumed_at`` via a conditional UPDATE, so
+    the token grants access exactly once even under concurrency. Pass
+    ``consume=False`` for informational pre-checks that must not burn the
+    token. Tokens issued before the P1-7 migration have NULL
+    ``token_expires_at`` and are treated as expired (fail closed).
+    """
+    if not access_token or not resource_id:
         return False
+    now = datetime.now(timezone.utc)
     with _conn() as conn:
         row = conn.execute(
-            """SELECT challenge_id FROM x402_challenges
+            """SELECT challenge_id, token_expires_at, token_consumed_at
+               FROM x402_challenges
                WHERE access_token=? AND resource_id=? AND status='fulfilled'""",
             (access_token, resource_id),
         ).fetchone()
-    return bool(row)
+        if not row:
+            return False
+        exp = row["token_expires_at"]
+        if not exp:
+            # Legacy token (no expiry stamped): fail closed.
+            return False
+        if _parse_iso(exp) < now:
+            return False
+        if row["token_consumed_at"]:
+            return False
+        if consume:
+            cur = conn.execute(
+                """UPDATE x402_challenges SET token_consumed_at=?
+                   WHERE access_token=? AND resource_id=? AND status='fulfilled'
+                   AND token_consumed_at IS NULL""",
+                (now.isoformat(), access_token, resource_id),
+            )
+            conn.commit()
+            if cur.rowcount != 1:
+                # Lost the consumption race: another dispatch won.
+                return False
+    return True
 
 # ---------------------------------------------------------------------------
 # Settle-before-serve guard (dev-watch item 79)
