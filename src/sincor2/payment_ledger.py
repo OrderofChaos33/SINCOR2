@@ -34,6 +34,7 @@ Design rules (additive-only integration):
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 import uuid
@@ -135,10 +136,13 @@ _ALLOWED_TRANSITIONS: dict[PaymentState, frozenset[PaymentState]] = {
     ),
     PaymentState.DISPUTED: frozenset(
         {
-            # Dispute resolution outcomes.
-            PaymentState.SETTLED,
-            PaymentState.REFUNDED,
-            PaymentState.QUARANTINED,
+            # Dispute resolution: the ONLY legal exit is back to
+            # pending_verification for full re-verification with fresh
+            # finality observations.  A disputed payment must NEVER
+            # transition directly to settled/fulfilled/refunded — that
+            # would resurrect money movement the chain may have taken
+            # back (reorg).  See W-55.
+            PaymentState.PENDING_VERIFICATION,
         }
     ),
     PaymentState.QUARANTINED: frozenset(
@@ -174,6 +178,74 @@ class PaymentConflictError(PaymentLedgerError):
 
 class FinalityNotConfirmed(PaymentLedgerError):
     """Raised when a caller tries to settle an onchain payment without finality."""
+
+
+class MalformedTxHashError(PaymentLedgerError):
+    """Raised when a tx hash cannot be canonicalized (fail closed).
+
+    Empty, None-in-normalize, non-hex, or wrong-length hashes are rejected
+    at ingestion — they must never become dedup keys or chain lookups.
+    """
+
+
+class MissingTxHashError(PaymentLedgerError):
+    """Raised when an onchain payment tries to enter a verified-or-later
+    state without a tx hash.
+
+    Offchain providers (e.g. stripe) settle without chain evidence; onchain
+    providers must always carry a canonical tx hash before verification.
+    """
+
+
+# ---------------------------------------------------------------------------
+# tx_hash canonicalization (W-53 / W-56)
+# ---------------------------------------------------------------------------
+
+# Canonical tx hash form: "0x" + 64 lowercase hex chars (32 bytes).
+_TX_HASH_RE = re.compile(r"^0x[0-9a-f]{64}$")
+
+# Providers whose money movement is onchain: they must carry a canonical
+# tx hash before entering any verified-or-later state.  Offchain providers
+# (fiat etc.) settle without chain evidence.
+_TX_HASH_REQUIRED_PROVIDERS = frozenset({"x402", "a2a", "manual", "checkout", "legacy"})
+_TX_HASH_REQUIRED_STATES = frozenset(
+    {
+        PaymentState.VERIFIED,
+        PaymentState.AWAITING_FINALITY,
+        PaymentState.SETTLED,
+        PaymentState.FULFILLED,
+    }
+)
+
+
+def normalize_tx_hash(tx_hash: object) -> str:
+    """Canonicalize a tx hash to ``0x`` + 64 lowercase hex chars.
+
+    Accepts the spellings providers actually emit — mixed case, ``0X``
+    prefix, missing ``0x`` prefix, surrounding whitespace — and folds them
+    to one canonical form so the uniqueness check cannot be bypassed by
+    re-spelling the same onchain transaction.
+
+    Raises:
+        MalformedTxHashError: for None, non-string, empty/whitespace-only,
+            non-hex, or wrong-length input.  Fail closed: malformed hashes
+            are rejected, never stored, never used as dedup keys.
+    """
+    if not isinstance(tx_hash, str):
+        raise MalformedTxHashError(
+            f"tx_hash must be a string, got {type(tx_hash).__name__}"
+        )
+    s = tx_hash.strip()
+    if not s:
+        raise MalformedTxHashError("tx_hash is empty")
+    if s[:2].lower() == "0x":
+        s = s[2:]
+    canonical = "0x" + s.lower()
+    if not _TX_HASH_RE.fullmatch(canonical):
+        raise MalformedTxHashError(
+            f"tx_hash is not 0x + 64 hex chars: {tx_hash!r}"
+        )
+    return canonical
 
 
 # ---------------------------------------------------------------------------
@@ -579,7 +651,12 @@ CREATE TABLE IF NOT EXISTS payments (
     finality_confirmed INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL,
-    tx_hash         TEXT
+    tx_hash         TEXT,
+    -- Canonical tx_hash (0x + 64 lowercase hex) used as the dedup key.
+    -- NULL means "no onchain evidence" (offchain providers); those rows
+    -- dedup on payment_id only.  Empty/malformed hashes are rejected at
+    -- ingestion and never stored here (W-53/W-56).
+    tx_hash_norm    TEXT
 );
 CREATE TABLE IF NOT EXISTS payment_history (
     seq           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -592,9 +669,10 @@ CREATE TABLE IF NOT EXISTS payment_history (
 );
 CREATE INDEX IF NOT EXISTS idx_payment_history_payment
     ON payment_history(payment_id, seq);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_provider_tx
-    ON payments(provider, tx_hash)
-    WHERE tx_hash IS NOT NULL AND tx_hash != '';
+-- NOTE: the UNIQUE index on (provider, tx_hash_norm) is created by
+-- _migrate_tx_hash_norm() AFTER backfilling older databases, so a legacy
+-- canonical collision fails closed (quarantine) instead of breaking the
+-- index build.
 -- History is append-only: reject UPDATE and DELETE at the SQL layer so that
 -- even raw-SQL access cannot rewrite payment history.
 CREATE TRIGGER IF NOT EXISTS trg_payment_history_no_update
@@ -641,9 +719,70 @@ class PaymentLedgerStore:
             conn.execute("PRAGMA busy_timeout=30000")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.executescript(_SCHEMA)
+            self._migrate_tx_hash_norm(conn)
             conn.commit()
         finally:
             conn.close()
+
+    @staticmethod
+    def _migrate_tx_hash_norm(conn: sqlite3.Connection) -> None:
+        """Backfill ``tx_hash_norm`` on databases created before W-53.
+
+        Canonicalizes every stored tx hash.  If two rows canonicalize to
+        the same (provider, tx_hash_norm) — i.e. the database already
+        contains the double-credit the red team demonstrated — the later
+        row is quarantined fail-closed (it can never settle without human
+        review) and the earliest keeps the dedup key.  Malformed legacy
+        hashes backfill to NULL (no dedup key) rather than breaking the
+        migration.
+        """
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(payments)").fetchall()]
+        if "tx_hash_norm" not in cols:
+            conn.execute("ALTER TABLE payments ADD COLUMN tx_hash_norm TEXT")
+            rows = conn.execute(
+                "SELECT payment_id, provider, tx_hash, state, version"
+                " FROM payments ORDER BY created_at, rowid"
+            ).fetchall()
+            seen: dict[tuple[str, str], str] = {}
+            for r in rows:
+                pid, provider, raw, prior_state = r[0], r[1], r[2], r[3]
+                norm: Optional[str] = None
+                if raw:
+                    try:
+                        norm = normalize_tx_hash(raw)
+                    except MalformedTxHashError:
+                        norm = None
+                key = (provider, norm) if norm else None
+                if key is not None and key in seen:
+                    now = _utc_now_iso()
+                    conn.execute(
+                        "UPDATE payments SET tx_hash_norm=NULL, state=?,"
+                        " version=version+1, updated_at=? WHERE payment_id=?",
+                        (PaymentState.QUARANTINED.value, now, pid),
+                    )
+                    conn.execute(
+                        "INSERT INTO payment_history"
+                        " (payment_id, from_state, to_state, ts, actor, reason)"
+                        " VALUES (?,?,?,?,?,?)",
+                        (
+                            pid, prior_state, PaymentState.QUARANTINED.value, now,
+                            "rt12-migration",
+                            "canonical tx_hash collision with"
+                            f" {seen[key]}; quarantined fail-closed (W-53)",
+                        ),
+                    )
+                else:
+                    if key is not None:
+                        seen[key] = pid
+                    conn.execute(
+                        "UPDATE payments SET tx_hash_norm=? WHERE payment_id=?",
+                        (norm, pid),
+                    )
+            conn.execute("DROP INDEX IF EXISTS idx_payments_provider_tx")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_provider_tx_norm"
+            " ON payments(provider, tx_hash_norm) WHERE tx_hash_norm IS NOT NULL"
+        )
 
     # -- internals --------------------------------------------------------
 
@@ -699,11 +838,25 @@ class PaymentLedgerStore:
     def ingest(self, record: PaymentRecord) -> PaymentRecord:
         """Persist a mapped record, replaying its history into the ledger.
 
+        The tx hash is canonicalized BEFORE the uniqueness check: any
+        spelling of the same onchain transaction (mixed case, ``0X``
+        prefix, missing prefix, whitespace) folds to one dedup key, and
+        malformed hashes are rejected fail-closed.
+
         Raises:
+            MalformedTxHashError: the record carries an empty/malformed
+                tx hash.  Fail closed — the record is NOT ingested.
             DuplicatePaymentError: if the provider+tx_hash (or payment_id)
                 was already ingested — this is the double-ingest guard.
         """
-        tx_hash = record.provider_evidence.get("tx_hash")
+        raw_tx_hash = record.provider_evidence.get("tx_hash")
+        tx_hash_norm: Optional[str] = None
+        if raw_tx_hash is not None:
+            # Fail closed BEFORE the uniqueness check: a malformed hash
+            # must never become a dedup key or a chain lookup.
+            tx_hash_norm = normalize_tx_hash(raw_tx_hash)
+            if tx_hash_norm != raw_tx_hash:
+                record.provider_evidence["tx_hash"] = tx_hash_norm
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
@@ -713,8 +866,9 @@ class PaymentLedgerStore:
                        (payment_id, owner, amount_atomic, amount_display, currency,
                         provider, provider_evidence, entitlements, refunds, state,
                         version, block_number, block_hash, confirmations,
-                        finality_confirmed, created_at, updated_at, tx_hash)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        finality_confirmed, created_at, updated_at, tx_hash,
+                        tx_hash_norm)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         record.payment_id,
                         record.owner,
@@ -733,7 +887,8 @@ class PaymentLedgerStore:
                         int(record.finality_confirmed),
                         record.created_at,
                         record.updated_at,
-                        tx_hash,
+                        tx_hash_norm,
+                        tx_hash_norm,
                     ),
                 )
             except sqlite3.IntegrityError as exc:
@@ -752,6 +907,51 @@ class PaymentLedgerStore:
             return record
         finally:
             conn.close()
+
+    @staticmethod
+    def _enforce_evidence_guards(
+        record: PaymentRecord,
+        target: PaymentState,
+        *,
+        allow_finality_bypass: bool = False,
+    ) -> None:
+        """Enforce money-safety guards before a state transition is applied.
+
+        Raises:
+            FinalityNotConfirmed: settling an onchain payment (has tx_hash)
+                whose finality was not confirmed by the finality checker,
+                unless ``allow_finality_bypass`` is True (used by the
+                finality module itself).
+            MissingTxHashError: an onchain provider's payment entering a
+                verified-or-later state without a tx hash.  Fail closed:
+                money movement must always be attributable to a canonical
+                onchain transaction.
+        """
+        # Skip-finality guard: onchain money may not settle without
+        # confirmed finality.  This is the anti-double-spend / anti-reorg
+        # gate — settling on a 0-conf tx is how reorgs steal entitlements.
+        if (
+            target == PaymentState.SETTLED
+            and record.provider_evidence.get("tx_hash")
+            and not record.finality_confirmed
+            and not allow_finality_bypass
+        ):
+            raise FinalityNotConfirmed(
+                f"payment {record.payment_id} carries onchain evidence but finality "
+                "is not confirmed; route through payment_finality.check_finality"
+            )
+        # Hash-required guard: onchain providers must carry a canonical tx
+        # hash before verification or anything past it.  Offchain providers
+        # (no tx_hash by design) are unaffected.
+        if (
+            target in _TX_HASH_REQUIRED_STATES
+            and record.provider in _TX_HASH_REQUIRED_PROVIDERS
+            and not record.provider_evidence.get("tx_hash")
+        ):
+            raise MissingTxHashError(
+                f"payment {record.payment_id} (provider {record.provider}) cannot"
+                f" enter {target.value} without a tx hash"
+            )
 
     def transition_payment(
         self,
@@ -776,6 +976,8 @@ class PaymentLedgerStore:
                 whose finality was not confirmed by the finality checker,
                 unless ``allow_finality_bypass`` is True (used by the
                 finality module itself).
+            MissingTxHashError: an onchain provider's payment entering a
+                verified-or-later state without a tx hash.
             PaymentConflictError: version mismatch — another writer moved
                 the payment first.
         """
@@ -792,20 +994,15 @@ class PaymentLedgerStore:
             history = self._load_history(conn, payment_id)
             record = self._row_to_record(row, history)
 
-            # Skip-finality guard: onchain money may not settle without
-            # confirmed finality.  This is the anti-double-spend / anti-reorg
-            # gate — settling on a 0-conf tx is how reorgs steal entitlements.
-            if (
-                target == PaymentState.SETTLED
-                and record.provider_evidence.get("tx_hash")
-                and not record.finality_confirmed
-                and not allow_finality_bypass
-            ):
+            if not record.can_transition(target):
                 conn.rollback()
-                raise FinalityNotConfirmed(
-                    f"payment {payment_id} carries onchain evidence but finality "
-                    "is not confirmed; route through payment_finality.check_finality"
+                raise IllegalPaymentTransition(
+                    f"illegal transition {record.state.value} -> {target.value} "
+                    f"for payment {payment_id}"
                 )
+            self._enforce_evidence_guards(
+                record, target, allow_finality_bypass=allow_finality_bypass
+            )
 
             if expected_version is not None and record.version != expected_version:
                 conn.rollback()
@@ -835,6 +1032,97 @@ class PaymentLedgerStore:
             )
             conn.commit()
             return record
+        finally:
+            conn.close()
+
+    def transition_payment_if_state(
+        self,
+        payment_id: str,
+        *,
+        from_state: PaymentState | str,
+        to_state: PaymentState | str,
+        actor: str,
+        reason: str = "",
+        allow_finality_bypass: bool = False,
+    ) -> tuple[bool, PaymentRecord]:
+        """Atomically transition only if the payment is in ``from_state``.
+
+        The state check, the evidence guards, and the write all happen
+        inside ONE write transaction, so concurrent advancers race cleanly:
+        exactly one caller applies the transition; the losers get
+        ``(False, <fresh record>)`` instead of :class:`PaymentConflictError`
+        or :class:`IllegalPaymentTransition`.  This is the primitive
+        concurrent finality pollers use — they must never crash on a lost
+        race (W-54).
+
+        Returns:
+            ``(applied, record)`` — ``applied`` is True only if THIS call
+            performed the transition (the caller that applied the final
+            step owns side effects like entitlement grants).  When False,
+            ``record`` is the freshly-read current state so the caller can
+            map it to a clean "already advanced" result.  Note: if the
+            payment is already in ``to_state``, ``applied`` is False —
+            someone else already did the work.
+
+        Raises:
+            PaymentNotFound: unknown payment_id.
+            IllegalPaymentTransition: the ``from_state`` -> ``to_state``
+                pair itself is not legal (a programming error, not a race).
+            FinalityNotConfirmed / MissingTxHashError: the evidence guards
+                (same as :meth:`transition_payment`).
+        """
+        expected = _as_state(from_state)
+        target = _as_state(to_state)
+        if target not in _ALLOWED_TRANSITIONS[expected]:
+            raise IllegalPaymentTransition(
+                f"illegal transition {expected.value} -> {target.value} "
+                f"for payment {payment_id}"
+            )
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT * FROM payments WHERE payment_id=?", (payment_id,)
+            ).fetchone()
+            if row is None:
+                conn.rollback()
+                raise PaymentNotFound(f"unknown payment_id: {payment_id}")
+            history = self._load_history(conn, payment_id)
+            record = self._row_to_record(row, history)
+            if record.state != expected:
+                # Another writer moved the payment first (or already
+                # advanced it to the target).  Clean loss, no exception.
+                conn.rollback()
+                return False, record
+            self._enforce_evidence_guards(
+                record, target, allow_finality_bypass=allow_finality_bypass
+            )
+            entry = record.transition(target, actor=actor, reason=reason)
+            updated = conn.execute(
+                "UPDATE payments SET state=?, version=?, updated_at=? "
+                "WHERE payment_id=? AND version=? AND state=?",
+                (
+                    record.state.value,
+                    record.version,
+                    record.updated_at,
+                    payment_id,
+                    row["version"],
+                    expected.value,
+                ),
+            )
+            if updated.rowcount != 1:
+                # Practically unreachable under BEGIN IMMEDIATE, but stay
+                # total: re-read and report a clean loss.
+                conn.rollback()
+                return False, self.get(payment_id)
+            conn.execute(
+                "INSERT INTO payment_history"
+                " (payment_id, from_state, to_state, ts, actor, reason)"
+                " VALUES (?,?,?,?,?,?)",
+                (entry.payment_id, entry.from_state, entry.to_state, entry.ts, entry.actor, entry.reason),
+            )
+            conn.commit()
+            return True, record
         finally:
             conn.close()
 
@@ -959,12 +1247,21 @@ class PaymentLedgerStore:
             conn.close()
 
     def find_by_tx_hash(self, provider: str, tx_hash: str) -> Optional[PaymentRecord]:
-        """Find a payment by provider + tx hash (double-spend lookup)."""
+        """Find a payment by provider + tx hash (double-spend lookup).
+
+        The probe is canonicalized first, so any spelling of the same
+        onchain transaction hits the stored row.  A malformed/empty probe
+        can never match a dedup key and returns None instead of raising.
+        """
+        try:
+            norm = normalize_tx_hash(tx_hash)
+        except MalformedTxHashError:
+            return None
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT * FROM payments WHERE provider=? AND tx_hash=?",
-                (provider, tx_hash),
+                "SELECT * FROM payments WHERE provider=? AND tx_hash_norm=?",
+                (provider, norm),
             ).fetchone()
             if row is None:
                 return None
