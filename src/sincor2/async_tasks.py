@@ -33,11 +33,19 @@ def _celery_task(*dargs, **dkwargs):
 
 @_celery_task(bind=True, name="sincor2.execute_job", queue="sincor.long")
 def execute_job(self=None, job_id: str = "") -> Any:
+    # C2 (P2 audit): the Celery worker MUST resolve the job through the
+    # SHARED job store (Redis). If the job is missing here it means the web
+    # process wrote to process-local memory — a deployment misconfiguration
+    # that run_job surfaces loudly ("job ... not found") instead of
+    # executing blind.
     if self is not None:
         try:
             update_job(job_id, celery_id=getattr(self.request, "id", None), state="running")
-        except Exception:
-            pass
+        except Exception as exc:
+            # The job record itself may be unreachable (store down); keep the
+            # failure visible — swallowing it hides a broken shared store.
+            logger.warning("execute_job: could not record celery_id for job %s: %s",
+                           job_id, exc)
     job = run_job(job_id)
     return job.result if job else None
 
