@@ -242,13 +242,20 @@ class PaymentVerifier:
 
     @classmethod
     def is_verified(cls, tx_hash: str, expected_amount_wei: int,
-                    expected_to: str = TREASURY_WALLET) -> bool:
+                    expected_to: str = TREASURY_WALLET,
+                    *, allow_simulated: bool = False) -> bool:
         """
         Returns True if the tx has >=1 confirmation and transferred at least
         `expected_amount_wei` AXM to `expected_to`.
 
         Falls back to True in non-production environments so development/testing
         does not require live RPC calls.
+
+        Simulated tx hashes ("0xSIMULATED...") are rejected fail-closed
+        unless the caller explicitly passes ``allow_simulated=True``. There
+        is deliberately NO environment-variable or global toggle for this:
+        the bypass is test-only by construction (opt-in per call, default
+        closed). Production call sites must never pass ``allow_simulated``.
 
         Raises PaymentRpcError if every provider fails with a transient error
         (so the caller can retry verification instead of burning the payment).
@@ -263,6 +270,18 @@ class PaymentVerifier:
             return False
 
         if str(tx_hash).startswith("0xSIMULATED"):
+            # AUDIT P1-6: a bare "0xSIMULATED..." hash used to return True
+            # unconditionally — anyone could forge payment proof. Now
+            # fail-closed by default; only an explicit per-call
+            # allow_simulated=True (test-only) accepts it. This is never
+            # read from the environment.
+            if not allow_simulated:
+                logger.warning(
+                    "PaymentVerifier: rejecting simulated tx_hash %r", tx_hash)
+                return False
+            logger.warning(
+                "PaymentVerifier: accepting simulated tx_hash %r via "
+                "explicit allow_simulated=True (test-only)", tx_hash)
             return True
 
         cache_key = cls._cache_key(tx_hash, expected_to, expected_amount_wei)
@@ -371,7 +390,8 @@ class PaymentVerifier:
     @classmethod
     @classmethod
     def verified_tx_data(cls, tx_hash: str, expected_amount_wei: int,
-                         expected_to: str = TREASURY_WALLET
+                         expected_to: str = TREASURY_WALLET,
+                         *, allow_simulated: bool = False
                          ) -> Optional[Dict[str, Any]]:
         """Like :meth:`is_verified`, but returns chain-verified tx data.
 
@@ -379,8 +399,11 @@ class PaymentVerifier:
         "verification": "onchain"}`` when the receipt is successful and
         carries a qualifying AXM Transfer log; a ``"dev_bypass"``-labeled
         record in non-production envs (honestly marked, never mistaken for
-        on-chain verification); or ``None`` when the payment cannot be
-        verified.  Raises :class:`PaymentRpcError` when every provider fails
+        on-chain verification); a ``"simulated_test"``-labeled record
+        (``verified_transfer`` False, never ``"onchain"``) when the caller
+        explicitly passes ``allow_simulated=True`` for a simulated hash
+        (test-only); or ``None`` when the payment cannot be verified.
+        Raises :class:`PaymentRpcError` when every provider fails
         transiently (caller should treat that as "unavailable", fail closed).
         """
         env = os.getenv("FLASK_ENV", "production").lower()
@@ -392,7 +415,17 @@ class PaymentVerifier:
         if not tx_hash or not str(tx_hash).startswith("0x"):
             return None
         if str(tx_hash).startswith("0xSIMULATED"):
-            return None
+            # AUDIT P1-6: fail closed by default. The explicit test-only
+            # opt-in returns an honestly-labeled record that can never be
+            # mistaken for on-chain verification.
+            if not allow_simulated:
+                return None
+            logger.warning(
+                "PaymentVerifier: returning simulated_test record for %r "
+                "(explicit allow_simulated=True, test-only)", tx_hash)
+            return {"tx_hash": tx_hash, "block_number": None, "status": 1,
+                    "verified_transfer": False,
+                    "verification": "simulated_test"}
 
         urls = cls._rpc_urls()
         if not urls:
@@ -507,6 +540,7 @@ class PaymentVerifier:
         cls,
         tx_hash: str,
         expected_to: str = TREASURY_WALLET,
+        *, allow_simulated: bool = False,
     ) -> Optional[int]:
         """
         Return the actual AXM wei transferred to *expected_to* in *tx_hash*,
@@ -526,6 +560,12 @@ class PaymentVerifier:
             return None
 
         if str(tx_hash).startswith("0xSIMULATED"):
+            # AUDIT P1-6: no amount can be read from a simulated tx (there is
+            # no receipt), so this is always fail-closed. The flag exists for
+            # signature uniformity and to make the rejection explicit.
+            logger.warning(
+                "PaymentVerifier: rejecting simulated tx_hash %r "
+                "(allow_simulated=%s)", tx_hash, allow_simulated)
             return None
 
         cache_key = cls._amount_cache_key(tx_hash, expected_to)

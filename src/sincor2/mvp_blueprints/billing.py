@@ -207,7 +207,9 @@ def x402_challenge(resource_id):
         return jsonify({'error': 'x402_unavailable'}), 503
     from sincor2.x402_payments import access_granted, create_challenge
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
-    if access_granted(token, resource_id):
+    # Informational status check: must not burn the single-use token.
+    # The actual serve path (x402_paid_resource below) consumes it.
+    if access_granted(token, resource_id, consume=False):
         return jsonify({'ok': True, 'resource_id': resource_id, 'access': 'granted'}), 200
     wallet = validate_wallet(request.args.get('wallet', '')) or ''
     challenge = create_challenge(resource_id, payer_wallet=wallet or '')
