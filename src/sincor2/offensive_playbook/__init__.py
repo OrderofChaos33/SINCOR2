@@ -1,0 +1,1 @@
+"""Offensive playbook package."""
