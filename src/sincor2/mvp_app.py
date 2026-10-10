@@ -102,8 +102,14 @@ app.config['JWT_SECRET_KEY'] = resolve_jwt_secret()
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 app.config['SECRET_KEY'] = resolve_flask_secret()
+from sincor2.cookie_security import is_production_https, secure_cookie_kwargs
+
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
+# C3 (P2 audit): Secure follows the effective production-HTTPS posture, not a
+# single provider's environment label.
+app.config['SESSION_COOKIE_SECURE'] = is_production_https()
+logger.info('[COOKIE] SESSION_COOKIE_SECURE=%s (production_https=%s)',
+            app.config['SESSION_COOKIE_SECURE'], is_production_https())
 jwt = JWTManager(app)
 
 try:
@@ -127,6 +133,23 @@ try:
     _register_queue_routes(app)
 except Exception as _q_exc:
     logger.warning('[QUEUE] poll routes not registered: %s', _q_exc)
+
+# C2 (P2 audit): boot-time queue readiness gate. A configured-but-unreachable
+# broker or a celery backend without shared job storage fails boot fast with
+# a clear error instead of booting a half-working queue. Degraded (no-broker)
+# mode is allowed but loudly logged — never silent.
+try:
+    from sincor2.task_queue import verify_queue_readiness
+    _queue_report = verify_queue_readiness()
+    if _queue_report.get("degraded"):
+        logger.warning('[QUEUE] DEGRADED mode at boot: %s',
+                       _queue_report.get("degraded_reason"))
+    else:
+        logger.info('[QUEUE] ready: backend=%s job_store=%s',
+                    _queue_report.get("backend"), _queue_report.get("job_store"))
+except Exception as _qgate_exc:
+    logger.error('[QUEUE] readiness gate failed — refusing to boot: %s', _qgate_exc)
+    raise
 
 oauth = None
 OAUTH_REDIRECT_BASE = _env_first('OAUTH_REDIRECT_BASE_URL', 'PUBLIC_BASE_URL', 'SITE_URL', default='').rstrip('/')
@@ -158,9 +181,8 @@ def _auth_cookie_response(email: str, redirect_url: str = '/dashboard'):
         redirect_url = f'{redirect_url}{sep}email={email}'
     resp = make_response(redirect(redirect_url))
     resp.set_cookie(
-        'access_token', access_token, httponly=True,
-        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-        samesite='Lax', max_age=28800,
+        'access_token', access_token, max_age=28800,
+        **secure_cookie_kwargs(),
     )
     return resp
 
@@ -909,9 +931,8 @@ def _admin_cookie_response(username: str, redirect_url: str = '/admin'):
     access_token = create_access_token(identity=identity, additional_claims={'role': 'admin'})
     resp = make_response(redirect(_safe_next_url(redirect_url, '/admin')))
     resp.set_cookie(
-        'access_token', access_token, httponly=True,
-        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-        samesite='Lax', max_age=28800,
+        'access_token', access_token, max_age=28800,
+        **secure_cookie_kwargs(),
     )
     return resp
 
