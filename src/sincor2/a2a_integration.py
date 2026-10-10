@@ -2975,16 +2975,15 @@ def _recover_eip191_signer(message: str, signature: str) -> Optional[str]:
     try:
         from eth_account import Account
         from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
     except ImportError:  # eth_account is a hard dependency; fail closed if absent
         return None
     try:
-        raw = bytes.fromhex(_canonical_signature_hex(signature))
-        if len(raw) != 65:
-            return None
-        if int.from_bytes(raw[32:64], "big") > _SECP256K1_HALF_N:
-            return None  # non-canonical high-s: possible (r, n-s) malleation
+        raw = require_low_s(bytes.fromhex(_canonical_signature_hex(signature)))
         return str(Account.recover_message(encode_defunct(text=message), signature=raw))
     except Exception:
+        # Malformed, wrong length, or non-canonical high-s (possible
+        # (r, n-s) malleation): refuse. Callers fail closed.
         return None
 
 
