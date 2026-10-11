@@ -31,7 +31,7 @@ jobs:
       - name: Test
         env:
           PYTHONPATH: .:src:src/sincor2
-        run: pytest tests/pytest/test_toa.py tests/pytest/test_settings.py --cov=src/sincor2 --cov-report=xml --cov-report=term
+        run: pytest tests/pytest/test_toa.py tests/pytest/test_settings.py tests/pytest/test_ct01_p24_deploy_no_live.py tests/pytest/test_fee_conversion_executor.py tests/pytest/test_treasury_policy_failclosed.py --cov=src/sincor2 --cov-report=xml --cov-report=term
 
       - name: Upload coverage artifact
         if: always()
@@ -41,3 +41,15 @@ jobs:
           path: |
             coverage.xml
             .coverage
+
+  p24-simulation-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install pinned forge-std
+        working-directory: onchain
+        run: forge install foundry-rs/forge-std@v1.9.7 --no-git
+      - name: P24 local simulation safety regression
+        working-directory: onchain
+        run: FOUNDRY_PROFILE=p24 forge test --offline --match-path test/p24/P24Deploy.t.sol -vv

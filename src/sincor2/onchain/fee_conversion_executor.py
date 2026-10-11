@@ -1,7 +1,11 @@
-"""Forwarder swap executor: converts realized AXM/SINC platform fees to USDC/WETH.
+"""Fee-conversion planning and offline simulation for AXM/SINC fee obligations.
 
-Pipeline
---------
+The live conversion pipeline below is design intent only and is not executable
+in this repository. Live execution is rejected unconditionally; no production
+signer, key-custody integration, or canonical authorization capability exists.
+
+Proposed pipeline (not currently enabled)
+-----------------------------------------
 pending obligation (recorded by ``record_axm_receipt`` / settle-proof builders)
   -> quote via the Uniswap V4 Quoter (read-only)
   -> approve Permit2 to pull the fee token (if allowance is short)
@@ -11,9 +15,9 @@ pending obligation (recorded by ``record_axm_receipt`` / settle-proof builders)
 
 Security rules (same posture as ``onchain/auction_client.py``)
 ---------------------------------------------------------------
-* This module NEVER reads private keys.  Execution takes an injected
-  ``sign_and_broadcast`` callable; in production that callable signs with the
-  forwarder key held in the Secure Vault and is approved per broadcast.
+* This module NEVER reads private keys. The legacy signer callback is
+  unreachable for live execution: no canonical release/approval contract or
+  owner-approved live capability exists. ``armed`` is not authorization.
 * All token / infra addresses come from ``sincor2.onchain.constants`` or are
   verified Base deployments named below with their source.
 * Pool keys are operator-pinned config (see ``discover_pool``).  The executor
@@ -23,13 +27,12 @@ Security rules (same posture as ``onchain/auction_client.py``)
 * Swaps are exact-input with an explicit ``amountOutMinimum`` derived from
   the live quote minus ``slippage_bps``.  Dust below ``min_swap_wei`` stays
   queued in the ledger instead of being swapped at a loss to gas.
-* Live broadcasting is gated behind ``config.armed`` (default False).  The
-  arming runbook is in ``docs/ops/FEE_EXECUTOR_RUNBOOK.md``: pool discovery,
-  fork simulation of the exact calldata, then a dust-amount live swap.
+* Live broadcasting is denied unconditionally.  Planning, read-only quoting,
+  unsigned transaction construction, and dry-run simulation remain available.
 
-Fee policy (locked 2026-09-26): 5 % platform fee, 100 % to treasury,
-converted to USDC/WETH before deposit, no burn.  Deflationary mechanics are
-deferred to a later governance decision.
+Fee-policy intent (recorded 2026-09-26; conversion not live or authorized): 5 %
+platform fee, 100 % to treasury, desired conversion to USDC/WETH before deposit,
+no burn. Deflationary mechanics are deferred to a later governance decision.
 """
 
 from __future__ import annotations
@@ -197,7 +200,7 @@ class FeeConversionConfig:
     min_swap_wei: int = 0                # dust stays queued below this
     target: str = "USDC"                 # "USDC" | "WETH" (fee policy lists both)
     pool_keys: Dict[Tuple[str, str], PoolKey] = field(default_factory=dict)
-    armed: bool = False                  # live broadcast gate; see runbook
+    armed: bool = False                  # legacy compatibility; never authorizes live execution
     ledger_path: str = field(default_factory=_default_fee_ledger_path)
 
     def pool_key_for(self, token_in: str, token_out: str) -> PoolKey:
@@ -310,16 +313,16 @@ def _now() -> str:
 
 # --- Executor ----------------------------------------------------------------
 
-# Type of the injected broadcast hook.  Receives an unsigned tx dict
-# (to/data/value/gas/chainId/nonce...), returns the tx hash.  The callable
-# owns key custody (Secure Vault in production) — this module never sees keys.
+# Legacy callback type retained for compatibility with the planned pipeline.
+# This repository has no production key-custody integration, and the callback
+# is unreachable from every non-dry-run entrypoint while live execution is held.
 SignAndBroadcast = Callable[[Dict[str, Any], str], str]
 # Waits for inclusion; returns a receipt-ish mapping.
 WaitForReceipt = Callable[[str], Mapping[str, Any]]
 
 
 class FeeConversionExecutor:
-    """Builds, simulates, and (when armed) executes fee conversions."""
+    """Builds and simulates fee conversions; live execution is disabled."""
 
     def __init__(self, config: FeeConversionConfig,
                  ledger: Optional[ConversionLedger] = None):
@@ -385,6 +388,7 @@ class FeeConversionExecutor:
             msg = str(exc)
             raise ExecutorError(f"quote failed for {token_in}->{token_out}: {msg}")
         min_out = amount_out * (10_000 - self.config.slippage_bps) // 10_000
+        token_in_address = TOKEN_ADDRESSES[token_in.upper()]
         return {
             "token_in": token_in.upper(),
             "token_out": token_out.upper(),
@@ -394,7 +398,7 @@ class FeeConversionExecutor:
             "gas_estimate": gas_est,
             "slippage_bps": self.config.slippage_bps,
             "pool": asdict(pool),
-            "zero_for_one": zero_for_one(pool, token_in),
+            "zero_for_one": zero_for_one(pool, token_in_address),
         }
 
     def discover_pool(self, token_in: str, token_out: str,
@@ -591,7 +595,8 @@ class FeeConversionExecutor:
 
         plan = {"obligation_id": obligation_id, "quote": q, "txs": txs,
                 "forwarder": self.config.forwarder,
-                "treasury": self.config.treasury, "armed": self.config.armed}
+                "treasury": self.config.treasury, "armed": False,
+                "live_execution_allowed": False}
         return plan
 
     # -- execution ----------------------------------------------------------
@@ -599,22 +604,23 @@ class FeeConversionExecutor:
                      sign_and_broadcast: SignAndBroadcast,
                      wait_for_receipt: WaitForReceipt,
                      dry_run: bool = False) -> Dict[str, Any]:
-        """Run a plan end to end.  With dry_run=True, simulates every step
-        via eth_call and broadcasts nothing."""
-        oid = plan["obligation_id"]
-        ob = self.ledger.get(oid)
-        token_in = ob["token_in"]
-        token_out = plan["quote"]["token_out"]
-        amount_in = int(ob["amount_wei"])
+        """Dry-run a plan, or deny live execution before touching a signer.
 
-        if not dry_run and not self.config.armed:
+        WP0 has no live onchain authorization contract.  The existing ``armed``
+        boolean is not authorization and cannot grant a live capability.
+        """
+        if not dry_run:
             raise ExecutorError(
-                "executor is not armed; run the arming runbook first "
-                "(docs/ops/FEE_EXECUTOR_RUNBOOK.md)")
+                "live conversion is blocked: no canonical release/approval "
+                "contract or owner-approved onchain capability exists")
+
+        oid = plan["obligation_id"]
+        token_out = plan["quote"]["token_out"]
 
         mode = "dry_run" if dry_run else "live"
         logger.info("executing conversion %s (%s)", oid, mode)
-        self.ledger.transition(oid, STATUS_EXECUTING, {"mode": mode})
+        # Dry-runs are simulations, not durable progress.  Live execution is
+        # denied above, so this method must not leave an obligation executing.
 
         try:
             for step in plan["txs"]:
@@ -650,6 +656,10 @@ class FeeConversionExecutor:
                          wait_for_receipt: WaitForReceipt,
                          dry_run: bool) -> None:
         """Build the treasury forward from the VERIFIED post-swap balance."""
+        if not dry_run:
+            raise ExecutorError(
+                "live conversion is blocked: no canonical release/approval "
+                "contract or owner-approved onchain capability exists")
         if dry_run:
             logger.info("[dry-run] forward_to_treasury: balance check skipped")
             return

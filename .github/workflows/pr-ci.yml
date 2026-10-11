@@ -1,22 +1,11 @@
 name: PR checks
 
-# Cheap gate: ruff + inbound pytest + forge build when onchain/lib exists.
-# GitHub Actions billing was previously locked (see ci.yml workflow_dispatch).
-# This workflow is small enough to re-enable on pull_request.
+# Commit/PR gate: focused Python safety tests plus an unconditional local P24
+# Foundry test. Actual runs still depend on repository Actions/billing availability.
 
 on:
+  push:
   pull_request:
-    paths:
-      - "src/sincor2/**"
-      - "tests/**"
-      - "onchain/**"
-      - ".github/workflows/pr-ci.yml"
-      - "requirements.txt"
-      - "pyproject.toml"
-      - "TOKEN_CANON.json"
-      - "TOKEN_CANON.md"
-      - "launch_content_engine/**"
-      - "templates/**"
   workflow_dispatch:
 
 permissions:
@@ -36,7 +25,7 @@ jobs:
           pip install ruff pytest
           pip install -r requirements.txt
       - name: Ruff
-        run: ruff check src/sincor2/mvp_app.py src/sincor2/mvp_blueprints src/sincor2/a2a_inbound.py src/sincor2/contract_net.py tests/pytest/test_a2a_inbound.py
+        run: ruff check src/sincor2/mvp_app.py src/sincor2/mvp_blueprints src/sincor2/a2a_inbound.py src/sincor2/contract_net.py src/sincor2/treasury_policy.py tests/pytest/test_a2a_inbound.py tests/pytest/test_ct01_p24_deploy_no_live.py gen_tasks.py
       - name: Pytest (inbound + money surface + boot pin)
         env:
           PYTHONPATH: src:.
@@ -46,13 +35,19 @@ jobs:
           ADMIN_USERNAME: admin
           ADMIN_PASSWORD: admin-password-32-char-minimum-ok
           SINCOR_TASK_QUEUE: eager
-        run: python -m pytest tests/pytest/test_a2a_inbound.py tests/pytest/test_mvp_p0_456.py tests/pytest/test_onchain_constants.py tests/pytest/test_live_onchain_snapshot.py tests/pytest/test_import_all_and_http_smoke.py -q
+        run: python -m pytest tests/pytest/test_a2a_inbound.py tests/pytest/test_mvp_p0_456.py tests/pytest/test_onchain_constants.py tests/pytest/test_live_onchain_snapshot.py tests/pytest/test_import_all_and_http_smoke.py tests/pytest/test_ct01_p24_deploy_no_live.py tests/pytest/test_fee_conversion_executor.py tests/pytest/test_treasury_policy_failclosed.py -q
 
   forge:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install pinned forge-std for P24 local safety test
+        working-directory: onchain
+        run: forge install foundry-rs/forge-std@v1.9.7 --no-git
+      - name: P24 local simulation safety regression (required)
+        working-directory: onchain
+        run: FOUNDRY_PROFILE=p24 forge test --offline --match-path test/p24/P24Deploy.t.sol -vv
       - name: forge build
         working-directory: onchain
         run: |
@@ -64,7 +59,7 @@ jobs:
       - name: forge test (when libs present)
         working-directory: onchain
         run: |
-          if [ -d lib/forge-std ] || [ -d lib/v4-core ]; then
+          if [ -d lib/v4-core ]; then
             forge test --no-match-path '*fork*' -q
           else
             echo "onchain/lib not vendored — skipping forge test"

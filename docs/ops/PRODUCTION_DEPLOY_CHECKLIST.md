@@ -65,7 +65,7 @@ Every required variable, its source, and what breaks without it.
 | `A2A_STATE_STORE` (`memory\|sqlite\|redis`), unset → sqlite in prod | w15 | default sqlite is fine; set `REDIS_URL` only if Redis wanted |
 | `A2A_STATE_SQLITE_PATH` | w15 | defaults under `SINCOR_DATA_DIR` |
 | `SINCOR_DATA_DIR` | pre-existing (w19 cursor) | fee-listener cursor + shared-state sqlite need a durable dir; on Railway use `/data` |
-| `SINCOR_FEE_EXECUTOR_ARMED` | w19 | **leave unset/`false`** — fail-closed; `true` only in the item-32 arming ceremony |
+| `SINCOR_FEE_EXECUTOR_ARMED` | legacy w19 | **Do not set to `true`** — the flag is ignored and is not authorization. Live fee conversion is denied until a new canonical authorization interface and explicit owner decisions are separately reviewed. |
 | `FEE_LISTENER_*` (cursor path, rpc url, token, recipient, confirmations, poll secs, min wei, fee bps=500, backfill blocks, start block) | w19 | needed only when running the fee-event listener; `FEE_LISTENER_FEE_BPS` must stay 500 (locked 5% policy — the code refuses anything else) |
 | `SINCOR_REGISTRATION_PROOF_REQUIRED=1` | w32 | recommended production posture; off by default — unsigned registrations stay `unverified` instead of being rejected |
 | `STAKE_SLASH_ADDRESS`, `STAKE_RPC_URL`, `STAKE_CHAIN_ID=84532` | w27 | set only after the stake/slash deploy ceremony; `dry_run_onchain_deposit` must be green before any real deposit |
@@ -91,16 +91,16 @@ adjudicator EOA** (founder-held key, never shared). P20 fail-closed flip
 implemented at ceremony time. All 72 matrix tests green before mainnet
 consideration. `[FOUNDER-EXECUTED]`
 
-### 3b. P24 creator-token factory (backlog item 8)
+### 3b. P24 creator-token stack — local simulation only; live deployment held
 
-- [ ] Deploy `CreatorTokenFactory.sol` **from the w12 source** (gained the
-      `ZeroCreator` guard — do not deploy an older artifact) (w12).
-- [ ] P24 factory-admin custody decision by founder (backlog item 13).
-- [ ] P24 content-policy screener identity/key decision (backlog).
-- [ ] Secure Vault/forwarder vs relayer/multisig decision (backlog).
-- [ ] Release-or-retain P24 live block (backlog).
-- [ ] P24 wiring is deployed dry-run-only until broadcast authorization
-      (w05, w08, w11). `[FOUNDER-EXECUTED]` for any broadcast.
+- [x] Validate constructor plumbing and execute the deploy script only in the
+      in-memory Foundry test EVM. This is not deployment evidence.
+- [ ] Do not fund a P24 wallet, broadcast, verify contracts, or create a live
+      deployment manifest under the current decision. `onchain/script/07_DeployP24.s.sol`
+      has no signer/broadcast hook and is local simulation only.
+- [ ] Any future live P24 deployment requires a separate owner authorization,
+      reviewed custody/role decisions, source-pinned contract review, and a
+      separately approved deployment runbook. No step here authorizes it.
 
 ### 3c. StakeSlashManager (w27 `docs/ops/STAKE_SLASH_DEPLOY_RUNBOOK.md`)
 
@@ -120,13 +120,17 @@ consideration. `[FOUNDER-EXECUTED]`
       `stake_bridge.canonicalize_signature()` — ~50% of naive signatures
       revert otherwise. `[FOUNDER-EXECUTED]`
 
-### 3d. Fee-executor arming (backlog item 32 — founder call, not authorized)
+### 3d. Fee executor — live conversion disabled; no arming ceremony
 
-Per `docs/ops/FEE_EXECUTOR_RUNBOOK.md` (w19): dedicated forwarder EOA (key
-in Secure Vault only), pool-key discovery + pinning (never the rogue SINC
-V2 pool), fork-simulated calldata, `SINCOR_FEE_EXECUTOR_ARMED=true` only
-after all sign-offs. **The listener may run read-only before arming; the
-executor must stay disarmed.**
+- [x] The executor rejects `dry_run=False` before signer, receipt, or broadcast
+      callbacks. The legacy `armed` configuration and
+      `SINCOR_FEE_EXECUTOR_ARMED` variable are not authorization.
+- [ ] Do not provision/custody a forwarder key, fund a conversion wallet, set
+      an armed flag, sign, broadcast, or conduct a dust conversion.
+- [ ] Reconsideration requires a separate owner decision and independently
+      reviewed authorization design covering allowlists, limits, approvers,
+      expiry/replay protection, receipt ownership, monitoring, and rollback.
+      Until then, only synthetic tests and read-only research are in scope.
 
 ## Phase 4 — Founder decisions still open (block deployment completeness)
 
@@ -155,8 +159,9 @@ From gap-audit + merge plan §9:
 - [ ] Liveness pass exit 0 (`liveness/runner.py --once`); heartbeats 200
       (proves `AGENT_HEARTBEAT_TOKEN` match).
 - [ ] Pool admin route reachable with `X-Admin-Key` (proves `ADMIN_PASSWORD`).
-- [ ] Fee-listener cursor advancing (if listener enabled); executor still
-      reports `converted=False` with reason until armed.
+- [ ] Fee-listener cursor advancing (if listener enabled); pending obligations
+      do not trigger conversion, and treasury policy remains `converted=False`
+      regardless of legacy armed configuration.
 - [ ] Basescan watch: first realized platform-fee ledger entries (standing
       monitoring rule); zero realized fees = failure signal.
 - [ ] `/data` volume mounted on Railway (deploy log line "Mounting volume
