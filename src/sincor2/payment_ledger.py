@@ -964,6 +964,9 @@ class PaymentLedgerStore:
                 ingested.
             MalformedTxHashError: the record carries an empty/malformed
                 tx hash.  Fail closed — the record is NOT ingested.
+            MissingTxHashError: an onchain provider's record arrives already
+                in a verified-or-later state without a tx hash.  Fail closed
+                at the ingest seam (W-73), same as the transition methods.
             DuplicatePaymentError: if the tx_hash (or payment_id)
                 was already ingested — this is the double-ingest guard.
         """
@@ -976,6 +979,17 @@ class PaymentLedgerStore:
             tx_hash_norm = normalize_tx_hash(raw_tx_hash)
             if tx_hash_norm != raw_tx_hash:
                 record.provider_evidence["tx_hash"] = tx_hash_norm
+        # W-73: close the ingest seam.  Records may arrive already sitting
+        # in a verified-or-later state (replayed history, external imports),
+        # so the hash-required guard must run here too — not only on live
+        # transitions.  The finality gate is bypassed on purpose: ingest
+        # persists claimed state and cannot re-run the finality checker's
+        # chain lookup (a planted finality_confirmed flag would render that
+        # check theater), and honest snapshot restores of settled records
+        # must keep working.
+        self._enforce_evidence_guards(
+            record, record.state, allow_finality_bypass=True
+        )
         conn = self._connect()
         try:
             conn.execute("BEGIN IMMEDIATE")
