@@ -14,8 +14,10 @@ SAFETY (fail-closed):
 - max_payment_usd cap per call (default $0.10). Any 402 demanding more
   raises PaymentCapExceeded and NO signature is produced.
 - No auto-retry on ambiguous payments: if the retry response is not a
-  clear 200 or 402, raise AmbiguousPayment instead of retrying blindly
-  (a retry could double-pay).
+  clear 200 or 402, raise AmbiguousPayment instead of retrying blindly.
+  A caller-driven retry of the same logical payment reuses the in-flight
+  signed authorization (W-75 journal) — never a fresh nonce — so it cannot
+  double-pay.
 - Paid-leg transport errors (timeouts, dropped responses) AFTER the
   signed payment has been sent — or at any point where delivery cannot
   be disproven — raise AmbiguousPayment, never a retryable error: the
@@ -38,6 +40,7 @@ from __future__ import annotations
 import json
 import secrets
 import socket
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -189,6 +192,15 @@ class X402Buyer:
         self._signer_fn = signer_fn
         self.max_payment_usd = max_payment_usd
         self.timeout_seconds = timeout_seconds
+        # W-75: payment-attempt journal.  Maps a resource URL to the
+        # (requirements, signed authorization) of the last attempt whose
+        # outcome was ambiguous (or transport-failed after signing).  A
+        # retry of the SAME logical payment reuses the in-flight signed
+        # bytes instead of minting a fresh nonce — the onchain nonce can
+        # only be spent once, so reuse can never double-pay, while a
+        # fresh signature would create a second spendable authorization.
+        self._inflight: dict[str, tuple[PaymentRequirements, SignedPayment]] = {}
+        self._journal_lock = threading.Lock()
 
     # -- 402 parsing ----------------------------------------------------
 
@@ -313,6 +325,56 @@ class X402Buyer:
             raise X402BuyerError("signer_fn did not return 0x signature")
         return SignedPayment(signature=str(signature), authorization=message)
 
+    # -- payment-attempt journal (W-75) -------------------------------------
+
+    @staticmethod
+    def _same_logical_payment(
+        req: PaymentRequirements, journaled: PaymentRequirements
+    ) -> bool:
+        """True when two challenges describe the same logical payment.
+
+        Same recipient, amount, asset, and network.  A changed price or
+        recipient is a NEW payment and must be signed fresh.
+        """
+        return (
+            req.pay_to == journaled.pay_to
+            and req.amount_atomic == journaled.amount_atomic
+            and req.asset == journaled.asset
+            and req.network == journaled.network
+        )
+
+    def _reuse_inflight(
+        self, url: str, req: PaymentRequirements
+    ) -> Optional[SignedPayment]:
+        """Return the in-flight signed authorization for a retry, if any.
+
+        Returns None when there is no journaled attempt for this URL, when
+        the new challenge describes a different logical payment, or when
+        the journaled authorization has expired (validBefore in the past) —
+        in all of which the caller must sign fresh.
+        """
+        with self._journal_lock:
+            entry = self._inflight.get(url)
+        if entry is None:
+            return None
+        journaled_req, signed = entry
+        if not self._same_logical_payment(req, journaled_req):
+            return None
+        valid_before = int(signed.authorization.get("validBefore") or 0)
+        if valid_before and valid_before <= int(time.time()):
+            return None
+        return signed
+
+    def _record_inflight(
+        self, url: str, req: PaymentRequirements, signed: SignedPayment
+    ) -> None:
+        with self._journal_lock:
+            self._inflight[url] = (req, signed)
+
+    def _clear_inflight(self, url: str) -> None:
+        with self._journal_lock:
+            self._inflight.pop(url, None)
+
     # -- HTTP ---------------------------------------------------------
 
     def _do_request(
@@ -380,8 +442,10 @@ class X402Buyer:
         - :class:`PaymentTransportError`: safe to retry — no payment was
           made or could have been made.
         - :class:`AmbiguousPayment`: payment state UNKNOWN — do NOT retry
-          blindly; reconcile payment status first (a retry re-signs a fresh
-          authorization and can double-pay).
+          blindly; reconcile payment status first.  If you must retry the
+          same logical payment, this method reuses the in-flight signed
+          authorization (W-75) instead of minting a fresh nonce, so the
+          retry can never create a second spendable authorization.
         """
         # --- unpaid leg: no signature exists yet, so ANY transport failure
         # is safe to retry.
@@ -417,7 +481,14 @@ class X402Buyer:
                     continue
 
         req = self.parse_402(challenge_body)
-        signed = self.sign_authorization(req)
+        # W-75: on retry of the same logical payment, reuse the in-flight
+        # signed authorization instead of minting a fresh nonce.  The
+        # onchain nonce can only be spent once, so reuse is double-pay
+        # safe; a fresh signature would be a second spendable authorization.
+        signed = self._reuse_inflight(url, req)
+        if signed is None:
+            signed = self.sign_authorization(req)
+            self._record_inflight(url, req, signed)
 
         payment_header = json.dumps(
             {
@@ -433,8 +504,9 @@ class X402Buyer:
         # --- paid leg: the signed authorization now exists. A transport
         # error here is AMBIGUOUS unless the transport proves nothing was
         # sent: the payment may have settled server-side before the error.
-        # Retrying would re-sign a FRESH authorization (fresh nonce) and can
-        # double-pay. Never auto-retry; the caller must reconcile first.
+        # A caller-driven retry reuses the in-flight authorization (W-75),
+        # never a fresh nonce. Never auto-retry; the caller must reconcile
+        # first.
         try:
             status2, _, raw2 = self._do_request(
                 url,
@@ -455,6 +527,9 @@ class X402Buyer:
             ) from exc
 
         if status2 == 200:
+            # Paid leg settled: the logical payment is complete — drop the
+            # journal entry so a later, genuinely new payment signs fresh.
+            self._clear_inflight(url)
             return {
                 "ok": True,
                 "paid": True,
