@@ -39,7 +39,12 @@ BOUNTY = 1.5
 
 @pytest.fixture
 def client(tmp_path):
+    from sincor2.a2a_rate_limits import reset_a2a_limits
+
     reset_fabric()
+    # Registration is rate-limited via a module-global enforcer; reset it
+    # for per-test isolation (test hook provided by a2a_rate_limits).
+    reset_a2a_limits()
     reset_stake_ledger(path=str(tmp_path / "stake.json"))
     app = Flask(__name__)
     register_inbound(app)

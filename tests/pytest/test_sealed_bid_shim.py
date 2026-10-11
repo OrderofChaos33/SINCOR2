@@ -22,9 +22,13 @@ from sincor2.contract_net import calculate_bid_score
 @pytest.fixture
 def client(tmp_path):
     from sincor2.a2a_inbound import reset_fabric
+    from sincor2.a2a_rate_limits import reset_a2a_limits
     from sincor2.onchain.stake_ledger import reset_stake_ledger
 
     reset_fabric()
+    # Registration is rate-limited (register policy, 3600s window); the
+    # limiter is module-global, so reset it for per-test isolation.
+    reset_a2a_limits()
     # Stake enforcement is active: each test gets an isolated ledger.
     reset_stake_ledger(path=str(tmp_path / "stake.json"))
     app = Flask(__name__)
