@@ -5,7 +5,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "spec",
   "title": "Draft MEV protection and capture architecture spec",
-  "description": "Deliverable: docs/p04/ARCHITECTURE.md covering the MEV taxonomy (sandwich, backrun, JIT-adjacent flow), the detection model over MoebiusMEVHook flow data (beforeSwap/afterSwap transient metering), the agent bidding module (searcher-style backrun capture with a proceeds-funded bidder EOA), capture routing to treasury (20 bps + residual, pull-based), and the no_treasury_key enforcement boundary (code deny-list + deploy assertion + CI grep + adversarial tests). Acceptance criteria: (1) spec ratifies the catalog gates — flow_threshold ($1,000 notional AND 50 bps impact per block) and no_treasury_key — with numeric thresholds; (2) trust-boundary diagram proves the treasury EOA is never a signer on any path; (3) worked capture example shows 1.0 ETH-equivalent → 0.002 ETH fee + 0.998 ETH residual to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Numeric constraints: detection false-positive budget ≤ 5%; hot-path gas ≤ 5,000/swap. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: docs/p04/ARCHITECTURE.md covering the MEV taxonomy (sandwich, backrun, JIT-adjacent flow), the detection model over MoebiusMEVHook flow data (beforeSwap/afterSwap transient metering), the agent bidding module (searcher-style backrun capture with a proceeds-funded bidder EOA), capture routing to treasury (20 bps + residual, pull-based), and the no_treasury_key enforcement boundary (code deny-list + deploy assertion + CI grep + adversarial tests). Acceptance criteria: (1) spec ratifies the catalog gates \u2014 flow_threshold ($1,000 notional AND 50 bps impact per block) and no_treasury_key \u2014 with numeric thresholds; (2) trust-boundary diagram proves the treasury EOA is never a signer on any path; (3) worked capture example shows 1.0 ETH-equivalent \u2192 0.002 ETH fee + 0.998 ETH residual to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Numeric constraints: detection false-positive budget \u2264 5%; hot-path gas \u2264 5,000/swap. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-architecture-spec",
   "tags": [
    "defi",
@@ -22,7 +22,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "spec",
   "title": "Define hook and bidding interfaces",
-  "description": "Deliverable: onchain/src/hooks/IMEVCaptureHook.sol (capture accounting: recordCapture, claimCapture; distribution claims; events CaptureRecorded, CaptureClaimed) and src/sincor2/defi/p04/interfaces.py (flow-event schema, bid-strategy interface, capture-estimate model) — frozen before core. Acceptance criteria: (1) Solidity compiles under solc 0.8.24; (2) Python is mypy-clean; (3) every downstream core module imports these interfaces (no duplicate signatures); (4) interfaces frozen — later changes require a spec amendment. Numeric constraints: event fields fixed-width for indexing; estimate model expresses amounts in wei and bps. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: onchain/src/hooks/IMEVCaptureHook.sol (capture accounting: recordCapture, claimCapture; distribution claims; events CaptureRecorded, CaptureClaimed) and src/sincor2/defi/p04/interfaces.py (flow-event schema, bid-strategy interface, capture-estimate model) \u2014 frozen before core. Acceptance criteria: (1) Solidity compiles under solc 0.8.24; (2) Python is mypy-clean; (3) every downstream core module imports these interfaces (no duplicate signatures); (4) interfaces frozen \u2014 later changes require a spec amendment. Numeric constraints: event fields fixed-width for indexing; estimate model expresses amounts in wei and bps. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-interface-definitions",
   "tags": [
    "defi",
@@ -42,7 +42,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "spec",
   "title": "Specify economic and capture model",
-  "description": "Deliverable: docs/p04/ECONOMICS.md — 20 bps protocol fee on captured MEV routed to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac; capture-estimate methodology from hook flow (attributable vs noise, with the $1,000/50 bps threshold); bidder profit-share split (residual funds the bidder float; surplus beyond the 20% float cap routes to treasury); flow_threshold economics (minimum profitable capture given the 3× gas shading rule). Acceptance criteria: (1) worked sandwich-capture example with fee math to the wei; (2) break-even table showing minimum capture size vs gas price tiers (5/20/100 gwei); (3) target 9% APR on bidder float derived from modeled capture frequency. Numeric constraints: fee 20 bps; shading 3×. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: docs/p04/ECONOMICS.md \u2014 20 bps protocol fee on captured MEV routed to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac; capture-estimate methodology from hook flow (attributable vs noise, with the $1,000/50 bps threshold); bidder profit-share split (residual funds the bidder float; surplus beyond the 20% float cap routes to treasury); flow_threshold economics (minimum profitable capture given the 3\u00d7 gas shading rule). Acceptance criteria: (1) worked sandwich-capture example with fee math to the wei; (2) break-even table showing minimum capture size vs gas price tiers (5/20/100 gwei); (3) target 9% APR on bidder float derived from modeled capture frequency. Numeric constraints: fee 20 bps; shading 3\u00d7. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-economic-fee-model",
   "tags": [
    "defi",
@@ -62,7 +62,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "scaffold",
   "title": "Create repo layout and stub interfaces",
-  "description": "Deliverable: onchain/src/hooks/p04/, src/sincor2/defi/p04/, agents/defi/p04/, tests/pytest/test_p04_*.py stubs, docs/p04/; agent YAML skeleton agents/defi/p04/mev_bidder.yaml (name, budgets, flow_threshold, gas ceiling per repo convention). Acceptance criteria: (1) tree committed; stubs compile/collect with zero errors; (2) YAML skeleton validates; (3) CI lints pass. Numeric constraints: YAML pins flow_threshold $1,000/50 bps and the treasury deny-list entry from day one. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: onchain/src/hooks/p04/, src/sincor2/defi/p04/, agents/defi/p04/, tests/pytest/test_p04_*.py stubs, docs/p04/; agent YAML skeleton agents/defi/p04/mev_bidder.yaml (name, budgets, flow_threshold, gas ceiling per repo convention). Acceptance criteria: (1) tree committed; stubs compile/collect with zero errors; (2) YAML skeleton validates; (3) CI lints pass. Numeric constraints: YAML pins flow_threshold $1,000/50 bps and the treasury deny-list entry from day one. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-repo-scaffold",
   "tags": [
    "defi",
@@ -81,7 +81,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "scaffold",
   "title": "Write boilerplate starter code",
-  "description": "Deliverable: MEVCaptureHook.sol boilerplate extending MoebiusMEVHook with ReentrancyGuard + SafeERC20 and non-bricking try/catch around capture accounting; Python package with flow-listener skeleton and TOA hooks; SignerRegistry stub with the treasury deny-list wired from config. Acceptance criteria: (1) forge build succeeds; (2) pytest collects with zero import errors; (3) no unresolved stub markers in public function bodies (grep-verified in CI). Numeric constraints: none yet; structure only. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: MEVCaptureHook.sol boilerplate extending MoebiusMEVHook with ReentrancyGuard + SafeERC20 and non-bricking try/catch around capture accounting; Python package with flow-listener skeleton and TOA hooks; SignerRegistry stub with the treasury deny-list wired from config. Acceptance criteria: (1) forge build succeeds; (2) pytest collects with zero import errors; (3) no unresolved stub markers in public function bodies (grep-verified in CI). Numeric constraints: none yet; structure only. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-boilerplate-starter",
   "tags": [
    "defi",
@@ -100,7 +100,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "core",
   "title": "Implement MEV capture hook skeleton",
-  "description": "Deliverable: onchain/src/hooks/p04/MEVCaptureHook.sol extending MoebiusMEVHook — beforeSwap/afterSwap flow metering into EIP-1153 transient storage, per-block flow ledger keyed by (blockHash, poolId), capture accounting vault (ERC-6909 claims / ERC-20 escrow). Acceptance criteria: (1) compiles under solc 0.8.24; (2) deploys against the V4 PoolManager on a local fork (Base PoolManager 0x498581ff718922c3f8e6a244956af099b2652b2b referenced for mainnet fork); (3) flow events emitted per swap with correct before/after sqrtPriceX96. Numeric constraints: metering overhead ≤ 5,000 gas per swap; hook address mined with correct beforeSwap+afterSwap permission bits. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: onchain/src/hooks/p04/MEVCaptureHook.sol extending MoebiusMEVHook \u2014 beforeSwap/afterSwap flow metering into EIP-1153 transient storage, per-block flow ledger keyed by (blockHash, poolId), capture accounting vault (ERC-6909 claims / ERC-20 escrow). Acceptance criteria: (1) compiles under solc 0.8.24; (2) deploys against the V4 PoolManager on a local fork (Base PoolManager 0x498581ff718922c3f8e6a244956af099b2652b2b referenced for mainnet fork); (3) flow events emitted per swap with correct before/after sqrtPriceX96. Numeric constraints: metering overhead \u2264 5,000 gas per swap; hook address mined with correct beforeSwap+afterSwap permission bits. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-hook-skeleton",
   "tags": [
    "defi",
@@ -120,7 +120,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "core",
   "title": "Implement MEV flow detection in afterSwap",
-  "description": "Deliverable: sandwich/backrun detection in afterSwap using transient (EIP-1153) state — sandwich signature: same-block A→V→B pattern with shared sender/funding relation, victim impact > 50 bps, B reversing A; backrun signature: large displacement (> 50 bps) followed by an arbitrage-shaped reversal capturing ≥ 30% of it; flow_threshold gate ($1,000 notional AND 50 bps impact per block) filters noise. Acceptance criteria: (1) detection battery on historical fixtures — known sandwiches flagged, organic volatility not flagged; (2) precision ≥ 90%, recall ≥ 80%, false positives ≤ 5%; (3) sub-threshold flow emits no bid intent. Numeric constraints: thresholds as specified. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: sandwich/backrun detection in afterSwap using transient (EIP-1153) state \u2014 sandwich signature: same-block A\u2192V\u2192B pattern with shared sender/funding relation, victim impact > 50 bps, B reversing A; backrun signature: large displacement (> 50 bps) followed by an arbitrage-shaped reversal capturing \u2265 30% of it; flow_threshold gate ($1,000 notional AND 50 bps impact per block) filters noise. Acceptance criteria: (1) detection battery on historical fixtures \u2014 known sandwiches flagged, organic volatility not flagged; (2) precision \u2265 90%, recall \u2265 80%, false positives \u2264 5%; (3) sub-threshold flow emits no bid intent. Numeric constraints: thresholds as specified. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-flow-detection",
   "tags": [
    "defi",
@@ -140,7 +140,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "core",
   "title": "Build proceeds-funded agent bidding module",
-  "description": "Deliverable: src/sincor2/defi/p04/bidder.py — consumes FlowFlagged events, computes expected capture (estimated arb profit − gas), applies the bid-shading rule (expected_net ≥ 3× gas_cost else stand down), submits defensive backruns via a private-mempool relay from a dedicated bidder EOA funded only from captured proceeds (initial float ≤ 20% of tick capital, min $100). The module NEVER uses the treasury EOA — enforced by a code-level signer deny-list plus config assertion. Includes nonce management, exponential-backoff retries, and TOA telemetry hooks. Acceptance criteria: (1) bidder captures a scripted sandwich flow on fork with positive net PnL; (2) config test proves the treasury address is absent from the signer set; (3) sub-threshold flow produces zero bids. Numeric constraints: shading 3×; float cap 20%; estimate-vs-actual ≤ 1%. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: src/sincor2/defi/p04/bidder.py \u2014 consumes FlowFlagged events, computes expected capture (estimated arb profit \u2212 gas), applies the bid-shading rule (expected_net \u2265 3\u00d7 gas_cost else stand down), submits defensive backruns via a private-mempool relay from a dedicated bidder EOA funded only from captured proceeds (initial float \u2264 20% of tick capital, min $100). The module NEVER uses the treasury EOA \u2014 enforced by a code-level signer deny-list plus config assertion. Includes nonce management, exponential-backoff retries, and TOA telemetry hooks. Acceptance criteria: (1) bidder captures a scripted sandwich flow on fork with positive net PnL; (2) config test proves the treasury address is absent from the signer set; (3) sub-threshold flow produces zero bids. Numeric constraints: shading 3\u00d7; float cap 20%; estimate-vs-actual \u2264 1%. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-agent-bidding",
   "tags": [
    "defi",
@@ -160,7 +160,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "core",
   "title": "Implement capture routing to treasury",
-  "description": "Deliverable: capture routing — 20 bps protocol fee plus 100% residual capture to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac via pull-based claimCapture() (non-bricking per claimant); capture estimate ledger reconciled against actual receipts with |estimate − actual| / actual ≤ 1%, breaches decaying the bidder's confidence weight. Acceptance criteria: (1) routing test — captured 1.0 ETH-equivalent yields exactly 0.002 ETH fee + 0.998 ETH residual claimable by treasury; (2) reconciliation within 1% on fork fixtures; (3) a reverting claimant does not block other claimants. Numeric constraints: fee exactly 20 bps; reconciliation tolerance 1%. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: capture routing \u2014 20 bps protocol fee plus 100% residual capture to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac via pull-based claimCapture() (non-bricking per claimant); capture estimate ledger reconciled against actual receipts with |estimate \u2212 actual| / actual \u2264 1%, breaches decaying the bidder's confidence weight. Acceptance criteria: (1) routing test \u2014 captured 1.0 ETH-equivalent yields exactly 0.002 ETH fee + 0.998 ETH residual claimable by treasury; (2) reconciliation within 1% on fork fixtures; (3) a reverting claimant does not block other claimants. Numeric constraints: fee exactly 20 bps; reconciliation tolerance 1%. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-capture-routing",
   "tags": [
    "defi",
@@ -181,7 +181,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "core",
   "title": "Enforce no-treasury-key invariant at every layer",
-  "description": "Deliverable: code-level no_treasury_key enforcement — SignerRegistry deny-listing the treasury EOA (0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac) checked at every signing call; deployment script asserting the treasury address appears in zero signer fields; CI job grepping all configs/YAMLs for the treasury address in any key/signer field (build fails on hit); hook verified to contain no delegatecall/selfdestruct paths. Documented in docs/p04/TRUST_BOUNDARY.md. Acceptance criteria: (1) adversarial suite attempts treasury-key usage from every module (hook, bidder, deploy script, config) and all fail closed; (2) CI grep test passes; (3) TRUST_BOUNDARY.md states the guarantee precisely. Numeric constraints: zero exceptions — the deny-list has no bypass path. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: code-level no_treasury_key enforcement \u2014 SignerRegistry deny-listing the treasury EOA (0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac) checked at every signing call; deployment script asserting the treasury address appears in zero signer fields; CI job grepping all configs/YAMLs for the treasury address in any key/signer field (build fails on hit); hook verified to contain no delegatecall/selfdestruct paths. Documented in docs/p04/TRUST_BOUNDARY.md. Acceptance criteria: (1) adversarial suite attempts treasury-key usage from every module (hook, bidder, deploy script, config) and all fail closed; (2) CI grep test passes; (3) TRUST_BOUNDARY.md states the guarantee precisely. Numeric constraints: zero exceptions \u2014 the deny-list has no bypass path. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-no-treasury-key",
   "tags": [
    "defi",
@@ -201,7 +201,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "core",
   "title": "Implement user protection rules",
-  "description": "Deliverable: protective execution for opted-in orders (hookData flag) — slippage guardrail reverting fills worse than 100 bps vs the quoted price, private-mempool routing hints for protected orders, automatic revert of the fill if the hook flagged the block as toxic before the user's swap executed. Acceptance criteria: (1) protected-order fixture shows sandwich loss reduced ≥ 80% vs the unprotected baseline in fork replay; (2) guardrail revert triggers correctly at 100 bps deviation; (3) non-opted-in orders are unaffected (zero behavior change). Numeric constraints: guardrail 100 bps; loss reduction ≥ 80%. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: protective execution for opted-in orders (hookData flag) \u2014 slippage guardrail reverting fills worse than 100 bps vs the quoted price, private-mempool routing hints for protected orders, automatic revert of the fill if the hook flagged the block as toxic before the user's swap executed. Acceptance criteria: (1) protected-order fixture shows sandwich loss reduced \u2265 80% vs the unprotected baseline in fork replay; (2) guardrail revert triggers correctly at 100 bps deviation; (3) non-opted-in orders are unaffected (zero behavior change). Numeric constraints: guardrail 100 bps; loss reduction \u2265 80%. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-protection-rules",
   "tags": [
    "defi",
@@ -221,7 +221,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "core",
   "title": "Access control and edge-case handling",
-  "description": "Deliverable: access control (BIDDER_ROLE, GUARDIAN_ROLE) plus edge-case handling — empty-capture blocks (no-ops logged), reorged flow events (idempotent accounting keyed by blockHash/poolId/txIndex — replay is a safe no-op), bidder EOA depletion below the 2× gas-reserve floor (graceful stand-down, never touches any treasury-adjacent key), gas-price spikes (bid shading tightens: expected_net ≥ 3× gas). Acceptance criteria: (1) unauthorized bid reverts; (2) reorg replay leaves ledger balances unchanged; (3) depleted bidder emits stand-down and builds zero transactions; (4) every edge case has a dedicated test. Numeric constraints: gas-reserve floor 2× gas ceiling; shading rule 3×. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: access control (BIDDER_ROLE, GUARDIAN_ROLE) plus edge-case handling \u2014 empty-capture blocks (no-ops logged), reorged flow events (idempotent accounting keyed by blockHash/poolId/txIndex \u2014 replay is a safe no-op), bidder EOA depletion below the 2\u00d7 gas-reserve floor (graceful stand-down, never touches any treasury-adjacent key), gas-price spikes (bid shading tightens: expected_net \u2265 3\u00d7 gas). Acceptance criteria: (1) unauthorized bid reverts; (2) reorg replay leaves ledger balances unchanged; (3) depleted bidder emits stand-down and builds zero transactions; (4) every edge case has a dedicated test. Numeric constraints: gas-reserve floor 2\u00d7 gas ceiling; shading rule 3\u00d7. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-access-edge-cases",
   "tags": [
    "defi",
@@ -242,7 +242,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "testing",
   "title": "Write unit tests for hook and bidder",
-  "description": "Deliverable: Foundry tests for flow detection and capture accounting; pytest for bidder strategy, signer deny-list enforcement, and estimate math. Acceptance criteria: (1) 24/24 pass; (2) no-treasury-key adversarial tests included; (3) each test names the invariant it guards. Numeric constraints: detection thresholds tested at boundary (49/50/51 bps); fee math exact to 1 wei. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: Foundry tests for flow detection and capture accounting; pytest for bidder strategy, signer deny-list enforcement, and estimate math. Acceptance criteria: (1) 24/24 pass; (2) no-treasury-key adversarial tests included; (3) each test names the invariant it guards. Numeric constraints: detection thresholds tested at boundary (49/50/51 bps); fee math exact to 1 wei. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-unit-tests",
   "tags": [
    "defi",
@@ -262,7 +262,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "testing",
   "title": "Write integration tests: attack to capture",
-  "description": "Deliverable: local V4 pool + scripted sandwich attacker + hook + bidder agent — full cycle detect → bid → capture → route to treasury; tests assert treasury receipts match estimates within 1% and the 20 bps fee is exact. Acceptance criteria: (1) full cycle completes end-to-end; (2) treasury receipts equal estimate ± 1%; (3) suite green in CI; (4) no_treasury_key adversarial cases included in the integration run. Numeric constraints: fixture capture 1.0 ETH-equivalent; fee 0.002 ETH exact. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: local V4 pool + scripted sandwich attacker + hook + bidder agent \u2014 full cycle detect \u2192 bid \u2192 capture \u2192 route to treasury; tests assert treasury receipts match estimates within 1% and the 20 bps fee is exact. Acceptance criteria: (1) full cycle completes end-to-end; (2) treasury receipts equal estimate \u00b1 1%; (3) suite green in CI; (4) no_treasury_key adversarial cases included in the integration run. Numeric constraints: fixture capture 1.0 ETH-equivalent; fee 0.002 ETH exact. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-integration-tests",
   "tags": [
    "defi",
@@ -282,7 +282,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "testing",
   "title": "Invariant and fuzz tests",
-  "description": "Deliverable: Foundry invariant suite + docs/p04/INVARIANTS.md — (a) captured accounting == distributed + fees (±1 wei); (b) treasury EOA never signs under fuzzed signer configs (all rejected); (c) honest swap value unaffected by detection (no balance drift for non-flagged swaps); (d) flow ledger idempotent under reorg replay. Acceptance criteria: (1) 10,000 runs per invariant, zero counterexamples; (2) any counterexample fixed and recorded; (3) INVARIANTS.md documents each bound. Numeric constraints: 10k runs; accounting identity to 1 wei. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: Foundry invariant suite + docs/p04/INVARIANTS.md \u2014 (a) captured accounting == distributed + fees (\u00b11 wei); (b) treasury EOA never signs under fuzzed signer configs (all rejected); (c) honest swap value unaffected by detection (no balance drift for non-flagged swaps); (d) flow ledger idempotent under reorg replay. Acceptance criteria: (1) 10,000 runs per invariant, zero counterexamples; (2) any counterexample fixed and recorded; (3) INVARIANTS.md documents each bound. Numeric constraints: 10k runs; accounting identity to 1 wei. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-invariant-fuzz",
   "tags": [
    "defi",
@@ -302,7 +302,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "testing",
   "title": "Fork simulation on historical MEV flow",
-  "description": "Deliverable: fork Base at a pinned block; replay blocks with known sandwich/backrun activity; measure detection precision/recall, capture rate, and bidder PnL net of gas; publish docs/p04/FORK_SIM.md. Acceptance criteria: (1) report records pinned block range, precision/recall numbers, gross capture, gas spent, and net PnL; (2) net PnL positive across the replayed window; (3) replay is re-runnable from the documented block pins. Numeric constraints: block pins documented; PnL broken down per capture. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: fork Base at a pinned block; replay blocks with known sandwich/backrun activity; measure detection precision/recall, capture rate, and bidder PnL net of gas; publish docs/p04/FORK_SIM.md. Acceptance criteria: (1) report records pinned block range, precision/recall numbers, gross capture, gas spent, and net PnL; (2) net PnL positive across the replayed window; (3) replay is re-runnable from the documented block pins. Numeric constraints: block pins documented; PnL broken down per capture. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-fork-simulation",
   "tags": [
    "defi",
@@ -322,7 +322,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "audit",
   "title": "Assemble audit-prep package",
-  "description": "Deliverable: docs/p04/AUDIT.md — threat model (bidder key compromise, detection griefing, accounting drift, trust-boundary breach, reorg replay), privileged-role matrix, 100% NatSpec coverage, deployment parameters (flow_threshold, gas ceiling, treasury address), known-limitations list; code frozen with a tagged commit. Acceptance criteria: (1) package passes the repo audit checklist; (2) the trust boundary (treasury EOA never signs) is explicitly reviewed as its own checklist section; (3) every external call annotated trust/no-trust. Numeric constraints: checklist completeness binary. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: docs/p04/AUDIT.md \u2014 threat model (bidder key compromise, detection griefing, accounting drift, trust-boundary breach, reorg replay), privileged-role matrix, 100% NatSpec coverage, deployment parameters (flow_threshold, gas ceiling, treasury address), known-limitations list; code frozen with a tagged commit. Acceptance criteria: (1) package passes the repo audit checklist; (2) the trust boundary (treasury EOA never signs) is explicitly reviewed as its own checklist section; (3) every external call annotated trust/no-trust. Numeric constraints: checklist completeness binary. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-audit-prep",
   "tags": [
    "defi",
@@ -341,7 +341,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "audit",
   "title": "Remediate audit findings",
-  "description": "Deliverable: triaged findings, fixes for all High/Critical, documented accepted risks for Medium/Low, one regression test per finding, docs/p04/FINDINGS.md ledger. Acceptance criteria: (1) auditor sign-off recorded; (2) no open item above Low without written acceptance; (3) the no_treasury_key adversarial suite re-run green after every signing-path change. Numeric constraints: zero open High/Critical. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: triaged findings, fixes for all High/Critical, documented accepted risks for Medium/Low, one regression test per finding, docs/p04/FINDINGS.md ledger. Acceptance criteria: (1) auditor sign-off recorded; (2) no open item above Low without written acceptance; (3) the no_treasury_key adversarial suite re-run green after every signing-path change. Numeric constraints: zero open High/Critical. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-findings-remediation",
   "tags": [
    "defi",
@@ -361,7 +361,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "audit",
   "title": "Gas optimization pass",
-  "description": "Deliverable: profile swap-path metering overhead and claim functions; optimize transient-storage layout and minimize per-swap writes; docs/p04/GAS.md before/after report. Acceptance criteria: (1) ≥ 15% improvement on the swap hot path while staying within the 5,000 gas budget; (2) fuzz suite re-run green with zero behavior change; (3) claim-path gas table published. Numeric constraints: hot-path ceiling 5,000 gas/swap; improvement ≥ 15%. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: profile swap-path metering overhead and claim functions; optimize transient-storage layout and minimize per-swap writes; docs/p04/GAS.md before/after report. Acceptance criteria: (1) \u2265 15% improvement on the swap hot path while staying within the 5,000 gas budget; (2) fuzz suite re-run green with zero behavior change; (3) claim-path gas table published. Numeric constraints: hot-path ceiling 5,000 gas/swap; improvement \u2265 15%. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-gas-optimization",
   "tags": [
    "defi",
@@ -381,7 +381,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "docs",
   "title": "Write technical documentation",
-  "description": "Deliverable: docs/p04/TECHNICAL.md — flow metering model, detection algorithm (both signatures with thresholds), bidding strategy (shading rule, proceeds-only funding), capture accounting, trust boundary with the no-treasury-key guarantee stated precisely. Acceptance criteria: (1) reimplementable from the doc alone; (2) all diagrams current with final code; (3) every numeric parameter from the spec table appears with its enforcing location. Numeric constraints: doc completeness. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: docs/p04/TECHNICAL.md \u2014 flow metering model, detection algorithm (both signatures with thresholds), bidding strategy (shading rule, proceeds-only funding), capture accounting, trust boundary with the no-treasury-key guarantee stated precisely. Acceptance criteria: (1) reimplementable from the doc alone; (2) all diagrams current with final code; (3) every numeric parameter from the spec table appears with its enforcing location. Numeric constraints: doc completeness. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-technical-docs",
   "tags": [
    "defi",
@@ -400,7 +400,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "docs",
   "title": "Ship agent YAML config and ops runbook",
-  "description": "Deliverable: finalized agents/defi/p04/mev_bidder.yaml (budgets, flow_threshold $1,000/50 bps, gas ceiling, key-rotation schedule) plus docs/p04/RUNBOOK.md — bidder funding from proceeds only, API/key rotation ceremony, flow_threshold tuning procedure (±50% guardian bounds), incident response for bidder-key compromise (revoke, rotate, stand-down). Acceptance criteria: (1) agent boots from the YAML with no code changes; (2) runbook rehearsed with logged timestamps, including a simulated key-compromise drill; (3) compromise drill completes rotate-and-resume within 30 minutes on testnet. Numeric constraints: thresholds match the spec table. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: finalized agents/defi/p04/mev_bidder.yaml (budgets, flow_threshold $1,000/50 bps, gas ceiling, key-rotation schedule) plus docs/p04/RUNBOOK.md \u2014 bidder funding from proceeds only, API/key rotation ceremony, flow_threshold tuning procedure (\u00b150% guardian bounds), incident response for bidder-key compromise (revoke, rotate, stand-down). Acceptance criteria: (1) agent boots from the YAML with no code changes; (2) runbook rehearsed with logged timestamps, including a simulated key-compromise drill; (3) compromise drill completes rotate-and-resume within 30 minutes on testnet. Numeric constraints: thresholds match the spec table. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-agent-config-runbook",
   "tags": [
    "defi",
@@ -420,7 +420,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "docs",
   "title": "Build dashboard and monitoring hooks",
-  "description": "Deliverable: src/sincor2/defi/p04/monitor.py — detections, captures, estimate-vs-actual, treasury receipts, bidder float balance, flag rate — emitted to the SINCOR dashboard schema; alert rules for trust-boundary violations (any treasury-EOA signing attempt: critical page), bidder depletion below gas reserve, flag-rate spikes > 3× the 7-day median, and reconciliation breaches > 1%. Acceptance criteria: (1) panel renders fork-sim data; (2) trust-boundary alert tested with a simulated violation; (3) depletion alert fires before the bidder can build an underfunded transaction. Numeric constraints: thresholds as specified. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: src/sincor2/defi/p04/monitor.py \u2014 detections, captures, estimate-vs-actual, treasury receipts, bidder float balance, flag rate \u2014 emitted to the SINCOR dashboard schema; alert rules for trust-boundary violations (any treasury-EOA signing attempt: critical page), bidder depletion below gas reserve, flag-rate spikes > 3\u00d7 the 7-day median, and reconciliation breaches > 1%. Acceptance criteria: (1) panel renders fork-sim data; (2) trust-boundary alert tested with a simulated violation; (3) depletion alert fires before the bidder can build an underfunded transaction. Numeric constraints: thresholds as specified. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-dashboard-monitoring",
   "tags": [
    "defi",
@@ -440,7 +440,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "deploy",
   "title": "Write and execute testnet deploy scripts",
-  "description": "Deliverable: scripts/p04/deploy_testnet.sh + onchain/script/p04/Deploy.s.sol deploying MEVCaptureHook to Base Sepolia; Basescan verification; run scripted MEV flow (detection + simulated capture only — live bidding stays blocked) to prove the pipeline end-to-end. Acceptance criteria: (1) verified hook linked in docs/p04/DEPLOY.md with detection and capture transaction hashes; (2) treasury receipts observed for the simulated capture; (3) no_treasury_key assertions pass on the testnet deployment. Numeric constraints: live-block stays engaged on testnet. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: scripts/p04/deploy_testnet.sh + onchain/script/p04/Deploy.s.sol deploying MEVCaptureHook to Base Sepolia; Basescan verification; run scripted MEV flow (detection + simulated capture only \u2014 live bidding stays blocked) to prove the pipeline end-to-end. Acceptance criteria: (1) verified hook linked in docs/p04/DEPLOY.md with detection and capture transaction hashes; (2) treasury receipts observed for the simulated capture; (3) no_treasury_key assertions pass on the testnet deployment. Numeric constraints: live-block stays engaged on testnet. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-testnet-deploy",
   "tags": [
    "defi",
@@ -460,7 +460,7 @@
   "project_name": "MEV Protection & Capture",
   "phase": "deploy",
   "title": "Mainnet readiness checklist",
-  "description": "Deliverable: docs/p04/MAINNET_CHECKLIST.md — audit sign-off, trust-boundary review signed as its own line item, bidder funding plan (proceeds-only, float cap 20%), multisig ownership, monitoring/alerting live, runbook rehearsed, go/no-go table. Acceptance criteria: (1) every box signed; (2) treasury EOA exclusion re-verified at deploy (deny-list + config grep + adversarial suite); (3) live-block release recorded as a separate founder-signed transaction — no mainnet bidding before it. Numeric constraints: checklist 100% signed. Per specs/p04-mev-capture.md §Acceptance criteria.",
+  "description": "Deliverable: docs/p04/MAINNET_CHECKLIST.md \u2014 audit sign-off, trust-boundary review signed as its own line item, bidder funding plan (proceeds-only, float cap 20%), multisig ownership, monitoring/alerting live, runbook rehearsed, go/no-go table. Acceptance criteria: (1) every box signed; (2) treasury EOA exclusion re-verified at deploy (deny-list + config grep + adversarial suite); (3) live-block release recorded as a separate founder-signed transaction \u2014 no mainnet bidding before it. Numeric constraints: checklist 100% signed. Per specs/p04-mev-capture.md \u00a7Acceptance criteria.",
   "skill": "p04-mev-mainnet-readiness",
   "tags": [
    "defi",
@@ -472,6 +472,311 @@
   "effort": "S",
   "depends_on": [
    "p04-mev-testnet-deploy"
+  ]
+ },
+ {
+  "task_key": "p04-mev-capture-routing-testharden-0",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "testing",
+  "title": "Test-hardening: Implement capture routing to treasury",
+  "description": "Follow-on to p04-mev-capture-routing (Implement capture routing to treasury).\n\nBuilds on the deliverable: capture routing \u2014 20 bps protocol fee plus 100% residual capture to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac via pull-based claimCapture() (non-bricking per claimant); capture estimate ledger reconciled against actual receipts with |estimate \u2212 actual| / actual \u2264 1%, breaches decaying the bidder's confidence weight.\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p04-mev-capture-routing-testharden-0",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "solidity",
+   "fees",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p04-mev-capture-routing"
+  ]
+ },
+ {
+  "task_key": "p04-mev-no-treasury-key-testharden-1",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "testing",
+  "title": "Test-hardening: Enforce no-treasury-key invariant at every layer",
+  "description": "Follow-on to p04-mev-no-treasury-key (Enforce no-treasury-key invariant at every layer).\n\nBuilds on the deliverable: code-level no_treasury_key enforcement \u2014 SignerRegistry deny-listing the treasury EOA (0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac) checked at every signing call; deployment script asserting the treasury address appears in zero signer fields; CI job grepping all configs/YAMLs for the treasury address in any key/signer f...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p04-mev-no-treasury-key-testharden-1",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "security",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p04-mev-no-treasury-key"
+  ]
+ },
+ {
+  "task_key": "p04-mev-protection-rules-testharden-2",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "testing",
+  "title": "Test-hardening: Implement user protection rules",
+  "description": "Follow-on to p04-mev-protection-rules (Implement user protection rules).\n\nBuilds on the deliverable: protective execution for opted-in orders (hookData flag) \u2014 slippage guardrail reverting fills worse than 100 bps vs the quoted price, private-mempool routing hints for protected orders, automatic revert of the fill if the hook flagged the block as toxic before the user's swap executed.\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p04-mev-protection-rules-testharden-2",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "solidity",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p04-mev-protection-rules"
+  ]
+ },
+ {
+  "task_key": "p04-mev-access-edge-cases-testharden-3",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "testing",
+  "title": "Test-hardening: Access control and edge-case handling",
+  "description": "Follow-on to p04-mev-access-edge-cases (Access control and edge-case handling).\n\nBuilds on the deliverable: access control (BIDDER_ROLE, GUARDIAN_ROLE) plus edge-case handling \u2014 empty-capture blocks (no-ops logged), reorged flow events (idempotent accounting keyed by blockHash/poolId/txIndex \u2014 replay is a safe no-op), bidder EOA depletion below the 2\u00d7 gas-reserve floor (graceful stand-down, never touches any treasury-adjacen...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p04-mev-access-edge-cases-testharden-3",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "security",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p04-mev-access-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p04-mev-hook-skeleton-secreview-0",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "audit",
+  "title": "Security review: Implement MEV capture hook skeleton",
+  "description": "Follow-on to p04-mev-hook-skeleton (Implement MEV capture hook skeleton).\n\nBuilds on the deliverable: onchain/src/hooks/p04/MEVCaptureHook.sol extending MoebiusMEVHook \u2014 beforeSwap/afterSwap flow metering into EIP-1153 transient storage, per-block flow ledger keyed by (blockHash, poolId), capture accounting vault (ERC-6909 claims / ERC-20 escrow).\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p04-mev-hook-skeleton-secreview-0",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "solidity",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-hook-skeleton"
+  ]
+ },
+ {
+  "task_key": "p04-mev-flow-detection-secreview-1",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "audit",
+  "title": "Security review: Implement MEV flow detection in afterSwap",
+  "description": "Follow-on to p04-mev-flow-detection (Implement MEV flow detection in afterSwap).\n\nBuilds on the deliverable: sandwich/backrun detection in afterSwap using transient (EIP-1153) state \u2014 sandwich signature: same-block A\u2192V\u2192B pattern with shared sender/funding relation, victim impact > 50 bps, B reversing A; backrun signature: large displacement (> 50 bps) followed by an arbitrage-shaped reversal capturing \u2265 30% of it; flow_thresh...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p04-mev-flow-detection-secreview-1",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "solidity",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-flow-detection"
+  ]
+ },
+ {
+  "task_key": "p04-mev-agent-bidding-secreview-2",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "audit",
+  "title": "Security review: Build proceeds-funded agent bidding module",
+  "description": "Follow-on to p04-mev-agent-bidding (Build proceeds-funded agent bidding module).\n\nBuilds on the deliverable: src/sincor2/defi/p04/bidder.py \u2014 consumes FlowFlagged events, computes expected capture (estimated arb profit \u2212 gas), applies the bid-shading rule (expected_net \u2265 3\u00d7 gas_cost else stand down), submits defensive backruns via a private-mempool relay from a dedicated bidder EOA funded only from captured proceeds (initial ...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p04-mev-agent-bidding-secreview-2",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "agent",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-agent-bidding"
+  ]
+ },
+ {
+  "task_key": "p04-mev-testnet-deploy-prodready-0",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "deploy",
+  "title": "Production readiness: Write and execute testnet deploy scripts",
+  "description": "Follow-on to p04-mev-testnet-deploy (Write and execute testnet deploy scripts).\n\nBuilds on the deliverable: scripts/p04/deploy_testnet.sh + onchain/script/p04/Deploy.s.sol deploying MEVCaptureHook to Base Sepolia; Basescan verification; run scripted MEV flow (detection + simulated capture only \u2014 live bidding stays blocked) to prove the pipeline end-to-end.\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p04-mev-testnet-deploy-prodready-0",
+  "tags": [
+   "defi",
+   "mev",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-testnet-deploy"
+  ]
+ },
+ {
+  "task_key": "p04-mev-mainnet-readiness-prodready-1",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "deploy",
+  "title": "Production readiness: Mainnet readiness checklist",
+  "description": "Follow-on to p04-mev-mainnet-readiness (Mainnet readiness checklist).\n\nBuilds on the deliverable: docs/p04/MAINNET_CHECKLIST.md \u2014 audit sign-off, trust-boundary review signed as its own line item, bidder funding plan (proceeds-only, float cap 20%), multisig ownership, monitoring/alerting live, runbook rehearsed, go/no-go table.\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p04-mev-mainnet-readiness-prodready-1",
+  "tags": [
+   "defi",
+   "mev",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-mainnet-readiness"
+  ]
+ },
+ {
+  "task_key": "p04-mev-technical-docs-prodready-2",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "deploy",
+  "title": "Production readiness: Write technical documentation",
+  "description": "Follow-on to p04-mev-technical-docs (Write technical documentation).\n\nBuilds on the deliverable: docs/p04/TECHNICAL.md \u2014 flow metering model, detection algorithm (both signatures with thresholds), bidding strategy (shading rule, proceeds-only funding), capture accounting, trust boundary with the no-treasury-key guarantee stated precisely.\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p04-mev-technical-docs-prodready-2",
+  "tags": [
+   "defi",
+   "mev",
+   "docs",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p04-mev-repo-scaffold-devex-0",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "scaffold",
+  "title": "DevEx: Create repo layout and stub interfaces",
+  "description": "Follow-on to p04-mev-repo-scaffold (Create repo layout and stub interfaces).\n\nBuilds on the deliverable: onchain/src/hooks/p04/, src/sincor2/defi/p04/, agents/defi/p04/, tests/pytest/test_p04_*.py stubs, docs/p04/; agent YAML skeleton agents/defi/p04/mev_bidder.yaml (name, budgets, flow_threshold, gas ceiling per repo convention).\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p04-mev-repo-scaffold-devex-0",
+  "tags": [
+   "defi",
+   "mev",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p04-mev-repo-scaffold"
+  ]
+ },
+ {
+  "task_key": "p04-mev-boilerplate-starter-devex-1",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "scaffold",
+  "title": "DevEx: Write boilerplate starter code",
+  "description": "Follow-on to p04-mev-boilerplate-starter (Write boilerplate starter code).\n\nBuilds on the deliverable: MEVCaptureHook.sol boilerplate extending MoebiusMEVHook with ReentrancyGuard + SafeERC20 and non-bricking try/catch around capture accounting; Python package with flow-listener skeleton and TOA hooks; SignerRegistry stub with the treasury deny-list wired from config.\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p04-mev-boilerplate-starter-devex-1",
+  "tags": [
+   "defi",
+   "mev",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p04-mev-boilerplate-starter"
+  ]
+ },
+ {
+  "task_key": "p04-mev-hook-skeleton-completion-0",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "core",
+  "title": "Core completion: Implement MEV capture hook skeleton",
+  "description": "Follow-on to p04-mev-hook-skeleton (Implement MEV capture hook skeleton).\n\nBuilds on the deliverable: onchain/src/hooks/p04/MEVCaptureHook.sol extending MoebiusMEVHook \u2014 beforeSwap/afterSwap flow metering into EIP-1153 transient storage, per-block flow ledger keyed by (blockHash, poolId), capture accounting vault (ERC-6909 claims / ERC-20 escrow).\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p04-mev-hook-skeleton-completion-0",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "solidity"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-hook-skeleton"
+  ]
+ },
+ {
+  "task_key": "p04-mev-flow-detection-completion-1",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "core",
+  "title": "Core completion: Implement MEV flow detection in afterSwap",
+  "description": "Follow-on to p04-mev-flow-detection (Implement MEV flow detection in afterSwap).\n\nBuilds on the deliverable: sandwich/backrun detection in afterSwap using transient (EIP-1153) state \u2014 sandwich signature: same-block A\u2192V\u2192B pattern with shared sender/funding relation, victim impact > 50 bps, B reversing A; backrun signature: large displacement (> 50 bps) followed by an arbitrage-shaped reversal capturing \u2265 30% of it; flow_thresh...\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p04-mev-flow-detection-completion-1",
+  "tags": [
+   "defi",
+   "mev",
+   "core",
+   "solidity"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p04-mev-flow-detection"
+  ]
+ },
+ {
+  "task_key": "p04-mev-technical-docs-operatordocs",
+  "project_id": "P04",
+  "project_name": "MEV Protection & Capture",
+  "phase": "docs",
+  "title": "Operator docs: Write technical documentation",
+  "description": "Follow-on to p04-mev-technical-docs (Write technical documentation).\n\nBuilds on the deliverable: docs/p04/TECHNICAL.md \u2014 flow metering model, detection algorithm (both signatures with thresholds), bidding strategy (shading rule, proceeds-only funding), capture accounting, trust boundary with the no-treasury-key guarantee stated precisely.\n\nAcceptance criteria: (1) operator runbook for the parent deliverable: parameters, commands, and failure modes; (2) parameter reference table where every number traces to the parent task; (3) FAQ covering the top failure modes with recovery steps; (4) every claim in the docs links back to the parent task key. Proof: docs file paths.",
+  "skill": "p04-mev-technical-docs-operatordocs",
+  "tags": [
+   "defi",
+   "mev",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p04-mev-technical-docs"
   ]
  }
 ]

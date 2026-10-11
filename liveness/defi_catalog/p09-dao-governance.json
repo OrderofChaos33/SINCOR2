@@ -1,542 +1,837 @@
 [
-  {
-    "task_key": "p09-architecture-spec",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "spec",
-    "title": "Draft DAO governance optimizer architecture spec",
-    "description": "Write docs/architecture/p09-dao-governance.md: vote-weight simulator, strategy engine, quorum/timelock guards, proposal tracker, and the simulation-only invariant \u2014 the swarm NEVER broadcasts an on-chain vote. Acceptance: spec maps gates (quorum, timelock) to enforcing components and proves the no-broadcast boundary in the data-flow diagram.",
-    "skill": "p09-architecture-spec",
-    "tags": [
-      "defi",
-      "governance",
-      "spec"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": []
-  },
-  {
-    "task_key": "p09-interface-definitions",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "spec",
-    "title": "Define interfaces for governance simulation",
-    "description": "Create src-level interfaces (Python protocols + Solidity stubs if needed): IVoteSimulator, IStrategyEngine, IProposalTracker with typed signatures for simulation, scoring and guard checks. Acceptance: contracts/protocols compile or type-check; the no-broadcast rule is declared as an interface-level invariant.",
-    "skill": "p09-interface-definitions",
-    "tags": [
-      "defi",
-      "governance",
-      "interfaces"
-    ],
-    "bounty_axm": 0.75,
-    "effort": "S",
-    "depends_on": []
-  },
-  {
-    "task_key": "p09-economic-model",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "spec",
-    "title": "Model governance value-extraction economics",
-    "description": "Write docs/economics/p09-governance-economics.md: SINAX-proven voting strategy value model, bribe/emission capture math, 5 bps fee to Treasury, risk budgets (min capital $10, max_alloc_pct 0.25). Acceptance: model reproduces target 3% APR scenarios; fee flow traces to Treasury.",
-    "skill": "p09-economic-model",
-    "tags": [
-      "defi",
-      "governance",
-      "economics"
-    ],
-    "bounty_axm": 0.75,
-    "effort": "S",
-    "depends_on": []
-  },
-  {
-    "task_key": "p09-repo-layout",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "scaffold",
-    "title": "Scaffold p09 repo layout and interfaces",
-    "description": "Create src/sincor2/defi/p09_gov/, tests/pytest/test_p09_*, configs/agents/p09-governance-agent.yaml; wire the interfaces from the spec with one-line READMEs per directory. Acceptance: tree exists, imports resolve, type checks pass cleanly.",
-    "skill": "p09-repo-layout",
-    "tags": [
-      "defi",
-      "governance",
-      "scaffold"
-    ],
-    "bounty_axm": 0.75,
-    "effort": "S",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model"
-    ]
-  },
-  {
-    "task_key": "p09-boilerplate",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "scaffold",
-    "title": "Starter simulator and governance agent boilerplate",
-    "description": "Write the vote simulator and Python governance agent skeletons with TOA hooks, structured logging, and the no-broadcast assertion stub. Acceptance: agent boots, simulation runs on fixtures, stub test green.",
-    "skill": "p09-boilerplate",
-    "tags": [
-      "defi",
-      "governance",
-      "scaffold"
-    ],
-    "bounty_axm": 0.75,
-    "effort": "S",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model"
-    ]
-  },
-  {
-    "task_key": "p09-vote-simulator",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "core",
-    "title": "Build vote-weight simulation engine",
-    "description": "Implement the vote-weight simulator: delegation graphs, quorum projection, outcome probabilities under configurable strategies, with a Python engine in src/sincor2/defi/p09_gov/simulator.py. Acceptance: simulator reproduces recorded historical votes within documented tolerance; every run is reproducible from a seed.",
-    "skill": "p09-vote-simulator",
-    "tags": [
-      "defi",
-      "governance",
-      "simulation"
-    ],
-    "bounty_axm": 5.0,
-    "effort": "L",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model",
-      "p09-repo-layout",
-      "p09-boilerplate"
-    ]
-  },
-  {
-    "task_key": "p09-strategy-engine",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "core",
-    "title": "Build SINAX-proven voting strategy engine",
-    "description": "Implement the strategy engine ranking voting strategies for maximum value extraction, with SINAX proof stubs attesting strategy validity. Acceptance: engine ranks fixtures deterministically; strategies that violate quorum/timelock guards are rejected, never ranked.",
-    "skill": "p09-strategy-engine",
-    "tags": [
-      "defi",
-      "governance",
-      "strategy"
-    ],
-    "bounty_axm": 5.0,
-    "effort": "L",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model",
-      "p09-repo-layout",
-      "p09-boilerplate"
-    ]
-  },
-  {
-    "task_key": "p09-guard-enforcer",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "core",
-    "title": "Build quorum and timelock guard enforcer",
-    "description": "Implement the guard enforcer: any strategy or recommendation must satisfy quorum and timelock constraints before being emitted. Acceptance: guard-violating strategies are rejected with logged reasons; tests cover quorum-fail and timelock-fail matrices.",
-    "skill": "p09-guard-enforcer",
-    "tags": [
-      "defi",
-      "governance",
-      "guards"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model",
-      "p09-repo-layout",
-      "p09-boilerplate"
-    ]
-  },
-  {
-    "task_key": "p09-no-broadcast",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "core",
-    "title": "Enforce no on-chain vote broadcast in code",
-    "description": "Implement the no-broadcast boundary: the swarm has no signing path to any governance contract, and a runtime assertion kills any attempt to construct a vote transaction. Acceptance: tests attempt every conceivable broadcast path and all are blocked; static analysis shows no governance-call calldata builders.",
-    "skill": "p09-no-broadcast",
-    "tags": [
-      "defi",
-      "governance",
-      "safety"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model",
-      "p09-repo-layout",
-      "p09-boilerplate"
-    ]
-  },
-  {
-    "task_key": "p09-proposal-tracker",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "core",
-    "title": "Build proposal tracker",
-    "description": "Implement the proposal tracker ingesting DAO proposals, deadlines, quorum states and outcomes with idempotent records. Acceptance: tracker reconciles against fixture chains; missed or duplicate proposals are detected and reported.",
-    "skill": "p09-proposal-tracker",
-    "tags": [
-      "defi",
-      "governance",
-      "tracking"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model",
-      "p09-repo-layout",
-      "p09-boilerplate"
-    ]
-  },
-  {
-    "task_key": "p09-agent-loop",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "core",
-    "title": "Build governance agent loop",
-    "description": "Build the Python agent loop: track proposals, simulate strategies, emit recommendations with guard attestations. Acceptance: full track-simulate-recommend cycle on fixtures with TOA telemetry and error handling.",
-    "skill": "p09-agent-loop",
-    "tags": [
-      "defi",
-      "governance",
-      "agent"
-    ],
-    "bounty_axm": 0.75,
-    "effort": "S",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model",
-      "p09-repo-layout",
-      "p09-boilerplate"
-    ]
-  },
-  {
-    "task_key": "p09-edge-cases",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "core",
-    "title": "Handle governance optimizer edge cases",
-    "description": "Handle proposal cancellation, quorum rule changes mid-vote, bribe market data gaps, and timelock delays shifting. Acceptance: each case has a dedicated test and docs/ops/p09-edge-cases.md incident write-ups.",
-    "skill": "p09-edge-cases",
-    "tags": [
-      "defi",
-      "governance",
-      "edge-cases"
-    ],
-    "bounty_axm": 0.75,
-    "effort": "S",
-    "depends_on": [
-      "p09-architecture-spec",
-      "p09-interface-definitions",
-      "p09-economic-model",
-      "p09-repo-layout",
-      "p09-boilerplate"
-    ]
-  },
-  {
-    "task_key": "p09-unit-tests",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "testing",
-    "title": "Unit tests for simulator and guards",
-    "description": "Write tests/pytest/test_p09_unit.py covering simulation math, guard matrices and the no-broadcast assertion. Acceptance: 100% pass; broadcast attempts asserted blocked.",
-    "skill": "p09-unit-tests",
-    "tags": [
-      "defi",
-      "governance",
-      "tests"
-    ],
-    "bounty_axm": 1.0,
-    "effort": "S",
-    "depends_on": [
-      "p09-vote-simulator",
-      "p09-strategy-engine",
-      "p09-guard-enforcer",
-      "p09-no-broadcast",
-      "p09-proposal-tracker",
-      "p09-agent-loop",
-      "p09-edge-cases"
-    ]
-  },
-  {
-    "task_key": "p09-integration-tests",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "testing",
-    "title": "Integration tests for agent recommendation flow",
-    "description": "Write tests/pytest/test_p09_integration.py: agent tracks, simulates, recommends with guard attestations on fixture DAOs. Acceptance: full flow green; no-broadcast boundary exercised end-to-end.",
-    "skill": "p09-integration-tests",
-    "tags": [
-      "defi",
-      "governance",
-      "tests"
-    ],
-    "bounty_axm": 1.0,
-    "effort": "S",
-    "depends_on": [
-      "p09-vote-simulator",
-      "p09-strategy-engine",
-      "p09-guard-enforcer",
-      "p09-no-broadcast",
-      "p09-proposal-tracker",
-      "p09-agent-loop",
-      "p09-edge-cases"
-    ]
-  },
-  {
-    "task_key": "p09-fuzz-invariant",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "testing",
-    "title": "Fuzz and invariant tests for simulation safety",
-    "description": "Fuzz delegation graphs and proposal parameters; assert invariants: guards never bypassed, no broadcast path exists, recommendations are deterministic per seed. Acceptance: 10k+ fuzz runs green; counterexamples fixed and recorded.",
-    "skill": "p09-fuzz-invariant",
-    "tags": [
-      "defi",
-      "governance",
-      "fuzz"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": [
-      "p09-vote-simulator",
-      "p09-strategy-engine",
-      "p09-guard-enforcer",
-      "p09-no-broadcast",
-      "p09-proposal-tracker",
-      "p09-agent-loop",
-      "p09-edge-cases"
-    ]
-  },
-  {
-    "task_key": "p09-fork-simulation",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "testing",
-    "title": "Mainnet-fork simulation of governance strategies",
-    "description": "Replay historical DAO votes on a mainnet fork through the simulator. Acceptance: report in tests/reports/p09-fork-sim.md comparing simulated vs actual outcomes with reproducible block pins.",
-    "skill": "p09-fork-simulation",
-    "tags": [
-      "defi",
-      "governance",
-      "simulation"
-    ],
-    "bounty_axm": 1.0,
-    "effort": "S",
-    "depends_on": [
-      "p09-vote-simulator",
-      "p09-strategy-engine",
-      "p09-guard-enforcer",
-      "p09-no-broadcast",
-      "p09-proposal-tracker",
-      "p09-agent-loop",
-      "p09-edge-cases"
-    ]
-  },
-  {
-    "task_key": "p09-audit-prep",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "audit",
-    "title": "Audit-prep package for governance optimizer",
-    "description": "Assemble docs/audits/p09/: frozen code, threat model (broadcast bypass, guard gaming, data poisoning), guard map. Acceptance: complete component inventory and the no-broadcast boundary documented.",
-    "skill": "p09-audit-prep",
-    "tags": [
-      "defi",
-      "governance",
-      "audit"
-    ],
-    "bounty_axm": 4.0,
-    "effort": "L",
-    "depends_on": [
-      "p09-unit-tests",
-      "p09-integration-tests",
-      "p09-fuzz-invariant",
-      "p09-fork-simulation"
-    ]
-  },
-  {
-    "task_key": "p09-findings-remediation",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "audit",
-    "title": "Remediate governance optimizer audit findings",
-    "description": "Fix all findings, prioritizing broadcast-boundary and guard issues; each fix links to its finding ID. Acceptance: zero open high/medium; regression tests for each fix pass.",
-    "skill": "p09-findings-remediation",
-    "tags": [
-      "defi",
-      "governance",
-      "audit"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": [
-      "p09-unit-tests",
-      "p09-integration-tests",
-      "p09-fuzz-invariant",
-      "p09-fork-simulation"
-    ]
-  },
-  {
-    "task_key": "p09-gas-optimization",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "audit",
-    "title": "Gas optimization for governance components",
-    "description": "Optimize the onchain guard and tracker paths without weakening the no-broadcast boundary. Acceptance: before/after gas report in docs/audits/p09/gas.md; zero behavioral change in tests.",
-    "skill": "p09-gas-optimization",
-    "tags": [
-      "defi",
-      "governance",
-      "gas"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": [
-      "p09-unit-tests",
-      "p09-integration-tests",
-      "p09-fuzz-invariant",
-      "p09-fork-simulation"
-    ]
-  },
-  {
-    "task_key": "p09-technical-docs",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "docs",
-    "title": "Technical docs for governance optimizer",
-    "description": "Write docs/p09-dao-governance.md: simulator reference, strategy model, guard semantics, no-broadcast invariant. Acceptance: a new builder can run the simulator from the docs alone; references resolve.",
-    "skill": "p09-technical-docs",
-    "tags": [
-      "defi",
-      "governance",
-      "docs"
-    ],
-    "bounty_axm": 1.0,
-    "effort": "S",
-    "depends_on": [
-      "p09-vote-simulator",
-      "p09-strategy-engine",
-      "p09-guard-enforcer",
-      "p09-no-broadcast",
-      "p09-proposal-tracker",
-      "p09-agent-loop",
-      "p09-edge-cases",
-      "p09-unit-tests"
-    ]
-  },
-  {
-    "task_key": "p09-runbook-yaml",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "docs",
-    "title": "Agent YAML config and ops runbook",
-    "description": "Write configs/agents/p09-governance-agent.yaml and docs/ops/p09-runbook.md (deploy, monitor, proposal incidents). Acceptance: agent boots from YAML; runbook covers quorum-fail and cancellation incidents.",
-    "skill": "p09-runbook-yaml",
-    "tags": [
-      "defi",
-      "governance",
-      "runbook"
-    ],
-    "bounty_axm": 1.0,
-    "effort": "S",
-    "depends_on": [
-      "p09-vote-simulator",
-      "p09-strategy-engine",
-      "p09-guard-enforcer",
-      "p09-no-broadcast",
-      "p09-proposal-tracker",
-      "p09-agent-loop",
-      "p09-edge-cases",
-      "p09-unit-tests"
-    ]
-  },
-  {
-    "task_key": "p09-dashboard-hooks",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "docs",
-    "title": "Dashboard and monitoring hooks",
-    "description": "Expose tracked proposals, strategy rankings, guard states and recommendation log in the status feed. Acceptance: feed reports real values or 'unknown', never fabricated 'healthy'.",
-    "skill": "p09-dashboard-hooks",
-    "tags": [
-      "defi",
-      "governance",
-      "monitoring"
-    ],
-    "bounty_axm": 1.0,
-    "effort": "S",
-    "depends_on": [
-      "p09-vote-simulator",
-      "p09-strategy-engine",
-      "p09-guard-enforcer",
-      "p09-no-broadcast",
-      "p09-proposal-tracker",
-      "p09-agent-loop",
-      "p09-edge-cases",
-      "p09-unit-tests"
-    ]
-  },
-  {
-    "task_key": "p09-testnet-deploy",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "deploy",
-    "title": "Testnet deploy scripts for governance optimizer",
-    "description": "Write scripts/deploy/p09/ deploying trackers to Base Sepolia with the no-broadcast boundary asserted at deploy time. Acceptance: idempotent scripts; deployment recorded; broadcast attempt on testnet provably blocked.",
-    "skill": "p09-testnet-deploy",
-    "tags": [
-      "defi",
-      "governance",
-      "deploy"
-    ],
-    "bounty_axm": 2.0,
-    "effort": "M",
-    "depends_on": [
-      "p09-audit-prep",
-      "p09-findings-remediation",
-      "p09-gas-optimization"
-    ]
-  },
-  {
-    "task_key": "p09-mainnet-checklist",
-    "project_id": "P09",
-    "project_name": "DAO Governance Optimizer",
-    "phase": "deploy",
-    "title": "Mainnet readiness checklist for governance optimizer",
-    "description": "Write docs/ops/p09-mainnet-checklist.md: audit sign-off, data-source trust, key custody, no-broadcast re-verification. Acceptance: checklist signed off by the auditor task; boundary re-tested before any mainnet step.",
-    "skill": "p09-mainnet-checklist",
-    "tags": [
-      "defi",
-      "governance",
-      "deploy"
-    ],
-    "bounty_axm": 1.0,
-    "effort": "S",
-    "depends_on": [
-      "p09-audit-prep",
-      "p09-findings-remediation",
-      "p09-gas-optimization"
-    ]
-  }
+ {
+  "task_key": "p09-architecture-spec",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "spec",
+  "title": "Draft DAO governance optimizer architecture spec",
+  "description": "Write docs/architecture/p09-dao-governance.md: vote-weight simulator, strategy engine, quorum/timelock guards, proposal tracker, and the simulation-only invariant \u2014 the swarm NEVER broadcasts an on-chain vote. Acceptance: spec maps gates (quorum, timelock) to enforcing components and proves the no-broadcast boundary in the data-flow diagram.",
+  "skill": "p09-architecture-spec",
+  "tags": [
+   "defi",
+   "governance",
+   "spec"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": []
+ },
+ {
+  "task_key": "p09-interface-definitions",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "spec",
+  "title": "Define interfaces for governance simulation",
+  "description": "Create src-level interfaces (Python protocols + Solidity stubs if needed): IVoteSimulator, IStrategyEngine, IProposalTracker with typed signatures for simulation, scoring and guard checks. Acceptance: contracts/protocols compile or type-check; the no-broadcast rule is declared as an interface-level invariant.",
+  "skill": "p09-interface-definitions",
+  "tags": [
+   "defi",
+   "governance",
+   "interfaces"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p09-economic-model",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "spec",
+  "title": "Model governance value-extraction economics",
+  "description": "Write docs/economics/p09-governance-economics.md: SINAX-proven voting strategy value model, bribe/emission capture math, 5 bps fee to Treasury, risk budgets (min capital $10, max_alloc_pct 0.25). Acceptance: model reproduces target 3% APR scenarios; fee flow traces to Treasury.",
+  "skill": "p09-economic-model",
+  "tags": [
+   "defi",
+   "governance",
+   "economics"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": []
+ },
+ {
+  "task_key": "p09-repo-layout",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "scaffold",
+  "title": "Scaffold p09 repo layout and interfaces",
+  "description": "Create src/sincor2/defi/p09_gov/, tests/pytest/test_p09_*, configs/agents/p09-governance-agent.yaml; wire the interfaces from the spec with one-line READMEs per directory. Acceptance: tree exists, imports resolve, type checks pass cleanly.",
+  "skill": "p09-repo-layout",
+  "tags": [
+   "defi",
+   "governance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model"
+  ]
+ },
+ {
+  "task_key": "p09-boilerplate",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "scaffold",
+  "title": "Starter simulator and governance agent boilerplate",
+  "description": "Write the vote simulator and Python governance agent skeletons with TOA hooks, structured logging, and the no-broadcast assertion stub. Acceptance: agent boots, simulation runs on fixtures, stub test green.",
+  "skill": "p09-boilerplate",
+  "tags": [
+   "defi",
+   "governance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model"
+  ]
+ },
+ {
+  "task_key": "p09-vote-simulator",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Build vote-weight simulation engine",
+  "description": "Implement the vote-weight simulator: delegation graphs, quorum projection, outcome probabilities under configurable strategies, with a Python engine in src/sincor2/defi/p09_gov/simulator.py. Acceptance: simulator reproduces recorded historical votes within documented tolerance; every run is reproducible from a seed.",
+  "skill": "p09-vote-simulator",
+  "tags": [
+   "defi",
+   "governance",
+   "simulation"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model",
+   "p09-repo-layout",
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-strategy-engine",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Build SINAX-proven voting strategy engine",
+  "description": "Implement the strategy engine ranking voting strategies for maximum value extraction, with SINAX proof stubs attesting strategy validity. Acceptance: engine ranks fixtures deterministically; strategies that violate quorum/timelock guards are rejected, never ranked.",
+  "skill": "p09-strategy-engine",
+  "tags": [
+   "defi",
+   "governance",
+   "strategy"
+  ],
+  "bounty_axm": 5.0,
+  "effort": "L",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model",
+   "p09-repo-layout",
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-guard-enforcer",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Build quorum and timelock guard enforcer",
+  "description": "Implement the guard enforcer: any strategy or recommendation must satisfy quorum and timelock constraints before being emitted. Acceptance: guard-violating strategies are rejected with logged reasons; tests cover quorum-fail and timelock-fail matrices.",
+  "skill": "p09-guard-enforcer",
+  "tags": [
+   "defi",
+   "governance",
+   "guards"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model",
+   "p09-repo-layout",
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-no-broadcast",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Enforce no on-chain vote broadcast in code",
+  "description": "Implement the no-broadcast boundary: the swarm has no signing path to any governance contract, and a runtime assertion kills any attempt to construct a vote transaction. Acceptance: tests attempt every conceivable broadcast path and all are blocked; static analysis shows no governance-call calldata builders.",
+  "skill": "p09-no-broadcast",
+  "tags": [
+   "defi",
+   "governance",
+   "safety"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model",
+   "p09-repo-layout",
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-proposal-tracker",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Build proposal tracker",
+  "description": "Implement the proposal tracker ingesting DAO proposals, deadlines, quorum states and outcomes with idempotent records. Acceptance: tracker reconciles against fixture chains; missed or duplicate proposals are detected and reported.",
+  "skill": "p09-proposal-tracker",
+  "tags": [
+   "defi",
+   "governance",
+   "tracking"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model",
+   "p09-repo-layout",
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-agent-loop",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Build governance agent loop",
+  "description": "Build the Python agent loop: track proposals, simulate strategies, emit recommendations with guard attestations. Acceptance: full track-simulate-recommend cycle on fixtures with TOA telemetry and error handling.",
+  "skill": "p09-agent-loop",
+  "tags": [
+   "defi",
+   "governance",
+   "agent"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model",
+   "p09-repo-layout",
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-edge-cases",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Handle governance optimizer edge cases",
+  "description": "Handle proposal cancellation, quorum rule changes mid-vote, bribe market data gaps, and timelock delays shifting. Acceptance: each case has a dedicated test and docs/ops/p09-edge-cases.md incident write-ups.",
+  "skill": "p09-edge-cases",
+  "tags": [
+   "defi",
+   "governance",
+   "edge-cases"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p09-architecture-spec",
+   "p09-interface-definitions",
+   "p09-economic-model",
+   "p09-repo-layout",
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-unit-tests",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Unit tests for simulator and guards",
+  "description": "Write tests/pytest/test_p09_unit.py covering simulation math, guard matrices and the no-broadcast assertion. Acceptance: 100% pass; broadcast attempts asserted blocked.",
+  "skill": "p09-unit-tests",
+  "tags": [
+   "defi",
+   "governance",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-vote-simulator",
+   "p09-strategy-engine",
+   "p09-guard-enforcer",
+   "p09-no-broadcast",
+   "p09-proposal-tracker",
+   "p09-agent-loop",
+   "p09-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p09-integration-tests",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Integration tests for agent recommendation flow",
+  "description": "Write tests/pytest/test_p09_integration.py: agent tracks, simulates, recommends with guard attestations on fixture DAOs. Acceptance: full flow green; no-broadcast boundary exercised end-to-end.",
+  "skill": "p09-integration-tests",
+  "tags": [
+   "defi",
+   "governance",
+   "tests"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-vote-simulator",
+   "p09-strategy-engine",
+   "p09-guard-enforcer",
+   "p09-no-broadcast",
+   "p09-proposal-tracker",
+   "p09-agent-loop",
+   "p09-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p09-fuzz-invariant",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Fuzz and invariant tests for simulation safety",
+  "description": "Fuzz delegation graphs and proposal parameters; assert invariants: guards never bypassed, no broadcast path exists, recommendations are deterministic per seed. Acceptance: 10k+ fuzz runs green; counterexamples fixed and recorded.",
+  "skill": "p09-fuzz-invariant",
+  "tags": [
+   "defi",
+   "governance",
+   "fuzz"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-vote-simulator",
+   "p09-strategy-engine",
+   "p09-guard-enforcer",
+   "p09-no-broadcast",
+   "p09-proposal-tracker",
+   "p09-agent-loop",
+   "p09-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p09-fork-simulation",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Mainnet-fork simulation of governance strategies",
+  "description": "Replay historical DAO votes on a mainnet fork through the simulator. Acceptance: report in tests/reports/p09-fork-sim.md comparing simulated vs actual outcomes with reproducible block pins.",
+  "skill": "p09-fork-simulation",
+  "tags": [
+   "defi",
+   "governance",
+   "simulation"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-vote-simulator",
+   "p09-strategy-engine",
+   "p09-guard-enforcer",
+   "p09-no-broadcast",
+   "p09-proposal-tracker",
+   "p09-agent-loop",
+   "p09-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p09-audit-prep",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "audit",
+  "title": "Audit-prep package for governance optimizer",
+  "description": "Assemble docs/audits/p09/: frozen code, threat model (broadcast bypass, guard gaming, data poisoning), guard map. Acceptance: complete component inventory and the no-broadcast boundary documented.",
+  "skill": "p09-audit-prep",
+  "tags": [
+   "defi",
+   "governance",
+   "audit"
+  ],
+  "bounty_axm": 4.0,
+  "effort": "L",
+  "depends_on": [
+   "p09-unit-tests",
+   "p09-integration-tests",
+   "p09-fuzz-invariant",
+   "p09-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p09-findings-remediation",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "audit",
+  "title": "Remediate governance optimizer audit findings",
+  "description": "Fix all findings, prioritizing broadcast-boundary and guard issues; each fix links to its finding ID. Acceptance: zero open high/medium; regression tests for each fix pass.",
+  "skill": "p09-findings-remediation",
+  "tags": [
+   "defi",
+   "governance",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-unit-tests",
+   "p09-integration-tests",
+   "p09-fuzz-invariant",
+   "p09-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p09-gas-optimization",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "audit",
+  "title": "Gas optimization for governance components",
+  "description": "Optimize the onchain guard and tracker paths without weakening the no-broadcast boundary. Acceptance: before/after gas report in docs/audits/p09/gas.md; zero behavioral change in tests.",
+  "skill": "p09-gas-optimization",
+  "tags": [
+   "defi",
+   "governance",
+   "gas"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-unit-tests",
+   "p09-integration-tests",
+   "p09-fuzz-invariant",
+   "p09-fork-simulation"
+  ]
+ },
+ {
+  "task_key": "p09-technical-docs",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "docs",
+  "title": "Technical docs for governance optimizer",
+  "description": "Write docs/p09-dao-governance.md: simulator reference, strategy model, guard semantics, no-broadcast invariant. Acceptance: a new builder can run the simulator from the docs alone; references resolve.",
+  "skill": "p09-technical-docs",
+  "tags": [
+   "defi",
+   "governance",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-vote-simulator",
+   "p09-strategy-engine",
+   "p09-guard-enforcer",
+   "p09-no-broadcast",
+   "p09-proposal-tracker",
+   "p09-agent-loop",
+   "p09-edge-cases",
+   "p09-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p09-runbook-yaml",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "docs",
+  "title": "Agent YAML config and ops runbook",
+  "description": "Write configs/agents/p09-governance-agent.yaml and docs/ops/p09-runbook.md (deploy, monitor, proposal incidents). Acceptance: agent boots from YAML; runbook covers quorum-fail and cancellation incidents.",
+  "skill": "p09-runbook-yaml",
+  "tags": [
+   "defi",
+   "governance",
+   "runbook"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-vote-simulator",
+   "p09-strategy-engine",
+   "p09-guard-enforcer",
+   "p09-no-broadcast",
+   "p09-proposal-tracker",
+   "p09-agent-loop",
+   "p09-edge-cases",
+   "p09-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p09-dashboard-hooks",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "docs",
+  "title": "Dashboard and monitoring hooks",
+  "description": "Expose tracked proposals, strategy rankings, guard states and recommendation log in the status feed. Acceptance: feed reports real values or 'unknown', never fabricated 'healthy'.",
+  "skill": "p09-dashboard-hooks",
+  "tags": [
+   "defi",
+   "governance",
+   "monitoring"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-vote-simulator",
+   "p09-strategy-engine",
+   "p09-guard-enforcer",
+   "p09-no-broadcast",
+   "p09-proposal-tracker",
+   "p09-agent-loop",
+   "p09-edge-cases",
+   "p09-unit-tests"
+  ]
+ },
+ {
+  "task_key": "p09-testnet-deploy",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "deploy",
+  "title": "Testnet deploy scripts for governance optimizer",
+  "description": "Write scripts/deploy/p09/ deploying trackers to Base Sepolia with the no-broadcast boundary asserted at deploy time. Acceptance: idempotent scripts; deployment recorded; broadcast attempt on testnet provably blocked.",
+  "skill": "p09-testnet-deploy",
+  "tags": [
+   "defi",
+   "governance",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-audit-prep",
+   "p09-findings-remediation",
+   "p09-gas-optimization"
+  ]
+ },
+ {
+  "task_key": "p09-mainnet-checklist",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "deploy",
+  "title": "Mainnet readiness checklist for governance optimizer",
+  "description": "Write docs/ops/p09-mainnet-checklist.md: audit sign-off, data-source trust, key custody, no-broadcast re-verification. Acceptance: checklist signed off by the auditor task; boundary re-tested before any mainnet step.",
+  "skill": "p09-mainnet-checklist",
+  "tags": [
+   "defi",
+   "governance",
+   "deploy"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-audit-prep",
+   "p09-findings-remediation",
+   "p09-gas-optimization"
+  ]
+ },
+ {
+  "task_key": "p09-no-broadcast-testharden-0",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Test-hardening: Enforce no on-chain vote broadcast in code",
+  "description": "Follow-on to p09-no-broadcast (Enforce no on-chain vote broadcast in code).\n\nBuilds on the deliverable: Implement the no-broadcast boundary: the swarm has no signing path to any governance contract, and a runtime assertion kills any attempt to construct a vote transaction. Acceptance: tests attempt every conceivable broadcast path and all are blocked; static analysis shows no governance-call calldata builders.\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p09-no-broadcast-testharden-0",
+  "tags": [
+   "defi",
+   "governance",
+   "safety",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-no-broadcast"
+  ]
+ },
+ {
+  "task_key": "p09-proposal-tracker-testharden-1",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Test-hardening: Build proposal tracker",
+  "description": "Follow-on to p09-proposal-tracker (Build proposal tracker).\n\nBuilds on the deliverable: Implement the proposal tracker ingesting DAO proposals, deadlines, quorum states and outcomes with idempotent records. Acceptance: tracker reconciles against fixture chains; missed or duplicate proposals are detected and reported.\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p09-proposal-tracker-testharden-1",
+  "tags": [
+   "defi",
+   "governance",
+   "tracking",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-proposal-tracker"
+  ]
+ },
+ {
+  "task_key": "p09-agent-loop-testharden-2",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Test-hardening: Build governance agent loop",
+  "description": "Follow-on to p09-agent-loop (Build governance agent loop).\n\nBuilds on the deliverable: Build the Python agent loop: track proposals, simulate strategies, emit recommendations with guard attestations. Acceptance: full track-simulate-recommend cycle on fixtures with TOA telemetry and error handling.\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p09-agent-loop-testharden-2",
+  "tags": [
+   "defi",
+   "governance",
+   "agent",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-agent-loop"
+  ]
+ },
+ {
+  "task_key": "p09-edge-cases-testharden-3",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "testing",
+  "title": "Test-hardening: Handle governance optimizer edge cases",
+  "description": "Follow-on to p09-edge-cases (Handle governance optimizer edge cases).\n\nBuilds on the deliverable: Handle proposal cancellation, quorum rule changes mid-vote, bribe market data gaps, and timelock delays shifting. Acceptance: each case has a dedicated test and docs/ops/p09-edge-cases.md incident write-ups.\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p09-edge-cases-testharden-3",
+  "tags": [
+   "defi",
+   "governance",
+   "edge-cases",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-edge-cases"
+  ]
+ },
+ {
+  "task_key": "p09-vote-simulator-secreview-0",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "audit",
+  "title": "Security review: Build vote-weight simulation engine",
+  "description": "Follow-on to p09-vote-simulator (Build vote-weight simulation engine).\n\nBuilds on the deliverable: Implement the vote-weight simulator: delegation graphs, quorum projection, outcome probabilities under configurable strategies, with a Python engine in src/sincor2/defi/p09_gov/simulator.py. Acceptance: simulator reproduces recorded historical votes within documented tolerance; every run is reproducible from a seed.\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p09-vote-simulator-secreview-0",
+  "tags": [
+   "defi",
+   "governance",
+   "simulation",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-vote-simulator"
+  ]
+ },
+ {
+  "task_key": "p09-strategy-engine-secreview-1",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "audit",
+  "title": "Security review: Build SINAX-proven voting strategy engine",
+  "description": "Follow-on to p09-strategy-engine (Build SINAX-proven voting strategy engine).\n\nBuilds on the deliverable: Implement the strategy engine ranking voting strategies for maximum value extraction, with SINAX proof stubs attesting strategy validity. Acceptance: engine ranks fixtures deterministically; strategies that violate quorum/timelock guards are rejected, never ranked.\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p09-strategy-engine-secreview-1",
+  "tags": [
+   "defi",
+   "governance",
+   "strategy",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-strategy-engine"
+  ]
+ },
+ {
+  "task_key": "p09-guard-enforcer-secreview-2",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "audit",
+  "title": "Security review: Build quorum and timelock guard enforcer",
+  "description": "Follow-on to p09-guard-enforcer (Build quorum and timelock guard enforcer).\n\nBuilds on the deliverable: Implement the guard enforcer: any strategy or recommendation must satisfy quorum and timelock constraints before being emitted. Acceptance: guard-violating strategies are rejected with logged reasons; tests cover quorum-fail and timelock-fail matrices.\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p09-guard-enforcer-secreview-2",
+  "tags": [
+   "defi",
+   "governance",
+   "guards",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-guard-enforcer"
+  ]
+ },
+ {
+  "task_key": "p09-testnet-deploy-prodready-0",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "deploy",
+  "title": "Production readiness: Testnet deploy scripts for governance optimizer",
+  "description": "Follow-on to p09-testnet-deploy (Testnet deploy scripts for governance optimizer).\n\nBuilds on the deliverable: Write scripts/deploy/p09/ deploying trackers to Base Sepolia with the no-broadcast boundary asserted at deploy time. Acceptance: idempotent scripts; deployment recorded; broadcast attempt on testnet provably blocked.\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p09-testnet-deploy-prodready-0",
+  "tags": [
+   "defi",
+   "governance",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-testnet-deploy"
+  ]
+ },
+ {
+  "task_key": "p09-mainnet-checklist-prodready-1",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "deploy",
+  "title": "Production readiness: Mainnet readiness checklist for governance optimizer",
+  "description": "Follow-on to p09-mainnet-checklist (Mainnet readiness checklist for governance optimizer).\n\nBuilds on the deliverable: Write docs/ops/p09-mainnet-checklist.md: audit sign-off, data-source trust, key custody, no-broadcast re-verification. Acceptance: checklist signed off by the auditor task; boundary re-tested before any mainnet step.\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p09-mainnet-checklist-prodready-1",
+  "tags": [
+   "defi",
+   "governance",
+   "deploy"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-mainnet-checklist"
+  ]
+ },
+ {
+  "task_key": "p09-technical-docs-prodready-2",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "deploy",
+  "title": "Production readiness: Technical docs for governance optimizer",
+  "description": "Follow-on to p09-technical-docs (Technical docs for governance optimizer).\n\nBuilds on the deliverable: Write docs/p09-dao-governance.md: simulator reference, strategy model, guard semantics, no-broadcast invariant. Acceptance: a new builder can run the simulator from the docs alone; references resolve.\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p09-technical-docs-prodready-2",
+  "tags": [
+   "defi",
+   "governance",
+   "docs",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p09-repo-layout-devex-0",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "scaffold",
+  "title": "DevEx: Scaffold p09 repo layout and interfaces",
+  "description": "Follow-on to p09-repo-layout (Scaffold p09 repo layout and interfaces).\n\nBuilds on the deliverable: Create src/sincor2/defi/p09_gov/, tests/pytest/test_p09_*, configs/agents/p09-governance-agent.yaml; wire the interfaces from the spec with one-line READMEs per directory. Acceptance: tree exists, imports resolve, type checks pass cleanly.\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p09-repo-layout-devex-0",
+  "tags": [
+   "defi",
+   "governance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p09-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p09-boilerplate-devex-1",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "scaffold",
+  "title": "DevEx: Starter simulator and governance agent boilerplate",
+  "description": "Follow-on to p09-boilerplate (Starter simulator and governance agent boilerplate).\n\nBuilds on the deliverable: Write the vote simulator and Python governance agent skeletons with TOA hooks, structured logging, and the no-broadcast assertion stub. Acceptance: agent boots, simulation runs on fixtures, stub test green.\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p09-boilerplate-devex-1",
+  "tags": [
+   "defi",
+   "governance",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p09-boilerplate"
+  ]
+ },
+ {
+  "task_key": "p09-vote-simulator-completion-0",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Core completion: Build vote-weight simulation engine",
+  "description": "Follow-on to p09-vote-simulator (Build vote-weight simulation engine).\n\nBuilds on the deliverable: Implement the vote-weight simulator: delegation graphs, quorum projection, outcome probabilities under configurable strategies, with a Python engine in src/sincor2/defi/p09_gov/simulator.py. Acceptance: simulator reproduces recorded historical votes within documented tolerance; every run is reproducible from a seed.\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p09-vote-simulator-completion-0",
+  "tags": [
+   "defi",
+   "governance",
+   "simulation",
+   "core"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-vote-simulator"
+  ]
+ },
+ {
+  "task_key": "p09-strategy-engine-completion-1",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "core",
+  "title": "Core completion: Build SINAX-proven voting strategy engine",
+  "description": "Follow-on to p09-strategy-engine (Build SINAX-proven voting strategy engine).\n\nBuilds on the deliverable: Implement the strategy engine ranking voting strategies for maximum value extraction, with SINAX proof stubs attesting strategy validity. Acceptance: engine ranks fixtures deterministically; strategies that violate quorum/timelock guards are rejected, never ranked.\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p09-strategy-engine-completion-1",
+  "tags": [
+   "defi",
+   "governance",
+   "strategy",
+   "core"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p09-strategy-engine"
+  ]
+ },
+ {
+  "task_key": "p09-technical-docs-operatordocs",
+  "project_id": "P09",
+  "project_name": "DAO Governance Optimizer",
+  "phase": "docs",
+  "title": "Operator docs: Technical docs for governance optimizer",
+  "description": "Follow-on to p09-technical-docs (Technical docs for governance optimizer).\n\nBuilds on the deliverable: Write docs/p09-dao-governance.md: simulator reference, strategy model, guard semantics, no-broadcast invariant. Acceptance: a new builder can run the simulator from the docs alone; references resolve.\n\nAcceptance criteria: (1) operator runbook for the parent deliverable: parameters, commands, and failure modes; (2) parameter reference table where every number traces to the parent task; (3) FAQ covering the top failure modes with recovery steps; (4) every claim in the docs links back to the parent task key. Proof: docs file paths.",
+  "skill": "p09-technical-docs-operatordocs",
+  "tags": [
+   "defi",
+   "governance",
+   "docs"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p09-technical-docs"
+  ]
+ }
 ]

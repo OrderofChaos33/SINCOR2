@@ -5,7 +5,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "spec",
   "title": "Specify the read-only treasury swarm with a no-broadcast invariant",
-  "description": "Write docs/spec/P21_ARCHITECTURE.md defining the read-only treasury allocation swarm: the allocator agent, the hold_file gate, the allocation-report generator, and the SINCOR dashboard publisher, with data flows between them. (1) The spec states the hard no-broadcast invariant as a blocking requirement: the swarm computes allocation reports and NEVER broadcasts transactions. (2) The report schema and both gates (hold_file, execute_live_env) are defined. (3) The execute_live_env approval path is documented: delegation to an approved external executor, swarm still never signs. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write docs/spec/P21_ARCHITECTURE.md defining the read-only treasury allocation swarm: the allocator agent, the hold_file gate, the allocation-report generator, and the SINCOR dashboard publisher, with data flows between them. (1) The spec states the hard no-broadcast invariant as a blocking requirement: the swarm computes allocation reports and NEVER broadcasts transactions. (2) The report schema and both gates (hold_file, execute_live_env) are defined. (3) The execute_live_env approval path is documented: delegation to an approved external executor, swarm still never signs. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-architecture-spec",
   "tags": [
    "defi",
@@ -23,7 +23,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "spec",
   "title": "Define P21 Python interfaces and the allocation report schema",
-  "description": "Define Python interfaces in src/sincor2/defi/p21/interfaces.py: TreasuryAllocator, AllocationReport, GateCheck protocols plus the dashboard publisher contract. (1) The interfaces are type-checked and a stub report validates against the schema. (2) The report dataclass covers per-venue allocations, risk metrics, fee_bps (8), and the canonical treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. (3) The schema enforces allocations summing to 100%. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Define Python interfaces in src/sincor2/defi/p21/interfaces.py: TreasuryAllocator, AllocationReport, GateCheck protocols plus the dashboard publisher contract. (1) The interfaces are type-checked and a stub report validates against the schema. (2) The report dataclass covers per-venue allocations, risk metrics, fee_bps (8), and the canonical treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. (3) The schema enforces allocations summing to 100%. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-interface-definitions",
   "tags": [
    "defi",
@@ -41,7 +41,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "spec",
   "title": "Write P21 economics: 8 bps fee, 4% APR target, 0.30 max alloc",
-  "description": "Write docs/spec/P21_ECONOMICS.md: 8 bps protocol fee on realized treasury yield routed to the canonical treasury, 4% target APR assumptions, risk_score 0.20 allocation bounds, max_alloc_pct 0.30 per venue per tick, min_capital_usd 1.0. (1) The numbers are specified so the fee-routing module can implement them to the wei. (2) A worked fee-math example per reallocation tick is included (e.g. $1M at 4% APR → $40k yield → $32 fee). (3) The rebalancing trigger table is complete (500 bps band deviation or 24h elapsed). Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write docs/spec/P21_ECONOMICS.md: 8 bps protocol fee on realized treasury yield routed to the canonical treasury, 4% target APR assumptions, risk_score 0.20 allocation bounds, max_alloc_pct 0.30 per venue per tick, min_capital_usd 1.0. (1) The numbers are specified so the fee-routing module can implement them to the wei. (2) A worked fee-math example per reallocation tick is included (e.g. $1M at 4% APR \u2192 $40k yield \u2192 $32 fee). (3) The rebalancing trigger table is complete (500 bps band deviation or 24h elapsed). Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-economic-model",
   "tags": [
    "defi",
@@ -61,7 +61,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "scaffold",
   "title": "Create the P21 Python package skeleton",
-  "description": "Create src/sincor2/defi/p21/ with allocator.py, gates.py, report.py, publisher.py, fees.py, plus tests/pytest/test_p21_*.py stubs, configs/agents/p21-treasury-dao.yaml, and a docs runbook stub. (1) The package imports cleanly (python -m compileall passes). (2) The layout matches the repo's Python-agent conventions. (3) The YAML parses. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Create src/sincor2/defi/p21/ with allocator.py, gates.py, report.py, publisher.py, fees.py, plus tests/pytest/test_p21_*.py stubs, configs/agents/p21-treasury-dao.yaml, and a docs runbook stub. (1) The package imports cleanly (python -m compileall passes). (2) The layout matches the repo's Python-agent conventions. (3) The YAML parses. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-repo-layout",
   "tags": [
    "defi",
@@ -81,7 +81,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "scaffold",
   "title": "Write P21 allocator and report stubs with catalog defaults",
-  "description": "Write starter boilerplate: an allocator stub with TOA hooks, a report generator stub emitting an empty-but-valid allocation report, and config defaults (fee_bps=8, target_apr=0.04, risk_score=0.20). (1) python -m compileall passes on the package. (2) The stub report validates against the report schema. (3) Defaults match the catalog ProtocolSpec exactly. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write starter boilerplate: an allocator stub with TOA hooks, a report generator stub emitting an empty-but-valid allocation report, and config defaults (fee_bps=8, target_apr=0.04, risk_score=0.20). (1) python -m compileall passes on the package. (2) The stub report validates against the report schema. (3) Defaults match the catalog ProtocolSpec exactly. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-starter-code",
   "tags": [
    "defi",
@@ -100,7 +100,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "core",
   "title": "Implement the treasury allocator inside the risk budget",
-  "description": "Build the allocator agent in src/sincor2/defi/p21/allocator.py: computes target allocations across yield venues within the risk budget (risk_score 0.20), max_alloc_pct 0.30 per venue, the four bands (stables 40–60%, blue-chip 20–35%, yield venues 10–25%, native 5–15%), and TOA revenue forecasts, with error handling, retries with backoff, and TOA ingest_feedback hooks. (1) Produces a valid allocation report for a mocked venue set. (2) Bands and the 0.30 per-venue cap are respected. (3) Invalid inputs raise instead of silently defaulting. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Build the allocator agent in src/sincor2/defi/p21/allocator.py: computes target allocations across yield venues within the risk budget (risk_score 0.20), max_alloc_pct 0.30 per venue, the four bands (stables 40\u201360%, blue-chip 20\u201335%, yield venues 10\u201325%, native 5\u201315%), and TOA revenue forecasts, with error handling, retries with backoff, and TOA ingest_feedback hooks. (1) Produces a valid allocation report for a mocked venue set. (2) Bands and the 0.30 per-venue cap are respected. (3) Invalid inputs raise instead of silently defaulting. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-treasury-allocator-agent",
   "tags": [
    "defi",
@@ -122,7 +122,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "core",
   "title": "Implement the content-addressed hold_file gate",
-  "description": "Implement the hold_file gate in src/sincor2/defi/p21/gates.py: every allocation decision (including no-action) is written to a content-addressed hold file (JSON, filename = sha256 of canonical contents) awaiting human review; no downstream step proceeds without a reviewed hold file. (1) Unreviewed holds block publishing in tests. (2) Reviewed holds unlock it. (3) Holds older than 72h unreviewed raise a backlog alert. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Implement the hold_file gate in src/sincor2/defi/p21/gates.py: every allocation decision (including no-action) is written to a content-addressed hold file (JSON, filename = sha256 of canonical contents) awaiting human review; no downstream step proceeds without a reviewed hold file. (1) Unreviewed holds block publishing in tests. (2) Reviewed holds unlock it. (3) Holds older than 72h unreviewed raise a backlog alert. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-hold-file-gate",
   "tags": [
    "defi",
@@ -142,7 +142,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "core",
   "title": "Implement the canonical allocation report generator",
-  "description": "Implement the allocation report generator for the canonical treasury: per-venue allocations, risk metrics, fee projection at 8 bps, IPS-limit checks, runway projection, and a human-readable summary, written to the hold file and the dashboard feed. (1) Allocations sum to exactly 100% in every generated report. (2) Reports round-trip through the dashboard schema. (3) A no-action tick still emits a valid report. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Implement the allocation report generator for the canonical treasury: per-venue allocations, risk metrics, fee projection at 8 bps, IPS-limit checks, runway projection, and a human-readable summary, written to the hold file and the dashboard feed. (1) Allocations sum to exactly 100% in every generated report. (2) Reports round-trip through the dashboard schema. (3) A no-action tick still emits a valid report. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-allocation-report-generator",
   "tags": [
    "defi",
@@ -163,7 +163,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "core",
   "title": "Implement the BroadcastForbidden no-broadcast guard",
-  "description": "Implement the no-broadcast guard: the swarm holds no signing capability and no signing libraries are importable from the allocator module; any code path attempting a transaction broadcast raises BroadcastForbidden and logs a security event. (1) Broadcast attempts through every agent entrypoint raise in tests. (2) The catalog live_blocked=False flag does not weaken this invariant. (3) An import-lint test fails if a signing library becomes importable from the allocator path. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Implement the no-broadcast guard: the swarm holds no signing capability and no signing libraries are importable from the allocator module; any code path attempting a transaction broadcast raises BroadcastForbidden and logs a security event. (1) Broadcast attempts through every agent entrypoint raise in tests. (2) The catalog live_blocked=False flag does not weaken this invariant. (3) An import-lint test fails if a signing library becomes importable from the allocator path. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-no-broadcast-guard",
   "tags": [
    "defi",
@@ -184,7 +184,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "core",
   "title": "Implement the SINCOR dashboard publisher",
-  "description": "Implement the dashboard publisher posting reviewed allocation reports to the SINCOR dashboard feed on the status-feed schema, reporting unknown rather than healthy on failure. (1) A reviewed report publishes end-to-end. (2) A dashboard endpoint failure is surfaced, never swallowed. (3) Unreviewed holds are never published. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Implement the dashboard publisher posting reviewed allocation reports to the SINCOR dashboard feed on the status-feed schema, reporting unknown rather than healthy on failure. (1) A reviewed report publishes end-to-end. (2) A dashboard endpoint failure is surfaced, never swallowed. (3) Unreviewed holds are never published. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-dashboard-publisher",
   "tags": [
    "defi",
@@ -204,7 +204,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "core",
   "title": "Implement 8 bps fee routing to the canonical treasury",
-  "description": "Implement 8 bps fee computation on realized treasury yield, routed to the canonical treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac with per-tick accounting. (1) Fee math matches the worked example in P21_ECONOMICS.md to the wei. (2) The treasury address constant is verified against the catalog at import time; a mismatch fails closed. (3) Zero-yield ticks route zero fee without error. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Implement 8 bps fee computation on realized treasury yield, routed to the canonical treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac with per-tick accounting. (1) Fee math matches the worked example in P21_ECONOMICS.md to the wei. (2) The treasury address constant is verified against the catalog at import time; a mismatch fails closed. (3) Zero-yield ticks route zero fee without error. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-fee-routing",
   "tags": [
    "defi",
@@ -225,7 +225,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "core",
   "title": "Implement the execute_live_env controller",
-  "description": "Implement the execute_live_env controller: live execution of approved allocations happens ONLY when the EXECUTE_LIVE_ENV flag is set and a reviewed hold file exists, and execution is delegated to an approved external executor path (the swarm itself still never broadcasts). (1) Report-only behavior without the env flag, even against live data. (2) Reviewed-holds-only dispatch with the flag set. (3) Every dispatch is audit-logged. (4) The flag defaults to off in every deploy config. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Implement the execute_live_env controller: live execution of approved allocations happens ONLY when the EXECUTE_LIVE_ENV flag is set and a reviewed hold file exists, and execution is delegated to an approved external executor path (the swarm itself still never broadcasts). (1) Report-only behavior without the env flag, even against live data. (2) Reviewed-holds-only dispatch with the flag set. (3) Every dispatch is audit-logged. (4) The flag defaults to off in every deploy config. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-live-env-controller",
   "tags": [
    "defi",
@@ -247,7 +247,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "testing",
   "title": "Write P21 unit tests with 85% coverage of the package",
-  "description": "Write unit tests under tests/pytest/test_p21_treasury_dao_unit.py covering gates, fee math, report schema validation, and the no-broadcast guard. (1) All tests pass. (2) Line coverage of src/sincor2/defi/p21/ is above 85%. (3) The import-lint test for signing libraries is included. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write unit tests under tests/pytest/test_p21_treasury_dao_unit.py covering gates, fee math, report schema validation, and the no-broadcast guard. (1) All tests pass. (2) Line coverage of src/sincor2/defi/p21/ is above 85%. (3) The import-lint test for signing libraries is included. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-unit-tests",
   "tags": [
    "defi",
@@ -268,7 +268,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "testing",
   "title": "Write P21 pipeline integration tests",
-  "description": "Write integration tests for the full pipeline: allocator to hold file to review to report to dashboard publish, plus the live-env controller with the env flag on and off. (1) The full pipeline is green. (2) Both flag states are tested. (3) The no-broadcast invariant holds in every path. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write integration tests for the full pipeline: allocator to hold file to review to report to dashboard publish, plus the live-env controller with the env flag on and off. (1) The full pipeline is green. (2) Both flag states are tested. (3) The no-broadcast invariant holds in every path. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-integration-tests",
   "tags": [
    "defi",
@@ -290,7 +290,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "testing",
   "title": "Fuzz P21 allocation invariants across 1000+ cases",
-  "description": "Write property and invariant tests: allocations always sum to 100%, max_alloc_pct 0.30 is never exceeded, and no fuzzed allocator input ever produces a broadcast attempt. (1) Invariants hold over at least 1000 randomized cases. (2) Band limits hold on every case. (3) Zero broadcast attempts across all cases. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write property and invariant tests: allocations always sum to 100%, max_alloc_pct 0.30 is never exceeded, and no fuzzed allocator input ever produces a broadcast attempt. (1) Invariants hold over at least 1000 randomized cases. (2) Band limits hold on every case. (3) Zero broadcast attempts across all cases. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-invariant-fuzz-tests",
   "tags": [
    "defi",
@@ -311,7 +311,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "testing",
   "title": "Run the P21 allocator on a Base fork with zero emitted transactions",
-  "description": "Run the allocator against forked Base state with real venue data, verifying the report generator handles real balances and the live-env controller stays report-only without EXECUTE_LIVE_ENV. (1) The simulation produces a valid report from real venue data. (2) Zero on-chain transactions are emitted. (3) The no-broadcast alarm stays silent (any firing is a failure). Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Run the allocator against forked Base state with real venue data, verifying the report generator handles real balances and the live-env controller stays report-only without EXECUTE_LIVE_ENV. (1) The simulation produces a valid report from real venue data. (2) Zero on-chain transactions are emitted. (3) The no-broadcast alarm stays silent (any firing is a failure). Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-fork-simulation",
   "tags": [
    "defi",
@@ -331,7 +331,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "audit",
   "title": "Assemble the P21 audit-prep package",
-  "description": "Assemble the audit-prep package: frozen code snapshot, a threat model focused on accidental broadcast, hold-file tampering, and fee diversion, plus a known-limitations log. (1) A single reviewable directory exists with the commit hash recorded. (2) The threat model covers the three named classes. (3) The known-limitations log is filed. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Assemble the audit-prep package: frozen code snapshot, a threat model focused on accidental broadcast, hold-file tampering, and fee diversion, plus a known-limitations log. (1) A single reviewable directory exists with the commit hash recorded. (2) The threat model covers the three named classes. (3) The known-limitations log is filed. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-audit-prep",
   "tags": [
    "defi",
@@ -351,7 +351,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "audit",
   "title": "Remediate all P21 medium-and-higher audit findings",
-  "description": "Remediate all audit findings rated medium or higher, re-running the full P21 suite and the no-broadcast guard tests after each fix. (1) Zero open medium-or-higher findings. (2) The full suite is green after each fix. (3) Each fix links to its regression test. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Remediate all audit findings rated medium or higher, re-running the full P21 suite and the no-broadcast guard tests after each fix. (1) Zero open medium-or-higher findings. (2) The full suite is green after each fix. (3) Each fix links to its regression test. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-findings-remediation",
   "tags": [
    "defi",
@@ -371,7 +371,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "audit",
   "title": "Gas-optimize P21 on-chain components with a 20% hot-path cut",
-  "description": "Gas-optimize the on-chain components (fee routing, executor adapter): measure gas per path and target a 20% reduction on hot paths without changing behavior. (1) A committed before/after gas report shows the 20% cut on hot paths. (2) All tests still pass. (3) Behavior is unchanged (byte-identical outputs on the fixture set). Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Gas-optimize the on-chain components (fee routing, executor adapter): measure gas per path and target a 20% reduction on hot paths without changing behavior. (1) A committed before/after gas report shows the 20% cut on hot paths. (2) All tests still pass. (3) Behavior is unchanged (byte-identical outputs on the fixture set). Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-gas-optimization",
   "tags": [
    "defi",
@@ -391,7 +391,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "docs",
   "title": "Write the P21 component reference",
-  "description": "Write technical docs: a component reference for src/sincor2/defi/p21/, the report schema, gate semantics, and the no-broadcast invariant. (1) Docs build without warnings. (2) Every public function is documented. (3) Gate semantics (hold_file, execute_live_env) are specified exactly. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write technical docs: a component reference for src/sincor2/defi/p21/, the report schema, gate semantics, and the no-broadcast invariant. (1) Docs build without warnings. (2) Every public function is documented. (3) Gate semantics (hold_file, execute_live_env) are specified exactly. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-technical-docs",
   "tags": [
    "defi",
@@ -411,7 +411,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "docs",
   "title": "Ship the P21 agent YAML config and ops runbook",
-  "description": "Ship configs/agents/p21-treasury-dao.yaml (budgets, memory, TOA hooks, check-in cadence) plus docs/ops/P21_RUNBOOK.md covering hold-file review, dashboard checks, and live-env enablement. (1) The YAML validates. (2) Runbook steps are executable by an operator (hold-file review, dashboard checks, live-env enablement). (3) The runbook states the 72h hold-review SLA. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Ship configs/agents/p21-treasury-dao.yaml (budgets, memory, TOA hooks, check-in cadence) plus docs/ops/P21_RUNBOOK.md covering hold-file review, dashboard checks, and live-env enablement. (1) The YAML validates. (2) Runbook steps are executable by an operator (hold-file review, dashboard checks, live-env enablement). (3) The runbook states the 72h hold-review SLA. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-agent-yaml-runbook",
   "tags": [
    "defi",
@@ -432,7 +432,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "docs",
   "title": "Add P21 dashboard monitoring hooks",
-  "description": "Add monitoring hooks: allocation-report freshness alert (fires if no reviewed report in 30h), hold-file backlog metric, and a no-broadcast-attempt alarm wired to the SINCOR dashboard. (1) Hooks emit on the feed schema. (2) Alerts fire on simulated staleness. (3) The no-broadcast alarm firing is classified SEV-1 in the runbook. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Add monitoring hooks: allocation-report freshness alert (fires if no reviewed report in 30h), hold-file backlog metric, and a no-broadcast-attempt alarm wired to the SINCOR dashboard. (1) Hooks emit on the feed schema. (2) Alerts fire on simulated staleness. (3) The no-broadcast alarm firing is classified SEV-1 in the runbook. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-dashboard-monitoring-hooks",
   "tags": [
    "defi",
@@ -452,7 +452,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "deploy",
   "title": "Write P21 testnet and agent deploy scripts",
-  "description": "Write testnet deploy scripts for any P21 on-chain components plus the offchain agent deployment (Railway/Gunicorn) with EXECUTE_LIVE_ENV defaulting to off. (1) Scripts run end-to-end on Base Sepolia. (2) Agent check-ins are visible in logs. (3) A CI check asserts the flag default is off in every deploy config. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Write testnet deploy scripts for any P21 on-chain components plus the offchain agent deployment (Railway/Gunicorn) with EXECUTE_LIVE_ENV defaulting to off. (1) Scripts run end-to-end on Base Sepolia. (2) Agent check-ins are visible in logs. (3) A CI check asserts the flag default is off in every deploy config. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-testnet-deploy-scripts",
   "tags": [
    "defi",
@@ -472,7 +472,7 @@
   "project_name": "DAO Treasury Management",
   "phase": "deploy",
   "title": "Produce the P21 mainnet readiness checklist",
-  "description": "Produce the mainnet readiness checklist: audit sign-off, env-flag policy, treasury address verification (0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac), rollback plan, and a printed compliance checkpoint pre-flight. (1) The checklist is reviewed and signed with go/no-go recorded. (2) Rollback steps are executable. (3) No live-env enablement before sign-off. Ref: per specs/p21-treasury-dao.md §Acceptance criteria.",
+  "description": "Produce the mainnet readiness checklist: audit sign-off, env-flag policy, treasury address verification (0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac), rollback plan, and a printed compliance checkpoint pre-flight. (1) The checklist is reviewed and signed with go/no-go recorded. (2) Rollback steps are executable. (3) No live-env enablement before sign-off. Ref: per specs/p21-treasury-dao.md \u00a7Acceptance criteria.",
   "skill": "p21-treasury-dao-mainnet-readiness-checklist",
   "tags": [
    "defi",
@@ -484,6 +484,295 @@
   "effort": "S",
   "depends_on": [
    "p21-treasury-dao-testnet-deploy-scripts"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-no-broadcast-guard-testharden-0",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "testing",
+  "title": "Test-hardening: Implement the BroadcastForbidden no-broadcast guard",
+  "description": "Follow-on to p21-treasury-dao-no-broadcast-guard (Implement the BroadcastForbidden no-broadcast guard).\n\nBuilds on the deliverable: Implement the no-broadcast guard: the swarm holds no signing capability and no signing libraries are importable from the allocator module; any code path attempting a transaction broadcast raises BroadcastForbidden and logs a security event. (1) Broadcast attempts through every agent entrypoint raise in tests. (2) The c...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p21-treasury-dao-no-broadcast-guard-testharden-0",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "security",
+   "gates",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p21-treasury-dao-no-broadcast-guard"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-dashboard-publisher-testharden-1",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "testing",
+  "title": "Test-hardening: Implement the SINCOR dashboard publisher",
+  "description": "Follow-on to p21-treasury-dao-dashboard-publisher (Implement the SINCOR dashboard publisher).\n\nBuilds on the deliverable: Implement the dashboard publisher posting reviewed allocation reports to the SINCOR dashboard feed on the status-feed schema, reporting unknown rather than healthy on failure. (1) A reviewed report publishes end-to-end. (2) A dashboard endpoint failure is surfaced, never swallowed. (3) Unreviewed holds are never publis...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p21-treasury-dao-dashboard-publisher-testharden-1",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "dashboard",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p21-treasury-dao-dashboard-publisher"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-fee-routing-testharden-2",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "testing",
+  "title": "Test-hardening: Implement 8 bps fee routing to the canonical treasury",
+  "description": "Follow-on to p21-treasury-dao-fee-routing (Implement 8 bps fee routing to the canonical treasury).\n\nBuilds on the deliverable: Implement 8 bps fee computation on realized treasury yield, routed to the canonical treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac with per-tick accounting. (1) Fee math matches the worked example in P21_ECONOMICS.md to the wei. (2) The treasury address constant is verified against the catalog at import time; a mi...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p21-treasury-dao-fee-routing-testharden-2",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "fees",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p21-treasury-dao-fee-routing"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-live-env-controller-testharden-3",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "testing",
+  "title": "Test-hardening: Implement the execute_live_env controller",
+  "description": "Follow-on to p21-treasury-dao-live-env-controller (Implement the execute_live_env controller).\n\nBuilds on the deliverable: Implement the execute_live_env controller: live execution of approved allocations happens ONLY when the EXECUTE_LIVE_ENV flag is set and a reviewed hold file exists, and execution is delegated to an approved external executor path (the swarm itself still never broadcasts). (1) Report-only behavior without the env flag,...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p21-treasury-dao-live-env-controller-testharden-3",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "gates",
+   "execution",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p21-treasury-dao-live-env-controller"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-treasury-allocator-agent-secreview-0",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "audit",
+  "title": "Security review: Implement the treasury allocator inside the risk budget",
+  "description": "Follow-on to p21-treasury-dao-treasury-allocator-agent (Implement the treasury allocator inside the risk budget).\n\nBuilds on the deliverable: Build the allocator agent in src/sincor2/defi/p21/allocator.py: computes target allocations across yield venues within the risk budget (risk_score 0.20), max_alloc_pct 0.30 per venue, the four bands (stables 40\u201360%, blue-chip 20\u201335%, yield venues 10\u201325%, native 5\u201315%), and TOA revenue forecasts, with error handling, re...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p21-treasury-dao-treasury-allocator-agent-secreview-0",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "agent",
+   "toa",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-treasury-allocator-agent"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-hold-file-gate-secreview-1",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "audit",
+  "title": "Security review: Implement the content-addressed hold_file gate",
+  "description": "Follow-on to p21-treasury-dao-hold-file-gate (Implement the content-addressed hold_file gate).\n\nBuilds on the deliverable: Implement the hold_file gate in src/sincor2/defi/p21/gates.py: every allocation decision (including no-action) is written to a content-addressed hold file (JSON, filename = sha256 of canonical contents) awaiting human review; no downstream step proceeds without a reviewed hold file. (1) Unreviewed holds block publishin...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p21-treasury-dao-hold-file-gate-secreview-1",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "gates",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-hold-file-gate"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-allocation-report-generator-secreview-2",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "audit",
+  "title": "Security review: Implement the canonical allocation report generator",
+  "description": "Follow-on to p21-treasury-dao-allocation-report-generator (Implement the canonical allocation report generator).\n\nBuilds on the deliverable: Implement the allocation report generator for the canonical treasury: per-venue allocations, risk metrics, fee projection at 8 bps, IPS-limit checks, runway projection, and a human-readable summary, written to the hold file and the dashboard feed. (1) Allocations sum to exactly 100% in every generated report. (2) Repor...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p21-treasury-dao-allocation-report-generator-secreview-2",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "reporting",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-allocation-report-generator"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-testnet-deploy-scripts-prodready-0",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "deploy",
+  "title": "Production readiness: Write P21 testnet and agent deploy scripts",
+  "description": "Follow-on to p21-treasury-dao-testnet-deploy-scripts (Write P21 testnet and agent deploy scripts).\n\nBuilds on the deliverable: Write testnet deploy scripts for any P21 on-chain components plus the offchain agent deployment (Railway/Gunicorn) with EXECUTE_LIVE_ENV defaulting to off. (1) Scripts run end-to-end on Base Sepolia. (2) Agent check-ins are visible in logs. (3) A CI check asserts the flag default is off in every deploy config. Ref: per...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p21-treasury-dao-testnet-deploy-scripts-prodready-0",
+  "tags": [
+   "defi",
+   "treasury",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-testnet-deploy-scripts"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-mainnet-readiness-checklist-prodready-1",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "deploy",
+  "title": "Production readiness: Produce the P21 mainnet readiness checklist",
+  "description": "Follow-on to p21-treasury-dao-mainnet-readiness-checklist (Produce the P21 mainnet readiness checklist).\n\nBuilds on the deliverable: Produce the mainnet readiness checklist: audit sign-off, env-flag policy, treasury address verification (0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac), rollback plan, and a printed compliance checkpoint pre-flight. (1) The checklist is reviewed and signed with go/no-go recorded. (2) Rollback steps are executable. (3) No ...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p21-treasury-dao-mainnet-readiness-checklist-prodready-1",
+  "tags": [
+   "defi",
+   "treasury",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-mainnet-readiness-checklist"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-technical-docs-prodready-2",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "deploy",
+  "title": "Production readiness: Write the P21 component reference",
+  "description": "Follow-on to p21-treasury-dao-technical-docs (Write the P21 component reference).\n\nBuilds on the deliverable: Write technical docs: a component reference for src/sincor2/defi/p21/, the report schema, gate semantics, and the no-broadcast invariant. (1) Docs build without warnings. (2) Every public function is documented. (3) Gate semantics (hold_file, execute_live_env) are specified exactly. Ref: per specs/p21-treasury-dao.md \u00a7...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p21-treasury-dao-technical-docs-prodready-2",
+  "tags": [
+   "defi",
+   "treasury",
+   "docs",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-repo-layout-devex-0",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "scaffold",
+  "title": "DevEx: Create the P21 Python package skeleton",
+  "description": "Follow-on to p21-treasury-dao-repo-layout (Create the P21 Python package skeleton).\n\nBuilds on the deliverable: Create src/sincor2/defi/p21/ with allocator.py, gates.py, report.py, publisher.py, fees.py, plus tests/pytest/test_p21_*.py stubs, configs/agents/p21-treasury-dao.yaml, and a docs runbook stub. (1) The package imports cleanly (python -m compileall passes). (2) The layout matches the repo's Python-agent conventions. (3)...\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p21-treasury-dao-repo-layout-devex-0",
+  "tags": [
+   "defi",
+   "treasury",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p21-treasury-dao-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-starter-code-devex-1",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "scaffold",
+  "title": "DevEx: Write P21 allocator and report stubs with catalog defaults",
+  "description": "Follow-on to p21-treasury-dao-starter-code (Write P21 allocator and report stubs with catalog defaults).\n\nBuilds on the deliverable: Write starter boilerplate: an allocator stub with TOA hooks, a report generator stub emitting an empty-but-valid allocation report, and config defaults (fee_bps=8, target_apr=0.04, risk_score=0.20). (1) python -m compileall passes on the package. (2) The stub report validates against the report schema. (3) Defaults mat...\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p21-treasury-dao-starter-code-devex-1",
+  "tags": [
+   "defi",
+   "treasury",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p21-treasury-dao-starter-code"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-treasury-allocator-agent-completion-0",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "core",
+  "title": "Core completion: Implement the treasury allocator inside the risk budget",
+  "description": "Follow-on to p21-treasury-dao-treasury-allocator-agent (Implement the treasury allocator inside the risk budget).\n\nBuilds on the deliverable: Build the allocator agent in src/sincor2/defi/p21/allocator.py: computes target allocations across yield venues within the risk budget (risk_score 0.20), max_alloc_pct 0.30 per venue, the four bands (stables 40\u201360%, blue-chip 20\u201335%, yield venues 10\u201325%, native 5\u201315%), and TOA revenue forecasts, with error handling, re...\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p21-treasury-dao-treasury-allocator-agent-completion-0",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "agent",
+   "toa"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-treasury-allocator-agent"
+  ]
+ },
+ {
+  "task_key": "p21-treasury-dao-hold-file-gate-completion-1",
+  "project_id": "P21",
+  "project_name": "DAO Treasury Management",
+  "phase": "core",
+  "title": "Core completion: Implement the content-addressed hold_file gate",
+  "description": "Follow-on to p21-treasury-dao-hold-file-gate (Implement the content-addressed hold_file gate).\n\nBuilds on the deliverable: Implement the hold_file gate in src/sincor2/defi/p21/gates.py: every allocation decision (including no-action) is written to a content-addressed hold file (JSON, filename = sha256 of canonical contents) awaiting human review; no downstream step proceeds without a reviewed hold file. (1) Unreviewed holds block publishin...\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p21-treasury-dao-hold-file-gate-completion-1",
+  "tags": [
+   "defi",
+   "treasury",
+   "core",
+   "gates"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p21-treasury-dao-hold-file-gate"
   ]
  }
 ]
