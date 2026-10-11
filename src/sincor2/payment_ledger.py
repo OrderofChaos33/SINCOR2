@@ -1132,10 +1132,26 @@ class PaymentLedgerStore:
 
             entry = record.transition(target, actor=actor, reason=reason)
 
+            # W-72: a dispute voids any prior finality confirmation.  The
+            # flag is write-once by the finality checker; entering DISPUTED
+            # clears it so the payment cannot re-settle on stale finality —
+            # fresh finality evidence must re-confirm it (this implements
+            # the long-claimed batch-A claim 4).
+            clears_finality = target == PaymentState.DISPUTED
+            if clears_finality:
+                record.finality_confirmed = False
+
             updated = conn.execute(
-                "UPDATE payments SET state=?, version=?, updated_at=? "
-                "WHERE payment_id=? AND version=?",
-                (record.state.value, record.version, record.updated_at, payment_id, row["version"]),
+                "UPDATE payments SET state=?, version=?, updated_at=?,"
+                " finality_confirmed=? WHERE payment_id=? AND version=?",
+                (
+                    record.state.value,
+                    record.version,
+                    record.updated_at,
+                    0 if clears_finality else int(row["finality_confirmed"]),
+                    payment_id,
+                    row["version"],
+                ),
             )
             if updated.rowcount != 1:
                 # Another writer moved the payment between our read and write.
@@ -1217,13 +1233,20 @@ class PaymentLedgerStore:
                 record, target, allow_finality_bypass=allow_finality_bypass
             )
             entry = record.transition(target, actor=actor, reason=reason)
+            # W-72: a dispute voids any prior finality confirmation (same
+            # semantics as transition_payment — see there).
+            clears_finality = target == PaymentState.DISPUTED
+            if clears_finality:
+                record.finality_confirmed = False
             updated = conn.execute(
-                "UPDATE payments SET state=?, version=?, updated_at=? "
+                "UPDATE payments SET state=?, version=?, updated_at=?,"
+                " finality_confirmed=? "
                 "WHERE payment_id=? AND version=? AND state=?",
                 (
                     record.state.value,
                     record.version,
                     record.updated_at,
+                    0 if clears_finality else int(row["finality_confirmed"]),
                     payment_id,
                     row["version"],
                     expected.value,
