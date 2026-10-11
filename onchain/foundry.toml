@@ -25,6 +25,20 @@ remappings = [
 cbor_metadata = true
 bytecode_hash = "ipfs"
 
+# Isolated, offline profile for the P24 local-simulation safety regression.
+# Use: FOUNDRY_PROFILE=p24 forge test --offline --match-path test/p24/P24Deploy.t.sol
+[profile.p24]
+src = "src/p24"
+test = "test/p24"
+out = "out-p24"
+cache_path = "cache-p24"
+libs = ["lib"]
+solc = "0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+remappings = ["forge-std/=lib/forge-std/src/"]
+
 # File System Security Permissions
 fs_permissions = [
     { access = "read", path = "./" },

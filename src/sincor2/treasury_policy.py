@@ -14,16 +14,13 @@ This module centralizes the logic so every revenue path respects the policy.
 .. warning::
 
     ``convert_before_treasury_if_needed()`` returns a **signal only**, and
-    is fail-closed: ``converted`` is ``False`` until an executor is armed
-    (backlog item 34, landed via PR #321). Even when ``True``, it means
-    "conversion *should* happen" — this module performs **no swap and
-    moves no funds**. The real conversion executor
-    (``sincor2.onchain.fee_conversion_executor``) ships disarmed
-    (``armed=False``) with zero production callers. The onchain fee-event
+    is fail-closed: ``converted`` is always ``False`` because no canonical
+    release/approval contract or owner-approved live conversion capability
+    exists. This module performs **no swap and moves no funds**. The conversion
+    executor rejects all live attempts; ``armed`` is not authorization. The onchain fee-event
     listener (``sincor2.onchain.fee_event_listener``) records confirmed
     fee inflows as *pending obligations* only — it never converts.
-    Never treat a ``True`` return as settled conversion; verify the
-    ConversionLedger / onchain receipts.
+    The legacy ``SINCOR_FEE_EXECUTOR_ARMED`` environment flag is ignored.
     Canonical reference: ``docs/architecture/CANONICAL_PATHS.md`` §2.
 """
 
@@ -54,9 +51,10 @@ class TreasuryPolicy:
             from_token="AXM",
             receiving_wallet="TREASURY"
         )
-        # decision.converted is False until an executor is armed (item 32);
-        # decision.reason explains why.  Never treat converted=True as proof
-        # that funds moved — verify the ConversionLedger / onchain receipts.
+        # decision.converted is always False: no canonical authorization
+        # interface or owner-approved live conversion capability exists.
+        # Legacy armed flags cannot enable execution. Never treat this signal
+        # as proof that funds moved; verify the ConversionLedger/onchain receipts.
 
         # Trading wallet syphon check
         if treasury_policy.should_syphon_native_profit(wallet_address, profit_usd=3200):
@@ -122,10 +120,8 @@ class ConversionDecision(NamedTuple):
     """
     Fail-closed conversion signal (build-out item 34, 2026-09-30).
 
-    ``converted`` is True ONLY when a real conversion executor is armed and
-    has performed (or is responsible for) the swap.  Until then it is False
-    and ``reason`` explains why.  No caller may treat ``converted=True`` as
-    proof that funds moved — verify the ConversionLedger / onchain receipts.
+    ``converted`` remains False while no canonical release/approval contract
+    and owner-approved live capability exist.
     """
     amount: float
     target_asset: str
@@ -135,15 +131,13 @@ class ConversionDecision(NamedTuple):
 
 def is_conversion_executor_armed() -> bool:
     """
-    Whether a real fee-conversion executor is armed and able to perform the
-    swap.  Fail-closed default False.
+    Compatibility predicate for legacy callers; always fail closed.
 
-    This flag may ONLY be set true by the item-32 arming ceremony
-    (docs/ops/FEE_EXECUTOR_RUNBOOK.md): pinned pool, fork-simulated
-    calldata, forwarder key in the Secure Vault.  No code path in this repo
-    sets it; until the ceremony completes it stays False.
+    The legacy SINCOR_FEE_EXECUTOR_ARMED environment flag is not authorization.
+    WP0 has no canonical release/approval contract or owner-approved live
+    conversion capability, so configuration cannot enable a live swap.
     """
-    return os.getenv("SINCOR_FEE_EXECUTOR_ARMED", "false").lower() == "true"
+    return False
 
 
 # Singleton instance for easy import across the codebase
@@ -158,10 +152,8 @@ def convert_before_treasury_if_needed(
     """
     Helper used by revenue paths (SADAS, A2A tasks, trading profits, etc).
 
-    FAIL-CLOSED (2026-09-30, build-out item 34): this returns
-    ``converted=False`` with a ``reason`` until a conversion executor is
-    actually armed (item 32).  No code path may believe conversion happened
-    when it didn't.
+    FAIL-CLOSED: this returns ``converted=False`` because a legacy armed flag
+    is not an authorization contract. No code path may claim conversion.
 
     Returns:
         ConversionDecision(amount, target_asset, converted, reason)
@@ -174,23 +166,13 @@ def convert_before_treasury_if_needed(
             reason="conversion not required by policy "
                    "(non-fee token or trading-wallet exception)",
         )
-    if is_conversion_executor_armed():
-        # The armed executor owns the swap; this signal alone never proves
-        # funds moved — verify the ConversionLedger / onchain receipts.
-        return ConversionDecision(
-            amount=amount,
-            target_asset=treasury_policy.target_asset,
-            converted=True,
-            reason="conversion executor is armed; conversion is the armed "
-                   "executor's responsibility (verify onchain)",
-        )
     return ConversionDecision(
         amount=amount,
         target_asset=from_token,
         converted=False,
-        reason="conversion required by policy but the fee-conversion "
-               "executor is disarmed (item 32 not complete); no conversion "
-               "was performed — queue the obligation in the ConversionLedger",
+        reason="conversion required by policy but live conversion is blocked "
+               "pending canonical release/approval contract and owner decision; "
+               "no conversion was performed",
     )
 
 

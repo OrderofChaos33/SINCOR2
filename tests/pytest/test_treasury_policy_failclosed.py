@@ -1,7 +1,5 @@
 """Fail-closed treasury policy tests (build-out item 34) — all offline."""
 
-import importlib
-
 import pytest
 
 import src.sincor2.treasury_policy as tp
@@ -16,7 +14,7 @@ def _no_armed_env(monkeypatch):
 def test_not_converted_by_default_for_axm_to_treasury():
     d = tp.convert_before_treasury_if_needed(1250.0, "AXM", "TREASURY")
     assert d.converted is False
-    assert "disarmed" in d.reason
+    assert "blocked" in d.reason
     assert d.amount == 1250.0
     # target must NOT claim USDC — nothing was converted
     assert d.target_asset == "AXM"
@@ -48,20 +46,14 @@ def test_armed_flag_is_fail_closed_by_default():
     assert tp.is_conversion_executor_armed() is False
 
 
-def test_armed_env_changes_signal_only_with_explicit_reason(monkeypatch):
-    # Documents the ONLY path to converted=True: the item-32 arming ceremony
-    # sets SINCOR_FEE_EXECUTOR_ARMED=true.  Even then the reason warns the
-    # signal alone is not proof that funds moved.
+def test_legacy_armed_env_cannot_enable_conversion(monkeypatch):
+    # Legacy boolean flags are not an authorization contract.
     monkeypatch.setenv("SINCOR_FEE_EXECUTOR_ARMED", "true")
-    importlib.reload(tp)
-    try:
-        assert tp.is_conversion_executor_armed() is True
-        d = tp.convert_before_treasury_if_needed(1250.0, "AXM", "TREASURY")
-        assert d.converted is True
-        assert "verify onchain" in d.reason
-    finally:
-        monkeypatch.delenv("SINCOR_FEE_EXECUTOR_ARMED", raising=False)
-        importlib.reload(tp)
+    assert tp.is_conversion_executor_armed() is False
+    d = tp.convert_before_treasury_if_needed(1250.0, "AXM", "TREASURY")
+    assert d.converted is False
+    assert "blocked" in d.reason
+    assert d.target_asset == "AXM"
 
 
 def test_policy_predicate_unchanged():

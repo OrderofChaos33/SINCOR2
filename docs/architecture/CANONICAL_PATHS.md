@@ -67,37 +67,36 @@ Verified caller counts below are from a repo-wide grep on 2026-09-30
 | `src/sincor2/treasury_settlement.py` | Fee-only realized-inflow recording for the A2A settlement path; feeds `treasury_inflow.record_inflow`. **Never moves funds.** | Measurement helper | `a2a_integration.py`, `platform_payments.py` + tests |
 | `src/sincor2/platform_payments.py` | Human billing/checkout surface (AXM primary; SINC legacy renewals only). Read-only `verify_treasury_transfer()` (eth_getTransactionReceipt + ERC-20 Transfer log parsing), live at `POST /api/platform/verify`. | Billing surface | `agent_billing.py`, `mvp_app.py`, `mvp_blueprints/billing.py`, `subscription_scheduler.py`, `x402_payments.py` |
 | `src/sincor2/treasury_hold.py` | Policy constants (`FEE_DESTINATION_PCT=100`, `PLATFORM_FEE_BPS=500`; HOLD lifted 2026-09-10). `standing_order()` consumed by the KYA quest surface. | Constants | `kya/blueprint.py` + tests |
-| `src/sincor2/treasury_policy.py` | Conversion-policy config + `convert_before_treasury_if_needed()`. **WARNING — signal only, and fail-closed (item 34 landed):** `converted` is `False` until an executor is armed; **no swap is ever executed** here. The real executor (`onchain/fee_conversion_executor.py`) ships disarmed (`armed=False`) with zero production callers. Do not treat a `True` return as settled conversion — verify the ConversionLedger / onchain receipts. | Policy signal (see §3) | `sadas_orchestrator.py` (only production caller) |
+| `src/sincor2/treasury_policy.py` | Conversion-policy signal + `convert_before_treasury_if_needed()`. **Fail-closed:** `converted` remains `False` regardless of legacy armed flags; this module executes no swap. The executor rejects live execution until a new canonical authorization interface and explicit owner decisions are separately reviewed. Verify any future settlement only from the ConversionLedger/onchain receipts. | Policy signal (see §3) | `sadas_orchestrator.py` (only production caller) |
 | `src/sincor2/x402_payments.py` | HTTP 402 micropayments in SINC (spec §5.4). | Micropayment surface | `mvp_app.py`, `mvp_blueprints/billing.py` + tests |
 | `src/sincor2/sinc_payment_verifier.py` | Onchain SINC transfer verification (`SINCPaymentVerifier`, 8-decimal SINC scaling). | **QUARANTINED — zero importers. Do not import.** Retained (not deleted) because it is the only SINC-verification implementation; deletion needs founder review in case SINC billing ever returns. | none |
 
 Related (outside the 8, for completeness):
 
-- `src/sincor2/onchain/fee_conversion_executor.py` builds Uniswap V4
-  Universal-Router + Permit2 swap calldata and pre-broadcast eth_call, but
-  ships **disarmed** (`armed=False`) with zero production callers. Arming is
-  backlog item 32 (founder ceremony: pool pin + fork-sim + forwarder key in
-  Secure Vault).
+- `src/sincor2/onchain/fee_conversion_executor.py` can build Uniswap V4
+  Universal-Router + Permit2 plans and pre-broadcast `eth_call` simulations,
+  but live execution is unconditionally denied before signer/receipt/broadcast
+  callbacks. It has zero production callers. The legacy `armed` setting and
+  `SINCOR_FEE_EXECUTOR_ARMED` flag are not authorization.
 - `src/sincor2/onchain/fee_event_listener.py` (PR #321) is a **read-only**
   onchain fee-inflow watcher: it polls Base `eth_getLogs` for AXM `Transfer`
   events into the platform fee-recipient address and records *confirmed*
   inflows (N-confirmations deep, default 12, durable cursor with reorg
   handling) as pending obligations in the `ConversionLedger` via
-  `record_pending_conversion()`. It never handles keys, never signs, never
-  broadcasts, never arms the executor — **pending obligations only, no funds
-  move**. A recorded fee inflow becomes a ledger obligation automatically;
-  conversion still waits on the item-32 armed executor.
+  `record_pending_conversion()`. It never handles keys, signs, broadcasts, or
+  arms an executor — **pending obligations only, no funds move**. A recorded
+  fee inflow does not authorize or schedule a conversion.
 
 ---
 
 ## 3. Known dangerous shapes (documented, not fixed here)
 
 - `treasury_policy.convert_before_treasury_if_needed()` returning
-  `converted=True` while performing no swap — **fixed on main by PR #321**
-  (backlog item 34: fail-closed, `converted=False` until an executor is armed;
-  the sole production caller now reports "NOT converted … held pending
-  conversion"). The residual shape is verbal: any log line or doc that says
-  "converted" without pointing at the ConversionLedger / onchain receipts.
+  `converted=True` while performing no swap — the policy now remains
+  `converted=False` regardless of legacy armed configuration, and the sole
+  production caller reports the funds as not converted. The residual shape is
+  verbal: any log line or doc that says "converted" without pointing at the
+  ConversionLedger / onchain receipts.
 - `marketplace/settlement.py` docstring says the 5% fee "is routed to the
   treasury"; it is recorded in a process-local dict (`route_to_treasury()`
   marks conversion `'status': 'pending'`). Fixed by backlog item 35.
