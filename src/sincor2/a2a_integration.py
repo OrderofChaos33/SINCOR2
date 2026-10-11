@@ -2901,6 +2901,7 @@ _AUTH_HTTP_STATUS = {_ERR_AUTH_REQUIRED: 401, _ERR_FORBIDDEN: 403}
 _AUTH_CREATE_DOMAIN = "SINCOR-A2A task-create"
 _AUTH_MARKET_CREATE_DOMAIN = "SINCOR-A2A-MARKET task-create"
 _AUTH_TASK_DOMAIN_FMT = "SINCOR-A2A task-{purpose}"  # get | cancel | list | push
+_AUTH_BID_DOMAIN_FMT = "SINCOR-A2A-MARKET bid-{purpose}"  # commit | reveal
 _AUTH_MAX_SKEW_S = 600      # signature freshness window, seconds
 _AUTH_REPLAY_MAX = 8192     # bounded replay cache (per-process)
 
@@ -3137,6 +3138,53 @@ def _verify_list_auth(params: Optional[Dict[str, Any]],
         return None, _err("Signature already used (replay rejected).",
                            code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
     return signer.lower(), None
+
+
+def _auth_bid_message(purpose: str, task_id: str, agent_id: str,
+                      payload: str, timestamp: int, nonce: str) -> str:
+    """Canonical bid message for the marketplace commit/reveal routes.
+
+    Binds the signature to the exact bid action: purpose (commit|reveal),
+    task, bidding agent, and the action payload (the commitment hex for
+    commit; ``bid_axm:nonce`` for reveal).  A captured commit signature
+    cannot be replayed as a reveal or retargeted to another task/agent.
+    """
+    return (
+        f"{_AUTH_BID_DOMAIN_FMT.format(purpose=purpose)}\n"
+        f"task_id:{task_id}\n"
+        f"agent_id:{agent_id}\n"
+        f"payload:{payload}\n"
+        f"timestamp:{int(timestamp)}\n"
+        f"nonce:{nonce}"
+    )
+
+
+def _server_bound_bidder_wallet(body: Optional[Dict[str, Any]], *,
+                                purpose: str, task_id: str, agent_id: str,
+                                payload: str) -> Optional[str]:
+    """Recover the bidder wallet from an EIP-191 bid signature (W-77).
+
+    Returns the recovered wallet (lowercased), or None when the request is
+    unsigned, the signature is invalid/stale/replayed, or required fields
+    are missing.  Callers bind the recovered wallet to the agent's
+    registered wallet — a client-supplied ``agent_id`` is NEVER trusted
+    for attribution on its own.
+    """
+    src = body or {}
+    auth = _extract_auth_fields(src)
+    ts = _parse_auth_timestamp(auth["timestamp"])
+    if (not auth["signature"] or ts is None or not auth["nonce"]
+            or not task_id or not agent_id):
+        return None
+    message = _auth_bid_message(purpose, task_id, agent_id, payload,
+                                ts, auth["nonce"])
+    signer = _recover_eip191_signer(message, auth["signature"])
+    if not signer:
+        return None
+    digest = _auth_digest(message, auth["signature"])
+    if _auth_replay_seen(digest):
+        return None
+    return signer.lower()
 
 
 def _server_bound_poster_id(body: Optional[Dict[str, Any]]) -> Optional[str]:

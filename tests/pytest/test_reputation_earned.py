@@ -120,10 +120,25 @@ def _commitment(bid_axm, nonce_hex, agent_id):
 
 
 def _commit(client, task_id, agent_id, bid_axm=1.0, nonce_hex="aa" * 32):
+    # W-77: bids bind to the agent's registered wallet (keys in _REGISTER_KEYS).
+    from bid_testkit import signed_commit_body, signed_reveal_body
     return client.post(
         "/v1/a2a/bids/commit",
-        json={"task_id": task_id, "agent_id": agent_id,
-              "commitment": _commitment(bid_axm, nonce_hex, agent_id)},
+        json=signed_commit_body(
+            _REGISTER_KEYS[agent_id], task_id, agent_id,
+            _commitment(bid_axm, nonce_hex, agent_id)),
+    )
+
+
+def _reveal(client, task_id, agent_id, bid_axm=1.0, nonce_hex="aa" * 32,
+            est=300):
+    # W-77: reveals bind to the agent's registered wallet too.
+    from bid_testkit import signed_reveal_body
+    return client.post(
+        "/v1/a2a/bids/reveal",
+        json=signed_reveal_body(
+            _REGISTER_KEYS[agent_id], task_id, agent_id,
+            bid_axm, nonce_hex, est),
     )
 
 
@@ -149,9 +164,7 @@ def _run_auction_to_winner(client, agent_id="winner-a"):
     r = _commit(client, task_id, agent_id)
     assert r.status_code == 201, r.get_json()
     get_fabric().tasks[task_id]["commit_deadline"] = _now_ms() - 1000
-    r = client.post("/v1/a2a/bids/reveal", json={
-        "task_id": task_id, "agent_id": agent_id, "bid_axm": 1.0,
-        "nonce": "aa" * 32, "estimated_seconds": 300})
+    r = _reveal(client, task_id, agent_id)
     assert r.status_code == 201, r.get_json()
     get_fabric().tasks[task_id]["reveal_deadline"] = _now_ms() - 1
     r = client.post(f"/v1/a2a/tasks/{task_id}/close")
@@ -245,9 +258,7 @@ def test_ghosting_resets_reputation_to_zero(client):
     assert _commit(client, task_id, "ghost-1", nonce_hex="aa" * 32).status_code == 201
     assert _commit(client, task_id, "winner-1", nonce_hex="bb" * 32).status_code == 201
     fabric.tasks[task_id]["commit_deadline"] = _now_ms() - 1000
-    r = client.post("/v1/a2a/bids/reveal", json={
-        "task_id": task_id, "agent_id": "winner-1", "bid_axm": 1.0,
-        "nonce": "bb" * 32, "estimated_seconds": 300})
+    r = _reveal(client, task_id, "winner-1", nonce_hex="bb" * 32)
     assert r.status_code == 201, r.get_json()
     fabric.tasks[task_id]["reveal_deadline"] = _now_ms() - 1
     r = client.post(f"/v1/a2a/tasks/{task_id}/close")

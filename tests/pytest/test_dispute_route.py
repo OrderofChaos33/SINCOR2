@@ -14,6 +14,13 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from flask import Flask
 
+from bid_testkit import (
+    key_for,
+    register_wallet_agent,
+    signed_commit_body,
+    signed_reveal_body,
+)
+
 from sincor2.a2a_inbound import _now_ms, get_fabric, reset_fabric
 from sincor2.a2a_inbound import register as register_inbound
 from sincor2.a2a_inbound_market import (
@@ -51,10 +58,8 @@ def _adjudicator_env(monkeypatch, adjudicator):
 
 
 def _register(client, agent_id, stake_axm=10):
-    r = client.post("/v1/a2a/register", json={
-        "agent_id": agent_id, "capability_tags": ["lead-enrichment"],
-        "rpc_callback": "https://agent.example/rpc"})
-    assert r.status_code in (200, 201), r.get_json()
+    # W-77: bids bind to the agent's registered wallet.
+    register_wallet_agent(client, agent_id)
     if stake_axm:
         stake_ledger().deposit(agent_id, int(stake_axm * ONE_AXM))
 
@@ -77,14 +82,13 @@ def _run_auction_to_winner(client, agent_id="winner-a"):
     """Commit -> reveal -> close; returns (task_id, locked_wei)."""
     _register(client, agent_id)
     task_id = _sealed_task(client)
-    r = client.post("/v1/a2a/bids/commit", json={
-        "task_id": task_id, "agent_id": agent_id,
-        "commitment": _commitment(1.0, "aa" * 32, agent_id)})
+    r = client.post("/v1/a2a/bids/commit", json=signed_commit_body(
+        key_for(agent_id), task_id, agent_id,
+        _commitment(1.0, "aa" * 32, agent_id)))
     assert r.status_code == 201, r.get_json()
     get_fabric().tasks[task_id]["commit_deadline"] = _now_ms() - 1000
-    r = client.post("/v1/a2a/bids/reveal", json={
-        "task_id": task_id, "agent_id": agent_id, "bid_axm": 1.0,
-        "nonce": "aa" * 32, "estimated_seconds": 300})
+    r = client.post("/v1/a2a/bids/reveal", json=signed_reveal_body(
+        key_for(agent_id), task_id, agent_id, 1.0, "aa" * 32, 300))
     assert r.status_code == 201, r.get_json()
     get_fabric().tasks[task_id]["reveal_deadline"] = _now_ms() - 1
     r = client.post(f"/v1/a2a/tasks/{task_id}/close")

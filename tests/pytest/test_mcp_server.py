@@ -11,6 +11,7 @@ from __future__ import annotations
 from conftest import hb_headers
 
 import json
+import os
 
 import pytest
 from flask import Flask
@@ -42,10 +43,13 @@ def env(tmp_path, monkeypatch):
     client = app.test_client()
 
     def fake_request(method, path, body=None):
+        # W-77: the MCP server presents the operator heartbeat token on
+        # writes (same as production _request); mirror it here.
+        headers = {"X-Sincor-Heartbeat": os.environ.get("AGENT_HEARTBEAT_TOKEN", "")}
         if method.upper() == "GET":
             resp = client.get(path)
         else:
-            resp = client.post(path, json=body)
+            resp = client.post(path, json=body, headers=headers)
         try:
             data = resp.get_json()
         except Exception:

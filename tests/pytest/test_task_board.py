@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from conftest import hb_headers
 
+from bid_testkit import register_wallet_agent, signed_commit_body, key_for
+
 import json
 import os
 
@@ -239,12 +241,10 @@ def test_commit_after_stale_window_refreshes_not_kills(board_client):
     from sincor2.onchain.stake_ledger import reset_stake_ledger, stake_ledger
 
     reset_stake_ledger(path="/tmp/sincor-test-board-stake.json")
-    r = board_client.post("/v1/a2a/register", json={
-        "agent_id": "board-bidder",
-        "capability_tags": ["deal-scoring"],
-        "rpc_callback": "https://agent.example/rpc",
-    })
-    assert r.status_code in (200, 201), r.get_json()
+    # W-77: bids bind to the agent's registered wallet.
+    register_wallet_agent(
+        board_client, "board-bidder",
+        capability_tags=["deal-scoring"])
     assert board_client.post(
         "/v1/a2a/heartbeat", json={"agent_id": "board-bidder"},
         headers=hb_headers()).status_code == 200
@@ -260,11 +260,8 @@ def test_commit_after_stale_window_refreshes_not_kills(board_client):
         fabric.tasks[task_id]["reveal_deadline"] = 1
         fabric.tasks[task_id]["commit_deadline"] = 1
 
-    r = board_client.post("/v1/a2a/bids/commit", json={
-        "task_id": task_id,
-        "agent_id": "board-bidder",
-        "commitment": "0x" + "cd" * 32,
-    })
+    r = board_client.post("/v1/a2a/bids/commit", json=signed_commit_body(
+        key_for("board-bidder"), task_id, "board-bidder", "0x" + "cd" * 32))
     assert r.status_code == 201, r.get_json()
     assert get_fabric().tasks[task_id]["state"] in ("open", "auction")
 

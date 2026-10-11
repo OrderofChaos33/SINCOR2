@@ -12,6 +12,8 @@ from conftest import hb_headers
 import pytest
 from flask import Flask
 
+from bid_testkit import key_for, register_wallet_agent, signed_commit_body
+
 from sincor2.a2a_inbound import get_fabric, reset_fabric
 from sincor2.a2a_inbound import register as register_inbound
 from sincor2.a2a_inbound_market import create_task, sealed_commitment
@@ -33,15 +35,8 @@ def client(tmp_path):
 
 
 def _register(client, agent_id):
-    r = client.post(
-        "/v1/a2a/register",
-        json={
-            "agent_id": agent_id,
-            "capability_tags": ["lead-enrichment"],
-            "rpc_callback": "https://agent.example/rpc",
-        },
-    )
-    assert r.status_code in (200, 201), r.get_json()
+    # W-77: bids bind to the agent's registered wallet.
+    register_wallet_agent(client, agent_id)
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200, r.get_json()
 
@@ -62,8 +57,8 @@ def _commit(client, task_id, agent_id, bid_axm=1.0, nonce_hex="aa" * 32):
     commitment = "0x" + sealed_commitment(price_wei, salt, agent_id).hex()
     return client.post(
         "/v1/a2a/bids/commit",
-        json={"task_id": task_id, "agent_id": agent_id,
-              "commitment": commitment},
+        json=signed_commit_body(
+            key_for(agent_id), task_id, agent_id, commitment),
     )
 
 
