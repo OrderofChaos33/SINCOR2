@@ -121,10 +121,17 @@ class TestW53CanonicalDedup:
         assert row[0] == TX_CANON and row[1] == TX_CANON
 
     def test_unique_index_on_normalized_column(self, store: PaymentLedgerStore):
+        # W-70: the dedup key is GLOBAL across providers — the index must
+        # be UNIQUE on tx_hash_norm alone, with no provider column.
         idx = sqlite3.connect(str(store.db_path)).execute(
-            "SELECT sql FROM sqlite_master WHERE name='idx_payments_provider_tx_norm'"
+            "SELECT sql FROM sqlite_master WHERE name='idx_payments_tx_hash_norm_global'"
         ).fetchone()[0]
         assert "UNIQUE" in idx and "tx_hash_norm" in idx
+        assert "provider" not in idx
+        legacy = sqlite3.connect(str(store.db_path)).execute(
+            "SELECT name FROM sqlite_master WHERE name='idx_payments_provider_tx_norm'"
+        ).fetchone()
+        assert legacy is None
 
     def test_normalize_tx_hash_unit(self):
         assert normalize_tx_hash(TX_UPPER) == TX_CANON

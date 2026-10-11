@@ -197,6 +197,45 @@ class MissingTxHashError(PaymentLedgerError):
     """
 
 
+class UnknownProviderError(PaymentLedgerError):
+    """Raised when a provider label is not in the canonical whitelist.
+
+    Provider strings are canonicalized (strip + lowercase) at ingestion and
+    validated against the whitelist.  An unknown label is rejected
+    fail-closed — it must never become a stored value, a dedup key, or a
+    guard-bypass vector (W-71).
+    """
+
+
+# Canonical provider whitelist (W-71).  Every provider label the codebase
+# emits, lowercase.  Canonicalization happens at the ingest choke point so
+# no spelling variant can dodge the tx-hash-required guard or the dedup
+# key, and no unknown provider can enter the ledger.
+_CANONICAL_PROVIDERS = frozenset(
+    {"x402", "a2a", "manual", "checkout", "legacy", "stripe"}
+)
+
+
+def canonicalize_provider(provider: object) -> str:
+    """Fold a provider label to its canonical form.
+
+    Strips surrounding whitespace and lowercases.  Raises
+    :class:`UnknownProviderError` for anything outside the whitelist —
+    fail closed (W-71).
+    """
+    if not isinstance(provider, str):
+        raise UnknownProviderError(
+            f"provider must be a string, got {type(provider).__name__}"
+        )
+    canon = provider.strip().lower()
+    if canon not in _CANONICAL_PROVIDERS:
+        raise UnknownProviderError(
+            f"unknown provider {provider!r}; expected one of"
+            f" {sorted(_CANONICAL_PROVIDERS)}"
+        )
+    return canon
+
+
 # ---------------------------------------------------------------------------
 # tx_hash canonicalization (W-53 / W-56)
 # ---------------------------------------------------------------------------
@@ -669,10 +708,12 @@ CREATE TABLE IF NOT EXISTS payment_history (
 );
 CREATE INDEX IF NOT EXISTS idx_payment_history_payment
     ON payment_history(payment_id, seq);
--- NOTE: the UNIQUE index on (provider, tx_hash_norm) is created by
+-- NOTE: the UNIQUE index on (tx_hash_norm) is created by
 -- _migrate_tx_hash_norm() AFTER backfilling older databases, so a legacy
 -- canonical collision fails closed (quarantine) instead of breaking the
--- index build.
+-- index build.  The dedup key is GLOBAL across providers (W-70): one
+-- onchain transaction maps to exactly one payment row, no matter which
+-- provider label claimed it.
 -- History is append-only: reject UPDATE and DELETE at the SQL layer so that
 -- even raw-SQL access cannot rewrite payment history.
 CREATE TRIGGER IF NOT EXISTS trg_payment_history_no_update
@@ -726,15 +767,29 @@ class PaymentLedgerStore:
 
     @staticmethod
     def _migrate_tx_hash_norm(conn: sqlite3.Connection) -> None:
-        """Backfill ``tx_hash_norm`` on databases created before W-53.
+        """Backfill ``tx_hash_norm`` and enforce the GLOBAL dedup key.
 
-        Canonicalizes every stored tx hash.  If two rows canonicalize to
-        the same (provider, tx_hash_norm) — i.e. the database already
-        contains the double-credit the red team demonstrated — the later
-        row is quarantined fail-closed (it can never settle without human
-        review) and the earliest keeps the dedup key.  Malformed legacy
-        hashes backfill to NULL (no dedup key) rather than breaking the
-        migration.
+        Two phases:
+
+        1. W-53 backfill (databases created before the norm column existed):
+           canonicalizes every stored tx hash.  If two rows canonicalize to
+           the same tx hash — i.e. the database already contains the
+           double-credit the red team demonstrated — the later row is
+           quarantined fail-closed (it can never settle without human
+           review) and the earliest keeps the dedup key.  Malformed legacy
+           hashes backfill to NULL (no dedup key) rather than breaking the
+           migration.
+
+        2. W-70 sweep (runs on every open, idempotent): quarantines any
+           cross-provider canonical-tx collision the old per-provider key
+           allowed through (same ``tx_hash_norm`` under two provider
+           labels — the W-70 double-credit), and best-effort canonicalizes
+           legacy provider spellings (strip + lowercase) so the whitelist
+           means the same thing for old rows as for new ingests (W-71).
+
+        The dedup key is GLOBAL across providers: one onchain transaction
+        maps to exactly one payment row.  Provider is an attribute of the
+        payment, not part of its identity.
         """
         cols = [r[1] for r in conn.execute("PRAGMA table_info(payments)").fetchall()]
         if "tx_hash_norm" not in cols:
@@ -743,7 +798,7 @@ class PaymentLedgerStore:
                 "SELECT payment_id, provider, tx_hash, state, version"
                 " FROM payments ORDER BY created_at, rowid"
             ).fetchall()
-            seen: dict[tuple[str, str], str] = {}
+            seen: dict[str, str] = {}
             for r in rows:
                 pid, provider, raw, prior_state = r[0], r[1], r[2], r[3]
                 norm: Optional[str] = None
@@ -752,36 +807,87 @@ class PaymentLedgerStore:
                         norm = normalize_tx_hash(raw)
                     except MalformedTxHashError:
                         norm = None
-                key = (provider, norm) if norm else None
-                if key is not None and key in seen:
-                    now = _utc_now_iso()
-                    conn.execute(
-                        "UPDATE payments SET tx_hash_norm=NULL, state=?,"
-                        " version=version+1, updated_at=? WHERE payment_id=?",
-                        (PaymentState.QUARANTINED.value, now, pid),
-                    )
-                    conn.execute(
-                        "INSERT INTO payment_history"
-                        " (payment_id, from_state, to_state, ts, actor, reason)"
-                        " VALUES (?,?,?,?,?,?)",
-                        (
-                            pid, prior_state, PaymentState.QUARANTINED.value, now,
-                            "rt12-migration",
-                            "canonical tx_hash collision with"
-                            f" {seen[key]}; quarantined fail-closed (W-53)",
-                        ),
+                if norm is not None and norm in seen:
+                    PaymentLedgerStore._quarantine_collision(
+                        conn, pid, prior_state, seen[norm], actor="rt12-migration",
                     )
                 else:
-                    if key is not None:
-                        seen[key] = pid
+                    if norm is not None:
+                        seen[norm] = pid
                     conn.execute(
                         "UPDATE payments SET tx_hash_norm=? WHERE payment_id=?",
                         (norm, pid),
                     )
             conn.execute("DROP INDEX IF EXISTS idx_payments_provider_tx")
+        # W-70 sweep: cross-provider collisions the old (provider, norm)
+        # key let through.  Idempotent: quarantined rows carry NULL norm,
+        # so a second open finds no collisions.
+        dupes = conn.execute(
+            "SELECT tx_hash_norm FROM payments"
+            " WHERE tx_hash_norm IS NOT NULL"
+            " GROUP BY tx_hash_norm HAVING COUNT(*) > 1"
+        ).fetchall()
+        for (norm,) in dupes:
+            rows = conn.execute(
+                "SELECT payment_id, state FROM payments"
+                " WHERE tx_hash_norm=? ORDER BY created_at, rowid",
+                (norm,),
+            ).fetchall()
+            keeper = rows[0][0]
+            for pid, prior_state in rows[1:]:
+                PaymentLedgerStore._quarantine_collision(
+                    conn, pid, prior_state, keeper, actor="hunt15-w70-sweep",
+                )
+        # W-71 sweep: best-effort canonicalize legacy provider spellings.
+        for (pid, provider) in conn.execute(
+            "SELECT payment_id, provider FROM payments"
+        ).fetchall():
+            if isinstance(provider, str):
+                canon = provider.strip().lower()
+                if canon != provider and canon in _CANONICAL_PROVIDERS:
+                    conn.execute(
+                        "UPDATE payments SET provider=?, updated_at=?"
+                        " WHERE payment_id=?",
+                        (canon, _utc_now_iso(), pid),
+                    )
+        # Global dedup key replaces the old per-provider key.
+        conn.execute("DROP INDEX IF EXISTS idx_payments_provider_tx_norm")
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_provider_tx_norm"
-            " ON payments(provider, tx_hash_norm) WHERE tx_hash_norm IS NOT NULL"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_tx_hash_norm_global"
+            " ON payments(tx_hash_norm) WHERE tx_hash_norm IS NOT NULL"
+        )
+
+    @staticmethod
+    def _quarantine_collision(
+        conn: sqlite3.Connection,
+        payment_id: str,
+        prior_state: str,
+        keeper_id: str,
+        *,
+        actor: str,
+    ) -> None:
+        """Quarantine a canonical-tx collision fail-closed.
+
+        The colliding row loses its dedup key (``tx_hash_norm=NULL``) so it
+        can never settle without human review; the earliest row keeps the
+        key.  History records the quarantine.
+        """
+        now = _utc_now_iso()
+        conn.execute(
+            "UPDATE payments SET tx_hash_norm=NULL, state=?,"
+            " version=version+1, updated_at=? WHERE payment_id=?",
+            (PaymentState.QUARANTINED.value, now, payment_id),
+        )
+        conn.execute(
+            "INSERT INTO payment_history"
+            " (payment_id, from_state, to_state, ts, actor, reason)"
+            " VALUES (?,?,?,?,?,?)",
+            (
+                payment_id, prior_state, PaymentState.QUARANTINED.value, now,
+                actor,
+                "canonical tx_hash collision with"
+                f" {keeper_id}; quarantined fail-closed",
+            ),
         )
 
     # -- internals --------------------------------------------------------
@@ -838,17 +944,30 @@ class PaymentLedgerStore:
     def ingest(self, record: PaymentRecord) -> PaymentRecord:
         """Persist a mapped record, replaying its history into the ledger.
 
-        The tx hash is canonicalized BEFORE the uniqueness check: any
-        spelling of the same onchain transaction (mixed case, ``0X``
-        prefix, missing prefix, whitespace) folds to one dedup key, and
-        malformed hashes are rejected fail-closed.
+        The provider label is canonicalized (strip + lowercase) and
+        validated against the whitelist BEFORE anything else: an unknown
+        or mis-spelled provider can neither dodge the tx-hash-required
+        guard nor the dedup key (W-71).  The tx hash is canonicalized
+        BEFORE the uniqueness check: any spelling of the same onchain
+        transaction (mixed case, ``0X`` prefix, missing prefix,
+        whitespace) folds to one dedup key, and malformed hashes are
+        rejected fail-closed.
+
+        The dedup key is GLOBAL across providers (W-70): the same
+        canonical tx hash ingested under a second provider label is a
+        duplicate, not a second payment — one onchain transaction maps to
+        exactly one payment row.
 
         Raises:
+            UnknownProviderError: the provider label is not in the
+                canonical whitelist.  Fail closed — the record is NOT
+                ingested.
             MalformedTxHashError: the record carries an empty/malformed
                 tx hash.  Fail closed — the record is NOT ingested.
-            DuplicatePaymentError: if the provider+tx_hash (or payment_id)
+            DuplicatePaymentError: if the tx_hash (or payment_id)
                 was already ingested — this is the double-ingest guard.
         """
+        record.provider = canonicalize_provider(record.provider)
         raw_tx_hash = record.provider_evidence.get("tx_hash")
         tx_hash_norm: Optional[str] = None
         if raw_tx_hash is not None:
@@ -1247,12 +1366,19 @@ class PaymentLedgerStore:
             conn.close()
 
     def find_by_tx_hash(self, provider: str, tx_hash: str) -> Optional[PaymentRecord]:
-        """Find a payment by provider + tx hash (double-spend lookup).
+        """Find a payment by tx hash (double-spend lookup).
+
+        The lookup is GLOBAL across providers (W-70): one onchain
+        transaction maps to exactly one payment row, so the probe matches
+        no matter which provider label claimed the payment.  The provider
+        argument is canonicalized and validated (unknown labels raise
+        :class:`UnknownProviderError`) but does not narrow the match.
 
         The probe is canonicalized first, so any spelling of the same
         onchain transaction hits the stored row.  A malformed/empty probe
         can never match a dedup key and returns None instead of raising.
         """
+        canonicalize_provider(provider)
         try:
             norm = normalize_tx_hash(tx_hash)
         except MalformedTxHashError:
@@ -1260,8 +1386,8 @@ class PaymentLedgerStore:
         conn = self._connect()
         try:
             row = conn.execute(
-                "SELECT * FROM payments WHERE provider=? AND tx_hash_norm=?",
-                (provider, norm),
+                "SELECT * FROM payments WHERE tx_hash_norm=?",
+                (norm,),
             ).fetchone()
             if row is None:
                 return None
