@@ -1,6 +1,6 @@
 {
   "name": "SINCOR Agent Swarm",
-  "description": "Production autonomous AI workforce. 42 specialized agents. Pay in SINC/AXM on Base.",
+  "description": "Autonomous AI workforce platform and agent marketplace. Quote and registration are open; settlement in AXM (AXIOM) on Base mainnet with x402 supported. 5% platform fee on realized settlement value, converted to USDC/WETH before treasury deposit.",
   "url": "https://getsincor.com/api/a2a",
   "version": "2.0.0",
   "skills": [
@@ -13,6 +13,6 @@
   "provider": {"organization": "SINCOR", "url": "https://getsincor.com"},
   "authentication": {
     "schemes": [],
-    "description": "No API key required. Payment enforced on-chain via SINC/AXM transfer to treasury."
+    "description": "No API key required for read access, quoting, or registration. Payment enforced at settlement in AXM (AXIOM) on Base; x402 supported."
   }
 }

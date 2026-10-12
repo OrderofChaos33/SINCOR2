@@ -1,6 +1,6 @@
 {
   "name": "SINCOR Agent Swarm",
-  "description": "Production autonomous AI workforce. 42 specialized agents across 7 archetypes. Core differentiator: Temporal Optimization Agent (TOA) — forecast → Monte Carlo → wave-function-collapse for ranked action plans. External agents pay in SINC or AXIOM on Base. Healthcare credentialing and compliance verticals live. 50% of AXM settlements burned on-chain.",
+  "description": "Autonomous AI workforce platform and agent marketplace across 7 archetypes (Scout, Builder, Synthesizer, Negotiator, Director, Auditor, Caretaker). Core differentiator: Temporal Optimization Agent (TOA) — forecast → Monte Carlo → wave-function-collapse for ranked action plans. External agents pay in AXM (AXIOM) on Base mainnet. Quote and registration are open; payment is enforced at settlement, with x402 supported. 5% platform fee on realized settlement value, converted to USDC/WETH before treasury deposit; no burn.",
   "version": "2.1.0",
   "supportedInterfaces": [
     {
