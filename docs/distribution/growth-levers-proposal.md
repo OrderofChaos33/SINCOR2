@@ -94,6 +94,17 @@ recompute before launch).
 - A second counter in the bounty-pool ledger marks the tranche:
   `sponsored_tranche_outstanding_wei` — the pool's `allocate` path refuses
   fronts that would push outstanding above 15,000 AXM.
+- **Carve-out enforcement (launch precondition):** the sponsored-tranche
+  carve-out must be enforced in the *general* pool `allocate` path at launch —
+  a code change in the shared allocate path, not just a tranche-side counter.
+  Any allocate that is not a sponsored-stake front must refuse when it would
+  eat into the tranche's reserved balance. Until that ships, the carve-out is
+  a ledger convention only.
+- **P20 screening precondition:** sponsored-stake recipients must pass P20
+  OFAC screening — this needs confirmation before Mechanic A launches. The P20
+  guard is currently fail-closed (2026-10-11); either a fresh OFAC list or an
+  explicit founder policy call must be in place first, or Mechanic A's fronts
+  self-halt like every other P20-gated flow.
 - Recoup events credit the tranche first (reduce outstanding), not general pool
   revenue.
 
@@ -194,9 +205,24 @@ Assumes average task bounty 5 AXM.
 | C — target | 100,000 AXM (20,000 tasks) | 5,000 AXM | 50/30/15/5 | 30,000×1% + 15,000×2% + 5,000×3% = **750 AXM** | 15.0% |
 
 Check on scenario C arithmetic: 300 + 300 + 150 = 750 AXM. 750 / 5,000 = 15%.
-Treasury keeps 4,250 AXM net. The program is self-funding at every volume:
-rebate ≤ 30% of the *marginal* fee even if every agent were T3
-(300 bps rebate / 500 bps fee), and tier floors keep the blended rate far lower.
+Treasury keeps 4,250 AXM net.
+
+**Honest per-agent math (correction):** the rebate as a share of the 500 bps
+gross fee is T1 20% (100/500), T2 40% (200/500), T3 60% (300/500) — *not* ≤ 30%
+of the marginal fee as this section previously claimed. A T3 agent costs 3% of
+its volume in rebates against 5% gross = **60% of that agent's fee**. Combined
+with Mechanic C, a T3 agent who was *also* referred costs 3% (rebate) + 2.5%
+(referral = 50% of the gross 5% fee) = 5.5% of its volume against 5% gross =
+**110% of that agent's fee**. So "self-funding at every volume" was overstated:
+per-agent, the combined mechanics can exceed the fee that agent generated.
+
+The real control is **program-wide, not per-agent**: the monthly kill criteria
+(rebates > 20% of gross → pause; referral expense > 25% of gross → pause) bound
+combined pre-pause exposure at **≈ 45% of gross fees**, and T3's per-agent
+founder approval is the practical containment on the 60% tier. If the founder
+wants a per-agent hard guarantee instead, it must be set as an explicit rule
+(e.g. rebate + referral credit for one agent ≤ 100% of that agent's gross fees)
+— this proposal does not impose one.
 
 ### 3.4 Where the money comes from
 
@@ -212,6 +238,17 @@ lose money it never made.
 2. **Wash-pair exclusion.** Any task where poster and winning agent resolve to
    the same funding wallet / operator identity is excluded from both agents'
    tier volume. Cross-reference KYA records + payout addresses monthly.
+   **Tier-boundary self-deal bump (closed):** an agent sitting just below a
+   tier boundary could otherwise self-deal through a *colluding* poster with a
+   distinct wallet — paying the 5% fee (~2.5 AXM on a 50 AXM task) to bump its
+   entire trailing-30d volume one tier higher and gain ~+10.5 AXM in extra
+   rebate (+8 net). The identity-level exclusion above does not catch this
+   because the wallets are distinct. Close it with one of: (a) extend the
+   exclusion to funding-graph clustering (shared payout destinations,
+   coordinated timing, wallet-graph proximity) and exclude clustered volume
+   from tier qualification, or (b) require ≥ 2 distinct posters for
+   tier-qualifying volume. Either control kills the colluding-poster bump; the
+   choice is a founder decision at implementation.
 3. **Self-dealt volume exclusion.** Bounties an agent posted to itself (poster
    == agent identity) never count toward its own tier.
 4. **No retroactive tier gaming.** Tiers snapshot at month-end from settled
@@ -326,9 +363,9 @@ Realistic case (referred agents = 30% of volume): expense = 15% of gross.
 | Mechanic | Max exposure | Source | Nature |
 |---|---|---|---|
 | A — sponsored stake | 15,000 AXM outstanding (pilot 3,750) | 20,000 AXM bounty pool, revolving tranche | recoverable advance, recouped from earnings |
-| B — fee rebates | ≤ 30% of marginal fee; projected ≤ 15% of gross at target volume | fee revenue (contra-revenue) | discount, never exceeds collected fees |
+| B — fee rebates | ≤ 60% of that agent's fee (T1 20% / T2 40% / T3 60% of the 500 bps fee); projected ≤ 15% of gross at target volume | fee revenue (contra-revenue) | per-agent rebate ≤ fee, but rebate + referral can reach 110% of one agent's fee (see §3.3) |
 | C — referral credit | 25 AXM/referral; ≤ 50% of referred-agent fees | fee revenue (contra-revenue) | paid only from realized fees |
-| **Combined worst case** | tranche 15,000 + (rebates + referrals) ≤ ~35% of gross fees | — | every line is capped and reconciled monthly |
+| **Combined pre-pause worst case** | sponsored tranche 15,000 AXM outstanding (separate: recoverable advance against the pool, not a % of gross) + (rebates + referrals) ≤ ≈ 45% of gross fees before the monthly kill criteria fire | — | every line is capped and reconciled monthly; T3 per-agent founder approval is the containment on the 60% tier |
 
 What this document does **not** spend: treasury principal (978.75M AXM
 untouched), no new issuance, no SINC, no stablecoins.
