@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""Polyclaw scheduler shim — production entry point used by mvp_app.py.
+"""Polyclaw job-function library + real status endpoint — production entry point.
+
+One-scheduler consolidation (2026-10-11): this module no longer owns an
+APScheduler instance. The central scheduler (sincor2.scheduler) registers the
+``polyclaw_scan`` job exactly once; :func:`run_polyclaw_cycle` is the callable
+it uses. Scheduling (cadence, enablement) is defined once in
+sincor2.scheduler.SCHEDULER_DEFAULTS.
 
 The previous implementation traded on ``random.gauss()`` "edges" and
 ``random.uniform()`` "market prices", recording paper PnL from coin flips
 and zero PnL in live mode. That code is deleted.
 
-This shim keeps the exact module-level API mvp_app.py expects
-(``start_polyclaw_scheduler(app)`` / ``stop_polyclaw_scheduler()``) but every
-cycle now runs the REAL stack:
+Every cycle now runs the REAL stack:
 
     forecasting_engine.scan_opportunities()   real Polymarket markets
     bankroll                                  equity-proportional risk gates
     execution_adapter                         CLOB FOK orders (dry-run default)
     shadow_portfolio                          silent 25% TOA-blend A/B twin
 
-On LIVE startup it also forces CLOB client init + on-chain USDC.e/CTF
-approvals so a quiet market scan cannot leave a funded wallet unapproved.
-
-It also registers the REAL ``/api/polyclaw/status`` view. Because mvp_app.py
-initialises this scheduler before defining its own legacy status route,
-Flask's first-registered rule wins and this real implementation serves the
-endpoint (public sees mode/liveness only; admin sees full financials).
+Live/dry-run posture is UNTOUCHED by the consolidation: POLYCLAW_LIVE default
+false, private-key env handling (POLYMARKET_PRIVATE_KEY / POLYCLAW_PRIVATE_KEY /
+POLYMARKET_PK) unchanged, and the 80s hard cycle ceiling preserved.
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-_scheduler: Optional[Any] = None
 _live_adapter: Optional[Any] = None
 _bootstrap_error: Optional[str] = None
 _bootstrap_thread: Optional[threading.Thread] = None
@@ -95,12 +94,22 @@ def _is_admin_request(req: Any) -> bool:
         return False
 
 
+def _polyclaw_job_running() -> bool:
+    """True when the central scheduler has the polyclaw_scan job registered."""
+    try:
+        from sincor2.scheduler import get_scheduler_status  # lazy: scheduler imports this module
+        status = get_scheduler_status()
+        return bool(status.get("running")) and any(
+            j.get("id") == "polyclaw_scan" for j in status.get("jobs", [])
+        )
+    except Exception:
+        return False
+
+
 def _status_view():
     from flask import jsonify, request
 
-    scheduler_running = bool(
-        _scheduler is not None and getattr(_scheduler, "running", False)
-    )
+    scheduler_running = _polyclaw_job_running()
     live = os.getenv("POLYCLAW_LIVE", "false").lower() == "true"
     addr = None
     allowances_ready = False
@@ -156,8 +165,14 @@ def _status_view():
     return jsonify(base), 200
 
 
-def _register_status_route(app: Any) -> None:
-    """Register the real status view; Flask's first-registered rule wins."""
+def register_polyclaw_status_route(app: Any) -> None:
+    """Register the real /api/polyclaw/status view.
+
+    Call from mvp_app at the same point the old start_polyclaw_scheduler(app)
+    was called: mvp_app defines its own legacy status route later, so Flask's
+    first-registered rule lets this real implementation win (public sees
+    mode/liveness only; admin sees full financials).
+    """
     try:
         app.add_url_rule(
             "/api/polyclaw/status",
@@ -170,109 +185,55 @@ def _register_status_route(app: Any) -> None:
         logger.debug("[POLYCLAW] status route registration skipped: %s", exc)
 
 
+# Backwards-compatible alias for the previous private name.
+_register_status_route = register_polyclaw_status_route
+
+
 # ---------------------------------------------------------------------------
-# Scheduler lifecycle (API expected by mvp_app.py)
+# Job function (called by the central scheduler as job id "polyclaw_scan").
+# Preserves the previous standalone behavior exactly: live-mode bootstrap of
+# the CLOB client/allowances and an 80s hard ceiling per cycle.
 # ---------------------------------------------------------------------------
 
-def start_polyclaw_scheduler(app: Any = None) -> Optional[Any]:
-    """Start the real trading loop and register the real status endpoint.
-
-    Returns the BackgroundScheduler (or None if disabled/unavailable).
-    """
-    global _scheduler
-
-    if app is not None:
-        _register_status_route(app)
-
-    if os.getenv("POLYCLAW_ENABLED", "true").lower() != "true":
-        logger.info("[POLYCLAW] disabled via POLYCLAW_ENABLED=false")
-        return None
-    if _scheduler is not None:
-        return _scheduler
-
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-    except ImportError:
-        logger.warning("[POLYCLAW] APScheduler not installed — loop not started")
-        return None
+def run_polyclaw_cycle() -> None:
+    """One Polyclaw trading scan cycle. Keep the try/except + timeout pattern."""
+    import concurrent.futures
 
     from sincor2.polyclaw_mega_aggressive_live import run_cycle
 
-    interval = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "120"))
-
-    scheduler = BackgroundScheduler(daemon=True)
-
-    def _job() -> None:
-        import concurrent.futures
-        def _run() -> None:
-            if (
-                os.getenv("POLYCLAW_LIVE", "false").lower() == "true"
-                and (
-                    _live_adapter is None
-                    or not getattr(_live_adapter, "_allowances_ready", False)
-                )
-            ):
-                _bootstrap_live_client()
-            result = run_cycle(adapter=_live_adapter)
-            if result.get("status") == "halted":
-                logger.warning("[POLYCLAW] cycle halted: kill switch")
-
-        try:
-            # Hard ceiling: entire cycle must finish in 80s (10s buffer before next trigger)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(_run)
-                future.result(timeout=80)
-        except concurrent.futures.TimeoutError:
-            logger.error("[POLYCLAW] ENTIRE CYCLE TIMED OUT after 80s — check network calls")
-        except Exception:
-            logger.exception("[POLYCLAW] cycle crashed")
-
-    scheduler.add_job(
-        _job,
-        trigger="interval",
-        seconds=interval,
-        id="polyclaw_scan",
-        max_instances=1,
-        coalesce=True,
-        replace_existing=True,
-    )
-    scheduler.start()
-    _scheduler = scheduler
-
-    # Do not block gunicorn worker boot on Polygon RPC; run approvals async.
-    global _bootstrap_thread
-    if os.getenv("POLYCLAW_LIVE", "false").lower() == "true":
-        if _bootstrap_thread is None or not _bootstrap_thread.is_alive():
-            _bootstrap_thread = threading.Thread(
-                target=_bootstrap_live_client,
-                name="polyclaw-live-bootstrap",
-                daemon=True,
+    def _run() -> None:
+        if (
+            os.getenv("POLYCLAW_LIVE", "false").lower() == "true"
+            and (
+                _live_adapter is None
+                or not getattr(_live_adapter, "_allowances_ready", False)
             )
-            _bootstrap_thread.start()
+        ):
+            _bootstrap_live_client()
+        result = run_cycle(adapter=_live_adapter)
+        if result.get("status") == "halted":
+            logger.warning("[POLYCLAW] cycle halted: kill switch")
 
-    logger.info(
-        "[POLYCLAW] live scheduler started (every %ds, mode=%s)",
-        interval,
-        "LIVE" if os.getenv("POLYCLAW_LIVE", "false").lower() == "true" else "DRY-RUN",
-    )
-    return scheduler
-
-
-def stop_polyclaw_scheduler() -> None:
-    global _scheduler, _live_adapter
-    if _scheduler is not None and _scheduler.running:
-        _scheduler.shutdown(wait=False)
-        logger.info("[POLYCLAW] scheduler stopped")
-    _scheduler = None
-    _live_adapter = None
-
-
-if __name__ == "__main__":
-    import time
-    os.environ.setdefault("POLYCLAW_ENABLED", "true")
-    start_polyclaw_scheduler(None)
     try:
-        while True:
-            time.sleep(60)
-    except KeyboardInterrupt:
-        stop_polyclaw_scheduler()
+        # Hard ceiling: entire cycle must finish in 80s (10s buffer before next trigger)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(_run)
+            future.result(timeout=80)
+    except concurrent.futures.TimeoutError:
+        logger.error("[POLYCLAW] ENTIRE CYCLE TIMED OUT after 80s — check network calls")
+    except Exception:
+        logger.exception("[POLYCLAW] cycle crashed")
+
+
+def maybe_bootstrap_live_client() -> None:
+    """Start the async live-client bootstrap thread (live mode only)."""
+    global _bootstrap_thread
+    if os.getenv("POLYCLAW_LIVE", "false").lower() != "true":
+        return
+    if _bootstrap_thread is None or not _bootstrap_thread.is_alive():
+        _bootstrap_thread = threading.Thread(
+            target=_bootstrap_live_client,
+            name="polyclaw-live-bootstrap",
+            daemon=True,
+        )
+        _bootstrap_thread.start()

@@ -13,9 +13,11 @@ Usage:
     # Run once:
     python -m sincor2.compliance_monitor
 
-    # Schedule via APScheduler (called from app startup):
-    from sincor2.compliance_monitor import start_compliance_scheduler
-    start_compliance_scheduler()
+    # Schedule via the central scheduler (sincor2.scheduler registers the
+    # "compliance_checks" job exactly once; this module is a job-function
+    # library now and no longer creates its own APScheduler instance):
+    from sincor2.compliance_monitor import run_all_checks
+    # registered centrally as job id "compliance_checks"
 """
 
 import os
@@ -578,39 +580,6 @@ def run_all_checks() -> list[ComplianceViolation]:
     logger.info(f"Summary written to {summary_path}")
 
     return all_violations
-
-
-def start_compliance_scheduler():
-    """Attach the compliance monitor to APScheduler (call from app.py startup)."""
-    if os.getenv("COMPLIANCE_MONITOR_ENABLED", "false").lower() != "true":
-        logger.info(
-            "Compliance monitor disabled (set COMPLIANCE_MONITOR_ENABLED=true to activate)"
-        )
-        return None
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.interval import IntervalTrigger
-
-        scheduler = BackgroundScheduler(daemon=True)
-        scheduler.add_job(
-            func=run_all_checks,
-            trigger=IntervalTrigger(minutes=30),
-            id="compliance_monitor",
-            name="SINCOR Compliance Monitor",
-            replace_existing=True,
-            misfire_grace_time=300,
-        )
-        scheduler.start()
-        logger.info(
-            "Compliance monitor scheduler started — internal-only, runs every 30 minutes"
-        )
-        return scheduler
-    except ImportError:
-        logger.warning(
-            "APScheduler not installed — compliance monitor will not auto-run. "
-            "Install with: pip install apscheduler"
-        )
-        return None
 
 
 # ---------------------------------------------------------------------------
