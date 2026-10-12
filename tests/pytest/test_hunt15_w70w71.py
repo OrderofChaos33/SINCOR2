@@ -16,6 +16,7 @@ Run: PYTHONPATH=src:. <venv>/bin/python -m pytest tests/pytest/test_hunt15_w70w7
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -135,6 +136,13 @@ class TestW70GlobalDedup:
         # global index first so the legacy collision can be staged.
         conn = sqlite3.connect(str(db))
         conn.execute("DROP INDEX idx_payments_tx_hash_norm_global")
+        # The double-credit row must sort LATER than the keeper (the W-70
+        # sweep quarantines the later collision).  Compute it relative to
+        # now — a hardcoded timestamp is a time-bomb: once wall-clock
+        # passes it, the planted row sorts first and becomes the keeper.
+        evil_ts = (
+            datetime.now(timezone.utc) + timedelta(hours=1)
+        ).isoformat()
         conn.execute(
             "INSERT INTO payments (payment_id, owner, amount_atomic,"
             " amount_display, currency, provider, provider_evidence,"
@@ -146,7 +154,7 @@ class TestW70GlobalDedup:
                 PaymentState.PENDING_VERIFICATION.value, 1,
                 normalize_tx_hash(TX_CANON),
                 # Later than the keeper: this is the double-credit row.
-                "2026-10-12T00:00:01", "2026-10-12T00:00:01",
+                evil_ts, evil_ts,
             ),
         )
         conn.commit()
