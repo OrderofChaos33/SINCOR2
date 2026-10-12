@@ -29,6 +29,8 @@ except ImportError:
     HAS_APSCHEDULER = False
     BackgroundScheduler = None  # type: ignore
 
+from sincor2.scheduler_guards import guarded_run
+
 _scheduler: Optional[BackgroundScheduler] = None
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -326,12 +328,20 @@ def _add_job(
         minute = int(os.environ.get(spec["env_minute"], str(spec["minute"])))
         tz = os.environ.get(spec.get("timezone_env", ""), "") or spec["timezone"]
         trigger = CronTrigger(hour=hour, minute=minute, timezone=tz)
-    sched.add_job(lambda: _safe_run(name, func), trigger=trigger, **kwargs)
+    # Guards compose with _safe_run: timeout + circuit breaker inside,
+    # _safe_run outside — no job exception may ever reach APScheduler.
+    sched.add_job(
+        lambda: _safe_run(name, lambda: guarded_run(job_id, name, func)),
+        trigger=trigger,
+        **kwargs,
+    )
 
     startup_delay = spec.get("startup_delay_sec")
     if startup_delay:
         sched.add_job(
-            lambda: _safe_run(f"{name} (startup)", func),
+            lambda: _safe_run(
+                f"{name} (startup)", lambda: guarded_run(job_id, f"{name} (startup)", func)
+            ),
             trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=startup_delay)),
             id=f"{job_id}_startup",
             replace_existing=True,
