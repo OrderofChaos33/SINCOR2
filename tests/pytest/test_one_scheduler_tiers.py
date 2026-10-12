@@ -2,10 +2,11 @@
 require_approval mode.
 
 Covers:
-1. job_tier() classification for all 11 canonical jobs.
+1. job_tier() classification for all 12 canonical jobs.
 2. Idempotency: a Tier 2/3 job's effect function runs once per hourly bucket;
    the duplicate firing is skipped with an "idempotent skip" log and the
-   effect function is not invoked again.
+   effect function is not invoked again. (Sub-hourly jobs like
+   activity_engine_cycle use a per-job idempotency_minutes bucket.)
 3. Kill-switch (SCHEDULER_EFFECTS_PAUSED=true): Tier 2/3 jobs skipped, Tier
    0/1 jobs unwrapped/unaffected.
 4. require_approval mode (SCHEDULER_REQUIRE_APPROVAL=true): Tier 2/3 jobs
@@ -31,6 +32,7 @@ EXPECTED_TIERS = {
     "subscription_reminders": 2,
     "launch_review_notify": 2,
     "partner_notify": 2,
+    "activity_engine_cycle": 2,
     "polyclaw_scan": 3,
 }
 
@@ -62,7 +64,7 @@ def _fake_effect(calls):
 
 # --- 1. tier lookup ----------------------------------------------------------
 
-def test_tier_lookup_all_eleven_jobs():
+def test_tier_lookup_all_twelve_jobs():
     assert set(EXPECTED_TIERS) == set(central.CANONICAL_JOB_IDS)
     for job_id, expected in EXPECTED_TIERS.items():
         assert tiers.job_tier(job_id) == expected, job_id
@@ -124,6 +126,23 @@ def test_idempotency_key_format():
     key = idem.make_key("outreach_cycle",
                         datetime(2026, 10, 12, 7, 59, tzinfo=timezone.utc))
     assert key == "outreach_cycle:2026101207"
+
+
+def test_idempotency_key_sub_hourly_bucket():
+    # Jobs with idempotency_minutes < 60 (e.g. the 2-minute activity
+    # engine loop) get a per-bucket key so the intended cadence is not
+    # throttled, while duplicates inside the same bucket still collide.
+    t1 = datetime(2026, 10, 12, 7, 1, 30, tzinfo=timezone.utc)
+    t2 = datetime(2026, 10, 12, 7, 3, 30, tzinfo=timezone.utc)
+    t3 = datetime(2026, 10, 12, 7, 1, 45, tzinfo=timezone.utc)
+    k1 = idem.make_key("activity_engine_cycle", t1, bucket_minutes=2)
+    k2 = idem.make_key("activity_engine_cycle", t2, bucket_minutes=2)
+    k3 = idem.make_key("activity_engine_cycle", t3, bucket_minutes=2)
+    assert k1 == "activity_engine_cycle:2026101207:00"
+    assert k2 == "activity_engine_cycle:2026101207:02"
+    assert k3 == k1  # same 2-minute bucket -> duplicate skipped
+    # Default (no bucket arg) stays hourly for all existing jobs.
+    assert idem.make_key("outreach_cycle", t1) == "outreach_cycle:2026101207"
 
 
 # --- 3. kill-switch ----------------------------------------------------------

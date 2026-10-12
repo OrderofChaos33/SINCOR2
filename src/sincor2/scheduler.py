@@ -174,6 +174,24 @@ SCHEDULER_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "timezone": "America/Chicago",
         "max_instances": 1,
     },
+    "activity_engine_cycle": {
+        "name": "AXM Activity Engine Cycle",
+        "env_enabled": "ACTIVITY_ENGINE_ENABLED",
+        "enabled": True,
+        # Gasless ledger-only auction loop: posts sealed auctions, advances
+        # commit -> reveal -> close -> settle. Fires every 2 minutes with a
+        # 60s boot cycle (same cadence as the pre-consolidation registration).
+        "kind": "interval",
+        "env_interval_minutes": "ACTIVITY_ENGINE_INTERVAL_MINUTES",
+        "interval_minutes": 2,
+        "startup_delay_sec": 60,
+        # The engine intentionally fires every 2 minutes; the Tier 2
+        # idempotency guard dedupes per 2-minute bucket (not the default
+        # hourly bucket) so the loop cadence survives while double-fires
+        # within the same window are still skipped.
+        "idempotency_minutes": 2,
+        "max_instances": 1,
+    },
 }
 
 CANONICAL_JOB_IDS: List[str] = list(SCHEDULER_DEFAULTS.keys())
@@ -274,7 +292,13 @@ def _effect_guard(job_id: str, func: Callable[[], None]) -> Callable[[], None]:
             )
             return
 
-        key = idem.make_key(job_id, now)
+        # Idempotency: dedupe per job-configured bucket (default hourly).
+        # Jobs that intentionally fire sub-hourly (e.g. the 2-minute
+        # activity engine loop) set "idempotency_minutes" in their
+        # SCHEDULER_DEFAULTS spec so the guard dedupes double-fires within
+        # the same cadence window without throttling the intended rate.
+        bucket_minutes = SCHEDULER_DEFAULTS[job_id].get("idempotency_minutes", 60)
+        key = idem.make_key(job_id, now, bucket_minutes=bucket_minutes)
         if idem.already_done(key):
             logger.info("[SCHEDULER] %s idempotent skip (key %s)", job_id, key)
             return
@@ -376,6 +400,15 @@ def _partner_notify_job() -> None:
     send_partner_outreach_reminder()
 
 
+def _activity_engine_job() -> None:
+    from sincor2.activity_engine import run_cycle
+    summary = run_cycle()
+    logger.info(
+        "[ACTIVITY] cycle: posted=%d settled=%d expired=%d in_flight=%d fees=%.4f",
+        len(summary["posted"]), len(summary["settled"]),
+        len(summary["expired"]), summary["in_flight"], summary["fees_axm"])
+
+
 _JOB_FUNCS: Dict[str, Callable[[], None]] = {
     "daily_ops": _daily_ops_job,
     "sadas_scan": _sadas_job,
@@ -388,6 +421,7 @@ _JOB_FUNCS: Dict[str, Callable[[], None]] = {
     "compliance_checks": _compliance_checks_job,
     "launch_review_notify": _launch_review_notify_job,
     "partner_notify": _partner_notify_job,
+    "activity_engine_cycle": _activity_engine_job,
 }
 
 

@@ -55,14 +55,22 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def make_key(job_id: str, when: Optional[datetime] = None) -> str:
-    """Idempotency key: job_id + hourly bucket of the scheduled run window.
+def make_key(job_id: str, when: Optional[datetime] = None,
+             bucket_minutes: int = 60) -> str:
+    """Idempotency key: job_id + time bucket of the scheduled run window.
 
-    An hourly bucket means any duplicate firing of the same job within the
-    same hour is skipped, while the next scheduled window gets a fresh key.
+    Default is an hourly bucket (``bucket_minutes=60``): any duplicate firing
+    of the same job within the same hour is skipped, while the next
+    scheduled window gets a fresh key. Jobs that intentionally fire more
+    often (e.g. a 2-minute loop) pass a smaller bucket via the scheduler
+    spec so the intended cadence is not throttled — duplicate firings
+    within the same bucket are still skipped.
     """
     when = when or utcnow()
-    return f"{job_id}:{when.strftime('%Y%m%d%H')}"
+    if bucket_minutes >= 60:
+        return f"{job_id}:{when.strftime('%Y%m%d%H')}"
+    bucket = (when.minute // bucket_minutes) * bucket_minutes
+    return f"{job_id}:{when.strftime('%Y%m%d%H')}:{bucket:02d}"
 
 
 # ---------------------------------------------------------------------------
