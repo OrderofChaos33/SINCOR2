@@ -5,7 +5,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "spec",
   "title": "Spec P24 SocialFi revenue share: factory, curve, 4940/4940/120 split, no_price_talk",
-  "description": "Deliverable: docs/spec/P24_ARCHITECTURE.md for creator tokens with DeFi primitives: creator token factory (1e9 fixed supply, 50/50 market/vesting), bonding curve (supply^2/16000, $69k graduation), fee-split distributor (4940/4940/120 of the 10% trade fee), revenue accrual (7-day epochs), staking + collateral adapters, and the content-policy guard enforcing no_price_talk. Acceptance: (1) token lifecycle written as state transitions with numeric parameters; (2) split math stated as integers summing exactly to the fee with the 4000 bps creator floor; (3) no_price_talk defined as versioned deny-list requirements. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: docs/spec/P24_ARCHITECTURE.md for creator tokens with DeFi primitives: creator token factory (1e9 fixed supply, 50/50 market/vesting), bonding curve (supply^2/16000, $69k graduation), fee-split distributor (4940/4940/120 of the 10% trade fee), revenue accrual (7-day epochs), staking + collateral adapters, and the content-policy guard enforcing no_price_talk. Acceptance: (1) token lifecycle written as state transitions with numeric parameters; (2) split math stated as integers summing exactly to the fee with the 4000 bps creator floor; (3) no_price_talk defined as versioned deny-list requirements. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-architecture-spec",
   "tags": [
    "defi",
@@ -23,7 +23,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "spec",
   "title": "Define P24 Solidity + Python interfaces (factory, distributor, accrual)",
-  "description": "Deliverable: Solidity interfaces in onchain/src/p24/interfaces/ (ICreatorTokenFactory, IFeeSplitDistributor, IRevenueAccrual) and Python protocols in src/sincor2/defi/p24/interfaces.py. Acceptance: (1) Solidity interfaces compile under solc 0.8.24; (2) Python protocols type-check and cover issuance, splits, claims, staking, and policy screening; (3) interface docs state the live-blocked constraint and the 4000 bps creator floor. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: Solidity interfaces in onchain/src/p24/interfaces/ (ICreatorTokenFactory, IFeeSplitDistributor, IRevenueAccrual) and Python protocols in src/sincor2/defi/p24/interfaces.py. Acceptance: (1) Solidity interfaces compile under solc 0.8.24; (2) Python protocols type-check and cover issuance, splits, claims, staking, and policy screening; (3) interface docs state the live-blocked constraint and the 4000 bps creator floor. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-interface-definitions",
   "tags": [
    "defi",
@@ -42,7 +42,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "spec",
   "title": "Write P24 economics: 6% APR, 12 bps treasury cut, worked creator payout",
-  "description": "Deliverable: docs/spec/P24_ECONOMICS.md with target_apr=0.06 (staking primitive), fee_bps=12 (treasury = 12 bps of trade value = 120 bps of the 10% trade fee), creator/platform/treasury split 4940/4940/120, risk_score bound 0.33, max_alloc_pct=0.10, min_capital_usd=50.0. Acceptance: (1) worked creator-payout example: $500k/yr volume -> $50,000 fees -> creator $24,700 / platform $24,700 / treasury $600, matching to the cent; (2) dust-to-treasury rounding rule stated; (3) staking rewards sourced as 10% of the platform leg with 72 h unbonding. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: docs/spec/P24_ECONOMICS.md with target_apr=0.06 (staking primitive), fee_bps=12 (treasury = 12 bps of trade value = 120 bps of the 10% trade fee), creator/platform/treasury split 4940/4940/120, risk_score bound 0.33, max_alloc_pct=0.10, min_capital_usd=50.0. Acceptance: (1) worked creator-payout example: $500k/yr volume -> $50,000 fees -> creator $24,700 / platform $24,700 / treasury $600, matching to the cent; (2) dust-to-treasury rounding rule stated; (3) staking rewards sourced as 10% of the platform leg with 72 h unbonding. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-economic-model",
   "tags": [
    "defi",
@@ -62,7 +62,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "scaffold",
   "title": "Create P24 repo layout: onchain/src/p24/ + src/sincor2/defi/p24/",
-  "description": "Deliverable: onchain/src/p24/ (factory, curve, distributor, accrual, staking, collateral adapter, policy guard, interfaces), src/sincor2/defi/p24/ (onboarding, interfaces), tests/pytest/test_p24_*.py stubs, configs/agents/p24-socialfi-revenue.yaml, docs runbook stub. Acceptance: (1) solc 0.8.24 compiles the Solidity tree and the Python package imports cleanly; (2) layout mirrors the spec-phase interfaces; (3) agent YAML validates. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: onchain/src/p24/ (factory, curve, distributor, accrual, staking, collateral adapter, policy guard, interfaces), src/sincor2/defi/p24/ (onboarding, interfaces), tests/pytest/test_p24_*.py stubs, configs/agents/p24-socialfi-revenue.yaml, docs runbook stub. Acceptance: (1) solc 0.8.24 compiles the Solidity tree and the Python package imports cleanly; (2) layout mirrors the spec-phase interfaces; (3) agent YAML validates. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-repo-layout",
   "tags": [
    "defi",
@@ -82,7 +82,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "scaffold",
   "title": "Write P24 starter boilerplate: factory/distributor stubs, mock revenue",
-  "description": "Deliverable: CreatorTokenFactory stub, FeeSplitDistributor stub with fixed 4940/4940/120 splits, mock revenue source, Python onboarding stub with TOA hooks and policy screening. Acceptance: (1) solc compiles all stubs with zero warnings; (2) mock issue->split->claim round-trip works in Python with exact split accounting; (3) every stub state-changing path marked live-blocked. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: CreatorTokenFactory stub, FeeSplitDistributor stub with fixed 4940/4940/120 splits, mock revenue source, Python onboarding stub with TOA hooks and policy screening. Acceptance: (1) solc compiles all stubs with zero warnings; (2) mock issue->split->claim round-trip works in Python with exact split accounting; (3) every stub state-changing path marked live-blocked. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-starter-code",
   "tags": [
    "defi",
@@ -102,7 +102,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "core",
   "title": "Build the creator token factory: 1e9 supply, 50/50 split, 5-yr vesting",
-  "description": "Deliverable: CreatorTokenFactory.sol with permissioned issuance, fixed 1,000,000,000 supply, 50% to bonding curve / 50% to creator vesting linearly over 1,825 days (unvested non-transferable), creator attribution events, ReentrancyGuard + SafeERC20. Acceptance: (1) tokens issue only through the factory with supply caps enforced and attribution events emitted; (2) vesting math verified: 0% claimable day 0, 50% at day 912, 100% at day 1825; (3) onlyFactory minting proven by direct mint attempts reverting. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: CreatorTokenFactory.sol with permissioned issuance, fixed 1,000,000,000 supply, 50% to bonding curve / 50% to creator vesting linearly over 1,825 days (unvested non-transferable), creator attribution events, ReentrancyGuard + SafeERC20. Acceptance: (1) tokens issue only through the factory with supply caps enforced and attribution events emitted; (2) vesting math verified: 0% claimable day 0, 50% at day 912, 100% at day 1825; (3) onlyFactory minting proven by direct mint attempts reverting. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-creator-token-factory",
   "tags": [
    "defi",
@@ -123,7 +123,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "core",
   "title": "Build the fee-split distributor: exact 4940/4940/120, pull claims",
-  "description": "Deliverable: FeeSplitDistributor.sol splitting each trade's 1000 bps fee as creator 4940 / platform 4940 / treasury 120 (bps of fee), pull-based claims, per-payout try/catch so one failed payout never blocks others, dust to treasury. Acceptance: (1) splits match the spec's exact basis points across fuzzed trade sizes (1 wei to 1e24); (2) creator+platform+treasury == fee exactly for every trade; (3) a reverting claimant does not block other claimants. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: FeeSplitDistributor.sol splitting each trade's 1000 bps fee as creator 4940 / platform 4940 / treasury 120 (bps of fee), pull-based claims, per-payout try/catch so one failed payout never blocks others, dust to treasury. Acceptance: (1) splits match the spec's exact basis points across fuzzed trade sizes (1 wei to 1e24); (2) creator+platform+treasury == fee exactly for every trade; (3) a reverting claimant does not block other claimants. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-fee-split-distributor",
   "tags": [
    "defi",
@@ -145,7 +145,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "core",
   "title": "Build revenue accrual: 7-day epochs, snapshots, no retroactive claims",
-  "description": "Deliverable: RevenueAccrual module tracking per-creator-token revenue over 604800 s epochs with balance snapshots at epoch start, so late joiners cannot claim past epochs. Acceptance: (1) accrual math matches the spec across epoch boundaries in tests; (2) a holder joining mid-epoch claims only the post-join portion; (3) claims never exceed accrued amounts (fuzzed). Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: RevenueAccrual module tracking per-creator-token revenue over 604800 s epochs with balance snapshots at epoch start, so late joiners cannot claim past epochs. Acceptance: (1) accrual math matches the spec across epoch boundaries in tests; (2) a holder joining mid-epoch claims only the post-join portion; (3) claims never exceed accrued amounts (fuzzed). Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-revenue-accrual",
   "tags": [
    "defi",
@@ -166,7 +166,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "core",
   "title": "Implement the content-policy guard: no_price_talk screening at issuance",
-  "description": "Deliverable: ContentPolicyGuard enforcing no_price_talk on token name/symbol/description/creator bio at issuance and metadata updates, with versioned phrase-based deny-list; violations block issuance or flag the token, citing rule version + matched phrase. Acceptance: (1) 30+ adversarial price-talk samples (predictions, guaranteed returns, 100x promises) are all rejected; (2) legitimate creator metadata passes, including edge cases like the word 'priceless'; (3) every rejection cites rule version and matched phrase. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: ContentPolicyGuard enforcing no_price_talk on token name/symbol/description/creator bio at issuance and metadata updates, with versioned phrase-based deny-list; violations block issuance or flag the token, citing rule version + matched phrase. Acceptance: (1) 30+ adversarial price-talk samples (predictions, guaranteed returns, 100x promises) are all rejected; (2) legitimate creator metadata passes, including edge cases like the word 'priceless'; (3) every rejection cites rule version and matched phrase. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-content-policy-guard",
   "tags": [
    "defi",
@@ -187,7 +187,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "core",
   "title": "Build DeFi primitives adapters: staking (6% target) + collateral (50% LTV)",
-  "description": "Deliverable: CreatorStaking (rewards from 10% of platform fee leg, 6% target APR, 72 h unbonding) and CollateralAdapter (creator tokens as collateral in allowlisted venues, max LTV 0.50, per-token exposure <=0.10). Acceptance: (1) staking and collateral flows work against mocked venues with caps enforced; (2) stake/unstake timing attack around epoch snapshots yields no extra rewards; (3) LTV breach attempts revert. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: CreatorStaking (rewards from 10% of platform fee leg, 6% target APR, 72 h unbonding) and CollateralAdapter (creator tokens as collateral in allowlisted venues, max LTV 0.50, per-token exposure <=0.10). Acceptance: (1) staking and collateral flows work against mocked venues with caps enforced; (2) stake/unstake timing attack around epoch snapshots yields no extra rewards; (3) LTV breach attempts revert. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-defi-primitives-adapter",
   "tags": [
    "defi",
@@ -207,7 +207,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "core",
   "title": "Build the creator onboarding agent: registration + policy screening",
-  "description": "Deliverable: src/sincor2/defi/p24/onboarding.py guiding creator registration, validating metadata through the content-policy guard, emitting TOA feedback; full error handling; never signs. Acceptance: (1) a valid creator onboards end-to-end; (2) policy violations rejected with clear errors citing rule version + phrase; (3) any live-intent path raises LiveBlocked. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: src/sincor2/defi/p24/onboarding.py guiding creator registration, validating metadata through the content-policy guard, emitting TOA feedback; full error handling; never signs. Acceptance: (1) a valid creator onboards end-to-end; (2) policy violations rejected with clear errors citing rule version + phrase; (3) any live-intent path raises LiveBlocked. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-creator-onboarding-agent",
   "tags": [
    "defi",
@@ -229,7 +229,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "core",
   "title": "Implement 12 bps treasury fee routing with per-creator accounting",
-  "description": "Deliverable: fee router computing treasury leg = floor(trade_fee * 120 / 10000) + dust per trade, routed to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac with per-creator accounting. Acceptance: (1) fee math matches the P24_ECONOMICS.md $500k-volume worked example to the wei; (2) per-creator ledger attributes every wei; (3) settlement targets only the canonical treasury. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: fee router computing treasury leg = floor(trade_fee * 120 / 10000) + dust per trade, routed to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac with per-creator accounting. Acceptance: (1) fee math matches the P24_ECONOMICS.md $500k-volume worked example to the wei; (2) per-creator ledger attributes every wei; (3) settlement targets only the canonical treasury. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-treasury-fee-router",
   "tags": [
    "defi",
@@ -250,7 +250,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "testing",
   "title": "Write P24 unit tests: factory, splits, accrual, guard, fees",
-  "description": "Deliverable: tests/pytest/test_p24_socialfi_revenue_unit.py covering factory issuance/vesting, split math, accrual snapshots, content-policy guard true/false positives, and fee math. Acceptance: (1) all tests pass; (2) Solidity coverage via forge and Python coverage >=85%; (3) split tests pin the 4940/4940/120 conservation across fuzzed inputs. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: tests/pytest/test_p24_socialfi_revenue_unit.py covering factory issuance/vesting, split math, accrual snapshots, content-policy guard true/false positives, and fee math. Acceptance: (1) all tests pass; (2) Solidity coverage via forge and Python coverage >=85%; (3) split tests pin the 4940/4940/120 conservation across fuzzed inputs. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-unit-tests",
   "tags": [
    "defi",
@@ -271,7 +271,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "testing",
   "title": "Write P24 integration tests: onboard->issue->accrue->split->claim",
-  "description": "Deliverable: end-to-end tests: onboard to issue to accrue revenue to split to claim, plus staking-primitive flows and policy-violation rejection. Acceptance: (1) green cycle with exact split accounting to the wei; (2) staking flow accrues the 6% target pro-rata with 72 h unbonding enforced; (3) price-talk metadata rejected mid-flow without breaking the valid path. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: end-to-end tests: onboard to issue to accrue revenue to split to claim, plus staking-primitive flows and policy-violation rejection. Acceptance: (1) green cycle with exact split accounting to the wei; (2) staking flow accrues the 6% target pro-rata with 72 h unbonding enforced; (3) price-talk metadata rejected mid-flow without breaking the valid path. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-integration-tests",
   "tags": [
    "defi",
@@ -292,7 +292,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "testing",
   "title": "Write P24 invariant/fuzz tests: 1000+ issue/accrue/claim sequences",
-  "description": "Deliverable: property tests asserting (a) splits always sum to 100% of the fee, (b) no token issues with price-talk metadata, (c) claims never exceed accrued amounts. Acceptance: (1) invariants hold over >=1000 randomized issue/accrue/claim sequences; (2) violations fail loudly with the offending sequence logged; (3) fixed fuzz seeds for reproducibility. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: property tests asserting (a) splits always sum to 100% of the fee, (b) no token issues with price-talk metadata, (c) claims never exceed accrued amounts. Acceptance: (1) invariants hold over >=1000 randomized issue/accrue/claim sequences; (2) violations fail loudly with the offending sequence logged; (3) fixed fuzz seeds for reproducibility. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-invariant-fuzz-tests",
   "tags": [
    "defi",
@@ -313,7 +313,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "testing",
   "title": "Run P24 mainnet-fork simulation: factory, distributor, accrual",
-  "description": "Deliverable: fork run of factory, distributor, and accrual with realistic revenue flows, verifying splits and claims. Acceptance: (1) completed run with exact accounting to the wei; (2) zero unexpected reverts; (3) zero live intents emitted (asserted). Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: fork run of factory, distributor, and accrual with realistic revenue flows, verifying splits and claims. Acceptance: (1) completed run with exact accounting to the wei; (2) zero unexpected reverts; (3) zero live intents emitted (asserted). Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-fork-simulation",
   "tags": [
    "defi",
@@ -333,7 +333,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "audit",
   "title": "Assemble P24 audit-prep package: snapshot, threat model, limitations log",
-  "description": "Deliverable: single reviewable directory with frozen snapshot (commit hash recorded), threat model covering split manipulation, accrual gaming, factory permission bypass, and bonding-curve reflexivity, plus known-limitations log. Acceptance: (1) snapshot builds and all P24 tests pass from the frozen tree; (2) each threat maps to a mitigating control and its test; (3) limitations log documents curve reflexivity on the way down plainly. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: single reviewable directory with frozen snapshot (commit hash recorded), threat model covering split manipulation, accrual gaming, factory permission bypass, and bonding-curve reflexivity, plus known-limitations log. Acceptance: (1) snapshot builds and all P24 tests pass from the frozen tree; (2) each threat maps to a mitigating control and its test; (3) limitations log documents curve reflexivity on the way down plainly. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-audit-prep",
   "tags": [
    "defi",
@@ -353,7 +353,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "audit",
   "title": "Remediate P24 audit findings: zero open medium+ with suite green",
-  "description": "Deliverable: fixes for all audit findings rated medium or higher, each with a regression test. Acceptance: (1) zero open medium-or-higher findings; (2) full P24 suite plus content-policy guard tests re-run green after each fix; (3) each fix references the finding ID in its commit message. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: fixes for all audit findings rated medium or higher, each with a regression test. Acceptance: (1) zero open medium-or-higher findings; (2) full P24 suite plus content-policy guard tests re-run green after each fix; (3) each fix references the finding ID in its commit message. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-findings-remediation",
   "tags": [
    "defi",
@@ -373,7 +373,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "audit",
   "title": "Gas-optimize P24 factory and distributor: 20% reduction target",
-  "description": "Deliverable: gas measurements per issuance/split/claim path and optimizations targeting >=20% reduction on hot paths without behavior change. Acceptance: (1) committed before/after gas report with per-path numbers; (2) all P24 tests still pass; (3) no change to split math, curve math, or guard semantics (verified by the invariant suite). Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: gas measurements per issuance/split/claim path and optimizations targeting >=20% reduction on hot paths without behavior change. Acceptance: (1) committed before/after gas report with per-path numbers; (2) all P24 tests still pass; (3) no change to split math, curve math, or guard semantics (verified by the invariant suite). Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-gas-optimization",
   "tags": [
    "defi",
@@ -393,7 +393,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "docs",
   "title": "Write P24 technical docs: contracts, agents, split/accrual semantics",
-  "description": "Deliverable: technical docs with component reference for Solidity contracts and Python agents, split and accrual semantics, and content-policy requirements. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) the no_price_talk rule-set versioning documented. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: technical docs with component reference for Solidity contracts and Python agents, split and accrual semantics, and content-policy requirements. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) the no_price_talk rule-set versioning documented. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-technical-docs",
   "tags": [
    "defi",
@@ -413,7 +413,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "docs",
   "title": "Ship P24 agent YAML config and ops runbook",
-  "description": "Deliverable: configs/agents/p24-socialfi-revenue.yaml (budgets, memory, TOA hooks, check-in cadence) and docs/ops/P24_RUNBOOK.md (creator onboarding, split monitoring, policy escalations + human appeal path). Acceptance: (1) YAML validates; (2) runbook steps executable in order (dry-run first); (3) appeal path for false-positive policy rejections documented. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: configs/agents/p24-socialfi-revenue.yaml (budgets, memory, TOA hooks, check-in cadence) and docs/ops/P24_RUNBOOK.md (creator onboarding, split monitoring, policy escalations + human appeal path). Acceptance: (1) YAML validates; (2) runbook steps executable in order (dry-run first); (3) appeal path for false-positive policy rejections documented. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-agent-yaml-runbook",
   "tags": [
    "defi",
@@ -434,7 +434,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "docs",
   "title": "Add P24 dashboard monitoring hooks: revenue, split drift, policy events",
-  "description": "Deliverable: monitoring hooks on the feed schema: per-creator revenue and payout metrics, split-drift P0 alert (legs != fee), policy-violation events. Acceptance: (1) hooks emit valid feed-schema events; (2) simulated split drift fires the P0 alert; (3) simulated policy violations emit events with rule version. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: monitoring hooks on the feed schema: per-creator revenue and payout metrics, split-drift P0 alert (legs != fee), policy-violation events. Acceptance: (1) hooks emit valid feed-schema events; (2) simulated split drift fires the P0 alert; (3) simulated policy violations emit events with rule version. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-dashboard-monitoring-hooks",
   "tags": [
    "defi",
@@ -454,7 +454,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "deploy",
   "title": "Write P24 testnet deploy scripts: dry-run default, Sepolia end-to-end",
-  "description": "Deliverable: deploy scripts for factory, distributor, accrual contracts plus offchain agent deployment, with dry-run defaulting ON. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs; (3) flipping dry-run off requires an explicit flag and prints the compliance checkpoint. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: deploy scripts for factory, distributor, accrual contracts plus offchain agent deployment, with dry-run defaulting ON. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs; (3) flipping dry-run off requires an explicit flag and prints the compliance checkpoint. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-testnet-deploy-scripts",
   "tags": [
    "defi",
@@ -474,7 +474,7 @@
   "project_name": "SocialFi Revenue Share",
   "phase": "deploy",
   "title": "Produce P24 mainnet readiness checklist: signed NO-GO by design",
-  "description": "Deliverable: mainnet readiness checklist (audit signoff, split-parameter freeze at 4940/4940/120, treasury 0x09E289...9612Ac verification, rollback plan, printed compliance checkpoint) recorded as NO-GO by design until re-audit. Acceptance: (1) every item has owner + evidence link; (2) checklist reviewed and signed with NO-GO recorded and the re-audit precondition stated; (3) no mainnet deploy script ships enabled. Judged per specs/p24-socialfi-revenue.md §Acceptance criteria.",
+  "description": "Deliverable: mainnet readiness checklist (audit signoff, split-parameter freeze at 4940/4940/120, treasury 0x09E289...9612Ac verification, rollback plan, printed compliance checkpoint) recorded as NO-GO by design until re-audit. Acceptance: (1) every item has owner + evidence link; (2) checklist reviewed and signed with NO-GO recorded and the re-audit precondition stated; (3) no mainnet deploy script ships enabled. Judged per specs/p24-socialfi-revenue.md \u00a7Acceptance criteria.",
   "skill": "p24-socialfi-revenue-mainnet-readiness-checklist",
   "tags": [
    "defi",
@@ -486,6 +486,299 @@
   "effort": "S",
   "depends_on": [
    "p24-socialfi-revenue-testnet-deploy-scripts"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-content-policy-guard-testharden-0",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "testing",
+  "title": "Test-hardening: Implement the content-policy guard: no_price_talk screening at issuance",
+  "description": "Follow-on to p24-socialfi-revenue-content-policy-guard (Implement the content-policy guard: no_price_talk screening at issuance).\n\nBuilds on the deliverable: ContentPolicyGuard enforcing no_price_talk on token name/symbol/description/creator bio at issuance and metadata updates, with versioned phrase-based deny-list; violations block issuance or flag the token, citing rule version + matched phrase. Acceptance: (1) 30+ adversarial price-talk samples (predictions, guaranteed ...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p24-socialfi-revenue-content-policy-guard-testharden-0",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "policy",
+   "gates",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p24-socialfi-revenue-content-policy-guard"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-defi-primitives-adapter-testharden-1",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "testing",
+  "title": "Test-hardening: Build DeFi primitives adapters: staking (6% target) + collateral (50% LTV)",
+  "description": "Follow-on to p24-socialfi-revenue-defi-primitives-adapter (Build DeFi primitives adapters: staking (6% target) + collateral (50% LTV)).\n\nBuilds on the deliverable: CreatorStaking (rewards from 10% of platform fee leg, 6% target APR, 72 h unbonding) and CollateralAdapter (creator tokens as collateral in allowlisted venues, max LTV 0.50, per-token exposure <=0.10). Acceptance: (1) staking and collateral flows work against mocked venues with caps enforced; (2) stake/unstake timing a...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p24-socialfi-revenue-defi-primitives-adapter-testharden-1",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "defi-primitives",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p24-socialfi-revenue-defi-primitives-adapter"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-creator-onboarding-agent-testharden-2",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "testing",
+  "title": "Test-hardening: Build the creator onboarding agent: registration + policy screening",
+  "description": "Follow-on to p24-socialfi-revenue-creator-onboarding-agent (Build the creator onboarding agent: registration + policy screening).\n\nBuilds on the deliverable: src/sincor2/defi/p24/onboarding.py guiding creator registration, validating metadata through the content-policy guard, emitting TOA feedback; full error handling; never signs. Acceptance: (1) a valid creator onboards end-to-end; (2) policy violations rejected with clear errors citing rule version + phrase; (3) any live...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p24-socialfi-revenue-creator-onboarding-agent-testharden-2",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "agent",
+   "toa",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p24-socialfi-revenue-creator-onboarding-agent"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-treasury-fee-router-testharden-3",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "testing",
+  "title": "Test-hardening: Implement 12 bps treasury fee routing with per-creator accounting",
+  "description": "Follow-on to p24-socialfi-revenue-treasury-fee-router (Implement 12 bps treasury fee routing with per-creator accounting).\n\nBuilds on the deliverable: fee router computing treasury leg = floor(trade_fee * 120 / 10000) + dust per trade, routed to 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac with per-creator accounting. Acceptance: (1) fee math matches the P24_ECONOMICS.md $500k-volume worked example to the wei; (2) per-creator ledger attributes every wei; (3) settlement...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p24-socialfi-revenue-treasury-fee-router-testharden-3",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "fees",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p24-socialfi-revenue-treasury-fee-router"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-creator-token-factory-secreview-0",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "audit",
+  "title": "Security review: Build the creator token factory: 1e9 supply, 50/50 split, 5-yr vesting",
+  "description": "Follow-on to p24-socialfi-revenue-creator-token-factory (Build the creator token factory: 1e9 supply, 50/50 split, 5-yr vesting).\n\nBuilds on the deliverable: CreatorTokenFactory.sol with permissioned issuance, fixed 1,000,000,000 supply, 50% to bonding curve / 50% to creator vesting linearly over 1,825 days (unvested non-transferable), creator attribution events, ReentrancyGuard + SafeERC20. Acceptance: (1) tokens issue only through the factory with supply caps enforced and...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p24-socialfi-revenue-creator-token-factory-secreview-0",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "tokens",
+   "solidity",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-creator-token-factory"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-fee-split-distributor-secreview-1",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "audit",
+  "title": "Security review: Build the fee-split distributor: exact 4940/4940/120, pull claims",
+  "description": "Follow-on to p24-socialfi-revenue-fee-split-distributor (Build the fee-split distributor: exact 4940/4940/120, pull claims).\n\nBuilds on the deliverable: FeeSplitDistributor.sol splitting each trade's 1000 bps fee as creator 4940 / platform 4940 / treasury 120 (bps of fee), pull-based claims, per-payout try/catch so one failed payout never blocks others, dust to treasury. Acceptance: (1) splits match the spec's exact basis points across fuzzed trade sizes (1 wei to 1e24...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p24-socialfi-revenue-fee-split-distributor-secreview-1",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "revenue",
+   "solidity",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-fee-split-distributor"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-revenue-accrual-secreview-2",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "audit",
+  "title": "Security review: Build revenue accrual: 7-day epochs, snapshots, no retroactive claims",
+  "description": "Follow-on to p24-socialfi-revenue-revenue-accrual (Build revenue accrual: 7-day epochs, snapshots, no retroactive claims).\n\nBuilds on the deliverable: RevenueAccrual module tracking per-creator-token revenue over 604800 s epochs with balance snapshots at epoch start, so late joiners cannot claim past epochs. Acceptance: (1) accrual math matches the spec across epoch boundaries in tests; (2) a holder joining mid-epoch claims only the post-join portion; (3) claims neve...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p24-socialfi-revenue-revenue-accrual-secreview-2",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "revenue",
+   "accounting",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-revenue-accrual"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-testnet-deploy-scripts-prodready-0",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "deploy",
+  "title": "Production readiness: Write P24 testnet deploy scripts: dry-run default, Sepolia end-to-end",
+  "description": "Follow-on to p24-socialfi-revenue-testnet-deploy-scripts (Write P24 testnet deploy scripts: dry-run default, Sepolia end-to-end).\n\nBuilds on the deliverable: deploy scripts for factory, distributor, accrual contracts plus offchain agent deployment, with dry-run defaulting ON. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs; (3) flipping dry-run off requires an explicit flag and prints the compliance checkpoint. Judged per specs/p2...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p24-socialfi-revenue-testnet-deploy-scripts-prodready-0",
+  "tags": [
+   "defi",
+   "socialfi",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-testnet-deploy-scripts"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-mainnet-readiness-checklist-prodready-1",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "deploy",
+  "title": "Production readiness: Produce P24 mainnet readiness checklist: signed NO-GO by design",
+  "description": "Follow-on to p24-socialfi-revenue-mainnet-readiness-checklist (Produce P24 mainnet readiness checklist: signed NO-GO by design).\n\nBuilds on the deliverable: mainnet readiness checklist (audit signoff, split-parameter freeze at 4940/4940/120, treasury 0x09E289...9612Ac verification, rollback plan, printed compliance checkpoint) recorded as NO-GO by design until re-audit. Acceptance: (1) every item has owner + evidence link; (2) checklist reviewed and signed with NO-GO recor...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p24-socialfi-revenue-mainnet-readiness-checklist-prodready-1",
+  "tags": [
+   "defi",
+   "socialfi",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-mainnet-readiness-checklist"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-technical-docs-prodready-2",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "deploy",
+  "title": "Production readiness: Write P24 technical docs: contracts, agents, split/accrual semantics",
+  "description": "Follow-on to p24-socialfi-revenue-technical-docs (Write P24 technical docs: contracts, agents, split/accrual semantics).\n\nBuilds on the deliverable: technical docs with component reference for Solidity contracts and Python agents, split and accrual semantics, and content-policy requirements. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) the no_price_talk rule-set versioning documented. J...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p24-socialfi-revenue-technical-docs-prodready-2",
+  "tags": [
+   "defi",
+   "socialfi",
+   "docs",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-repo-layout-devex-0",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "scaffold",
+  "title": "DevEx: Create P24 repo layout: onchain/src/p24/ + src/sincor2/defi/p24/",
+  "description": "Follow-on to p24-socialfi-revenue-repo-layout (Create P24 repo layout: onchain/src/p24/ + src/sincor2/defi/p24/).\n\nBuilds on the deliverable: onchain/src/p24/ (factory, curve, distributor, accrual, staking, collateral adapter, policy guard, interfaces), src/sincor2/defi/p24/ (onboarding, interfaces), tests/pytest/test_p24_*.py stubs, configs/agents/p24-socialfi-revenue.yaml, docs runbook stub. Acceptance: (1) solc 0.8.24 compiles the Solidity tree and the Py...\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p24-socialfi-revenue-repo-layout-devex-0",
+  "tags": [
+   "defi",
+   "socialfi",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p24-socialfi-revenue-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-starter-code-devex-1",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "scaffold",
+  "title": "DevEx: Write P24 starter boilerplate: factory/distributor stubs, mock revenue",
+  "description": "Follow-on to p24-socialfi-revenue-starter-code (Write P24 starter boilerplate: factory/distributor stubs, mock revenue).\n\nBuilds on the deliverable: CreatorTokenFactory stub, FeeSplitDistributor stub with fixed 4940/4940/120 splits, mock revenue source, Python onboarding stub with TOA hooks and policy screening. Acceptance: (1) solc compiles all stubs with zero warnings; (2) mock issue->split->claim round-trip works in Python with exact split accounting; (3) every ...\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p24-socialfi-revenue-starter-code-devex-1",
+  "tags": [
+   "defi",
+   "socialfi",
+   "scaffold",
+   "solidity"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p24-socialfi-revenue-starter-code"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-creator-token-factory-completion-0",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "core",
+  "title": "Core completion: Build the creator token factory: 1e9 supply, 50/50 split, 5-yr vesting",
+  "description": "Follow-on to p24-socialfi-revenue-creator-token-factory (Build the creator token factory: 1e9 supply, 50/50 split, 5-yr vesting).\n\nBuilds on the deliverable: CreatorTokenFactory.sol with permissioned issuance, fixed 1,000,000,000 supply, 50% to bonding curve / 50% to creator vesting linearly over 1,825 days (unvested non-transferable), creator attribution events, ReentrancyGuard + SafeERC20. Acceptance: (1) tokens issue only through the factory with supply caps enforced and...\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p24-socialfi-revenue-creator-token-factory-completion-0",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "tokens",
+   "solidity"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-creator-token-factory"
+  ]
+ },
+ {
+  "task_key": "p24-socialfi-revenue-fee-split-distributor-completion-1",
+  "project_id": "P24",
+  "project_name": "SocialFi Revenue Share",
+  "phase": "core",
+  "title": "Core completion: Build the fee-split distributor: exact 4940/4940/120, pull claims",
+  "description": "Follow-on to p24-socialfi-revenue-fee-split-distributor (Build the fee-split distributor: exact 4940/4940/120, pull claims).\n\nBuilds on the deliverable: FeeSplitDistributor.sol splitting each trade's 1000 bps fee as creator 4940 / platform 4940 / treasury 120 (bps of fee), pull-based claims, per-payout try/catch so one failed payout never blocks others, dust to treasury. Acceptance: (1) splits match the spec's exact basis points across fuzzed trade sizes (1 wei to 1e24...\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p24-socialfi-revenue-fee-split-distributor-completion-1",
+  "tags": [
+   "defi",
+   "socialfi",
+   "core",
+   "revenue",
+   "solidity"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p24-socialfi-revenue-fee-split-distributor"
   ]
  }
 ]
