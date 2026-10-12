@@ -9,6 +9,7 @@ for all 17 price-needing products.
 
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
 
@@ -412,3 +413,61 @@ def test_oracle_config_rejects_unknown_keys():
     o = PriceOracle()
     with pytest.raises(OracleError):
         o.configure("ETH/USD", not_a_key=1)
+
+
+# -- per-product module wiring (from xioix/sku-defi-price-oracle) --------------
+
+WIRED_MODULES = {
+    "P01_YIELD_AGG": "src.sincor2.defi.yield_aggregator",
+    "P02_CLMM": "src.sincor2.defi.clmm_manager",
+    "P03_INTENT_DARK": "src.sincor2.defi.intent_dark_pool",
+    "P06_PERPS": "src.sincor2.defi.perp_hedge_swarm",
+    "P07_BRIDGE": "src.sincor2.defi.bridge_optimizer",
+    "P08_RWA": "src.sincor2.defi.rwa_vaults",
+    "P10_FLASH_ARB": "src.sincor2.defi.flash_arbitrage",
+    "P11_DELTA_NEUTRAL": "src.sincor2.defi.delta_neutral",
+    "P12_TWAMM": "src.sincor2.defi.twamm",
+    "P13_AVS": "src.sincor2.defi.avs_tranching",
+    "P14_PREDICTION": "src.sincor2.defi.prediction_markets",
+    "P15_LENDING": "src.sincor2.defi.lending_optimizer",
+    "P16_DEX_AGG": "src.sincor2.defi.dex_aggregator",
+    "P17_OPTIONS": "src.sincor2.defi.options_protocol",
+    "P18_STRUCTURED": "src.sincor2.defi.structured_products",
+    "P19_CREDIT": "src.sincor2.defi.credit_underwriting",
+    "P25_PORTFOLIO": "src.sincor2.defi.p25.rebalancer",
+}
+
+
+def test_all_17_products_declare_and_bind():
+    o = _wired_oracle()
+    assert set(WIRED_MODULES) == set(po.PRODUCT_PRICE_NEEDS)
+    for key, modname in WIRED_MODULES.items():
+        mod = importlib.import_module(modname)
+        assert mod.PRICE_ASSETS == po.PRODUCT_PRICE_NEEDS[key], key
+        feed = mod.price_feed_for(o)
+        assert isinstance(feed, ProductPriceFeed)
+        assert feed.product_key == key
+        assert feed.assets == po.PRODUCT_PRICE_NEEDS[key]
+        got = feed.require_all(T0 + 5)
+        assert set(got) == set(feed.assets)
+        expected = {"ETH/USD": 3_000 * PRICE_FP,
+                    "BTC/USD": 97_000 * PRICE_FP,
+                    "USDC/USD": 1 * PRICE_FP}
+        for asset, val in got.items():
+            assert val == expected[asset], (key, asset)
+
+
+def test_perp_native_sync_routes_through_shared_oracle():
+    from src.sincor2.defi import perp_hedge_swarm as phs
+    o = _wired_oracle()
+    feed = phs.price_feed_for(o)
+    engine_feed = phs.PriceFeed()
+    got = engine_feed.sync_from_oracle(feed, "ETH/USD", T0 + 5)
+    assert got == 3_000 * PRICE_FP
+    assert engine_feed.get(T0 + 5) == 3_000 * PRICE_FP
+    # oracle failure leaves the local feed untouched (fail-static)
+    o2 = PriceOracle()  # nothing published
+    feed2 = phs.price_feed_for(o2)
+    with pytest.raises(NoPriceAvailable):
+        engine_feed.sync_from_oracle(feed2, "ETH/USD", T0 + 6)
+    assert engine_feed.get(T0 + 6) == 3_000 * PRICE_FP  # old price intact
