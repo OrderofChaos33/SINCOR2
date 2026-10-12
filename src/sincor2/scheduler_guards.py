@@ -65,6 +65,8 @@ PER_JOB_TIMEOUTS: Dict[str, int] = {
     "compliance_checks": 300,
     "launch_review_notify": 300,
     "partner_notify": 300,
+    # 2-minute cadence -> 600s ceiling (5x), same band as other fast loops.
+    "activity_engine_cycle": 600,
 }
 
 #: Fallback ceiling for job ids not in PER_JOB_TIMEOUTS.

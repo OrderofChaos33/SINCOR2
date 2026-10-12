@@ -75,6 +75,11 @@ from sincor2.dispute_evidence import (
 # docs/architecture/CANONICAL_PATHS.md §1.
 from sincor2.contract_net import calculate_bid_score, stage_payout
 
+# Anti-gaming guards for the AXM Activity Engine loop (Stream B):
+# self-bid rejection, participation rate limits, and anti-collusion
+# rotation caps. All checks fail closed (PermissionError -> HTTP 403).
+from sincor2 import axm_antigaming
+
 logger = logging.getLogger("sincor.a2a.inbound")
 
 # ---------------------------------------------------------------------------
@@ -613,6 +618,29 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
         cands = [b for b in fabric.bids.values()
                  if b.get("task_id") == task_id and b.get("revealed", True)]
         close_blocked = False
+        # Anti-gaming re-validation at winner selection (fail closed): a
+        # bid committed while eligible must not win after a cap trips
+        # (consecutive-win / pair / window caps, self-bid, anonymous
+        # bounty task). Each candidate is re-checked NOW; ineligible bids
+        # are excluded from selection. Never bricks the close — a guard
+        # failure excludes the bid rather than raising. Excluded bids are
+        # simply losers (stake released by the normal loser path below);
+        # if none remain eligible the auction expires with no winner.
+        # (Rebased onto W-78: runs BEFORE the escrow-cap walk below, so
+        # the cap walk only ever sees eligible candidates.)
+        eligible_cands: List[Dict[str, Any]] = []
+        for _bid in cands:
+            try:
+                axm_antigaming.check_bid_eligibility(
+                    task, str(_bid.get("agent_id")))
+            except Exception as _err:
+                logger.warning("antigaming: bid %s by %s excluded at "
+                               "winner selection: %s",
+                               _bid.get("bid_id"), _bid.get("agent_id"),
+                               _err)
+            else:
+                eligible_cands.append(_bid)
+        cands = eligible_cands
         if not cands:
             task["state"] = "expired"
             task["expired_reason"] = "auction_timeout"
@@ -691,6 +719,16 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 ledger.release(agent_id, task_id)
             except Exception as err:
                 logger.warning("stake release failed for %s: %s", agent_id, err)
+    # Anti-gaming rotation accounting (outside the fabric lock; never
+    # bricks the close). Records the winner for the rolling win cap and
+    # updates consecutive-win / pair streaks. A close with no winner
+    # resets all streaks (anti-brick: caps can never deadlock the loop).
+    try:
+        axm_antigaming.record_auction_close(
+            poster_id, snap.get("assigned_to"), task_id=task_id)
+    except Exception as err:  # never brick auction close on accounting
+        logger.warning("antigaming close record failed for %s: %s",
+                       task_id, err)
     # Ghosting zeroes earned reputation and restores probation. This is the
     # behavior penalty for committing without revealing; it applies to every
     # detected ghost independent of ledger accounting, and never bricks
@@ -819,6 +857,23 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
                 expired.append(dict(task))
     for snap in expired:
         ghost_agent = snap.get("assigned_to")
+        # Ghost slash wiring (Stream B): a winner that never performs is
+        # slashed under the EXISTING stake_ledger ghost rule — 100 % of the
+        # locked stake via the protocol path (no adjudicator needed, same
+        # as a commit-without-reveal ghost). This codebase already treats a
+        # no-show as ghosting (see _apply_no_show_penalty); no new slash
+        # economics are invented here. Never bricks expiry on accounting.
+        ghost_slash: Dict[str, Any] = {}
+        if ghost_agent:
+            try:
+                from sincor2.onchain.stake_ledger import stake_ledger
+                ghost_slash = stake_ledger().slash_ghost(
+                    ghost_agent, snap["task_id"],
+                    poster_id=snap.get("poster_id"))
+            except Exception as err:
+                logger.warning("ghost stake slash failed for %s: %s",
+                               ghost_agent, err)
+        snap["ghost_slash"] = ghost_slash
         penalty = (
             _apply_no_show_penalty(fabric, ghost_agent)
             if ghost_agent
@@ -872,6 +927,9 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
             raise PermissionError("capability mismatch")
         if task.get("requires_merit") and float(agent.get("reputation") or 0) < 0.15:
             raise PermissionError("merit required")
+        # Anti-gaming gate (fail closed): self-bid, participation windows,
+        # consecutive-win and pair rotation caps. Raises PermissionError.
+        axm_antigaming.check_bid_eligibility(task, agent_id)
         score = calculate_bid_score(float(bid_axm), int(time_est_sec), float(agent.get("reputation") or 0))
         bid_id = "bid_" + uuid.uuid4().hex[:10]
         bid = {
@@ -890,6 +948,8 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
             "via": "legacy-plaintext",
         }
         fabric.bids[bid_id] = bid
+        # The bid is stored: consume participation quota now. Never raises.
+        axm_antigaming.record_bid_entry(agent_id, task_id)
         task["state"] = "auction"
         start = task.get("auction_closes_at") is None
         if start:
@@ -941,6 +1001,10 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
             # double-lock would let a later ghost-slash take 100% of the
             # doubled amount).
             return dict(fabric.commits[key])
+        # Anti-gaming gate (fail closed): self-bid, participation windows,
+        # consecutive-win and pair rotation caps. Runs BEFORE the stake
+        # lock so a rejected bid never touches stake accounting.
+        axm_antigaming.check_bid_eligibility(task, agent_id)
         # Stake enforcement (ratified minStakeBps=5000): the bid value is
         # still sealed, so the commit locks stake against the public bounty.
         # Insufficient stake => the commit itself is rejected.
@@ -960,6 +1024,9 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
             "price_wei": None,
         }
         fabric.commits[key] = record
+        # The commit is stored: consume participation quota now. Never
+        # raises. (Idempotent retries return above without re-recording.)
+        axm_antigaming.record_bid_entry(agent_id, task_id)
         task["state"] = "auction"
         snap = dict(record)
         tags = list(task.get("tags") or [])
@@ -1022,6 +1089,9 @@ def reveal_bid(task_id: str, agent_id: str, bid_axm: float, nonce: Any,
                 raise PermissionError("reveal window closed")
         if task["state"] not in ("open", "auction"):
             raise RuntimeError("auction closed")
+        # Defense in depth: the commit was already gated, but a reveal must
+        # never materialize a self-bid even if the commit path is bypassed.
+        axm_antigaming.check_self_bid(task, agent_id)
         expected = sealed_commitment(price_wei, salt, agent_id)
         if not _hmac.compare_digest(expected, bytes.fromhex(commit["commitment"][2:])):
             raise ValueError("commitment mismatch: wrong bid_axm or nonce")
@@ -2302,6 +2372,12 @@ def attach_market_routes(bp: Blueprint) -> None:
     from sincor2.sponsored_stake import attach_sponsored_stake_routes
 
     attach_sponsored_stake_routes(bp)
+
+    # Honest activity metrics (AXM activity engine, stream C): every figure
+    # labeled ledger/onchain, computed from real store state.
+    from sincor2.a2a_activity import attach_activity_routes
+
+    attach_activity_routes(bp)
 
     # Bankruptcy recovery track: admin-gated, default off. Deterministic
     # eligibility (honest-fail only, tombstoned wallets excluded) with a

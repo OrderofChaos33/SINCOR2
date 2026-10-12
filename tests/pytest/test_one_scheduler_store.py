@@ -353,12 +353,13 @@ def test_misfire_grace_time_and_coalesce_on_all_jobs(canonical_env):
             assert job.misfire_grace_time == 300, (
                 f"{job.id}: misfire_grace_time={job.misfire_grace_time}"
             )
-        # The canonical enabled set from STREAM A is unchanged.
+        # The canonical enabled set from STREAM A, plus the AXM activity
+        # engine (registered on the central registry post-consolidation).
         ids = {j.id for j in jobs}
         assert ids == {
             "daily_ops", "sadas_scan", "outreach_cycle", "content_cycle",
             "launch_cycle", "recursive_optimizer", "subscription_reminders",
-            "polyclaw_scan",
+            "polyclaw_scan", "activity_engine_cycle",
         }
     finally:
         central.stop_central_scheduler()

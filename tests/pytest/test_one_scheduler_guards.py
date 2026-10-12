@@ -95,6 +95,7 @@ EXPECTED_TIMEOUTS = {
     "compliance_checks": 300,
     "launch_review_notify": 300,
     "partner_notify": 300,
+    "activity_engine_cycle": 600,
 }
 
 

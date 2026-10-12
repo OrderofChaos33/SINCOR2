@@ -27,6 +27,24 @@ from sincor2.sponsored_stake import (
 
 AGENT = "sponsored-agent-1"
 TAGS = ["lead-enrichment"]
+
+
+def _poster_auth():
+    """Signed poster-auth fields: the anti-gaming guards reject bids on
+    anonymous (unsigned) bounty tasks, so the post must bind a poster
+    wallet (distinct from the bidding agent)."""
+    import time
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_sdk import SincorAgentSDK
+
+    poster_key = Account.create()
+    return SincorAgentSDK.make_poster_auth(
+        "sponsored-poster", "lead-enrichment", int(time.time()),
+        lambda m: "0x" + poster_key.sign_message(
+            encode_defunct(text=m)).signature.hex())
 WALLET = "0x" + "33" * 20
 AXM = 10**18
 
@@ -202,7 +220,8 @@ def test_end_to_end_sponsored_auction_recoups(client, monkeypatch):
                     json={"agent_id": AGENT, "amount_axm": 2.0})
     assert r.status_code == 201
 
-    task = sdk.post_task("lead-enrichment", TAGS, 1.5, sealed=True)
+    task = sdk.post_task("lead-enrichment", TAGS, 1.5, sealed=True,
+                         **_poster_auth())
     task_id = task["task_id"]
     bid = sdk.sealed_commit(task_id, AGENT, 0.9)  # works: fronted stake
     get_fabric().tasks[task_id]["commit_deadline"] = _now_ms() - 1000

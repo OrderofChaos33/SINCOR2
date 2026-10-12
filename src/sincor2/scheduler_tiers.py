@@ -56,6 +56,10 @@ EFFECT_TIERS = {
             "subscription_reminders",
             "launch_review_notify",
             "partner_notify",
+            # AXM activity engine: posts sealed auctions and bids to the
+            # marketplace (outbound publishing). Ledger-only and gasless —
+            # no broadcasts, no fund movement — so Tier 2, not Tier 3.
+            "activity_engine_cycle",
         ),
     },
     TIER_MONEY: {

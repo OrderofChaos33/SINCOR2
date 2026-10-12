@@ -45,6 +45,32 @@ def hb_headers() -> dict:
     return {"X-Sincor-Heartbeat": os.environ.get("AGENT_HEARTBEAT_TOKEN", "")}
 
 
+def signed_task_auth(skill: str, key: str = "0x" + "dd" * 32) -> dict:
+    """Fresh EIP-191 caller-signature fields for a marketplace task create.
+
+    The anti-gaming guards reject bids on anonymous (unsigned) bounty
+    tasks, so HTTP tests that post tasks and then bid must bind a poster
+    server-side. Merge into the POST /v1/a2a/tasks JSON body; the bound
+    poster_id is the signer's wallet (lowercased), never the bidder.
+    """
+    import time
+    import uuid
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_integration import _auth_market_create_message
+
+    skill = str(skill).strip().lower()
+    acct = Account.from_key(key)
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    sig = "0x" + acct.sign_message(
+        encode_defunct(text=_auth_market_create_message(skill, ts, nonce))
+    ).signature.hex()
+    return {"authSignature": sig, "authTimestamp": ts, "authNonce": nonce}
+
+
 @pytest.fixture(autouse=True)
 def isolated_waitlist_db(tmp_path, monkeypatch):
     """Give every test its own fresh waitlist SQLite database."""
@@ -86,6 +112,23 @@ def _isolated_kya_registry(tmp_path, monkeypatch):
     kya.reset()
     yield
     kya.reset()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_antigaming_store(tmp_path):
+    """Hermetic anti-gaming store per test.
+
+    The guard store persists to the real data dir and never resets between
+    tests; the rotation caps (consecutive AND the per-pair wins-per-window
+    cap) make that accumulation load-bearing — repeated runs with the same
+    poster wallet would trip caps and flake unrelated market tests. Every
+    test gets a fresh store; production restart-persistence is unaffected.
+    """
+    from sincor2 import axm_antigaming as ag
+
+    ag.reset_antigaming_store(path=str(tmp_path / "antigaming_test.json"))
+    yield
+    ag.reset_antigaming_store(path=str(tmp_path / "antigaming_test.json"))
 
 
 @pytest.fixture
