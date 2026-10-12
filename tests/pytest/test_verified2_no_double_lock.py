@@ -10,6 +10,8 @@ existing commitment record (idempotent) without touching the stake ledger.
 
 from __future__ import annotations
 
+from conftest import signed_task_auth
+
 import pytest
 from flask import Flask
 
@@ -62,10 +64,15 @@ def _commit(client, task_id, agent_id, bid_axm, nonce_hex):
 
 
 def _sealed_task(client):
-    r = client.post("/v1/a2a/tasks", json={
-        "skill": "lead-enrichment", "tags": ["lead-enrichment"],
-        "bounty_axm": 1.5, "sealed": True,
-    })
+    # Signed: the anti-gaming guards reject bids on anonymous (unsigned)
+    # bounty tasks, so the post must bind a poster via EIP-191.
+    skill = "lead-enrichment"
+    r = client.post(
+        "/v1/a2a/tasks",
+        json={"skill": skill, "tags": ["lead-enrichment"],
+              "bounty_axm": 1.5, "sealed": True,
+              **signed_task_auth(skill)},
+    )
     assert r.status_code == 201, r.get_json()
     return r.get_json()["task_id"]
 

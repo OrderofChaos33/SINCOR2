@@ -618,6 +618,29 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
         cands = [b for b in fabric.bids.values()
                  if b.get("task_id") == task_id and b.get("revealed", True)]
         close_blocked = False
+        # Anti-gaming re-validation at winner selection (fail closed): a
+        # bid committed while eligible must not win after a cap trips
+        # (consecutive-win / pair / window caps, self-bid, anonymous
+        # bounty task). Each candidate is re-checked NOW; ineligible bids
+        # are excluded from selection. Never bricks the close — a guard
+        # failure excludes the bid rather than raising. Excluded bids are
+        # simply losers (stake released by the normal loser path below);
+        # if none remain eligible the auction expires with no winner.
+        # (Rebased onto W-78: runs BEFORE the escrow-cap walk below, so
+        # the cap walk only ever sees eligible candidates.)
+        eligible_cands: List[Dict[str, Any]] = []
+        for _bid in cands:
+            try:
+                axm_antigaming.check_bid_eligibility(
+                    task, str(_bid.get("agent_id")))
+            except Exception as _err:
+                logger.warning("antigaming: bid %s by %s excluded at "
+                               "winner selection: %s",
+                               _bid.get("bid_id"), _bid.get("agent_id"),
+                               _err)
+            else:
+                eligible_cands.append(_bid)
+        cands = eligible_cands
         if not cands:
             task["state"] = "expired"
             task["expired_reason"] = "auction_timeout"

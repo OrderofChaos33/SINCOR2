@@ -15,7 +15,7 @@ still rewards reputation — but only earned.
 
 from __future__ import annotations
 
-from conftest import hb_headers
+from conftest import hb_headers, signed_task_auth
 
 import pytest
 from eth_account import Account
@@ -104,10 +104,15 @@ def _register(client, agent_id, **extra):
 
 
 def _sealed_task(client, poster_id="poster-p"):
+    # Signed: the anti-gaming guards reject bids on anonymous (unsigned)
+    # bounty tasks; client-supplied poster_id is ignored server-side, so
+    # bind the poster with a real EIP-191 signature instead.
+    skill = "lead-enrichment"
     r = client.post(
         "/v1/a2a/tasks",
-        json={"skill": "lead-enrichment", "tags": ["lead-enrichment"],
-              "bounty_axm": BOUNTY, "sealed": True, "poster_id": poster_id},
+        json={"skill": skill, "tags": ["lead-enrichment"],
+              "bounty_axm": BOUNTY, "sealed": True,
+              **signed_task_auth(skill)},
     )
     assert r.status_code == 201, r.get_json()
     return r.get_json()["task_id"]

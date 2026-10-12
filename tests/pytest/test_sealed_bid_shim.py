@@ -4,7 +4,7 @@ from __future__ import annotations
 import secrets
 import time
 
-from conftest import hb_headers
+from conftest import hb_headers, signed_task_auth
 
 import pytest
 from eth_account import Account
@@ -82,9 +82,12 @@ def _bid_auth(key, purpose, task_id, agent_id, payload):
 
 
 def _sealed_task(client, skill="lead-enrichment"):
+    # Signed: the anti-gaming guards reject bids on anonymous (unsigned)
+    # bounty tasks, so the post must bind a poster via EIP-191.
     r = client.post(
         "/v1/a2a/tasks",
-        json={"skill": skill, "tags": ["lead-enrichment"], "bounty_axm": 1.5, "sealed": True},
+        json={"skill": skill, "tags": ["lead-enrichment"], "bounty_axm": 1.5,
+              "sealed": True, **signed_task_auth(skill)},
     )
     assert r.status_code == 201, r.get_json()
     body = r.get_json()
@@ -260,10 +263,12 @@ def test_plaintext_bid_rejected_on_sealed_task(client):
 
 def test_legacy_plaintext_bid_still_works(client):
     # Backward compat: non-sealed tasks keep the old plaintext flow untouched.
-    key_l = _register(client, "legacy-a")
+    # (Signed: bids on anonymous bounty tasks are rejected by the guards.)
+    _register(client, "legacy-a")
     r = client.post(
         "/v1/a2a/tasks",
-        json={"skill": "lead-enrichment", "tags": ["lead-enrichment"], "bounty_axm": 1.0},
+        json={"skill": "lead-enrichment", "tags": ["lead-enrichment"], "bounty_axm": 1.0,
+              **signed_task_auth("lead-enrichment")},
     )
     assert r.status_code == 201
     task_id = r.get_json()["task_id"]

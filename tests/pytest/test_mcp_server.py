@@ -86,8 +86,12 @@ def _register_agent(client, agent_id, tags=("lead-enrichment",)):
 
 
 def _anchored_sealed_task(skill="lead-enrichment", bounty=2.0):
-    """Sealed task with a stamped auction_id (simulates an onchain anchor)."""
-    task = create_task(skill, tags=[skill], bounty_axm=bounty, sealed=True)
+    """Sealed task with a stamped auction_id (simulates an onchain anchor).
+
+    Named poster: the anti-gaming guards reject bids on anonymous tasks.
+    """
+    task = create_task(skill, tags=[skill], bounty_axm=bounty, sealed=True,
+                       poster_id="mcp-poster")
     task_id = task["task_id"]
     fabric = get_fabric()
     with fabric.lock:
@@ -332,8 +336,9 @@ def test_submit_bid_reveal_flow(env):
 
 def test_submit_bid_legacy_flow(env):
     _register_agent(env, "mcp-legacy")
+    # Named poster: the anti-gaming guards reject bids on anonymous tasks.
     task = create_task("lead-enrichment", tags=["lead-enrichment"],
-                       bounty_axm=1.5, sealed=False)
+                       bounty_axm=1.5, sealed=False, poster_id="mcp-poster")
     args = {"task_id": task["task_id"], "agent_id": "mcp-legacy",
             "bid_axm": 1.0, "mode": "legacy"}
     payload, _ = _call("submit_bid", args)

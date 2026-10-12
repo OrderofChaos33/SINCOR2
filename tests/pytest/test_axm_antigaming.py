@@ -9,6 +9,13 @@ Covers, for real (no mocks of the guard itself):
      ghost rule — slash math is the ledger's, asserted on ledger state.
   6. Honest rotation still works: distinct agents alternate wins, nobody
      blocked.
+  7. Anonymous (poster_id=None) bounty tasks are un-biddable on every
+     path (commit / plaintext / reveal) — fail closed, logged, audited —
+     including a pre-guard bid excluded at winner selection.
+  8. Deterministic two-agent alternation is broken by the per-pair
+     wins-per-window cap (consecutive streaks stay 1; the window cap fires).
+  9. A bid committed while eligible does not win after a cap trips:
+     eligibility is re-validated at winner selection in close_auction.
 """
 from __future__ import annotations
 
@@ -43,6 +50,11 @@ def iso(tmp_path, monkeypatch):
     monkeypatch.setenv("AXM_AG_MAX_WINS_PER_HOUR", "1000")
     monkeypatch.setenv("AXM_AG_MAX_CONSECUTIVE_WINS", "3")
     monkeypatch.setenv("AXM_AG_MAX_PAIR_CONSECUTIVE", "2")
+    # Lenient pair wins-per-window for the legacy scenarios below (they
+    # exercise the consecutive caps, not the window cap). The new
+    # alternation test deletes this override to exercise the strict
+    # production default (2).
+    monkeypatch.setenv("AXM_AG_MAX_PAIR_WINS_PER_WINDOW", "1000")
     return store
 
 
@@ -190,21 +202,24 @@ def test_pair_cap_resets_after_rotation(iso):
 # --- 3. per-agent consecutive-win cap ------------------------------------------
 def test_consecutive_win_cap(iso):
     # Adversarial: one agent wins every auction it enters.
+    # Named posters per round: anonymous tasks (poster_id=None) no longer
+    # accept bounty bids (anonymous-bounty rule), and a single poster would
+    # trip the pair-consecutive cap before the per-agent cap under test.
     _agent("domA")
     _agent("domB")
     for i in range(3):
-        task_id = _sealed_task()  # no poster: pure agent-streak test
+        task_id = _sealed_task(poster_id=f"posterDom{i}")
         snap = _sealed_round(task_id, [("domA", 0.9)])
         assert snap["assigned_to"] == "domA"
     assert iso.win_streak_of("domA") == 3
-    task_id = _sealed_task()
+    task_id = _sealed_task(poster_id="posterDomX")
     with pytest.raises(ag.CollusionCapError):
         _commit(task_id, "domA", 0.9)
     # A different winner breaks the streak; domA is eligible again.
     snap = _sealed_round(task_id, [("domB", 0.9)])
     assert snap["assigned_to"] == "domB"
     assert iso.win_streak_of("domA") == 0
-    task_id = _sealed_task()
+    task_id = _sealed_task(poster_id="posterDomY")
     rec, _ = _commit(task_id, "domA", 0.9)
     assert rec["agent_id"] == "domA"
 
@@ -212,18 +227,19 @@ def test_consecutive_win_cap(iso):
 def test_no_winner_close_resets_streaks_no_deadlock(iso, monkeypatch):
     # Lone-agent edge: the only bidder hits the cap, the next auction gets
     # no bids and expires — streaks reset, the loop is NOT bricked.
+    # Distinct posters per round (see test_consecutive_win_cap).
     _agent("lone")
-    for _ in range(3):
-        task_id = _sealed_task()
+    for i in range(3):
+        task_id = _sealed_task(poster_id=f"posterLone{i}")
         _sealed_round(task_id, [("lone", 0.9)])
-    task_id = _sealed_task()
+    task_id = _sealed_task(poster_id="posterLoneX")
     with pytest.raises(ag.CollusionCapError):
         _commit(task_id, "lone", 0.9)
     # No bids at all -> close expires the task, streaks reset.
     snap = _close(task_id)
     assert snap["state"] == "expired"
     assert iso.win_streak_of("lone") == 0
-    task_id = _sealed_task()
+    task_id = _sealed_task(poster_id="posterLoneY")
     rec, _ = _commit(task_id, "lone", 0.9)
     assert rec["agent_id"] == "lone"
 
@@ -232,8 +248,10 @@ def test_no_winner_close_resets_streaks_no_deadlock(iso, monkeypatch):
 def test_bid_rate_cap(iso, monkeypatch):
     monkeypatch.setenv("AXM_AG_MAX_BIDS_PER_HOUR", "2")
     _agent("busy")
+    # Named poster: anonymous tasks no longer accept bounty bids.
     task_ids = [
-        create_task("gig", tags=["gig"], bounty_axm=1.0, sealed=False)["task_id"]
+        create_task("gig", tags=["gig"], bounty_axm=1.0, sealed=False,
+                    poster_id="posterBusy")["task_id"]
         for _ in range(3)
     ]
     place_bid(task_ids[0], "busy", 0.9, 60)
@@ -246,11 +264,12 @@ def test_bid_rate_cap(iso, monkeypatch):
 def test_win_rate_cap(iso, monkeypatch):
     monkeypatch.setenv("AXM_AG_MAX_WINS_PER_HOUR", "1")
     _agent("winner1")
-    task_id = _sealed_task()
+    # Named poster: anonymous tasks no longer accept bounty bids.
+    task_id = _sealed_task(poster_id="posterWin")
     snap = _sealed_round(task_id, [("winner1", 0.9)])
     assert snap["assigned_to"] == "winner1"
     assert iso.wins_in_window("winner1") == 1
-    task_id = _sealed_task()
+    task_id = _sealed_task(poster_id="posterWin")
     with pytest.raises(ag.ParticipationCapError):
         _commit(task_id, "winner1", 0.9)
 
@@ -302,7 +321,8 @@ def test_honest_winner_settlement_releases_stake(iso):
 
     _agent("honest")
     ledger = stake_ledger()
-    task_id = _sealed_task()
+    # Named poster: anonymous tasks no longer accept bounty bids.
+    task_id = _sealed_task(poster_id="posterSettle")
     snap = _sealed_round(task_id, [("honest", 0.9)])
     assert snap["state"] == "assigned"
     locked = int(ledger.balance_of("honest")["locked_wei"])
@@ -345,3 +365,113 @@ def test_rejections_are_audited(iso):
     assert len(log) == 1
     assert log[0]["agent_id"] == "traderB"
     assert log[0]["reason"] == "pair_win_cap"
+
+
+# --- 7. Break 1 rework: anonymous (poster_id=None) bounty tasks are --------
+# ---     un-biddable (fail closed, logged, audited) --------------------------
+def test_anonymous_bounty_task_bids_rejected(iso):
+    # Adversarial: an agent posts an UNSIGNED task (poster_id=None), then
+    # bids on it itself — check_self_bid cannot see the self-deal because
+    # the poster is anonymous. Every bid path must reject fail-closed.
+    assert issubclass(ag.AnonymousBountyError, ag.SelfBidError)
+    _agent("anon_bidder")
+    # Sealed commit path.
+    task_id = _sealed_task()  # poster_id=None, bounty=1.0 > 0
+    with pytest.raises(ag.AnonymousBountyError):
+        _commit(task_id, "anon_bidder", 0.9)
+    # Plaintext bid path.
+    task = create_task("gig", tags=["gig"], bounty_axm=1.0, sealed=False)
+    with pytest.raises(ag.AnonymousBountyError):
+        place_bid(task["task_id"], "anon_bidder", 0.9, 60)
+    # The attempts are written to the durable rejection audit log.
+    log = iso.rejection_log()
+    assert any(e["reason"] == "anonymous_bounty_task"
+               and e["agent_id"] == "anon_bidder" for e in log)
+    # Boundary control: named-poster tasks are unaffected.
+    _agent("posterN")
+    task_id = _sealed_task(poster_id="posterN")
+    rec, _ = _commit(task_id, "anon_bidder", 0.9)
+    assert rec["agent_id"] == "anon_bidder"
+
+
+def test_anonymous_bounty_legacy_bid_excluded_at_close(iso):
+    # Break 1 at winner selection: a bid committed BEFORE the guard existed
+    # (planted directly into the fabric, bypassing the commit gate) must
+    # not win — close_auction re-validates eligibility and excludes it, so
+    # the auction expires with no winner and no payout.
+    _agent("sneaky")
+    task = create_task("gig", tags=["gig"], bounty_axm=1.0, sealed=False)
+    task_id = task["task_id"]
+    fabric = get_fabric()
+    fabric.bids["bid_legacy1"] = {
+        "bid_id": "bid_legacy1",
+        "task_id": task_id,
+        "agent_id": "sneaky",
+        "bid_axm": 0.9,
+        "score": 999.0,
+        "received_at": _now_ms(),
+        "revealed": True,
+    }
+    fabric.tasks[task_id]["auction_closes_at"] = _now_ms() - 1
+    snap = close_auction(task_id)
+    assert snap["state"] == "expired"
+    assert snap.get("assigned_to") is None
+
+
+# --- 8. Break 2 rework: deterministic two-agent alternation is broken --------
+# ---     by the per-pair wins-per-window cap ---------------------------------
+def test_pair_window_cap_breaks_deterministic_alternation(iso, monkeypatch):
+    # Adversarial: X and Y alternate wins 6/6 rounds. Consecutive streaks
+    # stay at 1 (record_auction_close resets the idle pair), so the
+    # consecutive caps never fire. The per-pair WINS-PER-WINDOW cap must
+    # break it. This test deletes the fixture's lenient override to
+    # exercise the strict production default — the default MUST stop 6/6.
+    monkeypatch.delenv("AXM_AG_MAX_PAIR_WINS_PER_WINDOW", raising=False)
+    assert ag.max_pair_wins_per_window() == 2
+    _agent("posterAlt")
+    _agent("altX")
+    _agent("altY")
+    wins = []
+    blocked = 0
+    for i in range(6):
+        bidder = "altX" if i % 2 == 0 else "altY"
+        task_id = _sealed_task(poster_id="posterAlt")
+        try:
+            snap = _sealed_round(task_id, [(bidder, 0.9)])
+        except ag.CollusionCapError:
+            blocked += 1
+            _close(task_id)  # expire the un-biddable auction cleanly
+            continue
+        wins.append(snap["assigned_to"])
+    assert blocked >= 1, "deterministic alternation was never blocked"
+    assert len(wins) < 6, "alternation completed 6/6 wins"
+    # Neither pair could take a 3rd win inside the window.
+    assert iso.pair_wins_in_window("posterAlt", "altX") <= 2
+    assert iso.pair_wins_in_window("posterAlt", "altY") <= 2
+
+
+# --- 9. Hardening: pre-cap bids must not win post-cap --------------------------
+def test_precap_bid_does_not_win_after_cap_trips(iso):
+    # A bid committed while eligible must not win once a cap trips before
+    # the auction closes: earlyA commits on T1, then wins 3 auctions
+    # elsewhere (tripping the consecutive-win cap = 3), then T1 is revealed
+    # and closed. Selection-time re-validation excludes the stale bid and
+    # T1 expires instead of assigning to earlyA.
+    _agent("posterEarly")
+    _agent("earlyA")
+    t1 = _sealed_task(poster_id="posterEarly")
+    _, nonce = _commit(t1, "earlyA", 0.9)
+    # Distinct posters: the pair-consecutive cap must not fire first —
+    # this test trips the per-agent consecutive-win cap.
+    for i in range(3):
+        t = _sealed_task(poster_id=f"posterMid{i}")
+        snap = _sealed_round(t, [("earlyA", 0.9)])
+        assert snap["assigned_to"] == "earlyA"
+    assert iso.win_streak_of("earlyA") == 3
+    _reveal(t1, "earlyA", 0.9, nonce)
+    snap = _close(t1)
+    assert snap["state"] == "expired"
+    assert snap.get("assigned_to") is None
+    log = iso.rejection_log()
+    assert any(e["reason"] == "consecutive_win_cap"
+               and e["agent_id"] == "earlyA" for e in log)

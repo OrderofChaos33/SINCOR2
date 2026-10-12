@@ -8,7 +8,7 @@ policy coverage for the new routes.
 """
 from __future__ import annotations
 
-from conftest import hb_headers
+from conftest import hb_headers, signed_task_auth
 
 from bid_testkit import register_wallet_agent, signed_commit_body, key_for
 
@@ -251,8 +251,11 @@ def test_commit_after_stale_window_refreshes_not_kills(board_client):
     stake_ledger().deposit("board-bidder", 10 * 10**18)
 
     r = board_client.post("/v1/a2a/tasks", json={
+        # Signed: the anti-gaming guards reject bids on anonymous
+        # (unsigned) bounty tasks, so the post must bind a poster.
         "skill": "deal-scoring", "tags": ["deal-scoring"],
         "bounty_axm": 1.0, "sealed": True,
+        **signed_task_auth("deal-scoring"),
     })
     task_id = r.get_json()["task_id"]
     fabric = get_fabric()

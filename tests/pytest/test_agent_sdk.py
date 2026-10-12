@@ -68,7 +68,23 @@ def _onboard(sdk, agent_id=AGENT, stake_axm=2.0, key=None):
 
 
 def _sealed_task(sdk, bounty_axm=1.5):
-    task = sdk.post_task("lead-enrichment", TAGS, bounty_axm, sealed=True)
+    # Signed poster: the anti-gaming guards reject bids on anonymous
+    # (unsigned) bounty tasks, so the post must bind a poster wallet
+    # (distinct from the bidding agent).
+    import time
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_sdk import SincorAgentSDK
+
+    poster_key = Account.create()
+    auth = SincorAgentSDK.make_poster_auth(
+        "sdk-poster", "lead-enrichment", int(time.time()),
+        lambda m: "0x" + poster_key.sign_message(
+            encode_defunct(text=m)).signature.hex())
+    task = sdk.post_task("lead-enrichment", TAGS, bounty_axm, sealed=True,
+                         **auth)
     assert task["sealed"] is True
     assert task["commit_deadline"] and task["reveal_deadline"]
     return task["task_id"]

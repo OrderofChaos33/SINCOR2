@@ -9,7 +9,12 @@ Four guard families:
 
 1. Self-bid rejection — an agent can never bid on a task it posted
    (``poster_id`` is server-bound at task creation, so the bidder cannot
-   spoof it away). Enforced in ``place_bid`` / ``commit_bid`` / ``reveal_bid``.
+   spoof it away). Tasks with NO poster are anonymous: the guard cannot
+   prove the bidder is not the poster, so any anonymous task carrying a
+   bounty (>0) is un-biddable — bids are rejected fail-closed. Unsigned
+   POSTING itself is unchanged (P3-14); only the bid side is rejected.
+   Enforced in ``place_bid`` / ``commit_bid`` / ``reveal_bid`` and
+   re-checked at winner selection in ``close_auction``.
 
 2. Participation rate limits — rolling-window caps on how many auctions a
    single agent may ENTER (bids) and WIN, so no agent can dominate the loop.
@@ -20,18 +25,28 @@ Four guard families:
    math is invented here.
 
 4. Anti-collusion rotation — no fixed agent, and no fixed poster/winner
-   pair, may win more than K consecutive auctions. Enforced at bid time, so
-   a would-be win-trading loop is broken BEFORE the win happens:
+   pair, may win more than K consecutive auctions, and no fixed pair may
+   win more than W auctions per rolling window (non-consecutive: this is
+   what breaks deterministic alternation, where consecutive streaks stay
+   at 1). Enforced at bid time, so a would-be win-trading loop is broken
+   BEFORE the win happens, and RE-VALIDATED at winner selection in
+   ``close_auction`` — a bid committed before a cap tripped must not
+   still win. Ineligible bids are excluded from selection (fail closed,
+   logged); if none remain eligible the auction expires.
    * ``win_streak[agent]`` — consecutive auctions won in the global close
      sequence. Reaching the cap rejects the agent's next bid.
    * ``pair_streak[(poster, winner)]`` — consecutive auctions posted by
      ``poster`` and won by ``winner``. Reaching the cap rejects that
      bidder on that poster's tasks.
+   * ``pair_win_events[(poster, winner)]`` — rolling-window list of pair
+     wins (any spacing). Reaching the wins-per-window cap rejects that
+     bidder on that poster's tasks.
    A close that produces NO winner resets the streaks: this is the
    anti-brick property — a lone agent cannot be locked out of the loop
    forever, and a blocked colluder regains eligibility only after sitting
    out (the wash loop is punctuated by dead auctions, which is exactly
-   what makes manufactured volume economically pointless).
+   what makes manufactured volume economically pointless). Windowed
+   events are time-pruned only; an empty close does NOT erase them.
 
 State is a small JSON store (thread-safe, atomic writes, pruned to the
 rolling windows) so caps survive restarts — a restart must not be a
@@ -44,6 +59,10 @@ Tuning knobs (env, read per call so tests can monkeypatch):
   AXM_AG_PARTICIPATION_WINDOW_S default 3600 — rolling window for both
   AXM_AG_MAX_CONSECUTIVE_WINS default 3    — per-agent rotation cap
   AXM_AG_MAX_PAIR_CONSECUTIVE default 2    — per poster/winner-pair cap
+  AXM_AG_MAX_PAIR_WINS_PER_WINDOW default 2 — per-pair wins per rolling
+     window (non-consecutive). Default 2 breaks deterministic 2-agent
+     alternation (each pair is capped at 2 wins/hour); raise for
+     high-throughput honest single-poster loops.
   SINCOR_ANTIGAMING_PATH      default <data_dir>/axm_antigaming.json
 """
 
@@ -61,6 +80,14 @@ logger = logging.getLogger("sincor.market.antigaming")
 
 class SelfBidError(PermissionError):
     """An agent attempted to bid on a task it posted."""
+
+
+class AnonymousBountyError(SelfBidError):
+    """A bid targeted an anonymous (poster_id=None) task carrying a bounty.
+
+    Subclasses SelfBidError so existing self-bid handling (HTTP 403,
+    fail-closed paths) applies unchanged; the distinct type lets forensics
+    tell "bidder == poster" apart from "poster unknowable"."""
 
 
 class ParticipationCapError(PermissionError):
@@ -102,6 +129,10 @@ def max_pair_consecutive() -> int:
     return _env_int("AXM_AG_MAX_PAIR_CONSECUTIVE", 2)
 
 
+def max_pair_wins_per_window() -> int:
+    return _env_int("AXM_AG_MAX_PAIR_WINS_PER_WINDOW", 2)
+
+
 def _now_ms() -> int:
     return int(time.time() * 1000)
 
@@ -136,6 +167,7 @@ class AntigamingStore:
             "win_events": {},   # agent_id -> [ts_ms, ...] (won auctions)
             "win_streak": {},   # agent_id -> consecutive wins (global order)
             "pair_streak": {},  # "poster\\x00winner" -> consecutive wins
+            "pair_win_events": {},  # "poster\\x00winner" -> [ts_ms, ...]
             "rejections": [],   # bounded audit log of rejected bids
         }
         self._load()
@@ -175,6 +207,17 @@ class AntigamingStore:
                 else:
                     self._data[bucket].pop(agent_id, None)
 
+    def _prune_pairs(self, now_ms: int) -> None:
+        """Prune every pair's win events to the rolling window (call with
+        self._lock held). The store is small; a full sweep is cheap."""
+        cutoff = now_ms - participation_window_s() * 1000
+        for key, events in list(self._data["pair_win_events"].items()):
+            kept = [t for t in events if int(t) >= cutoff]
+            if kept:
+                self._data["pair_win_events"][key] = kept
+            else:
+                self._data["pair_win_events"].pop(key, None)
+
     def _reject(self, agent_id: str, task_id: str, reason: str,
                 detail: str = "") -> None:
         entry = {"at": _now_ms(), "agent_id": str(agent_id),
@@ -213,6 +256,17 @@ class AntigamingStore:
             return int(self._data["pair_streak"].get(
                 self._pair_key(poster_id, winner_id), 0))
 
+    def pair_wins_in_window(self, poster_id: str, winner_id: str,
+                            now_ms: Optional[int] = None) -> int:
+        """Non-consecutive pair wins inside the rolling window — the
+        alternation-breaker. Unlike pair_streak_of, rotation by a third
+        party does NOT reset this count; only time prunes it."""
+        now_ms = _now_ms() if now_ms is None else int(now_ms)
+        with self._lock:
+            self._prune_pairs(now_ms)
+            return len(self._data["pair_win_events"].get(
+                self._pair_key(str(poster_id), str(winner_id)), []))
+
     def rejection_log(self, limit: int = 50) -> List[Dict[str, Any]]:
         with self._lock:
             return [dict(e) for e in self._data["rejections"][-limit:]]
@@ -240,19 +294,50 @@ def reset_antigaming_store(path: Optional[str] = None) -> AntigamingStore:
 
 
 # --- guard 1: self-bid rejection ---------------------------------------------
+def _audit_rejection(agent_id: str, task_id: str, reason: str,
+                     detail: str = "") -> None:
+    """Append to the durable rejection audit log. Never raises: audit
+    accounting must not brick the guard path."""
+    try:
+        store = antigaming_store()
+        with store._lock:
+            store._reject(str(agent_id), str(task_id or ""), reason, detail)
+            store._save()
+    except Exception as exc:  # pragma: no cover - accounting only
+        logger.warning("antigaming rejection audit failed: %s", exc)
+
+
 def check_self_bid(task: Dict[str, Any], agent_id: str) -> None:
     """Reject an agent bidding on its own task. Fail closed, logged.
 
     ``poster_id`` is server-bound at task creation (EIP-191 signature), so
-    the bidder cannot spoof it away. Tasks with no poster are anonymous and
-    pass this check."""
+    the bidder cannot spoof it away. Tasks with NO poster are anonymous:
+    the guard cannot prove the bidder is not the poster, so any anonymous
+    task carrying a bounty (>0) is un-biddable — the bid is rejected
+    (AnonymousBountyError, a SelfBidError subclass) and the attempt is
+    written to the rejection audit log. Unsigned POSTING itself is
+    unchanged (P3-14); only the bid side is rejected."""
     poster_id = task.get("poster_id")
+    task_id = str(task.get("task_id") or "")
     if poster_id and str(poster_id) == str(agent_id):
         logger.warning("self-bid rejected agent=%s task=%s",
-                       agent_id, task.get("task_id"))
+                       agent_id, task_id)
         raise SelfBidError(
-            f"agent {agent_id} cannot bid on its own task "
-            f"{task.get('task_id')}")
+            f"agent {agent_id} cannot bid on its own task {task_id}")
+    if not poster_id:
+        try:
+            bounty = float(task.get("bounty_axm") or 0)
+        except (TypeError, ValueError):
+            bounty = 0.0
+        if bounty > 0:
+            logger.warning("anonymous-bounty bid rejected agent=%s task=%s "
+                           "bounty_axm=%s", agent_id, task_id, bounty)
+            _audit_rejection(agent_id, task_id, "anonymous_bounty_task",
+                             f"bounty_axm={bounty}")
+            raise AnonymousBountyError(
+                f"agent {agent_id} cannot bid on anonymous task {task_id} "
+                f"carrying a bounty ({bounty} AXM): poster_id is absent so "
+                f"self-dealing cannot be ruled out")
 
 
 # --- guards 2+4: participation caps and rotation caps --------------------------
@@ -311,6 +396,23 @@ def check_bid_eligibility(task: Dict[str, Any], agent_id: str,
                         f"agent {agent_id} won the last {pair} auctions "
                         f"posted by {poster_id} (cap "
                         f"{max_pair_consecutive()}); rotation required")
+                # Non-consecutive pair cap: breaks deterministic
+                # alternation, where consecutive streaks stay at 1 because
+                # a third party (or the alternating partner) resets them.
+                # Time-pruned only — rotation does NOT reset this count.
+                store._prune_pairs(now_ms)
+                pwins = len(store._data["pair_win_events"].get(
+                    store._pair_key(str(poster_id), agent_id), []))
+                if pwins >= max_pair_wins_per_window():
+                    store._reject(agent_id, task_id, "pair_win_window_cap",
+                                  f"pair_wins_in_window={pwins} "
+                                  f"poster={poster_id}")
+                    store._save()
+                    raise CollusionCapError(
+                        f"agent {agent_id} won {pwins} auctions posted by "
+                        f"{poster_id} in the last "
+                        f"{participation_window_s()}s (cap "
+                        f"{max_pair_wins_per_window()}); rotation required")
     except (SelfBidError, ParticipationCapError, CollusionCapError):
         raise
     except Exception as exc:  # fail closed: unverifiable bid is rejected
@@ -382,6 +484,12 @@ def record_auction_close(poster_id: Optional[str],
                                 if key == target else 0)
                     if target not in store._data["pair_streak"]:
                         store._data["pair_streak"][target] = 1
+                    # Rolling pair-win events for the non-consecutive
+                    # wins-per-window cap (Break 2). Pruned by time only —
+                    # an empty close does NOT erase these.
+                    store._prune_pairs(now_ms)
+                    store._data["pair_win_events"].setdefault(
+                        target, []).append(now_ms)
             else:
                 # No winner: the loop demonstrably did not concentrate —
                 # reset every streak so caps can never deadlock the market.

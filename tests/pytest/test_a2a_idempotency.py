@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from conftest import signed_task_auth
+
 import json
 import sqlite3
 import time
@@ -280,9 +282,13 @@ def _register_and_fund(client, agent_id):
 
 
 def _sealed_task(client):
+    # Signed: the anti-gaming guards reject bids on anonymous (unsigned)
+    # bounty tasks, so the post must bind a poster via EIP-191.
+    skill = "lead-enrichment"
     r = client.post("/v1/a2a/tasks", json={
-        "skill": "lead-enrichment", "tags": ["lead-enrichment"],
+        "skill": skill, "tags": ["lead-enrichment"],
         "bounty_axm": 1.5, "sealed": True,
+        **signed_task_auth(skill),
     })
     assert r.status_code == 201, r.get_json()
     return r.get_json()["task_id"]
