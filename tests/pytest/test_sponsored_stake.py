@@ -69,10 +69,24 @@ def client(ledgers):
     return app.test_client()
 
 
-def _register(client, agent_id=AGENT):
-    r = client.post("/v1/a2a/register", json={
-        "agent_id": agent_id, "capability_tags": TAGS,
-        "rpc_callback": "https://sponsored.example/rpc"})
+def _register(client, agent_id=AGENT, key=None):
+    body = {"agent_id": agent_id, "capability_tags": TAGS,
+            "rpc_callback": "https://sponsored.example/rpc"}
+    if key is not None:
+        # Signed first-time registration: binds a wallet so the agent can
+        # satisfy the W-77 sealed-bid auth gate.
+        import time as _time
+
+        from eth_account.messages import encode_defunct
+
+        from sincor2.a2a_identity import register_message
+        ts = int(_time.time() * 1000)
+        body["wallet"] = key.address
+        body["registration_wallet"] = key.address
+        body["registration_ts"] = ts
+        body["registration_signature"] = "0x" + key.sign_message(
+            encode_defunct(text=register_message(agent_id, ts))).signature.hex()
+    r = client.post("/v1/a2a/register", json=body)
     assert r.status_code == 201
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
@@ -212,8 +226,10 @@ def test_end_to_end_sponsored_auction_recoups(client, monkeypatch):
     from sincor2.a2a_sdk import FlaskTestTransport, SincorAgentSDK
 
     _enable(monkeypatch)
-    _register(client)
-    sdk = SincorAgentSDK(FlaskTestTransport(client))
+    from eth_account import Account
+    agent_key = Account.create()
+    _register(client, key=agent_key)
+    sdk = SincorAgentSDK(FlaskTestTransport(client), signer=agent_key)
     admin = {"X-Admin-Key": os.environ["ADMIN_PASSWORD"]}
 
     r = client.post("/v1/a2a/admin/sponsored-stake", headers=admin,
