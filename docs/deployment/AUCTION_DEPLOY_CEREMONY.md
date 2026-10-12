@@ -13,6 +13,12 @@ Script: `scripts/deploy_auction_contracts.py`.
   It is single-key for now — never represent dispute resolution as
   decentralized.
 - Compliance checkpoint prints at every pre-flight; read it every time.
+- Hardware-wallet device provenance (Oct 9 2026 Ledger supply-chain drain,
+  ~$86-93M stolen via tampered devices from reseller CryptoBilis): buy any
+  hardware wallet direct from the manufacturer only — never a reseller,
+  marketplace, or secondhand. Generate the seed phrase on the device itself;
+  never import a pre-supplied seed or use a device that arrived "pre-set-up".
+  Applies to the Sepolia adjudicator key and all operator keys.
 
 ## 1. Prepare
 

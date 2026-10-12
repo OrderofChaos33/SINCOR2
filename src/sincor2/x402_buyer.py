@@ -16,6 +16,14 @@ SAFETY (fail-closed):
 - No auto-retry on ambiguous payments: if the retry response is not a
   clear 200 or 402, raise AmbiguousPayment instead of retrying blindly
   (a retry could double-pay).
+- Paid-leg transport errors (timeouts, dropped responses) AFTER the
+  signed payment has been sent — or at any point where delivery cannot
+  be disproven — raise AmbiguousPayment, never a retryable error: the
+  payment MAY have settled server-side. Callers must reconcile (check
+  payment status / reuse the settled authorization) before any retry.
+  Only a transport failure that PROVES no bytes left this machine
+  (DNS failure, connection refused, malformed request) raises
+  PaymentTransportError, which is safe to retry.
 - validBefore must be in the future and within 1 hour of now; otherwise
   refuse to sign (stale or absurd expiry).
 - Only USDC on Base (eip155:8453) is supported. Any other asset/network
@@ -29,6 +37,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import socket
 import time
 import urllib.request
 import urllib.error
@@ -89,14 +98,37 @@ class MalformedChallenge(X402BuyerError):
 
 
 class AmbiguousPayment(X402BuyerError):
-    """Retry response was neither clear success nor clear 402.
+    """Payment state is UNKNOWN — retrying blindly could double-pay.
 
-    Retrying blindly could double-pay. Human must investigate.
+    Raised when the paid retry's response is neither a clear success nor
+    a clear 402, AND when the paid leg suffers a transport error (timeout,
+    dropped response, connection reset) at or after the point where the
+    signed payment bytes may have left this machine. The payment MAY have
+    settled server-side. The caller must reconcile (check payment status,
+    reuse the settled authorization) before any retry. Human must
+    investigate.
+    """
+
+
+class PaymentTransportError(X402BuyerError):
+    """Transport failed BEFORE any payment bytes left this machine.
+
+    Safe to retry: either no signature had been produced yet (unpaid leg),
+    or the transport proved the connection was never established
+    (DNS failure, connection refused, malformed request). No payment
+    could have been made or settled.
     """
 
 
 class StaleChallenge(X402BuyerError):
     """validBefore is in the past or unreasonably far in the future."""
+
+
+# URLError reasons that prove the TCP connection was never established,
+# hence no request bytes (and no payment) could have left this machine.
+# Anything else (timeouts, resets, TLS errors, mid-stream failures) is
+# treated as possibly-post-send: ambiguous on the paid leg.
+_PROVABLY_PRE_SEND_REASONS = (ConnectionRefusedError, socket.gaierror)
 
 
 # ---------------------------------------------------------------------------
@@ -290,8 +322,28 @@ class X402Buyer:
         body: Optional[dict],
         headers: dict[str, str],
     ) -> tuple[int, dict[str, str], bytes]:
+        """Send one HTTP request; return (status, headers, body).
+
+        Transport-failure contract (subclass overrides must honor it):
+        - raise :class:`PaymentTransportError` ONLY when the transport can
+          prove no request bytes left this machine (DNS failure, connection
+          refused, malformed request). The caller treats this as safe to
+          retry, even on the paid leg.
+        - let any other transport error (``urllib.error.URLError``,
+          ``OSError``, timeouts, resets) propagate unchanged: the caller
+          maps those to :class:`AmbiguousPayment` on the paid leg, because
+          the signed payment may already have been delivered.
+        """
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(url, data=data, method=method.upper(), headers=headers)
+        try:
+            req = urllib.request.Request(
+                url, data=data, method=method.upper(), headers=headers
+            )
+        except Exception as exc:
+            # Request could not even be constructed: nothing was sent.
+            raise PaymentTransportError(
+                f"could not build request (nothing sent; safe to retry): {exc}"
+            ) from exc
         if body is not None:
             req.add_header("Content-Type", "application/json")
         try:
@@ -299,6 +351,17 @@ class X402Buyer:
                 return resp.status, dict(resp.headers), resp.read()
         except urllib.error.HTTPError as exc:
             return exc.code, dict(exc.headers or {}), exc.read()
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, _PROVABLY_PRE_SEND_REASONS):
+                # TCP connect never completed: no bytes left this machine.
+                raise PaymentTransportError(
+                    "connection never established "
+                    f"(nothing sent; safe to retry): {exc.reason}"
+                ) from exc
+            # Timeout / reset / TLS failure at an unknown point in the send
+            # sequence: the payment may have been delivered. Propagate raw;
+            # fetch() maps this to AmbiguousPayment on the paid leg.
+            raise
 
     def fetch(
         self,
@@ -310,9 +373,27 @@ class X402Buyer:
 
         Returns the parsed JSON response body on success.
         Raises PaymentCapExceeded / UnsupportedPayment / MalformedChallenge /
-        AmbiguousPayment / StaleChallenge (all fail-closed, no payment made).
+        AmbiguousPayment / StaleChallenge / PaymentTransportError (all
+        fail-closed, no payment made unless stated).
+
+        Retry contract:
+        - :class:`PaymentTransportError`: safe to retry — no payment was
+          made or could have been made.
+        - :class:`AmbiguousPayment`: payment state UNKNOWN — do NOT retry
+          blindly; reconcile payment status first (a retry re-signs a fresh
+          authorization and can double-pay).
         """
-        status, headers, raw = self._do_request(url, method, body, {})
+        # --- unpaid leg: no signature exists yet, so ANY transport failure
+        # is safe to retry.
+        try:
+            status, headers, raw = self._do_request(url, method, body, {})
+        except PaymentTransportError:
+            raise
+        except Exception as exc:
+            raise PaymentTransportError(
+                "unpaid request transport error "
+                f"(no payment was made; safe to retry): {exc}"
+            ) from exc
 
         if status == 200:
             return {"ok": True, "paid": False, "data": json.loads(raw or b"{}")}
@@ -349,12 +430,29 @@ class X402Buyer:
                 },
             }
         )
-        status2, _, raw2 = self._do_request(
-            url,
-            method,
-            body,
-            {"X-PAYMENT": payment_header, "PAYMENT-SIGNATURE": payment_header},
-        )
+        # --- paid leg: the signed authorization now exists. A transport
+        # error here is AMBIGUOUS unless the transport proves nothing was
+        # sent: the payment may have settled server-side before the error.
+        # Retrying would re-sign a FRESH authorization (fresh nonce) and can
+        # double-pay. Never auto-retry; the caller must reconcile first.
+        try:
+            status2, _, raw2 = self._do_request(
+                url,
+                method,
+                body,
+                {"X-PAYMENT": payment_header, "PAYMENT-SIGNATURE": payment_header},
+            )
+        except PaymentTransportError:
+            # Transport proved no bytes left this machine: safe to retry.
+            raise
+        except Exception as exc:
+            raise AmbiguousPayment(
+                "paid request transport error after the signed payment was "
+                "sent (or at an unknown point in the send sequence); the "
+                "payment MAY have settled server-side. DO NOT retry blindly "
+                "— reconcile payment status before any retry "
+                f"({type(exc).__name__}: {exc})"
+            ) from exc
 
         if status2 == 200:
             return {
@@ -377,7 +475,14 @@ class X402Buyer:
 
     def preflight(self, preflight_url: str) -> dict[str, Any]:
         """Free preflight check before any paid call. No signing involved."""
-        status, _, raw = self._do_request(preflight_url, "GET", None, {})
+        try:
+            status, _, raw = self._do_request(preflight_url, "GET", None, {})
+        except PaymentTransportError:
+            raise
+        except Exception as exc:
+            raise PaymentTransportError(
+                f"preflight transport error (nothing paid; safe to retry): {exc}"
+            ) from exc
         if status != 200:
             raise X402BuyerError(f"preflight failed with status {status}")
         return {"ok": True, "data": json.loads(raw or b"{}")}

@@ -697,19 +697,20 @@ ACTIONS: Dict[str, Dict[str, object]] = {
     "kya_revoke": {
         "entry_point": "src/sincor2/kya_blueprint.py:106",
         "http": "POST /api/kya/revoke",
-        "auth": ["none"],
+        "auth": ["jwt-or-session", "owner-or-admin"],
         "side_effects": "write-local",
         "risk_tier": "critical",
         "reversibility": "reversible",
         "domain": "identity",
         "notes": "Revokes a KYA identity (excludes the agent from discovery "
-                 "immediately). AUTH GAP: unauthenticated revocation is an "
-                 "auth/permissions change — must be admin-gated.",
+                 "immediately). W-59 FIXED: requires an authenticated "
+                 "principal AND record ownership or the admin role "
+                 "(401/403 otherwise).",
     },
     "kya_unstake_request": {
         "entry_point": "src/sincor2/kya_blueprint.py:116",
         "http": "POST /api/kya/unstake/request",
-        "auth": ["none"],
+        "auth": ["jwt-or-session", "owner-or-admin"],
         "side_effects": "write-local",
         "risk_tier": "high",
         "reversibility": "reversible",
@@ -719,7 +720,7 @@ ACTIONS: Dict[str, Dict[str, object]] = {
     "kya_unstake_finalize": {
         "entry_point": "src/sincor2/kya_blueprint.py:128",
         "http": "POST /api/kya/unstake/finalize",
-        "auth": ["none"],
+        "auth": ["jwt-or-session", "owner-or-admin"],
         "side_effects": "write-local",
         "risk_tier": "high",
         "reversibility": "reversible-with-cost",

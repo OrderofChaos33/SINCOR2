@@ -214,9 +214,11 @@ def verify_content_binding_sig(
         return True
     from eth_account import Account
     from eth_account.messages import encode_defunct
+    from sincor2.sig_canonical import require_low_s
 
     message = encode_defunct(text=evidence.deliverable_hash)
     try:
+        require_low_s(sig)  # reject (r, n-s) malleation twins
         signer = Account.recover_message(message, signature=sig)
     except Exception as err:  # noqa: BLE001 - any recovery failure rejects
         raise ValueError(f"content_binding_sig does not recover: {err}")
