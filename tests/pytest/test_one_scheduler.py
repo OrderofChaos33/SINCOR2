@@ -71,6 +71,7 @@ def test_scheduler_defaults_match_founder_decisions():
         "compliance_checks": False,
         "launch_review_notify": False,
         "partner_notify": False,
+        "activity_engine_cycle": True,
     }
     assert set(central.SCHEDULER_DEFAULTS) == set(expected_enabled)
     for job_id, enabled in expected_enabled.items():
@@ -93,7 +94,7 @@ def test_exactly_one_outreach_job_registered(canonical_env):
         for job_id in (
             "daily_ops", "sadas_scan", "outreach_cycle", "content_cycle",
             "launch_cycle", "recursive_optimizer", "subscription_reminders",
-            "polyclaw_scan",
+            "polyclaw_scan", "activity_engine_cycle",
         ):
             assert ids.count(job_id) == 1, f"{job_id}: count={ids.count(job_id)}"
         # OFF-by-default jobs must NOT be registered
