@@ -37,6 +37,8 @@ except ImportError:
     HAS_APSCHEDULER = False
     BackgroundScheduler = None  # type: ignore
 
+from sincor2.scheduler_guards import guarded_run
+
 _scheduler: Optional[BackgroundScheduler] = None
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -209,11 +211,20 @@ def _dispatch_job(job_id: str, startup: bool = False) -> None:
     """
     spec = SCHEDULER_DEFAULTS[job_id]
     name = spec["name"] + (" (startup)" if startup else "")
-    # Wrapper composition (B + C): ledger records the run; the Stream C effect
-    # guard (tier kill-switch / approval mode / idempotency) decides whether
-    # the job function actually invokes. Guard sits inside the ledger so skips
-    # are recorded too.
-    _safe_run(name, wrap_with_ledger(job_id, _wrap_job(job_id, _JOB_FUNCS[job_id])))
+    # Wrapper composition (B + C + D), outside in:
+    #   _safe_run -> ledger -> effect guard (kill-switch/approval/idempotency)
+    #     -> timeout + circuit breaker -> job func.
+    # The lambda is created at RUN time only; the registered entrypoint stays
+    # the picklable module-level _dispatch_job (STREAM B requirement).
+    # The breaker wraps the raw job func so only real executions (not
+    # guard-skips) count toward consecutive failures.
+    _safe_run(
+        name,
+        wrap_with_ledger(
+            job_id,
+            _wrap_job(job_id, lambda: guarded_run(job_id, name, _JOB_FUNCS[job_id])),
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -414,6 +425,9 @@ def _add_job(
         tz = os.environ.get(spec.get("timezone_env", ""), "") or spec["timezone"]
         trigger = CronTrigger(hour=hour, minute=minute, timezone=tz)
     # _dispatch_job (not a lambda): picklable for the durable SQLAlchemyJobStore.
+    # All wrapper composition (ledger / effect guard / timeout+breaker) happens
+    # inside _dispatch_job at RUN time, so the registered entrypoint stays
+    # importable and serializable.
     sched.add_job(_dispatch_job, args=(job_id,), trigger=trigger, **kwargs)
 
     startup_delay = spec.get("startup_delay_sec")
