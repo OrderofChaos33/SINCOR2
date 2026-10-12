@@ -40,7 +40,7 @@
     .shell { position: relative; z-index: 10; min-height: 100dvh; max-width: 1120px; margin: 0 auto; padding: 24px 20px 28px; display: flex; flex-direction: column; }
     header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-    .brand img { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(139,92,246,0.5); object-fit: cover; box-shadow: 0 0 16px rgba(139,92,246,0.4); }
+    .brand img.brand-logo { width: auto; height: 48px; border-radius: 10px; border: 1px solid rgba(139,92,246,0.5); object-fit: cover; box-shadow: 0 0 16px rgba(139,92,246,0.4); }
     .brand span { font-family: Sora, sans-serif; font-weight: 700; font-size: 18px; background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .cohort { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
     .cohort b { color: var(--cyan); font-weight: 600; margin-left: 8px; }
@@ -100,8 +100,7 @@
   <div class="shell">
     <header>
       <a class="brand" href="/">
-        <img src="/static/sincor_nav_icon.png" alt="">
-        <span>SINCOR</span>
+        <img class="brand-logo" src="/static/sincor_wasp_logo.png" alt="SINCOR">
       </a>
       <div class="cohort">Genesis cohort<b id="count">{{ '%05d'|format(genesis_count or 0) }}</b></div>
     </header>
