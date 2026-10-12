@@ -260,20 +260,20 @@
   {
    "current_gateway_status": "unwrapped",
    "effect_type": "SCHEDULER_ENQUEUE",
-   "file_line": "src/sincor2/scheduler.py:100",
-   "function": "_register_jobs",
+   "file_line": "src/sincor2/scheduler.py:428",
+   "function": "_add_job",
    "module_path": "sincor2.scheduler",
-   "notes": "BackgroundScheduler job registration: _daily_ops_job, _outreach_job, _content_agent_job, _subscription_check_job \u2014 recurring side-effect jobs.",
+   "notes": "Central scheduler canonical job registration: _add_job registers each job from SCHEDULER_DEFAULTS (12 jobs incl. outreach_cycle, activity_engine_cycle); _dispatch_job composes ledger / effect-guard / timeout at run time.",
    "owner": "ops",
    "sink_id": "scheduler-register-jobs"
   },
   {
    "current_gateway_status": "unwrapped",
    "effect_type": "SCHEDULER_ENQUEUE",
-   "file_line": "src/sincor2/outreach_scheduler.py:32",
-   "function": "_run_cycle",
+   "file_line": "src/sincor2/outreach_scheduler.py:16",
+   "function": "run_outreach_cycle",
    "module_path": "sincor2.outreach_scheduler",
-   "notes": "Periodic outreach cycle; triggers email sinks.",
+   "notes": "Periodic outreach cycle job function; registered exactly once by the central scheduler (sincor2.scheduler SCHEDULER_DEFAULTS[outreach_cycle]); triggers email sinks. _run_cycle kept as a backwards-compatible alias.",
    "owner": "comms",
    "sink_id": "outreach-scheduler-cycle"
   },
