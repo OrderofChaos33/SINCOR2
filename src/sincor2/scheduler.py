@@ -5,8 +5,10 @@ creates an APScheduler instance. The 8 standalone ``*_scheduler.py`` modules are
 job-function libraries now — they no longer create schedulers of their own.
 
 Canonical defaults live in SCHEDULER_DEFAULTS below, defined once. They equal
-the previously effective production behavior, with one deliberate fix:
-outreach is registered exactly ONCE (the old setup ran it 2x per 2h).
+the previously effective production behavior, with two deliberate fixes:
+outreach is registered exactly ONCE (the old setup ran it 2x per 2h), and
+per P1 audit #9 the send/publish jobs (outreach_cycle, content_cycle,
+launch_cycle) default OFF and require explicit env opt-in (fail closed).
 
 STREAM C (2026-10-12): effect-tier classification lives in
 ``sincor2.scheduler_tiers``; Tier 2/3 jobs are wrapped at the scheduling layer
@@ -75,10 +77,11 @@ SCHEDULER_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "outreach_cycle": {
         "name": "SINCOR Outreach Cycle",
         "env_enabled": "OUTREACH_ENABLED",
-        "enabled": True,
-        # Canonical: ON, exactly 1x per 2h. This entry is the single owner of
-        # outreach — it replaces the old outreach_scheduler.py standalone
-        # scheduler, which double-fired the same cycle.
+        # P1 audit #9 (fail closed): send/publish jobs default OFF and require
+        # explicit env opt-in. This entry is the single owner of outreach —
+        # it replaces the old outreach_scheduler.py standalone scheduler,
+        # which double-fired the same cycle.
+        "enabled": False,
         "kind": "interval",
         "env_interval_hours": "OUTREACH_INTERVAL_HOURS",
         "interval_hours": 2,
@@ -88,7 +91,8 @@ SCHEDULER_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "content_cycle": {
         "name": "SINCOR Content Agent",
         "env_enabled": "CONTENT_AGENT_ENABLED",
-        "enabled": True,
+        # P1 audit #9 (fail closed): default OFF, explicit opt-in required.
+        "enabled": False,
         "kind": "interval",
         "env_interval_hours": "CONTENT_AGENT_INTERVAL_HOURS",
         "interval_hours": 48,
@@ -97,7 +101,8 @@ SCHEDULER_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "launch_cycle": {
         "name": "SINCOR Launch Content",
         "env_enabled": "LAUNCH_OPS_ENABLED",
-        "enabled": True,
+        # P1 audit #9 (fail closed): default OFF, explicit opt-in required.
+        "enabled": False,
         "kind": "interval",
         "env_interval_hours": "LAUNCH_OPS_INTERVAL_HOURS",
         "interval_hours": 24,
@@ -216,7 +221,12 @@ def _safe_run(name: str, func: Callable[[], Any]) -> None:
 def _is_enabled(job_id: str) -> bool:
     spec = SCHEDULER_DEFAULTS[job_id]
     default = "true" if spec["enabled"] else "false"
-    return os.environ.get(spec["env_enabled"], default).lower() == "true"
+    # P1 audit #9: use the canonical explicit-opt-in truthy set from
+    # sincor2.comms_gating ("1"/"true"/"yes", case-insensitive) so the
+    # scheduler layer agrees with the comms layer on what counts as opted in.
+    from sincor2.comms_gating import _truthy
+
+    return _truthy(os.environ.get(spec["env_enabled"], default))
 
 
 def _dispatch_job(job_id: str, startup: bool = False) -> None:
