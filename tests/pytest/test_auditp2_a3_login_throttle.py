@@ -93,7 +93,9 @@ def test_mvp_form_login_rapid_failures_throttled(mvp_client):
             environ_base={"REMOTE_ADDR": ip},
         )
         codes.append(r.status_code)
-    assert codes[:5] == [401] * 5
+    # P1 (#442): failed form logins now hit the disabled-customer path (403),
+    # not 401. Throttling (429 on 6th) is the P2-A3 behavior under test.
+    assert codes[:5] == [403] * 5
     assert codes[5] == 429
     # legitimate admin form login still works from another IP (302 -> /admin)
     ok = mvp_client.post(
@@ -110,14 +112,14 @@ def test_form_login_get_not_counted_against_post_budget(mvp_client):
     for _ in range(10):
         r = mvp_client.get("/login", environ_base={"REMOTE_ADDR": ip})
         assert r.status_code == 200
-    # POST budget untouched by the GETs: first POST attempt is processed (401),
-    # not pre-throttled.
+    # POST budget untouched by the GETs: first POST attempt is processed (403
+    # per P1 disabled-customer path), not pre-throttled.
     r = mvp_client.post(
         "/login",
         data={"identifier": ADMIN_USER, "password": "wrong-password"},
         environ_base={"REMOTE_ADDR": ip},
     )
-    assert r.status_code == 401
+    assert r.status_code == 403
 
 
 def test_per_account_limit_contains_distributed_attack(client):
