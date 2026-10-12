@@ -19,6 +19,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger("sincor2.scheduler")
 
+from sincor2.scheduler_ledger import wrap_with_ledger  # noqa: E402
+
 try:
     from apscheduler.schedulers.background import BackgroundScheduler
     from apscheduler.triggers.interval import IntervalTrigger
@@ -191,6 +193,19 @@ def _is_enabled(job_id: str) -> bool:
     return os.environ.get(spec["env_enabled"], default).lower() == "true"
 
 
+def _dispatch_job(job_id: str, startup: bool = False) -> None:
+    """Module-level job entrypoint (STREAM B).
+
+    Lambdas/closures cannot be serialized into the durable SQLAlchemyJobStore,
+    so the central registry dispatches through this importable function by job
+    id. The ledger wrap happens here at run time so the ledger singleton
+    resolves lazily (and stays in-memory when no DB is configured).
+    """
+    spec = SCHEDULER_DEFAULTS[job_id]
+    name = spec["name"] + (" (startup)" if startup else "")
+    _safe_run(name, wrap_with_ledger(job_id, _JOB_FUNCS[job_id]))
+
+
 # ---------------------------------------------------------------------------
 # Job functions (scheduling-owned wrappers). Domain logic lives in the
 # per-domain modules; imports stay lazy so registration never pulls heavy
@@ -298,13 +313,15 @@ def _add_job(
 ) -> None:
     """Register one canonical job (interval or cron) from SCHEDULER_DEFAULTS."""
     spec = SCHEDULER_DEFAULTS[job_id]
-    func = _JOB_FUNCS[job_id]
     name = spec["name"]
     kwargs: Dict[str, Any] = {
         "id": job_id,
         "name": name,
         "replace_existing": True,
         "max_instances": spec.get("max_instances", 1),
+        # STREAM B: misfire_grace_time + coalesce on ALL interval/cron jobs.
+        "coalesce": spec.get("coalesce", True),
+        "misfire_grace_time": spec.get("misfire_grace_time", 300),
     }
     if spec["kind"] == "interval":
         if "interval_hours" in spec:
@@ -317,21 +334,19 @@ def _add_job(
         else:
             seconds = int(os.environ.get(spec["env_interval_seconds"], str(spec["interval_seconds"])))
             trigger = IntervalTrigger(seconds=seconds)
-        if spec.get("coalesce"):
-            kwargs["coalesce"] = True
-        if spec.get("misfire_grace_time"):
-            kwargs["misfire_grace_time"] = spec["misfire_grace_time"]
     else:  # cron
         hour = int(os.environ.get(spec["env_hour"], str(spec["hour"])))
         minute = int(os.environ.get(spec["env_minute"], str(spec["minute"])))
         tz = os.environ.get(spec.get("timezone_env", ""), "") or spec["timezone"]
         trigger = CronTrigger(hour=hour, minute=minute, timezone=tz)
-    sched.add_job(lambda: _safe_run(name, func), trigger=trigger, **kwargs)
+    # _dispatch_job (not a lambda): picklable for the durable SQLAlchemyJobStore.
+    sched.add_job(_dispatch_job, args=(job_id,), trigger=trigger, **kwargs)
 
     startup_delay = spec.get("startup_delay_sec")
     if startup_delay:
         sched.add_job(
-            lambda: _safe_run(f"{name} (startup)", func),
+            _dispatch_job,
+            args=(job_id, True),
             trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=startup_delay)),
             id=f"{job_id}_startup",
             replace_existing=True,
@@ -361,12 +376,41 @@ def start_central_scheduler(app: Any = None) -> Optional[BackgroundScheduler]:
         return None
     if _scheduler is not None and _scheduler.running:
         return _scheduler
-    _scheduler = BackgroundScheduler(timezone="America/Chicago")
-    registered = _register_jobs(_scheduler)
+    # STREAM B: durable job store (Postgres) with silent in-memory fallback —
+    # boot never fails for lack of a DB.
+    from sincor2.scheduler_store import build_jobstore, durable_db_url
+
+    db_url = durable_db_url()
+    jobstores, store_backend = build_jobstore(db_url)
+    _scheduler = BackgroundScheduler(jobstores=jobstores, timezone="America/Chicago")
+    try:
+        registered = _register_jobs(_scheduler)
+    except Exception as exc:
+        if store_backend != "memory":
+            logger.warning(
+                "[SCHEDULER] durable job store unusable (%s); retrying in-memory",
+                exc,
+            )
+            from apscheduler.jobstores.memory import MemoryJobStore
+
+            _scheduler = BackgroundScheduler(
+                jobstores={"default": MemoryJobStore()}, timezone="America/Chicago"
+            )
+            registered = _register_jobs(_scheduler)
+            db_url = None
+            store_backend = "memory"
+        else:
+            raise
+    logger.info("[SCHEDULER] job store backend: %s", store_backend)
     if not registered:
         logger.info("[SCHEDULER] No automations enabled")
         _scheduler = None
         return None
+    # STREAM B: boot crash-recovery — requeue interrupted Tier 0/1 runs, hold
+    # Tier 2/3 for operator review. Never raises; never blocks boot.
+    from sincor2.scheduler_recovery import run_boot_recovery
+
+    run_boot_recovery(_scheduler, database_url=db_url)
     _scheduler.start()
     logger.info("[SCHEDULER] Started jobs: %s", registered)
     return _scheduler
