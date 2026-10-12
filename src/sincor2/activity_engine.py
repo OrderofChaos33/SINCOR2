@@ -245,7 +245,10 @@ def resolve_cohort() -> List[str]:
     """
     override = os.environ.get("SINCOR_ACTIVITY_COHORT_IDS", "").strip()
     if override:
-        return [a.strip() for a in override.split(",") if a.strip()]
+        # Defense-in-depth: the engine poster must never appear in the bidder
+        # cohort, even via operator override (self-bid guard is the backstop).
+        return [a.strip() for a in override.split(",")
+                if a.strip() and a.strip() != POSTER_ID]
     from sincor2.a2a_inbound import get_fabric
     fabric = get_fabric()
     present = [a for a in LIVENESS_COHORT if a in fabric.agents]
