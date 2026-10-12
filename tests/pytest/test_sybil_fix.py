@@ -64,6 +64,7 @@ from sincor2.a2a_inbound import (
     get_fabric,
     reset_fabric,
 )
+from sincor2.a2a_identity import register_message as _new_registration_message
 from sincor2.a2a_inbound_ext import heartbeat_agent, register_agent_record
 from sincor2.a2a_inbound_market import (
     expire_stale_assignments,
@@ -109,8 +110,24 @@ def _body(agent_id: str, wallet: str, **extra):
     return body
 
 
-def _register(agent_id: str, wallet: str, **extra):
-    return register_agent_record(_body(agent_id, wallet, **extra))
+def _register(agent_id: str, key, **extra):
+    """Register with a VALID EIP-191 wallet proof signed by the key holder.
+
+    Since the C3 fail-closed remediation (#413), a wallet claim without a
+    valid EIP-191 registration proof is rejected outright. The sybil probes
+    sign with the attacker's own key — the attacks under test are about
+    wallet REUSE (tombstoned rebirth, identity caps, shared-wallet
+    clusters), not proof forgery, so self-signed proofs keep the tests
+    honest: the attacker really does control the wallets.
+    """
+    body = _body(agent_id, key.address, **extra)
+    ts = _now_ms()
+    message = _new_registration_message(agent_id, ts)
+    sig = key.sign_message(encode_defunct(text=message)).signature
+    body["registration_wallet"] = key.address
+    body["registration_ts"] = ts
+    body["registration_signature"] = "0x" + bytes(sig).hex()
+    return register_agent_record(body)
 
 
 def _signed_reregistration_body(key, agent_id: str, wallet: str, **extra):
@@ -132,7 +149,7 @@ def test_a_tombstoned_wallet_rejects_new_registration():
     """Rebirth with a new agent_id on a ghost-tombstoned wallet fails closed."""
     key = Account.create()
     wallet = key.address
-    _register("sybil-a1", wallet)
+    _register("sybil-a1", key)
 
     tomb = kya.flag_ghost("sybil-a1")
     assert tomb is not None and tomb["reason"] == "ghosting"
@@ -140,7 +157,7 @@ def test_a_tombstoned_wallet_rejects_new_registration():
 
     # Same wallet, fresh agent_id: the classic whitewash. Must be refused.
     with pytest.raises(RegistrationAuthError, match="tombstoned"):
-        _register("sybil-a2", wallet)
+        _register("sybil-a2", key)
 
 
 def test_a_tombstoned_wallet_rejects_reregistration_even_with_valid_proof():
@@ -151,7 +168,7 @@ def test_a_tombstoned_wallet_rejects_reregistration_even_with_valid_proof():
     """
     key = Account.create()
     wallet = key.address
-    _register("sybil-a1r", wallet)
+    _register("sybil-a1r", key)
     kya.flag_ghost("sybil-a1r")
     assert kya.is_wallet_tombstoned(wallet)
 
@@ -165,17 +182,17 @@ def test_a_revoke_tombstone_also_blocks_registration():
     """revoke() writes a tombstone too — it must block rebirth as well."""
     key = Account.create()
     wallet = key.address
-    snap = _register("sybil-a1v", wallet)
+    snap = _register("sybil-a1v", key)
     kya.revoke(snap["kya_id"], "test revocation")
     assert kya.is_wallet_tombstoned(wallet)
 
     with pytest.raises(RegistrationAuthError, match="tombstoned"):
-        _register("sybil-a2v", wallet)
+        _register("sybil-a2v", key)
 
 
 def test_a_untombstoned_wallet_registers_fine():
     """The gate is evidence-triggered: clean wallets are unaffected."""
-    snap = _register("sybil-clean", Account.create().address)
+    snap = _register("sybil-clean", Account.create())
     assert snap["agent_id"] == "sybil-clean"
 
 
@@ -185,11 +202,11 @@ def test_a_untombstoned_wallet_registers_fine():
 
 def test_wallet_identity_cap_enforced_on_inbound_path():
     """The 4th live identity on one wallet is rejected at registration."""
-    wallet = Account.create().address
+    key = Account.create()
     for i in range(kya.MAX_IDENTITIES_PER_WALLET):
-        _register(f"sybil-cap-{i}", wallet)
+        _register(f"sybil-cap-{i}", key)
     with pytest.raises(RegistrationAuthError, match="identity cap"):
-        _register("sybil-cap-over", wallet)
+        _register("sybil-cap-over", key)
 
 
 def test_wallet_identity_cap_allows_reregistration_of_member():
@@ -197,7 +214,7 @@ def test_wallet_identity_cap_allows_reregistration_of_member():
     key = Account.create()
     wallet = key.address
     for i in range(kya.MAX_IDENTITIES_PER_WALLET):
-        _register(f"sybil-capm-{i}", wallet)
+        _register(f"sybil-capm-{i}", key)
     # exclude_agent_id=self keeps the member's own record out of the count.
     body = _signed_reregistration_body(key, "sybil-capm-0", wallet,
                                        description="still me")
@@ -227,8 +244,9 @@ def _assigned_task(task_id: str, agent_id: str, assigned_ago_ms: int):
 
 def test_b_plaintext_noshow_triggers_reputation_reset_and_tombstone():
     """expire_stale_assignments() now punishes no-shows like sealed ghosts."""
-    wallet = Account.create().address
-    _register("sybil-ns", wallet)
+    key = Account.create()
+    wallet = key.address
+    _register("sybil-ns", key)
     fabric = get_fabric()
     _apply_reputation(fabric.agents["sybil-ns"], 0.8)
     assert fabric.agents["sybil-ns"]["reputation"] == 0.8
@@ -268,15 +286,18 @@ def test_b_residual_same_identity_can_still_bid_after_penalty():
     (reputation 0.0 only gates merit-gated work). The ban bites new
     identities on the tombstoned wallet, not the penalized record itself.
     """
-    wallet = Account.create().address
-    _register("sybil-ns2", wallet)
+    key = Account.create()
+    _register("sybil-ns2", key)
     fabric = get_fabric()
     _apply_reputation(fabric.agents["sybil-ns2"], 0.8)
     _assigned_task("task-noshow-2", "sybil-ns2", assigned_ago_ms=10_000_000)
     expire_stale_assignments()
     assert fabric.agents["sybil-ns2"]["reputation"] == 0.0
 
-    # The penalized identity heartbeats and bids on a fresh open task.
+    # The penalized identity heartbeats and bids on a fresh open task
+    # posted by someone else (poster_id present: the activity-engine
+    # anti-gaming guard correctly rejects bids on anonymous bounty tasks,
+    # so the fixture must be a legitimate third-party task).
     heartbeat_agent("sybil-ns2")
     fabric.tasks["task-fresh"] = {
         "task_id": "task-fresh",
@@ -284,6 +305,7 @@ def test_b_residual_same_identity_can_still_bid_after_penalty():
         "tags": ["lead-enrichment"],
         "auction_closes_at": None,
         "bounty_axm": 1.0,
+        "poster_id": "poster-1",
     }
     bid = place_bid("task-fresh", "sybil-ns2", 0.9, 600)
     assert bid["agent_id"] == "sybil-ns2"
@@ -295,9 +317,10 @@ def test_b_residual_same_identity_can_still_bid_after_penalty():
 
 def test_c_cluster_of_three_is_quarantined_and_payout_blocked():
     """3 identities on one wallet: quarantine_check blocks; payout refused."""
-    wallet = Account.create().address
+    key = Account.create()
+    wallet = key.address
     for i in range(3):
-        _register(f"sybil-c{i}", wallet)
+        _register(f"sybil-c{i}", key)
 
     clusters = cluster_identities_by_wallet()
     assert clusters[wallet.lower()] == ["sybil-c0", "sybil-c1", "sybil-c2"]
@@ -316,9 +339,9 @@ def test_c_cluster_of_three_is_quarantined_and_payout_blocked():
 
 def test_c_pair_cluster_is_flagged_not_blocked_and_noted_on_receipt():
     """2 identities on one wallet: flagged on the payout record, not blocked."""
-    wallet = Account.create().address
-    _register("sybil-p0", wallet)
-    _register("sybil-p1", wallet)
+    key = Account.create()
+    _register("sybil-p0", key)
+    _register("sybil-p1", key)
 
     verdict = quarantine_check("sybil-p0")
     assert verdict["cluster_size"] == 2
@@ -336,8 +359,8 @@ def test_c_pair_cluster_is_flagged_not_blocked_and_noted_on_receipt():
 
 def test_c_solo_agent_payout_clean():
     """A singleton wallet pays out with no sybil annotation."""
-    wallet = Account.create().address
-    _register("sybil-solo", wallet)
+    key = Account.create()
+    _register("sybil-solo", key)
     verdict = quarantine_check("sybil-solo")
     assert verdict["flagged"] is False
     assert verdict["quarantined"] is False
@@ -350,9 +373,9 @@ def test_c_solo_agent_payout_clean():
 
 def test_c_tombstoned_member_quarantines_small_cluster():
     """Any tombstoned cluster member blocks payout even below size 3."""
-    wallet = Account.create().address
-    _register("sybil-t0", wallet)
-    _register("sybil-t1", wallet)
+    key = Account.create()
+    _register("sybil-t0", key)
+    _register("sybil-t1", key)
     kya.flag_ghost("sybil-t0")  # one member ghosts elsewhere
 
     verdict = quarantine_check("sybil-t1")
@@ -375,11 +398,11 @@ def test_c_residual_split_cluster_evades_size_tripwire():
     needs funding-graph tracing beyond shared wallets (onchain funding
     sources), which is out of scope for this fix.
     """
-    wa, wb = Account.create().address, Account.create().address
-    _register("sybil-x0", wa)
-    _register("sybil-x1", wa)
-    _register("sybil-y0", wb)
-    _register("sybil-y1", wb)
+    ka, kb = Account.create(), Account.create()
+    _register("sybil-x0", ka)
+    _register("sybil-x1", ka)
+    _register("sybil-y0", kb)
+    _register("sybil-y1", kb)
 
     for aid in ("sybil-x0", "sybil-y0"):
         verdict = quarantine_check(aid)
