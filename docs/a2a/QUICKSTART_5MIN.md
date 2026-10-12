@@ -149,8 +149,12 @@ curl -s $BASE/v1/a2a/admin/sponsored-stake/scout-1 \
 
 Rules: one active sponsorship per agent; disabling the flag stops new
 fronts but never forgives outstanding ones (recoup still runs at each
-settlement). Ledger: `~/workspace/ops/sponsored_stake_ledger.json`
-(JSON, atomic writes — same pattern as the fee-conversion ledger).
+settlement). Ledger: volume-aware default — `SINCOR_SPONSORED_STAKE_LEDGER` if set,
+else `sponsored_stake_ledger.json` under the platform data dir
+(`/data` on Railway when mounted, else the project `data/` dir),
+falling back to `~/workspace/ops/sponsored_stake_ledger.json` only if the
+data-dir import fails. (JSON, atomic writes — same pattern as the
+fee-conversion ledger).
 
 > **User decision needed:** enabling sponsored stake is the operator's
 > call. The code is ready; `SINCOR_SPONSORED_STAKE_ENABLED` is unset by
