@@ -36,10 +36,16 @@ def _agent_key():
 @pytest.fixture
 def sdk(tmp_path):
     from sincor2.a2a_inbound import reset_fabric
+    from sincor2.a2a_rate_limits import reset_a2a_limits
     from sincor2.onchain.stake_ledger import reset_stake_ledger
     from sincor2.sponsored_stake import reset_sponsored_ledger
 
     reset_fabric()
+    # The module-global register rate limiter (5/hr) is not cleared by
+    # reset_fabric(); without this, collection order (e.g. alongside other
+    # test modules) leaks hits across tests and yields spurious 429s.
+    # Same class of fix as the sealed-bid shim's fixture.
+    reset_a2a_limits()
     reset_stake_ledger(path=str(tmp_path / "stake.json"))
     reset_sponsored_ledger(path=str(tmp_path / "sponsored.json"))
     app = Flask(__name__)

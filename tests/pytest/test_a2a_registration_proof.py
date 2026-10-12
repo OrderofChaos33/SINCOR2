@@ -31,7 +31,13 @@ from sincor2.a2a_inbound_ext import register_agent_record
 
 @pytest.fixture
 def client():
+    from sincor2.a2a_rate_limits import reset_a2a_limits
+
     reset_fabric()
+    # The module-global register rate limiter (5/hr) is not cleared by
+    # reset_fabric(); without this, collection order leaks hits across test
+    # modules and yields spurious 429s. Same class of fix as the SDK fixture.
+    reset_a2a_limits()
     app = Flask(__name__)
     register_inbound(app)
     app.config["TESTING"] = True

@@ -39,8 +39,10 @@ def register_mvp_blueprints(app: Flask) -> None:
     from sincor2.mvp_blueprints.sinc import bp as sinc_bp
     from sincor2.mvp_blueprints.launch import bp as launch_bp
     from sincor2.mvp_blueprints.admin import bp as admin_bp
+    from sincor2.mvp_blueprints.discovery import bp as discovery_bp
 
     app.register_blueprint(health_alias_bp)
+    app.register_blueprint(discovery_bp)
 
     for bp in (
         health_bp,

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+
+# Machine-readable agent/marketplace discovery:
+# /.well-known/agent-card.json
+# /.well-known/sincor-marketplace.json
+# /docs/a2a
+# /llms.txt
+# /ai.txt
+
+Sitemap: https://getsincor.com/sitemap

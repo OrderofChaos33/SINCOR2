@@ -1,0 +1,5 @@
+Contact: https://getsincor.com/contact
+Policy: https://getsincor.com/docs/a2a
+Expires: 2027-10-12T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://getsincor.com/.well-known/security.txt
