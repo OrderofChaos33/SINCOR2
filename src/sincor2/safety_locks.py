@@ -61,6 +61,64 @@ def onchain_writes_allowed() -> bool:
     return os.getenv("ALLOW_ONCHAIN_WRITES", "false").lower() == "true"
 
 
+# Safety-critical env flags echoed at startup. Values are safe to log for
+# every name here; BILLING_FORWARDER_PRIVATE_KEY is deliberately absent —
+# it is logged as set/unset only (never its value).
+_SAFETY_ENV_FLAGS = (
+    "RAILWAY_ENVIRONMENT",       # prod detection context
+    "FLASK_ENV",                 # prod detection context
+    "POLYCLAW_AUTO_EXECUTE",     # dangerous when true
+    "EXECUTE_LIVE",              # dangerous when 1
+    "COMPLIANCE_CONFIDENTIAL",   # dangerous when false
+    "COMPLIANCE_LOG_TO_STDOUT",  # dangerous when true
+    "ALLOW_ONCHAIN_WRITES",      # non-prod onchain write gate
+    "SAFETY_OVERRIDE",           # two-key override, part 1
+)
+
+
+def _flag_is_dangerous(name: str, value: str) -> bool:
+    """Mirror the dangerous-state predicates used by assert_production_safety."""
+    v = (value or "").strip()
+    if name == "POLYCLAW_AUTO_EXECUTE":
+        return v.lower() == "true"
+    if name == "EXECUTE_LIVE":
+        return v == "1"
+    if name == "COMPLIANCE_CONFIDENTIAL":
+        return v.lower() == "false"
+    if name == "COMPLIANCE_LOG_TO_STDOUT":
+        return v.lower() == "true"
+    if name == "SAFETY_OVERRIDE":
+        return v.lower() == "true"
+    return False
+
+
+def log_safety_env() -> None:
+    """Echo safety-critical env flags at startup (2026-10-12 outage fix).
+
+    Logs each flag's effective value at INFO on every boot, e.g.
+    ``SAFETY_ENV POLYCLAW_AUTO_EXECUTE=false``. Flags in a dangerous state
+    are additionally logged at WARNING. Secrets are never logged:
+    BILLING_FORWARDER_PRIVATE_KEY and SAFETY_OVERRIDE_CONFIRM are reported
+    as set/unset only.
+    """
+    dangerous: list[str] = []
+    for name in _SAFETY_ENV_FLAGS:
+        value = os.getenv(name, "")
+        display = value if value else "<unset>"
+        logger.info("[SAFETY] SAFETY_ENV %s=%s", name, display)
+        if _flag_is_dangerous(name, value):
+            dangerous.append(name)
+    fwd = "set" if os.getenv("BILLING_FORWARDER_PRIVATE_KEY", "").strip() else "unset"
+    logger.info("[SAFETY] SAFETY_ENV BILLING_FORWARDER_PRIVATE_KEY=%s", fwd)
+    confirm = "set" if os.getenv("SAFETY_OVERRIDE_CONFIRM", "") else "unset"
+    logger.info("[SAFETY] SAFETY_ENV SAFETY_OVERRIDE_CONFIRM=%s", confirm)
+    for name in dangerous:
+        logger.warning(
+            "[SAFETY] SAFETY_ENV %s is in DANGEROUS state — may block production boot",
+            name,
+        )
+
+
 def assert_production_safety() -> list[str]:
     """
     Run at app startup. Returns the warning list (logged internally).
@@ -71,6 +129,10 @@ def assert_production_safety() -> list[str]:
     merely warning — the process must not serve traffic in that state.
     Outside production it keeps the old warn-and-continue behavior.
     """
+    # Echo the safety-critical env flags FIRST so the effective config is in
+    # the logs even when the guard below raises (2026-10-12 outage:
+    # POLYCLAW_AUTO_EXECUTE=true was invisible in startup logs).
+    log_safety_env()
     warnings: list[str] = []
 
     if os.getenv("EXECUTE_LIVE", "0").strip() == "1" and _IS_PROD and not safety_override_active():
