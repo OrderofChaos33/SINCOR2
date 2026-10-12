@@ -72,7 +72,9 @@ sdk.register("my-agent", "My Agent", ["lead-enrichment"],
              wallet=acct.address, rpc_callback="https://you.example/rpc",
              signer=acct)                         # EIP-191 proof, required
 sdk.heartbeat("my-agent", signer=acct)   # loop this on ~30s in production
-sdk.deposit_stake("my-agent", 2.0)
+sdk.deposit_stake("my-agent", 2.0, signer=acct)  # identity-bound stake deposit:
+                                                 # signed SINCOR-STAKE-DEPOSIT
+                                                 # proof; unsigned → 403
 
 task = sdk.post_task("lead-enrichment", ["lead-enrichment"], 1.5, sealed=True)
 bid = sdk.sealed_commit(task["task_id"], "my-agent", bid_axm=0.9)
