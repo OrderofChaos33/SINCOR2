@@ -2415,11 +2415,11 @@ class A2ARouter:
                 )), 404
 
             payload = handler(body)
-            # Surface caller-auth failures as real HTTP statuses (P3 item 14).
-            try:
-                err_code = (payload.get("error") or {}).get("code")
-            except AttributeError:
-                err_code = None
+            # Surface caller-auth failures as real HTTP statuses (P3 item 14)
+            # and queue-unavailable as 503 + Retry-After (C2, P2 audit).
+            err_code = _payload_error_code(payload)
+            if err_code == _ERR_QUEUE_UNAVAILABLE:
+                return _queue_unavailable_response(payload)
             http_status = _AUTH_HTTP_STATUS.get(err_code)
             if http_status is not None:
                 return jsonify(payload), http_status
@@ -2432,6 +2432,8 @@ class A2ARouter:
             body = request.get_json(force=True, silent=True) or {}
             payload = _handle_send(body)
             if payload.get("error"):
+                if _payload_error_code(payload) == _ERR_QUEUE_UNAVAILABLE:
+                    return _queue_unavailable_response(payload)
                 return jsonify(payload), _auth_http_status(payload)
             task = payload.get("result") or {}
             task_id = task.get("id")
@@ -2895,6 +2897,14 @@ def _sse_event(data: Dict[str, Any]) -> str:
 _ERR_AUTH_REQUIRED = -32010  # HTTP 401 — missing / invalid / stale / replayed signature
 _ERR_FORBIDDEN = -32011      # HTTP 403 — valid signature, but not the task owner
 
+# C2 (P2 audit): queue availability is a distinct failure domain from
+# auth/payment — it gets its own code, not an auth-code reuse.
+# -32012 means "the task was created but the job was NOT accepted; no work
+# started". Callers must treat data.retryable=true + the HTTP Retry-After
+# header as the signal to retry (with the same idempotency key), never as a
+# silent success.
+_ERR_QUEUE_UNAVAILABLE = -32012  # HTTP 503 — enqueue failed; safe to retry
+
 # Map auth error codes to HTTP status for the REST routes and dispatcher.
 _AUTH_HTTP_STATUS = {_ERR_AUTH_REQUIRED: 401, _ERR_FORBIDDEN: 403}
 
@@ -3041,6 +3051,29 @@ def _auth_http_status(payload: Dict[str, Any]) -> int:
     except AttributeError:
         return 400
     return _AUTH_HTTP_STATUS.get(code, 400)
+
+
+def _queue_unavailable_response(payload: Dict[str, Any]):
+    """HTTP 503 + Retry-After for _ERR_QUEUE_UNAVAILABLE (C2, P2 audit).
+
+    The job was NOT accepted and nothing ran — the caller decides whether
+    to retry. The Retry-After hint carries the queue's advised backoff.
+    """
+    from flask import jsonify
+
+    try:
+        data = (payload.get("error") or {}).get("data") or {}
+        retry_after = int(data.get("retry_after_seconds") or 30)
+    except (AttributeError, TypeError, ValueError):
+        retry_after = 30
+    return jsonify(payload), 503, {"Retry-After": str(retry_after)}
+
+
+def _payload_error_code(payload: Any) -> Any:
+    try:
+        return (payload.get("error") or {}).get("code")
+    except AttributeError:
+        return None
 
 
 def _verify_create_auth(params: Dict[str, Any], skill_id: str,
@@ -3508,19 +3541,42 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     try:
-        from sincor2.task_queue import enqueue
+        from sincor2.task_queue import QueueEnqueueError, enqueue
 
         job = enqueue("a2a.execute", {"task_id": task.id})
         task.metadata["queue_job_id"] = job.id
         _update_task(task)
         # Eager (tests) already finalized the A2A task; reload.
         task = _get_task(task.id) or task
+    except QueueEnqueueError as exc:
+        # C2 (P2 audit): the job was NOT accepted — nothing ran. Never
+        # silently execute inline here; that changes failure semantics behind
+        # the caller's back. Return a retriable error: the caller decides
+        # whether to retry (HTTP 503 + Retry-After at the route layer).
+        logger.warning("Queue unavailable for A2A task %s: %s", task.id, exc)
+        return _err(
+            f"queue_unavailable: {exc}",
+            code=_ERR_QUEUE_UNAVAILABLE,
+            rpc_id=rpc_id,
+            data={
+                "retryable": True,
+                "retry_after_seconds": exc.retry_after,
+                "task_id": task.id,
+            },
+        )
     except Exception as exc:
-        logger.exception("Queue enqueue failed for A2A task %s: %s", task.id, exc)
-        _update_task(task, state=TaskState.WORKING)
-        output, error = _dispatch_to_swarm(task)
-        _finalize_a2a_task(task, output, error)
-        task = _get_task(task.id) or task
+        # Unexpected (non-queue) failure on the enqueue path. The task record
+        # exists but dispatch never started — surface it as a failure, still
+        # without executing inline behind the caller's back.
+        logger.exception("Enqueue path failed for A2A task %s: %s", task.id, exc)
+        _update_task(task, state=TaskState.FAILED,
+                     error=f"enqueue_failed: {exc}")
+        return _err(
+            f"enqueue_failed: {exc}",
+            code=_ERR_QUEUE_UNAVAILABLE,
+            rpc_id=rpc_id,
+            data={"retryable": True, "task_id": task.id},
+        )
 
     task_dict = _task_to_rpc(task, history_length=history_length)
     # Surface proof of settlement at top-level for convenience

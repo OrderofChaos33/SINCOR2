@@ -20,7 +20,51 @@ def _bind_mvp():
         g[key] = value
 
 
+# B4: canonical paid/active order states. The single source of truth is
+# sincor2.mvp_app._PAID_STATUSES, bound into this namespace by _bind_mvp()
+# (called below). Vault materials are served ONLY for orders whose canonical
+# record carries one of these states. Anything else (pending, failed,
+# refunded, expired, complete-without-payment) is denied — the check re-reads
+# the order row on every request; client-supplied flags and cached statuses
+# are never trusted.
+#
+# NOTE: _VAULT_PAID_STATUSES is defined AFTER the _bind_mvp() call below,
+# because the binding populates _PAID_STATUSES.
+
+
+def _order_is_paid(order) -> bool:
+    """B4: is this order record canonically paid/active?"""
+    try:
+        status = order["payment_status"] if not isinstance(order, dict) \
+            else order.get("payment_status")
+    except Exception:
+        status = ""
+    return str(status or "").strip().lower() in _VAULT_PAID_STATUSES
+
+
+def _vault_denied_response(order) -> tuple:
+    """B4: denial response for an order that exists but is not paid."""
+    status = str((order["payment_status"] if not isinstance(order, dict)
+                  else order.get("payment_status")) or "").strip().lower()
+    if status == "pending":
+        return render_template(
+            'error.html', code=402, title='Payment Pending',
+            message="Your payment has not completed yet. Once it is confirmed, "
+                    "your training materials will be available here."), 402
+    logger.warning('[VAULT] denied vault access for unpaid order: %s (status=%s)',
+                   order["order_id"] if not isinstance(order, dict) else order.get("order_id"),
+                   status or "unknown")
+    return render_template(
+        'error.html', code=403, title='Access Denied',
+        message="This order is not in a paid state, so training materials "
+                "cannot be served. Please contact support if you believe this "
+                "is an error."), 403
+
+
 _bind_mvp()
+
+# Bound above: mvp_app._PAID_STATUSES is now in this namespace.
+_VAULT_PAID_STATUSES = frozenset(s.lower() for s in _PAID_STATUSES)
 
 
 @bp.route('/buy', methods=['GET'])
@@ -76,7 +120,13 @@ def platform_checkout():
 @bp.route('/api/platform/verify', methods=['POST'])
 @limiter.limit("120 per hour")
 def platform_verify():
-    """Verify ERC-20 payment to treasury and trigger fulfillment."""
+    """Verify ERC-20 payment to treasury and trigger fulfillment (post-finality).
+
+    B1: a valid receipt alone never provisions. While the tx is below the
+    confirmation-depth gate the order stays 'pending' (HTTP 202); provisioning
+    (order completion, fulfillment, subscription) happens only once the
+    checkout is 'finalized'.
+    """
     if not PLATFORM_PAYMENTS_AVAILABLE:
         return jsonify({'ok': False, 'error': 'platform_payments_unavailable'}), 503
     data = request.get_json(silent=True) or {}
@@ -88,39 +138,98 @@ def platform_verify():
         payment_id, tx_hash, customer_email=email, payer_wallet=wallet or ''
     )
     if not result.get('ok'):
-        status = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
+        error = result.get('error')
+        if error == 'sanctions_hit':
+            status = 403
+        elif error == 'ofac_screening_unavailable':
+            status = 503
+        elif error in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer',
+                       'confirmations_unavailable', 'receipt_malformed'):
+            status = 402
+        elif error in ('reorg_detected', 'tx_failed', 'tx_already_used',
+                       'checkout_blocked', 'checkout_reverted',
+                       'checkout_disputed', 'tx_hash_mismatch'):
+            status = 409
+        else:
+            status = 400
         return jsonify(result), status
 
-    order_id = result['order_id']
+    checkout_status = result.get('status')
+    order_id = result.get('order_id')
+    customer_email = result.get('customer_email') or ''
+
+    if checkout_status == 'awaiting_finality':
+        # Receipt valid but below the confirmation-depth gate: record a
+        # pending order and provision NOTHING.
+        _upsert_pending_platform_order(result, customer_email)
+        return jsonify({
+            'ok': True,
+            'status': 'awaiting_finality',
+            'payment_id': payment_id,
+            'order_id': order_id,
+            'tx_hash': tx_hash,
+            'confirmations': result.get('confirmations'),
+            'required_confirmations': result.get('required_confirmations'),
+            'message': 'Payment seen on-chain; awaiting confirmation depth '
+                       'before fulfillment.',
+        }), 202
+
+    if checkout_status == 'already_fulfilled':
+        # Idempotent re-poll: never provision twice.
+        return jsonify(result), 200
+
+    if checkout_status != 'finalized':
+        logger.error('[PAYMENTS] unexpected checkout status %r for %s',
+                     checkout_status, payment_id)
+        return jsonify({'ok': False, 'error': 'unexpected_checkout_status',
+                        'status': checkout_status}), 500
+
+    # 'finalized': confirmation depth reached and sanctions screen passed.
+    # Provision exactly once, then record fulfillment on the checkout.
     product_name = result['product_name']
     amount = result['usd_reference']
     order_type = result.get('order_type', 'generic')
     product_info = PRODUCT_CATALOG.get(product_name, {'type': order_type})
-    customer_email = result.get('customer_email') or ''
 
     db = get_db()
+    order_meta = json.dumps({
+        'tx_hash': tx_hash,
+        'payment_id': payment_id,
+        'token': result['token'],
+        'payer_wallet': result.get('payer_wallet'),
+        'billing': 'platform_tokens',
+        'confirmations': result.get('confirmations'),
+        'required_confirmations': result.get('required_confirmations'),
+        'ofac_verdict': result.get('ofac_verdict'),
+    })
     try:
-        db.execute(
-            '''INSERT INTO orders
-               (order_id, paypal_order_id, customer_email, product_name, amount,
-                currency, payment_status, delivery_status, delivery_url, order_type,
-                created_at, updated_at, metadata)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (order_id, tx_hash, customer_email or result.get('payer_wallet', ''),
-             product_name, amount, result['token'], 'completed', 'processing',
-             f'/my-orders?email={customer_email}' if customer_email else '/dashboard',
-             order_type, datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
-             json.dumps({
-                 'tx_hash': tx_hash,
-                 'payment_id': payment_id,
-                 'token': result['token'],
-                 'payer_wallet': result.get('payer_wallet'),
-                 'billing': 'platform_tokens',
-             }))
+        # A 202 'pending' row may already exist from an awaiting_finality
+        # poll — promote it instead of inserting a duplicate.
+        cur = db.execute(
+            """UPDATE orders SET payment_status='completed',
+               delivery_status='processing', paypal_order_id=?,
+               customer_email=COALESCE(NULLIF(?, ''), customer_email),
+               updated_at=?, metadata=?
+               WHERE order_id=?""",
+            (tx_hash, customer_email,
+             datetime.utcnow().isoformat(), order_meta, order_id),
         )
+        if cur.rowcount == 0:
+            db.execute(
+                '''INSERT INTO orders
+                   (order_id, paypal_order_id, customer_email, product_name, amount,
+                    currency, payment_status, delivery_status, delivery_url, order_type,
+                    created_at, updated_at, metadata)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (order_id, tx_hash, customer_email or result.get('payer_wallet', ''),
+                 product_name, amount, result['token'], 'completed', 'processing',
+                 f'/my-orders?email={customer_email}' if customer_email else '/dashboard',
+                 order_type, datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
+                 order_meta)
+            )
         db.commit()
     except sqlite3.IntegrityError:
-        pass
+        logger.warning('[PAYMENTS] order row race for %s', order_id)
 
     if customer_email:
         trigger_fulfillment(order_id, customer_email, product_name, amount, order_type, product_info)
@@ -153,8 +262,50 @@ def platform_verify():
         )
         result['subscription'] = sub
 
-    logger.info('[PAYMENTS] %s verified: %s %s tx=%s', result['token'], product_name, order_id, tx_hash)
+    if not platform_mark_checkout_fulfilled(payment_id):
+        logger.warning('[PAYMENTS] %s already fulfilled (fulfillment race)',
+                       payment_id)
+    result['status'] = 'fulfilled'
+    logger.info('[PAYMENTS] %s verified+finalized: %s %s tx=%s', result['token'], product_name, order_id, tx_hash)
     return jsonify(result), 200
+
+
+def _upsert_pending_platform_order(result, customer_email):
+    """Record a pending (not yet final) platform order.
+
+    INSERT OR IGNORE keyed on order_id: re-polls must never downgrade or
+    duplicate the row. The row is promoted to 'completed' once the checkout
+    is finalized.
+    """
+    db = get_db()
+    try:
+        db.execute(
+            '''INSERT OR IGNORE INTO orders
+               (order_id, paypal_order_id, customer_email, product_name, amount,
+                currency, payment_status, delivery_status, delivery_url, order_type,
+                created_at, updated_at, metadata)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', 'pending', ?, ?, ?, ?, ?)''',
+            (result['order_id'], result.get('tx_hash'),
+             customer_email or result.get('payer_wallet', ''),
+             result['product_name'], result['usd_reference'], result['token'],
+             f'/my-orders?email={customer_email}' if customer_email else '/dashboard',
+             result.get('order_type', 'generic'),
+             datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
+             json.dumps({
+                 'tx_hash': result.get('tx_hash'),
+                 'payment_id': result.get('payment_id'),
+                 'token': result['token'],
+                 'payer_wallet': result.get('payer_wallet'),
+                 'billing': 'platform_tokens',
+                 'awaiting_finality': True,
+                 'confirmations': result.get('confirmations'),
+                 'required_confirmations': result.get('required_confirmations'),
+             }))
+        )
+        db.commit()
+    except Exception as e:
+        logger.warning('[PAYMENTS] pending order upsert failed for %s: %s',
+                       result.get('order_id'), e)
 
 
 @bp.route('/api/platform/subscription', methods=['GET'])
@@ -273,9 +424,15 @@ def payment_webhook():
     Stores order in DB and triggers product fulfillment/delivery.
     """
     if not fiat_payments_enabled():
+        # B3: log loudly — a webhook arriving while the integration is
+        # disabled is either a misconfiguration or a probe; never silent.
+        logger.error('[WEBHOOK] Stripe webhook received while legacy fiat payments '
+                     'are DISABLED (founder decision D3: Stripe is legacy/not-supported). '
+                     'Event dropped; no processing performed.')
         return jsonify({'error': 'Legacy fiat payments disabled. Use SINC/AXM at /buy.'}), 410
     if not stripe_processor or not stripe_processor.enabled:
-        logger.error('[WEBHOOK] Stripe not configured � cannot process webhook')
+        logger.error('[WEBHOOK] Stripe webhook received but the Stripe processor is '
+                     'not configured/enabled. Event dropped; no processing performed.')
         return jsonify({'error': 'Payment processor not configured'}), 503
 
     payload = request.get_data()
@@ -291,10 +448,29 @@ def payment_webhook():
         return jsonify({'error': 'Webhook verification failed'}), 400
 
     event_type = event_data.get('event', 'unknown')
+
+    # B3: persist the Stripe event ID with a UNIQUE constraint BEFORE
+    # processing (insert-or-ignore claim). Duplicate deliveries are
+    # acknowledged without re-fulfillment; fulfillment is idempotent keyed
+    # on the event ID.
+    event_id = (event_data.get('event_id') or '').strip()
+    if not event_id:
+        logger.error('[WEBHOOK] Stripe event without event_id — refusing to process')
+        return jsonify({'error': 'Missing Stripe event id'}), 400
+    claim = claim_stripe_webhook_event(event_id, event_type)
+    if claim in ('duplicate_processed', 'duplicate_inflight'):
+        logger.warning('[WEBHOOK] Duplicate Stripe event %s (%s) — acknowledged '
+                       'without re-fulfillment', event_id, claim)
+        return jsonify({'success': True, 'event': event_type, 'duplicate': True}), 200
+    if claim == 'reclaimed':
+        logger.warning('[WEBHOOK] Reclaimed stale Stripe event %s from a crashed '
+                       'attempt — reprocessing', event_id)
+
     logger.info(f"[WEBHOOK] Stripe event: {event_type}")
 
     # Only process completed payments
     if event_type != 'payment_completed':
+        mark_stripe_webhook_event_processed(event_id)
         return jsonify({'success': True, 'event': event_type}), 200
 
     customer_email = validate_email(event_data.get('customer_email', ''))
@@ -307,9 +483,15 @@ def payment_webhook():
     session_id = sanitize_string(event_data.get('session_id', ''), max_length=100)
     subscription_id = sanitize_string(event_data.get('subscription_id', '') or '', max_length=100)
 
-    # Determine product from amount
+    # Determine product from amount.
+    # NOTE: PRODUCT_PRICES lives on the auth blueprint; bind lazily so the
+    # legacy webhook can never NameError at runtime if module wiring changes.
+    try:
+        from sincor2.mvp_blueprints.auth import PRODUCT_PRICES as _STRIPE_PRICES
+    except ImportError:
+        _STRIPE_PRICES = {'Starter': 297, 'Professional': 997, 'Enterprise': 2997}
     product_name = 'Unknown'
-    for name, price in PRODUCT_PRICES.items():
+    for name, price in _STRIPE_PRICES.items():
         if abs(amount - price) < 1:  # Allow for rounding
             product_name = name
             break
@@ -345,7 +527,17 @@ def payment_webhook():
         logger.warning(f"[ORDER] Duplicate order: {session_id}")
 
     # Trigger product delivery
-    trigger_fulfillment(order_id, customer_email, product_name, amount, order_type, product_info)
+    try:
+        trigger_fulfillment(order_id, customer_email, product_name, amount, order_type, product_info)
+    except Exception:
+        # Processing failed: release the claim so a redelivery can retry
+        # instead of being acked as a duplicate.
+        release_stripe_webhook_event_claim(event_id)
+        raise
+
+    # B3: fulfillment done — mark the event processed so redeliveries are
+    # acknowledged as duplicates instead of re-fulfilling.
+    mark_stripe_webhook_event_processed(event_id)
 
     return jsonify({'success': True, 'order_id': order_id}), 200
 
@@ -623,6 +815,12 @@ def admin_training_vault():
                                  message="You don't have an active SINCOR subscription. Please purchase one to access training materials."), 404
     else:
         order_data = dict(rows)
+        # B4: confirm the order's canonical paid/active state before serving
+        # vault materials. Re-reads the order record; never trusts a
+        # client-supplied flag or cached status. Admin sessions bypass (server
+        # -side trust domain, not a customer claim).
+        if not is_admin and not _order_is_paid(order_data):
+            return _vault_denied_response(order_data)
 
     product_name = order_data.get('product_name', 'Enterprise')
     tier_name = product_name if product_name in ['Starter', 'Professional', 'Enterprise'] else 'Enterprise'
@@ -691,13 +889,21 @@ def download_guide(filename):
             return jsonify({'error': 'Authentication required. Include email and order_id params.'}), 401
 
         db = get_db()
+        # B4: re-read the canonical order record and require a paid/active
+        # payment_status before serving any vault material.
         order_row = db.execute(
-            "SELECT order_id FROM orders WHERE customer_email=? AND order_id=? LIMIT 1",
+            "SELECT order_id, payment_status FROM orders WHERE customer_email=? AND order_id=? LIMIT 1",
             (req_email, req_order)
         ).fetchone()
         if not order_row:
             logger.warning(f'[DOWNLOAD] Unauthorized guide access attempt: {req_email} / {req_order} from {request.remote_addr}')
             return jsonify({'error': 'Order not found or access denied'}), 403
+        if not _order_is_paid(order_row):
+            order_status = str(order_row["payment_status"] or "").strip().lower()
+            logger.warning(f'[DOWNLOAD] Denied guide for unpaid order: {req_email} / {req_order} (status={order_status})')
+            if order_status == "pending":
+                return jsonify({'error': 'Payment pending. Materials unlock once payment completes.'}), 402
+            return jsonify({'error': 'Order is not in a paid state. Access denied.'}), 403
 
         # Verify the filename contains this order_id (so you can only download your own guide)
         if req_order not in filename:

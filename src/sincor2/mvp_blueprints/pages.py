@@ -122,6 +122,7 @@ def genesis_alias():
 
 
 @bp.route("/login", methods=["GET", "POST"])
+@credential_rate_limits(limiter, methods=["POST"])  # P2-A3: throttle credential checks (POST only)
 def login_page():
     next_url = request.values.get("next") or request.args.get("next") or ""
     identifier = (request.form.get("identifier") or request.form.get("email") or request.form.get("username") or "").strip()
@@ -142,12 +143,15 @@ def login_page():
     if not identifier:
         return render_template("login.html", error="Email or username required.", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github), 400
     if _admin_credentials_match(identifier, password):
+        note_login_success(identifier)
         return _admin_cookie_response(identifier, _safe_next_url(next_url, "/admin"))
     # AUDIT P1 finding 1: the customer path below granted a session on
     # identifier alone (no password store exists for customers — admin auth
     # is env credentials; genesis_cohort is a separate marketing claim DB).
     # Customer password login is DISABLED until a proper credential store
     # ships; customers authenticate via OAuth (verified email) meanwhile.
+    # P2-A3: failed attempt still counts toward progressive backoff.
+    note_login_failure(identifier)
     logger.warning(
         "[AUTH] Disabled customer password-login attempt for identifier=%r from %s",
         identifier, request.remote_addr,

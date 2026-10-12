@@ -14,7 +14,7 @@ Machine-readable source of truth: `src/sincor2/governance/guardrails.py` (`get_g
 | **low** | 17 | 17 auto | optional |
 | **total** | **111** | | |
 
-**Coverage:** 111/111 actions have guardrails (validated: 111 entries, 0 gaps, 0 orphans). **POLICY-MISSING flags:** 58 actions carry at least one `POLICY-MISSING` marker — a policy check the codebase does not yet implement as a dedicated module. Each marker names what is needed.
+**Coverage:** 111/111 actions have guardrails (validated: 111 entries, 0 gaps, 0 orphans). **POLICY-MISSING flags:** 57 actions carry at least one `POLICY-MISSING` marker — a policy check the codebase does not yet implement as a dedicated module. Each marker names what is needed.
 
 ### Approval counts (high + critical)
 
@@ -1035,11 +1035,11 @@ Entry point: `src/sincor2/mvp_blueprints/billing.py:53` · HTTP: `POST /api/plat
 
 Entry point: `src/sincor2/mvp_blueprints/billing.py:76` · HTTP: `POST /api/platform/verify` · Auth: `['none']`
 
-**Approval:** human — Human approval required: verifies an onchain payment claim and provisions the purchase; provisioning is effectively final.
+**Approval:** human — Human approval required: verifies an onchain payment claim and provisions the purchase; provisioning is effectively final. FOUNDER DECISION: jurisdiction-specific legal sign-off from qualified compliance counsel is still required before relying on the OFAC screening mechanism for any regulated activity.
 
 **Pre-conditions:** not_in_shadow_mode, rate_limit_ok, idempotency_key_present
 
-**Policy checks:**<br>- onchain payment claim verification (mvp_blueprints/billing.py)<br>- sincor2.defi.ofac_sdn.screen_wallet_address (payer)<br>- POLICY-MISSING: confirmation-depth policy — ad hoc in handler
+**Policy checks:**<br>- onchain payment claim verification (mvp_blueprints/billing.py)<br>- sincor2.defi.ofac_sdn.screen_wallet_address (payer) — fail-closed strict mode via PLATFORM_OFAC_STRICT (default true); sanctions hits always block<br>- confirmation-depth finality policy (platform_payments.finality_confirmations; Base 8453 defaults to 12 confirmations) — orders stay pending below depth
 
 **Rate limits:**<br>`PROPOSED: money_verify`<br>**per_ip**: 10/min<br>**per_tenant**: 100/hour
 

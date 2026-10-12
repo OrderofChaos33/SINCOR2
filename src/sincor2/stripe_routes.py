@@ -150,22 +150,57 @@ def init_stripe_routes(app, stripe_processor):
             if success:
                 event_type = event_data.get('event', 'unknown')
                 logger.info(f"[STRIPE] Webhook received: {event_type}")
-                
-                # Route through revenue orchestrator if available
-                if ORCHESTRATOR_AVAILABLE and get_orchestrator:
-                    try:
-                        # Log revenue synchronously (don't block response)
-                        stripe_event = {
-                            'type': event_type,
-                            'data': {'object': event_data}
-                        }
-                        # Store for async processing later
-                        logger.info(f"[REVENUE] Queued for orchestration: {event_type}")
-                    except Exception as e:
-                        logger.warning(f"[ORCHESTRATOR] Warning: {e}")
-                
-                # Also run original fulfillment (backward compatibility)
-                _process_payment_event(event_data)
+
+                # B3: idempotency — persist the Stripe event ID with a UNIQUE
+                # constraint BEFORE processing (insert-or-ignore claim).
+                # Duplicate deliveries are acknowledged without re-fulfillment.
+                # (Lazy import: stripe_routes is imported by mvp_app at boot.)
+                from sincor2.mvp_app import (
+                    claim_stripe_webhook_event,
+                    mark_stripe_webhook_event_processed,
+                    release_stripe_webhook_event_claim,
+                )
+                event_id = (event_data.get('event_id') or '').strip()
+                if not event_id:
+                    logger.error("[STRIPE] Webhook event without event_id — "
+                                 "refusing to process")
+                    return jsonify({'success': False,
+                                    'error': 'Missing Stripe event id'}), 400
+                claim = claim_stripe_webhook_event(event_id, event_type)
+                if claim in ('duplicate_processed', 'duplicate_inflight'):
+                    logger.warning("[STRIPE] Duplicate webhook event %s (%s) — "
+                                   "acknowledged without re-fulfillment",
+                                   event_id, claim)
+                    return jsonify({'success': True, 'duplicate': True}), 200
+                if claim == 'reclaimed':
+                    logger.warning("[STRIPE] Reclaimed stale webhook event %s "
+                                   "from a crashed attempt — reprocessing",
+                                   event_id)
+
+                try:
+                    # Route through revenue orchestrator if available
+                    if ORCHESTRATOR_AVAILABLE and get_orchestrator:
+                        try:
+                            # Log revenue synchronously (don't block response)
+                            stripe_event = {
+                                'type': event_type,
+                                'data': {'object': event_data}
+                            }
+                            # Store for async processing later
+                            logger.info(f"[REVENUE] Queued for orchestration: {event_type}")
+                        except Exception as e:
+                            logger.warning(f"[ORCHESTRATOR] Warning: {e}")
+
+                    # Also run original fulfillment (backward compatibility)
+                    _process_payment_event(event_data)
+                except Exception:
+                    # Processing failed: release the claim so a redelivery
+                    # can retry instead of being acked as a duplicate.
+                    release_stripe_webhook_event_claim(event_id)
+                    raise
+                # B3: fulfillment done — mark processed so redeliveries
+                # are acknowledged as duplicates, never re-fulfilled.
+                mark_stripe_webhook_event_processed(event_id)
                 return jsonify({'success': True}), 200
             else:
                 logger.warning("[STRIPE] Webhook verification failed")

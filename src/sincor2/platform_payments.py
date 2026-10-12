@@ -5,6 +5,36 @@ CEO 2026-08-19: SINC updated to new 8-decimal live contract 0xe1D836087F6573b665
 New flows prefer AXM. SINC is legacy for residual subscription renewals only.
 CEO 2026-09-01: USD-priced human checkout falls back to Base USDC when AXM has
 no DEX/CoinGecko spot. A2A skills stay AXM-only (fixed wei).
+
+Checkout state machine (B1 receipt-finality hardening):
+    pending ──► verifying ──► awaiting_finality ──► finalized ──► fulfilled
+       │             │                │                  │
+       │             │                ▼                  ▼
+       │             │            reverted            disputed
+       │             │         (reorg/dropped      (reorg detected
+       │             │          pre-fulfillment)    AFTER fulfillment)
+       │             ▼
+       │          expired (TTL passed while pending/verifying/awaiting_finality)
+       ▼
+    blocked (terminal compliance denial: OFAC sanctions hit, or screening
+             unavailable while PLATFORM_OFAC_STRICT=true)
+
+- `pending`: checkout created, awaiting a payment claim.
+- `verifying`: transient claim lock while one verify call owns the row.
+- `awaiting_finality`: receipt is valid on-chain but below the confirmation
+  depth. NOT provisioned. The client re-polls verify until the depth is met.
+- `finalized`: confirmation depth reached (and sanctions screen passed);
+  safe to provision exactly once.
+- `fulfilled`: entitlements provisioned. (Legacy rows may carry `completed`;
+  treated as `fulfilled` on read.)
+- `reverted`: tx disappeared from chain (reorg/drop) BEFORE fulfillment —
+  never silently left fulfilled.
+- `disputed`: tx disappeared AFTER fulfillment — needs human remediation
+  (e.g. entitlement clawback); never silently stays fulfilled.
+- `blocked`: compliance denial; never provisions.
+
+Every reorg/blocked transition writes an audit row to
+`platform_payment_audits`.
 """
 
 from __future__ import annotations
@@ -47,6 +77,50 @@ USDC_DECIMALS = _USDC_DECIMALS
 
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 AMOUNT_TOLERANCE_BPS = 150  # 1.5% underpayment slack for spot drift
+
+# --- B1: chain confirmation-depth finality gates ---------------------------------
+# A valid receipt is NOT finality: shallow reorgs can still drop the tx. Orders
+# must stay `pending`/`awaiting_finality` (never provisioned) until the payment
+# tx is buried under `finality_confirmations(chain_id)` blocks.
+#
+# Base produces a block every ~2s. 12 confirmations (~24s) is the default:
+# cheap enough for human-checkout UX, deep enough that a reorg at that depth
+# is for all practical purposes impossible on a healthy L2.
+FINALITY_CONFIRMATIONS_BY_CHAIN: dict[int, int] = {
+    BASE_CHAIN_ID: 12,  # 8453 — Base mainnet
+}
+# Fallback for chains with no configured entry. Named (not a magic number) so
+# operators can reason about it; per-chain overrides below take precedence.
+FINALITY_CONFIRMATIONS_FALLBACK = 12
+
+
+def finality_confirmations(chain_id: int = CHAIN_ID) -> int:
+    """Confirmation depth required before a receipt counts as final.
+
+    Precedence: PLATFORM_FINALITY_CONFIRMATIONS_<chain_id> (e.g.
+    PLATFORM_FINALITY_CONFIRMATIONS_8453) > PLATFORM_FINALITY_CONFIRMATIONS_JSON
+    (a JSON object like '{"8453": 12}') > the per-chain table above > fallback.
+    """
+    env = os.environ.get(f"PLATFORM_FINALITY_CONFIRMATIONS_{chain_id}", "").strip()
+    if env:
+        try:
+            return max(1, int(env))
+        except ValueError:
+            pass
+    raw = os.environ.get("PLATFORM_FINALITY_CONFIRMATIONS_JSON", "").strip()
+    if raw:
+        try:
+            table = json.loads(raw)
+            if str(chain_id) in table:
+                return max(1, int(table[str(chain_id)]))
+        except (ValueError, TypeError):
+            pass
+    return max(
+        1,
+        FINALITY_CONFIRMATIONS_BY_CHAIN.get(
+            chain_id, FINALITY_CONFIRMATIONS_FALLBACK
+        ),
+    )
 
 # AXM = primary for new flows (reports, one-offs, A2A). SINC = legacy subscriptions only.
 PLATFORM_PLANS: dict[str, dict[str, Any]] = {
@@ -156,13 +230,66 @@ def init_platform_payments_db() -> None:
         "CREATE INDEX IF NOT EXISTS idx_platform_checkouts_idem "
         "ON platform_checkouts(idempotency_key, status)"
     )
+    # B1: one tx pays for one checkout. The uniqueness must already hold at
+    # 'finalized' (pre-provisioning), otherwise two checkouts could finalize
+    # the same tx and double-provision. The v1 index covered only
+    # fulfilled/completed, so drop it and recreate with the wider predicate.
+    conn.execute("DROP INDEX IF EXISTS idx_platform_checkouts_tx_hash")
     conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_checkouts_tx_hash "
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_checkouts_tx_hash_v2 "
         "ON platform_checkouts(tx_hash) WHERE tx_hash IS NOT NULL AND tx_hash != '' "
-        "AND status = 'completed'"
+        "AND status IN ('finalized', 'fulfilled', 'completed')"
+    )
+    # B1: append-only audit trail for reorg / compliance state transitions.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS platform_payment_audits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            payment_id TEXT NOT NULL,
+            tx_hash TEXT,
+            event TEXT NOT NULL,
+            detail TEXT,
+            created_at TEXT NOT NULL
+        )"""
+    )
+    conn.execute(
+        """CREATE INDEX IF NOT EXISTS idx_platform_payment_audits_payment
+           ON platform_payment_audits(payment_id)"""
     )
     conn.commit()
     conn.close()
+
+
+def _audit_payment_event(
+    payment_id: str,
+    event: str,
+    tx_hash: str = "",
+    detail: str = "",
+) -> None:
+    """Append an audit record for a reorg/compliance state transition."""
+    with _conn() as conn:
+        conn.execute(
+            """INSERT INTO platform_payment_audits
+               (payment_id, tx_hash, event, detail, created_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                payment_id,
+                tx_hash or None,
+                event,
+                detail,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+
+
+def list_payment_audits(payment_id: str) -> list[dict[str, Any]]:
+    """Audit trail for one checkout (reorgs, sanctions blocks, finality events)."""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM platform_payment_audits WHERE payment_id=? ORDER BY id",
+            (payment_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def _conn() -> sqlite3.Connection:
@@ -420,7 +547,9 @@ def create_checkout(
         with _conn() as conn:
             existing = conn.execute(
                 """SELECT * FROM platform_checkouts
-                   WHERE idempotency_key=? AND status IN ('pending', 'verifying', 'completed')
+                   WHERE idempotency_key=? AND status IN
+                       ('pending', 'verifying', 'awaiting_finality', 'finalized',
+                        'fulfilled', 'completed')
                    ORDER BY created_at DESC LIMIT 1""",
                 (key,),
             ).fetchone()
@@ -434,7 +563,7 @@ def create_checkout(
                     ) >= now
                 except ValueError:
                     still_open = True
-            if existing["status"] == "completed" or still_open:
+            if existing["status"] in ("completed", "fulfilled") or still_open:
                 return _checkout_payload(dict(existing), reused=True, spot=spot, mode=mode)
 
     expire_stale_checkouts()
@@ -589,6 +718,84 @@ def _parse_transfer_logs(receipt: dict, token_addr: str, treasury: str) -> list[
     return matches
 
 
+# --- B2: OFAC sanctions screening on the payment path ------------------------------
+# The sender address recovered from the verified transfer is screened against
+# the vendored OFAC SDN snapshot (sincor2.defi.ofac_sdn). Strict mode defaults
+# to fail-closed for the payment path: a sanctioned payer is ALWAYS blocked,
+# and an unavailable/stale screening service blocks too unless the operator
+# explicitly opts out via PLATFORM_OFAC_STRICT=false (audited when it happens).
+#
+# FOUNDER DECISION REQUIRED: this implements the screening *mechanism*.
+# Jurisdiction-specific legal sign-off from qualified compliance counsel is
+# still needed before relying on it for any regulated activity.
+
+_OFAC_ORACLE_RETRY_SEC = 60  # retry building the oracle this often after failure
+
+_ofac_oracle = None
+_ofac_oracle_error_at: float | None = None
+
+
+def ofac_strict_mode() -> bool:
+    """Fail-closed default for the payment path.
+
+    PLATFORM_OFAC_STRICT=false opts out (fail-open on screening outage only —
+    a sanctions HIT always blocks regardless of this flag).
+    """
+    return os.environ.get("PLATFORM_OFAC_STRICT", "true").lower() == "true"
+
+
+def _get_ofac_oracle():
+    """Lazily built, cached OFAC screening oracle. Retries after failures."""
+    global _ofac_oracle, _ofac_oracle_error_at
+    if _ofac_oracle is not None:
+        return _ofac_oracle
+    if _ofac_oracle_error_at is not None and (
+        time.time() - _ofac_oracle_error_at < _OFAC_ORACLE_RETRY_SEC
+    ):
+        raise RuntimeError("ofac_oracle_unavailable_cached")
+    try:
+        from sincor2.defi.ofac_sdn import build_ofac_oracle
+
+        _ofac_oracle = build_ofac_oracle()
+        _ofac_oracle_error_at = None
+        return _ofac_oracle
+    except Exception:
+        _ofac_oracle_error_at = time.time()
+        raise
+
+
+def screen_payer_sanctions(payer_wallet: str) -> dict[str, Any]:
+    """Screen a payer wallet against the OFAC SDN snapshot. Never raises.
+
+    Returns {'verdict': 'pass'|'hit'|'unavailable', 'detail': str}.
+    A stale (>48h) list is treated as 'unavailable', not a pass — strict mode
+    must fail closed rather than trust an expired list.
+    """
+    if not payer_wallet:
+        return {"verdict": "unavailable", "detail": "no_payer_wallet"}
+    try:
+        oracle = _get_ofac_oracle()
+    except Exception as exc:
+        return {"verdict": "unavailable", "detail": f"oracle_unavailable: {exc}"}
+    try:
+        from sincor2.defi.compliance_automation import Verdict
+        from sincor2.defi.ofac_sdn import screen_wallet_address
+
+        result = screen_wallet_address(oracle, payer_wallet)
+    except Exception as exc:
+        # ComplianceError (provider unreachable) and any other screening
+        # failure both land here: fail-closed under strict mode.
+        return {"verdict": "unavailable", "detail": f"screen_error: {exc}"}
+    if result.verdict == Verdict.FAIL:
+        return {"verdict": "hit", "detail": result.detail or "sanctions_hit"}
+    if result.verdict != Verdict.PASS:
+        return {
+            "verdict": "unavailable",
+            "detail": f"screen_not_pass: {result.verdict} {result.detail or ''}".strip(),
+        }
+    return {"verdict": "pass", "detail": result.detail or "clean"}
+
+
 def verify_treasury_transfer(
     tx_hash: str,
     *,
@@ -612,11 +819,30 @@ def verify_treasury_transfer(
     if receipt.get("status") != "0x1":
         return {"ok": False, "error": "tx_failed"}
 
+    # B1: confirmation depth. A mined receipt is not finality — count how many
+    # blocks bury it. Fail closed when the head is unreachable: never assume
+    # depth.
+    try:
+        receipt_block = int(receipt.get("blockNumber", "0x0"), 16)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "receipt_malformed", "detail": "bad blockNumber"}
+    try:
+        latest_block = int(_rpc_call("eth_blockNumber", []), 16)
+    except Exception as e:
+        return {"ok": False, "error": "confirmations_unavailable", "detail": str(e)}
+    confirmations = max(0, latest_block - receipt_block + 1)
+    chain_ctx = {
+        "confirmations": confirmations,
+        "receipt_block": receipt_block,
+        "latest_block": latest_block,
+        "required_confirmations": finality_confirmations(),
+    }
+
     token_addr = token_address(token)
     min_amount = expected_atomic * (10000 - AMOUNT_TOLERANCE_BPS) // 10000
     transfers = _parse_transfer_logs(receipt, token_addr, treasury)
     if not transfers:
-        return {"ok": False, "error": "no_treasury_transfer", "token": token}
+        return {"ok": False, "error": "no_treasury_transfer", "token": token, **chain_ctx}
 
     paid = max(t["amount_atomic"] for t in transfers)
     if paid < min_amount:
@@ -626,11 +852,12 @@ def verify_treasury_transfer(
             "paid_display": atomic_to_display(paid, token),
             "required_display": atomic_to_display(expected_atomic, token),
             "token": token,
+            **chain_ctx,
         }
 
     payer = transfers[0]["from"]
     if payer_wallet and payer_wallet.lower() != payer:
-        return {"ok": False, "error": "payer_wallet_mismatch"}
+        return {"ok": False, "error": "payer_wallet_mismatch", **chain_ctx}
 
     return {
         "ok": True,
@@ -638,6 +865,7 @@ def verify_treasury_transfer(
         "amount_atomic": paid,
         "amount_display": atomic_to_display(paid, token),
         "token": token,
+        **chain_ctx,
     }
 
 
@@ -762,20 +990,306 @@ def subscriptions_needing_renewal(within_days: int = 7) -> list[dict[str, Any]]:
 
 
 def expire_stale_checkouts(now: datetime | None = None) -> int:
-    """Mark pending/verifying checkouts past expires_at as expired."""
+    """Mark pending/verifying/awaiting-finality checkouts past expires_at as expired."""
     now = now or datetime.now(timezone.utc)
     stamp = now.isoformat()
     with _conn() as conn:
         cur = conn.execute(
             """UPDATE platform_checkouts
                SET status='expired'
-               WHERE status IN ('pending', 'verifying')
+               WHERE status IN ('pending', 'verifying', 'awaiting_finality')
                  AND expires_at IS NOT NULL
                  AND expires_at < ?""",
             (stamp,),
         )
         conn.commit()
         return cur.rowcount
+
+
+def _load_checkout(payment_id: str) -> dict[str, Any] | None:
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM platform_checkouts WHERE payment_id=?", (payment_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def _set_checkout_status(
+    payment_id: str,
+    status: str,
+    *,
+    tx_hash: str | None = None,
+    payer_wallet: str | None = None,
+    only_from: tuple[str, ...] = (),
+) -> int:
+    """Set a checkout's status; returns the number of rows updated."""
+    sets = ["status=?"]
+    params: list[Any] = [status]
+    if tx_hash is not None:
+        sets.append("tx_hash=?")
+        params.append(tx_hash)
+    if payer_wallet is not None:
+        sets.append("payer_wallet=?")
+        params.append(payer_wallet)
+    params.append(payment_id)
+    where = "WHERE payment_id=?"
+    if only_from:
+        where += " AND status IN (%s)" % ",".join("?" * len(only_from))
+        params.extend(only_from)
+    with _conn() as conn:
+        cur = conn.execute(
+            f"UPDATE platform_checkouts SET {', '.join(sets)} {where}", params
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def _order_id_for_payment(payment_id: str) -> str:
+    """Deterministic order id, stable across finality re-polls."""
+    return f"TOKEN-ORD-{payment_id}"
+
+
+def _checkout_result_payload(row: dict[str, Any], **extra: Any) -> dict[str, Any]:
+    """Full verify-result payload built from a checkout row."""
+    meta = {}
+    try:
+        meta = json.loads(row.get("metadata") or "{}")
+    except (ValueError, TypeError):
+        pass
+    payload = {
+        "payment_id": row["payment_id"],
+        "order_id": _order_id_for_payment(row["payment_id"]),
+        "tx_hash": row.get("tx_hash"),
+        "payer_wallet": row.get("payer_wallet"),
+        "product_name": row["product_name"],
+        "plan_id": row["plan_id"],
+        "token": row["token"],
+        "amount_atomic": row["amount_atomic"],
+        "usd_reference": row["usd_reference"],
+        "order_type": meta.get("order_type", "generic"),
+        "billing": meta.get("billing", "once"),
+        "customer_email": row.get("customer_email") or "",
+    }
+    payload.update(extra)
+    return payload
+
+
+def _maybe_finalize(
+    payment_id: str, row: dict[str, Any], vr: dict[str, Any], tx_hash: str
+) -> dict[str, Any]:
+    """Receipt is valid: enforce the confirmation-depth gate, then OFAC-screen.
+
+    Below depth -> stays 'awaiting_finality' (never provisioned). At/above
+    depth -> sanctions screen, then 'finalized' (safe to provision once).
+    """
+    conf = int(vr.get("confirmations") or 0)
+    depth = int(vr.get("required_confirmations") or finality_confirmations())
+    base = _checkout_result_payload(
+        row,
+        tx_hash=tx_hash,
+        payer_wallet=vr.get("payer_wallet"),
+        amount_display=vr.get("amount_display"),
+        confirmations=conf,
+        required_confirmations=depth,
+    )
+    if conf < depth:
+        _set_checkout_status(
+            payment_id,
+            "awaiting_finality",
+            tx_hash=tx_hash,
+            payer_wallet=vr.get("payer_wallet"),
+            only_from=("verifying", "awaiting_finality", "finalized"),
+        )
+        return {"ok": True, "status": "awaiting_finality", **base}
+
+    # Depth reached — B2: screen the recovered payer against OFAC BEFORE
+    # anything is finalized. A sanctions HIT always blocks; an unavailable
+    # service blocks in strict mode (default) and is audit-flagged otherwise.
+    payer = vr.get("payer_wallet") or ""
+    screen = screen_payer_sanctions(payer)
+    verdict = screen["verdict"]
+    if verdict == "hit":
+        _set_checkout_status(
+            payment_id, "blocked", tx_hash=tx_hash, payer_wallet=payer,
+            only_from=("verifying", "awaiting_finality"),
+        )
+        _audit_payment_event(payment_id, "ofac_hit", tx_hash, screen["detail"])
+        return {
+            "ok": False, "error": "sanctions_hit", "status": "blocked",
+            "ofac_verdict": verdict, "ofac_detail": screen["detail"], **base,
+        }
+    if verdict == "unavailable" and ofac_strict_mode():
+        _set_checkout_status(
+            payment_id, "blocked", tx_hash=tx_hash, payer_wallet=payer,
+            only_from=("verifying", "awaiting_finality"),
+        )
+        _audit_payment_event(
+            payment_id, "ofac_unavailable_blocked", tx_hash, screen["detail"]
+        )
+        return {
+            "ok": False, "error": "ofac_screening_unavailable",
+            "status": "blocked", "ofac_verdict": verdict,
+            "ofac_detail": screen["detail"], **base,
+        }
+    if verdict == "unavailable":
+        _audit_payment_event(
+            payment_id, "ofac_unavailable_failopen", tx_hash,
+            screen["detail"] + "; PLATFORM_OFAC_STRICT=false",
+        )
+
+    try:
+        _set_checkout_status(
+            payment_id, "finalized", tx_hash=tx_hash, payer_wallet=payer,
+            only_from=("verifying", "awaiting_finality"),
+        )
+    except sqlite3.IntegrityError:
+        # Another checkout already finalized/fulfilled this tx_hash (partial
+        # unique index) — same tx can't pay twice. Send this checkout back to
+        # 'pending' so the payer can submit a different tx.
+        _set_checkout_status(
+            payment_id, "pending", only_from=("verifying", "awaiting_finality")
+        )
+        return {"ok": False, "error": "tx_already_used", **base}
+    _audit_payment_event(
+        payment_id, "finalized", tx_hash,
+        f"confirmations={conf} required={depth} ofac={verdict}",
+    )
+
+    # Platform-fee accounting at finality (best-effort; never blocks).
+    try:
+        from sincor2.treasury_settlement import record_platform_fee_inflow
+
+        usd = float(row["usd_reference"] or 0)
+        fee = usd * 0.05 if usd > 0 else 0.0
+        if fee > 0:
+            record_platform_fee_inflow(
+                fee_amount=fee,
+                asset=row["token"],
+                source="human_checkout",
+                tx_hash=tx_hash,
+                task_id=payment_id,
+                note=f"checkout {row['plan_id']} {row['product_name']}",
+            )
+    except Exception:
+        pass
+
+    return {
+        "ok": True, "status": "finalized", "ofac_verdict": verdict, **base,
+    }
+
+
+def _advance_finality(payment_id: str) -> dict[str, Any]:
+    """Re-check chain state for a checkout in 'awaiting_finality'/'finalized'.
+
+    - receipt gone from chain        -> 'reverted' + audit (reorg/drop)
+    - receipt failed                 -> 'reverted' + audit
+    - depth not yet reached          -> stays 'awaiting_finality'
+    - depth reached                  -> '_maybe_finalize' (OFAC + finalize)
+    Transient RPC trouble never reverts: the checkout stays put and the
+    error surfaces to the caller.
+    """
+    row = _load_checkout(payment_id)
+    if not row or row["status"] not in ("awaiting_finality", "finalized"):
+        return {"ok": False, "error": "not_awaiting_finality",
+                "payment_id": payment_id}
+    tx_hash = row["tx_hash"] or ""
+    if not tx_hash:
+        return {"ok": False, "error": "tx_hash_missing", "payment_id": payment_id}
+    vr = verify_treasury_transfer(
+        tx_hash,
+        token=row["token"],
+        expected_atomic=int(row["amount_atomic"]),
+        payer_wallet=row["payer_wallet"] or "",
+    )
+    if not vr.get("ok"):
+        if vr.get("error") == "tx_pending":
+            # We previously saw a valid receipt for this tx. It is gone now:
+            # dropped from the mempool or reorged out. Pre-fulfillment, so the
+            # order must NOT stay fulfilled — move to 'reverted' with an audit
+            # record, never silently.
+            _set_checkout_status(
+                payment_id, "reverted",
+                only_from=("awaiting_finality", "finalized"),
+            )
+            _audit_payment_event(
+                payment_id, "reorg_tx_missing", tx_hash,
+                "receipt no longer present on chain (reorg or drop)",
+            )
+            return {"ok": False, "error": "reorg_detected", "status": "reverted",
+                    "payment_id": payment_id, "tx_hash": tx_hash}
+        if vr.get("error") == "tx_failed":
+            _set_checkout_status(
+                payment_id, "reverted",
+                only_from=("awaiting_finality", "finalized"),
+            )
+            _audit_payment_event(
+                payment_id, "tx_failed_on_recheck", tx_hash,
+                "receipt now reports failure",
+            )
+            return {"ok": False, "error": "tx_failed", "status": "reverted",
+                    "payment_id": payment_id, "tx_hash": tx_hash}
+        # Transient (RPC/head/amount issues): stay put, surface the error.
+        base = _checkout_result_payload(row, tx_hash=tx_hash)
+        return {**vr, "status": row["status"], **base}
+
+    if row["status"] == "finalized":
+        # Already finalized; receipt still good — no re-screen, just confirm.
+        base = _checkout_result_payload(
+            row, tx_hash=tx_hash, payer_wallet=vr.get("payer_wallet"),
+            confirmations=vr.get("confirmations"),
+            required_confirmations=vr.get("required_confirmations"),
+        )
+        return {"ok": True, "status": "finalized", **base}
+    return _maybe_finalize(payment_id, row, vr, tx_hash)
+
+
+def recheck_finality(payment_id: str) -> dict[str, Any]:
+    """Reorg/finality sweeper for one checkout. Safe to call repeatedly.
+
+    Covers pre-fulfillment states (advance or revert) and post-fulfillment
+    states (deep-reorg watch -> 'disputed'). Returns a status dict; never
+    raises for chain issues.
+    """
+    row = _load_checkout(payment_id)
+    if not row:
+        return {"ok": False, "error": "checkout_not_found"}
+    status = row["status"]
+    if status in ("awaiting_finality", "finalized"):
+        return _advance_finality(payment_id)
+    if status in ("fulfilled", "completed"):
+        tx_hash = row["tx_hash"] or ""
+        if not tx_hash:
+            return {"ok": True, "status": "fulfilled", "reorg": False,
+                    "payment_id": payment_id}
+        try:
+            receipt = _rpc_call("eth_getTransactionReceipt", [tx_hash])
+        except Exception as e:
+            return {"ok": False, "error": "rpc_failed", "detail": str(e),
+                    "status": status, "payment_id": payment_id}
+        if not receipt or receipt.get("status") != "0x1":
+            # Deep reorg AFTER fulfillment: entitlements were already granted.
+            # The order must never silently stay fulfilled -> 'disputed' with
+            # an audit record so a human remediates (e.g. clawback/revoke).
+            _set_checkout_status(
+                payment_id, "disputed", only_from=("fulfilled", "completed")
+            )
+            _audit_payment_event(
+                payment_id, "deep_reorg_after_fulfillment", tx_hash,
+                "tx missing/failed on chain after fulfillment; "
+                "manual remediation required",
+            )
+            return {"ok": True, "status": "disputed", "reorg": True,
+                    "payment_id": payment_id, "tx_hash": tx_hash}
+        return {"ok": True, "status": "fulfilled", "reorg": False,
+                "payment_id": payment_id, "tx_hash": tx_hash}
+    return {"ok": False, "error": "not_finality_pending", "status": status,
+            "payment_id": payment_id}
+
+
+def mark_checkout_fulfilled(payment_id: str) -> bool:
+    """Record provisioning: 'finalized' -> 'fulfilled'. Returns True on success."""
+    return _set_checkout_status(payment_id, "fulfilled",
+                                only_from=("finalized",)) == 1
 
 
 def verify_checkout(
@@ -785,6 +1299,15 @@ def verify_checkout(
     customer_email: str = "",
     payer_wallet: str = "",
 ) -> dict[str, Any]:
+    """Verify an onchain treasury payment for a checkout.
+
+    B1: a valid receipt alone never provisions. The checkout moves to
+    'awaiting_finality' until `finality_confirmations()` blocks bury the tx,
+    then (after the B2 OFAC screen) to 'finalized'. Only 'finalized' may be
+    provisioned, via `mark_checkout_fulfilled`. Re-polling an
+    'awaiting_finality' checkout re-checks the chain: a vanished tx means a
+    reorg/drop and the order goes to 'reverted' with an audit record.
+    """
     if not payment_id or not tx_hash:
         return {"ok": False, "error": "payment_id_and_tx_hash_required"}
     if not tx_hash.startswith("0x") or len(tx_hash) != 66:
@@ -802,13 +1325,38 @@ def verify_checkout(
         if not row:
             conn.rollback()
             return {"ok": False, "error": "checkout_not_found"}
-        if row["status"] == "completed":
+        status = row["status"]
+        if status in ("fulfilled", "completed"):
+            # Legacy 'completed' rows are 'fulfilled' by another name.
+            if status == "completed":
+                conn.execute(
+                    "UPDATE platform_checkouts SET status='fulfilled' "
+                    "WHERE payment_id=?",
+                    (payment_id,),
+                )
+                conn.commit()
+            else:
+                conn.rollback()
+            base = _checkout_result_payload(dict(row))
+            return {"ok": True, "status": "already_fulfilled", **base}
+        if status in ("awaiting_finality", "finalized"):
+            if (row["tx_hash"] or "") != tx_hash:
+                conn.rollback()
+                return {
+                    "ok": False, "error": "tx_hash_mismatch",
+                    "detail": "checkout is already bound to a different tx_hash",
+                    "payment_id": payment_id,
+                }
             conn.rollback()
-            return {"ok": True, "status": "already_completed", "tx_hash": row["tx_hash"]}
-        if row["status"] == "expired":
+            return _advance_finality(payment_id)
+        if status in ("blocked", "reverted", "disputed"):
+            conn.rollback()
+            return {"ok": False, "error": f"checkout_{status}",
+                    "status": status, "payment_id": payment_id}
+        if status == "expired":
             conn.rollback()
             return {"ok": False, "error": "checkout_expired"}
-        if row["status"] == "verifying":
+        if status == "verifying":
             conn.rollback()
             return {"ok": False, "error": "verify_in_progress"}
 
@@ -822,7 +1370,8 @@ def verify_checkout(
             return {"ok": False, "error": "checkout_expired"}
 
         dup = conn.execute(
-            "SELECT payment_id FROM platform_checkouts WHERE tx_hash=? AND status='completed'",
+            "SELECT payment_id FROM platform_checkouts "
+            "WHERE tx_hash=? AND status IN ('finalized', 'fulfilled', 'completed')",
             (tx_hash,),
         ).fetchone()
         if dup:
@@ -830,7 +1379,8 @@ def verify_checkout(
             return {"ok": False, "error": "tx_already_used"}
 
         claimed = conn.execute(
-            "UPDATE platform_checkouts SET status='verifying' WHERE payment_id=? AND status='pending'",
+            "UPDATE platform_checkouts SET status='verifying' "
+            "WHERE payment_id=? AND status='pending'",
             (payment_id,),
         )
         if claimed.rowcount != 1:
@@ -849,65 +1399,21 @@ def verify_checkout(
     if not vr.get("ok"):
         with _conn() as conn:
             conn.execute(
-                "UPDATE platform_checkouts SET status='pending' WHERE payment_id=? AND status='verifying'",
+                "UPDATE platform_checkouts SET status='pending' "
+                "WHERE payment_id=? AND status='verifying'",
                 (payment_id,),
             )
             conn.commit()
-        return vr
+        base = _checkout_result_payload(row, tx_hash=tx_hash)
+        return {**vr, **base}
 
-    payer = vr["payer_wallet"]
-    paid = vr["amount_atomic"]
-    meta = json.loads(row["metadata"] or "{}")
-    order_id = f"TOKEN-ORD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-
-    try:
+    if customer_email:
         with _conn() as conn:
             conn.execute(
-                """UPDATE platform_checkouts SET status='completed', tx_hash=?, payer_wallet=?,
-                   customer_email=COALESCE(NULLIF(?, ''), customer_email) WHERE payment_id=?""",
-                (tx_hash, payer, customer_email, payment_id),
+                "UPDATE platform_checkouts SET customer_email=? "
+                "WHERE payment_id=? AND (customer_email IS NULL OR customer_email='')",
+                (customer_email, payment_id),
             )
             conn.commit()
-    except sqlite3.IntegrityError:
-        with _conn() as conn:
-            conn.execute(
-                "UPDATE platform_checkouts SET status='pending' WHERE payment_id=? AND status='verifying'",
-                (payment_id,),
-            )
-            conn.commit()
-        return {"ok": False, "error": "tx_already_used"}
 
-    try:
-        from sincor2.treasury_settlement import record_platform_fee_inflow
-
-        usd = float(row["usd_reference"] or 0)
-        fee = usd * 0.05 if usd > 0 else 0.0
-        if fee > 0:
-            record_platform_fee_inflow(
-                fee_amount=fee,
-                asset=token,
-                source="human_checkout",
-                tx_hash=tx_hash,
-                task_id=payment_id,
-                note=f"checkout {row['plan_id']} {row['product_name']}",
-            )
-    except Exception:
-        pass
-
-    return {
-        "ok": True,
-        "status": "verified",
-        "payment_id": payment_id,
-        "order_id": order_id,
-        "tx_hash": tx_hash,
-        "payer_wallet": payer,
-        "product_name": row["product_name"],
-        "plan_id": row["plan_id"],
-        "token": token,
-        "amount_display": atomic_to_display(paid, token),
-        "usd_reference": row["usd_reference"],
-        "order_type": meta.get("order_type", "generic"),
-        "billing": meta.get("billing", "once"),
-        "customer_email": customer_email or row["customer_email"],
-        "amount_atomic": paid,
-    }
+    return _maybe_finalize(payment_id, row, vr, tx_hash)

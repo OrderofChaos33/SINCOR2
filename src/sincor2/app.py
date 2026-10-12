@@ -47,6 +47,26 @@ except ImportError as e:
     print(f"Rate limiter not available: {e}")
     RATE_LIMIT_AVAILABLE = False
 
+# Shared credential-verifier throttling (audit P2-A3): stacked IP + account
+# rate limits plus progressive backoff on the limiter's own storage backend.
+try:
+    from sincor2.login_throttle import (
+        credential_rate_limits,
+        note_login_failure,
+        note_login_success,
+    )
+    LOGIN_THROTTLE_AVAILABLE = True
+except ImportError as e:
+    print(f"Login throttle not available: {e}")
+    LOGIN_THROTTLE_AVAILABLE = False
+    credential_rate_limits = None  # type: ignore
+
+    def note_login_failure(identifier=None):  # type: ignore
+        return 0.0
+
+    def note_login_success(identifier=None):  # type: ignore
+        return None
+
 # Import security headers
 try:
     from sincor2.security_headers import SecurityHeaders
@@ -231,9 +251,9 @@ else:
 # ==================== AUTHENTICATION ROUTES ====================
 
 @app.route('/api/auth/login', methods=['POST'])
-@limiter.limit(AUTH_LIMITS) if limiter else lambda f: f
+@credential_rate_limits(limiter) if credential_rate_limits else (lambda f: f)
 def login():
-    """Authenticate and get access token (RATE LIMITED)"""
+    """Authenticate and get access token (RATE LIMITED + progressive backoff, P2-A3)"""
     if not AUTH_AVAILABLE:
         return jsonify({'error': 'Authentication system not available'}), 503
 
@@ -256,8 +276,10 @@ def login():
         result = sincor_auth.authenticate_user(username, password)
 
         if result['success']:
+            note_login_success(username)
             return jsonify(result), 200
         else:
+            note_login_failure(username)  # progressive backoff (P2-A3)
             return jsonify(result), 401
 
     except Exception as e:
@@ -460,11 +482,22 @@ def health_check():
 
 
 @app.route('/api/metrics/treasury')
-@limiter.exempt if limiter else lambda f: f
+@jwt_required()
+@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f
 def treasury_metrics():
-    """Public treasury KPI snapshot for homepage metrics."""
+    """Treasury KPI snapshot (AUTHENTICATED — audit P2-A2 remediation).
+
+    Previously public for homepage metrics; now requires a valid Bearer
+    JWT and returns an explicit field allowlist only (no raw ledger
+    internals). FOUNDER DECISION: confirm whether any subset should stay
+    intentionally public for the homepage, and if so via which surface.
+    """
     try:
-        from sincor2.treasury_inflow import get_treasury_snapshot, ledger_summary_24h
+        from sincor2.treasury_inflow import (
+            get_treasury_snapshot,
+            ledger_summary_24h,
+            public_treasury_dto,
+        )
     except ImportError as exc:
         logger.error("treasury_inflow import failed: %s", exc)
         return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
@@ -472,14 +505,7 @@ def treasury_metrics():
     try:
         snap = get_treasury_snapshot(include_onchain=True)
         summary = ledger_summary_24h()
-        return jsonify(
-            {
-                "status": "ok",
-                "kpi": "treasury_inflow",
-                "snapshot": snap.to_dict(),
-                "ledger_24h": summary,
-            }
-        ), 200
+        return jsonify(public_treasury_dto(snap, summary)), 200
     except Exception as exc:
         logger.exception("treasury metrics failed")
         return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500
@@ -1511,7 +1537,7 @@ if __name__ == '__main__':
             print("  Password: NOT CONFIGURED — admin auth is REJECTED in production")
             print("  ⚠️  Set ADMIN_PASSWORD env var to a strong value before launch.")
         else:
-            print("  Password: changeme123  (dev default — DO NOT use in production)")
+            print("  Password: <dev default — DO NOT use in production>")
 
     if RATE_LIMIT_AVAILABLE:
         print("\nRate Limiting Active:")

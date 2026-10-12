@@ -24,7 +24,7 @@ _bind_mvp()
 
 
 @bp.route('/api/auth/login', methods=['POST'])
-@limiter.limit("5 per minute")  # Brute-force protection
+@credential_rate_limits(limiter)  # Brute-force protection (P2-A3): stacked IP + account limits
 def login():
     """
     Admin login endpoint. Validates credentials against ADMIN_USERNAME / ADMIN_PASSWORD
@@ -53,8 +53,10 @@ def login():
 
     if not _admin_credentials_match(username, password):
         logger.warning(f'[AUTH] Failed login attempt for: {username} from {request.remote_addr}')
+        note_login_failure(username)  # progressive backoff (P2-A3)
         return jsonify({'error': 'Invalid credentials'}), 401
 
+    note_login_success(username)
     identity = _admin_username()
     access_token = create_access_token(identity=identity, additional_claims={'role': 'admin'})
     logger.info(f'[AUTH] Successful login: {identity}')

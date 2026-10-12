@@ -98,20 +98,31 @@ def dashboard_metrics():
 
 
 @monitoring_bp.get("/api/metrics/treasury")
+@jwt_required()
 def treasury_metrics():
     """
     CEO KPI endpoint: treasury balances + 24h inflow ledger.
+
+    AUTHENTICATED (audit P2-A2 remediation): a valid Bearer JWT is required.
+    The response is built from an explicit field allowlist only
+    (``sincor2.treasury_inflow.public_treasury_dto``) — no raw ledger
+    internals, no treasury address, no RPC diagnostics.
 
     On-chain snapshot is best-effort. Ledger is always local and authoritative
     for recorded events. Never exposes keys or signer material.
     """
     try:
-        from sincor2.treasury_inflow import get_treasury_snapshot, ledger_summary_24h
+        from sincor2.treasury_inflow import (
+            get_treasury_snapshot,
+            ledger_summary_24h,
+            public_treasury_dto,
+        )
     except ImportError:
         try:
             from src.sincor2.treasury_inflow import (
                 get_treasury_snapshot,
                 ledger_summary_24h,
+                public_treasury_dto,
             )
         except ImportError as exc:
             logger.error("treasury_inflow import failed: %s", exc)
@@ -129,17 +140,10 @@ def treasury_metrics():
     try:
         snap = get_treasury_snapshot(include_onchain=include_onchain)
         summary = ledger_summary_24h()
-        return jsonify(
-            {
-                "status": "ok",
-                "kpi": "treasury_inflow",
-                "snapshot": snap.to_dict(),
-                "ledger_24h": summary,
-            }
-        ), 200
-    except Exception as exc:
+        return jsonify(public_treasury_dto(snap, summary)), 200
+    except Exception:
         logger.exception("treasury metrics failed")
-        return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
+        return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500
 
 
 @monitoring_bp.get("/api/polyclaw/bankroll")

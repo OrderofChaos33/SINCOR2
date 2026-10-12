@@ -102,8 +102,14 @@ app.config['JWT_SECRET_KEY'] = resolve_jwt_secret()
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 app.config['SECRET_KEY'] = resolve_flask_secret()
+from sincor2.cookie_security import is_production_https, secure_cookie_kwargs
+
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
+# C3 (P2 audit): Secure follows the effective production-HTTPS posture, not a
+# single provider's environment label.
+app.config['SESSION_COOKIE_SECURE'] = is_production_https()
+logger.info('[COOKIE] SESSION_COOKIE_SECURE=%s (production_https=%s)',
+            app.config['SESSION_COOKIE_SECURE'], is_production_https())
 jwt = JWTManager(app)
 
 try:
@@ -127,6 +133,23 @@ try:
     _register_queue_routes(app)
 except Exception as _q_exc:
     logger.warning('[QUEUE] poll routes not registered: %s', _q_exc)
+
+# C2 (P2 audit): boot-time queue readiness gate. A configured-but-unreachable
+# broker or a celery backend without shared job storage fails boot fast with
+# a clear error instead of booting a half-working queue. Degraded (no-broker)
+# mode is allowed but loudly logged — never silent.
+try:
+    from sincor2.task_queue import verify_queue_readiness
+    _queue_report = verify_queue_readiness()
+    if _queue_report.get("degraded"):
+        logger.warning('[QUEUE] DEGRADED mode at boot: %s',
+                       _queue_report.get("degraded_reason"))
+    else:
+        logger.info('[QUEUE] ready: backend=%s job_store=%s',
+                    _queue_report.get("backend"), _queue_report.get("job_store"))
+except Exception as _qgate_exc:
+    logger.error('[QUEUE] readiness gate failed — refusing to boot: %s', _qgate_exc)
+    raise
 
 oauth = None
 OAUTH_REDIRECT_BASE = _env_first('OAUTH_REDIRECT_BASE_URL', 'PUBLIC_BASE_URL', 'SITE_URL', default='').rstrip('/')
@@ -158,9 +181,8 @@ def _auth_cookie_response(email: str, redirect_url: str = '/dashboard'):
         redirect_url = f'{redirect_url}{sep}email={email}'
     resp = make_response(redirect(redirect_url))
     resp.set_cookie(
-        'access_token', access_token, httponly=True,
-        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-        samesite='Lax', max_age=28800,
+        'access_token', access_token, max_age=28800,
+        **secure_cookie_kwargs(),
     )
     return resp
 
@@ -459,6 +481,14 @@ limiter = Limiter(
     storage_uri=os.environ.get("SINCOR_LIMITER_STORAGE_URI", "memory://"),
 )
 
+# Shared credential-verifier throttling (audit P2-A3). Imported here so the
+# mvp blueprints pick these up via _bind_mvp(); app.py imports them directly.
+from sincor2.login_throttle import (  # noqa: E402
+    credential_rate_limits,
+    note_login_failure,
+    note_login_success,
+)
+
 try:
     from sincor2.safety_locks import ProductionSafetyError, assert_production_safety
     assert_production_safety()
@@ -478,6 +508,7 @@ try:
         init_platform_payments_db,
         list_plans as platform_list_plans,
         list_subscriptions,
+        mark_checkout_fulfilled as platform_mark_checkout_fulfilled,
         verify_checkout as platform_verify_checkout,
     )
     init_platform_payments_db()
@@ -657,9 +688,115 @@ def init_db():
         updated_at TEXT,
         metadata TEXT
     )''')
+    db.execute('''CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        event_id TEXT PRIMARY KEY,
+        event_type TEXT,
+        received_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'claimed'
+    )''')
     db.commit()
     db.close()
     logger.info('[DB] ready at %s', DB_PATH)
+
+
+# --- B3: Stripe webhook event idempotency --------------------------------------
+# Every received Stripe event ID is persisted with a UNIQUE constraint BEFORE
+# processing (insert-or-ignore claim). Duplicate deliveries are acknowledged
+# without re-fulfillment, so fulfillment is idempotent keyed on event ID.
+# Stripe is legacy/not-supported per founder decision D3 — this makes the
+# webhook path safe IF the integration is ever enabled.
+STRIPE_EVENT_CLAIM_TTL_SEC = 300  # reclaim window for crashed (claimed, never processed) events
+
+
+def _ensure_stripe_event_schema(db) -> None:
+    db.execute('''CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        event_id TEXT PRIMARY KEY,
+        event_type TEXT,
+        received_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'claimed'
+    )''')
+
+
+def claim_stripe_webhook_event(event_id: str, event_type: str = "unknown") -> str:
+    """Atomically claim a Stripe webhook event for processing.
+
+    Insert-or-ignore on the PRIMARY KEY means exactly one concurrent delivery
+    wins the claim. Returns:
+      'claimed'             — first delivery; caller owns processing.
+      'reclaimed'           — stale 'claimed' row from a crashed attempt;
+                              caller owns processing.
+      'duplicate_processed' — already fulfilled; ack without re-processing.
+      'duplicate_inflight'  — claimed moments ago by a concurrent delivery;
+                              ack without re-processing.
+    """
+    event_id = (event_id or "").strip()
+    if not event_id:
+        return "missing"
+    db = get_db()
+    db.execute("PRAGMA busy_timeout=5000")
+    _ensure_stripe_event_schema(db)
+    now = datetime.now(timezone.utc).isoformat()
+    cur = db.execute(
+        "INSERT OR IGNORE INTO stripe_webhook_events "
+        "(event_id, event_type, received_at, status) VALUES (?, ?, ?, 'claimed')",
+        (event_id, event_type, now),
+    )
+    db.commit()
+    if cur.rowcount == 1:
+        return "claimed"
+    row = db.execute(
+        "SELECT status, received_at FROM stripe_webhook_events WHERE event_id=?",
+        (event_id,),
+    ).fetchone()
+    if row is None:
+        return "claimed"  # defensive; cannot happen without a deleter
+    if row["status"] == "processed":
+        return "duplicate_processed"
+    # Claimed but not processed: a concurrent delivery in flight, or a crashed
+    # attempt. Reclaim only after the TTL so concurrent duplicates are dropped.
+    try:
+        claimed_at = datetime.fromisoformat(
+            (row["received_at"] or "").replace("Z", "+00:00")
+        )
+        age_sec = (datetime.now(timezone.utc) - claimed_at).total_seconds()
+    except (ValueError, TypeError):
+        age_sec = 0
+    if age_sec < STRIPE_EVENT_CLAIM_TTL_SEC:
+        return "duplicate_inflight"
+    cur = db.execute(
+        "UPDATE stripe_webhook_events SET status='claimed', received_at=?, "
+        "event_type=? WHERE event_id=? AND status='claimed'",
+        (now, event_type, event_id),
+    )
+    db.commit()
+    return "reclaimed" if cur.rowcount == 1 else "duplicate_inflight"
+
+
+def mark_stripe_webhook_event_processed(event_id: str) -> None:
+    """Mark a claimed Stripe event as processed (fulfilled)."""
+    db = get_db()
+    _ensure_stripe_event_schema(db)
+    db.execute(
+        "UPDATE stripe_webhook_events SET status='processed' WHERE event_id=?",
+        ((event_id or "").strip(),),
+    )
+    db.commit()
+
+
+def release_stripe_webhook_event_claim(event_id: str) -> None:
+    """Release a 'claimed' event after a processing failure.
+
+    The failed attempt is over, so no concurrent processing is possible;
+    deleting the claim lets a redelivery claim and retry instead of being
+    acked as a duplicate.
+    """
+    db = get_db()
+    _ensure_stripe_event_schema(db)
+    db.execute(
+        "DELETE FROM stripe_webhook_events WHERE event_id=? AND status='claimed'",
+        ((event_id or "").strip(),),
+    )
+    db.commit()
 
 
 init_db()
@@ -794,9 +931,8 @@ def _admin_cookie_response(username: str, redirect_url: str = '/admin'):
     access_token = create_access_token(identity=identity, additional_claims={'role': 'admin'})
     resp = make_response(redirect(_safe_next_url(redirect_url, '/admin')))
     resp.set_cookie(
-        'access_token', access_token, httponly=True,
-        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-        samesite='Lax', max_age=28800,
+        'access_token', access_token, max_age=28800,
+        **secure_cookie_kwargs(),
     )
     return resp
 

@@ -4,12 +4,59 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from datetime import date
 from typing import Any, Dict, Optional, Tuple
 
 from verticals.loader import resolve_vertical_agent
 
 logger = logging.getLogger(__name__)
+
+# Dedicated audit channel for policy-enforcement outcomes. A policy executor
+# failure is a security event: it must be visible to auditors even when the
+# general application log is noisy or filtered.
+audit_logger = logging.getLogger("sincor.audit.vertical_dispatch")
+
+# --- Dispatch registry (C1, P2 audit: fail-closed policy dispatch) -----------
+# Keyed by task_id so that:
+#   1. a policy-executor exception can NEVER fall through to an unenforced
+#      agent.run() — the dispatch is recorded as INDETERMINATE and the caller
+#      gets an explicit error requiring operator review;
+#   2. a completed/indeterminate dispatch is never blindly re-executed — a
+#      resubmission without a matching idempotency_key is rejected.
+# The registry is intentionally process-local and advisory: it guards the
+# in-process double-dispatch path. Cross-process exactly-once semantics are
+# the queue's job (see task_queue idempotency), not this layer's.
+_DISPATCH_COMPLETED = "completed"
+_DISPATCH_INDETERMINATE = "indeterminate"
+_DISPATCH_REGISTRY_MAX = 10000
+_dispatch_lock = threading.Lock()
+_dispatch_registry: Dict[str, Dict[str, Any]] = {}
+
+
+def _record_dispatch(task_id: str, status: str, output: Optional[str],
+                     idempotency_key: Optional[str]) -> None:
+    with _dispatch_lock:
+        if len(_dispatch_registry) >= _DISPATCH_REGISTRY_MAX:
+            oldest = next(iter(_dispatch_registry))
+            del _dispatch_registry[oldest]
+        _dispatch_registry[task_id] = {
+            "status": status,
+            "output": output,
+            "idempotency_key": idempotency_key,
+        }
+
+
+def _prior_dispatch(task_id: str) -> Optional[Dict[str, Any]]:
+    with _dispatch_lock:
+        prior = _dispatch_registry.get(task_id)
+        return dict(prior) if prior else None
+
+
+def _reset_dispatch_registry() -> None:
+    """Test hook: clear the dispatch registry."""
+    with _dispatch_lock:
+        _dispatch_registry.clear()
 
 # Maps A2A skill ids for cross-cutting SINCOR skills to AgencyKernel task types.
 _KERNEL_SKILL_MAP: Dict[str, str] = {
@@ -228,6 +275,16 @@ def dispatch_vertical_task(
     Tasks are routed through the :class:`~core.policy.PolicyEnforcedExecutor`
     for auth checks, policy rules, retry-with-backoff, and AXIOM settlement
     triggering before and after execution.
+
+    Fail-closed contract (C1, P2 audit): if the policy executor raises, the
+    agent is NOT executed — the dispatch is recorded as indeterminate and the
+    caller receives an explicit error requiring operator review. Re-running
+    an executor that may already have produced the effect is unsafe, so there
+    is no blind retry at this layer. A resubmission for an already-dispatched
+    task_id is rejected unless it carries the matching ``idempotency_key``;
+    a matching key on a completed dispatch replays the stored result.
+
+    Returns ``(output, error)`` or ``None`` when no agent handles the skill.
     """
     if not platform_state:
         return None
@@ -240,13 +297,61 @@ def dispatch_vertical_task(
     task_payload = _parse_task_payload(input_text, skill_id)
     task_payload.setdefault("task_id", task_id or "")
     task_payload.setdefault("caller_id", caller_id)
+    effective_task_id = str(task_payload.get("task_id") or "")
+    idempotency_key = task_payload.get("idempotency_key")
+
+    # Double-dispatch guard: a dispatched task is never re-executed without
+    # a matching idempotency key. Completed dispatches replay their stored
+    # result (safe); indeterminate ones stay indeterminate until an operator
+    # intervenes.
+    if effective_task_id:
+        prior = _prior_dispatch(effective_task_id)
+        if prior is not None:
+            if (
+                prior["status"] == _DISPATCH_COMPLETED
+                and idempotency_key
+                and idempotency_key == prior.get("idempotency_key")
+            ):
+                logger.info(
+                    "Vertical dispatch idempotent replay skill=%s task_id=%s",
+                    skill_id, effective_task_id,
+                )
+                return prior["output"], None
+            logger.warning(
+                "Vertical dispatch duplicate rejected skill=%s task_id=%s status=%s",
+                skill_id, effective_task_id, prior["status"],
+            )
+            return None, (
+                f"duplicate_dispatch_rejected: task_id '{effective_task_id}' was "
+                f"already dispatched (status={prior['status']}); resubmission "
+                "requires the matching idempotency_key"
+            )
 
     try:
         from core.policy import get_default_executor
         executor = get_default_executor()
         result = executor.execute(agent.run, task_payload)
-    except Exception:
-        result = agent.run(task_payload)
+    except Exception as exc:
+        # FAIL CLOSED: a policy-enforcement error must never fall through to
+        # an unenforced agent.run(). The effect may already have run inside
+        # the executor, so the outcome is indeterminate — record it and
+        # require operator review instead of retrying blindly.
+        audit_logger.error(
+            "policy_enforcement_failure skill=%s agent=%s task_id=%s caller_id=%s "
+            "exc_type=%s exc=%s",
+            skill_id, agent.name, effective_task_id, caller_id,
+            type(exc).__name__, exc, exc_info=True,
+        )
+        if effective_task_id:
+            _record_dispatch(
+                effective_task_id, _DISPATCH_INDETERMINATE, None, idempotency_key
+            )
+        return None, (
+            "policy_enforcement_failure: the policy executor raised "
+            f"{type(exc).__name__}; execution halted before any unenforced run. "
+            "Outcome is indeterminate (the effect may have partially run) — "
+            "operator review required before any retry."
+        )
 
     output = json.dumps(result, indent=2) if isinstance(result, dict) else str(result)
     logger.info(
@@ -255,6 +360,10 @@ def dispatch_vertical_task(
         agent.name,
         result.get("status") if isinstance(result, dict) else "ok",
     )
+    if effective_task_id:
+        _record_dispatch(
+            effective_task_id, _DISPATCH_COMPLETED, output, idempotency_key
+        )
     return output, None
 
 
