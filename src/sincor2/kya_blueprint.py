@@ -112,6 +112,11 @@ def verify():
     body = request.get_json(silent=True) or {}
     kya_id = str(body.get("kya_id") or "")
     if body.get("stake_tx") and body.get("stake_wei"):
+        # W-76: stake application is a state mutation — authenticate and
+        # authorize (owner or admin) BEFORE apply_stake persists anything.
+        _, err = _guard_kya_mutation(kya_id)
+        if err is not None:
+            return err
         try:
             kya.apply_stake(kya_id, str(body["stake_wei"]), str(body["stake_tx"]))
         except (KeyError, ValueError) as exc:
