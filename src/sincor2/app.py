@@ -1433,6 +1433,11 @@ def create_app():
     except Exception as e:
         print(f"Waitlist blueprint not available: {e}")
     try:
+        from sincor2.mvp_blueprints.discovery import bp as discovery_bp
+        app.register_blueprint(discovery_bp)
+    except Exception as e:
+        print(f"Discovery blueprint not available: {e}")
+    try:
         from verticals.auto_detailing.blueprint import register_chroma
         register_chroma(app)
     except Exception as e:
