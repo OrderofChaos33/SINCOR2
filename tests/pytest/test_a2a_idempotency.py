@@ -27,6 +27,13 @@ from sincor2.a2a_idempotency import (
 )
 from sincor2.a2a_inbound import register as register_inbound, reset_fabric
 
+from bid_testkit import (
+    key_for,
+    register_wallet_agent,
+    signed_commit_body,
+    signed_reveal_body,
+)
+
 
 @pytest.fixture
 def idem_db(tmp_path, monkeypatch):
@@ -267,12 +274,8 @@ def test_task_create_no_key_unchanged_behavior(client):
 def _register_and_fund(client, agent_id):
     from sincor2.onchain.stake_ledger import stake_ledger
 
-    r = client.post("/v1/a2a/register", json={
-        "agent_id": agent_id,
-        "capability_tags": ["lead-enrichment"],
-        "rpc_callback": "https://agent.example/rpc",
-    })
-    assert r.status_code in (200, 201), r.get_json()
+    # W-77: bids bind to the agent's registered wallet.
+    register_wallet_agent(client, agent_id)
     stake_ledger().deposit(agent_id, 10 * 10**18)
 
 
@@ -297,8 +300,7 @@ def test_commit_idempotent(client):
     agent_id = "idem-agent-1"
     _register_and_fund(client, agent_id)
     task_id = _sealed_task(client)
-    body = {"task_id": task_id, "agent_id": agent_id,
-            "commitment": _commitment(1.0, "aa" * 32, agent_id)}
+    body = signed_commit_body(key_for(agent_id), task_id, agent_id, _commitment(1.0, "aa" * 32, agent_id))
     key = str(uuid.uuid4())
     r1 = client.post("/v1/a2a/bids/commit", json=body,
                      headers={"Idempotency-Key": key})
@@ -321,8 +323,7 @@ def test_commit_without_key_second_attempt_409(client):
     agent_id = "idem-agent-2"
     _register_and_fund(client, agent_id)
     task_id = _sealed_task(client)
-    body = {"task_id": task_id, "agent_id": agent_id,
-            "commitment": _commitment(1.0, "bb" * 32, agent_id)}
+    body = signed_commit_body(key_for(agent_id), task_id, agent_id, _commitment(1.0, "bb" * 32, agent_id))
     r1 = client.post("/v1/a2a/bids/commit", json=body)
     assert r1.status_code == 201
     r2 = client.post("/v1/a2a/bids/commit", json=body)
@@ -335,10 +336,8 @@ def test_commit_key_conflict_on_different_commitment(client):
     _register_and_fund(client, agent_id)
     task_id = _sealed_task(client)
     key = str(uuid.uuid4())
-    body1 = {"task_id": task_id, "agent_id": agent_id,
-             "commitment": _commitment(1.0, "cc" * 32, agent_id)}
-    body2 = {"task_id": task_id, "agent_id": agent_id,
-             "commitment": _commitment(2.0, "dd" * 32, agent_id)}
+    body1 = signed_commit_body(key_for(agent_id), task_id, agent_id, _commitment(1.0, "cc" * 32, agent_id))
+    body2 = signed_commit_body(key_for(agent_id), task_id, agent_id, _commitment(2.0, "dd" * 32, agent_id))
     assert client.post("/v1/a2a/bids/commit", json=body1,
                        headers={"Idempotency-Key": key}).status_code == 201
     r2 = client.post("/v1/a2a/bids/commit", json=body2,
@@ -351,15 +350,13 @@ def test_reveal_idempotent(client):
     _register_and_fund(client, agent_id)
     task_id = _sealed_task(client)
     nonce = "ee" * 32
-    commit_body = {"task_id": task_id, "agent_id": agent_id,
-                   "commitment": _commitment(1.0, nonce, agent_id)}
+    commit_body = signed_commit_body(key_for(agent_id), task_id, agent_id, _commitment(1.0, nonce, agent_id))
     assert client.post("/v1/a2a/bids/commit", json=commit_body).status_code == 201
     # Move into the reveal window (commit phase over, reveal phase open).
     from sincor2.a2a_inbound import _now_ms, get_fabric
 
     get_fabric().tasks[task_id]["commit_deadline"] = _now_ms() - 1000
-    reveal_body = {"task_id": task_id, "agent_id": agent_id,
-                   "bid_axm": 1.0, "nonce": nonce, "estimated_seconds": 300}
+    reveal_body = signed_reveal_body(key_for(agent_id), task_id, agent_id, 1.0, nonce, 300)
     key = str(uuid.uuid4())
     r1 = client.post("/v1/a2a/bids/reveal", json=reveal_body,
                      headers={"Idempotency-Key": key})

@@ -309,6 +309,53 @@ def _sealed_agent_checks(fabric: Any, task: Dict[str, Any], agent_id: str) -> Di
     return agent
 
 
+def _require_bid_auth(agent_id: str, body: Dict[str, Any], *, purpose: str,
+                      task_id: str, payload: str) -> None:
+    """Fail-closed bidder authentication for sealed-bid commit/reveal (W-77).
+
+    A commit locks the named agent's stake, and an unrevealed commit lets
+    ``close_auction`` ghost-slash 100% of it to the poster fund — so the
+    caller must prove control of the agent.  Accepts either the operator
+    heartbeat token (first-party ops, e.g. the liveness runner, mirroring
+    heartbeat auth) or an EIP-191 ``personal_sign`` signature by the
+    agent's REGISTERED wallet over the exact bid message
+    (purpose/task/agent/payload/timestamp/nonce, with freshness and
+    single-use replay guards).  A bare client-supplied ``agent_id`` is
+    NEVER trusted for attribution — that was the W-77 spoofed-commit
+    hole (zero-cost griefing: lock a victim's stake in their name, then
+    let the ghost-slash take it).
+
+    Raises PermissionError (-> HTTP 403) on any failure.
+    """
+    from sincor2.a2a_inbound_ext import _operator_heartbeat_token_ok
+    if _operator_heartbeat_token_ok():
+        return
+    from sincor2.a2a_integration import _server_bound_bidder_wallet
+    wallet = _server_bound_bidder_wallet(
+        body, purpose=purpose, task_id=task_id, agent_id=agent_id,
+        payload=payload,
+    )
+    if not wallet:
+        raise PermissionError(
+            "bid commit/reveal requires an EIP-191 signature from the agent's "
+            "registered wallet (authSignature + authTimestamp + authNonce), "
+            "or the operator heartbeat token"
+        )
+    fabric = get_fabric()
+    with fabric.lock:
+        agent = fabric.agents.get(agent_id)
+    registered = str((agent or {}).get("wallet") or "").strip().lower()
+    if not registered:
+        raise PermissionError(
+            "agent has no registered wallet; bid commit/reveal requires "
+            "the operator token"
+        )
+    if wallet != registered:
+        raise PermissionError(
+            "bid signature is not from the agent's registered wallet"
+        )
+
+
 def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float = 1.5,
                 sealed: bool = False, poster_id: Optional[str] = None,
                 seed_key: Optional[str] = None, auto_refresh: bool = False,
@@ -1440,17 +1487,47 @@ def attach_market_routes(bp: Blueprint) -> None:
     @bp.post("/v1/a2a/bids/commit")
     @idempotent("bids.commit", error=_http_error)
     def v1_bids_commit():
-        """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}.
+        """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}
+        plus bidder auth (authSignature + authTimestamp + authNonce).
 
         commitment = keccak256(abi.encodePacked(bytes32(price_wei), salt,
         keccak256(agent_id))) as 0x hex — the OFFCHAIN shim preimage. It is
         NOT an onchain commitment: the onchain scheme additionally binds
         auctionId and chainId, so shim hashes must never be submitted to
         CommitRevealAuction.commit().
+
+        W-77: the commit locks the named agent's stake, so the caller must
+        prove control of the agent — an EIP-191 signature by the agent's
+        registered wallet over the exact bid message, or the operator
+        heartbeat token.  Unsigned commits are rejected (403).
         """
         body = request.get_json(silent=True) or {}
         try:
-            record = commit_bid(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), body.get("commitment"))
+            task_id = str(body.get("task_id") or "")
+            agent_id = str(body.get("agent_id") or "")
+            commitment = body.get("commitment")
+            # VERIFIED-2 / W-77 idempotent retry: a byte-identical re-POST
+            # of an already-recorded commit returns the existing record
+            # WITHOUT re-authenticating and WITHOUT re-locking stake.  No
+            # new authorization is created — only the identical existing
+            # record is returned — so the single-use signature guarantee
+            # for fresh authorizations is unaffected.
+            try:
+                _commit_hex = "0x" + _parse_bytes32_hex(commitment, "commitment").hex()
+            except ValueError:
+                _commit_hex = None
+            if _commit_hex and _commit_hex != "0x" + "00" * 32:
+                _fabric = get_fabric()
+                with _fabric.lock:
+                    _existing = _fabric.commits.get(_commit_key(task_id, agent_id))
+                if _existing is not None and str(
+                    _existing.get("commitment") or ""
+                ).lower() == _commit_hex.lower():
+                    return jsonify(dict(_existing)), 201
+            _require_bid_auth(agent_id, body, purpose="commit",
+                              task_id=task_id,
+                              payload=str(commitment or ""))
+            record = commit_bid(task_id, agent_id, commitment)
             return jsonify(record), 201
         except ValueError as err:
             return _http_error(str(err), 400)
@@ -1465,15 +1542,28 @@ def attach_market_routes(bp: Blueprint) -> None:
     @idempotent("bids.reveal", error=_http_error)
     def v1_bids_reveal():
         """Sealed-bid reveal phase. Body: {task_id, agent_id, bid_axm, nonce}
-        (+ optional estimated_seconds). The commitment is recomputed and
-        compared in constant time; only valid reveals become bids."""
+        (+ optional estimated_seconds) plus bidder auth (authSignature +
+        authTimestamp + authNonce). The commitment is recomputed and
+        compared in constant time; only valid reveals become bids.
+
+        W-77: the reveal must come from the same wallet that committed —
+        the caller proves control of the agent's registered wallet (or the
+        operator token), same as the commit phase.
+        """
         body = request.get_json(silent=True) or {}
         try:
+            task_id = str(body.get("task_id") or "")
+            agent_id = str(body.get("agent_id") or "")
+            bid_axm = float(body.get("bid_axm") or 0)
+            nonce = body.get("nonce")
+            _require_bid_auth(agent_id, body, purpose="reveal",
+                              task_id=task_id,
+                              payload=f"{bid_axm}:{nonce}")
             bid = reveal_bid(
-                str(body.get("task_id") or ""),
-                str(body.get("agent_id") or ""),
-                float(body.get("bid_axm") or 0),
-                body.get("nonce"),
+                task_id,
+                agent_id,
+                bid_axm,
+                nonce,
                 int(body.get("estimated_seconds") or DEFAULT_REVEAL_TIME_EST_SEC),
             )
             return jsonify(bid), 201

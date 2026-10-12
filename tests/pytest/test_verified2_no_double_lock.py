@@ -13,6 +13,8 @@ from __future__ import annotations
 import pytest
 from flask import Flask
 
+from bid_testkit import key_for, register_wallet_agent, signed_commit_body
+
 from sincor2.a2a_inbound import register as register_inbound, reset_fabric
 
 
@@ -45,13 +47,18 @@ def client(idem_db, tmp_path):
 def _register_and_fund(client, agent_id):
     from sincor2.onchain.stake_ledger import stake_ledger
 
-    r = client.post("/v1/a2a/register", json={
-        "agent_id": agent_id,
-        "capability_tags": ["lead-enrichment"],
-        "rpc_callback": "https://agent.example/rpc",
-    })
-    assert r.status_code in (200, 201), r.get_json()
+    # W-77: bids bind to the agent's registered wallet.
+    register_wallet_agent(client, agent_id)
     stake_ledger().deposit(agent_id, 10 * 10**18)
+
+
+def _commit(client, task_id, agent_id, bid_axm, nonce_hex):
+    return client.post(
+        "/v1/a2a/bids/commit",
+        json=signed_commit_body(
+            key_for(agent_id), task_id, agent_id,
+            _commitment(bid_axm, nonce_hex, agent_id)),
+    )
 
 
 def _sealed_task(client):
@@ -84,8 +91,8 @@ def test_retry_does_not_double_lock(client):
     agent_id = "v2-agent-1"
     _register_and_fund(client, agent_id)
     task_id = _sealed_task(client)
-    body = {"task_id": task_id, "agent_id": agent_id,
-            "commitment": _commitment(1.0, "aa" * 32, agent_id)}
+    body = signed_commit_body(key_for(agent_id), task_id, agent_id,
+                               _commitment(1.0, "aa" * 32, agent_id))
 
     r1 = client.post("/v1/a2a/bids/commit", json=body)
     assert r1.status_code == 201, r1.get_json()
@@ -108,8 +115,8 @@ def test_triple_commit_single_lock(client):
     agent_id = "v2-agent-2"
     _register_and_fund(client, agent_id)
     task_id = _sealed_task(client)
-    body = {"task_id": task_id, "agent_id": agent_id,
-            "commitment": _commitment(1.0, "bb" * 32, agent_id)}
+    body = signed_commit_body(key_for(agent_id), task_id, agent_id,
+                               _commitment(1.0, "bb" * 32, agent_id))
 
     for i in range(3):
         r = client.post("/v1/a2a/bids/commit", json=body)
@@ -129,10 +136,10 @@ def test_different_agent_still_locks_separately(client):
     _register_and_fund(client, "v2-agent-3b")
     task_id = _sealed_task(client)
 
-    body_a = {"task_id": task_id, "agent_id": "v2-agent-3a",
-              "commitment": _commitment(1.0, "cc" * 32, "v2-agent-3a")}
-    body_b = {"task_id": task_id, "agent_id": "v2-agent-3b",
-              "commitment": _commitment(1.0, "dd" * 32, "v2-agent-3b")}
+    body_a = signed_commit_body(key_for("v2-agent-3a"), task_id, "v2-agent-3a",
+                                 _commitment(1.0, "cc" * 32, "v2-agent-3a"))
+    body_b = signed_commit_body(key_for("v2-agent-3b"), task_id, "v2-agent-3b",
+                                 _commitment(1.0, "dd" * 32, "v2-agent-3b"))
 
     assert client.post("/v1/a2a/bids/commit", json=body_a).status_code == 201
     assert client.post("/v1/a2a/bids/commit", json=body_b).status_code == 201

@@ -14,6 +14,13 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 from flask import Flask
 
+from bid_testkit import (
+    key_for,
+    register_wallet_agent,
+    signed_commit_body,
+    signed_reveal_body,
+)
+
 from sincor2.a2a_inbound import _now_ms, get_fabric, reset_fabric
 from sincor2.a2a_inbound import register as register_inbound
 from sincor2.a2a_integration import _auth_market_create_message
@@ -41,15 +48,8 @@ def client(tmp_path):
 
 
 def _register(client, agent_id, stake_axm=10):
-    r = client.post(
-        "/v1/a2a/register",
-        json={
-            "agent_id": agent_id,
-            "capability_tags": ["lead-enrichment"],
-            "rpc_callback": "https://agent.example/rpc",
-        },
-    )
-    assert r.status_code in (200, 201), r.get_json()
+    # W-77: bids bind to the agent's registered wallet.
+    register_wallet_agent(client, agent_id)
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
     if stake_axm:
@@ -87,16 +87,17 @@ def _commitment(bid_axm, nonce_hex, agent_id):
 def _commit(client, task_id, agent_id, bid_axm, nonce_hex):
     return client.post(
         "/v1/a2a/bids/commit",
-        json={"task_id": task_id, "agent_id": agent_id,
-              "commitment": _commitment(bid_axm, nonce_hex, agent_id)},
+        json=signed_commit_body(
+            key_for(agent_id), task_id, agent_id,
+            _commitment(bid_axm, nonce_hex, agent_id)),
     )
 
 
 def _reveal(client, task_id, agent_id, bid_axm, nonce_hex, est=300):
     return client.post(
         "/v1/a2a/bids/reveal",
-        json={"task_id": task_id, "agent_id": agent_id, "bid_axm": bid_axm,
-              "nonce": nonce_hex, "estimated_seconds": est},
+        json=signed_reveal_body(
+            key_for(agent_id), task_id, agent_id, bid_axm, nonce_hex, est),
     )
 
 

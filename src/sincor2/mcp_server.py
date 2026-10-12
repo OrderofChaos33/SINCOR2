@@ -84,13 +84,22 @@ def _request(method: str, path: str,
     """
     url = _base_url() + path
     payload = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    # W-77: sealed-bid commit/reveal require bidder auth.  The MCP server
+    # is a first-party operator tool, so it presents the operator
+    # heartbeat token (same credential as the liveness runner) instead
+    # of per-agent EIP-191 signatures.
+    _op_token = (os.environ.get("SINCOR_HEARTBEAT_TOKEN")
+                 or os.environ.get("AGENT_HEARTBEAT_TOKEN") or "").strip()
+    if _op_token:
+        headers["X-Sincor-Heartbeat"] = _op_token
     req = urllib.request.Request(
         url, data=payload, method=method.upper(),
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
