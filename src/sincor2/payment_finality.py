@@ -485,7 +485,10 @@ def on_reorg(
     """Handle a detected chain reorganization for a payment.
 
     Moves the payment to ``disputed``, revokes all linked entitlements via
-    the registered revokers, and persists a ``reorg_detected`` alert.
+    the registered revokers, persists a ``reorg_detected`` alert, and
+    clears ``finality_confirmed`` (W-72): a reorged payment's finality is
+    void, so it cannot re-settle on the stale confirmation — fresh
+    finality evidence must re-confirm it via ``mark_finality_confirmed``.
 
     Idempotent under concurrent pollers: the dispute itself is a
     compare-and-swap, so exactly one caller disputes, revokes, and alerts;
