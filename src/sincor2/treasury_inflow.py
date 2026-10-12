@@ -231,6 +231,15 @@ def ledger_summary_24h() -> Dict[str, Any]:
     }
 
 
+def list_inflow_events() -> List[Dict[str, Any]]:
+    """All inflow ledger events as dicts (no age filter).
+
+    Public read path for honest-activity reporting (a2a_activity): the
+    caller filters and aggregates; nothing is invented here.
+    """
+    return [ev.to_dict() for ev in _read_ledger_events()]
+
+
 def _rpc_call(rpc_url: str, method: str, params: list, timeout: float = 4.0) -> Any:
     payload = json.dumps(
         {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}

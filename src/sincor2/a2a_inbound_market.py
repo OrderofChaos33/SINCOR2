@@ -2303,6 +2303,12 @@ def attach_market_routes(bp: Blueprint) -> None:
 
     attach_sponsored_stake_routes(bp)
 
+    # Honest activity metrics (AXM activity engine, stream C): every figure
+    # labeled ledger/onchain, computed from real store state.
+    from sincor2.a2a_activity import attach_activity_routes
+
+    attach_activity_routes(bp)
+
     # Bankruptcy recovery track: admin-gated, default off. Deterministic
     # eligibility (honest-fail only, tombstoned wallets excluded) with a
     # fixed per-wallet escalation ladder; fronting reuses sponsored stake.

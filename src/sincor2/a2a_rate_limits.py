@@ -169,6 +169,7 @@ ENDPOINT_POLICY: Dict[str, str] = {
     "GET /v1/a2a/directory": "read",
     "GET /v1/a2a/agents": "read",
     "GET /v1/a2a/registration-velocity": "read",
+    "GET /v1/a2a/activity": "read",
     "GET /v1/a2a/chain": "read",
     "GET /api/a2a/agents": "read",
     "GET /api/a2a/tasks/<task_id>": "read",
