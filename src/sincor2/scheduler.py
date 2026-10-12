@@ -7,6 +7,12 @@ job-function libraries now — they no longer create schedulers of their own.
 Canonical defaults live in SCHEDULER_DEFAULTS below, defined once. They equal
 the previously effective production behavior, with one deliberate fix:
 outreach is registered exactly ONCE (the old setup ran it 2x per 2h).
+
+STREAM C (2026-10-12): effect-tier classification lives in
+``sincor2.scheduler_tiers``; Tier 2/3 jobs are wrapped at the scheduling layer
+only (kill-switch SCHEDULER_EFFECTS_PAUSED, draft mode
+SCHEDULER_REQUIRE_APPROVAL, hourly idempotency keys via
+``sincor2.scheduler_idempotency``). Send logic itself is never touched.
 """
 from __future__ import annotations
 
@@ -192,6 +198,70 @@ def _is_enabled(job_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Tier 2/3 scheduling-layer guard (STREAM C).
+#
+# Wraps ONLY the scheduling layer: kill-switch, require_approval draft mode,
+# and idempotency check-before-act. The underlying send logic
+# (outreach_engine.run_cycle, email senders, polyclaw executors) is untouched
+# — the wrapper either invokes the job function unchanged or skips it
+# entirely. Tier 0/1 jobs are returned unwrapped.
+# ---------------------------------------------------------------------------
+
+def _effect_guard(job_id: str, func: Callable[[], None]) -> Callable[[], None]:
+    from sincor2 import scheduler_idempotency as idem
+    from sincor2 import scheduler_tiers
+
+    tier = scheduler_tiers.job_tier(job_id)
+    if tier < scheduler_tiers.TIER_OUTBOUND:
+        return func  # Tier 0/1: no guard needed
+
+    tier_label = scheduler_tiers.tier_name(tier)
+
+    def guarded() -> None:
+        run_id = idem.new_run_id()
+        now = idem.utcnow()
+
+        if scheduler_tiers.effects_paused():
+            logger.warning(
+                "[SCHEDULER] %s (tier %s) skipped: SCHEDULER_EFFECTS_PAUSED=true",
+                job_id,
+                tier_label,
+            )
+            return
+
+        if scheduler_tiers.require_approval():
+            idem.record_intent(
+                job_id,
+                run_id,
+                f"{SCHEDULER_DEFAULTS[job_id]['name']} cycle invoked "
+                f"{func.__name__}() — outbound effects withheld pending approval",
+            )
+            logger.info(
+                "[SCHEDULER] %s (tier %s) draft-only: SCHEDULER_REQUIRE_APPROVAL=true, "
+                "intent recorded, effect function not invoked",
+                job_id,
+                tier_label,
+            )
+            return
+
+        key = idem.make_key(job_id, now)
+        if idem.already_done(key):
+            logger.info("[SCHEDULER] %s idempotent skip (key %s)", job_id, key)
+            return
+
+        func()
+        idem.mark_done(key)
+
+    guarded.__name__ = f"guarded_{func.__name__}"
+    return guarded
+
+
+def _wrap_job(job_id: str, func: Callable[[], None]) -> Callable[[], None]:
+    """Apply the Stream C scheduling-layer guard (Tier 2/3 only)."""
+    return _effect_guard(job_id, func)
+
+
+# ---------------------------------------------------------------------------
 # Job functions (scheduling-owned wrappers). Domain logic lives in the
 # per-domain modules; imports stay lazy so registration never pulls heavy
 # deps at boot.
@@ -298,7 +368,7 @@ def _add_job(
 ) -> None:
     """Register one canonical job (interval or cron) from SCHEDULER_DEFAULTS."""
     spec = SCHEDULER_DEFAULTS[job_id]
-    func = _JOB_FUNCS[job_id]
+    func = _wrap_job(job_id, _JOB_FUNCS[job_id])
     name = spec["name"]
     kwargs: Dict[str, Any] = {
         "id": job_id,
@@ -384,7 +454,14 @@ def get_scheduler_status() -> Dict[str, Any]:
         return {"running": False, "jobs": []}
     jobs = []
     for job in _scheduler.get_jobs():
-        jobs.append({"id": job.id, "name": job.name, "next_run": str(job.next_run_time) if job.next_run_time else None})
+        base_id = job.id[:-len("_startup")] if job.id.endswith("_startup") else job.id
+        try:
+            from sincor2 import scheduler_tiers
+            tier = scheduler_tiers.job_tier(base_id)
+        except Exception:
+            tier = None
+        jobs.append({"id": job.id, "name": job.name, "tier": tier,
+                     "next_run": str(job.next_run_time) if job.next_run_time else None})
     return {"running": _scheduler.running, "job_count": len(jobs), "jobs": jobs}
 
 
