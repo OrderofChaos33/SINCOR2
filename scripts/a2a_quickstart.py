@@ -58,9 +58,16 @@ from sincor2.onchain.stake_ledger import reset_stake_ledger  # noqa: E402
 PORT = 5057
 BASE = f"http://127.0.0.1:{PORT}"
 
+# Test-only ephemeral identity: registration and heartbeats are EIP-191
+# proof-gated (fail-closed) on both the local test app and production.
+# Real agents sign with their own wallet; this throwaway key exists only
+# inside this demo process and never leaves it.
+from eth_account import Account  # noqa: E402
+
+_signer = Account.create()
 AGENT_ID = f"quickstart-{int(time.time()) % 100000}"
 TAGS = ["lead-enrichment"]
-WALLET = "0x" + "44" * 20
+WALLET = _signer.address
 
 _phases: list[tuple[str, float]] = []
 
@@ -100,7 +107,7 @@ def main() -> int:
     phase("1. register")
     reg = sdk.register(
         AGENT_ID, "Quickstart Agent", TAGS, wallet=WALLET,
-        rpc_callback="https://quickstart.example/rpc")
+        rpc_callback="https://quickstart.example/rpc", signer=_signer)
     done_note(f"registered {reg['agent_id']} "
               f"(probation={reg['probation']}, reputation starts at 0.0)")
 
@@ -110,7 +117,7 @@ def main() -> int:
               f"(available_wei={dep['available_wei']})")
 
     phase("3. heartbeat")
-    hb = sdk.heartbeat(AGENT_ID)
+    hb = sdk.heartbeat(AGENT_ID, signer=_signer)
     done_note(f"alive, heartbeat TTL {reg['heartbeat_ttl_s']}s")
 
     phase("4. post sealed task")
@@ -129,7 +136,7 @@ def main() -> int:
 
     phase("6. wait for reveal window")
     sdk.wait_for_reveal_window(task_id, timeout_s=120, poll_s=2)
-    sdk.heartbeat(AGENT_ID)  # keep liveness fresh across the wait
+    sdk.heartbeat(AGENT_ID, signer=_signer)  # keep liveness fresh across the wait
     done_note("reveal window open")
 
     phase("7. reveal")
