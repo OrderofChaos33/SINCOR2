@@ -108,8 +108,23 @@ class FlaskTestTransport:
 class SincorAgentSDK:
     """Agent-facing client for the A2A task market."""
 
-    def __init__(self, transport: Any):
+    def __init__(self, transport: Any, signer: Any = None):
         self.t = transport
+        # Optional default wallet signer (eth_account Account). When set —
+        # directly or remembered from register() — sealed_commit /
+        # sealed_reveal attach the W-77 EIP-191 bidder auth automatically.
+        # With no signer the calls go out unsigned and the server's gate
+        # answers 403 (the gate is never weakened client-side).
+        self._default_signer = signer
+        self._signers: Dict[str, Any] = {}
+
+    def _bid_signer(self, agent_id: str, signer: Any = None) -> Any:
+        """Resolve the wallet signer for a bid call: explicit per-call
+        signer wins, then the key remembered at register() time for this
+        agent, then the construction-time default."""
+        if signer is not None:
+            return signer
+        return self._signers.get(agent_id) or self._default_signer
 
     # -- onboarding -------------------------------------------------------
     def register(self, agent_id: str, name: str,
@@ -167,7 +182,13 @@ class SincorAgentSDK:
             sig = signer.sign_message(encode_defunct(text=message)).signature
             body["registration_ts"] = ts
             body["registration_signature"] = "0x" + bytes(sig).hex()
-        return self.t.post("/v1/a2a/register", body)
+        result = self.t.post("/v1/a2a/register", body)
+        if signer is not None:
+            # Remember the wallet key for this agent so sealed_commit /
+            # sealed_reveal can satisfy the W-77 bidder-auth gate without
+            # the caller re-supplying it on every call.
+            self._signers[agent_id] = signer
+        return result
 
     def _agent_exists(self, agent_id: str) -> bool:
         """Best-effort existence probe for proof-format selection.
@@ -333,6 +354,39 @@ class SincorAgentSDK:
             "auth_nonce": nonce,
         }
 
+    @staticmethod
+    def make_bid_auth(purpose: str, task_id: str, agent_id: str,
+                      payload: str, timestamp: int, signer: Any,
+                      nonce: Optional[str] = None) -> Dict[str, Any]:
+        """Build the W-77 bidder-auth fields for a sealed-bid commit/reveal.
+
+        Signs the server's canonical bid message byte-for-byte
+        (``sincor2.a2a_integration._auth_bid_message``): the EIP-191
+        ``personal_sign`` signature binds purpose (``commit``|``reveal``),
+        task, bidding agent, the action payload (the commitment hex for
+        commit; ``f"{float(bid_axm)}:{nonce}"`` for reveal — the exact
+        string the server rebuilds), timestamp, and a fresh single-use
+        nonce. The recovered wallet must equal the agent's REGISTERED
+        wallet or the server answers 403; unsigned or replayed signatures
+        are rejected the same way. The SDK never sees private keys beyond
+        the ``signer`` object the caller supplies.
+        """
+        import secrets
+
+        from eth_account.messages import encode_defunct
+
+        from sincor2.a2a_integration import _auth_bid_message
+        nonce = nonce or secrets.token_hex(8)
+        ts = int(timestamp)
+        message = _auth_bid_message(str(purpose), str(task_id), str(agent_id),
+                                    str(payload), ts, nonce)
+        sig = signer.sign_message(encode_defunct(text=message)).signature
+        return {
+            "auth_signature": "0x" + bytes(sig).hex(),
+            "auth_timestamp": ts,
+            "auth_nonce": nonce,
+        }
+
     def get_task(self, task_id: str) -> Dict[str, Any]:
         """Public task view (sealed-safe: no bid/commit details)."""
         return self.t.get(f"/v1/a2a/tasks/{task_id}")
@@ -354,30 +408,60 @@ class SincorAgentSDK:
         return "0x" + _shim(price_wei, bytes(salt), agent_id).hex()
 
     def sealed_commit(self, task_id: str, agent_id: str,
-                      bid_axm: float) -> SealedBid:
+                      bid_axm: float, signer: Any = None) -> SealedBid:
         """Commit a sealed bid. Returns a SealedBid handle — keep
         ``salt_hex`` secret until the reveal window opens. One commitment
-        per (task, agent); the commit locks 50% of the bounty in stake."""
+        per (task, agent); the commit locks 50% of the bounty in stake.
+
+        W-77: the commit must carry EIP-191 bidder auth (a signature by the
+        agent's registered wallet over the exact bid message). The SDK
+        attaches it automatically from the ``signer`` given here, the key
+        remembered at ``register()`` time, or the construction-time
+        default — pass none of those and the call goes out unsigned, which
+        the server rejects with 403.
+        """
         salt = _random_salt()
         price_wei = int(round(float(bid_axm) * 1e18))
         commit_hex = self.make_commitment(bid_axm, salt, agent_id)
-        self.t.post("/v1/a2a/bids/commit", {
+        body: Dict[str, Any] = {
             "task_id": task_id, "agent_id": agent_id,
-            "commitment": commit_hex})
+            "commitment": commit_hex}
+        key = self._bid_signer(agent_id, signer)
+        if key is not None:
+            body.update(self.make_bid_auth(
+                "commit", task_id, agent_id, commit_hex,
+                int(time.time()), key))
+        self.t.post("/v1/a2a/bids/commit", body)
         return SealedBid(task_id=task_id, agent_id=agent_id,
                          bid_axm=float(bid_axm), price_wei=price_wei,
                          salt_hex="0x" + salt.hex(),
                          commitment=commit_hex)
 
     def sealed_reveal(self, bid: SealedBid,
-                      estimated_seconds: int = 600) -> Dict[str, Any]:
+                      estimated_seconds: int = 600,
+                      signer: Any = None) -> Dict[str, Any]:
         """Reveal a committed bid. Only valid inside the reveal window
         (after ``commit_deadline``, before ``reveal_deadline``); the server
-        recomputes the commitment in constant time."""
-        return self.t.post("/v1/a2a/bids/reveal", {
+        recomputes the commitment in constant time.
+
+        W-77: same bidder-auth requirement as the commit — the reveal must
+        come from the agent's registered wallet. Signer resolution is the
+        same as :meth:`sealed_commit` (per-call arg, then the
+        register()-time key, then the construction default).
+        """
+        body: Dict[str, Any] = {
             "task_id": bid.task_id, "agent_id": bid.agent_id,
             "bid_axm": bid.bid_axm, "nonce": bid.salt_hex,
-            "estimated_seconds": int(estimated_seconds)})
+            "estimated_seconds": int(estimated_seconds)}
+        key = self._bid_signer(bid.agent_id, signer)
+        if key is not None:
+            # The server rebuilds the signed payload as
+            # f"{float(bid_axm)}:{nonce}" — sign exactly that string.
+            payload = f"{float(bid.bid_axm)}:{bid.salt_hex}"
+            body.update(self.make_bid_auth(
+                "reveal", bid.task_id, bid.agent_id, payload,
+                int(time.time()), key))
+        return self.t.post("/v1/a2a/bids/reveal", body)
 
     def close_auction(self, task_id: str) -> Dict[str, Any]:
         """Permissionless close once the reveal deadline has passed. Ghosts
