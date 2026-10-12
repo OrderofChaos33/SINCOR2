@@ -476,85 +476,23 @@ except Exception as e:
     logger.warning('[EMAIL] %s', e)
     email_sender = None
 
+# One-scheduler consolidation (2026-10-11): exactly ONE BackgroundScheduler for
+# the whole app, owned by the central registry in sincor2.scheduler. The 8
+# standalone *_scheduler modules are job-function libraries now — they no
+# longer create schedulers of their own. Canonical job IDs and defaults live
+# in sincor2.scheduler.SCHEDULER_DEFAULTS.
 try:
-    from sincor2.outreach_scheduler import start_outreach_scheduler, stop_outreach_scheduler
-    import atexit
-    outreach_scheduler = start_outreach_scheduler(app)
-    if outreach_scheduler:
-        atexit.register(stop_outreach_scheduler)
+    from sincor2.scheduler import start_central_scheduler, stop_central_scheduler
+    import atexit as _atexit_central
+    central_scheduler = start_central_scheduler(app)
+    if central_scheduler:
+        _atexit_central.register(stop_central_scheduler)
+        logger.info('[SCHEDULER] central scheduler started')
+    else:
+        logger.info('[SCHEDULER] central scheduler not started (no jobs enabled)')
 except Exception as e:
-    logger.warning('[OUTREACH] %s', e)
-    outreach_scheduler = None
-
-try:
-    from sincor2.content_scheduler import start_content_scheduler, stop_content_scheduler
-    import atexit as _atexit
-    content_scheduler = start_content_scheduler(app)
-    if content_scheduler:
-        _atexit.register(stop_content_scheduler)
-except Exception as e:
-    logger.warning('[CONTENT] %s', e)
-    content_scheduler = None
-
-try:
-    from sincor2.launch_ops_scheduler import start_launch_ops_scheduler, stop_launch_ops_scheduler
-    import atexit as _atexit_launch
-    launch_ops_scheduler = start_launch_ops_scheduler(app)
-    if launch_ops_scheduler:
-        _atexit_launch.register(stop_launch_ops_scheduler)
-except Exception as e:
-    logger.warning('[LAUNCH_OPS] %s', e)
-    launch_ops_scheduler = None
-
-try:
-    from sincor2.launch_review_notify import start_review_reminder_scheduler, stop_review_reminder_scheduler
-    import atexit as _atexit_review
-    review_reminder_scheduler = start_review_reminder_scheduler(app)
-    if review_reminder_scheduler:
-        _atexit_review.register(stop_review_reminder_scheduler)
-except Exception as e:
-    logger.warning('[REVIEW_REMINDER] %s', e)
-
-try:
-    from sincor2.partner_outreach_notify import start_partner_reminder_scheduler, stop_partner_reminder_scheduler
-    import atexit as _atexit_partner
-    partner_reminder_scheduler = start_partner_reminder_scheduler(app)
-    if partner_reminder_scheduler:
-        _atexit_partner.register(stop_partner_reminder_scheduler)
-except Exception as e:
-    logger.warning('[PARTNER_REMINDER] %s', e)
-
-try:
-    from sincor2.daily_ops_scheduler import start_daily_ops_scheduler, stop_daily_ops_scheduler
-    import atexit as _atexit_daily
-    daily_ops_scheduler = start_daily_ops_scheduler(app)
-    if daily_ops_scheduler:
-        _atexit_daily.register(stop_daily_ops_scheduler)
-except Exception as e:
-    logger.warning('[DAILY_OPS] %s', e)
-    daily_ops_scheduler = None
-
-try:
-    from sincor2.compliance_monitor import start_compliance_scheduler
-    import atexit as _atexit_compliance
-    compliance_scheduler = start_compliance_scheduler()
-    if compliance_scheduler:
-        def _stop_compliance():
-            if compliance_scheduler.running:
-                compliance_scheduler.shutdown(wait=False)
-        _atexit_compliance.register(_stop_compliance)
-except Exception as e:
-    logger.warning('[COMPLIANCE] %s', e)
-    compliance_scheduler = None
-
-try:
-    from sincor2.subscription_scheduler import start_subscription_scheduler, stop_subscription_scheduler
-    import atexit as _atexit_sub
-    subscription_scheduler = start_subscription_scheduler(app)
-    if subscription_scheduler:
-        _atexit_sub.register(stop_subscription_scheduler)
-except Exception as e:
-    logger.warning('[SUBSCRIPTION] %s', e)
+    logger.warning('[SCHEDULER] %s', e)
+    central_scheduler = None
 
 try:
     from sincor2.x402_payments import init_x402_db
@@ -565,15 +503,18 @@ except Exception as e:
     X402_AVAILABLE = False
 
 try:
-    from sincor2.polyclaw_scheduler import start_polyclaw_scheduler, stop_polyclaw_scheduler
-    import atexit as _atexit_poly
-    polyclaw_scheduler = start_polyclaw_scheduler(app)
-    if polyclaw_scheduler:
-        _atexit_poly.register(stop_polyclaw_scheduler)
-        logger.info('[POLYCLAW] scheduler started')
+    # Real /api/polyclaw/status view — registered here, ahead of the legacy
+    # route defined later, so Flask's first-registered rule lets the real
+    # implementation win. The trading loop itself now runs as the
+    # "polyclaw_scan" job on the central scheduler above; this is route-only.
+    # Live-mode CLOB warm-up stays async so it never blocks gunicorn boot
+    # (dry-run default: no-op). Live/dry-run posture and private-key env
+    # handling are untouched by the one-scheduler consolidation.
+    from sincor2.polyclaw_scheduler import register_polyclaw_status_route, maybe_bootstrap_live_client
+    register_polyclaw_status_route(app)
+    maybe_bootstrap_live_client()
 except Exception as e:
     logger.warning('[POLYCLAW] %s', e)
-    polyclaw_scheduler = None
 
 
 @app.before_request

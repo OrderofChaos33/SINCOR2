@@ -1,6 +1,12 @@
 """
 Daily email reminder — pending launch drafts need ~5 min approval at /launch/review.
 HARD-DISABLED — operator requested all draft reminder emails stopped.
+
+One-scheduler consolidation (2026-10-11): this module no longer owns an
+APScheduler instance. The central scheduler (sincor2.scheduler) registers the
+``launch_review_notify`` job exactly once (default OFF, and still
+hard-disabled here); the send function below is the callable it uses.
+Scheduling is defined once in sincor2.scheduler.SCHEDULER_DEFAULTS.
 """
 
 from __future__ import annotations
@@ -15,7 +21,6 @@ logger = logging.getLogger("sincor2.launch_review_notify")
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_ALERT_EMAIL = "court@getsincor.com"
-_scheduler = None
 
 # Operator kill switch. Railway still has LAUNCH_REVIEW_REMINDER_ENABLED=true,
 # so honoring that env var would keep sending. Do not remove until emails are wanted.
@@ -137,56 +142,3 @@ def send_launch_review_reminder() -> dict:
     except Exception as e:
         logger.error("[REVIEW_REMINDER] Failed: %s", e, exc_info=True)
         return {"ok": False, "error": str(e)}
-
-
-def start_review_reminder_scheduler(app=None):
-    """Daily cron reminder. Hard-disabled — will not start."""
-    global _scheduler
-
-    if _HARD_DISABLE_REMINDER_EMAILS:
-        logger.info("[REVIEW_REMINDER] Hard-disabled by operator request")
-        return None
-
-    if os.environ.get("LAUNCH_REVIEW_REMINDER_ENABLED", "false").lower() != "true":
-        logger.info("[REVIEW_REMINDER] Disabled (LAUNCH_REVIEW_REMINDER_ENABLED!=true)")
-        return None
-
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.cron import CronTrigger
-    except ImportError:
-        logger.warning("[REVIEW_REMINDER] APScheduler not installed")
-        return None
-
-    if _scheduler is not None and _scheduler.running:
-        return _scheduler
-
-    hour = int(os.environ.get("LAUNCH_REVIEW_REMINDER_HOUR", "9"))
-    minute = int(os.environ.get("LAUNCH_REVIEW_REMINDER_MINUTE", "15"))
-    tz = os.environ.get("LAUNCH_OPS_TIMEZONE", "America/Chicago")
-
-    _scheduler = BackgroundScheduler(timezone=tz)
-    _scheduler.add_job(
-        send_launch_review_reminder,
-        trigger=CronTrigger(hour=hour, minute=minute),
-        id="launch_review_reminder",
-        name="SINCOR Launch Review Daily Reminder",
-        replace_existing=True,
-        max_instances=1,
-    )
-    _scheduler.start()
-    logger.info(
-        "[REVIEW_REMINDER] Scheduled daily %02d:%02d %s → %s",
-        hour,
-        minute,
-        tz,
-        _alert_email(),
-    )
-    return _scheduler
-
-
-def stop_review_reminder_scheduler() -> None:
-    global _scheduler
-    if _scheduler and _scheduler.running:
-        _scheduler.shutdown(wait=False)
-        logger.info("[REVIEW_REMINDER] Scheduler stopped")

@@ -1,13 +1,17 @@
-"""Email reminders for SINC subscription renewals."""
+"""Email reminders for SINC subscription renewals.
+
+One-scheduler consolidation (2026-10-11): this module no longer owns an
+APScheduler instance. The central scheduler (sincor2.scheduler) registers the
+``subscription_reminders`` job exactly once (default ON); the job function
+below is the callable it uses. Scheduling is defined once in
+sincor2.scheduler.SCHEDULER_DEFAULTS.
+"""
 
 from __future__ import annotations
 
 import logging
-import os
 
 logger = logging.getLogger("sincor2.subscription_scheduler")
-
-_scheduler = None
 
 
 def _send_renewal_reminders() -> None:
@@ -52,38 +56,3 @@ def _send_renewal_reminders() -> None:
     except Exception as e:
         logger.error("[SUBSCRIPTION] Renewal cycle error: %s", e, exc_info=True)
 
-
-def start_subscription_scheduler(app=None):
-    global _scheduler
-
-    if os.environ.get("SUBSCRIPTION_REMINDER_ENABLED", "true").lower() != "true":
-        logger.info("[SUBSCRIPTION] Reminder scheduler disabled")
-        return None
-
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.cron import CronTrigger
-    except ImportError:
-        logger.warning("[SUBSCRIPTION] APScheduler not installed")
-        return None
-
-    hour = int(os.environ.get("SUBSCRIPTION_REMINDER_HOUR", "10"))
-    minute = int(os.environ.get("SUBSCRIPTION_REMINDER_MINUTE", "0"))
-
-    _scheduler = BackgroundScheduler(daemon=True)
-    _scheduler.add_job(
-        _send_renewal_reminders,
-        CronTrigger(hour=hour, minute=minute),
-        id="subscription_renewal_reminder",
-        replace_existing=True,
-    )
-    _scheduler.start()
-    logger.info("[SUBSCRIPTION] Renewal reminder scheduler started (%02d:%02d UTC)", hour, minute)
-    return _scheduler
-
-
-def stop_subscription_scheduler():
-    global _scheduler
-    if _scheduler and _scheduler.running:
-        _scheduler.shutdown(wait=False)
-        _scheduler = None

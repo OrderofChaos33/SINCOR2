@@ -1,12 +1,14 @@
 """
-SINCOR Launch Ops Scheduler
-Runs launch_content_engine cycle on an interval (drafts → human review queue).
+SINCOR Launch Ops job-function library.
 
+One-scheduler consolidation (2026-10-11): this module no longer owns an
+APScheduler instance. The central scheduler (sincor2.scheduler) registers the
+``launch_cycle`` job exactly once; the job function below is the callable it
+can use. Scheduling (cadence, enablement) is defined once in
+sincor2.scheduler.SCHEDULER_DEFAULTS.
+
+Runs launch_content_engine cycle (drafts → human review queue).
 Hook keeper + buy_watcher are Windows/local daemons — use scripts/install_launch_ops_schedule.ps1.
-
-Environment variables:
-  LAUNCH_OPS_ENABLED         — set to "true" to activate (default: false)
-  LAUNCH_OPS_INTERVAL_HOURS  — cycle interval (default: 24)
 """
 
 from __future__ import annotations
@@ -18,7 +20,6 @@ from pathlib import Path
 
 logger = logging.getLogger("sincor2.launch_ops_scheduler")
 
-_scheduler = None
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
@@ -53,59 +54,3 @@ def _run_content_cycle() -> None:
             send_launch_review_reminder()
     except Exception as e:
         logger.error("[LAUNCH_OPS] Content cycle error: %s", e, exc_info=True)
-
-
-def start_launch_ops_scheduler(app=None):
-    """Start APScheduler for launch content drafts (review queue, not auto-publish)."""
-    global _scheduler
-
-    if os.environ.get("LAUNCH_OPS_ENABLED", "false").lower() != "true":
-        logger.info(
-            "[LAUNCH_OPS] Disabled (set LAUNCH_OPS_ENABLED=true to activate)"
-        )
-        return None
-
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.interval import IntervalTrigger
-        from apscheduler.triggers.date import DateTrigger
-        from datetime import datetime, timedelta
-    except ImportError:
-        logger.warning("[LAUNCH_OPS] APScheduler not installed — pip install apscheduler")
-        return None
-
-    if _scheduler is not None and _scheduler.running:
-        logger.info("[LAUNCH_OPS] Scheduler already running")
-        return _scheduler
-
-    interval_hours = float(os.environ.get("LAUNCH_OPS_INTERVAL_HOURS", "24"))
-
-    _scheduler = BackgroundScheduler(timezone="America/Chicago")
-    _scheduler.add_job(
-        _run_content_cycle,
-        trigger=IntervalTrigger(hours=interval_hours),
-        id="launch_ops_content",
-        name="SINCOR Launch Content Cycle",
-        replace_existing=True,
-        max_instances=1,
-    )
-    _scheduler.add_job(
-        _run_content_cycle,
-        trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=90)),
-        id="launch_ops_startup",
-        name="SINCOR Launch Content Startup Run",
-    )
-    _scheduler.start()
-    logger.info(
-        "[LAUNCH_OPS] Scheduler started (every %sh, startup run in 90s). "
-        "Approve at /launch/review",
-        interval_hours,
-    )
-    return _scheduler
-
-
-def stop_launch_ops_scheduler() -> None:
-    global _scheduler
-    if _scheduler and _scheduler.running:
-        _scheduler.shutdown(wait=False)
-        logger.info("[LAUNCH_OPS] Scheduler stopped")

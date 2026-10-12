@@ -23,74 +23,105 @@ def _bind_mvp():
 _bind_mvp()
 
 
+# ---------------------------------------------------------------------------
+# One-scheduler consolidation (2026-10-11): all background jobs live on the
+# single central scheduler in sincor2.scheduler. These helpers query it by
+# canonical job id instead of the removed per-domain scheduler objects.
+# ---------------------------------------------------------------------------
+
+def _central_scheduler():
+    import sincor2.mvp_app as mvp
+    return getattr(mvp, 'central_scheduler', None)
+
+
+def _central_job_next(job_id):
+    sched = _central_scheduler()
+    if not sched or not sched.running:
+        return None
+    try:
+        job = sched.get_job(job_id)
+        return str(job.next_run_time) if job else None
+    except Exception:
+        return None
+
+
+def _central_job_running(job_id):
+    sched = _central_scheduler()
+    if not sched or not sched.running:
+        return False
+    try:
+        return sched.get_job(job_id) is not None
+    except Exception:
+        return False
+
+
+def _job_enabled(job_id):
+    """Env gate for a canonical job, using the single SCHEDULER_DEFAULTS table."""
+    from sincor2.scheduler import SCHEDULER_DEFAULTS
+    spec = SCHEDULER_DEFAULTS[job_id]
+    default = 'true' if spec['enabled'] else 'false'
+    return os.environ.get(spec['env_enabled'], default).lower() == 'true'
+
+
 @bp.route('/api/ops/schedulers', methods=['GET'])
 def ops_schedulers_status():
-    """Overview of background schedulers and env gates."""
-    def _job_next(sched, job_id):
-        if not sched or not sched.running:
-            return None
-        try:
-            job = sched.get_job(job_id)
-            return str(job.next_run_time) if job else None
-        except Exception:
-            return None
-
+    """Overview of background schedulers and env gates (central scheduler)."""
     return jsonify({
         'launch_ops': {
-            'enabled': os.environ.get('LAUNCH_OPS_ENABLED', 'false').lower() == 'true',
-            'running': bool(launch_ops_scheduler and launch_ops_scheduler.running),
-            'next_run': _job_next(launch_ops_scheduler, 'launch_ops_content'),
+            'enabled': _job_enabled('launch_cycle'),
+            'running': _central_job_running('launch_cycle'),
+            'next_run': _central_job_next('launch_cycle'),
             'review_url': '/launch/review',
         },
         'review_reminder': {
-            'enabled': os.environ.get('LAUNCH_REVIEW_REMINDER_ENABLED', 'true').lower() != 'false',
+            'enabled': _job_enabled('launch_review_notify'),
             'alert_email': os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'court@getsincor.com'),
-            'running': bool(review_reminder_scheduler and review_reminder_scheduler.running),
-            'next_run': _job_next(review_reminder_scheduler, 'launch_review_reminder'),
+            'running': _central_job_running('launch_review_notify'),
+            'next_run': _central_job_next('launch_review_notify'),
         },
         'partner_reminder': {
-            'enabled': os.environ.get('PARTNER_OUTREACH_ENABLED', 'false').lower() == 'true',
+            'enabled': _job_enabled('partner_notify'),
             'alert_email': (
                 os.environ.get('PARTNER_OUTREACH_ALERT_EMAIL')
                 or os.environ.get('LAUNCH_REVIEW_ALERT_EMAIL', 'court@getsincor.com')
             ),
-            'running': bool(partner_reminder_scheduler and partner_reminder_scheduler.running),
-            'next_run': _job_next(partner_reminder_scheduler, 'partner_outreach_reminder'),
+            'running': _central_job_running('partner_notify'),
+            'next_run': _central_job_next('partner_notify'),
             'partners_url': '/launch/partners',
         },
         'daily_ops': {
-            'enabled': os.environ.get('DAILY_OPS_ENABLED', 'false').lower() == 'true',
-            'running': bool(daily_ops_scheduler and daily_ops_scheduler.running),
-            'next_run': _job_next(daily_ops_scheduler, 'daily_ops'),
+            'enabled': _job_enabled('daily_ops'),
+            'running': _central_job_running('daily_ops'),
+            'next_run': _central_job_next('daily_ops'),
             'latest_report': '/logs/ops/daily_latest.json',
         },
         'content_agent': {
-            'enabled': os.environ.get('CONTENT_AGENT_ENABLED', 'false').lower() == 'true',
-            'running': bool(content_scheduler and content_scheduler.running),
-            'next_run': _job_next(content_scheduler, 'content_cycle'),
+            'enabled': _job_enabled('content_cycle'),
+            'running': _central_job_running('content_cycle'),
+            'next_run': _central_job_next('content_cycle'),
         },
         'outreach': {
-            'enabled': os.environ.get('OUTREACH_ENABLED', 'false').lower() == 'true',
-            'running': bool(outreach_scheduler and outreach_scheduler.running),
-            'next_run': _job_next(outreach_scheduler, 'outreach_cycle'),
+            'enabled': _job_enabled('outreach_cycle'),
+            'running': _central_job_running('outreach_cycle'),
+            'next_run': _central_job_next('outreach_cycle'),
         },
         'compliance': (
             {
-                'enabled': os.environ.get('COMPLIANCE_MONITOR_ENABLED', 'false').lower() == 'true',
+                'enabled': _job_enabled('compliance_checks'),
                 'confidential': True,
-                'running': bool(compliance_scheduler and compliance_scheduler.running),
-                'next_run': _job_next(compliance_scheduler, 'compliance_monitor'),
+                'running': _central_job_running('compliance_checks'),
+                'next_run': _central_job_next('compliance_checks'),
             }
             if _check_admin_token(request) or _check_admin_key(request)
             else {
-                'enabled': os.environ.get('COMPLIANCE_MONITOR_ENABLED', 'false').lower() == 'true',
+                'enabled': _job_enabled('compliance_checks'),
                 'confidential': True,
             }
         ),
         'polyclaw': {
-            'enabled': os.environ.get('POLYCLAW_ENABLED', 'false').lower() == 'true',
-            'running': bool(polyclaw_scheduler and polyclaw_scheduler.running),
-            'next_run': _job_next(polyclaw_scheduler, 'polyclaw_scan'),
+            'enabled': _job_enabled('polyclaw_scan'),
+            'running': _central_job_running('polyclaw_scan'),
+            'next_run': _central_job_next('polyclaw_scan'),
         },
         'windows_tasks': [
             'SINCOR Launch Daemons (logon)',
@@ -108,7 +139,7 @@ def outreach_status():
     try:
         from sincor2.outreach_engine import get_outreach_engine
         engine = get_outreach_engine()
-        scheduler_running = outreach_scheduler is not None and outreach_scheduler.running if outreach_scheduler else False
+        scheduler_running = _central_job_running('outreach_cycle')
         return jsonify({
             'enabled': engine.enabled,
             'scheduler_running': scheduler_running,
@@ -117,7 +148,7 @@ def outreach_status():
             'resend_configured': bool(os.environ.get('RESEND_API_KEY')),
             'daily_limit': engine.daily_limit,
             'total_sent_ever': len(engine._sent_ids),
-            'next_run': str(outreach_scheduler.get_job('outreach_cycle').next_run_time) if scheduler_running else None,
+            'next_run': _central_job_next('outreach_cycle') if scheduler_running else None,
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -129,8 +160,8 @@ def polyclaw_status():
     try:
         from pathlib import Path
         trades_log = Path.home() / ".openclaw" / "workspace" / "polyclaw_trades.jsonl"
-        
-        scheduler_running = polyclaw_scheduler is not None and polyclaw_scheduler.running if polyclaw_scheduler else False
+
+        scheduler_running = _central_job_running('polyclaw_scan')
         
         total_trades = 0
         total_profit = 0.0

@@ -1,6 +1,12 @@
 """
 Daily partner outreach reminder — due KOLs/curators for November 9 launch.
 Runs on Railway (PARTNER_OUTREACH_ENABLED) or Windows scheduled task.
+
+One-scheduler consolidation (2026-10-11): this module no longer owns an
+APScheduler instance. The central scheduler (sincor2.scheduler) registers the
+``partner_notify`` job exactly once (default OFF); the send function below is
+the callable it uses. Scheduling is defined once in
+sincor2.scheduler.SCHEDULER_DEFAULTS.
 """
 
 from __future__ import annotations
@@ -15,7 +21,6 @@ logger = logging.getLogger("sincor2.partner_outreach_notify")
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_ALERT_EMAIL = "court@getsincor.com"
-_scheduler = None
 
 
 def _partners_url() -> str:
@@ -116,45 +121,3 @@ def send_partner_outreach_reminder() -> dict:
     except Exception as e:
         logger.error("[PARTNER_REMINDER] failed: %s", e)
         return {"ok": False, "error": str(e)}
-
-
-def start_partner_reminder_scheduler(app=None):
-    global _scheduler
-    if os.environ.get("PARTNER_OUTREACH_ENABLED", "false").lower() != "true":
-        logger.info("[PARTNER_REMINDER] Disabled (PARTNER_OUTREACH_ENABLED != true)")
-        return None
-
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.triggers.cron import CronTrigger
-    except ImportError:
-        logger.warning("[PARTNER_REMINDER] APScheduler not installed")
-        return None
-
-    hour = int(os.environ.get("PARTNER_OUTREACH_REMINDER_HOUR", "8"))
-    minute = int(os.environ.get("PARTNER_OUTREACH_REMINDER_MINUTE", "30"))
-
-    if _scheduler is not None and _scheduler.running:
-        return _scheduler
-
-    _scheduler = BackgroundScheduler(daemon=True)
-    _scheduler.add_job(
-        send_partner_outreach_reminder,
-        CronTrigger(hour=hour, minute=minute),
-        id="partner_outreach_reminder",
-        replace_existing=True,
-    )
-    _scheduler.start()
-    logger.info(
-        "[PARTNER_REMINDER] Scheduled daily %02d:%02d → %s",
-        hour, minute, _alert_email(),
-    )
-    return _scheduler
-
-
-def stop_partner_reminder_scheduler():
-    global _scheduler
-    if _scheduler and _scheduler.running:
-        _scheduler.shutdown(wait=False)
-        _scheduler = None
-        logger.info("[PARTNER_REMINDER] Scheduler stopped")
