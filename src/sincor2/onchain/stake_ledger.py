@@ -545,6 +545,22 @@ class StakeLedger:
             self._save()
         return amount
 
+    def locked_for(self, agent_id: str, task_id: str) -> int:
+        """Wei currently locked for (agent_id, task_id).  Pure read.
+
+        Used by the W-78 escrow-concentration cap to test whether a
+        winning escrow is still unreleased (lock held).  Never creates
+        records and never mutates the ledger.
+        """
+        with self._lock:
+            rec = self._data.get("agents", {}).get(agent_id)
+            if not rec:
+                return 0
+            try:
+                return int(rec["locks"].get(task_id, "0"))
+            except (TypeError, ValueError):
+                return 0
+
     # -- slashing (adjudicator only) -------------------------------------------
     def _check_adjudicator(self, adjudicator: Optional[str]) -> str:
         expected = os.environ.get(ADJUDICATOR_ENV, "").strip()

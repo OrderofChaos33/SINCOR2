@@ -130,6 +130,25 @@ REVEAL_WINDOW_MS = _sealed_window_ms(
 UINT96_MAX = 2**96 - 1
 
 
+# --- Hunt-15 W-78: per-agent open-escrow concentration cap ----------------------
+# A fully veteran agent's reputation discount (COLLATERAL_ALPHA = 0.8 in
+# onchain/stake_ledger.py) cuts effective collateral to ~10 % of bid value,
+# so without a cap one veteran could hold UNBOUNDED simultaneous winning
+# escrows.  The cap is an ABSOLUTE aggregate (AXM) over the agent's OPEN
+# winning escrows and binds at WIN / escrow-open time (close_auction), never
+# at bid commit: bidding breadth stays unlimited, only realized exposure is
+# bounded.  Governance-tunable: change this number; do NOT touch the
+# reputation-discount parameter or any slash math.
+MAX_AGENT_OPEN_ESCROW_AXM = 50.0
+
+# Task states in which the winner's escrow counts as open.  `settled` and
+# `expired` are terminal (lock released or obligation dead).  `failed`
+# counts only while the winner's stake lock is still held — see
+# _open_escrows_locked: a failed task whose lock was slashed or released by
+# adjudication no longer encumbers capital and drops out.
+_OPEN_ESCROW_STATES = frozenset({"assigned", "proof_submitted", "failed"})
+
+
 def listing_ttl_ms() -> int:
     """Outer listing lifetime for a task (default 24 h).
 
@@ -500,6 +519,66 @@ def _reset_ghost_settlement_reputation(fabric, ghosts) -> int:
     return removed_total
 
 
+def _open_escrows_locked(fabric: Any, agent_id: str) -> List[Dict[str, Any]]:
+    """The agent's open winning escrows.  Caller must hold fabric.lock.
+
+    A task counts when the agent is the assigned winner, the task is in an
+    open state (see _OPEN_ESCROW_STATES), and the escrow is unreleased:
+    for sealed-bid tasks the winner's stake lock must still be held in the
+    stake ledger (a `failed` task whose lock was slashed or released by
+    adjudication drops out); legacy plaintext tasks never lock stake, so
+    the assignment itself is the escrow.  Exposure is measured in WINNING
+    BID AXM — the escrowed value at risk — falling back to bounty_axm when
+    the winning bid is not recorded.  Pure read: never mutates fabric or
+    the ledger.  (Ledger reads here are safe under fabric.lock:
+    stake_ledger never takes fabric.lock, so no lock-order inversion.)
+    """
+    from sincor2.onchain.stake_ledger import stake_ledger
+    ledger = stake_ledger()
+    open_escrows: List[Dict[str, Any]] = []
+    for task in fabric.tasks.values():
+        if task.get("assigned_to") != agent_id:
+            continue
+        if task.get("state") not in _OPEN_ESCROW_STATES:
+            continue
+        if task.get("sealed"):
+            try:
+                if ledger.locked_for(agent_id, task.get("task_id")) <= 0:
+                    continue
+            except Exception:
+                # Fail closed on ledger unreadability: count the escrow.
+                pass
+        amount = task.get("winning_bid_axm")
+        if amount is None:
+            amount = task.get("bounty_axm") or 0
+        try:
+            amount_f = float(amount)
+        except (TypeError, ValueError):
+            continue
+        open_escrows.append({
+            "task_id": task.get("task_id"),
+            "winning_bid_axm": amount_f,
+            "state": task.get("state"),
+        })
+    return open_escrows
+
+
+def _open_exposure_locked(fabric: Any, agent_id: str) -> float:
+    """Aggregate AXM over the agent's open winning escrows (fabric.lock held)."""
+    return sum(e["winning_bid_axm"] for e in _open_escrows_locked(fabric, agent_id))
+
+
+def open_escrow_exposure_axm(agent_id: str) -> float:
+    """Public read path: the agent's current open winning-escrow exposure.
+
+    Returns aggregate AXM (see _open_escrows_locked).  Backs the
+    GET /v1/a2a/escrow-exposure/<agent_id> monitoring endpoint.
+    """
+    fabric = get_fabric()
+    with fabric.lock:
+        return _open_exposure_locked(fabric, agent_id)
+
+
 def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     expire_stale_assignments()
     fabric = get_fabric()
@@ -533,6 +612,7 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 return dict(task)
         cands = [b for b in fabric.bids.values()
                  if b.get("task_id") == task_id and b.get("revealed", True)]
+        close_blocked = False
         if not cands:
             task["state"] = "expired"
             task["expired_reason"] = "auction_timeout"
@@ -541,25 +621,64 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
             snap = dict(task)
             tags = list(task.get("tags") or [])
         else:
-            winner = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))[0]
-            losers = [b["agent_id"] for b in cands
-                      if b["agent_id"] != winner["agent_id"]]
-            task.update({
-                "state": "assigned",
-                "assigned_to": winner["agent_id"],
-                "winner_score": winner["score"],
-                "winning_bid_axm": winner["bid_axm"],
-                "time_est_ms": winner.get("time_est_ms"),
-                "assigned_at": ts,
-            })
-            if task.get("sealed"):
-                task["ghosted_commits"] = ghosted
-            snap = dict(task)
-            tags = list(task.get("tags") or [])
+            ranked = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))
+            # Hunt-15 W-78: the concentration cap binds at WIN time, never at
+            # bid commit.  Walk the ranking; the first candidate whose win
+            # would keep the agent's aggregate open exposure within
+            # MAX_AGENT_OPEN_ESCROW_AXM takes the auction.  Over-cap
+            # candidates are skipped (they become ordinary losers).
+            winner = None
+            for cand in ranked:
+                try:
+                    cand_bid_axm = float(cand.get("bid_axm") or 0)
+                except (TypeError, ValueError):
+                    cand_bid_axm = 0.0
+                exposure = _open_exposure_locked(fabric, cand["agent_id"])
+                if exposure + cand_bid_axm <= MAX_AGENT_OPEN_ESCROW_AXM:
+                    winner = cand
+                    break
+                logger.info(
+                    "w78 escrow cap: skipping candidate %s on task %s "
+                    "(open exposure %.4f AXM + bid %.4f AXM > cap %.1f AXM)",
+                    cand["agent_id"], task_id, exposure, cand_bid_axm,
+                    MAX_AGENT_OPEN_ESCROW_AXM,
+                )
+            if winner is None:
+                # Fail closed: every revealed bidder is over the cap.  Do NOT
+                # assign — leave the task open so a later close (after
+                # settlements free capacity) processes the auction normally.
+                # Ghost/loser settlement is deferred to that close so each
+                # is processed exactly once (see close_blocked guard below).
+                task["close_blocked_reason"] = "escrow_cap"
+                task["close_blocked_at"] = ts
+                snap = dict(task)
+                tags = list(task.get("tags") or [])
+                close_blocked = True
+            else:
+                close_blocked = False
+                losers = [b["agent_id"] for b in cands
+                          if b["agent_id"] != winner["agent_id"]]
+                task.update({
+                    "state": "assigned",
+                    "assigned_to": winner["agent_id"],
+                    "winner_score": winner["score"],
+                    "winning_bid_axm": winner["bid_axm"],
+                    "time_est_ms": winner.get("time_est_ms"),
+                    "assigned_at": ts,
+                })
+                task.pop("close_blocked_reason", None)
+                task.pop("close_blocked_at", None)
+                if task.get("sealed"):
+                    task["ghosted_commits"] = ghosted
+                snap = dict(task)
+                tags = list(task.get("tags") or [])
     # Stake settlement (outside the fabric lock; separate ledger).
     # Ghosting => 100 % slash of the locked stake -> poster re-auction credit.
     # Losers are released; the winner's lock stays until proof settlement.
-    if ghosts or losers:
+    # W-78: when the close was blocked by the escrow cap, NOTHING is settled
+    # here — the task stays open and the next close processes ghosts/losers
+    # exactly once.
+    if not close_blocked and (ghosts or losers):
         from sincor2.onchain.stake_ledger import stake_ledger
         ledger = stake_ledger()
         for agent_id in ghosts:
@@ -578,7 +697,8 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     # the close. The wallet+card behind each ghost is tombstoned so a rebirth
     # under a new agent_id is flagged as a probable whitewash. Shared with
     # expire_stale_assignments() so plaintext no-shows cost exactly the same.
-    if ghosts:
+    # (Deferred with the rest of settlement when the close was cap-blocked.)
+    if not close_blocked and ghosts:
         for agent_id in ghosts:
             _apply_no_show_penalty(fabric, agent_id)
         # Zero the ghost wallet's settlement-ledger reputation as well, so a
@@ -1889,6 +2009,31 @@ def attach_market_routes(bp: Blueprint) -> None:
         summary = stake_ledger().balance_of(agent_id)
         summary["ledger"] = "offchain-axm"
         return jsonify(summary), 200
+
+    @bp.get("/v1/a2a/escrow-exposure/<agent_id>")
+    def v1_escrow_exposure(agent_id):
+        """Per-agent open winning-escrow exposure (W-78 concentration cap).
+
+        Returns the agent's aggregate open escrow exposure in AXM, the
+        absolute cap (MAX_AGENT_OPEN_ESCROW_AXM), remaining headroom, and
+        the open escrow task list.  Unknown agent -> 404 (same convention
+        as /v1/a2a/stake/<agent_id>).  Pure read: never mutates fabric or
+        the ledger.
+        """
+        agent_id = str(agent_id or "").strip()
+        fabric = get_fabric()
+        with fabric.lock:
+            if agent_id not in fabric.agents:
+                return _http_error("unknown agent", 404)
+            escrows = _open_escrows_locked(fabric, agent_id)
+        exposure = sum(e["winning_bid_axm"] for e in escrows)
+        return jsonify({
+            "agent_id": agent_id,
+            "open_exposure_axm": exposure,
+            "cap_axm": MAX_AGENT_OPEN_ESCROW_AXM,
+            "headroom_axm": max(0.0, MAX_AGENT_OPEN_ESCROW_AXM - exposure),
+            "open_escrows": escrows,
+        }), 200
 
     # -- P24 SocialFi issuance -------------------------------------------
     # Agent-triggered creator-token issuance. This route is a CALLER of the
