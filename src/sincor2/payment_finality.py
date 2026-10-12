@@ -31,6 +31,7 @@ from typing import Any, Callable, Mapping, Optional, Protocol
 
 from sincor2.payment_ledger import (
     IllegalPaymentTransition,
+    MissingTxHashError,
     PaymentLedgerStore,
     PaymentRecord,
     PaymentState,
@@ -239,6 +240,10 @@ def check_finality(
     Flow:
       * No tx_hash in evidence (fiat/offchain) -> settle directly from
         ``verified`` (finality is not applicable); grants entitlements.
+      * No tx_hash in evidence but provider is an onchain one (x402/a2a/...)
+        -> the store's evidence guards raise ``MissingTxHashError``; caught
+        here and returned as a clean fail-closed result (W-74).  The payment
+        stays ``pending_verification``, no money moves, the poller survives.
       * Receipt missing or chain unreachable -> stays ``awaiting_finality``,
         no state change, no crash.
       * Receipt reverted (status 0) -> ``failed``.
@@ -294,22 +299,43 @@ def check_finality(
     # -- offchain path: no tx_hash means no chain finality to await --------
     if not tx_hash:
         settled_by_me = False
-        for frm, to, reason in (
-            (PaymentState.CREATED, PaymentState.PENDING_VERIFICATION,
-             "finality_check_started"),
-            (PaymentState.PENDING_VERIFICATION, PaymentState.VERIFIED,
-             "offchain_provider_verified"),
-            (PaymentState.VERIFIED, PaymentState.SETTLED,
-             "finality_not_applicable_offchain"),
-        ):
-            applied, record = store.transition_payment_if_state(
-                payment_id, from_state=frm, to_state=to,
-                actor=actor, reason=reason,
+        try:
+            for frm, to, reason in (
+                (PaymentState.CREATED, PaymentState.PENDING_VERIFICATION,
+                 "finality_check_started"),
+                (PaymentState.PENDING_VERIFICATION, PaymentState.VERIFIED,
+                 "offchain_provider_verified"),
+                (PaymentState.VERIFIED, PaymentState.SETTLED,
+                 "finality_not_applicable_offchain"),
+            ):
+                applied, record = store.transition_payment_if_state(
+                    payment_id, from_state=frm, to_state=to,
+                    actor=actor, reason=reason,
+                )
+                if applied and to == PaymentState.SETTLED:
+                    settled_by_me = True
+                # Lost race: record is the fresh state; keep stepping — a
+                # later conditional may still apply, or the fresh state maps
+                # cleanly.
+        except (MissingTxHashError, IllegalPaymentTransition) as exc:
+            # An ONCHAIN provider (x402/a2a/...) mapped with no tx hash is
+            # blocked by the store's evidence guards: it may not enter
+            # verified-or-later without canonical onchain evidence.  That is
+            # a policy outcome, not a poller crash — the CAS never applied,
+            # so state is unchanged (fail closed: no settlement, no money
+            # movement, no entitlements) and the poller gets a clean result
+            # instead of dying (W-74; same shape as W-54).
+            record = store.get(payment_id)
+            status = (
+                "missing_tx_hash"
+                if isinstance(exc, MissingTxHashError)
+                else "transition_not_legal"
             )
-            if applied and to == PaymentState.SETTLED:
-                settled_by_me = True
-            # Lost race: record is the fresh state; keep stepping — a later
-            # conditional may still apply, or the fresh state maps cleanly.
+            return FinalityResult(
+                ok=False, status=status, payment_id=payment_id,
+                detail=f"{type(exc).__name__}: {exc}; payment stays "
+                       f"{record.state.value}; no money moved",
+            )
         if settled_by_me:
             granted = _grant_entitlements(record)
             return FinalityResult(
