@@ -1,12 +1,10 @@
 """Railway / Gunicorn entry.
 
 Gunicorn imports this module, then binds PORT. /health is served from this
-file with the stdlib only so Railway's probe can pass while mvp_app loads.
-
-The previous shim imported mvp_app on the first real request inside a sync
-worker, cached any failure forever, and kept advertising healthy. That left
-getsincor.com serving JSON stubs for /, /buy, and every other path while
-Railway kept billing the replica.
+file with the stdlib only and is the deploy probe: it stays 200 only while
+mvp_app is loaded or still inside its boot budget, and goes 503 when the
+load has failed or exceeded the budget, so Railway fails a broken deploy
+instead of promoting it.
 
 Load happens in a background thread (post_worker_init + first request).
 Failures retry. /ready tells the truth. /boot shows the exception.
@@ -31,6 +29,13 @@ if not logging.getLogger().handlers:
 _LIVENESS = frozenset({"/health", "/api/health", "/healthz"})
 _HEALTH = b'{"status":"healthy","service":"SINCOR2 MVP","entry":"railway_start"}'
 
+# Boot budget for the deploy probe (/health). Comfortably under Railway's
+# 120s healthcheckTimeout: a load that failed or is still stuck after this
+# long is a broken deploy and must fail the probe so the previous good
+# deployment keeps serving. A transient failure that recovers on retry flips
+# back to 200 once loaded, so brief blips don't kill good deploys.
+_HEALTH_BOOT_BUDGET_S = 90.0
+
 _lock = threading.Lock()
 _ready = threading.Event()
 _thread_started = False
@@ -46,6 +51,29 @@ _REQUEST_WAIT_SECONDS = 45.0
 
 def _json_bytes(payload: dict) -> bytes:
     return json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+
+def _health_probe(start_response):
+    """Truthful deploy probe for Railway's healthcheck.
+
+    - mvp_app loaded -> 200 with the healthy JSON (unchanged).
+    - Not loaded, load failed (_full_error set) or boot budget exceeded
+      -> 503 with boot_status() JSON (error field included so the deploy
+      log shows why).
+    - Not loaded, no error, still inside the boot budget -> 200 (the app
+      normally imports in ~10s; don't fail good deploys mid-boot).
+    """
+    start_background_load()
+    with _lock:
+        full = _full
+        error = _full_error
+    if full is not None:
+        return _respond(start_response, "200 OK", _HEALTH)
+    if error is not None or (time.time() - _started_at) >= _HEALTH_BOOT_BUDGET_S:
+        return _respond(
+            start_response, "503 Service Unavailable", _json_bytes(boot_status())
+        )
+    return _respond(start_response, "200 OK", _HEALTH)
 
 
 def _safe_error(exc: BaseException) -> str:
@@ -152,7 +180,14 @@ def wsgi(environ, start_response):
     if path != "/" and path.endswith("/"):
         path = path.rstrip("/")
 
+    if path == "/health":
+        # Deploy probe: truthful. A broken deploy must fail Railway's
+        # healthcheck instead of going live.
+        return _health_probe(start_response)
+
     if path in _LIVENESS:
+        # /api/health and /healthz are NOT the deploy probe; keep the
+        # instant-200 behavior.
         return _respond(start_response, "200 OK", _HEALTH)
 
     if path == "/boot":
