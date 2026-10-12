@@ -300,10 +300,10 @@ class TestContentPublishGating:
         assert result.get("wp_post_id") == 42
         assert len(calls) == 1
 
-    def test_content_scheduler_default_off(self, clean_gating_env):
-        import sincor2.content_scheduler as sched
-        sched._scheduler = None
-        assert sched.start_content_scheduler() is None
+    # NOTE (rebase onto one-scheduler, 2026-10-12): content_scheduler.py is now
+    # a job-function library — start_content_scheduler() no longer exists.
+    # The fail-closed scheduling requirement is covered by
+    # TestCentralSchedulerDefaults above.
 
 
 class _FakeDb:

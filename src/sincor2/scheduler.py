@@ -221,7 +221,12 @@ def _safe_run(name: str, func: Callable[[], Any]) -> None:
 def _is_enabled(job_id: str) -> bool:
     spec = SCHEDULER_DEFAULTS[job_id]
     default = "true" if spec["enabled"] else "false"
-    return os.environ.get(spec["env_enabled"], default).lower() == "true"
+    # P1 audit #9: use the canonical explicit-opt-in truthy set from
+    # sincor2.comms_gating ("1"/"true"/"yes", case-insensitive) so the
+    # scheduler layer agrees with the comms layer on what counts as opted in.
+    from sincor2.comms_gating import _truthy
+
+    return _truthy(os.environ.get(spec["env_enabled"], default))
 
 
 def _dispatch_job(job_id: str, startup: bool = False) -> None:
