@@ -120,6 +120,6 @@ https://getsincor.com/.well-known/sincor-marketplace.json
 | PulseMCP | `pulsemcp/` | PAUSED — submissions paused since 2026-09-03; auto-ingests Official MCP Registry |
 | Glama | `glama/` | READY — auto-indexes GitHub; founder claims listing after crawl |
 | mcp.directory | `mcp-directory/` | READY — submit form live, no sign-in, 24 h review |
-| Official MCP Registry | `official-mcp-registry/` | READY — `mcp-publisher` CLI + GitHub OIDC (also feeds PulseMCP + mcp.directory auto-discovery) |
+| Official MCP Registry | `official-mcp-registry/` | BLOCKED — draft rewritten to real schema (2026-10-12); needs founder to build the `.mcpb` release first (`mcp-publisher` CLI + GitHub OIDC after) — also gates PulseMCP + mcp.directory auto-ingest |
 | MCP Market | `mcpmarket/` | READY — submit page live (JS form) |
 | awesome-mcp-servers | `awesome-mcp-servers/` | READY — GitHub PR to `punkpeye/awesome-mcp-servers` (diff drafted) |
