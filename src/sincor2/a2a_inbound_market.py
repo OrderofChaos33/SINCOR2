@@ -456,6 +456,21 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
         with fabric.lock:
             snap = dict(fabric.tasks[task_id])
     _save_tasks(fabric)
+    # Wire-up: back the bounty from the ledger-only launch pool.
+    # Fail-open by design: if the pool is unconfigured or short on funds,
+    # the task still posts (unbacked) — pool backing is a funding upgrade,
+    # not a creation gate. Never bricks task creation on accounting.
+    try:
+        from sincor2.a2a_bounty_pool import PoolNotConfigured, bounty_pool
+        alloc = bounty_pool().allocate(
+            task_id, bounty, reason="task bounty backing")
+        snap["pool_backed"] = True
+        snap["pool_allocation_id"] = alloc.get("allocation_id")
+    except PoolNotConfigured:
+        snap["pool_backed"] = False
+    except Exception as err:  # insufficient funds, ledger write failure, ...
+        logger.warning("pool backing failed for task %s: %s", task_id, err)
+        snap["pool_backed"] = False
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
     return snap
 
@@ -648,6 +663,15 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 task["ghosted_commits"] = ghosted
             snap = dict(task)
             tags = list(task.get("tags") or [])
+            # Wire-up: release the pool backing — no winner, no payout.
+            # Fail-safe: never bricks the close on accounting.
+            try:
+                from sincor2.a2a_bounty_pool import bounty_pool
+                for alloc in bounty_pool().allocations_for_task(task_id):
+                    bounty_pool().release(alloc["allocation_id"])
+            except Exception as err:
+                logger.warning("pool release failed for expired task %s: %s",
+                               task_id, err)
         else:
             ranked = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))
             # Hunt-15 W-78: the concentration cap binds at WIN time, never at
