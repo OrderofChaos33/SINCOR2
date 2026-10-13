@@ -149,6 +149,14 @@ def _payload_hash(method: str, path: str,
 def _issue_confirmation(tool: str, method: str, path: str,
                         body: Dict[str, Any],
                         summary: str) -> Dict[str, Any]:
+    # Prune expired entries: without this, unconfirmed confirmations
+    # accumulate in _PENDING forever (slow memory exhaustion via repeated
+    # unconfirmed write-tool calls). Pruning here keeps the store bounded
+    # by live (unexpired, unconfirmed) entries only.
+    now = time.time()
+    for stale_id in [aid for aid, e in _PENDING.items()
+                     if now > float(e.get("expires_at", 0))]:
+        _PENDING.pop(stale_id, None)
     action_id = "mcpact_" + secrets.token_hex(8)
     token = secrets.token_urlsafe(32)
     phash = _payload_hash(method, path, body)
