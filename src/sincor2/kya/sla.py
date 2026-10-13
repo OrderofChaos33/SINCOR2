@@ -34,12 +34,38 @@ class SLAMonitor:
             self._persist()
         return dict(row)
 
+    def unsubscribe(self, kya_id: str) -> bool:
+        """Remove a subscription; receipts history is preserved."""
+        with self.lock:
+            if kya_id not in self.subs:
+                return False
+            del self.subs[kya_id]
+            self._persist()
+        return True
+
+    def uptime(self, kya_id: str) -> Dict[str, Any]:
+        with self.lock:
+            sub = self.subs.get(kya_id)
+            if sub is None:
+                raise KeyError("not subscribed")
+            ok = int(sub.get("ok") or 0)
+            miss = int(sub.get("miss") or 0)
+            total = ok + miss
+            pct: Optional[float] = round(ok / total, 4) if total else None
+            return {
+                "kya_id": kya_id,
+                "ok": ok,
+                "miss": miss,
+                "uptime_pct": pct,
+                "last_ts": int(sub.get("last_ts") or 0),
+                "interval_s": int(sub.get("interval_s") or INTERVAL_S),
+            }
+
     def ping(self, kya_id: str, ok: bool = True, latency_ms: int = 0) -> Dict[str, Any]:
         with self.lock:
             sub = self.subs.get(kya_id)
             if sub is None:
-                sub = {"kya_id": kya_id, "interval_s": INTERVAL_S, "ok": 0, "miss": 0, "last_ts": 0}
-                self.subs[kya_id] = sub
+                raise KeyError("not subscribed")
             now = _now()
             last = int(sub.get("last_ts") or 0)
             if last and now - last > INTERVAL_S * 2:
