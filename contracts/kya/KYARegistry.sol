@@ -462,4 +462,30 @@ contract KYARegistry {
         pendingOwner = address(0);
         emit OwnershipTransferred(previousOwner, nominee);
     }
+
+    /// @notice Single-call trust answer for off-chain verifiers.
+    /// @return verified true only when the attestation is live-verified AND
+    ///         neither identity component is tombstoned.
+    /// @return revoked the attestation's revoked flag.
+    /// @return tombstoned true when either the agent hash or the principal
+    ///         wallet is tombstoned.
+    /// @return everRevokedFlag the kyaId's permanent no-revive mark.
+    /// @dev Pure view: reads byKya, the per-actor tombstones and
+    ///      everRevoked; changes no state and adds no storage. verified is
+    ///      AND-ed with the tombstone check so a consumer never has to
+    ///      cross-reference revokedAgent/revokedPrincipal itself: the
+    ///      sweep and the graft-unverify keep a.verified false whenever a
+    ///      tombstone exists, but this view makes that invariant explicit
+    ///      in one call instead of four.
+    function attestationStatus(bytes32 kyaId)
+        external
+        view
+        returns (bool verified, bool revoked, bool tombstoned, bool everRevokedFlag)
+    {
+        Attestation storage a = byKya[kyaId];
+        tombstoned = _actorTombstoned(a);
+        verified = a.verified && !a.revoked && !tombstoned;
+        revoked = a.revoked;
+        everRevokedFlag = everRevoked[kyaId];
+    }
 }
