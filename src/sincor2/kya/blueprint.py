@@ -13,6 +13,7 @@ import os
 from flask import Blueprint, jsonify, request
 
 from sincor2.kya.airdrop_quest import get_quest
+from sincor2.kya.jwks import get_jwks
 from sincor2.kya.pricing import PRICE_BOOK
 from sincor2.kya.receipts import get_receipts
 from sincor2.kya.sadas import get_sadas
@@ -49,6 +50,13 @@ def mount_kya(app) -> bool:
     app.register_blueprint(kya_stack_bp)
     logger.info("KYA additive stack mounted (quest, SLA receipts, SADAS)")
     return True
+
+
+@kya_stack_bp.get("/v1/kya/jwks.json")
+def kya_jwks():
+    resp = jsonify(get_jwks())
+    resp.headers["Cache-Control"] = "max-age=300"
+    return resp
 
 
 @kya_stack_bp.get("/v1/kya/stack")

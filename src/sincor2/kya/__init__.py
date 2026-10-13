@@ -8,6 +8,7 @@ from sincor2.kya.sla import SLAMonitor, get_sla
 from sincor2.kya.sadas import SADASFeed, get_sadas
 from sincor2.kya.receipts import ReceiptBook, get_receipts
 from sincor2.kya.airdrop_quest import AirdropQuest, get_quest
+from sincor2.kya.jwks import get_jwks, key_for_kid
 from sincor2.kya.merkle import MerkleTree, verify_proof
 from sincor2.kya.pricing import PRICE_BOOK
 
@@ -25,5 +26,7 @@ __all__ = [
     "get_sadas",
     "get_receipts",
     "get_quest",
+    "get_jwks",
+    "key_for_kid",
     "PRICE_BOOK",
 ]
