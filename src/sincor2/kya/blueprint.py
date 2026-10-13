@@ -73,13 +73,16 @@ def sla_sub():
 @kya_stack_bp.post("/v1/sla/ping")
 def sla_ping():
     body = request.get_json(silent=True) or {}
-    return jsonify(
-        get_sla().ping(
-            str(body.get("kya_id") or ""),
-            ok=bool(body.get("ok", True)),
-            latency_ms=int(body.get("latency_ms") or 0),
+    try:
+        return jsonify(
+            get_sla().ping(
+                str(body.get("kya_id") or ""),
+                ok=bool(body.get("ok", True)),
+                latency_ms=int(body.get("latency_ms") or 0),
+            )
         )
-    )
+    except KeyError:
+        return jsonify({"error": "not subscribed"}), 404
 
 
 @kya_stack_bp.get("/v1/sla/receipts")
@@ -98,7 +101,17 @@ def sadas_pub():
 @kya_stack_bp.post("/v1/sadas/subscribe")
 def sadas_sub():
     body = request.get_json(silent=True) or {}
-    return jsonify(get_sadas().subscribe(str(body.get("kya_id") or ""), str(body.get("token") or "")))
+    raw_ttl = body.get("ttl_s")
+    ttl_s = None
+    try:
+        ttl_s = int(raw_ttl) if raw_ttl is not None else None
+    except (TypeError, ValueError):
+        ttl_s = None
+    return jsonify(
+        get_sadas().subscribe(
+            str(body.get("kya_id") or ""), str(body.get("token") or ""), ttl_s=ttl_s
+        )
+    )
 
 
 @kya_stack_bp.get("/v1/sadas/scorecard")
@@ -108,7 +121,15 @@ def sadas_card():
 
 @kya_stack_bp.get("/v1/sadas/feed")
 def sadas_feed():
-    return jsonify(get_sadas().feed(request.args.get("token")))
+    limit = request.args.get("limit", type=int)
+    offset = request.args.get("offset", type=int)
+    return jsonify(
+        get_sadas().feed(
+            request.args.get("token"),
+            limit=limit if limit is not None else 50,
+            offset=offset if offset is not None else 0,
+        )
+    )
 
 
 @kya_stack_bp.post("/v1/polyclaw/day")
