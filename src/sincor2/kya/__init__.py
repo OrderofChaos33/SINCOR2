@@ -10,6 +10,7 @@ from sincor2.kya.receipts import ReceiptBook, get_receipts
 from sincor2.kya.airdrop_quest import AirdropQuest, get_quest
 from sincor2.kya.merkle import MerkleTree, verify_proof
 from sincor2.kya.pricing import PRICE_BOOK
+from sincor2.kya.credentials import CredentialError, issue_credential, verify_credential
 
 __all__ = [
     "KYARegistry",
@@ -26,4 +27,7 @@ __all__ = [
     "get_receipts",
     "get_quest",
     "PRICE_BOOK",
+    "CredentialError",
+    "issue_credential",
+    "verify_credential",
 ]
