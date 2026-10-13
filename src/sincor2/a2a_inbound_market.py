@@ -724,6 +724,26 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                     task["ghosted_commits"] = ghosted
                 snap = dict(task)
                 tags = list(task.get("tags") or [])
+                # Wire-up: record the 5% platform fee on assignment.
+                # Ledger-only accounting (no tx_hash in the gasless path);
+                # idempotent via the task_id note. Never bricks the close.
+                try:
+                    from sincor2.treasury_settlement import (
+                        record_platform_fee_inflow)
+                    fee = round(float(winner["bid_axm"]) * 0.05, 6)
+                    if fee > 0:
+                        record_platform_fee_inflow(
+                            fee_amount=fee,
+                            asset="AXM",
+                            source="a2a_settlement",
+                            task_id=task_id,
+                            note=f"platform fee 5% of winning bid "
+                                 f"{winner['bid_axm']} AXM task={task_id}",
+                        )
+                        snap["fee_recorded_axm"] = fee
+                except Exception as err:
+                    logger.warning("fee record failed for task %s: %s",
+                                   task_id, err)
     # Stake settlement (outside the fabric lock; separate ledger).
     # Ghosting => 100 % slash of the locked stake -> poster re-auction credit.
     # Losers are released; the winner's lock stays until proof settlement.
