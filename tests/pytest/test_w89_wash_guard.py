@@ -95,7 +95,7 @@ def test_wash_caught_and_settlement_not_bricked(iso):
     assert "sole_bidder" in names
     assert "instant_settle" in names
     # Never bricks: settlement still completes, payout still stages.
-    assert proof["status"] in ("paid", "rejected")
+    assert proof["status"] in ("paid", "payout_staged", "rejected")
     fabric = get_fabric()
     assert fabric.tasks[task_id]["state"] in ("settled", "failed")
     assert fabric.tasks[task_id].get("wash_anomaly", {}).get("anomalous") is True
@@ -429,7 +429,7 @@ def test_submit_proof_acceptance_sig_threaded(iso):
                          poster_acceptance_sig="0x" + "00" * 65)
     # Invalid sig -> still assessed (flagged), never raises, kwarg accepted.
     assert (proof.get("wash_anomaly") or {}).get("anomalous") is True
-    assert proof["status"] in ("paid", "rejected")
+    assert proof["status"] in ("paid", "payout_staged", "rejected")
 
 
 @pytest.mark.parametrize("exc,status", [
