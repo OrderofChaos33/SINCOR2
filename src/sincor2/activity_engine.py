@@ -682,6 +682,19 @@ def _record_fee(task: Dict[str, Any], rec: Dict[str, Any],
         logger.warning("[ACTIVITY] fee record failed for %s",
                        rec["task_key"])
         return None
+    if quarantined:
+        # W-89 clearance support: stamp the projected booking on the task so
+        # a later poster EIP-191 acceptance can re-book it as realized with
+        # the exact amount (see wash_guard.clear_wash_anomaly).  Best-effort;
+        # the ledger remains the source of truth.
+        try:
+            task["wash_fee_projected"] = {
+                "fee_axm": fee,
+                "at_ms": int(time.time() * 1000),
+                "note": "projected; clearable by poster EIP-191 acceptance",
+            }
+        except Exception:
+            pass
     rec["fee_recorded"] = True
     rec["fee_axm"] = fee
     rec["fee_projected"] = quarantined

@@ -55,7 +55,14 @@ FALSE-POSITIVE ANALYSIS (why legitimate users don't trip this)
   work).  Cost of the FP is deliberately small: settlement still completes,
   payout still stages; only the anomaly flag is set and any fee is booked
   projected rather than realized.  The poster can clear the flag at any
-  time with an EIP-191 acceptance (see ``verify_poster_acceptance``).
+  time with an EIP-191 acceptance over the canonical message
+  (``SINCOR-POSTER-ACCEPT\\n{task_id}\\n{proof_id}\\n{receipt_hash}``),
+  verified against the poster's registered wallet — two wired paths:
+  (1) pass ``poster_acceptance_sig`` with ``submit_proof`` (clears at
+  settle time); (2) POST ``/v1/a2a/proofs/clear-wash-flag`` afterwards
+  (``clear_wash_anomaly``), which also re-books a quarantined fee as
+  realized.  Invalid acceptances keep the flag and are logged loudly;
+  clearance never raises.
 * ``self_deal_wallet``: no legitimate FP — even "testing" self-payment is
   correctly labeled wash; the flag is informational, not blocking.
 
@@ -291,3 +298,133 @@ def assess_settlement(task: Mapping[str, Any],
         verdict["signals"].append({"name": "assessment_error",
                                    "detail": str(err)[:200]})
         return verdict
+
+
+def clear_wash_anomaly(task_id: str, proof_id: str,
+                       poster_acceptance_sig: str) -> Dict[str, Any]:
+    """Poster-initiated clearance of a W-89 wash-anomaly flag.
+
+    The poster signs the canonical acceptance message
+    (``SINCOR-POSTER-ACCEPT\\n{task_id}\\n{proof_id}\\n{receipt_hash}``) with
+    their REGISTERED wallet; the signature is verified via
+    :func:`verify_poster_acceptance`.  Binding ``task_id`` (and ``proof_id``)
+    in the signed message makes an acceptance unreplayable across tasks.
+
+    On valid acceptance: the flag is cleared (signals kept as history), and
+    a fee previously booked *projected* for this task is re-booked as
+    realized with an audit note linking the clearance.  On invalid
+    acceptance: the flag stays, loudly logged.  Never raises: any failure
+    returns ``{"cleared": False, ...}`` — clearance must never brick
+    settlement or the API.
+    """
+    result: Dict[str, Any] = {
+        "cleared": False,
+        "reason": "",
+        "task_id": str(task_id or ""),
+        "proof_id": str(proof_id or ""),
+    }
+    try:
+        task_id = str(task_id or "")
+        proof_id = str(proof_id or "")
+        if not task_id or not proof_id or not poster_acceptance_sig:
+            result["reason"] = "missing task_id, proof_id, or signature"
+            return result
+        from sincor2.a2a_inbound import get_fabric
+        fabric = get_fabric()
+        task = (fabric.tasks or {}).get(task_id) or {}
+        if not task:
+            result["reason"] = "unknown task"
+            return result
+        proof = (fabric.proofs or {}).get(proof_id) or {}
+        stamp = task.get("wash_anomaly") or proof.get("wash_anomaly") or {}
+        if not stamp.get("anomalous"):
+            result["reason"] = "not flagged"
+            return result
+        if stamp.get("cleared_by_acceptance"):
+            result["reason"] = "already cleared"
+            return result
+        receipt_hash = str(proof.get("receipt_hash")
+                           or task.get("receipt_hash") or "")
+        ok = verify_poster_acceptance(task, proof_id, receipt_hash,
+                                      str(poster_acceptance_sig),
+                                      fabric=fabric)
+        if not ok:
+            logger.error(
+                "[WASH-GUARD] clearance REJECTED: task=%s proof=%s — "
+                "poster acceptance did not verify against the poster's "
+                "registered wallet; flag retained",
+                task_id, proof_id)
+            result["reason"] = "invalid acceptance"
+            return result
+        # Valid acceptance: clear the flag, keep signals as history.
+        now_ms = _now_ms()
+        new_stamp = dict(stamp)
+        new_stamp.update({
+            "anomalous": False,
+            "cleared_by_acceptance": True,
+            "cleared_at": now_ms,
+        })
+        # Re-book a quarantined (projected) fee as realized, exactly once.
+        fee_realized = None
+        fee_info = task.get("wash_fee_projected") or {}
+        if fee_info and not new_stamp.get("fee_realized_on_clearance"):
+            try:
+                amount = float(fee_info.get("fee_axm") or 0)
+            except (TypeError, ValueError):
+                amount = 0.0
+            if amount > 0:
+                try:
+                    from sincor2.treasury_settlement import (
+                        record_platform_fee_inflow)
+                    ev = record_platform_fee_inflow(
+                        fee_amount=amount,
+                        asset="AXM",
+                        source="a2a_settlement",
+                        task_id=task_id,
+                        note=(f"platform fee task={task_id} [realized on "
+                              f"wash-anomaly clearance by poster EIP-191 "
+                              f"acceptance; supersedes projected booking]"),
+                        projected=False,
+                    )
+                    if ev is not None:
+                        new_stamp["fee_realized_on_clearance"] = True
+                        fee_realized = amount
+                except Exception as err:
+                    logger.warning(
+                        "[WASH-GUARD] realized re-booking failed for %s: %s",
+                        task_id, err)
+        # Persist the cleared stamp on task and proof.
+        try:
+            with fabric.lock:
+                _t = fabric.tasks.get(task_id)
+                if _t is not None:
+                    _t["wash_anomaly"] = new_stamp
+                    _t.pop("wash_fee_projected", None)
+                _p = fabric.proofs.get(proof_id)
+                if _p is not None:
+                    _p["wash_anomaly"] = new_stamp
+        except Exception as err:
+            logger.warning("[WASH-GUARD] stamp persist failed for %s: %s",
+                           task_id, err)
+        try:
+            from sincor2.a2a_inbound import _save_tasks
+            _save_tasks(fabric)
+        except Exception:
+            pass
+        logger.error(
+            "[WASH-GUARD] clearance ACCEPTED: task=%s proof=%s flag cleared "
+            "by poster acceptance%s",
+            task_id, proof_id,
+            f", fee {fee_realized} AXM re-booked realized"
+            if fee_realized else "")
+        result.update({
+            "cleared": True,
+            "reason": "poster acceptance verified",
+            "fee_realized_axm": fee_realized,
+        })
+        return result
+    except Exception as err:  # clearance must never raise
+        logger.warning("[WASH-GUARD] clearance failed for %s: %s",
+                       task_id, err)
+        result["reason"] = "internal error"
+        return result
