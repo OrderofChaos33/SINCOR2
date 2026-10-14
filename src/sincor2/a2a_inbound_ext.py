@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 import threading
@@ -569,6 +570,98 @@ def ensure_platform_agent() -> Dict[str, Any]:
     return snapshot
 
 
+# ---------------------------------------------------------------------------
+# Liveness cohort startup seed
+# ---------------------------------------------------------------------------
+# The six sincor-liveness-* cohort agents are first-party/ops agents that run
+# the 24/7 marketplace liveness loop. Their IDs sit under the protected
+# ``sincor-`` prefix, so the public POST /v1/a2a/register route refuses them
+# by design ("reserved agent_id"). They are seeded here at startup through
+# the internal path instead — the same mechanism as ensure_platform_agent().
+#
+# Wallets are the runner's signing-key addresses: heartbeat EIP-191
+# signatures must recover to the registered wallet, so the seed must bind the
+# key the runner actually signs with (NOT the stale wallet values in the
+# runner's cohort.json, which do not match its keys). Override without a code
+# change via LIVENESS_COHORT_WALLETS (JSON object mapping agent_id to wallet).
+_LIVENESS_COHORT_WALLETS_DEFAULT = {
+    "sincor-liveness-01": "0xC2d20A60B4ea93c0aA68a131205224E159766C62",
+    "sincor-liveness-02": "0x4e36d02e8cCE2Fc98576dDEFdA2282623f586717",
+    "sincor-liveness-03": "0x75B0A7efB0B2B8025a8d52bc0f2AefbAAd3187C0",
+    "sincor-liveness-04": "0xB569346B5dFdB0b1e4044f289f912D56D2CEA809",
+    "sincor-liveness-05": "0x4aeF0adF086549eebCAFA2596E277d1a1c4824B8",
+    "sincor-liveness-06": "0xd3A8660d0E95c3FA767A3e1401940a412C116E1a",
+}
+
+_LIVENESS_COHORT_META = {
+    # agent_id: (name, capability_tags)
+    "sincor-liveness-01": ("Liveness Scout Alpha",
+                            ["defi", "data", "monitoring", "markets"]),
+    "sincor-liveness-02": ("Liveness Analyst Beta",
+                            ["defi", "forecasting", "risk", "reporting"]),
+    "sincor-liveness-03": ("Liveness Auditor Gamma",
+                            ["compliance", "audit", "defi", "reporting"]),
+    "sincor-liveness-04": ("Liveness Keeper Delta",
+                            ["defi", "data", "monitoring", "health"]),
+    "sincor-liveness-05": ("Liveness Strategist Epsilon",
+                            ["defi", "lending", "risk", "forecasting"]),
+    "sincor-liveness-06": ("Liveness Reporter Zeta",
+                            ["data", "reporting", "compliance", "monitoring"]),
+}
+
+_LIVENESS_COHORT_DESCRIPTION = (
+    "SINCOR-operated bootstrapping agent. Disclosed market-making "
+    "participant: bids, performs, and settles through the same public paths "
+    "as all agents."
+)
+
+
+def _liveness_cohort_wallets() -> Dict[str, str]:
+    raw = (os.environ.get("LIVENESS_COHORT_WALLETS") or "").strip()
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict) and parsed:
+                return {str(k): str(v) for k, v in parsed.items()}
+            logger.warning("[A2A] LIVENESS_COHORT_WALLETS is not a non-empty "
+                           "object; using built-in cohort wallets")
+        except Exception as err:
+            logger.warning("[A2A] LIVENESS_COHORT_WALLETS unparsable (%s); "
+                           "using built-in cohort wallets", err)
+    return dict(_LIVENESS_COHORT_WALLETS_DEFAULT)
+
+
+def ensure_liveness_cohort() -> List[str]:
+    """Seed the six liveness cohort agents via the internal registration path.
+
+    Idempotent: re-seeding an existing record updates it in place (the
+    internal path bypasses the re-registration proof requirement, same as
+    the platform agent seed). Returns the list of agent_ids seeded.
+    """
+    base = (os.environ.get("PUBLIC_BASE_URL") or os.environ.get("SITE_URL") or "https://getsincor.com").rstrip("/")
+    wallets = _liveness_cohort_wallets()
+    seeded: List[str] = []
+    for agent_id, (name, tags) in _LIVENESS_COHORT_META.items():
+        wallet = (wallets.get(agent_id) or "").strip()
+        if not wallet:
+            logger.warning("[A2A] liveness cohort seed skipped %s: no wallet",
+                           agent_id)
+            continue
+        register_agent_record({
+            "agent_id": agent_id,
+            "name": name,
+            "description": _LIVENESS_COHORT_DESCRIPTION,
+            "version": "1.0.0",
+            "capability_tags": list(tags),
+            "rpc_callback": f"{base}/api/a2a",
+            "wallet": wallet,
+            "chain_id": BASE_CHAIN_ID,
+        }, _internal_reputation=1.0)
+        seeded.append(agent_id)
+    logger.info("[A2A] Liveness cohort seeded: %s", ",".join(seeded))
+    return seeded
+
+
 def _start_platform_heartbeat() -> None:
     global _HEARTBEAT_THREAD
     if _HEARTBEAT_THREAD and _HEARTBEAT_THREAD.is_alive():
@@ -795,6 +888,11 @@ def mount(app: Flask) -> bool:
         ensure_platform_agent()
     except Exception as err:
         logger.warning("[A2A] Platform agent seed skipped: %s", err)
+    try:
+        seeded_cohort = ensure_liveness_cohort()
+        logger.info("[A2A] Liveness cohort seed: %d agents", len(seeded_cohort))
+    except Exception as err:
+        logger.warning("[A2A] Liveness cohort seed skipped: %s", err)
     try:
         seeded = seed_probation_tasks()
         logger.info("[A2A] Seeded %s probation auctions", len(seeded))
