@@ -1228,7 +1228,7 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
     # entirely (fail closed) — checked BEFORE any state is mutated. Smaller
     # clusters are flagged on the staged receipt below.
     from sincor2.sybil_defense import quarantine_check
-    qcheck = quarantine_check(agent_id)
+    qcheck = quarantine_check(agent_id, task_id=task_id)
     if qcheck["quarantined"]:
         raise PermissionError("payout quarantined: %s" % qcheck["reason"])
     close_auction(task_id)
@@ -1265,6 +1265,13 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
             "cluster_size": qcheck["cluster_size"],
             "cluster": qcheck["cluster"],
         }
+        ring = qcheck.get("ring") or {}
+        if ring.get("ring_shaped"):
+            receipt["sybil"]["ring"] = {
+                "cohort_size": ring["cohort_size"],
+                "cohort": ring["cohort"],
+                "poster_in_cohort": ring["poster_in_cohort"],
+            }
     with fabric.lock:
         task = fabric.tasks.get(task_id) or {}
         task["state"] = "settled" if receipt.get("ok") else "failed"
