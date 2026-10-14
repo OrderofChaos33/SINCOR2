@@ -48,6 +48,15 @@ DESCRIPTION_MAX_LEN = 2000
 VERSION_MAX_LEN = 32
 SKILL_FIELD_MAX_LEN = 120
 TAG_MAX_LEN = 64
+EXAMPLE_ENTRY_MAX_LEN = 500
+MODE_MAX_LEN = 64
+AGENT_ID_MAX_LEN = 128
+# Default cap for any skill string field not listed below — including fields
+# the schema gains in the future. Unknown fields are SANITIZED, never
+# passed through.
+_DEFAULT_SKILL_STRING_CAP = 500
+# Recursion cap for nested skill structures (JSON Schemas nest deeply).
+_MAX_SKILL_DEPTH = 12
 
 # C0 controls except \t \n \r, plus DEL, C1 controls, and invisible
 # format characters abused for display-spoofing in a trust directory:
@@ -71,6 +80,7 @@ _BLOCKED_NETWORKS = (
     ipaddress.ip_network("fe80::/10"),      # link-local v6
     ipaddress.ip_network("::/128"),         # unspecified v6
     ipaddress.ip_network("ff00::/8"),       # multicast v6
+    ipaddress.ip_network("64:ff9b::/96"),   # NAT64 well-known prefix: last 32 bits embed an IPv4 address a NAT64 gateway would translate (e.g. ::7f00:1 -> 127.0.0.1)
 )
 
 
@@ -90,26 +100,41 @@ def sanitize_card_text(value: Any, max_len: int) -> str:
 def sanitize_skills(skills: Any) -> list:
     """Sanitize the skills list of an agent card. Never raises.
 
-    Each skill's ``id``/``name``/``tags`` are attacker-controlled display
-    fields served to external UIs, so they get the same text treatment as
-    name/description. Other keys are passed through untouched (structure
-    preservation, not a trust boundary).
+    TRUST BOUNDARY, full stop. Registry-stored skills are served on the
+    public agent card (``/.well-known/agent-card.json`` via
+    ``AgentSkill.to_dict()``) and to external UIs, so EVERY
+    attacker-controlled string that can reach a served field is sanitized
+    here — not just id/name/tags, but description, examples, input/output
+    modes, every string leaf of input/output JSON Schemas, and any unknown
+    or future field.
+
+    Rules:
+      * every string leaf is passed through ``sanitize_card_text`` with a
+        per-field cap for known fields, or a 500-char default cap for
+        unknown fields — the default for an unrecognized string field is
+        SANITIZE, never passthrough;
+      * fields whose name is URL-typed (``quoteUrl`` and any ``*url`` /
+        ``*Url`` key) get the SSRF ``safe_url`` policy instead of the text
+        policy (a URL-looking display string in a non-URL field is left
+        alone — only URL-typed *keys* are gated);
+      * dict keys are sanitized too (``<>`` in a schema property name is
+        still served on the card);
+      * numbers, booleans, and None pass through untouched (they cannot
+        carry markup). Note: this means a JSON-Schema ``pattern``/``const``
+        containing ``<>`` is altered — acceptable for a trust boundary;
+        schemas remain structurally valid.
     """
     out: list = []
     try:
         for skill in (skills or []):
             if isinstance(skill, dict):
-                d = dict(skill)
-                d["id"] = sanitize_card_text(skill.get("id"), SKILL_FIELD_MAX_LEN)
-                d["name"] = sanitize_card_text(skill.get("name"), SKILL_FIELD_MAX_LEN)
-                d["tags"] = [
-                    t
-                    for t in (
-                        sanitize_card_text(t, TAG_MAX_LEN)
-                        for t in (skill.get("tags") or [])
-                    )
-                    if t
-                ]
+                d = _sanitize_skill_value(skill, None)
+                if not isinstance(d, dict):
+                    continue
+                # Historical guarantee: stored skills always carry string
+                # id/name (idempotent — the recursive pass already cleaned them).
+                d["id"] = sanitize_card_text(d.get("id"), SKILL_FIELD_MAX_LEN)
+                d["name"] = sanitize_card_text(d.get("name"), SKILL_FIELD_MAX_LEN)
                 out.append(d)
             else:
                 s = sanitize_card_text(skill, SKILL_FIELD_MAX_LEN)
@@ -118,6 +143,70 @@ def sanitize_skills(skills: Any) -> list:
     except Exception:
         pass
     return out
+
+
+# Per-field caps for known skill string fields. Lookup key is the field
+# name lowercased with underscores/whitespace removed, so "inputModes"
+# and "input_modes" hit the same cap.
+_SKILL_FIELD_CAPS = {
+    "id": SKILL_FIELD_MAX_LEN,            # 120
+    "name": SKILL_FIELD_MAX_LEN,          # 120
+    "description": DESCRIPTION_MAX_LEN,   # 2000
+    "tags": TAG_MAX_LEN,                  # 64, applied per item
+    "examples": EXAMPLE_ENTRY_MAX_LEN,    # 500, applied per item
+    "inputmodes": MODE_MAX_LEN,           # 64, applied per item
+    "outputmodes": MODE_MAX_LEN,          # 64, applied per item
+}
+
+
+def _norm_key(key: Any) -> str:
+    return re.sub(r"[\s_]+", "", str(key or "")).lower()
+
+
+def _is_url_field(key: Any) -> bool:
+    # quoteUrl, documentationUrl, iconUrl, ... — any present or future
+    # URL-typed key gets the SSRF policy. (A field merely *named* like a
+    # URL-ish word, e.g. "curl", also gets gated: fail-safe direction.)
+    n = _norm_key(key)
+    return n == "url" or n.endswith("url")
+
+
+def _skill_string_cap(key: Any) -> int:
+    return _SKILL_FIELD_CAPS.get(_norm_key(key), _DEFAULT_SKILL_STRING_CAP)
+
+
+def _sanitize_skill_value(value: Any, key: Any, depth: int = 0) -> Any:
+    """Recursively sanitize one skill-structure value. Never raises.
+
+    Strings are sanitized (URL-typed keys get ``safe_url``); dicts and
+    lists are walked depth-first with keys sanitized as well; anything
+    else passes through. Past ``_MAX_SKILL_DEPTH`` the value is flattened
+    to sanitized text rather than passed through raw.
+    """
+    try:
+        if isinstance(value, str):
+            if _is_url_field(key):
+                return safe_url(value)
+            return sanitize_card_text(value, _skill_string_cap(key))
+        if isinstance(value, dict):
+            if depth >= _MAX_SKILL_DEPTH:
+                return sanitize_card_text(str(value), _DEFAULT_SKILL_STRING_CAP)
+            return {
+                sanitize_card_text(k, SKILL_FIELD_MAX_LEN): _sanitize_skill_value(v, k, depth + 1)
+                for k, v in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            if depth >= _MAX_SKILL_DEPTH:
+                return sanitize_card_text(str(value), _DEFAULT_SKILL_STRING_CAP)
+            return [_sanitize_skill_value(v, key, depth + 1) for v in value]
+        return value  # numbers, booleans, None: cannot carry markup
+    except Exception:
+        # Fail-closed: on any unexpected error, sanitize as text rather
+        # than passing the raw value through.
+        try:
+            return sanitize_card_text(value, _DEFAULT_SKILL_STRING_CAP)
+        except Exception:
+            return ""
 
 
 def _ip_blocked(ip: Any) -> bool:

@@ -18,6 +18,7 @@ from sincor2.card_sanitize import (
     host_blocked,
     safe_url,
     sanitize_card_text,
+    sanitize_skills,
 )
 
 
@@ -304,6 +305,198 @@ class KyaListingTests(unittest.TestCase):
         rec = kya.list_from_inbound(agent)
         self.assertEqual(rec["name"], "Honest Agent")
         self.assertEqual(rec["card_url"], "https://93.184.216.34/hook")
+
+
+def _scan_no_markup(testcase, obj, path="root"):
+    """Recursively assert no <> survives in any string leaf OR dict key."""
+    if isinstance(obj, str):
+        testcase.assertNotIn("<", obj, f"markup at {path}: {obj!r}")
+        testcase.assertNotIn(">", obj, f"markup at {path}: {obj!r}")
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            _scan_no_markup(testcase, k, f"{path}.key")
+            _scan_no_markup(testcase, v, f"{path}[{k!r}]")
+    elif isinstance(obj, (list, tuple)):
+        for i, v in enumerate(obj):
+            _scan_no_markup(testcase, v, f"{path}[{i}]")
+
+
+class Nat64Tests(unittest.TestCase):
+    """Reviewer non-blocking rec: block the NAT64 well-known prefix."""
+
+    def test_nat64_prefix_blocked(self):
+        # 64:ff9b::/96 embeds an IPv4 address a NAT64 gateway translates;
+        # 64:ff9b::7f00:1 would reach 127.0.0.1 through NAT64.
+        self.assertTrue(host_blocked("64:ff9b::7f00:1"))
+        self.assertTrue(host_blocked("64:ff9b::a9fe:a9fe"))
+        self.assertEqual(safe_url("http://[64:ff9b::7f00:1]/"), "")
+        # sanity: a genuine public v6 address still passes
+        self.assertFalse(host_blocked("2606:4700:4700::1111"))
+
+
+class SkillSchemaExhaustivenessTests(unittest.TestCase):
+    """Round 3: stop whack-a-mole. sanitize_skills must cover the WHOLE
+    AgentSkill schema — description, examples, modes, JSON-Schema leaves,
+    unknown/future fields — not just id/name/tags.
+
+    test_every_schema_field_sanitized walks AgentSkill's fields
+    dynamically: a new str-ish field added to the schema tomorrow is
+    automatically poisoned and fails unless the sanitizer handles it.
+    """
+
+    @staticmethod
+    def _camel(snake):
+        parts = snake.split("_")
+        return parts[0] + "".join(p[:1].upper() + p[1:] for p in parts[1:])
+
+    @staticmethod
+    def _poison_for(ann):
+        import typing
+        origin = typing.get_origin(ann)
+        args = typing.get_args(ann)
+        if ann is str:
+            return "<script>alert(1)</script>"
+        if origin is typing.Union:  # Optional[str]
+            non_none = [a for a in args if a is not type(None)]
+            inner = non_none[0] if non_none else str
+            return SkillSchemaExhaustivenessTests._poison_for(inner)
+        if origin is list:
+            item = args[0] if args else typing.Any
+            if item is str or item is typing.Any:
+                return ["<img src=x onerror=alert(1)>", "clean"]
+            return [SkillSchemaExhaustivenessTests._poison_for(item)]
+        if origin is dict:
+            return {
+                "title": "<script>alert(1)</script>",
+                "<b>evilkey</b>": "v",
+                "properties": {
+                    "<i>prop</i>": {
+                        "type": "string",
+                        "description": "<u>d</u>",
+                    }
+                },
+            }
+        # int and anything else: poison with a string anyway — the
+        # sanitizer must never let <> through a string leaf, whatever
+        # the declared type.
+        return "<script>alert(1)</script>"
+
+    def test_every_schema_field_sanitized(self):
+        import typing
+        from sincor2.a2a_integration import AgentSkill
+        hints = typing.get_type_hints(AgentSkill)
+        self.assertIn("description", hints, "schema walk must see description")
+        self.assertIn("examples", hints, "schema walk must see examples")
+        skill = {}
+        for fname, ann in hints.items():
+            poison = self._poison_for(ann)
+            skill[fname] = poison
+            camel = self._camel(fname)
+            if camel != fname:
+                skill[camel] = poison
+        # Served-only keys from AgentSkill.to_dict() that are not dataclass
+        # fields (an attacker can also just send them):
+        skill["quoteUrl"] = "http://169.254.169.254/latest/meta-data/"
+        skill["axmPriceDisplay"] = "<script>alert(1)</script>"
+        # Unknown future fields — the default must be SANITIZE, never
+        # passthrough:
+        skill["mysteryFutureField"] = "<script>alert('future')</script>"
+        skill["nested_unknown"] = {"deep": ["<img src=x onerror=alert(9)>"]}
+        out = sanitize_skills([skill])
+        self.assertEqual(len(out), 1)
+        _scan_no_markup(self, out[0])
+        # the internal-URL quoteUrl must be killed by the SSRF policy
+        self.assertEqual(out[0]["quoteUrl"], "")
+
+    def test_description_examples_through_card_path(self):
+        """The round-2 finding, pinned at both levels: description and
+        examples must not survive the registration choke point."""
+        body = _poisoned_card(skills=[{
+            "id": "s1",
+            "name": "S1",
+            "description": "<script>alert('desc')</script>",
+            "examples": ["<b>evil example</b>", "clean example"],
+            "inputSchema": {"title": "<i>evil title</i>"},
+        }])
+        parsed = _normalize_registration(body)
+        self.assertTrue(parsed["skills"], "skills must survive")
+        _scan_no_markup(self, parsed["skills"])
+        # and at the sanitize_skills unit level:
+        _scan_no_markup(self, sanitize_skills(body["agent_card"]["skills"]))
+
+    def test_url_typed_skill_field_gets_ssrf_policy(self):
+        out = sanitize_skills(
+            [{"id": "s1", "name": "S1",
+              "quoteUrl": "http://169.254.169.254/x"}])[0]
+        self.assertEqual(out["quoteUrl"], "")
+        out = sanitize_skills(
+            [{"id": "s1", "name": "S1",
+              "quoteUrl": "https://93.184.216.34/q"}])[0]
+        self.assertEqual(out["quoteUrl"], "https://93.184.216.34/q")
+
+    def test_legit_skill_schema_survives(self):
+        skill = {
+            "id": "translator",
+            "name": "Translator",
+            "description": "Translates text between languages.",
+            "tags": ["nlp", "translation"],
+            "examples": ["Translate 'hello' to French."],
+            "inputModes": ["text/plain"],
+            "inputSchema": {
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+            },
+            "axmPriceWei": 1000,
+        }
+        out = sanitize_skills([skill])[0]
+        self.assertEqual(out["description"], "Translates text between languages.")
+        self.assertEqual(out["examples"], ["Translate 'hello' to French."])
+        self.assertEqual(out["inputSchema"]["properties"]["text"]["type"], "string")
+        self.assertEqual(out["axmPriceWei"], 1000)
+
+
+class NormalizeRecordExhaustivenessTests(unittest.TestCase):
+    """The normalized registration record is the stored trust anchor.
+    Recursively scans the ENTIRE output record: any string field added in
+    the future without sanitization fails this test. agent_id/wallet are
+    allowlist-shaped (regex-validated downstream in register_agent_record
+    and kya_registry); everything else must be markup-free."""
+
+    def test_record_has_no_passthrough_string_field(self):
+        body = _poisoned_card(
+            id="<script>alert('id')</script>",
+            wallet="0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+            skills=[{
+                "id": "s1",
+                "name": "S1",
+                "description": "<script>d</script>",
+                "examples": ["<b>e</b>"],
+                "inputSchema": {"title": "<i>t</i>"},
+                "futureField": "<u>f</u>",
+            }],
+        )
+        parsed = _normalize_registration(body)
+        self.assertNotIn("<", parsed["agent_id"],
+                         f"markup in agent_id: {parsed['agent_id']!r}")
+        for key, val in parsed.items():
+            if key in ("agent_id", "wallet"):
+                continue  # allowlist-validated identifier/address fields
+            _scan_no_markup(self, val, f"record[{key}]")
+
+    def test_flat_body_record_has_no_passthrough(self):
+        body = {
+            "agent_id": "<script>alert('x')</script>",
+            "name": "<b>evil</b>",
+            "description": "<i>evil desc</i>",
+            "capability_tags": ["<u>evil-tag</u>"],
+            "wallet": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+        }
+        parsed = _normalize_registration(body)
+        self.assertNotIn("<", parsed["agent_id"])
+        for key, val in parsed.items():
+            if key in ("agent_id", "wallet"):
+                continue
+            _scan_no_markup(self, val, f"record[{key}]")
 
 
 if __name__ == "__main__":

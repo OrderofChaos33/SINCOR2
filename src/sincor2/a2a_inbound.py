@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 from flask import Blueprint, Flask, Response, jsonify, request, stream_with_context
 
 from sincor2.card_sanitize import (
+    AGENT_ID_MAX_LEN,
     DESCRIPTION_MAX_LEN,
     NAME_MAX_LEN,
     SKILL_FIELD_MAX_LEN,
@@ -461,7 +462,9 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
         interfaces = card.get("supportedInterfaces") or []
         interface_url = str(interfaces[0].get("url") or "") if interfaces and isinstance(interfaces[0], dict) else ""
         return {
-            "agent_id": str(card.get("id") or _slug(str(card.get("name")))),
+            # W-82: agent_id is sanitized at the choke point (defense in depth;
+            # register_agent_record also allowlists it via _AGENT_ID_RE).
+            "agent_id": sanitize_card_text(str(card.get("id") or ""), AGENT_ID_MAX_LEN) or _slug(str(card.get("name"))),
             "name": _sanitize_card_text(card["name"], NAME_MAX_LEN),
             "description": _sanitize_card_text(card.get("description") or "", DESCRIPTION_MAX_LEN),
             "version": _sanitize_card_text(card.get("version") or "0.0.0", VERSION_MAX_LEN),
@@ -472,7 +475,12 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
             "sinc_stake": int(body.get("sinc_stake") or 0),
             "skills": sanitize_skills(skills),
         }
-    agent_id = str(body.get("agent_id") or _slug(str(body.get("name") or ""))).strip()
+    # W-82: agent_id is sanitized at the choke point (defense in depth;
+    # register_agent_record also allowlists it via _AGENT_ID_RE).
+    agent_id = (
+        sanitize_card_text(str(body.get("agent_id") or ""), AGENT_ID_MAX_LEN).strip()
+        or _slug(str(body.get("name") or ""))
+    ).strip()
     if not agent_id:
         raise ValueError("agent_id is required")
     tags = body.get("capability_tags") or body.get("tags") or []
