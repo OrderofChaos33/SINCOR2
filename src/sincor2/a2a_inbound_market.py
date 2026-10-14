@@ -1223,14 +1223,22 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
             raise ValueError(
                 "evidence payment_receipt_hash does not match receipt_hash")
     fabric = get_fabric()
-    # Anti-sybil payout quarantine (2026-10-08): a shared-wallet cluster of
-    # >= 3 identities, or any tombstoned cluster member, blocks the payout
-    # entirely (fail closed) — checked BEFORE any state is mutated. Smaller
-    # clusters are flagged on the staged receipt below.
+    # Anti-sybil payout gate (2026-10-08, W-81 rework): a shared-wallet
+    # cluster of >= 3 identities, any tombstoned cluster member, or a
+    # newborn burst paid by a newborn poster blocks the payout entirely
+    # (fail closed) — checked BEFORE any state is mutated. A newborn
+    # burst winning a platform-posted (or poster-unknown) task is HELD
+    # for manual review instead of staged. Smaller clusters and
+    # established-poster ring shapes are flagged on the staged receipt
+    # below (audit telemetry, not a control).
     from sincor2.sybil_defense import quarantine_check
     qcheck = quarantine_check(agent_id, task_id=task_id)
     if qcheck["quarantined"]:
         raise PermissionError("payout quarantined: %s" % qcheck["reason"])
+    if qcheck.get("held"):
+        return _hold_payout_for_review(
+            task_id=task_id, agent_id=agent_id, receipt_hash=receipt_hash,
+            bound=bound, qcheck=qcheck)
     close_auction(task_id)
     ts = _now_ms()
     with fabric.lock:
@@ -1270,7 +1278,14 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
             receipt["sybil"]["ring"] = {
                 "cohort_size": ring["cohort_size"],
                 "cohort": ring["cohort"],
-                "poster_in_cohort": ring["poster_in_cohort"],
+                "winner_low_reputation": ring["winner_low_reputation"],
+                "poster_id": ring["poster_id"],
+                "poster_origin": ring["poster_origin"],
+                "poster_low_reputation": ring["poster_low_reputation"],
+                # Audit telemetry only: an established poster paying a
+                # newborn burst is legitimate shape. Held/quarantined
+                # verdicts never reach this line.
+                "note": "flag only — not a control",
             }
     with fabric.lock:
         task = fabric.tasks.get(task_id) or {}
@@ -1359,6 +1374,215 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
     _save_agents(fabric)
     _save_tasks(fabric)
     snap["http_status"] = 202
+    return snap
+
+
+def _hold_payout_for_review(*, task_id: str, agent_id: str, receipt_hash: str,
+                            bound, qcheck: Dict[str, Any]) -> Dict[str, Any]:
+    """W-81: park a ring-shaped payout for manual review (hold, not block).
+
+    Called from :func:`submit_proof` when the sybil verdict is ``held``:
+    a newborn registration burst won a platform-posted (or
+    poster-unknown) task. The proof IS accepted — the work happened and
+    the deliverable evidence is preserved — but the payout is NOT
+    staged, no reputation is granted, and the winner's stake lock is NOT
+    released. The task moves to state ``"held"`` with the full release
+    context in ``task["sybil_hold"]``; an admin releases or rejects it
+    via the ``/v1/a2a/sybil/holds`` endpoints.
+
+    Fail-closed: the same task/agent/state checks as ``submit_proof``
+    run here, so a hold cannot be manufactured for a task that isn't
+    assigned to the caller.
+    """
+    fabric = get_fabric()
+    ts = _now_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task:
+            raise KeyError("unknown task")
+        if task.get("state") != "assigned":
+            raise RuntimeError("task is not assigned")
+        if task.get("assigned_to") != agent_id:
+            raise PermissionError("only the assigned agent may submit proof")
+        agent = fabric.agents.get(agent_id) or {}
+        amount = float(task.get("winning_bid_axm") or task.get("bounty_axm") or 0)
+        wallet = str(agent.get("wallet") or agent_id)
+        if bound is not None and bound.content_binding_sig:
+            # Same forged-attribution gate as the normal path.
+            verify_content_binding_sig(bound, wallet)
+        proof_id = "prf_" + uuid.uuid4().hex[:10]
+        tags = list(task.get("tags") or [])
+        evidence_dict = evidence_to_dict(bound) if bound is not None else None
+        ring = qcheck.get("ring") or {}
+        hold = {
+            "task_id": task_id,
+            "agent_id": agent_id,
+            "wallet": wallet,
+            "amount_axm": amount,
+            "receipt_hash": receipt_hash,
+            "proof_id": proof_id,
+            "reason": qcheck.get("reason"),
+            "ring": {
+                "cohort_size": ring.get("cohort_size"),
+                "cohort": ring.get("cohort"),
+                "winner_low_reputation": ring.get("winner_low_reputation"),
+                "poster_id": ring.get("poster_id"),
+                "poster_origin": ring.get("poster_origin"),
+                "poster_low_reputation": ring.get("poster_low_reputation"),
+            },
+            "held_at": ts,
+            "evidence": evidence_dict,
+            "tags": tags,
+            "status": "held",
+        }
+        task["state"] = "held"
+        task["proof_id"] = proof_id
+        task["sybil_hold"] = hold
+        if evidence_dict is not None:
+            task["deliverable_evidence"] = evidence_dict
+        proof = {
+            "proof_id": proof_id,
+            "task_id": task_id,
+            "agent_id": agent_id,
+            "receipt_hash": receipt_hash,
+            "status": "held",
+            "http_status": 202,
+            "submitted_at": ts,
+            "settled_at": None,
+            "payout": None,
+            "content_bound": bound is not None,
+            "evidence": evidence_dict,
+            "sybil_hold": {"reason": hold["reason"], "held_at": ts},
+        }
+        fabric.proofs[proof_id] = proof
+        snap = dict(proof)
+    logger.warning("sybil hold: payout for task %s (agent %s) held: %s",
+                   task_id, agent_id, hold["reason"])
+    fabric.publish("proof.held", tags, snap)
+    _save_agents(fabric)
+    _save_tasks(fabric)
+    snap["http_status"] = 202
+    return snap
+
+
+def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, Any]:
+    """Release a held payout: stage it and run settlement bookkeeping.
+
+    Mirrors the settlement tail of :func:`submit_proof` (staged receipt,
+    task settlement fields, +0.2 reputation, stake release,
+    completion record, sponsored-stake recoup). The hold context stored
+    at hold time is the single source of truth — nothing is
+    re-derived from mutable task state except the task record itself.
+    """
+    fabric = get_fabric()
+    ts = _now_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task or task.get("state") != "held" or not task.get("sybil_hold"):
+            raise KeyError("no held payout for task %s" % task_id)
+        hold = dict(task["sybil_hold"])
+    agent_id = hold["agent_id"]
+    wallet = hold["wallet"]
+    amount = float(hold["amount_axm"])
+    receipt_hash = hold["receipt_hash"]
+    proof_id = hold["proof_id"]
+    tags = list(hold.get("tags") or [])
+    receipt = stage_payout(agent_id=agent_id, wallet=wallet, amount_axm=amount,
+                           task_id=task_id, receipt_hash=receipt_hash)
+    receipt["sybil"] = {
+        "held": True,
+        "released_by": decided_by,
+        "released_at": ts,
+        "hold_reason": hold.get("reason"),
+        "ring": hold.get("ring"),
+    }
+    with fabric.lock:
+        task = fabric.tasks.get(task_id) or {}
+        task["state"] = "settled" if receipt.get("ok") else "failed"
+        task["payout_axm"] = amount
+        task["payout_tx"] = receipt.get("staged_tx_digest")
+        task["settled_at"] = ts
+        task["sybil_hold_decision"] = {
+            "decision": "released", "at": ts, "by": decided_by,
+        }
+        task.pop("sybil_hold", None)
+        if receipt.get("ok") and fabric.agents.get(agent_id):
+            ag = fabric.agents[agent_id]
+            _apply_reputation(ag, float(ag.get("reputation") or 0) + 0.2)
+        proof = fabric.proofs.get(proof_id) or {}
+        proof.update({
+            "status": "paid" if receipt.get("ok") else "rejected",
+            "settled_at": ts,
+            "payout": receipt,
+            "sybil_hold": {"decision": "released", "at": ts, "by": decided_by},
+        })
+        fabric.proofs[proof_id] = proof
+        snap = dict(proof)
+    if receipt.get("ok"):
+        try:
+            from sincor2.onchain.stake_ledger import stake_ledger
+            stake_ledger().release(agent_id, task_id)
+        except Exception as err:
+            logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        try:
+            from sincor2.onchain.stake_ledger import stake_ledger
+            _task = get_fabric().tasks.get(task_id) or {}
+            stake_ledger().record_completion(
+                agent_id, task_id, poster_id=_task.get("poster_id"))
+        except Exception as err:
+            logger.warning("reputation record failed for %s: %s", agent_id, err)
+        try:
+            from sincor2.sponsored_stake import recoup_sponsored_stake
+            recoup_sponsored_stake(
+                agent_id, int(round(amount * 1e18)), task_id=task_id)
+        except Exception as err:
+            logger.warning(
+                "sponsored-stake recoup skipped for %s: %s", agent_id, err)
+    logger.warning("sybil hold released: task %s paid %.4f AXM to %s (by %s)",
+                   task_id, amount, agent_id, decided_by)
+    fabric.publish("proof.settled", tags, snap)
+    _save_agents(fabric)
+    _save_tasks(fabric)
+    snap["http_status"] = 200
+    return snap
+
+
+def _reject_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, Any]:
+    """Reject a held payout: no money moves, the task is marked rejected.
+
+    The winner's stake lock is deliberately NOT released here — same as
+    a failed settlement in :func:`submit_proof`, the lock survives so the
+    adjudicator can rule. The proof record is preserved with the
+    rejection decision for audit.
+    """
+    fabric = get_fabric()
+    ts = _now_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task or task.get("state") != "held" or not task.get("sybil_hold"):
+            raise KeyError("no held payout for task %s" % task_id)
+        hold = dict(task["sybil_hold"])
+        proof_id = hold["proof_id"]
+        tags = list(hold.get("tags") or [])
+        task["state"] = "rejected"
+        task["sybil_hold_decision"] = {
+            "decision": "rejected", "at": ts, "by": decided_by,
+            "reason": hold.get("reason"),
+        }
+        task.pop("sybil_hold", None)
+        proof = fabric.proofs.get(proof_id) or {}
+        proof.update({
+            "status": "rejected",
+            "sybil_hold": {"decision": "rejected", "at": ts, "by": decided_by},
+        })
+        fabric.proofs[proof_id] = proof
+        snap = dict(proof)
+    logger.warning("sybil hold rejected: task %s payout to %s denied (by %s)",
+                   task_id, hold.get("agent_id"), decided_by)
+    fabric.publish("proof.rejected", tags, snap)
+    _save_agents(fabric)
+    _save_tasks(fabric)
+    snap["http_status"] = 200
     return snap
 
 
@@ -1958,6 +2182,49 @@ def attach_market_routes(bp: Blueprint) -> None:
             return _http_error(str(err), 403)
         except RuntimeError as err:
             return _http_error(str(err), 409)
+
+    @bp.get("/v1/a2a/sybil/holds")
+    def v1_sybil_holds():
+        """List payouts held for manual sybil review (W-81).
+
+        Admin-gated. Each hold carries the ring details the reviewer
+        needs: cohort size/members, winner/poster standing, and the
+        reason the payout was parked instead of staged.
+        """
+        err = _require_pool_admin()
+        if err:
+            return err
+        fabric = get_fabric()
+        with fabric.lock:
+            holds = [
+                dict(t.get("sybil_hold") or {})
+                for t in fabric.tasks.values()
+                if t.get("state") == "held" and t.get("sybil_hold")
+            ]
+        holds.sort(key=lambda h: h.get("held_at") or 0)
+        return jsonify({"holds": holds, "count": len(holds)}), 200
+
+    @bp.post("/v1/a2a/sybil/holds/<task_id>/release")
+    def v1_sybil_hold_release(task_id):
+        """Release a held payout: stage it and settle (W-81). Admin-gated."""
+        err = _require_pool_admin()
+        if err:
+            return err
+        try:
+            return jsonify(_release_sybil_hold(task_id)), 200
+        except KeyError as exc:
+            return _http_error(str(exc), 404)
+
+    @bp.post("/v1/a2a/sybil/holds/<task_id>/reject")
+    def v1_sybil_hold_reject(task_id):
+        """Reject a held payout: no money moves (W-81). Admin-gated."""
+        err = _require_pool_admin()
+        if err:
+            return err
+        try:
+            return jsonify(_reject_sybil_hold(task_id)), 200
+        except KeyError as exc:
+            return _http_error(str(exc), 404)
 
     @bp.get("/v1/a2a/auctions")
     def v1_auctions():
