@@ -169,8 +169,22 @@ def get_fabric() -> Fabric:
         with _FABRIC_LOCK:
             if _FABRIC is None:
                 _FABRIC = Fabric()
-                _load_agents(_FABRIC)
+                agents_path = _persist_path()
+                agents_file_existed = bool(agents_path is not None and agents_path.is_file())
+                restored = _load_agents(_FABRIC)
                 _load_tasks(_FABRIC)
+                _FABRIC.registry_boot = _registry_persistence_check(restored)
+                if not _is_test_env():
+                    if bool(os.environ.get("RAILWAY_ENVIRONMENT")) and not _FABRIC.registry_boot["persistent"]:
+                        logger.error(
+                            "[A2A] REGISTRY NOT PERSISTENT: %s — agent registry will NOT survive restarts; mount the /data volume",
+                            _FABRIC.registry_boot["reason"],
+                        )
+                    if agents_file_existed and restored == 0:
+                        logger.error(
+                            "[A2A] REGISTRY RESTORE EMPTY: %s existed but 0 agents were restored — the registry may have been wiped",
+                            agents_path,
+                        )
     return _FABRIC
 
 
@@ -189,10 +203,59 @@ def _persist_path():
         return None
 
 
-def _load_agents(fabric: Fabric) -> None:
+def _is_test_env() -> bool:
+    """True when running under a test harness (never log boot alarms there)."""
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENVIRONMENT") or "production").strip().lower()
+    return env in {"test", "testing"}
+
+
+def _registry_persistence_check(restored_count: int) -> Dict[str, Any]:
+    """Boot-time check: is the agent registry on persistent storage?
+
+    Returns ``{"persistent": bool, "data_dir": str, "restored_agents": int,
+    "reason": str}``. Off Railway, local/ephemeral storage is expected and
+    counts as persistent. On Railway, the data dir must be a mounted volume
+    (``/data``), otherwise the registry is wiped on every redeploy/restart.
+    Never raises: a failed check reports ``persistent=False`` with the reason.
+    """
+    try:
+        on_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+        from sincor2.data_paths import data_dir
+        ddir = str(data_dir())
+        if not on_railway:
+            return {
+                "persistent": True,
+                "data_dir": ddir,
+                "restored_agents": restored_count,
+                "reason": "not on Railway; local storage is expected",
+            }
+        if os.path.ismount(ddir):
+            return {
+                "persistent": True,
+                "data_dir": ddir,
+                "restored_agents": restored_count,
+                "reason": "data dir is a mounted volume",
+            }
+        return {
+            "persistent": False,
+            "data_dir": ddir,
+            "restored_agents": restored_count,
+            "reason": "on Railway but data dir is not a mounted volume",
+        }
+    except Exception as err:  # never fatal at boot
+        return {
+            "persistent": False,
+            "data_dir": "",
+            "restored_agents": restored_count,
+            "reason": "persistence check failed: %s" % (err,),
+        }
+
+
+def _load_agents(fabric: Fabric) -> int:
     path = _persist_path()
     if path is None or not path.is_file():
-        return
+        return 0
+    restored = 0
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         agents = raw.get("agents") if isinstance(raw, dict) else raw
@@ -200,8 +263,10 @@ def _load_agents(fabric: Fabric) -> None:
             for agent in agents:
                 if isinstance(agent, dict) and agent.get("agent_id"):
                     fabric.agents[agent["agent_id"]] = agent
+                    restored += 1
     except Exception as err:
         logger.warning("[A2A] restore failed: %s", err)
+    return restored
 
 
 def _save_agents(fabric: Fabric) -> None:
@@ -288,6 +353,10 @@ def health_snapshot() -> Dict[str, Any]:
     fabric = get_fabric()
     ts = _now_ms()
     ttl_ms = HEARTBEAT_TTL_S * 1000
+    # Boot-integrity hedge (Oct-11 registry wipe): registry_boot is set by
+    # get_fabric() on the boot path. Fabrics built via reset_fabric() (tests)
+    # never ran the check — default to safe values.
+    registry_boot = getattr(fabric, "registry_boot", None) or {}
     with fabric.lock:
         live = sum(1 for a in fabric.agents.values() if ts - int(a.get("last_heartbeat") or 0) <= ttl_ms)
         open_auctions = sum(1 for t in fabric.tasks.values() if t.get("state") in ("open", "auction"))
@@ -302,6 +371,8 @@ def health_snapshot() -> Dict[str, Any]:
             "heartbeat_ttl_s": HEARTBEAT_TTL_S,
             "merit_threshold_axm": MERIT_THRESHOLD_AXM,
             "base_chain_id": BASE_CHAIN_ID,
+            "registry_persistent": registry_boot.get("persistent"),
+            "registry_restored_agents": registry_boot.get("restored_agents", 0),
         }
 
 
