@@ -12,7 +12,13 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
-from urllib.parse import urlparse
+
+from sincor2.card_sanitize import (
+    NAME_MAX_LEN,
+    VERSION_MAX_LEN,
+    sanitize_card_text,
+    safe_url,
+)
 
 WALLET_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 AGENT_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -286,9 +292,9 @@ def make_kya_id(agent_id: str, principal: str, c_hash: str) -> str:
 
 
 def _safe_url(value: Any) -> str:
-    url = str(value or "").strip()
-    parsed = urlparse(url)
-    return url if url and parsed.scheme in ("http", "https") and parsed.netloc else ""
+    # W-82: hardened SSRF policy lives in card_sanitize (shared with
+    # a2a_inbound). This wrapper preserves the historical call sites.
+    return safe_url(value)
 
 
 def _recover_eip191(message: str, signature: str) -> str:
@@ -381,8 +387,8 @@ def list_from_inbound(agent: Dict[str, Any], card: Optional[Dict[str, Any]] = No
         "agent_wallet": wallet or principal,
         "card_url": _safe_url(agent.get("rpc_callback")),
         "card_hash": c_hash,
-        "name": agent.get("name") or agent_id,
-        "version": agent.get("version") or "0.0.0",
+        "name": sanitize_card_text(agent.get("name") or agent_id, NAME_MAX_LEN),
+        "version": sanitize_card_text(agent.get("version") or "0.0.0", VERSION_MAX_LEN),
         "skills": agent.get("skills") or [],
         "status": "listed",
         "scope": {
