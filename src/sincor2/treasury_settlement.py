@@ -28,9 +28,16 @@ def record_platform_fee_inflow(
     tx_hash: Optional[str] = None,
     task_id: Optional[str] = None,
     note: str = "",
+    projected: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
-    Record **platform fee only** as realized (projected=False) inflow.
+    Record **platform fee only** as inflow.
+
+    ``projected=False`` (default): realized inflow — money movement is
+    verified.  ``projected=True``: the fee is claimed but NOT verified
+    (e.g. the settlement was flagged by the W-89 wash-anomaly guard);
+    it is booked for audit visibility and must never be presented as
+    realized revenue.
 
     Returns the event dict on success, None if fee is zero/negative or write fails.
     """
@@ -44,6 +51,8 @@ def record_platform_fee_inflow(
         return None
 
     note = note or (f"platform fee task={task_id}" if task_id else "platform fee")
+    if projected and "[projected]" not in note:
+        note = "[projected] " + note
     try:
         event = record_inflow(
             amount,
@@ -52,10 +61,11 @@ def record_platform_fee_inflow(
             usd_estimate=amount,  # caller may refine; fee is the measured unit
             tx_hash=tx_hash,
             note=note,
-            projected=False,
+            projected=projected,
         )
         logger.info(
-            "Realized treasury fee recorded: %.6f %s source=%s tx=%s",
+            "%s treasury fee recorded: %.6f %s source=%s tx=%s",
+            "Projected" if projected else "Realized",
             amount,
             asset,
             source,
