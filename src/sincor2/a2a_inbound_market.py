@@ -1321,6 +1321,33 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
         except Exception as err:
             logger.warning(
                 "sponsored-stake recoup skipped for %s: %s", agent_id, err)
+    # W-89 wash-anomaly guard: detect-only, never bricks settlement.  A
+    # flagged settlement still completes and the payout still stages; what
+    # changes is revenue recognition (no realized fee) plus a structured
+    # anomaly stamp for the adjudicator and future fee rails.
+    try:
+        from sincor2.wash_guard import assess_settlement
+        _wash_verdict = assess_settlement(
+            task, agent_id,
+            content_bound=(bound is not None),
+            receipt_hash=receipt_hash,
+            proof_id=proof_id,
+            fabric=fabric, now_ms=ts,
+        )
+        proof["wash_anomaly"] = _wash_verdict
+        snap["wash_anomaly"] = _wash_verdict
+        with fabric.lock:
+            _t = fabric.tasks.get(task_id)
+            if _t is not None:
+                _t["wash_anomaly"] = _wash_verdict
+        if _wash_verdict.get("anomalous"):
+            logger.error(
+                "[WASH-GUARD] anomalous settlement: task=%s winner=%s "
+                "signals=%s",
+                task_id, agent_id,
+                [s["name"] for s in _wash_verdict["signals"]])
+    except Exception as err:  # guard must never brick settlement
+        logger.warning("[WASH-GUARD] guard failed for %s: %s", task_id, err)
     fabric.publish("proof.settled", tags, snap)
     _save_agents(fabric)
     _save_tasks(fabric)
