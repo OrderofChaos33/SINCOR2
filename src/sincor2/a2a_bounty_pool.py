@@ -113,6 +113,7 @@ class BountyPool:
         self.reserve_wei = max(0, _axm_to_wei(reserve_axm))
         self._lock = threading.Lock()
         self._funded_wei = 0
+        self._spent_wei = 0
         self._allocations: Dict[str, Dict[str, Any]] = {}
         self._history: List[Dict[str, Any]] = []
         self._load()
@@ -138,6 +139,7 @@ class BountyPool:
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             self._funded_wei = int(raw.get("funded_wei") or 0)
+            self._spent_wei = int(raw.get("spent_wei") or 0)
             allocs = raw.get("allocations") or {}
             if isinstance(allocs, dict):
                 for aid, alloc in allocs.items():
@@ -157,6 +159,7 @@ class BountyPool:
         payload = {
             "reserve_wei": str(self.reserve_wei),
             "funded_wei": str(self._funded_wei),
+            "spent_wei": str(self._spent_wei),
             "allocations": {
                 aid: {**a, "amount_wei": str(int(a.get("amount_wei") or 0))}
                 for aid, a in self._allocations.items()
@@ -176,6 +179,10 @@ class BountyPool:
         return sum(int(a.get("amount_wei") or 0)
                    for a in self._allocations.values()
                    if a.get("state") == "allocated")
+
+    def _available_wei(self) -> int:
+        """Spendable right now: funded minus spent minus live allocations."""
+        return self._funded_wei - self._spent_wei - self._allocated_wei()
 
     # -- API --------------------------------------------------------------
     def fund(self, amount_axm: Optional[float] = None) -> Dict[str, Any]:
@@ -218,7 +225,7 @@ class BountyPool:
         if amount_wei <= 0:
             raise PoolError("amount_axm must be positive")
         with self._lock:
-            available = self._funded_wei - self._allocated_wei()
+            available = self._available_wei()
             if amount_wei > available:
                 raise InsufficientPoolFunds(
                     f"allocation of {_wei_to_axm(amount_wei):g} AXM exceeds "
@@ -259,6 +266,34 @@ class BountyPool:
             self._save()
             return self._public_alloc(alloc)
 
+    def spend(self, allocation_id: str) -> Dict[str, Any]:
+        """Consume an allocation: the backed bounty was paid out on settlement.
+
+        Terminal transition allocated -> spent. Unlike ``release`` (which
+        returns funds to available unspent), spent funds left the pool:
+        they are no longer counted as allocated *or* available, and the
+        cumulative ``spent_wei`` counter is bumped so ``available`` stays
+        exact. Raises ``KeyError`` for an unknown allocation and
+        ``PoolError`` unless the allocation is currently allocated.
+        """
+        allocation_id = str(allocation_id or "").strip()
+        with self._lock:
+            alloc = self._allocations.get(allocation_id)
+            if alloc is None:
+                raise KeyError("unknown allocation")
+            if alloc.get("state") != "allocated":
+                raise PoolError(
+                    f"allocation already {alloc.get('state')}")
+            amount_wei = int(alloc.get("amount_wei") or 0)
+            alloc["state"] = "spent"
+            alloc["history"].append({"state": "spent", "at": _now_ms()})
+            self._spent_wei += amount_wei
+            self._record("spend", amount_wei,
+                         {"allocation_id": allocation_id,
+                          "task_id": alloc.get("task_id")})
+            self._save()
+            return self._public_alloc(alloc)
+
     def allocations_for_task(self, task_id: str) -> List[Dict[str, Any]]:
         """Live allocations attached to one task (for admin delist)."""
         task_id = str(task_id or "").strip()
@@ -276,8 +311,9 @@ class BountyPool:
         return {
             "reserve_axm": _wei_to_axm(self.reserve_wei),
             "funded_axm": _wei_to_axm(self._funded_wei),
+            "spent_axm": _wei_to_axm(self._spent_wei),
             "allocated_axm": _wei_to_axm(allocated),
-            "available_axm": _wei_to_axm(self._funded_wei - allocated),
+            "available_axm": _wei_to_axm(self._available_wei()),
             "allocation_count": sum(1 for a in self._allocations.values()
                                   if a.get("state") == "allocated"),
             "allocations": [self._public_alloc(a)
