@@ -261,3 +261,172 @@ def test_false_positive_analysis_engine_traffic(iso):
         if (proof.get("wash_anomaly") or {}).get("anomalous"):
             flags += 1
     assert flags == 0
+
+
+# ---------------------------------------------------------------------------
+# Poster-acceptance clearance tests (fix-up: verify_poster_acceptance was
+# dead code — submit_proof never passed poster_acceptance_sig and no API
+# surface accepted one).
+# ---------------------------------------------------------------------------
+
+def _sign_acceptance(key, task_id, proof_id, receipt):
+    message = "\n".join([POSTER_ACCEPT_DOMAIN, task_id, proof_id, receipt])
+    return Account.sign_message(
+        encode_defunct(text=message), private_key=key.key).signature.hex()
+
+
+def _flagged_proof(iso_unused=None):
+    """Create a flagged settlement; returns (poster_key, task_id, proof)."""
+    poster_key = _mk_agent("ext-poster", origin="external")
+    _mk_agent("ext-worker", origin="external")
+    task_id = _mk_assigned_task("ext-poster", "ext-worker",
+                               assigned_ago_ms=5_000)
+    _add_bid(task_id, "ext-worker")  # sole bidder
+    receipt = "0x" + "ab" * 32
+    proof = submit_proof(task_id, "ext-worker", receipt)
+    assert (proof.get("wash_anomaly") or {}).get("anomalous") is True
+    return poster_key, task_id, proof
+
+
+def test_clearance_valid_clears_and_rebooks_realized(iso, tmp_path, monkeypatch):
+    import sincor2.treasury_inflow as treasury_inflow
+    from sincor2.wash_guard import clear_wash_anomaly
+    monkeypatch.setattr(treasury_inflow, "_LEDGER_PATH",
+                        tmp_path / "ledger.jsonl")
+    poster_key, task_id, proof = _flagged_proof()
+    proof_id = proof["proof_id"]
+    receipt = proof["receipt_hash"]
+    # Simulate the engine having booked the fee projected at quarantine.
+    fabric = get_fabric()
+    with fabric.lock:
+        fabric.tasks[task_id]["wash_fee_projected"] = {"fee_axm": 0.5}
+    sig = _sign_acceptance(poster_key, task_id, proof_id, receipt)
+    result = clear_wash_anomaly(task_id, proof_id, sig)
+    assert result["cleared"] is True
+    assert result["fee_realized_axm"] == 0.5
+    stamp = fabric.tasks[task_id]["wash_anomaly"]
+    assert stamp["anomalous"] is False
+    assert stamp["cleared_by_acceptance"] is True
+    assert stamp["fee_realized_on_clearance"] is True
+    # Signals kept as history.
+    assert len(stamp["signals"]) > 0
+    # Ledger: exactly one realized event, superseding note, no double.
+    events = treasury_inflow._read_ledger_events()
+    realized = [e for e in events if not e.projected]
+    assert len(realized) == 1
+    assert realized[0].amount == 0.5
+    assert "supersedes projected" in realized[0].note
+
+
+def test_clearance_invalid_sig_keeps_flag(iso):
+    from sincor2.wash_guard import clear_wash_anomaly
+    poster_key, task_id, proof = _flagged_proof()
+    proof_id = proof["proof_id"]
+    receipt = proof["receipt_hash"]
+    good = _sign_acceptance(poster_key, task_id, proof_id, receipt)
+    # Tamper: flip the last hex digit.
+    bad = good[:-1] + ("0" if good[-1] != "0" else "1")
+    result = clear_wash_anomaly(task_id, proof_id, bad)
+    assert result["cleared"] is False
+    assert result["reason"] == "invalid acceptance"
+    fabric = get_fabric()
+    assert fabric.tasks[task_id]["wash_anomaly"]["anomalous"] is True
+
+
+def test_clearance_wrong_task_replay_resisted(iso):
+    from sincor2.wash_guard import clear_wash_anomaly
+    poster_key, task_id_a, proof_a = _flagged_proof()
+    # Second flagged settlement for the replay target.
+    _mk_agent("ext-poster2", origin="external")
+    task_id_b = _mk_assigned_task("ext-poster2", "ext-worker",
+                                 assigned_ago_ms=5_000)
+    _add_bid(task_id_b, "ext-worker")
+    proof_b = submit_proof(task_id_b, "ext-worker", "0x" + "cd" * 32)
+    assert (proof_b.get("wash_anomaly") or {}).get("anomalous") is True
+    # Acceptance signed for task A must not clear task B.
+    sig_a = _sign_acceptance(poster_key, task_id_a,
+                            proof_a["proof_id"], proof_a["receipt_hash"])
+    result = clear_wash_anomaly(task_id_b, proof_b["proof_id"], sig_a)
+    assert result["cleared"] is False
+    fabric = get_fabric()
+    assert fabric.tasks[task_id_b]["wash_anomaly"]["anomalous"] is True
+
+
+def test_clearance_non_poster_wallet_rejected(iso):
+    from sincor2.wash_guard import clear_wash_anomaly
+    poster_key, task_id, proof = _flagged_proof()
+    proof_id = proof["proof_id"]
+    receipt = proof["receipt_hash"]
+    # Sign with the WINNER's key instead of the poster's.
+    fabric = get_fabric()
+    winner_key = Account.create()  # distinct from poster's registered wallet
+    sig = _sign_acceptance(winner_key, task_id, proof_id, receipt)
+    result = clear_wash_anomaly(task_id, proof_id, sig)
+    assert result["cleared"] is False
+    assert fabric.tasks[task_id]["wash_anomaly"]["anomalous"] is True
+
+
+def test_clearance_idempotent(iso, tmp_path, monkeypatch):
+    import sincor2.treasury_inflow as treasury_inflow
+    from sincor2.wash_guard import clear_wash_anomaly
+    monkeypatch.setattr(treasury_inflow, "_LEDGER_PATH",
+                        tmp_path / "ledger.jsonl")
+    poster_key, task_id, proof = _flagged_proof()
+    proof_id = proof["proof_id"]
+    receipt = proof["receipt_hash"]
+    fabric = get_fabric()
+    with fabric.lock:
+        fabric.tasks[task_id]["wash_fee_projected"] = {"fee_axm": 0.5}
+    sig = _sign_acceptance(poster_key, task_id, proof_id, receipt)
+    first = clear_wash_anomaly(task_id, proof_id, sig)
+    assert first["cleared"] is True
+    second = clear_wash_anomaly(task_id, proof_id, sig)
+    assert second["cleared"] is False
+    assert second["reason"] == "not flagged"
+    # Exactly one realized booking — no double on re-clear.
+    events = treasury_inflow._read_ledger_events()
+    assert len([e for e in events if not e.projected]) == 1
+
+
+def test_clearance_no_projected_no_rebook(iso, tmp_path, monkeypatch):
+    import sincor2.treasury_inflow as treasury_inflow
+    from sincor2.wash_guard import clear_wash_anomaly
+    monkeypatch.setattr(treasury_inflow, "_LEDGER_PATH",
+                        tmp_path / "ledger.jsonl")
+    poster_key, task_id, proof = _flagged_proof()
+    proof_id = proof["proof_id"]
+    receipt = proof["receipt_hash"]
+    # No wash_fee_projected stamp: engine hasn't booked (or API path).
+    sig = _sign_acceptance(poster_key, task_id, proof_id, receipt)
+    result = clear_wash_anomaly(task_id, proof_id, sig)
+    assert result["cleared"] is True
+    assert result["fee_realized_axm"] is None
+    # Nothing booked — the engine will book realized normally on its cycle.
+    assert treasury_inflow._read_ledger_events() == []
+
+
+def test_clearance_unknown_task_no_raise(iso):
+    from sincor2.wash_guard import clear_wash_anomaly
+    result = clear_wash_anomaly("nope", "prf_nope", "0x" + "00" * 65)
+    assert result["cleared"] is False
+    assert result["reason"] == "unknown task"
+
+
+def test_submit_proof_acceptance_sig_threaded(iso):
+    """submit_proof accepts the poster_acceptance_sig kwarg (new API surface)
+    and threads it to the guard without breaking existing callers.  A valid
+    pre-signed acceptance is impossible here (proof_id is server-generated),
+    so this asserts the kwarg flows without error; end-to-end valid
+    acceptance is covered by the clearance tests above and the existing
+    assess-level test."""
+    _mk_agent("ext-poster", origin="external")
+    _mk_agent("ext-worker", origin="external")
+    task_id = _mk_assigned_task("ext-poster", "ext-worker",
+                               assigned_ago_ms=5_000)
+    _add_bid(task_id, "ext-worker")
+    receipt = "0x" + "ef" * 32
+    proof = submit_proof(task_id, "ext-worker", receipt,
+                         poster_acceptance_sig="0x" + "00" * 65)
+    # Invalid sig -> still assessed (flagged), never raises, kwarg accepted.
+    assert (proof.get("wash_anomaly") or {}).get("anomalous") is True
+    assert proof["status"] in ("paid", "rejected")
