@@ -430,3 +430,50 @@ def test_submit_proof_acceptance_sig_threaded(iso):
     # Invalid sig -> still assessed (flagged), never raises, kwarg accepted.
     assert (proof.get("wash_anomaly") or {}).get("anomalous") is True
     assert proof["status"] in ("paid", "rejected")
+
+
+@pytest.mark.parametrize("exc,status", [
+    (ValueError("bad input"), 400),
+    (KeyError("unknown task"), 404),
+    (PermissionError("not the winner"), 403),
+    (RuntimeError("already settled"), 409),
+])
+def test_v1_proofs_error_mapping_restored(iso, monkeypatch, exc, status):
+    """Regression guard for the 602d3d9 splice: v1_proofs must keep its full
+    error mapping (ValueError->400, KeyError->404, PermissionError->403,
+    RuntimeError->409) after the clear-wash-flag route was moved below it.
+    Drives the real HTTP route with submit_proof stubbed to raise."""
+    from flask import Flask
+    from sincor2.a2a_inbound import register as register_inbound
+    import sincor2.a2a_inbound_market as mkt
+
+    def _raise(*a, **k):
+        raise exc
+
+    monkeypatch.setattr(mkt, "submit_proof", _raise)
+    app = Flask(__name__)
+    register_inbound(app)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    resp = client.post("/v1/a2a/proofs",
+                       json={"task_id": "t", "agent_id": "a",
+                             "receipt_hash": "0x" + "ab" * 32})
+    assert resp.status_code == status, (
+        f"{type(exc).__name__} mapped to {resp.status_code}, expected {status}")
+
+
+def test_v1_clear_wash_flag_route_mounted(iso):
+    """The moved clear-wash-flag route still mounts and never bricks: an
+    unknown task returns cleared=False with HTTP 200, not a 500."""
+    from flask import Flask
+    from sincor2.a2a_inbound import register as register_inbound
+
+    app = Flask(__name__)
+    register_inbound(app)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    resp = client.post("/v1/a2a/proofs/clear-wash-flag",
+                       json={"task_id": "nope", "proof_id": "nope",
+                             "poster_acceptance_sig": "0x00"})
+    assert resp.status_code == 200
+    assert resp.get_json().get("cleared") is False

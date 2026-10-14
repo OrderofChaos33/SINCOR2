@@ -357,6 +357,12 @@ def clear_wash_anomaly(task_id: str, proof_id: str,
             result["reason"] = "invalid acceptance"
             return result
         # Valid acceptance: clear the flag, keep signals as history.
+        # The idempotency re-check, fee re-booking, and stamp persist all
+        # run under fabric.lock so two simultaneous clearances cannot
+        # double-book the realized fee.  treasury_inflow takes no fabric
+        # lock, so the fabric->treasury ordering is one-directional and
+        # deadlock-free.  The (expensive, stateless) signature verification
+        # above stays outside the lock.
         now_ms = _now_ms()
         new_stamp = dict(stamp)
         new_stamp.update({
@@ -366,38 +372,43 @@ def clear_wash_anomaly(task_id: str, proof_id: str,
         })
         # Re-book a quarantined (projected) fee as realized, exactly once.
         fee_realized = None
-        fee_info = task.get("wash_fee_projected") or {}
-        if fee_info and not new_stamp.get("fee_realized_on_clearance"):
-            try:
-                amount = float(fee_info.get("fee_axm") or 0)
-            except (TypeError, ValueError):
-                amount = 0.0
-            if amount > 0:
-                try:
-                    from sincor2.treasury_settlement import (
-                        record_platform_fee_inflow)
-                    ev = record_platform_fee_inflow(
-                        fee_amount=amount,
-                        asset="AXM",
-                        source="a2a_settlement",
-                        task_id=task_id,
-                        note=(f"platform fee task={task_id} [realized on "
-                              f"wash-anomaly clearance by poster EIP-191 "
-                              f"acceptance; supersedes projected booking]"),
-                        projected=False,
-                    )
-                    if ev is not None:
-                        new_stamp["fee_realized_on_clearance"] = True
-                        fee_realized = amount
-                except Exception as err:
-                    logger.warning(
-                        "[WASH-GUARD] realized re-booking failed for %s: %s",
-                        task_id, err)
-        # Persist the cleared stamp on task and proof.
         try:
             with fabric.lock:
-                _t = fabric.tasks.get(task_id)
-                if _t is not None:
+                _t = fabric.tasks.get(task_id) or {}
+                _cur = _t.get("wash_anomaly") or {}
+                if _cur.get("fee_realized_on_clearance"):
+                    # A concurrent clearance already re-booked; keep the
+                    # history, skip the re-book.
+                    new_stamp["fee_realized_on_clearance"] = True
+                else:
+                    fee_info = _t.get("wash_fee_projected") or {}
+                    try:
+                        amount = float(fee_info.get("fee_axm") or 0)
+                    except (TypeError, ValueError):
+                        amount = 0.0
+                    if amount > 0:
+                        try:
+                            from sincor2.treasury_settlement import (
+                                record_platform_fee_inflow)
+                            ev = record_platform_fee_inflow(
+                                fee_amount=amount,
+                                asset="AXM",
+                                source="a2a_settlement",
+                                task_id=task_id,
+                                note=(f"platform fee task={task_id} [realized on "
+                                      f"wash-anomaly clearance by poster EIP-191 "
+                                      f"acceptance; supersedes projected booking]"),
+                                projected=False,
+                            )
+                            if ev is not None:
+                                new_stamp["fee_realized_on_clearance"] = True
+                                fee_realized = amount
+                        except Exception as err:
+                            logger.warning(
+                                "[WASH-GUARD] realized re-booking failed for %s: %s",
+                                task_id, err)
+                # Persist the cleared stamp on task and proof.
+                if _t:
                     _t["wash_anomaly"] = new_stamp
                     _t.pop("wash_fee_projected", None)
                 _p = fabric.proofs.get(proof_id)
