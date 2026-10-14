@@ -41,7 +41,13 @@ import "./security/ScopedPausable.sol";
  *        rejected dispute: refunding it made junk-digest stalling ~free.
  *        An honest challenger's bond is protected by the adjudicator's
  *        ruling, not by the timeout -- on-chain a junk digest and a real
- *        one are indistinguishable without adjudicator judgment.
+ *        one are indistinguishable without adjudicator judgment. This
+ *        holds even when evidence WAS submitted (W-84): the filer chooses
+ *        both the digest and the preimage, so a registered junk preimage
+ *        is exactly as "substantiated" as real evidence. Conditioning a
+ *        dark-timeout refund on evidenceSubmitted would re-open the hole --
+ *        griefing would cost gas + lockup only, precisely when no
+ *        adjudicator is present to tell junk from merit.
  */
 contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     /// @notice The sealed-bid core; the only caller allowed to initialize escrows.
@@ -215,8 +221,13 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
         // dispute stalls the worker's payout through the whole adjudication
         // window for free (griefer's delay attack), so the poster posts the
         // same challengerBond with the same economics as the challenger path:
-        // returned if the dispute is upheld or if the adjudicator goes dark,
-        // forfeited if the dispute is rejected. Routing on reject depends on
+        // returned ONLY on a live adjudicator's uphold ruling; forfeited on
+        // rejection AND on dark-adjudicator timeout (W-84/J4 reconciliation:
+        // on-chain evidence proves retrievability, not merit -- the filer
+        // chooses both digest and preimage, so a junk preimage is exactly
+        // as "substantiated" as real evidence. Refunding on darkness would
+        // price griefing at gas-only precisely when no adjudicator is
+        // present to check it). Routing on forfeit depends on
         // who filed: a third-party challenger's bond is slashed to the
         // poster's re-auction fund; a poster who disputes their OWN auction
         // and loses forfeits the bond to the worker instead (A2: crediting
