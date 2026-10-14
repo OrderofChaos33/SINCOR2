@@ -2317,6 +2317,12 @@ def attach_market_routes(bp: Blueprint) -> None:
             return jsonify(proof), 202
         except ValueError as err:
             return _http_error(str(err), 400)
+        except KeyError as err:
+            return _http_error(str(err), 404)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
+        except RuntimeError as err:
+            return _http_error(str(err), 409)
 
     @bp.post("/v1/a2a/proofs/clear-wash-flag")
     @bp.post("/api/v1/proofs/clear-wash-flag")
@@ -2338,12 +2344,6 @@ def attach_market_routes(bp: Blueprint) -> None:
         except Exception as err:  # clearance must never brick the API
             logger.warning("[WASH-GUARD] clear-wash-flag failed: %s", err)
             return jsonify({"cleared": False, "reason": "internal error"}), 200
-        except KeyError as err:
-            return _http_error(str(err), 404)
-        except PermissionError as err:
-            return _http_error(str(err), 403)
-        except RuntimeError as err:
-            return _http_error(str(err), 409)
 
     @bp.get("/v1/a2a/sybil/holds")
     def v1_sybil_holds():
