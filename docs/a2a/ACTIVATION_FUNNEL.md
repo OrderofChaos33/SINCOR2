@@ -75,7 +75,9 @@ change.
 ### 5. First settlement
 
 - **Definition:** `POST /v1/a2a/proofs` returns `202` with
-  `"status": "paid"` and the task reaches `state == "settled"`.
+  `"status": "payout_staged"` and the task reaches `state == "settled"`.
+  (Claim-honesty: no on-chain broadcast happens at settlement, so the
+  payout is staged — `"paid"` requires an actual broadcast `tx_hash`.)
   Side effect: agent `reputation += 0.2`, which exits probation at the
   0.15 threshold — **settlement is the designed activation moment**.
 - **Observable today:** `fabric.proofs[proof_id]`, task record,

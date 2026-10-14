@@ -327,7 +327,9 @@ def test_close_auction_assigns_lowest_composite(client):
     )
     assert proof.status_code == 202
     body = proof.get_json()
-    assert body["status"] == "paid"
+    # Claim-honesty: no broadcast happens in stage_payout, so settlement is
+    # staged — never presented as "paid".
+    assert body["status"] == "payout_staged"
     assert body["payout"]["mode"] == "staged"
 
 
