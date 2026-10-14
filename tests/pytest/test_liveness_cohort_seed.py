@@ -29,9 +29,11 @@ from conftest import hb_headers
 from sincor2.a2a_inbound import reset_fabric
 from sincor2.a2a_inbound_ext import (
     _LIVENESS_COHORT_WALLETS_DEFAULT,
+    _liveness_cohort_wallets,
     build_heartbeat_message,
     ensure_liveness_cohort,
     get_fabric,
+    register_agent_record,
 )
 
 
@@ -112,6 +114,83 @@ class TestLivenessCohortSeed:
         })
         assert r.status_code == 200, r.get_json()
         assert r.get_json()["agent_id"] == "sincor-liveness-01"
+
+    # --- Review-finding regression tests (2026-10-14) ---------------------
+
+    def test_malformed_wallet_skips_only_that_agent(self, client, monkeypatch):
+        """Finding 1: one malformed wallet must not abort the other five."""
+        reset_fabric()
+        wallets = dict(_LIVENESS_COHORT_WALLETS_DEFAULT)
+        wallets["sincor-liveness-03"] = "0xNOT-A-WALLET"
+        monkeypatch.setenv("LIVENESS_COHORT_WALLETS", json.dumps(wallets))
+        seeded = ensure_liveness_cohort()  # must not raise
+        assert "sincor-liveness-03" not in seeded
+        assert sorted(seeded) == sorted(
+            aid for aid in EXPECTED_IDS if aid != "sincor-liveness-03")
+        for agent_id in EXPECTED_IDS:
+            if agent_id == "sincor-liveness-03":
+                assert not _fabric_agent(agent_id)
+            else:
+                assert _fabric_agent(agent_id)
+
+    def test_origin_is_internal_and_not_spoofable(self, client):
+        """Finding 2: system agents are stamped origin='internal',
+        server-assigned — never from request input."""
+        reset_fabric()
+        ensure_liveness_cohort()
+        for agent_id in EXPECTED_IDS:
+            assert _fabric_agent(agent_id)["origin"] == "internal", agent_id
+        # Even if a body claims an origin, the internal path ignores it.
+        reset_fabric()
+        snap = register_agent_record({
+            "agent_id": "sincor-liveness-01",
+            "name": "Spoof Attempt",
+            "description": "x",
+            "version": "1.0.0",
+            "capability_tags": ["defi"],
+            "rpc_callback": "https://getsincor.com/api/a2a",
+            "wallet": _LIVENESS_COHORT_WALLETS_DEFAULT["sincor-liveness-01"],
+            "chain_id": 8453,
+            "origin": "external",
+        }, _internal_reputation=1.0)
+        assert snap["origin"] == "internal"
+
+    def test_partial_override_merges_with_defaults(self, client, monkeypatch):
+        """Finding 3: overriding one wallet keeps the other five defaults."""
+        reset_fabric()
+        acct = Account.create()
+        monkeypatch.setenv("LIVENESS_COHORT_WALLETS", json.dumps({
+            "sincor-liveness-02": acct.address,
+        }))
+        seeded = ensure_liveness_cohort()
+        assert seeded == EXPECTED_IDS
+        assert _fabric_agent("sincor-liveness-02")["wallet"].lower() == \
+            acct.address.lower()
+        for agent_id in EXPECTED_IDS:
+            if agent_id == "sincor-liveness-02":
+                continue
+            assert _fabric_agent(agent_id)["wallet"].lower() == \
+                _LIVENESS_COHORT_WALLETS_DEFAULT[agent_id].lower(), agent_id
+
+    def test_json_null_stays_null(self, client, monkeypatch):
+        """Finding 4: a JSON null wallet is preserved as None, never the
+        literal string 'None' — and skips only that agent."""
+        reset_fabric()
+        monkeypatch.setenv("LIVENESS_COHORT_WALLETS", json.dumps({
+            "sincor-liveness-01": None,
+        }))
+        wallets = _liveness_cohort_wallets()
+        assert wallets["sincor-liveness-01"] is None
+        # The other five keep their defaults (finding 3 composes).
+        for agent_id in EXPECTED_IDS[1:]:
+            assert wallets[agent_id] == _LIVENESS_COHORT_WALLETS_DEFAULT[agent_id]
+        seeded = ensure_liveness_cohort()  # must not raise
+        assert "sincor-liveness-01" not in seeded
+        assert len(seeded) == 5
+        for agent_id in EXPECTED_IDS:
+            agent = _fabric_agent(agent_id)
+            if agent:
+                assert agent["wallet"] != "None", agent_id
 
     def test_public_route_still_refuses_protected_prefix(self, client):
         reset_fabric()

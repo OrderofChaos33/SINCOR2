@@ -454,10 +454,13 @@ def register_agent_record(body: Dict[str, Any],
             "last_heartbeat": ts,
             "registered_at": int(existing.get("registered_at") or ts),
             # Origin classification for registration-velocity ranking
-            # (operating directive): the platform agent is internal,
-            # every API registration is external.  Preserved across
-            # re-registrations like registered_at.
-            "origin": str(existing.get("origin") or ("internal" if agent_id == _PLATFORM_AGENT_ID else "external")),
+            # (operating directive): internal seeds (the platform agent and
+            # the liveness cohort, both seeded via _internal_reputation) are
+            # internal; every API registration is external.  Server-assigned
+            # only — never read from the request body (the body is ignored
+            # here entirely).  Preserved across re-registrations like
+            # registered_at.
+            "origin": str(existing.get("origin") or ("internal" if (_internal_reputation is not None or agent_id == _PLATFORM_AGENT_ID) else "external")),
         }
         # probation / requires_merit / status derive from the merit
         # threshold in one place (never declared, never KYA-derived).
@@ -616,19 +619,42 @@ _LIVENESS_COHORT_DESCRIPTION = (
 )
 
 
-def _liveness_cohort_wallets() -> Dict[str, str]:
+def _liveness_cohort_wallets() -> Dict[str, Optional[str]]:
+    """Cohort wallets: built-in defaults merged with LIVENESS_COHORT_WALLETS.
+
+    A partial override MERGES with (never replaces) the defaults: agents
+    not named in the override keep their built-in wallets.  JSON null values
+    are preserved as None — never stringified to the literal "None"; a None
+    wallet means "skip this agent" in the seeder.  Keys that are not cohort
+    agents are ignored with a warning (likely a typo in the override).
+    """
+    wallets: Dict[str, Optional[str]] = dict(_LIVENESS_COHORT_WALLETS_DEFAULT)
     raw = (os.environ.get("LIVENESS_COHORT_WALLETS") or "").strip()
-    if raw:
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict) and parsed:
-                return {str(k): str(v) for k, v in parsed.items()}
-            logger.warning("[A2A] LIVENESS_COHORT_WALLETS is not a non-empty "
-                           "object; using built-in cohort wallets")
-        except Exception as err:
-            logger.warning("[A2A] LIVENESS_COHORT_WALLETS unparsable (%s); "
-                           "using built-in cohort wallets", err)
-    return dict(_LIVENESS_COHORT_WALLETS_DEFAULT)
+    if not raw:
+        return wallets
+    try:
+        parsed = json.loads(raw)
+    except Exception as err:
+        logger.warning("[A2A] LIVENESS_COHORT_WALLETS unparsable (%s); "
+                       "using built-in cohort wallets", err)
+        return wallets
+    if not isinstance(parsed, dict) or not parsed:
+        logger.warning("[A2A] LIVENESS_COHORT_WALLETS is not a non-empty "
+                       "object; using built-in cohort wallets")
+        return wallets
+    overridden = []
+    for key, value in parsed.items():
+        agent_id = str(key)
+        if agent_id not in _LIVENESS_COHORT_META:
+            logger.warning("[A2A] LIVENESS_COHORT_WALLETS ignores unknown "
+                           "agent_id %r", agent_id)
+            continue
+        wallets[agent_id] = None if value is None else str(value)
+        overridden.append(agent_id)
+    logger.info("[A2A] LIVENESS_COHORT_WALLETS override applied for %s; "
+                "built-in defaults kept for the rest",
+                ",".join(sorted(overridden)) or "(none)")
+    return wallets
 
 
 def ensure_liveness_cohort() -> List[str]:
@@ -641,24 +667,36 @@ def ensure_liveness_cohort() -> List[str]:
     base = (os.environ.get("PUBLIC_BASE_URL") or os.environ.get("SITE_URL") or "https://getsincor.com").rstrip("/")
     wallets = _liveness_cohort_wallets()
     seeded: List[str] = []
+    skipped: List[str] = []
     for agent_id, (name, tags) in _LIVENESS_COHORT_META.items():
         wallet = (wallets.get(agent_id) or "").strip()
         if not wallet:
             logger.warning("[A2A] liveness cohort seed skipped %s: no wallet",
                            agent_id)
+            skipped.append(agent_id)
             continue
-        register_agent_record({
-            "agent_id": agent_id,
-            "name": name,
-            "description": _LIVENESS_COHORT_DESCRIPTION,
-            "version": "1.0.0",
-            "capability_tags": list(tags),
-            "rpc_callback": f"{base}/api/a2a",
-            "wallet": wallet,
-            "chain_id": BASE_CHAIN_ID,
-        }, _internal_reputation=1.0)
+        try:
+            register_agent_record({
+                "agent_id": agent_id,
+                "name": name,
+                "description": _LIVENESS_COHORT_DESCRIPTION,
+                "version": "1.0.0",
+                "capability_tags": list(tags),
+                "rpc_callback": f"{base}/api/a2a",
+                "wallet": wallet,
+                "chain_id": BASE_CHAIN_ID,
+            }, _internal_reputation=1.0)
+        except Exception as err:
+            # Per-agent fault isolation: one bad wallet/config must never
+            # abort the other five seeds.
+            logger.error("[A2A] liveness cohort seed FAILED for %s: %s "
+                         "(continuing with remaining agents)",
+                         agent_id, err)
+            skipped.append(agent_id)
+            continue
         seeded.append(agent_id)
-    logger.info("[A2A] Liveness cohort seeded: %s", ",".join(seeded))
+    logger.info("[A2A] Liveness cohort seeded: %s; skipped: %s",
+                ",".join(seeded) or "(none)", ",".join(skipped) or "(none)")
     return seeded
 
 
