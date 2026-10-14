@@ -73,7 +73,7 @@ from sincor2.dispute_evidence import (
 # Grandfathered plaintext scoring for non-sealed tasks (pre-shim clients).
 # Canonical money path is marketplace.contract_net — see
 # docs/architecture/CANONICAL_PATHS.md §1.
-from sincor2.contract_net import calculate_bid_score, stage_payout
+from sincor2.contract_net import calculate_bid_score, payout_broadcast_status, stage_payout
 
 # Anti-gaming guards for the AXM Activity Engine loop (Stream B):
 # self-bid rejection, participation rate limits, and anti-collusion
@@ -1253,6 +1253,8 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
         task["proof_id"] = proof_id
         tags = list(task.get("tags") or [])
     receipt = stage_payout(agent_id=agent_id, wallet=wallet, amount_axm=amount, task_id=task_id, receipt_hash=receipt_hash)
+    # Honest payout surface: only a real broadcast earns "paid"/payout_tx.
+    payout = payout_broadcast_status(receipt)
     # Funding-graph linkage: a shared-wallet cluster (>1 identity on the
     # payout wallet) is flagged on the payout record itself. Clusters at
     # quarantine size never reach here — they were blocked above.
@@ -1267,7 +1269,17 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
         task = fabric.tasks.get(task_id) or {}
         task["state"] = "settled" if receipt.get("ok") else "failed"
         task["payout_axm"] = amount
-        task["payout_tx"] = receipt.get("staged_tx_digest")
+        if payout["broadcasted"]:
+            task["payout_tx"] = payout["tx_hash"]
+            task.pop("payout_staged_digest", None)
+        else:
+            # Claim-honesty: a staged digest is not a tx hash — never store
+            # it under the tx-shaped "payout_tx" field name.
+            task.pop("payout_tx", None)
+            if payout["staged_digest"]:
+                task["payout_staged_digest"] = payout["staged_digest"]
+            else:
+                task.pop("payout_staged_digest", None)
         task["settled_at"] = ts
         if receipt.get("ok") and fabric.agents.get(agent_id):
             ag = fabric.agents[agent_id]
@@ -1277,7 +1289,7 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
             "task_id": task_id,
             "agent_id": agent_id,
             "receipt_hash": receipt_hash,
-            "status": "paid" if receipt.get("ok") else "rejected",
+            "status": payout["proof_status"],
             "http_status": 202,
             "submitted_at": ts,
             "settled_at": ts,
