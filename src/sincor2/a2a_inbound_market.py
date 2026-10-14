@@ -457,20 +457,34 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
             snap = dict(fabric.tasks[task_id])
     _save_tasks(fabric)
     # Wire-up: back the bounty from the ledger-only launch pool.
-    # Fail-open by design: if the pool is unconfigured or short on funds,
-    # the task still posts (unbacked) — pool backing is a funding upgrade,
-    # not a creation gate. Never bricks task creation on accounting.
-    try:
-        from sincor2.a2a_bounty_pool import PoolNotConfigured, bounty_pool
-        alloc = bounty_pool().allocate(
-            task_id, bounty, reason="task bounty backing")
-        snap["pool_backed"] = True
-        snap["pool_allocation_id"] = alloc.get("allocation_id")
-    except PoolNotConfigured:
+    # W-81 finding 1: pool backing is gated on poster standing. The pool
+    # subsidizes bounties; a dust-farmed poster (marketplace rep 1.0 for
+    # ~zero cost, reviewer-executed) must not unlock pool extraction.
+    # Without pool backing the self-deal loop loses the 5% platform fee
+    # per cycle — unprofitable by construction. The task still posts
+    # self-funded: pool backing is a funding upgrade, never a creation
+    # gate. Fail-open by design on the other pool failure modes: if the
+    # pool is unconfigured or short on funds, the task still posts
+    # (unbacked). Never bricks task creation on accounting.
+    from sincor2.sybil_defense import poster_pool_eligible
+    pool_ok, pool_gate_reason = poster_pool_eligible(poster_id)
+    if not pool_ok:
+        logger.warning("pool backing skipped for task %s: %s",
+                       task_id, pool_gate_reason)
         snap["pool_backed"] = False
-    except Exception as err:  # insufficient funds, ledger write failure, ...
-        logger.warning("pool backing failed for task %s: %s", task_id, err)
-        snap["pool_backed"] = False
+        snap["pool_backing_skipped_reason"] = pool_gate_reason
+    else:
+        try:
+            from sincor2.a2a_bounty_pool import PoolNotConfigured, bounty_pool
+            alloc = bounty_pool().allocate(
+                task_id, bounty, reason="task bounty backing")
+            snap["pool_backed"] = True
+            snap["pool_allocation_id"] = alloc.get("allocation_id")
+        except PoolNotConfigured:
+            snap["pool_backed"] = False
+        except Exception as err:  # insufficient funds, ledger write failure, ...
+            logger.warning("pool backing failed for task %s: %s", task_id, err)
+            snap["pool_backed"] = False
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
     return snap
 
@@ -1393,6 +1407,12 @@ def _hold_payout_for_review(*, task_id: str, agent_id: str, receipt_hash: str,
     Fail-closed: the same task/agent/state checks as ``submit_proof``
     run here, so a hold cannot be manufactured for a task that isn't
     assigned to the caller.
+
+    REVIEW SLA: a hold that no admin decides within ``sybil_hold_ttl_ms()``
+    (default 72h) auto-rejects on the next release attempt or sweep —
+    money never moves without a human, and the winner's stake is not
+    hostage forever. The auto-rejection preserves the proof record for
+    adjudication, exactly like a manual reject.
     """
     fabric = get_fabric()
     ts = _now_ms()
@@ -1435,6 +1455,11 @@ def _hold_payout_for_review(*, task_id: str, agent_id: str, receipt_hash: str,
             "tags": tags,
             "status": "held",
         }
+        try:
+            from sincor2.sybil_defense import sybil_hold_ttl_ms
+            hold["expires_at"] = ts + sybil_hold_ttl_ms()
+        except Exception:
+            pass
         task["state"] = "held"
         task["proof_id"] = proof_id
         task["sybil_hold"] = hold
@@ -1465,6 +1490,50 @@ def _hold_payout_for_review(*, task_id: str, agent_id: str, receipt_hash: str,
     return snap
 
 
+def _expire_sybil_hold_if_due(task_id: str,
+                            decided_by: str = "admin") -> Optional[Dict[str, Any]]:
+    """Auto-reject a sybil hold past its TTL (fail closed).
+
+    A held payout with no admin decision inside ``sybil_hold_ttl_ms()``
+    (default 72h) is rejected: money never moves without a human, and
+    the winner's stake is not hostage forever. The rejection preserves
+    the proof record for adjudication, exactly like a manual reject.
+    Returns the rejection snap when the hold expired, else None.
+    Race-safe: if a concurrent admin action decided the hold first, the
+    reject raises KeyError and None is returned ("already decided").
+    """
+    from sincor2.sybil_defense import sybil_hold_ttl_ms
+    fabric = get_fabric()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id) or {}
+        hold = task.get("sybil_hold")
+        if not hold or task.get("state") != "held":
+            return None
+        try:
+            age_ms = _now_ms() - int(hold.get("held_at") or 0)
+        except (TypeError, ValueError):
+            age_ms = 0
+        if age_ms < sybil_hold_ttl_ms():
+            return None
+    try:
+        snap = _reject_sybil_hold(task_id, decided_by=decided_by)
+    except KeyError:
+        # Lost the race: a concurrent release/reject decided it first.
+        return None
+    try:
+        with fabric.lock:
+            t = fabric.tasks.get(task_id) or {}
+            dec = dict(t.get("sybil_hold_decision") or {})
+            dec["ttl_expired"] = True
+            dec["ttl_ms"] = sybil_hold_ttl_ms()
+            t["sybil_hold_decision"] = dec
+        snap["sybil_hold_decision"] = dec
+    except Exception:
+        pass
+    logger.warning("sybil hold TTL expired: task %s auto-rejected", task_id)
+    return snap
+
+
 def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, Any]:
     """Release a held payout: stage it and run settlement bookkeeping.
 
@@ -1473,7 +1542,18 @@ def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, An
     completion record, sponsored-stake recoup). The hold context stored
     at hold time is the single source of truth — nothing is
     re-derived from mutable task state except the task record itself.
+
+    Settles EXACTLY ONCE: the hold state is re-verified under the
+    second lock (W-81 finding 2) — a concurrent release/reject that
+    decided the hold while ``stage_payout`` ran returns the
+    already-recorded outcome instead of settling twice. An expired hold
+    auto-rejects (TTL, fail closed) instead of releasing.
     """
+    # TTL first: an expired hold auto-rejects (fail closed) — money never
+    # moves on a hold no human reviewed in time.
+    expired_snap = _expire_sybil_hold_if_due(task_id, decided_by=decided_by)
+    if expired_snap is not None:
+        return expired_snap
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:
@@ -1498,6 +1578,22 @@ def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, An
     }
     with fabric.lock:
         task = fabric.tasks.get(task_id) or {}
+        # W-81 finding 2: re-verify under this lock. A concurrent
+        # release/reject may have decided the hold while stage_payout
+        # ran outside the first lock — settle exactly once. If the hold
+        # is gone, return the already-recorded outcome and discard the
+        # staged receipt (stage_payout is side-effect-free: it only
+        # builds a receipt dict).
+        if task.get("state") != "held" or not task.get("sybil_hold"):
+            proof = fabric.proofs.get(proof_id) or {}
+            snap = dict(proof)
+            hold_snap = dict(proof.get("sybil_hold") or {})
+            hold_snap["race_noop"] = (
+                "hold already decided by a concurrent admin action; "
+                "this release staged nothing")
+            snap["sybil_hold"] = hold_snap
+            snap["http_status"] = 200
+            return snap
         task["state"] = "settled" if receipt.get("ok") else "failed"
         task["payout_axm"] = amount
         task["payout_tx"] = receipt.get("staged_tx_digest")

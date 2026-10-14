@@ -147,6 +147,12 @@ PROTECTED_AGENT_IDS = frozenset({
     "admin", "administrator", "system", "root", "official", "support",
     "help", "security", "moderator", "treasury", "platform", "genesis",
     "foundation", "team", "staff",
+    # Engine poster identity (W-81 finding 4): the activity engine posts
+    # tasks as "axm-activity-engine". Without reservation, the first
+    # external claim squats the engine's poster identity — engine-task
+    # ring assessments then resolve the poster to the squatter's newborn
+    # record and HOLDs become QUARANTINEs for honest newcomers.
+    "axm-activity-engine",
 })
 
 # Any agent_id that is exactly "sincor" or starts with the "sincor-" prefix

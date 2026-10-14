@@ -59,19 +59,40 @@ SYBIL_LOW_REPUTATION = 1.0
 #: ``SYBIL_POSTER_LOW_REPUTATION``.
 SYBIL_POSTER_LOW_REPUTATION = 1.0
 
+#: Minimum ledger reputation_score (R_i) for a poster to unlock
+#: ledger-pool backing of its tasks (W-81 finding 1). R_i is the stake
+#: ledger's verified execution reputation —
+#: min(1,D/50) x min(1,P/3) x min(1,tenure/90d) x 0.5^U — deliberately
+#: separate from the marketplace display ``reputation`` scalar, which
+#: dust self-deals inflate to 1.0 for ~zero cost (reviewer-executed).
+#: R_i is tenure-gated: a dust-farmed identity scores ~0 no matter how
+#: many dust settlements it manufactures today. Tunable via
+#: ``SYBIL_POOL_POSTER_REPUTATION``.
+SYBIL_POOL_POSTER_REPUTATION = 0.05
+
 
 def _env_int(name: str, default: int) -> int:
     try:
-        return max(1, int(os.environ.get(name, "") or default))
+        raw = os.environ.get(name, "")
+        val = int(raw) if str(raw).strip() else default
     except (TypeError, ValueError):
         return default
+    # Fail closed: a below-minimum value (0, negative) falls back to the
+    # default instead of clamping to a neutered 1. A 1ms burst window or
+    # a cohort-size-1 ring layer would silently disable the control —
+    # the old max(1, ...) did exactly that for negatives.
+    return val if val >= 1 else default
 
 
 def _env_float(name: str, default: float) -> float:
     try:
-        return max(0.0, float(os.environ.get(name, "") or default))
+        raw = os.environ.get(name, "")
+        val = float(raw) if str(raw).strip() else default
     except (TypeError, ValueError):
         return default
+    # Fail closed: a reputation threshold <= 0 makes the newborn check
+    # vacuous (nothing is < 0.0), silently disabling the ring layer.
+    return val if val > 0 else default
 
 
 def sybil_burst_window_ms() -> int:
@@ -92,6 +113,103 @@ def sybil_low_reputation() -> float:
 def sybil_poster_low_reputation() -> float:
     """Poster-newborn threshold; env ``SYBIL_POSTER_LOW_REPUTATION``."""
     return _env_float("SYBIL_POSTER_LOW_REPUTATION", SYBIL_POSTER_LOW_REPUTATION)
+
+
+def sybil_pool_poster_reputation() -> float:
+    """Minimum ledger R_i for pool backing; env
+    ``SYBIL_POOL_POSTER_REPUTATION`` overrides."""
+    return _env_float("SYBIL_POOL_POSTER_REPUTATION", SYBIL_POOL_POSTER_REPUTATION)
+
+
+#: Maximum age of a sybil hold before it auto-rejects (W-81): a held
+#: winner's stake must not lock indefinitely with no SLA. Past the TTL
+#: with no admin decision, the hold auto-rejects (fail closed — money
+#: never moves without a human). The rejection preserves the proof
+#: record for adjudication, exactly like a manual reject. Tunable via
+#: ``SYBIL_HOLD_TTL_MS``.
+SYBIL_HOLD_TTL_MS = 72 * 3_600_000
+
+
+def sybil_hold_ttl_ms() -> int:
+    """Hold auto-reject TTL; env ``SYBIL_HOLD_TTL_MS`` overrides."""
+    return _env_int("SYBIL_HOLD_TTL_MS", SYBIL_HOLD_TTL_MS)
+
+
+def _resolve_poster_records(poster_id: str) -> List["tuple[str, Dict[str, Any]]"]:
+    """Agent records attributable to a task poster_id.
+
+    poster_id is an agent_id for internal/engine posts, but a signer
+    WALLET (lowercased hex) for external server-bound posts
+    (``_server_bound_poster_id`` returns the recovered signer, not an
+    agent id). Resolve both: exact agent_id match first, then wallet
+    match. Returns (agent_id, record) pairs; empty when unattributable.
+    """
+    fabric = get_fabric()
+    pid = str(poster_id or "").strip()
+    if not pid:
+        return []
+    with fabric.lock:
+        direct = fabric.agents.get(pid)
+        if direct is not None:
+            return [(pid, direct)]
+        lowered = pid.lower()
+        return [
+            (aid, a) for aid, a in fabric.agents.items()
+            if str(a.get("wallet") or "").strip().lower() == lowered
+        ]
+
+
+def poster_pool_eligible(poster_id: Any) -> "tuple[bool, str]":
+    """W-81 finding 1: gate ledger-pool backing on poster standing.
+
+    The 20,000 AXM launch pool subsidizes task bounties. The reviewer
+    EXECUTED the profit path: dust-farm a poster to marketplace rep 1.0
+    (five 0.000001-AXM self-deals, ~zero cost), post a large pool-backed
+    bounty, win it with a newborn burst, extract 0.95x from the pool.
+    The marketplace display scalar cannot gate this — it is exactly
+    what the dust-farming manufactures. So the gate uses the stake
+    ledger's verified execution reputation R_i (tenure-gated: a
+    dust-farmed identity scores ~0 regardless of manufactured
+    settlements), OR internal origin:
+
+    - internal origin -> eligible (engine exemption; origin is
+      server-stamped at registration and external origin-spoof attempts
+      stay external).
+    - R_i >= ``sybil_pool_poster_reputation()`` -> eligible.
+    - otherwise -> NOT eligible: the task still posts, self-funded.
+      Without pool backing the self-deal loop loses the 5% platform fee
+      per cycle — unprofitable by construction.
+
+    Fail-closed on the subsidy, never on task creation: an anonymous
+    poster, an unattributable poster, or a ledger read failure all post
+    self-funded. Returns (eligible, reason).
+    """
+    pid = str(poster_id or "").strip()
+    if not pid:
+        return False, "anonymous poster has no standing; task posts self-funded"
+    records = _resolve_poster_records(pid)
+    if not records:
+        return False, (
+            "poster %s has no registered record; task posts self-funded" % pid)
+    if any(str(rec.get("origin") or "") == "internal" for _, rec in records):
+        return True, "internal-origin poster (engine exemption)"
+    try:
+        from sincor2.onchain.stake_ledger import stake_ledger
+        ledger = stake_ledger()
+    except Exception as err:
+        return False, (
+            "reputation ledger unavailable (%s); task posts self-funded" % err)
+    best = 0.0
+    for aid, _rec in records:
+        try:
+            best = max(best, float(ledger.reputation_score(aid)))
+        except Exception:
+            continue
+    threshold = sybil_pool_poster_reputation()
+    if best >= threshold:
+        return True, "poster R_i %.4f >= %.4f" % (best, threshold)
+    return False, (
+        "poster R_i %.4f < %.4f; task posts self-funded" % (best, threshold))
 
 
 def cluster_identities_by_wallet() -> Dict[str, List[str]]:
@@ -235,30 +353,50 @@ def _ring_assessment(agent_id: str, task_id: str = "") -> Dict[str, Any]:
     self-limiting: once an identity reaches 1.0 reputation (five
     settlements) it is no longer newborn and flows without review.
 
-    CHEAPEST REMAINING EVASIONS (honest residual analysis):
+    CHEAPEST REMAINING EVASIONS (honest residual analysis, corrected
+    after the round-3 review):
 
-    1. **Slow-roll registration** — one identity per window-plus-epsilon
-       dodges the burst tripwire entirely. Cost scales LINEARLY with
-       fleet size (N x ~61 min wall-clock; ~4 days for 100 identities),
-       versus O(1) for a burst. Identities remain visible to
-       registration-velocity metrics.
-    2. **Poster-standing farming** — the poster earns 1.0 reputation via
-       five genuine settlements, then funds unlimited newborn bursts
-       (flag-only). Cost: five real tasks with bound deliverables. Each
-       subsequent burst still leaves pair/velocity traces for the W-89
-       wash-anomaly guard and registration-velocity monitoring.
-    3. **Winner-standing farming** — each fleet identity earns 1.0 via
-       five genuine settlements. Cost scales linearly (5N settlements):
-       doing real work is the desired outcome, not an evasion.
+    The round-2 residual claimed poster-standing farming cost "five
+    genuine settlements" and priced the attack at real work. That was
+    materially false: the reviewer EXECUTED five dust-bounty
+    (0.000001 AXM) self-deals between attacker identities and reached
+    marketplace rep 1.0 at ~zero cost (5% fee on dust), dodging pair
+    caps with 3 posters + loss alternation. The marketplace display
+    scalar is manufacturable and cannot gate anything of value. What
+    actually stops the extraction is the pool-backing gate
+    (``poster_pool_eligible``): it prices standing in the stake
+    ledger's R_i, which is tenure-gated, so a dust-farmed identity
+    scores ~0 no matter how many dust settlements it manufactures.
+
+    1. **Dust-farm poster to 1.0 (reviewer-executed)** — cost ~zero,
+       ~minutes. Result: the ring still flags the extraction shape,
+       but pool backing is DENIED (R_i ~0 < 0.05). The task posts
+       self-funded, and the self-deal loop loses the 5% platform fee
+       per cycle — unprofitable by construction. The attack's profit
+       is removed even though its mechanics still run.
+    2. **Unlock pool backing honestly-ish** — reach R_i >= 0.05, e.g.
+       50 settlements across 3+ distinct posters plus ~4.5 days of
+       tenure. Cost: 50 full auction cycles (commit/reveal/close/
+       settle each), days of wall-clock, and a complete wash trail in
+       the ledger (every completion records task, poster, and
+       timestamp). Then pool-backed extraction is possible — but the
+       ring layer still flags every newborn-burst win and W-89 watches
+       the pair pattern. Expensive, slow, and loud, versus the
+       original free, instant, and silent.
+    3. **Slow-roll registration** — one identity per window-plus-epsilon
+       dodges the burst tripwire. Cost scales LINEARLY with fleet size
+       (N x ~61 min wall-clock); identities remain visible to
+       registration-velocity metrics. Still no pool backing without
+       tenure (see 2).
     4. **Reputation exactly at threshold** — ``rep < threshold`` is
        strict; rep == 1.0 escapes "newborn". The 1.0 line is five
-       dispute-free settlements either way, so the hatch costs real
-       work, not a rounding trick.
+       dispute-free settlements either way; and it no longer unlocks
+       the pool (R_i gates that separately).
 
-    Closing (1) further needs registration rate-limiting or KYA at
-    mint; closing (2) further needs poster-side stake. Both are product
-    decisions beyond the W-81 gate, which prices the previously-free
-    attack at real work or real wall-clock.
+    Closing (2) further needs poster-side stake. That is a product
+    decision beyond the W-81 gate, which now prices the previously-free
+    attack at 50+ settlements plus days of tenure, or accepts a 5%
+    per-cycle loss.
     """
     out: Dict[str, Any] = {
         "cohort": [],

@@ -488,11 +488,18 @@ def test_ring_residual_slow_roll_registration_evades_burst():
 
 
 def test_ring_residual_poster_farming_costs_real_work():
-    """DOCUMENTED RESIDUAL: a poster that earned 1.0 via five genuine
-    settlements can fund newborn bursts (flag-only). The 1.0 line costs
-    five real tasks with bound deliverables — doing real work is the
-    desired outcome, not an evasion. This test pins that the flag still
-    fires (audit-visible) even when the block does not."""
+    """DOCUMENTED RESIDUAL (corrected round 3): a poster at marketplace
+    rep 1.0 funds newborn bursts flag-only on the ring layer. The old
+    docstring claimed the 1.0 line cost "five genuine settlements" —
+    the reviewer EXECUTED five dust-bounty self-deals to 1.0 at ~zero
+    cost, so the display scalar is manufacturable and gates nothing of
+    value. What gates the PROFIT is the pool-backing gate
+    (``poster_pool_eligible``): the dust-farmed poster scores R_i ~0
+    (tenure-gated) and its tasks post self-funded, so the self-deal
+    loop loses the 5% fee per cycle. This test pins that the ring flag
+    still fires (audit-visible) even when the block does not; see
+    ``test_pool_gate_dust_farmed_poster_denied`` for the profit gate.
+    """
     poster, workers = _burst_ring(3)
     get_fabric().agents[poster]["reputation"] = 1.0  # exactly at threshold
     winner = workers[0]
@@ -506,3 +513,403 @@ def test_ring_residual_poster_farming_costs_real_work():
     proof = submit_proof("task-ring-farm", winner, "0x" + "ab" * 16)
     assert proof["status"] == "paid"
     assert (proof["payout"].get("sybil") or {}).get("ring") is not None
+
+
+# ---------------------------------------------------------------------------
+# W-81 round 3: pool-backing gate, hold race, env fail-closed, poster-ID
+# squatting, hold TTL
+# ---------------------------------------------------------------------------
+
+import threading as _threading
+
+from sincor2.a2a_bounty_pool import bounty_pool, reset_bounty_pool
+from sincor2.activity_engine import POSTER_ID, ensure_engine_poster
+from sincor2.a2a_inbound_ext import PROTECTED_AGENT_IDS
+from sincor2.onchain.stake_ledger import reset_stake_ledger, stake_ledger
+from sincor2.a2a_inbound_market import (
+    _expire_sybil_hold_if_due,
+    create_task,
+)
+from sincor2.sybil_defense import (
+    SYBIL_POOL_POSTER_REPUTATION,
+    poster_pool_eligible,
+    sybil_hold_ttl_ms,
+    sybil_pool_poster_reputation,
+)
+
+
+@pytest.fixture
+def _pool_ledger_isolation(tmp_path):
+    """Funded pool + fresh stake ledger; singletons restored after."""
+    import sincor2.a2a_bounty_pool as pool_mod
+    import sincor2.onchain.stake_ledger as ledger_mod
+    old_pool, old_ledger = pool_mod._POOL, ledger_mod._LEDGER
+    pool_mod._POOL = None
+    ledger_mod._LEDGER = None
+    reset_bounty_pool(path=str(tmp_path / "pool.json"), reserve_axm=20000)
+    reset_stake_ledger(path=str(tmp_path / "stake.json"))
+    yield
+    pool_mod._POOL, ledger_mod._LEDGER = old_pool, old_ledger
+
+
+def _hold_task_for(winner_prefix: str, poster_id: str, task_id: str,
+                   held_ago_ms: int = 1_000):
+    """Drive a newborn-burst winner on an internal-poster task into a hold."""
+    _register("hold-poster", Account.create())
+    get_fabric().agents["hold-poster"]["origin"] = "internal"
+    for i in range(3):
+        _register(f"hold-w{i}", Account.create())
+    _assigned_task_as(task_id, "hold-w0", "hold-poster")
+    proof = submit_proof(task_id, "hold-w0", "0x" + "ab" * 16)
+    assert proof["status"] == "held"
+    if held_ago_ms != 1_000:
+        get_fabric().tasks[task_id]["sybil_hold"]["held_at"] = (
+            _now_ms() - held_ago_ms)
+    return task_id
+
+
+# ---------------------------------------------------------------------------
+# Finding 1: pool backing gated on poster standing (R_i, not the
+# dust-farmable display scalar)
+# ---------------------------------------------------------------------------
+
+def test_pool_gate_dust_farmed_poster_denied(_pool_ledger_isolation):
+    """REGRESSION (W-81 finding 1, reviewer-executed attack): dust-farm a
+    poster to marketplace rep 1.0 via five ~zero-cost self-deals, post a
+    large pool-backed bounty, win it with a newborn burst. The pool must
+    NOT allocate: the gate prices standing in ledger R_i (tenure-gated,
+    ~0 for the farmed identity), not the manufacturable display scalar.
+    The task posts self-funded; the self-deal loop then loses the 5%
+    platform fee per cycle — unprofitable by construction.
+    """
+    poster_key = Account.create()
+    _register("dust-poster", poster_key)
+    fabric = get_fabric()
+    # The reviewer's executed farming, simulated at the state level: the
+    # display scalar reaches 1.0 while the ledger records five
+    # manufactured settlements today (tenure ~0 -> R_i ~0).
+    fabric.agents["dust-poster"]["reputation"] = 1.0
+    ledger = stake_ledger()
+    for i in range(5):
+        ledger.record_completion("dust-poster", f"dust-task-{i}",
+                                 poster_id="dust-accomplice")
+    assert ledger.reputation_score("dust-poster") < sybil_pool_poster_reputation()
+
+    pool = bounty_pool()
+    avail_before = pool.status()["available_axm"]
+    task = create_task("lead-enrichment", bounty_axm=100.0,
+                       poster_id="dust-poster")
+    assert task["pool_backed"] is False
+    assert "pool_backing_skipped_reason" in task
+    # No pool funds moved: the extraction is zero, hence unprofitable
+    # (the operator funded the 100 AXM bounty themselves and the 5%
+    # platform fee burns on every self-deal cycle).
+    assert pool.status()["available_axm"] == avail_before
+    assert pool.status()["allocated_axm"] == 0
+    assert pool.allocations_for_task(task["task_id"]) == []
+    # The gate never bricks task creation: the task posts self-funded.
+    assert task["state"] == "open"
+    assert task["poster_id"] == "dust-poster"
+
+
+def test_pool_gate_engine_internal_poster_allowed(_pool_ledger_isolation):
+    """The engine's own tasks keep flowing: internal origin is exempt
+    from the standing gate (origin is server-stamped, not spoofable)."""
+    assert ensure_engine_poster() is True
+    rec = get_fabric().agents[POSTER_ID]
+    assert rec["origin"] == "internal"
+
+    task = create_task("lead-enrichment", bounty_axm=2.0, sealed=True,
+                       poster_id=POSTER_ID)
+    assert task["pool_backed"] is True
+    assert task["pool_allocation_id"]
+    pool = bounty_pool()
+    assert pool.allocations_for_task(task["task_id"])
+
+
+def test_pool_gate_established_poster_allowed(_pool_ledger_isolation):
+    """A poster with real tenure-gated standing (R_i >= threshold)
+    unlocks pool backing."""
+    _register("veteran-poster", Account.create())
+    ledger = stake_ledger()
+    # 50 completions across 3 posters, first seen 90 days ago -> R_i = 1.0.
+    now_s = int(__import__("time").time())
+    rep = ledger._rep("veteran-poster")
+    for i in range(50):
+        rep["completions"].append({
+            "task_id": f"vet-task-{i}",
+            "poster": f"vet-client-{i % 3}",
+            "ts": now_s - 45 * 86400,
+        })
+    rep["first_seen"] = now_s - 90 * 86400
+    ledger._save()
+    assert ledger.reputation_score("veteran-poster") >= sybil_pool_poster_reputation()
+
+    task = create_task("lead-enrichment", bounty_axm=2.0,
+                       poster_id="veteran-poster")
+    assert task["pool_backed"] is True
+
+
+def test_pool_gate_anonymous_and_unknown_poster_self_funded(
+        _pool_ledger_isolation):
+    """Anonymous posts and unattributable posters post self-funded —
+    fail-closed on the subsidy, never on creation."""
+    pool = bounty_pool()
+    avail_before = pool.status()["available_axm"]
+
+    t1 = create_task("lead-enrichment", bounty_axm=1.0, poster_id=None)
+    assert t1["pool_backed"] is False
+
+    t2 = create_task("lead-enrichment", bounty_axm=1.0,
+                     poster_id="nobody-here")
+    assert t2["pool_backed"] is False
+
+    assert pool.status()["available_axm"] == avail_before
+
+
+def test_pool_gate_wallet_poster_resolves(_pool_ledger_isolation):
+    """External server-bound posts attribute by signer WALLET: the gate
+    resolves the wallet to the agent record (and its R_i)."""
+    key = Account.create()
+    _register("wallet-poster", key)
+    ledger = stake_ledger()
+    now_s = int(__import__("time").time())
+    rep = ledger._rep("wallet-poster")
+    for i in range(50):
+        rep["completions"].append({
+            "task_id": f"wvet-task-{i}",
+            "poster": f"wvet-client-{i % 3}",
+            "ts": now_s - 45 * 86400,
+        })
+    rep["first_seen"] = now_s - 90 * 86400
+    ledger._save()
+
+    eligible, reason = poster_pool_eligible(key.address.lower())
+    assert eligible is True, reason
+    task = create_task("lead-enrichment", bounty_axm=2.0,
+                       poster_id=key.address.lower())
+    assert task["pool_backed"] is True
+
+
+# ---------------------------------------------------------------------------
+# Finding 2: double-release race settles exactly once
+# ---------------------------------------------------------------------------
+
+def test_hold_double_release_settles_exactly_once():
+    """REGRESSION (W-81 finding 2): two concurrent admin releases of the
+    same hold settle exactly once — the loser returns the already-recorded
+    outcome (race_noop) instead of double-settling."""
+    task_id = _hold_task_for("hold-w0", "hold-poster", "task-race-1")
+    fabric = get_fabric()
+    winner = "hold-w0"
+
+    # Widen the race window: stall inside stage_payout so both threads
+    # pass the first lock before either reaches the second.
+    import sincor2.a2a_inbound_market as mkt
+    real_stage = mkt.stage_payout
+
+    def slow_stage(**kw):
+        _threading.Event().wait(0.3)
+        return real_stage(**kw)
+
+    mkt.stage_payout = slow_stage
+    results = []
+    try:
+        def _release():
+            try:
+                results.append(_release_sybil_hold(task_id, decided_by="t"))
+            except Exception as err:  # pragma: no cover - diagnostic
+                results.append(err)
+        t1 = _threading.Thread(target=_release)
+        t2 = _threading.Thread(target=_release)
+        t1.start()
+        t2.start()
+        t1.join(timeout=10)
+        t2.join(timeout=10)
+    finally:
+        mkt.stage_payout = real_stage
+
+    assert len(results) == 2
+    assert not any(isinstance(r, Exception) for r in results), results
+    # The loser returns the winner's already-recorded "paid" proof plus
+    # a race_noop annotation: classify by the annotation, not the status.
+    noop = [r for r in results
+            if (r.get("sybil_hold") or {}).get("race_noop")]
+    paid = [r for r in results
+            if r.get("status") == "paid" and not (
+                (r.get("sybil_hold") or {}).get("race_noop"))]
+    assert len(paid) == 1, results
+    assert len(noop) == 1, results
+    # Exactly one settlement: +0.2 rep once, task settled once.
+    assert fabric.agents[winner]["reputation"] == 0.2
+    assert fabric.tasks[task_id]["state"] == "settled"
+    assert "sybil_hold" not in fabric.tasks[task_id]
+
+
+def test_hold_release_vs_reject_race_single_decision():
+    """A release racing a reject yields exactly one decision — no
+    double-settle, no lost update."""
+    task_id = _hold_task_for("hold-w0", "hold-poster", "task-race-2")
+
+    import sincor2.a2a_inbound_market as mkt
+    real_stage = mkt.stage_payout
+
+    def slow_stage(**kw):
+        _threading.Event().wait(0.3)
+        return real_stage(**kw)
+
+    mkt.stage_payout = slow_stage
+    results = []
+    try:
+        def _release():
+            try:
+                results.append(("release", _release_sybil_hold(task_id)))
+            except Exception as err:
+                results.append(("release", err))
+        def _reject():
+            try:
+                results.append(("reject", mkt._reject_sybil_hold(task_id)))
+            except Exception as err:
+                results.append(("reject", err))
+        t1 = _threading.Thread(target=_release)
+        t2 = _threading.Thread(target=_reject)
+        t1.start()
+        # Let the release pass its first lock, then reject wins the race.
+        _threading.Event().wait(0.1)
+        t2.start()
+        t1.join(timeout=10)
+        t2.join(timeout=10)
+    finally:
+        mkt.stage_payout = real_stage
+
+    # Exactly one terminal decision on the task; the loser either raised
+    # KeyError (reject after a completed release) or returned the
+    # winner's already-recorded outcome (release after a reject).
+    task = get_fabric().tasks[task_id]
+    assert task["state"] in ("settled", "rejected")
+    assert "sybil_hold" not in task
+    decisions = [r[1].get("status") for r in results
+                 if not isinstance(r[1], Exception)]
+    if task["state"] == "settled":
+        assert decisions.count("paid") == 1, decisions
+        assert get_fabric().agents["hold-w0"]["reputation"] == 0.2
+    else:
+        assert "paid" not in decisions, decisions
+        assert get_fabric().agents["hold-w0"].get("reputation") in (0, 0.0, None)
+
+
+# ---------------------------------------------------------------------------
+# Finding 3: env fail-open -> fail-closed
+# ---------------------------------------------------------------------------
+
+def test_env_negative_and_zero_fall_back_to_defaults(monkeypatch):
+    """REGRESSION (W-81 finding 3): SYBIL_BURST_WINDOW_MS=-1 used to
+    clamp to a 1ms window (ring neutered, fail-open); negatives/zeros
+    now fall back to defaults."""
+    from sincor2.sybil_defense import (
+        SYBIL_BURST_WINDOW_MS as DEF_WINDOW,
+        SYBIL_RING_COHORT_SIZE as DEF_COHORT,
+        SYBIL_HOLD_TTL_MS as DEF_TTL,
+        SYBIL_LOW_REPUTATION as DEF_REP,
+        sybil_burst_window_ms,
+        sybil_ring_cohort_size,
+        sybil_hold_ttl_ms,
+        sybil_low_reputation,
+        sybil_pool_poster_reputation,
+    )
+    monkeypatch.setenv("SYBIL_BURST_WINDOW_MS", "-1")
+    assert sybil_burst_window_ms() == DEF_WINDOW
+    monkeypatch.setenv("SYBIL_BURST_WINDOW_MS", "0")
+    assert sybil_burst_window_ms() == DEF_WINDOW
+    monkeypatch.setenv("SYBIL_RING_COHORT_SIZE", "-50")
+    assert sybil_ring_cohort_size() == DEF_COHORT
+    monkeypatch.setenv("SYBIL_RING_COHORT_SIZE", "0")
+    assert sybil_ring_cohort_size() == DEF_COHORT
+    monkeypatch.setenv("SYBIL_HOLD_TTL_MS", "-5")
+    assert sybil_hold_ttl_ms() == DEF_TTL
+    monkeypatch.setenv("SYBIL_LOW_REPUTATION", "-0.5")
+    assert sybil_low_reputation() == DEF_REP
+    monkeypatch.setenv("SYBIL_LOW_REPUTATION", "0")
+    assert sybil_low_reputation() == DEF_REP
+    monkeypatch.setenv("SYBIL_POOL_POSTER_REPUTATION", "-1")
+    assert sybil_pool_poster_reputation() == SYBIL_POOL_POSTER_REPUTATION
+    # Valid values still pass through.
+    monkeypatch.setenv("SYBIL_BURST_WINDOW_MS", "60000")
+    assert sybil_burst_window_ms() == 60_000
+
+
+# ---------------------------------------------------------------------------
+# Finding 4: engine poster-ID squatting refused
+# ---------------------------------------------------------------------------
+
+def test_engine_poster_id_squatting_refused():
+    """REGRESSION (W-81 finding 4): external registration of the
+    engine's reserved poster ID is refused."""
+    assert POSTER_ID in PROTECTED_AGENT_IDS
+    body = _body(POSTER_ID, Account.create().address)
+    with pytest.raises(ValueError, match="reserved agent_id"):
+        register_agent_record(body)
+
+
+def test_ensure_engine_poster_seeds_internal_and_reclaims():
+    """The engine poster seeds as internal; a pre-existing squatter
+    record is reclaimed."""
+    fabric = get_fabric()
+    # Simulate a squat from before the reservation.
+    fabric.agents[POSTER_ID] = {
+        "agent_id": POSTER_ID, "origin": "external", "reputation": 0.0,
+        "wallet": "", "registered_at": _now_ms(),
+    }
+    assert ensure_engine_poster() is True
+    rec = fabric.agents[POSTER_ID]
+    assert rec["origin"] == "internal"
+    # Idempotent: second call is a no-op.
+    assert ensure_engine_poster() is True
+    assert get_fabric().agents[POSTER_ID]["origin"] == "internal"
+
+
+# ---------------------------------------------------------------------------
+# Improvement: hold TTL — no capital hostage forever
+# ---------------------------------------------------------------------------
+
+def test_hold_ttl_expired_auto_rejects_on_release():
+    """A hold past SYBIL_HOLD_TTL_MS auto-rejects (fail closed) instead
+    of releasing — money never moves without a human."""
+    task_id = _hold_task_for(
+        "hold-w0", "hold-poster", "task-ttl-1",
+        held_ago_ms=sybil_hold_ttl_ms() + 60_000)
+    fabric = get_fabric()
+
+    snap = _release_sybil_hold(task_id, decided_by="test-admin")
+    assert snap["status"] == "rejected"
+    task = fabric.tasks[task_id]
+    assert task["state"] == "rejected"
+    assert "payout_axm" not in task
+    assert task["sybil_hold_decision"]["decision"] == "rejected"
+    assert task["sybil_hold_decision"]["ttl_expired"] is True
+    # No reputation granted, no money moved.
+    assert fabric.agents["hold-w0"].get("reputation") in (0, 0.0, None)
+
+
+def test_hold_ttl_not_yet_expired_releases_normally():
+    """A hold inside the TTL releases normally."""
+    task_id = _hold_task_for("hold-w0", "hold-poster", "task-ttl-2")
+    snap = _release_sybil_hold(task_id, decided_by="test-admin")
+    assert snap["status"] == "paid"
+    assert get_fabric().tasks[task_id]["state"] == "settled"
+
+
+def test_hold_carries_expires_at():
+    """Operators can see the review SLA on the hold record."""
+    task_id = _hold_task_for("hold-w0", "hold-poster", "task-ttl-3")
+    hold = get_fabric().tasks[task_id]["sybil_hold"]
+    assert hold["expires_at"] == hold["held_at"] + sybil_hold_ttl_ms()
+
+
+def test_expire_sweep_returns_none_when_fresh():
+    """The TTL sweep is a no-op for fresh holds and unknown tasks."""
+    task_id = _hold_task_for("hold-w0", "hold-poster", "task-ttl-4")
+    assert _expire_sybil_hold_if_due(task_id) is None
+    assert _expire_sybil_hold_if_due("task-nope") is None
+    # Fresh hold untouched.
+    assert get_fabric().tasks[task_id]["state"] == "held"
