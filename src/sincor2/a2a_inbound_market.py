@@ -905,6 +905,19 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
                   "wallet_tombstoned": False}
         )
         snap["ghost_penalty"] = penalty
+        # Pool backing: a ghosted assignment never pays out, so the
+        # task's bounty allocation returns to available (allocated ->
+        # released). Without this, ghosted allocations sit "allocated"
+        # forever and the pool drains monotonically. Never bricks
+        # expiry on accounting.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            pool = bounty_pool()
+            for alloc in pool.allocations_for_task(snap["task_id"]):
+                pool.release(alloc["allocation_id"])
+        except Exception as err:
+            logger.warning("pool release failed for ghosted task %s: %s",
+                           snap["task_id"], err)
         with fabric.lock:
             task = fabric.tasks.get(snap["task_id"])
             if task is not None:
@@ -1288,6 +1301,20 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
             stake_ledger().release(agent_id, task_id)
         except Exception as err:
             logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        # Bounty-pool settlement: the allocation backing this task's
+        # bounty is consumed (allocated -> spent) now that the payout
+        # staged. Distinct from release (unspent -> available): spent
+        # funds left the pool. Without this, settled allocations sit
+        # "allocated" forever and available drains monotonically.
+        # Never bricks settlement on accounting.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            pool = bounty_pool()
+            for alloc in pool.allocations_for_task(task_id):
+                pool.spend(alloc["allocation_id"])
+        except Exception as err:
+            logger.warning("pool spend failed for settled task %s: %s",
+                           task_id, err)
         # Reputation-weighted collateral: a dispute-free settlement is the
         # veteran-building event.  Recorded against the task's poster so
         # wash-trading with a sock-puppet poster cannot inflate R_i.
