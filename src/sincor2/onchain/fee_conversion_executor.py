@@ -76,6 +76,32 @@ WETH_DECIMALS = 18
 
 BASE_CHAIN_ID = 8453
 
+# --- Verified Base Sepolia (84532) deployments --------------------------------
+# V4 stack on Base Sepolia lives at DIFFERENT addresses than Base mainnet
+# (non-canonical deployment).  Presence verified on-chain 2026-10-14
+# (eth_getCode via https://sepolia.base.org):
+#   PoolManager  0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408  (24009 bytes)
+#   V4Quoter     0x4a6513c898fe1B2d0E78d3b0e0A4a151589B1cBa  (5820 bytes)
+#   UniversalRouter 0x492E6456D9528771018DeB9E87ef7750EF184104 (19540 bytes)
+#   Permit2      0x000000000022D473030F116dDEE9F6B43aC78BA3  (canonical, 9152 bytes)
+#   WETH         0x4200000000000000000000000000000000000006  (OP-Stack predeploy)
+#   USDC         0x036CbD53842c5426634e7929541eC2318f3dCF7e  (Circle testnet USDC)
+# NOTE: the AXM/SINC fee tokens are NOT deployed on Base Sepolia.  Sepolia
+# dry-runs use a control route (WETH->USDC); the AXM leg cannot be quoted on
+# Sepolia and must honestly report NO_POOL there.
+SEPOLIA_CHAIN_ID = 84532
+SEPOLIA_POOL_MANAGER = "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408"
+SEPOLIA_V4_QUOTER = "0x4a6513c898fe1B2d0E78d3b0e0A4a151589B1cBa"
+SEPOLIA_UNIVERSAL_ROUTER = "0x492E6456D9528771018DeB9E87ef7750EF184104"
+SEPOLIA_PERMIT2 = PERMIT2  # canonical on every chain
+SEPOLIA_WETH = WETH_TOKEN  # OP-Stack predeploy, same address
+SEPOLIA_USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+SEPOLIA_TOKEN_ADDRESSES = {
+    "WETH": SEPOLIA_WETH,
+    "USDC": SEPOLIA_USDC,
+}
+SEPOLIA_RPC_URL = "https://sepolia.base.org"
+
 # Universal Router command bytes (universal-router Commands.sol)
 CMD_V4_SWAP = 0x10
 CMD_SWEEP = 0x04
@@ -202,6 +228,38 @@ class FeeConversionConfig:
     pool_keys: Dict[Tuple[str, str], PoolKey] = field(default_factory=dict)
     armed: bool = False                  # legacy compatibility; never authorizes live execution
     ledger_path: str = field(default_factory=_default_fee_ledger_path)
+    # Multi-chain support.  Defaults preserve the historical Base-mainnet
+    # behavior exactly; Sepolia dry-runs override these.
+    chain_id: int = BASE_CHAIN_ID
+    token_addresses: Optional[Dict[str, str]] = None  # None -> TOKEN_ADDRESSES
+
+    def token_address(self, symbol: str) -> str:
+        """Resolve a token symbol to its address on this config's chain."""
+        addrs = self.token_addresses if self.token_addresses else TOKEN_ADDRESSES
+        try:
+            return addrs[symbol.upper()]
+        except KeyError:
+            raise ExecutorError(
+                f"unknown token {symbol} on chain {self.chain_id}")
+
+    @classmethod
+    def sepolia_defaults(cls, forwarder: str,
+                         treasury: str = TREASURY) -> "FeeConversionConfig":
+        """Config pointed at the verified Base Sepolia V4 deployments.
+
+        Read-only dry-runs only.  The fee tokens (AXM/SINC) do not exist on
+        Sepolia; use a control route (WETH->USDC) for the dry-run.
+        """
+        return cls(
+            rpc_url=SEPOLIA_RPC_URL,
+            forwarder=forwarder,
+            treasury=treasury,
+            quoter=SEPOLIA_V4_QUOTER,
+            universal_router=SEPOLIA_UNIVERSAL_ROUTER,
+            permit2=SEPOLIA_PERMIT2,
+            chain_id=SEPOLIA_CHAIN_ID,
+            token_addresses=dict(SEPOLIA_TOKEN_ADDRESSES),
+        )
 
     def pool_key_for(self, token_in: str, token_out: str) -> PoolKey:
         key = (token_in.upper(), token_out.upper())
@@ -357,7 +415,7 @@ class FeeConversionExecutor:
     # -- quoting ----------------------------------------------------------
     def _quote_calldata(self, pool: PoolKey, token_in: str,
                         amount_in_wei: int) -> bytes:
-        addr_in = TOKEN_ADDRESSES[token_in.upper()]
+        addr_in = self.config.token_address(token_in)
         zfo = zero_for_one(pool, addr_in)
         payload = abi_encode(
             ["((address,address,uint24,int24,address),bool,uint128,bytes)"],
@@ -388,7 +446,7 @@ class FeeConversionExecutor:
             msg = str(exc)
             raise ExecutorError(f"quote failed for {token_in}->{token_out}: {msg}")
         min_out = amount_out * (10_000 - self.config.slippage_bps) // 10_000
-        token_in_address = TOKEN_ADDRESSES[token_in.upper()]
+        token_in_address = self.config.token_address(token_in)
         return {
             "token_in": token_in.upper(),
             "token_out": token_out.upper(),
@@ -406,8 +464,8 @@ class FeeConversionExecutor:
         """Probe candidate (fee, tickSpacing) pairs; return the first pool
         that returns a non-zero quote.  Read-only.  The result must be pinned
         in config.pool_keys by the operator."""
-        addr_in = TOKEN_ADDRESSES[token_in.upper()]
-        addr_out = TOKEN_ADDRESSES[token_out.upper()]
+        addr_in = self.config.token_address(token_in)
+        addr_out = self.config.token_address(token_out)
         last_err: Optional[str] = None
         for fee, spacing in POOL_CANDIDATES:
             pool = PoolKey.for_pair(addr_in, addr_out, fee, spacing)
@@ -430,28 +488,43 @@ class FeeConversionExecutor:
     def allowance(self, token: str, owner: str, spender: str) -> int:
         data = SEL_ALLOWANCE + abi_encode(
             ["address", "address"], [owner, spender])
-        raw = self._eth_call(TOKEN_ADDRESSES[token.upper()], data)
+        raw = self._eth_call(self.config.token_address(token), data)
         return int.from_bytes(raw[-32:], "big")
 
     def balance_of(self, token: str, owner: str) -> int:
         data = SEL_BALANCE_OF + abi_encode(["address"], [owner])
-        raw = self._eth_call(TOKEN_ADDRESSES[token.upper()], data)
+        raw = self._eth_call(self.config.token_address(token), data)
         return int.from_bytes(raw[-32:], "big")
 
     @staticmethod
+    def _resolve_token(token: str,
+                       token_addresses: Optional[Mapping[str, str]]) -> str:
+        addrs = token_addresses if token_addresses else TOKEN_ADDRESSES
+        try:
+            return addrs[token.upper()]
+        except KeyError:
+            raise ExecutorError(f"unknown token {token}")
+
+    @staticmethod
     def build_approve_tx(token: str, spender: str, amount_wei: int,
-                         chain_id: int = BASE_CHAIN_ID) -> Dict[str, Any]:
+                         chain_id: int = BASE_CHAIN_ID,
+                         token_addresses: Optional[Mapping[str, str]] = None
+                         ) -> Dict[str, Any]:
         data = SEL_APPROVE + abi_encode(
             ["address", "uint256"], [spender, amount_wei])
-        return {"to": _ck(TOKEN_ADDRESSES[token.upper()]),
+        addr = FeeConversionExecutor._resolve_token(token, token_addresses)
+        return {"to": _ck(addr),
                 "data": "0x" + data.hex(), "value": 0, "chainId": chain_id}
 
     @staticmethod
     def build_transfer_tx(token: str, to: str, amount_wei: int,
-                          chain_id: int = BASE_CHAIN_ID) -> Dict[str, Any]:
+                          chain_id: int = BASE_CHAIN_ID,
+                          token_addresses: Optional[Mapping[str, str]] = None
+                          ) -> Dict[str, Any]:
         data = SEL_TRANSFER + abi_encode(
             ["address", "uint256"], [to, amount_wei])
-        return {"to": _ck(TOKEN_ADDRESSES[token.upper()]),
+        addr = FeeConversionExecutor._resolve_token(token, token_addresses)
+        return {"to": _ck(addr),
                 "data": "0x" + data.hex(), "value": 0, "chainId": chain_id}
 
     def permit2_allowance(self, token: str, owner: str, spender: str) -> int:
@@ -463,7 +536,7 @@ class FeeConversionExecutor:
         """
         data = SEL_P2_ALLOWANCE + abi_encode(
             ["address", "address", "address"],
-            [owner, TOKEN_ADDRESSES[token.upper()], spender])
+            [owner, self.config.token_address(token), spender])
         raw = self._eth_call(self.config.permit2, data)
         # returns (uint160 amount, uint48 expiration, uint48 nonce); amount first
         return int.from_bytes(raw[:32], "big")
@@ -471,7 +544,9 @@ class FeeConversionExecutor:
     @staticmethod
     def build_permit2_approve_tx(token: str, spender: str, amount_wei: int,
                                  expiration: int,
-                                 chain_id: int = BASE_CHAIN_ID) -> Dict[str, Any]:
+                                 chain_id: int = BASE_CHAIN_ID,
+                                 token_addresses: Optional[Mapping[str, str]] = None
+                                 ) -> Dict[str, Any]:
         """Unsigned Permit2.approve(token, spender, amount, expiration).
 
         Grants the Universal Router a Permit2-internal allowance so the V4
@@ -480,7 +555,8 @@ class FeeConversionExecutor:
         """
         data = SEL_P2_APPROVE + abi_encode(
             ["address", "address", "uint160", "uint48"],
-            [TOKEN_ADDRESSES[token.upper()], spender, amount_wei, expiration])
+            [FeeConversionExecutor._resolve_token(token, token_addresses),
+             spender, amount_wei, expiration])
         return {"to": _ck(PERMIT2),
                 "data": "0x" + data.hex(), "value": 0, "chainId": chain_id}
 
@@ -505,8 +581,8 @@ class FeeConversionExecutor:
         ``recipient`` must equal the forwarder (the execute() sender).
         """
         pool = self.config.pool_key_for(token_in, token_out)
-        addr_in = TOKEN_ADDRESSES[token_in.upper()]
-        addr_out = TOKEN_ADDRESSES[token_out.upper()]
+        addr_in = self.config.token_address(token_in)
+        addr_out = self.config.token_address(token_out)
         zfo = zero_for_one(pool, addr_in)
 
         actions = bytes([ACT_SWAP_EXACT_IN_SINGLE, ACT_SETTLE_ALL, ACT_TAKE_ALL])
@@ -571,7 +647,9 @@ class FeeConversionExecutor:
         if current_allowance < amount_in:
             txs.append({"kind": "approve_permit2",
                         "unsigned": self.build_approve_tx(
-                            token_in, self.config.permit2, amount_in)})
+                            token_in, self.config.permit2, amount_in,
+                            chain_id=self.config.chain_id,
+                            token_addresses=self.config.token_addresses)})
 
         # The V4 settle step pulls the fee token via Permit2.transferFrom,
         # which checks the Permit2-INTERNAL allowance (forwarder -> router),
@@ -583,12 +661,15 @@ class FeeConversionExecutor:
             txs.append({"kind": "permit2_approve",
                         "unsigned": self.build_permit2_approve_tx(
                             token_in, self.config.universal_router, amount_in,
-                            expiration=int(time.time()) + 30 * 86400)})
+                            expiration=int(time.time()) + 30 * 86400,
+                            chain_id=self.config.chain_id,
+                            token_addresses=self.config.token_addresses)})
 
         txs.append({"kind": "swap",
                     "unsigned": self.build_swap_tx(
                         token_in, token_out, amount_in,
-                        q["amount_out_min_wei"], self.config.forwarder)})
+                        q["amount_out_min_wei"], self.config.forwarder,
+                        chain_id=self.config.chain_id)})
         # Forward amount is filled after the swap confirms (verified balance).
         txs.append({"kind": "forward_to_treasury", "unsigned": None,
                     "note": "built post-swap from the verified output balance"})
@@ -668,7 +749,9 @@ class FeeConversionExecutor:
             raise ExecutorError(
                 f"post-swap {token_out} balance is 0; refusing to forward")
         unsigned = self.build_transfer_tx(token_out, self.config.treasury,
-                                          balance)
+                                          balance,
+                                          chain_id=self.config.chain_id,
+                                          token_addresses=self.config.token_addresses)
         self._simulate("forward_to_treasury", unsigned)
         tx_hash = sign_and_broadcast(unsigned, "forward_to_treasury")
         self.ledger.add_tx(oid, "forward_to_treasury", tx_hash,
