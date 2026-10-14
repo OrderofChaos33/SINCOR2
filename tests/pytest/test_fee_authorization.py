@@ -17,9 +17,9 @@ from sincor2.onchain.fee_authorization import (
     check_plan_scope,
     demo_record,
     sign_record,
-    synthetic_approvers,
     verify_authorization,
 )
+from fee_auth_test_helpers import synthetic_approvers
 
 CHAIN = 84532
 TOKEN_IN = "0x4200000000000000000000000000000000000006"   # WETH (Sepolia)
@@ -249,6 +249,22 @@ class _FakeConfig:
     treasury = TREASURY
     token_addresses = {"WETH": TOKEN_IN, "USDC": TOKEN_OUT}
 
+    def token_address(self, symbol):
+        # Duck-types FeeConversionConfig.token_address: explicit map first.
+        return self.token_addresses[symbol.upper()]
+
+
+class _FakeMainnetConfig(_FakeConfig):
+    # token_addresses=None: the Base-mainnet default.  Resolution must fall
+    # back to TOKEN_ADDRESSES via token_address(), not a raw dict lookup.
+    chain_id = 8453
+    token_addresses = None
+
+    def token_address(self, symbol):
+        from sincor2.onchain.fee_conversion_executor import TOKEN_ADDRESSES
+        addrs = self.token_addresses or TOKEN_ADDRESSES
+        return addrs[symbol.upper()]
+
 
 class _FakeExecutor:
     """Stub executor: proves authorized_dry_run's orchestration without RPC."""
@@ -323,7 +339,8 @@ def test_authorized_dry_run_rejects_bad_auth():
     rec, _ = _auth(ap)
     ex = _FakeExecutor()
     with pytest.raises(AuthorizationError):
-        authorized_dry_run(ex, "oid-1", rec, ["0x" + "11" * 65], now=NOW)
+        authorized_dry_run(ex, "oid-1", rec, ["0x" + "11" * 65],
+                           used_nonces=set(), now=NOW)
     assert not ex.planned  # nothing happened before auth
 
 
@@ -332,7 +349,8 @@ def test_authorized_dry_run_rejects_out_of_scope_plan():
     rec, sigs = _auth(ap, max_wei_per_run=10**10)  # plan needs 10**18
     ex = _FakeExecutor()
     with pytest.raises(AuthorizationError, match="exceeds"):
-        authorized_dry_run(ex, "oid-1", rec, sigs, now=NOW)
+        authorized_dry_run(ex, "oid-1", rec, sigs,
+                           used_nonces=set(), now=NOW)
 
 
 def test_authorized_dry_run_nonce_reuse_rejected(tmp_path):
@@ -349,13 +367,56 @@ def test_authorized_dry_run_nonce_reuse_rejected(tmp_path):
                            now=NOW)
 
 
-def test_authorized_dry_run_without_nonce_journal_allows_reuse(tmp_path):
-    # Without a journal the verifier is stateless; the caller owns replay
-    # policy.  Documented, tested, deliberate.
+def test_authorized_dry_run_requires_nonce_journal(tmp_path):
+    # Nonce replay protection is mandatory, not opt-in: the journal is a
+    # required parameter.  Omitting it fails at the call boundary.
     ap = _approvers()
     rec, sigs = _auth(ap)
     ex = _FakeExecutor()
-    authorized_dry_run(ex, "oid-1", rec, sigs,
-                       manifest_dir=str(tmp_path), now=NOW)
-    authorized_dry_run(ex, "oid-2", rec, sigs,
-                       manifest_dir=str(tmp_path), now=NOW)
+    with pytest.raises(TypeError):
+        authorized_dry_run(ex, "oid-1", rec, sigs,
+                           manifest_dir=str(tmp_path), now=NOW)
+
+
+def test_authorized_dry_run_mainnet_config_resolves_tokens(tmp_path):
+    # Regression for the scope-check finding: with token_addresses=None
+    # (the Base-mainnet default), quote symbols must resolve through
+    # config.token_address() (TOKEN_ADDRESSES fallback) — a raw dict lookup
+    # would leak the bare "WETH" symbol into _norm_addr and fail.
+    from sincor2.onchain.fee_conversion_executor import TOKEN_ADDRESSES
+    ap = _approvers()
+    rec = demo_record(chain_id=8453,
+                      token_in=TOKEN_ADDRESSES["WETH"],
+                      token_out=TOKEN_ADDRESSES["USDC"],
+                      treasury=TREASURY, approvers=ap, quorum=2,
+                      nonce="mainnet-1", now=NOW)
+    sigs = _sigs(rec, ap[:2])
+    ex = _FakeExecutor()
+    ex.config = _FakeMainnetConfig()
+    manifest = authorized_dry_run(ex, "oid-mainnet", rec, sigs,
+                                  manifest_dir=str(tmp_path),
+                                  used_nonces=set(), now=NOW)
+    assert manifest["chain_id"] == 8453
+    assert manifest["broadcast"] is False
+
+
+def test_non_string_signature_raises_authorization_error():
+    # A non-string signature must fail closed as AuthorizationError, not
+    # leak AttributeError from .strip().
+    ap = _approvers()
+    rec = _record(ap)
+    good = _sigs(rec, ap[:2])[0]
+    with pytest.raises(AuthorizationError, match="hex string"):
+        verify_authorization(rec, [None, good], now=NOW)
+    with pytest.raises(AuthorizationError, match="hex string"):
+        verify_authorization(rec, [b"0x" + b"11" * 65, good], now=NOW)
+
+
+def test_check_plan_scope_rejects_nonpositive_amount():
+    ap = _approvers()
+    rec = _record(ap)
+    for amount in (0, -10**18):
+        with pytest.raises(AuthorizationError, match="must be > 0"):
+            check_plan_scope(rec, chain_id=CHAIN, token_in=TOKEN_IN,
+                             token_out=TOKEN_OUT, treasury=TREASURY,
+                             amount_wei=amount, slippage_bps=100)

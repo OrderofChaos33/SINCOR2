@@ -49,8 +49,14 @@ The interface the runbook required now exists: `src/sincor2/onchain/fee_authoriz
   -> manifest.  It takes NO signer/broadcast callback: it cannot broadcast
   even if called wrong.  `execute_plan(dry_run=False)` still refuses
   unconditionally.
-- Replay: optional caller-owned `used_nonces` journal; without it the
-  verifier is stateless by design (documented, tested).
+- Replay: `authorized_dry_run` requires a caller-owned `used_nonces` journal;
+  the record's nonce must be unique per record and reuse fails closed
+  (AuthorizationError).  Pass a journal the caller persists across runs.
+- Clock: `authorized_dry_run`'s `now` defaults to the wall clock for
+  tests/dry-runs only.  Production callers MUST pass a trusted clock value:
+  the authorization time window (not_before / expires_at) is enforced
+  against it, and a skewed or attacker-controlled clock would widen or
+  bypass the window.
 
 **What this does NOT change:** no owner-signed record exists, no broadcast
 ceremony exists, nothing is armed.  Live conversion remains disabled; the

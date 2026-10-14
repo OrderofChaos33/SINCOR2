@@ -161,6 +161,8 @@ def _recover_signer(auth_hash: bytes, signature: str) -> str:
     from eth_account import Account
     from eth_account.messages import encode_defunct
 
+    if not isinstance(signature, str):
+        raise AuthorizationError("signature must be a hex string")
     sig = signature.strip()
     if sig.startswith("0x"):
         sig = sig[2:]
@@ -237,6 +239,9 @@ def check_plan_scope(record: AuthorizationRecord, *,
     if _norm_addr(treasury) != record.treasury:
         raise AuthorizationError(
             f"treasury {treasury} != authorized {record.treasury}")
+    if amount_wei <= 0:
+        raise AuthorizationError(
+            f"amount {amount_wei} must be > 0")
     if amount_wei > record.max_wei_per_run:
         raise AuthorizationError(
             f"amount {amount_wei} exceeds max_wei_per_run "
@@ -257,7 +262,7 @@ def authorized_dry_run(executor: Any,
                        *,
                        target: Optional[str] = None,
                        manifest_dir: Optional[str] = None,
-                       used_nonces: Optional[Set[str]] = None,
+                       used_nonces: Set[str],
                        now: Optional[int] = None) -> Dict[str, Any]:
     """Run the full conversion loop under authorization — without broadcast.
 
@@ -269,6 +274,16 @@ def authorized_dry_run(executor: Any,
     broadcast even if called wrong.  The returned manifest is the artifact a
     future founder-gated broadcast ceremony would consume.
 
+    ``used_nonces`` is REQUIRED: nonce replay protection is mandatory, not
+    opt-in.  Pass a durable journal (a set the caller persists across runs);
+    reuse of a nonce raises AuthorizationError and the run is recorded as
+    AUTHORIZED only after the nonce is journaled.
+
+    ``now`` defaults to the wall clock for tests/dry-runs only.  Production
+    callers MUST pass a trusted clock value for ``now``: the authorization
+    time window (not_before / expires_at) is enforced against it, and a
+    skewed or attacker-controlled clock would widen or bypass the window.
+
     Raises AuthorizationError (auth/scope/nonce) or ExecutorError
     (planning/simulation) — both fail closed, nothing is broadcast.
     """
@@ -277,22 +292,25 @@ def authorized_dry_run(executor: Any,
     # 1. Authorization first: nothing else happens without it.
     verify_authorization(record, signatures, now=now)
 
-    # 2. Replay protection across runs.
-    if used_nonces is not None:
-        if record.nonce in used_nonces:
-            raise AuthorizationError(
-                f"authorization nonce {record.nonce!r} already used")
+    # 2. Replay protection across runs: the record's own contract requires
+    #    the nonce to be unique per record; reuse fails closed.
+    if record.nonce in used_nonces:
+        raise AuthorizationError(
+            f"authorization nonce {record.nonce!r} already used")
     # 3. Plan: quote (read-only) + unsigned txs.  No broadcast.
     plan = executor.plan(obligation_id, target=target)
     quote = plan["quote"]
 
     # 4. Scope-check the CONCRETE plan values, not the request.
-    token_addrs = getattr(executor.config, "token_addresses", None) or {}
+    #    Token symbols from the quote resolve through config.token_address(),
+    #    which falls back to TOKEN_ADDRESSES when token_addresses is None
+    #    (the Base-mainnet default).  A raw dict lookup here would leak the
+    #    bare symbol ("WETH") into _norm_addr and fail closed incorrectly.
     check_plan_scope(
         record,
         chain_id=executor.config.chain_id,
-        token_in=token_addrs.get(quote["token_in"], quote["token_in"]),
-        token_out=token_addrs.get(quote["token_out"], quote["token_out"]),
+        token_in=executor.config.token_address(quote["token_in"]),
+        token_out=executor.config.token_address(quote["token_out"]),
         treasury=executor.config.treasury,
         amount_wei=int(quote["amount_in_wei"]),
         slippage_bps=int(quote["slippage_bps"]),
@@ -337,8 +355,7 @@ def authorized_dry_run(executor: Any,
         {"authorization_hash": record.auth_hash_hex(),
          "manifest_path": manifest_path})
 
-    if used_nonces is not None:
-        used_nonces.add(record.nonce)
+    used_nonces.add(record.nonce)
 
     logger.info("obligation %s authorized (not broadcast); manifest=%s",
                 obligation_id, manifest_path)
@@ -356,18 +373,10 @@ def _no_receipt(tx_hash: str) -> Mapping[str, Any]:
 
 
 # --- synthetic fixtures (tests / dry-runs only) ------------------------------
-
-def synthetic_approvers(n: int = 2, seed: int = 0xFEE) -> List[Any]:
-    """Deterministic synthetic owner accounts.  NEVER real keys.
-
-    For tests and dry-runs only.  These accounts exist solely so the
-    verification machinery can be exercised without owner key material.
-    """
-    from eth_account import Account
-
-    return [Account.from_key(keccak(f"sincor-fee-auth-test-{seed}-{i}".encode()))
-            for i in range(n)]
-
+# NOTE: synthetic_approvers lives in tests/pytest/fee_auth_test_helpers.py,
+# not here: deterministic key generation does not belong in a production
+# security module.  sign_record/demo_record stay: they are the record-signing
+# machinery exercised by tests and dry-runs.
 
 def sign_record(record: AuthorizationRecord, account: Any) -> str:
     """EIP-191 personal_sign of the record hash.  Tests/dry-runs only."""

@@ -10,6 +10,7 @@ import os
 import pytest
 
 from sincor2.onchain import fee_authorization as fauth
+from fee_auth_test_helpers import synthetic_approvers
 from sincor2.onchain.fee_conversion_executor import (
     ConversionLedger,
     ExecutorError,
@@ -130,7 +131,7 @@ def test_full_loop_plan_simulate_authorize(tmp_path, monkeypatch):
     assert sim["mode"] == "dry_run"
 
     # authorization with synthetic owner keys -> manifest, ledger AUTHORIZED
-    approvers = fauth.synthetic_approvers(2)
+    approvers = synthetic_approvers(2)
     record = fauth.demo_record(
         chain_id=84532, token_in=SEPOLIA_WETH, token_out=SEPOLIA_USDC,
         treasury=TREASURY, approvers=approvers, quorum=2,
@@ -172,11 +173,11 @@ def test_plan_fails_closed_below_dust(tmp_path, monkeypatch):
 def test_scope_rejects_wrong_treasury_in_full_loop(tmp_path, monkeypatch):
     ex = _executor(tmp_path, monkeypatch)
     oid = record_pending_conversion(ex.ledger, "WETH", 10**16)["id"]
-    approvers = fauth.synthetic_approvers(2)
+    approvers = synthetic_approvers(2)
     record = fauth.demo_record(
         chain_id=84532, token_in=SEPOLIA_WETH, token_out=SEPOLIA_USDC,
         treasury="0x" + "ab" * 20,  # not the executor's treasury
         approvers=approvers, quorum=2, nonce="scope-1")
     sigs = [fauth.sign_record(record, a) for a in approvers]
     with pytest.raises(fauth.AuthorizationError, match="treasury"):
-        fauth.authorized_dry_run(ex, oid, record, sigs)
+        fauth.authorized_dry_run(ex, oid, record, sigs, used_nonces=set())

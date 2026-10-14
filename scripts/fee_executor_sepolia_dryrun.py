@@ -29,10 +29,15 @@ import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src"))
+# synthetic_approvers lives in the test helpers, not the production
+# security module (fee_authorization.py): this dry-run script is a
+# demo/dry-run consumer, so it imports the helper like the tests do.
+sys.path.insert(0, os.path.join(REPO, "tests", "pytest"))
 
 from sincor2.onchain import fee_conversion_executor as fce
 from sincor2.onchain import fee_authorization as fauth
 from sincor2.onchain.constants import TREASURY
+from fee_auth_test_helpers import synthetic_approvers
 
 SEPOLIA_INFRA = {
     "PoolManager": fce.SEPOLIA_POOL_MANAGER,
@@ -160,7 +165,7 @@ def main() -> int:
                  data_prefix=u["data"][:18] + "...")
 
     # 5. Authorization with SYNTHETIC owner keys (in-memory only).
-    approvers = fauth.synthetic_approvers(3)
+    approvers = synthetic_approvers(3)
     record = fauth.demo_record(
         chain_id=fce.SEPOLIA_CHAIN_ID,
         token_in=fce.SEPOLIA_WETH,
