@@ -5,7 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {
     SincorPaymaster,
     PackedUserOperation,
-    IEntryPoint
+    IEntryPoint,
+    PostOpMode
 } from "../contracts/paymaster/SincorPaymaster.sol";
 
 /// @notice Minimal EntryPoint stand-in: tracks per-account deposits in wei
@@ -232,5 +233,67 @@ contract SincorPaymasterTest is Test {
         // Owner retains access after revoking the separate withdrawer.
         pm.withdrawTo(payable(recipient), 1 ether);
         assertEq(ep.balanceOf(address(pm)), 4 ether);
+    }
+
+    // ── (e) postOp matches the ERC-4337 v0.7 EntryPoint ───────────────────
+
+    // Canonical ERC-4337 v0.7 IPaymaster selector for
+    // postOp(uint8,bytes,uint256,uint256) — the enum ABI-encodes as uint8.
+    bytes4 constant V07_POSTOP_SELECTOR = 0x7c627b21;
+
+    function test_PostOpSelectorMatchesV07EntryPoint() public pure {
+        bytes4 sel = SincorPaymaster.postOp.selector;
+        bytes4 expected = bytes4(
+            keccak256("postOp(uint8,bytes,uint256,uint256)")
+        );
+        assertEq(sel, expected, "selector != canonical v0.7 encoding");
+        assertEq(sel, V07_POSTOP_SELECTOR, "selector != 0x7c627b21");
+    }
+
+    function test_OldV06PostOpSelectorNoLongerPresent() public pure {
+        bytes4 sel = SincorPaymaster.postOp.selector;
+        bytes4 oldBroken = bytes4(keccak256("postOp(uint8,bytes,uint256)"));
+        assertTrue(sel != oldBroken, "still exposes the v0.6 3-arg selector");
+    }
+
+    function _asEntryPointPostOp(
+        bytes memory ctx,
+        uint256 actualGasCost,
+        uint256 actualUserOpFeePerGas
+    ) internal {
+        vm.prank(address(ep));
+        pm.postOp(PostOpMode.opSucceeded, ctx, actualGasCost, actualUserOpFeePerGas);
+    }
+
+    function test_PostOpSettlesThroughV07Arity() public {
+        _openSponsorship();
+        uint256 maxCost = 1 ether;
+        (bytes memory ctx, ) = _asEntryPointValidate(agent, maxCost);
+        assertEq(pm.inFlight(agent), 1, "in-flight not marked");
+
+        uint256 actualGasCost = 0.6 ether;
+        _asEntryPointPostOp(ctx, actualGasCost, 2 gwei);
+
+        assertEq(pm.inFlight(agent), 0, "in-flight slot not released");
+        assertEq(pm.reservedWei(), 0, "reservation not released");
+        assertEq(pm.sponsoredWei(), actualGasCost, "actual cost not accrued");
+        assertEq(pm.sponsoredCount(agent), 1, "op not counted");
+    }
+
+    function test_PostOpIgnoresActualUserOpFeePerGas() public {
+        _openSponsorship();
+        (bytes memory ctx, ) = _asEntryPointValidate(agent, 1 ether);
+
+        // A large fee-per-gas must not leak into the settled accounting:
+        // sponsoredWei accrues actualGasCost only.
+        _asEntryPointPostOp(ctx, 0.4 ether, 1000 gwei);
+        assertEq(pm.sponsoredWei(), 0.4 ether, "feePerGas leaked into accounting");
+    }
+
+    function test_PostOpRevertsWhenCallerIsNotEntryPoint() public {
+        _openSponsorship();
+        (bytes memory ctx, ) = _asEntryPointValidate(agent, 1 ether);
+        vm.expectRevert("only EntryPoint");
+        pm.postOp(PostOpMode.opSucceeded, ctx, 0.5 ether, 1 gwei);
     }
 }
