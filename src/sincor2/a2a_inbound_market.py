@@ -1263,7 +1263,10 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
             # Claim-honesty: a staged digest is not a tx hash — never store
             # it under the tx-shaped "payout_tx" field name.
             task.pop("payout_tx", None)
-            task["payout_staged_digest"] = payout["staged_digest"]
+            if payout["staged_digest"]:
+                task["payout_staged_digest"] = payout["staged_digest"]
+            else:
+                task.pop("payout_staged_digest", None)
         task["settled_at"] = ts
         if receipt.get("ok") and fabric.agents.get(agent_id):
             ag = fabric.agents[agent_id]

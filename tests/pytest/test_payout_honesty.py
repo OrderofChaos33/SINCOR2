@@ -222,6 +222,11 @@ def test_complete_task_meta_is_honest(evaluator, store):
         ({"ok": True, "mode": "staged"}, "payout_staged", False),
         ({"ok": True, "mode": "live", "tx_hash": None}, "payout_staged", False),
         ({"ok": True, "tx_hash": ""}, "payout_staged", False),
+        # Adversarial: garbage / malformed / padded hashes fail closed —
+        # only exactly 0x + 64 hex earns broadcasted/paid.
+        ({"ok": True, "tx_hash": "garbage"}, "payout_staged", False),
+        ({"ok": True, "tx_hash": "0xZZZ"}, "payout_staged", False),
+        ({"ok": True, "tx_hash": "  " + REAL_TX + "  "}, "payout_staged", False),
         ({"ok": False}, "rejected", False),
         # Contradictory input, honest output: money moved (broadcasted)
         # but settlement failed (rejected) — needs human eyes, not a lie.

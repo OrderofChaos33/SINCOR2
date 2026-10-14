@@ -608,8 +608,14 @@ def _record_fee(task: Dict[str, Any], rec: Dict[str, Any],
     if fee <= 0:
         rec["fee_recorded"] = True
         return 0.0
+    from sincor2.contract_net import payout_broadcast_status
     from sincor2.treasury_settlement import record_platform_fee_inflow
-    tx_hash = task.get("payout_tx") or ""
+    # Honesty gate (not key absence): the fee ledger only ever carries a
+    # shape-validated broadcast hash. If a future staged-path regression
+    # stores a digest (or anything else) under the task's payout_tx key,
+    # it cannot silently flow into treasury accounting as a real tx hash.
+    payout = payout_broadcast_status({"ok": True, "tx_hash": task.get("payout_tx")})
+    tx_hash = payout["tx_hash"] if payout["broadcasted"] else None
     recorded = record_platform_fee_inflow(
         fee_amount=fee,
         asset="AXM",

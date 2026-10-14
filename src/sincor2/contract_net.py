@@ -38,6 +38,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import threading
 import time
 from typing import Any, Dict, Optional
@@ -185,10 +186,15 @@ def payout_broadcast_status(receipt: Optional[Dict[str, Any]]) -> Dict[str, Any]
     presented as one (it is 0x + 64 hex — shape-identical to a real tx
     hash). Only an actual broadcast — a real ``tx_hash`` on the receipt —
     earns ``"paid"`` / ``payout_tx``. Every other outcome is staged.
+
+    Fail-closed on the hash shape: ``tx_hash`` must be exactly ``0x`` +
+    64 hex characters. Garbage, truncated, whitespace-padded, or
+    non-string values never earn ``"paid"``.
     """
     receipt = receipt or {}
-    tx_hash = receipt.get("tx_hash") or ""
-    broadcasted = bool(tx_hash)
+    raw_hash = receipt.get("tx_hash")
+    tx_hash = raw_hash if isinstance(raw_hash, str) else ""
+    broadcasted = bool(re.fullmatch(r"0x[0-9a-fA-F]{64}", tx_hash))
     if receipt.get("ok") and broadcasted:
         proof_status = "paid"
     elif receipt.get("ok"):
@@ -197,7 +203,8 @@ def payout_broadcast_status(receipt: Optional[Dict[str, Any]]) -> Dict[str, Any]
         proof_status = "rejected"
     return {
         "broadcasted": broadcasted,
-        "tx_hash": tx_hash or None,
+        # Never echo an invalid hash back out as if it were one.
+        "tx_hash": tx_hash if broadcasted else None,
         "staged_digest": receipt.get("staged_tx_digest"),
         "proof_status": proof_status,
     }
@@ -358,7 +365,8 @@ class ContractNetEvaluator:
         else:
             # Claim-honesty: never store a staged digest under the
             # tx-shaped "payout_tx" field name.
-            payout_fields["payout_staged_digest"] = payout["staged_digest"] or ""
+            if payout["staged_digest"]:
+                payout_fields["payout_staged_digest"] = payout["staged_digest"]
         self.store.hset(meta_key, mapping=payout_fields)
         self.store.publish(
             TASK_BROADCAST_CHANNEL,
