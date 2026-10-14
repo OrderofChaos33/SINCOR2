@@ -24,6 +24,7 @@ from sincor2.card_sanitize import (
     TAG_MAX_LEN,
     VERSION_MAX_LEN,
     sanitize_card_text,
+    sanitize_skills,
     safe_url,
 )
 from sincor2.contract_net import (
@@ -469,7 +470,7 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
             "wallet": str(card.get("wallet") or body.get("wallet") or ""),
             "chain_id": int(body.get("chain_id") or card.get("chain_id") or BASE_CHAIN_ID),
             "sinc_stake": int(body.get("sinc_stake") or 0),
-            "skills": skills,
+            "skills": sanitize_skills(skills),
         }
     agent_id = str(body.get("agent_id") or _slug(str(body.get("name") or ""))).strip()
     if not agent_id:
@@ -479,17 +480,22 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
         tags = [t.strip() for t in tags.split(",") if t.strip()]
     if not tags:
         raise ValueError("capability_tags required")
+    clean_tags = sorted({
+        t
+        for t in (sanitize_card_text(t, TAG_MAX_LEN).lower() for t in tags)
+        if t
+    })
     return {
         "agent_id": agent_id,
         "name": _sanitize_card_text(body.get("name") or agent_id, NAME_MAX_LEN),
         "description": _sanitize_card_text(body.get("description") or "", DESCRIPTION_MAX_LEN),
         "version": _sanitize_card_text(body.get("version") or "0.1.0", VERSION_MAX_LEN),
-        "capability_tags": sorted({str(t).lower() for t in tags if t}),
+        "capability_tags": clean_tags,
         "rpc_callback": _safe_url(body.get("rpc_callback") or body.get("agent_url")),
         "wallet": str(body.get("wallet") or ""),
         "chain_id": int(body.get("chain_id") or BASE_CHAIN_ID),
         "sinc_stake": int(body.get("sinc_stake") or 0),
-        "skills": [{"id": t, "name": t} for t in tags],
+        "skills": [{"id": t, "name": t} for t in clean_tags],
     }
 
 

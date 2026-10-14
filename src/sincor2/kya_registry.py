@@ -17,6 +17,7 @@ from sincor2.card_sanitize import (
     NAME_MAX_LEN,
     VERSION_MAX_LEN,
     sanitize_card_text,
+    sanitize_skills,
     safe_url,
 )
 
@@ -380,6 +381,7 @@ def list_from_inbound(agent: Dict[str, Any], card: Optional[Dict[str, Any]] = No
     c_hash = card_hash(card)
     principal = wallet or "0x0000000000000000000000000000000000000000"
     kya_id = make_kya_id(agent_id, principal, c_hash)
+    clean_skills = sanitize_skills(agent.get("skills"))
     rec = {
         "kya_id": kya_id,
         "agent_id": agent_id,
@@ -389,12 +391,12 @@ def list_from_inbound(agent: Dict[str, Any], card: Optional[Dict[str, Any]] = No
         "card_hash": c_hash,
         "name": sanitize_card_text(agent.get("name") or agent_id, NAME_MAX_LEN),
         "version": sanitize_card_text(agent.get("version") or "0.0.0", VERSION_MAX_LEN),
-        "skills": agent.get("skills") or [],
+        "skills": clean_skills,
         "status": "listed",
         "scope": {
             "max_axm_per_tx": str(5 * 10**18),
             "daily_axm_limit": str(50 * 10**18),
-            "allowed_skills": [s.get("id") for s in (agent.get("skills") or []) if isinstance(s, dict)],
+            "allowed_skills": [s.get("id") for s in clean_skills if isinstance(s, dict)],
             "allowed_counterparties": [],
             "valid_until": "2027-01-01T00:00:00Z",
         },

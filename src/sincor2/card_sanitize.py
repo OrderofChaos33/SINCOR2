@@ -29,9 +29,10 @@ Text policy (``sanitize_card_text``)
 -----------------------------------
 The render path is JSON APIs (``/v1/a2a/agents``, ``/api/marketplace/agents``)
 consumed by external UIs. Sanitization: strip, drop C0/C1 control
-characters except TAB/LF/CR, neutralize markup by removing ``<``/``>``
-(no tag can form; avoids double-escaping issues for JSON consumers),
-then hard-truncate to the field cap.
+characters except TAB/LF/CR, strip bidi overrides/isolates and
+zero-width format characters (display-spoofing), neutralize markup by
+removing ``<``/``>`` (no tag can form; avoids double-escaping issues
+for JSON consumers), then hard-truncate to the field cap.
 """
 
 from __future__ import annotations
@@ -48,8 +49,14 @@ VERSION_MAX_LEN = 32
 SKILL_FIELD_MAX_LEN = 120
 TAG_MAX_LEN = 64
 
-# C0 controls except \t \n \r, plus DEL and C1 controls.
-_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f]")
+# C0 controls except \t \n \r, plus DEL, C1 controls, and invisible
+# format characters abused for display-spoofing in a trust directory:
+# bidi overrides/embeds (U+202A-U+202E), bidi isolates (U+2066-U+2069),
+# zero-width space/joiners (U+200B-U+200D), word joiner (U+2060), BOM (U+FEFF).
+_CONTROL_RE = re.compile(
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f"
+    r"\u200b-\u200d\u202a-\u202e\u2060\u2066-\u2069\ufeff]"
+)
 
 _BLOCKED_NETWORKS = (
     ipaddress.ip_network("127.0.0.0/8"),   # loopback v4
@@ -80,7 +87,48 @@ def sanitize_card_text(value: Any, max_len: int) -> str:
     return s
 
 
+def sanitize_skills(skills: Any) -> list:
+    """Sanitize the skills list of an agent card. Never raises.
+
+    Each skill's ``id``/``name``/``tags`` are attacker-controlled display
+    fields served to external UIs, so they get the same text treatment as
+    name/description. Other keys are passed through untouched (structure
+    preservation, not a trust boundary).
+    """
+    out: list = []
+    try:
+        for skill in (skills or []):
+            if isinstance(skill, dict):
+                d = dict(skill)
+                d["id"] = sanitize_card_text(skill.get("id"), SKILL_FIELD_MAX_LEN)
+                d["name"] = sanitize_card_text(skill.get("name"), SKILL_FIELD_MAX_LEN)
+                d["tags"] = [
+                    t
+                    for t in (
+                        sanitize_card_text(t, TAG_MAX_LEN)
+                        for t in (skill.get("tags") or [])
+                    )
+                    if t
+                ]
+                out.append(d)
+            else:
+                s = sanitize_card_text(skill, SKILL_FIELD_MAX_LEN)
+                if s:
+                    out.append({"id": s, "name": s})
+    except Exception:
+        pass
+    return out
+
+
 def _ip_blocked(ip: Any) -> bool:
+    # ipaddress containment is version-strict: ::ffff:127.0.0.1 is NOT
+    # "in" 127.0.0.0/8, yet on dual-stack hosts it connects to loopback.
+    # Unwrap IPv4-mapped (::ffff:a.b.c.d) and 6to4 (2002:a.b.c.d::/48)
+    # addresses so they are judged against the IPv4 block list.
+    if isinstance(ip, ipaddress.IPv6Address):
+        v4 = ip.ipv4_mapped or ip.sixtofour
+        if v4 is not None:
+            ip = v4
     return any(ip in net for net in _BLOCKED_NETWORKS)
 
 

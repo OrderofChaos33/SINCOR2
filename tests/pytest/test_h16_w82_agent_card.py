@@ -57,6 +57,14 @@ class SanitizeTextTests(unittest.TestCase):
         self.assertNotIn("<", out)
         self.assertNotIn(">", out)
 
+    def test_bidi_and_zero_width_stripped(self):
+        # Display-spoofing format chars must not survive in a trust directory.
+        out = sanitize_card_text("a\u202eb\u200bc", 120)
+        self.assertEqual(out, "abc")
+        out = sanitize_card_text("x\ufeffy", 120)
+        self.assertEqual(out, "xy")
+        out = sanitize_card_text("\u2066n\u2069", 120)
+        self.assertEqual(out, "n")
 
 class SafeUrlTests(unittest.TestCase):
     BLOCKED = [
@@ -106,6 +114,25 @@ class SafeUrlTests(unittest.TestCase):
             with self.subTest(host=h):
                 self.assertTrue(host_blocked(h))
         self.assertFalse(host_blocked("93.184.216.34"))
+
+    def test_ipv4_mapped_ipv6_rejected(self):
+        # W-82 rework: ipaddress containment is version-strict, so
+        # ::ffff:127.0.0.1 was NOT "in" 127.0.0.0/8 and slipped through.
+        # On dual-stack hosts these connect to loopback/private/metadata.
+        for url in [
+            "http://[::ffff:127.0.0.1]/",
+            "http://[::ffff:10.0.0.1]/",
+            "http://[::ffff:169.254.169.254]/",
+        ]:
+            with self.subTest(url=url):
+                self.assertEqual(safe_url(url), "", f"should reject {url!r}")
+                self.assertEqual(_safe_url(url), "", f"wrapper should reject {url!r}")
+        # Direct host checks, incl. a 6to4 form embedding 10.0.0.1.
+        for h in ["::ffff:127.0.0.1", "::ffff:192.168.1.1", "2002:0a00:0001::1"]:
+            with self.subTest(host=h):
+                self.assertTrue(host_blocked(h))
+        # Plain public v6 still passes.
+        self.assertEqual(safe_url("http://[2606:2800:220:1:248:1893:25c8:1946]/"), "http://[2606:2800:220:1:248:1893:25c8:1946]/")
 
     def test_dns_rebinding_naive_case_blocked(self):
         # Attacker domain resolving to the metadata IP must be rejected.
@@ -167,6 +194,70 @@ class NormalizeRegistrationTests(unittest.TestCase):
         self.assertNotIn("\x00", parsed["name"])
         self.assertEqual(len(parsed["description"]), DESCRIPTION_MAX_LEN)
         self.assertEqual(parsed["rpc_callback"], "")
+
+
+class SkillSanitizationTests(unittest.TestCase):
+    """W-82 rework: skill id/name/tags were stored raw in three sinks."""
+
+    POISON = [
+        {"id": "<script>alert(1)</script>", "name": "<img src=x onerror=alert(1)>",
+         "tags": ["<b>bold</b>", "ok-tag"]},
+    ]
+
+    def _assert_skills_clean(self, skills):
+        self.assertTrue(skills, "skills must survive sanitization")
+        for s in skills:
+            for field in ("id", "name"):
+                v = s.get(field, "")
+                self.assertNotIn("<", v, f"poison in skill {field}: {v!r}")
+                self.assertNotIn(">", v, f"poison in skill {field}: {v!r}")
+            for t in s.get("tags", []):
+                self.assertNotIn("<", t, f"poison in skill tag: {t!r}")
+                self.assertNotIn(">", t, f"poison in skill tag: {t!r}")
+
+    def test_card_path_skills_sanitized(self):
+        body = _poisoned_card(skills=self.POISON)
+        parsed = _normalize_registration(body)
+        self._assert_skills_clean(parsed["skills"])
+
+    def test_flat_body_tags_and_skills_sanitized(self):
+        body = {
+            "agent_id": "plain-02",
+            "name": "Plain",
+            "capability_tags": ["<script>alert(1)</script>", "legit-tag"],
+        }
+        parsed = _normalize_registration(body)
+        for t in parsed["capability_tags"]:
+            self.assertNotIn("<", t, f"poison in capability_tags: {t!r}")
+        self._assert_skills_clean(parsed["skills"])
+        self.assertIn("legit-tag", parsed["capability_tags"])
+
+    def test_kya_list_from_inbound_skills_sanitized(self):
+        prior = os.environ.get("KYA_STORE_PATH")
+        fd, store_path = tempfile.mkstemp(prefix="kya_w82_sk_", suffix=".json")
+        os.close(fd)
+        os.environ["KYA_STORE_PATH"] = store_path
+        try:
+            kya.reset()
+            if os.path.exists(store_path):
+                os.unlink(store_path)
+            agent = {
+                "agent_id": "w82-sk",
+                "name": "Skill Poison",
+                "skills": self.POISON,
+                "wallet": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+            }
+            rec = kya.list_from_inbound(agent)
+            self._assert_skills_clean(rec["skills"])
+            for sid in rec["scope"]["allowed_skills"]:
+                self.assertNotIn("<", sid, f"poison in allowed_skills: {sid!r}")
+        finally:
+            if os.path.exists(store_path):
+                os.unlink(store_path)
+            if prior is None:
+                os.environ.pop("KYA_STORE_PATH", None)
+            else:
+                os.environ["KYA_STORE_PATH"] = prior
 
 
 class KyaListingTests(unittest.TestCase):
