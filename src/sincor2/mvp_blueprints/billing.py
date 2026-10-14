@@ -552,12 +552,18 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
 
     # C4: route value-granting fulfillment through the effect boundary BEFORE
     # any delivery. Fail-closed: a denied intent aborts fulfillment.
+    # W-80: the treasury HALT file is consulted explicitly — a tripped
+    # (or unreadable/tampered) halt denies fulfillment via the money gate.
     try:
-        from sincor2.governance.money_gate import check_money_effect
+        from sincor2.governance.money_gate import (
+            check_money_effect,
+            treasury_halt_tripped,
+        )
     except ImportError:
         try:
             from src.sincor2.governance.money_gate import (  # type: ignore
                 check_money_effect,
+                treasury_halt_tripped,
             )
         except ImportError as exc:
             logger.critical(
@@ -574,6 +580,7 @@ def trigger_fulfillment(order_id, email, product_name, amount, order_type, produ
         idempotency_key=f"fulfill-{order_id}",
         target="order_fulfillment",
         estimated_cost=float(amount or 0),
+        kill_switch_tripped=treasury_halt_tripped(),
     )
     if not allowed:
         logger.critical(
