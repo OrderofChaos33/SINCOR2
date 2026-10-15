@@ -54,8 +54,8 @@ FALSE-POSITIVE ANALYSIS (why legitimate users don't trip this)
   This is the residual FP surface (urgent single-bidder gig, trivially fast
   work).  Cost of the FP is deliberately small: settlement still completes,
   payout still stages; only the anomaly flag is set and any fee is booked
-  projected rather than realized.  The poster can clear the flag at any
-  time with an EIP-191 acceptance over the canonical message
+  projected rather than realized.  The poster can clear a NON-self-deal
+  flag at any time with an EIP-191 acceptance over the canonical message
   (``SINCOR-POSTER-ACCEPT\\n{task_id}\\n{proof_id}\\n{receipt_hash}``),
   verified against the poster's registered wallet — two wired paths:
   (1) pass ``poster_acceptance_sig`` with ``submit_proof`` (clears at
@@ -64,7 +64,12 @@ FALSE-POSITIVE ANALYSIS (why legitimate users don't trip this)
   realized.  Invalid acceptances keep the flag and are logged loudly;
   clearance never raises.
 * ``self_deal_wallet``: no legitimate FP — even "testing" self-payment is
-  correctly labeled wash; the flag is informational, not blocking.
+  correctly labeled wash; the flag is informational, not blocking.  A
+  self-deal flag can NEVER be cleared by poster acceptance — a colluding
+  poster's self-attestation proves nothing (C1).  Both the assess-time
+  acceptance path and ``clear_wash_anomaly`` refuse it (the latter with
+  ``{"cleared": False, "reason": "self-deal not clearable by poster"}``)
+  and the flag stays ``anomalous=True``.
 
 EVASION NOTES (adversarial review, 2026-10-14)
 ----------------------------------------------
@@ -181,6 +186,43 @@ def verify_poster_acceptance(task: Mapping[str, Any],
         return False
 
 
+def _poster_wallet(task: Mapping[str, Any], fabric: Any) -> str:
+    """The poster's registered wallet ("" when unknown)."""
+    try:
+        poster_id = task.get("poster_id")
+        if fabric is not None and poster_id:
+            poster = (fabric.agents or {}).get(str(poster_id)) or {}
+            return _norm_wallet(poster.get("wallet"))
+    except Exception:
+        pass
+    return ""
+
+
+def _clearance_record(signals: List[Dict[str, Any]],
+                      task: Mapping[str, Any],
+                      fabric: Any,
+                      now_ms: int) -> Dict[str, Any]:
+    """Build the machine-readable wash_history entry for a clearance.
+
+    Captures the original signals plus the clearance record (who cleared,
+    when, by what mechanism) so downstream consumers can distinguish
+    "flagged-then-poster-accepted" from "never flagged" even though both
+    read anomalous=False.
+    """
+    return {
+        "original_signals": [
+            {"name": str(s.get("name")), "detail": str(s.get("detail"))}
+            for s in (signals or [])
+        ],
+        "clearance": {
+            "cleared_by": str(task.get("poster_id") or ""),
+            "cleared_by_wallet": _poster_wallet(task, fabric),
+            "cleared_at": int(now_ms),
+            "mechanism": "poster_eip191_acceptance",
+        },
+    }
+
+
 def assess_settlement(task: Mapping[str, Any],
                       winner_id: str,
                       *,
@@ -203,6 +245,12 @@ def assess_settlement(task: Mapping[str, Any],
         "exempt": False,
         "exemption_reason": None,
         "cleared_by_acceptance": False,
+        "acceptance_refused": False,
+        "acceptance_refused_reason": None,
+        # Ternary state: when a flag is cleared by poster acceptance the
+        # original signals + clearance record land here, so downstream
+        # consumers can distinguish "clean" from "flagged-then-cleared".
+        "wash_history": [],
         "assessed_at": now_ms,
     }
 
@@ -227,15 +275,20 @@ def assess_settlement(task: Mapping[str, Any],
         task_id = str(task.get("task_id") or "")
         poster_id = task.get("poster_id")
 
-        # Signal: unbound receipt with no poster acceptance.
+        # Poster acceptance is verified first but APPLIED last.  Signals are
+        # always computed, and a self_deal_wallet flag can never be cleared
+        # by the poster's own attestation (C1: a colluding poster clearing
+        # its own self-deal proves nothing).  Verifying before the signals
+        # keeps the (expensive, stateless) signature recovery out of the
+        # decision logic; the verdict below decides what the verification
+        # is allowed to do.
         accepted = False
         if poster_acceptance_sig:
             accepted = verify_poster_acceptance(
                 task, proof_id, receipt_hash, poster_acceptance_sig,
                 fabric=fabric)
-        if accepted:
-            verdict["cleared_by_acceptance"] = True
-            return verdict
+
+        # Signal: unbound receipt with no poster acceptance.
         if not content_bound:
             _signal("unbound_no_acceptance",
                     "bare receipt_hash, no deliverable binding, "
@@ -284,12 +337,31 @@ def assess_settlement(task: Mapping[str, Any],
         except Exception:
             pass
 
-        # Decision.
+        # Decision.  Signal precedence: self-deal first (never clearable),
+        # then valid acceptance, then the corroboration rule.
         names = {s["name"] for s in verdict["signals"]}
         corroborating = ({"sole_bidder", "instant_settle",
                            "pair_concentration"} & names)
         if "self_deal_wallet" in names:
+            # Self-deal is wash by definition and can NEVER be cleared by
+            # the poster's own acceptance: self-attestation of self-dealing
+            # proves nothing (C1).  A valid acceptance is refused here;
+            # note it so the refusal is audit-visible.
             verdict["anomalous"] = True
+            if accepted:
+                verdict["acceptance_refused"] = True
+                verdict["acceptance_refused_reason"] = (
+                    "self-deal not clearable by poster")
+        elif accepted:
+            # Non-self-deal flag cleared by a valid poster acceptance.
+            # Ternary state: anomalous=False, but the wash_history marker
+            # retains the original signals + the clearance record (who,
+            # when, by what mechanism) so downstream consumers can tell
+            # "flagged-then-poster-accepted" apart from "never flagged".
+            verdict["cleared_by_acceptance"] = True
+            verdict["wash_history"] = [
+                _clearance_record(verdict["signals"], task, fabric, now_ms),
+            ]
         elif "unbound_no_acceptance" in names and len(corroborating) >= 2:
             verdict["anomalous"] = True
         return verdict
@@ -310,10 +382,16 @@ def clear_wash_anomaly(task_id: str, proof_id: str,
     :func:`verify_poster_acceptance`.  Binding ``task_id`` (and ``proof_id``)
     in the signed message makes an acceptance unreplayable across tasks.
 
-    On valid acceptance: the flag is cleared (signals kept as history), and
+    On valid acceptance: the flag is cleared (signals kept as history, and
+    a wash_history entry records the original signals + who/when/how), and
     a fee previously booked *projected* for this task is re-booked as
     realized with an audit note linking the clearance.  On invalid
-    acceptance: the flag stays, loudly logged.  Never raises: any failure
+    acceptance: the flag stays, loudly logged.  Refusals: a flag whose
+    signals include ``self_deal_wallet`` is NEVER clearable by poster
+    acceptance (C1 — self-attestation of self-dealing proves nothing);
+    clearance is refused with
+    ``{"cleared": False, "reason": "self-deal not clearable by poster"}``
+    and the flag stays anomalous=True.  Never raises: any failure
     returns ``{"cleared": False, ...}`` — clearance must never brick
     settlement or the API.
     """
@@ -343,6 +421,19 @@ def clear_wash_anomaly(task_id: str, proof_id: str,
         if stamp.get("cleared_by_acceptance"):
             result["reason"] = "already cleared"
             return result
+        # C1: a self-deal flag can NEVER be cleared by the poster's own
+        # acceptance — self-attestation of self-dealing proves nothing.
+        # Refuse before verifying the signature so the flag and the stamp
+        # stay untouched and anomalous=True.
+        names = {s.get("name") for s in (stamp.get("signals") or [])}
+        if "self_deal_wallet" in names:
+            logger.error(
+                "[WASH-GUARD] clearance REFUSED: task=%s proof=%s — "
+                "self-deal flags cannot be cleared by poster acceptance; "
+                "flag retained",
+                task_id, proof_id)
+            result["reason"] = "self-deal not clearable by poster"
+            return result
         receipt_hash = str(proof.get("receipt_hash")
                            or task.get("receipt_hash") or "")
         ok = verify_poster_acceptance(task, proof_id, receipt_hash,
@@ -365,10 +456,18 @@ def clear_wash_anomaly(task_id: str, proof_id: str,
         # above stays outside the lock.
         now_ms = _now_ms()
         new_stamp = dict(stamp)
+        # Ternary state: keep the original signals and append a
+        # wash_history entry (original signals + clearance record: who
+        # cleared, when, by what mechanism) so downstream consumers can
+        # tell "flagged-then-poster-accepted" apart from "never flagged".
+        history = list(stamp.get("wash_history") or [])
+        history.append(_clearance_record(
+            stamp.get("signals") or [], task, fabric, now_ms))
         new_stamp.update({
             "anomalous": False,
             "cleared_by_acceptance": True,
             "cleared_at": now_ms,
+            "wash_history": history,
         })
         # Re-book a quarantined (projected) fee as realized, exactly once.
         fee_realized = None
