@@ -33,10 +33,16 @@ ONE_AXM = 10 ** 18
 
 @pytest.fixture
 def iso(tmp_path, monkeypatch):
-    """Isolated fabric + stake ledger + antigaming store."""
+    """Isolated fabric + stake ledger + antigaming store + bounty pool."""
     reset_fabric()
     reset_stake_ledger(path=str(tmp_path / "stake.json"))
     ag.reset_antigaming_store(path=str(tmp_path / "antigaming.json"))
+    # W-89 C2: settle/allocate paths drain the process-global bounty pool
+    # monotonically (allocated -> spent).  Without a reset, a suite that
+    # runs after this one inherits a drained pool and its pool-backed
+    # engine tests fail spuriously.  Fresh funded pool per test.
+    from sincor2.a2a_bounty_pool import reset_bounty_pool
+    reset_bounty_pool(path=str(tmp_path / "pool.json"), reserve_axm=10000)
     monkeypatch.setenv("AXM_AG_MAX_PAIR_WINS_PER_WINDOW", "1000")
     yield
     reset_fabric()

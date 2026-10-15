@@ -644,6 +644,12 @@ def _record_fee(task: Dict[str, Any], rec: Dict[str, Any],
     """Record the 5% treasury fee (off-chain accounting, idempotent)."""
     if rec.get("fee_recorded"):
         return rec.get("fee_axm")
+    # W-89 C2 defense-in-depth: the fee was already re-booked as realized
+    # by clear_wash_anomaly on poster acceptance.  This path must never
+    # book it a second time.
+    if (task.get("wash_anomaly") or {}).get("fee_realized_on_clearance"):
+        rec["fee_recorded"] = True
+        return rec.get("fee_axm")
     amount = float(task.get("payout_axm")
                    or task.get("winning_bid_axm")
                    or rec.get("bounty_axm") or 0)
@@ -685,13 +691,17 @@ def _record_fee(task: Dict[str, Any], rec: Dict[str, Any],
     if quarantined:
         # W-89 clearance support: stamp the projected booking on the task so
         # a later poster EIP-191 acceptance can re-book it as realized with
-        # the exact amount (see wash_guard.clear_wash_anomaly).  Best-effort;
+        # the exact amount (see wash_guard.clear_wash_anomaly).  The stamp
+        # carries the ledger event_id so the clearance re-booking can
+        # mechanically supersede this projected row (W-89 C2).  Best-effort;
         # the ledger remains the source of truth.
         try:
             task["wash_fee_projected"] = {
                 "fee_axm": fee,
                 "at_ms": int(time.time() * 1000),
                 "note": "projected; clearable by poster EIP-191 acceptance",
+                "event_id": (recorded.get("event_id")
+                             if isinstance(recorded, dict) else None),
             }
         except Exception:
             pass

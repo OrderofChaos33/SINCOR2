@@ -489,6 +489,15 @@ def clear_wash_anomaly(task_id: str, proof_id: str,
                         try:
                             from sincor2.treasury_settlement import (
                                 record_platform_fee_inflow)
+                            # C2 mechanical supersession: the realized
+                            # re-booking points at the original projected
+                            # event's id, so ledger aggregates exclude the
+                            # old row (a "supersedes" note in text is not
+                            # enough — nothing reads notes).  Older stamps
+                            # without an event_id leave supersedes None;
+                            # the aggregate then behaves as before.
+                            projected_event_id = (fee_info.get("event_id")
+                                                  or None)
                             ev = record_platform_fee_inflow(
                                 fee_amount=amount,
                                 asset="AXM",
@@ -498,6 +507,7 @@ def clear_wash_anomaly(task_id: str, proof_id: str,
                                       f"wash-anomaly clearance by poster EIP-191 "
                                       f"acceptance; supersedes projected booking]"),
                                 projected=False,
+                                supersedes=projected_event_id,
                             )
                             if ev is not None:
                                 new_stamp["fee_realized_on_clearance"] = True

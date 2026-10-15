@@ -29,6 +29,7 @@ def record_platform_fee_inflow(
     task_id: Optional[str] = None,
     note: str = "",
     projected: bool = False,
+    supersedes: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Record **platform fee only** as inflow.
@@ -38,6 +39,12 @@ def record_platform_fee_inflow(
     (e.g. the settlement was flagged by the W-89 wash-anomaly guard);
     it is booked for audit visibility and must never be presented as
     realized revenue.
+
+    ``supersedes`` names the event_id of the earlier event this booking
+    replaces (the realized re-booking after a wash-anomaly clearance
+    supersedes the original projected booking).  Superseded events are
+    excluded from ledger aggregates — a projected->realized transition
+    counts exactly once.
 
     Returns the event dict on success, None if fee is zero/negative or write fails.
     """
@@ -62,6 +69,7 @@ def record_platform_fee_inflow(
             tx_hash=tx_hash,
             note=note,
             projected=projected,
+            supersedes=supersedes,
         )
         logger.info(
             "%s treasury fee recorded: %.6f %s source=%s tx=%s",

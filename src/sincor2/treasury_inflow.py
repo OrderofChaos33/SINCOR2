@@ -20,6 +20,7 @@ import logging
 import os
 import threading
 import time
+import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,6 +59,11 @@ _LEDGER_PATH = Path(os.getenv("TREASURY_INFLOW_LEDGER", str(_DEFAULT_LEDGER)))
 _lock = threading.Lock()
 
 
+def _new_event_id() -> str:
+    """Stable unique id for one ledger event (supersession anchor)."""
+    return uuid.uuid4().hex
+
+
 @dataclass
 class InflowEvent:
     """One recorded inflow (or projected inflow) event."""
@@ -70,6 +76,14 @@ class InflowEvent:
     tx_hash: Optional[str] = None
     note: str = ""
     projected: bool = False
+    # event_id: stable identity of this row in the append-only ledger.
+    # supersedes: event_id of the earlier event this row replaces (W-89 C2:
+    # the realized re-booking of a cleared projected fee points back at the
+    # original projected event, which aggregators then exclude).  This is
+    # the mechanical supersession — a note in text is not enough, because
+    # nothing reads notes.
+    event_id: str = field(default_factory=_new_event_id)
+    supersedes: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -152,12 +166,20 @@ def record_inflow(
     tx_hash: Optional[str] = None,
     note: str = "",
     projected: bool = False,
+    supersedes: Optional[str] = None,
 ) -> InflowEvent:
     """
     Append an inflow event to the local ledger.
 
     Called by DeFi swarms, A2A settlement, subscription renewals, etc.
     Never moves funds. Pure measurement.
+
+    ``supersedes`` names the event_id of an earlier event this row
+    replaces (e.g. the realized re-booking after a wash-anomaly clearance
+    supersedes the original projected booking).  Superseded events are
+    excluded from ledger aggregates so a projected->realized transition
+    counts exactly once.  The ledger stays append-only: nothing is edited
+    or deleted.
     """
     if amount < 0:
         raise ValueError("inflow amount must be non-negative")
@@ -171,6 +193,7 @@ def record_inflow(
         tx_hash=tx_hash,
         note=note,
         projected=bool(projected),
+        supersedes=str(supersedes) if supersedes else None,
     )
 
     _ensure_ledger_dir()
@@ -230,6 +253,9 @@ def _read_ledger_events(max_age_seconds: Optional[float] = None) -> List[InflowE
                             tx_hash=raw.get("tx_hash"),
                             note=str(raw.get("note", "")),
                             projected=bool(raw.get("projected", False)),
+                            event_id=str(raw.get("event_id") or ""),
+                            supersedes=(str(raw.get("supersedes"))
+                                        if raw.get("supersedes") else None),
                         )
                     )
                 except (json.JSONDecodeError, TypeError, ValueError):
@@ -240,15 +266,26 @@ def _read_ledger_events(max_age_seconds: Optional[float] = None) -> List[InflowE
 
 
 def ledger_summary_24h() -> Dict[str, Any]:
-    """Aggregate ledger events from the last 24 hours."""
+    """Aggregate ledger events from the last 24 hours.
+
+    Events superseded by a later event (``supersedes`` pointer, e.g. the
+    realized re-booking of a cleared projected fee) are excluded from
+    every aggregate — by_asset, by_source, usd_total_24h,
+    usd_realized_24h, usd_projected_24h — so a projected->realized
+    transition counts exactly once.  The ledger itself stays append-only
+    (``events_24h`` still counts raw rows for audit visibility).
+    """
     events = _read_ledger_events(max_age_seconds=86400)
+    superseded_ids = {ev.supersedes for ev in events if ev.supersedes}
+    live = [ev for ev in events
+            if not (ev.event_id and ev.event_id in superseded_ids)]
     by_asset: Dict[str, float] = {}
     by_source: Dict[str, float] = {}
     usd_total = 0.0
     projected_usd = 0.0
     realized_usd = 0.0
 
-    for ev in events:
+    for ev in live:
         by_asset[ev.asset] = by_asset.get(ev.asset, 0.0) + ev.amount
         by_source[ev.source] = by_source.get(ev.source, 0.0) + ev.usd_estimate
         usd_total += ev.usd_estimate
