@@ -204,7 +204,7 @@ def test_ring_established_poster_flag_only_not_blocked():
 
     _assigned_task_as("task-ring-est", winner, poster)
     proof = submit_proof("task-ring-est", winner, "0x" + "cd" * 16)
-    assert proof["status"] == "paid"
+    assert proof["status"] == "payout_staged"
     sybil = proof["payout"].get("sybil") or {}
     assert sybil.get("flagged") is True
     ring = sybil.get("ring") or {}
@@ -223,7 +223,7 @@ def test_ring_reputation_escape_hatch():
 
     _assigned_task_as("task-ring-3", winner, poster)
     proof = submit_proof("task-ring-3", winner, "0x" + "ef" * 16)
-    assert proof["status"] == "paid"
+    assert proof["status"] == "payout_staged"
     verdict = quarantine_check(winner, task_id="task-ring-3")
     assert verdict["quarantined"] is False
     assert verdict["held"] is False
@@ -294,7 +294,7 @@ def test_ring_hold_release_settles_and_pays():
     assert proof["status"] == "held"
 
     released = _release_sybil_hold("task-ring-rel", decided_by="test-admin")
-    assert released["status"] == "paid"
+    assert released["status"] == "payout_staged"
     assert released["payout"]["sybil"]["held"] is True
     assert released["payout"]["sybil"]["released_by"] == "test-admin"
     task = get_fabric().tasks["task-ring-rel"]
@@ -356,7 +356,7 @@ def test_ring_legit_multiwallet_under_cohort_size_clean():
     assert _burst_cohort("honest-a") == ["honest-a", "honest-b"]
     _assigned_task_as("task-ring-4", "honest-a", "honest-poster")
     proof = submit_proof("task-ring-4", "honest-a", "0x" + "12" * 16)
-    assert proof["status"] == "paid"
+    assert proof["status"] == "payout_staged"
     assert "sybil" not in proof["payout"]
 
 
@@ -375,7 +375,7 @@ def test_ring_staggered_registrations_break_the_burst():
     assert _burst_cohort("stagger-0") == ["stagger-0"]
     _assigned_task_as("task-ring-5", "stagger-0", "stagger-1")
     proof = submit_proof("task-ring-5", "stagger-0", "0x" + "34" * 16)
-    assert proof["status"] == "paid"
+    assert proof["status"] == "payout_staged"
     assert "sybil" not in proof["payout"]
 
 
@@ -511,7 +511,7 @@ def test_ring_residual_poster_farming_costs_real_work():
     assert verdict["quarantined"] is False
     assert verdict["ring"]["ring_shaped"] is True
     proof = submit_proof("task-ring-farm", winner, "0x" + "ab" * 16)
-    assert proof["status"] == "paid"
+    assert proof["status"] == "payout_staged"
     assert (proof["payout"].get("sybil") or {}).get("ring") is not None
 
 
@@ -731,12 +731,12 @@ def test_hold_double_release_settles_exactly_once():
 
     assert len(results) == 2
     assert not any(isinstance(r, Exception) for r in results), results
-    # The loser returns the winner's already-recorded "paid" proof plus
+    # The loser returns the winner's already-recorded "payout_staged" proof plus
     # a race_noop annotation: classify by the annotation, not the status.
     noop = [r for r in results
             if (r.get("sybil_hold") or {}).get("race_noop")]
     paid = [r for r in results
-            if r.get("status") == "paid" and not (
+            if r.get("status") == "payout_staged" and not (
                 (r.get("sybil_hold") or {}).get("race_noop"))]
     assert len(paid) == 1, results
     assert len(noop) == 1, results
@@ -791,10 +791,10 @@ def test_hold_release_vs_reject_race_single_decision():
     decisions = [r[1].get("status") for r in results
                  if not isinstance(r[1], Exception)]
     if task["state"] == "settled":
-        assert decisions.count("paid") == 1, decisions
+        assert decisions.count("payout_staged") == 1, decisions
         assert get_fabric().agents["hold-w0"]["reputation"] == 0.2
     else:
-        assert "paid" not in decisions, decisions
+        assert "payout_staged" not in decisions, decisions
         assert get_fabric().agents["hold-w0"].get("reputation") in (0, 0.0, None)
 
 
@@ -895,7 +895,7 @@ def test_hold_ttl_not_yet_expired_releases_normally():
     """A hold inside the TTL releases normally."""
     task_id = _hold_task_for("hold-w0", "hold-poster", "task-ttl-2")
     snap = _release_sybil_hold(task_id, decided_by="test-admin")
-    assert snap["status"] == "paid"
+    assert snap["status"] == "payout_staged"
     assert get_fabric().tasks[task_id]["state"] == "settled"
 
 

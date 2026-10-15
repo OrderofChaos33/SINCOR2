@@ -1569,6 +1569,10 @@ def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, An
     tags = list(hold.get("tags") or [])
     receipt = stage_payout(agent_id=agent_id, wallet=wallet, amount_axm=amount,
                            task_id=task_id, receipt_hash=receipt_hash)
+    # Honest payout surface (#465): only a real broadcast earns
+    # "paid"/payout_tx — mirrors submit_proof exactly. A staged digest is
+    # never stored under the tx-shaped payout_tx field.
+    payout = payout_broadcast_status(receipt)
     receipt["sybil"] = {
         "held": True,
         "released_by": decided_by,
@@ -1596,7 +1600,17 @@ def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, An
             return snap
         task["state"] = "settled" if receipt.get("ok") else "failed"
         task["payout_axm"] = amount
-        task["payout_tx"] = receipt.get("staged_tx_digest")
+        if payout["broadcasted"]:
+            task["payout_tx"] = payout["tx_hash"]
+            task.pop("payout_staged_digest", None)
+        else:
+            # Claim-honesty (#465): a staged digest is not a tx hash —
+            # never store it under the tx-shaped "payout_tx" field name.
+            task.pop("payout_tx", None)
+            if payout["staged_digest"]:
+                task["payout_staged_digest"] = payout["staged_digest"]
+            else:
+                task.pop("payout_staged_digest", None)
         task["settled_at"] = ts
         task["sybil_hold_decision"] = {
             "decision": "released", "at": ts, "by": decided_by,
@@ -1607,7 +1621,7 @@ def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, An
             _apply_reputation(ag, float(ag.get("reputation") or 0) + 0.2)
         proof = fabric.proofs.get(proof_id) or {}
         proof.update({
-            "status": "paid" if receipt.get("ok") else "rejected",
+            "status": payout["proof_status"],
             "settled_at": ts,
             "payout": receipt,
             "sybil_hold": {"decision": "released", "at": ts, "by": decided_by},
