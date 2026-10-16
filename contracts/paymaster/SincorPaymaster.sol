@@ -18,6 +18,15 @@ pragma solidity ^0.8.24;
 ///      via depositTo/receive() are held by the EntryPoint, so without this
 ///      they had no recovery path.
 ///
+/// @dev W-83 fix: postOp now takes the ERC-4337 v0.7 canonical signature
+///      postOp(PostOpMode, bytes, uint256, uint256)
+///      (selector 0x7c627b21), matching the EntryPoint's IPaymaster call.
+///      The old v0.6 3-arg form postOp(uint8, bytes, uint256)
+///      (selector 0xa9a23409) could never be invoked by a v0.7 EntryPoint —
+///      the call would miss and revert, bricking settlement on deploy.
+///      The 4th arg (actualUserOpFeePerGas) is accepted and ignored: the
+///      accounting settles on actualGasCost exactly as before.
+///
 /// @dev P0/W-17 hardening: validatePaymasterUserOp enforces, in order:
 ///      1. the caller is the EntryPoint,
 ///      2. the UserOp sender is explicitly allowlisted: probation[sender]
@@ -65,6 +74,15 @@ struct PackedUserOperation {
     bytes32 gasFees;
     bytes paymasterAndData;
     bytes signature;
+}
+
+/// @notice ERC-4337 v0.7 postOp mode — mirrors the canonical IPaymaster
+///         enum. ABI-encodes as uint8, so the canonical postOp signature
+///         string is postOp(uint8,bytes,uint256,uint256).
+enum PostOpMode {
+    opSucceeded,
+    opReverted,
+    postOpReverted
 }
 
 contract SincorPaymaster {
@@ -144,10 +162,16 @@ contract SincorPaymaster {
         return (abi.encode(sender, maxCost), 0);
     }
 
+    /// @notice ERC-4337 v0.7 postOp. The EntryPoint calls this with
+    ///         (PostOpMode, context, actualGasCost, actualUserOpFeePerGas);
+    ///         the selector must be 0x7c627b21 or the call never lands
+    ///         (W-83). actualUserOpFeePerGas is accepted and ignored —
+    ///         settlement accounts on actualGasCost.
     function postOp(
-        uint8 /* mode */,
+        PostOpMode /* mode */,
         bytes calldata context,
-        uint256 actualGasCost
+        uint256 actualGasCost,
+        uint256 /* actualUserOpFeePerGas */
     ) external {
         require(msg.sender == address(entryPoint), "only EntryPoint");
         (address sender, uint256 maxCost) = abi.decode(context, (address, uint256));
