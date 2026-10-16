@@ -485,6 +485,21 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
         except Exception as err:  # insufficient funds, ledger write failure, ...
             logger.warning("pool backing failed for task %s: %s", task_id, err)
             snap["pool_backed"] = False
+    # W-92: the pool-backing fields above were set on the returned snapshot
+    # only. The task was already persisted before allocation, so the stored
+    # record was missing pool_backed/pool_allocation_id (API said backed,
+    # DB said nothing). Write the result back to the persisted task and
+    # save again, mirroring the save pattern above (mutate under lock,
+    # _save_tasks outside the lock).
+    with fabric.lock:
+        stored_task = fabric.tasks.get(task_id)
+        if stored_task is not None:
+            stored_task["pool_backed"] = snap.get("pool_backed", False)
+            stored_task["pool_allocation_id"] = snap.get("pool_allocation_id")
+            if "pool_backing_skipped_reason" in snap:
+                stored_task["pool_backing_skipped_reason"] = snap[
+                    "pool_backing_skipped_reason"]
+    _save_tasks(fabric)
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
     return snap
 
