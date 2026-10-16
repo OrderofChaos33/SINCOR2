@@ -325,12 +325,18 @@ def _process_payment_event(event_data):
 
     # C4: route Stripe-signed value events through the effect boundary BEFORE
     # any provisioning. Fail-closed: a denied intent skips provisioning.
+    # W-80: the treasury HALT file is consulted explicitly — a tripped
+    # (or unreadable/tampered) halt denies provisioning via the money gate.
     try:
-        from sincor2.governance.money_gate import check_money_effect
+        from sincor2.governance.money_gate import (
+            check_money_effect,
+            treasury_halt_tripped,
+        )
     except ImportError:
         try:
             from src.sincor2.governance.money_gate import (  # type: ignore
                 check_money_effect,
+                treasury_halt_tripped,
             )
         except ImportError as exc:
             logger.critical(
@@ -348,6 +354,7 @@ def _process_payment_event(event_data):
             event_type, event_data.get("session_id", "nosession")),
         target="stripe_event_provisioning",
         estimated_cost=float((event_data.get("amount_total") or 0)) / 100,
+        kill_switch_tripped=treasury_halt_tripped(),
     )
     if not allowed:
         logger.critical(

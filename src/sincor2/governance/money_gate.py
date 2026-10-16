@@ -77,6 +77,37 @@ def reset_money_boundary() -> None:
         _boundary = None
 
 
+def treasury_halt_tripped() -> bool:
+    """Fail-closed read of the treasury kill-switch HALT file.
+
+    Delegates to the canonical tamper-evident check in
+    :func:`sincor2.agents.treasury_execution_agent.kill_switch_tripped`
+    (marker validation; missing file + armed sentinel -> tripped;
+    unreadable or malformed file -> tripped). This function never raises:
+    an unavailable or erroring check is treated as TRIPPED (fail closed),
+    so a broken halt read can never silently re-arm money movement.
+    """
+    try:
+        from sincor2.agents.treasury_execution_agent import kill_switch_tripped
+    except ImportError:
+        try:
+            from src.sincor2.agents.treasury_execution_agent import (  # type: ignore
+                kill_switch_tripped,
+            )
+        except ImportError:
+            logger.critical(
+                "treasury halt check unavailable — treating as TRIPPED "
+                "(fail closed)")
+            return True
+    try:
+        return bool(kill_switch_tripped())
+    except Exception as exc:  # noqa: BLE001 - fail-closed by contract
+        logger.critical(
+            "treasury halt check raised (%s) — treating as TRIPPED "
+            "(fail closed)", exc)
+        return True
+
+
 def check_money_effect(
     *,
     effect_type: str,
@@ -87,14 +118,22 @@ def check_money_effect(
     idempotency_key: str = "",
     target: str = "",
     estimated_cost: float = 0.0,
-    kill_switch_tripped: bool = False,
+    kill_switch_tripped: Optional[bool] = None,
 ) -> Tuple[bool, str]:
     """Gate a money-path intent through the effect boundary.
+
+    ``kill_switch_tripped``: pass True/False to force the decision, or None
+    (default) to auto-detect from the treasury HALT file via
+    :func:`treasury_halt_tripped`. Every caller is halt-gated by default.
 
     Returns ``(allowed, reason)``. Fail-closed: any check failure or any
     internal error returns ``(False, reason)`` — this function never raises
     and never returns ``(True, ...)`` on a partial failure.
     """
+    if kill_switch_tripped is None:
+        # W-80: the treasury HALT file gates every money-path intent by
+        # default. A tripped (or unreadable/tampered) halt denies here.
+        kill_switch_tripped = treasury_halt_tripped()
     if kill_switch_tripped:
         logger.critical(
             "money gate DENIED %s for %s: external kill switch tripped",
