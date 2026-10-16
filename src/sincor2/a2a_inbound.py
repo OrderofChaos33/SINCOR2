@@ -14,10 +14,20 @@ import uuid
 from collections import deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 from flask import Blueprint, Flask, Response, jsonify, request, stream_with_context
 
+from sincor2.card_sanitize import (
+    AGENT_ID_MAX_LEN,
+    DESCRIPTION_MAX_LEN,
+    NAME_MAX_LEN,
+    SKILL_FIELD_MAX_LEN,
+    TAG_MAX_LEN,
+    VERSION_MAX_LEN,
+    sanitize_card_text,
+    sanitize_skills,
+    safe_url,
+)
 from sincor2.contract_net import (
     BASE_CHAIN_ID,
     ESCROW_ADDRESS,
@@ -424,9 +434,14 @@ def build_reregistration_message(body: Dict[str, Any], ts_ms: int) -> str:
 
 
 def _safe_url(value: Any) -> str:
-    url = str(value or "").strip()
-    parsed = urlparse(url)
-    return url if url and parsed.scheme in ("http", "https") and parsed.netloc else ""
+    # W-82: hardened SSRF policy lives in card_sanitize (shared with
+    # kya_registry). This wrapper preserves the historical call sites.
+    return safe_url(value)
+
+
+def _sanitize_card_text(value: Any, max_len: int) -> str:
+    # W-82: single choke point for agent-card display fields.
+    return sanitize_card_text(value, max_len)
 
 
 def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -442,23 +457,30 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
         for skill in skills:
             if not isinstance(skill, dict) or not skill.get("id") or not skill.get("name"):
                 raise ValueError("each skill needs id and name")
-            tags.append(str(skill.get("id")))
-            tags.extend(str(t) for t in (skill.get("tags") or []))
+            tags.append(_sanitize_card_text(skill.get("id"), SKILL_FIELD_MAX_LEN))
+            tags.extend(_sanitize_card_text(t, TAG_MAX_LEN) for t in (skill.get("tags") or []))
         interfaces = card.get("supportedInterfaces") or []
         interface_url = str(interfaces[0].get("url") or "") if interfaces and isinstance(interfaces[0], dict) else ""
         return {
-            "agent_id": str(card.get("id") or _slug(str(card.get("name")))),
-            "name": str(card["name"]),
-            "description": str(card.get("description") or ""),
-            "version": str(card.get("version") or "0.0.0"),
+            # W-82: agent_id is sanitized at the choke point (defense in depth;
+            # register_agent_record also allowlists it via _AGENT_ID_RE).
+            "agent_id": sanitize_card_text(str(card.get("id") or ""), AGENT_ID_MAX_LEN) or _slug(str(card.get("name"))),
+            "name": _sanitize_card_text(card["name"], NAME_MAX_LEN),
+            "description": _sanitize_card_text(card.get("description") or "", DESCRIPTION_MAX_LEN),
+            "version": _sanitize_card_text(card.get("version") or "0.0.0", VERSION_MAX_LEN),
             "capability_tags": sorted({t.lower() for t in tags if t}),
             "rpc_callback": _safe_url(body.get("agent_url") or interface_url),
             "wallet": str(card.get("wallet") or body.get("wallet") or ""),
             "chain_id": int(body.get("chain_id") or card.get("chain_id") or BASE_CHAIN_ID),
             "sinc_stake": int(body.get("sinc_stake") or 0),
-            "skills": skills,
+            "skills": sanitize_skills(skills),
         }
-    agent_id = str(body.get("agent_id") or _slug(str(body.get("name") or ""))).strip()
+    # W-82: agent_id is sanitized at the choke point (defense in depth;
+    # register_agent_record also allowlists it via _AGENT_ID_RE).
+    agent_id = (
+        sanitize_card_text(str(body.get("agent_id") or ""), AGENT_ID_MAX_LEN).strip()
+        or _slug(str(body.get("name") or ""))
+    ).strip()
     if not agent_id:
         raise ValueError("agent_id is required")
     tags = body.get("capability_tags") or body.get("tags") or []
@@ -466,17 +488,22 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
         tags = [t.strip() for t in tags.split(",") if t.strip()]
     if not tags:
         raise ValueError("capability_tags required")
+    clean_tags = sorted({
+        t
+        for t in (sanitize_card_text(t, TAG_MAX_LEN).lower() for t in tags)
+        if t
+    })
     return {
         "agent_id": agent_id,
-        "name": str(body.get("name") or agent_id),
-        "description": str(body.get("description") or ""),
-        "version": str(body.get("version") or "0.1.0"),
-        "capability_tags": sorted({str(t).lower() for t in tags if t}),
+        "name": _sanitize_card_text(body.get("name") or agent_id, NAME_MAX_LEN),
+        "description": _sanitize_card_text(body.get("description") or "", DESCRIPTION_MAX_LEN),
+        "version": _sanitize_card_text(body.get("version") or "0.1.0", VERSION_MAX_LEN),
+        "capability_tags": clean_tags,
         "rpc_callback": _safe_url(body.get("rpc_callback") or body.get("agent_url")),
         "wallet": str(body.get("wallet") or ""),
         "chain_id": int(body.get("chain_id") or BASE_CHAIN_ID),
         "sinc_stake": int(body.get("sinc_stake") or 0),
-        "skills": [{"id": t, "name": t} for t in tags],
+        "skills": [{"id": t, "name": t} for t in clean_tags],
     }
 
 
