@@ -223,9 +223,12 @@ interface IExecutionEscrowManager {
      * @notice Opens a quality dispute against a submitted result.
      * @dev P0/W-24: the poster bonds exactly like any challenger -- a free
      *      poster dispute is a zero-cost delay attack on the worker's payout.
-     *      The bond is returned if the dispute is upheld or if the
-     *      adjudicator goes dark and timeout() fires; it is forfeited if the
-     *      dispute is rejected (third-party challenger: slashed to the
+     *      The bond is returned ONLY on a live adjudicator's uphold ruling;
+     *      it is forfeited on rejection and on dark-adjudicator timeout
+     *      (W-84/J4 reconciliation, see timeout(): on-chain evidence proves
+     *      retrievability, not merit -- refunding on darkness would price
+     *      griefing at gas-only when no adjudicator is present to check it).
+     *      Forfeit routing (third-party challenger: slashed to the
      *      poster's re-auction fund; poster filing on their own auction:
      *      paid to the worker as compensation, so a rejected self-dispute
      *      cannot recycle the "slash" into the filer's own fund).
