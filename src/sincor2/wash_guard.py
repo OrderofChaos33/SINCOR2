@@ -149,7 +149,8 @@ def _distinct_bidders(fabric: Any, task_id: str) -> List[str]:
 
 
 def _norm_wallet(value: Any) -> str:
-    return str(value or "").strip().lower()
+    s = str(value or "").strip().lower()
+    return s[2:] if s.startswith("0x") else s
 
 
 def verify_poster_acceptance(task: Mapping[str, Any],
