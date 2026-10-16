@@ -24,6 +24,7 @@ import uuid
 
 from eth_account import Account
 from eth_account.messages import encode_defunct
+import pytest
 
 from conftest import hb_headers
 from sincor2.a2a_inbound import reset_fabric
@@ -202,3 +203,52 @@ class TestLivenessCohortSeed:
         })
         assert r.status_code == 400
         assert "reserved" in (r.get_json() or {}).get("error", "")
+
+
+
+class TestReseedPreservesEarnedReputation:
+    """W-97 regression: startup reseed must not overwrite earned reputation.
+
+    ``ensure_liveness_cohort()`` runs at every startup and re-registers each
+    cohort agent through the internal path with ``_internal_reputation=1.0``.
+    The seed value is a floor for fresh agents, never a reset: a
+    re-registered agent keeps its already-earned reputation.
+
+    Note on scale: reputation is clamped to [0, 1] by ``_apply_reputation``,
+    so the literal W-97 write-up's "2.5 -> 1.0" example cannot occur in this
+    codebase. The real W-97 effect here is the mirror image: an agent that
+    earned 0.4 (two settlements) was silently promoted to full 1.0 on every
+    restart, bypassing merit. These tests pin the floor semantics against
+    that: earned < seed must be preserved, fresh agents still get the seed.
+    """
+
+    def test_reseed_keeps_earned_reputation(self, client):
+        from sincor2.a2a_inbound import _apply_reputation
+
+        reset_fabric()
+        ensure_liveness_cohort()
+        # Simulate earned reputation below the seed floor (two settlements).
+        fabric = get_fabric()
+        with fabric.lock:
+            _apply_reputation(fabric.agents["sincor-liveness-01"], 0.4)
+        # Next startup's reseed must not promote it to the seed floor.
+        ensure_liveness_cohort()
+        assert _fabric_agent("sincor-liveness-01")["reputation"] == pytest.approx(0.4)
+
+    def test_fresh_agent_gets_seed_floor(self, client):
+        reset_fabric()
+        ensure_liveness_cohort()
+        assert _fabric_agent("sincor-liveness-01")["reputation"] == 1.0
+
+    def test_reseed_never_resets_to_seed(self, client):
+        """Seed is never written back onto an existing record, in either
+        direction: below-floor earned rep is preserved, not promoted."""
+        from sincor2.a2a_inbound import _apply_reputation
+
+        reset_fabric()
+        ensure_liveness_cohort()
+        fabric = get_fabric()
+        with fabric.lock:
+            _apply_reputation(fabric.agents["sincor-liveness-01"], 0.75)
+        ensure_liveness_cohort()
+        assert _fabric_agent("sincor-liveness-01")["reputation"] == pytest.approx(0.75)
