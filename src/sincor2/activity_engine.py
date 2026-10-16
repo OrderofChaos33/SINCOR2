@@ -644,6 +644,12 @@ def _record_fee(task: Dict[str, Any], rec: Dict[str, Any],
     """Record the 5% treasury fee (off-chain accounting, idempotent)."""
     if rec.get("fee_recorded"):
         return rec.get("fee_axm")
+    # W-89 C2 defense-in-depth: the fee was already re-booked as realized
+    # by clear_wash_anomaly on poster acceptance.  This path must never
+    # book it a second time.
+    if (task.get("wash_anomaly") or {}).get("fee_realized_on_clearance"):
+        rec["fee_recorded"] = True
+        return rec.get("fee_axm")
     amount = float(task.get("payout_axm")
                    or task.get("winning_bid_axm")
                    or rec.get("bounty_axm") or 0)
@@ -659,6 +665,16 @@ def _record_fee(task: Dict[str, Any], rec: Dict[str, Any],
     # it cannot silently flow into treasury accounting as a real tx hash.
     payout = payout_broadcast_status({"ok": True, "tx_hash": task.get("payout_tx")})
     tx_hash = payout["tx_hash"] if payout["broadcasted"] else None
+    # W-89 wash-anomaly quarantine: a flagged settlement is never booked as
+    # realized revenue.  The fee is recorded projected (audit-visible) so a
+    # wash cannot manufacture realized treasury inflow.
+    anomaly = (task.get("wash_anomaly") or {})
+    quarantined = bool(anomaly.get("anomalous"))
+    if quarantined:
+        logger.error("[WASH-GUARD] fee quarantine: task %s flagged %s; "
+                     "booking fee as PROJECTED, not realized",
+                     task.get("task_id"),
+                     [s.get("name") for s in anomaly.get("signals", [])])
     recorded = record_platform_fee_inflow(
         fee_amount=fee,
         asset="AXM",
@@ -666,16 +682,36 @@ def _record_fee(task: Dict[str, Any], rec: Dict[str, Any],
         tx_hash=tx_hash or None,
         task_id=task.get("task_id"),
         note=f"platform fee activity-engine task={rec['task_key']}",
+        projected=quarantined,
     )
     if recorded is None:
         logger.warning("[ACTIVITY] fee record failed for %s",
                        rec["task_key"])
         return None
+    if quarantined:
+        # W-89 clearance support: stamp the projected booking on the task so
+        # a later poster EIP-191 acceptance can re-book it as realized with
+        # the exact amount (see wash_guard.clear_wash_anomaly).  The stamp
+        # carries the ledger event_id so the clearance re-booking can
+        # mechanically supersede this projected row (W-89 C2).  Best-effort;
+        # the ledger remains the source of truth.
+        try:
+            task["wash_fee_projected"] = {
+                "fee_axm": fee,
+                "at_ms": int(time.time() * 1000),
+                "note": "projected; clearable by poster EIP-191 acceptance",
+                "event_id": (recorded.get("event_id")
+                             if isinstance(recorded, dict) else None),
+            }
+        except Exception:
+            pass
     rec["fee_recorded"] = True
     rec["fee_axm"] = fee
+    rec["fee_projected"] = quarantined
     state["fees_axm"] = round(state.get("fees_axm", 0.0) + fee, 6)
-    logger.info("[ACTIVITY] fee %.6f AXM recorded for %s",
-                fee, rec["task_key"])
+    logger.info("[ACTIVITY] fee %.6f AXM recorded for %s%s",
+                fee, rec["task_key"],
+                " (PROJECTED — wash-anomaly)" if quarantined else "")
     return fee
 
 

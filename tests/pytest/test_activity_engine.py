@@ -27,6 +27,16 @@ def engine_env(tmp_path, monkeypatch):
     reset_fabric()
     reset_stake_ledger(path=str(tmp_path / "stake.json"))
     activity_engine.reset_catalog_cache()
+    # Sealed-bid windows are frozen at sincor2.a2a_inbound_market import
+    # time.  The module-level env override above only takes effect when
+    # this file is imported before any module that pulls in the market
+    # module; when another suite (e.g. test_w89_wash_guard) is collected
+    # first, the 5-minute default sticks and the cycle-driving tests below
+    # hang past their 40s timeouts.  Pin the globals per-test so the
+    # suite is green regardless of collection order.
+    import sincor2.a2a_inbound_market as _mkt
+    monkeypatch.setattr(_mkt, "COMMIT_WINDOW_MS", 1000)
+    monkeypatch.setattr(_mkt, "REVEAL_WINDOW_MS", 1000)
     monkeypatch.setenv("SINCOR_ACTIVITY_ENGINE_STATE",
                        str(tmp_path / "ae_state.json"))
     monkeypatch.setenv("SINCOR_ACTIVITY_COHORT_IDS", COHORT)
