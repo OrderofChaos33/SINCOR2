@@ -262,6 +262,49 @@ def _is_engine_agent(agent_id: str) -> bool:
     return agent_id.startswith(ENGINE_COHORT_PREFIX + "-")
 
 
+def ensure_engine_poster() -> bool:
+    """Seed the engine's poster identity as internal (W-81 finding 4).
+
+    POSTER_ID ("axm-activity-engine") is protocol-reserved (see
+    ``PROTECTED_AGENT_IDS``): external registration is refused, so the
+    first external claim can no longer squat the engine's poster
+    identity and poison ring assessments on engine tasks (a squatter's
+    newborn record turned HOLDs into QUARANTINEs for honest newcomers).
+    The record is seeded here via the internal platform-seed path
+    (origin "internal", server-stamped — external origin-spoof attempts
+    stay external). If a pre-existing non-internal record holds the id
+    (squatted before the reservation), it is reclaimed with a warning.
+    Idempotent; safe to call every cycle.
+    """
+    from sincor2.a2a_inbound import get_fabric, _save_agents
+    from sincor2.a2a_inbound_ext import register_agent_record
+    fabric = get_fabric()
+    existing = fabric.agents.get(POSTER_ID)
+    if existing is not None and str(existing.get("origin") or "") == "internal":
+        return True
+    if existing is not None:
+        logger.warning(
+            "[ACTIVITY] reclaiming reserved poster id %s from non-internal record",
+            POSTER_ID)
+    register_agent_record({
+        "agent_id": POSTER_ID,
+        "name": "AXM Activity Engine",
+        "description": (
+            "Platform-operated task poster for the gasless AXM activity "
+            "loop. Ledger-only; no on-chain activity."),
+        "capability_tags": ["defi"],
+    }, _internal_reputation=0.0)
+    # Honest origin stamp: the engine poster is platform-internal, not
+    # external demand (mirrors ensure_cohort_agents).
+    with fabric.lock:
+        live = fabric.agents.get(POSTER_ID)
+        if live is not None:
+            live["origin"] = "internal"
+    _save_agents(fabric)
+    logger.info("[ACTIVITY] seeded engine poster %s (internal)", POSTER_ID)
+    return True
+
+
 def ensure_cohort_agents(agent_ids: List[str]) -> List[str]:
     """Register (if engine-owned) and heartbeat every cohort agent.
 
@@ -703,6 +746,10 @@ def run_cycle(*, post: bool = True) -> Dict[str, Any]:
     cohort = ensure_cohort_agents(resolve_cohort())
     if cohort:
         ensure_cohort_stake(cohort)
+    # The engine posts as POSTER_ID: its internal record must exist
+    # before any task carries it (W-81 finding 4 + pool-gate engine
+    # exemption). Idempotent.
+    ensure_engine_poster()
     state = load_state()
     catalog = load_catalog()
     for task_key in list(state["in_flight"].keys()):
