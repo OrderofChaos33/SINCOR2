@@ -913,3 +913,130 @@ def test_expire_sweep_returns_none_when_fresh():
     assert _expire_sybil_hold_if_due("task-nope") is None
     # Fresh hold untouched.
     assert get_fabric().tasks[task_id]["state"] == "held"
+
+
+# ---------------------------------------------------------------------------
+# W-99: releasing a held payout consumes the pool allocation backing the task
+# ---------------------------------------------------------------------------
+
+def _held_pool_backed_task(bounty_axm: float = 100.0):
+    """Create a pool-backed task on a newborn-burst winner and drive it
+    into a sybil hold. Returns the task_id (pool-backed, allocated)."""
+    _register("spend-poster", Account.create())
+    get_fabric().agents["spend-poster"]["origin"] = "internal"
+    for i in range(3):
+        _register(f"spend-w{i}", Account.create())
+    winner = "spend-w0"
+
+    task = create_task("lead-enrichment", bounty_axm=bounty_axm,
+                       poster_id="spend-poster")
+    assert task["pool_backed"] is True
+    task_id = task["task_id"]
+    # Assign out-of-band like _assigned_task_as, keeping the pool-backed row.
+    t = get_fabric().tasks[task_id]
+    t.update(state="assigned", assigned_to=winner,
+             assigned_at=_now_ms() - 1_000,
+             time_est_ms=60_000, winning_bid_axm=bounty_axm)
+    proof = submit_proof(task_id, winner, "0x" + "ab" * 16)
+    assert proof["status"] == "held"
+    return task_id
+
+
+def test_w99_release_held_payout_spends_pool_allocation(_pool_ledger_isolation):
+    """W-99 REGRESSION: releasing a held payout spends the pool allocation
+    backing the task (allocated -> spent), mirroring the submit_proof
+    settlement tail. Without this the pool books drift: the payout went
+    out but the allocation stays "allocated" forever."""
+    task_id = _held_pool_backed_task(bounty_axm=100.0)
+
+    pool = bounty_pool()
+    allocated_before = pool.status()["allocated_axm"]
+    spent_before = pool.status()["spent_axm"]
+    allocs = pool.allocations_for_task(task_id)
+    assert len(allocs) == 1
+
+    released = _release_sybil_hold(task_id, decided_by="test-admin")
+    assert released["status"] == "payout_staged"
+    assert released["payout"]["ok"] is True
+    assert get_fabric().tasks[task_id]["payout_axm"] == 100.0
+
+    status = pool.status()
+    assert status["allocated_axm"] == pytest.approx(allocated_before - 100.0)
+    assert status["spent_axm"] == pytest.approx(spent_before + 100.0)
+    # Terminal transition: no live allocation remains for the task, so a
+    # retry cannot spend it again.
+    assert pool.allocations_for_task(task_id) == []
+
+
+def test_w99_no_spend_on_failed_payout(_pool_ledger_isolation, monkeypatch):
+    """W-99 failure guard: if the payout stage fails, no pool funds move.
+    The allocation stays "allocated" for the follow-up decision."""
+    import sincor2.a2a_inbound_market as market
+
+    def _boom_stage(**_kw):
+        return {"ok": False, "staged_tx_digest": None, "tx_hash": None}
+
+    monkeypatch.setattr(market, "stage_payout", _boom_stage)
+    task_id = _held_pool_backed_task(bounty_axm=100.0)
+
+    pool = bounty_pool()
+    allocated_before = pool.status()["allocated_axm"]
+    spent_before = pool.status()["spent_axm"]
+
+    released = _release_sybil_hold(task_id, decided_by="test-admin")
+    assert released["status"] == "rejected"
+    assert released["payout"]["ok"] is False
+    assert get_fabric().tasks[task_id]["state"] == "failed"
+
+    status = pool.status()
+    assert status["allocated_axm"] == pytest.approx(allocated_before)
+    assert status["spent_axm"] == pytest.approx(spent_before)
+    assert len(pool.allocations_for_task(task_id)) == 1
+
+
+def test_w99_release_idempotent_spend(_pool_ledger_isolation):
+    """Two concurrent releases settle exactly once: the race loser is a
+    no-op (W-81 finding 2), so the pool is not spent twice."""
+    import threading
+
+    import sincor2.a2a_inbound_market as mkt
+
+    task_id = _held_pool_backed_task(bounty_axm=100.0)
+    pool = bounty_pool()
+    spent_before = pool.status()["spent_axm"]
+
+    real_stage = mkt.stage_payout
+
+    def slow_stage(**kw):
+        threading.Event().wait(0.3)
+        return real_stage(**kw)
+
+    mkt.stage_payout = slow_stage
+    results = []
+    try:
+        def _release():
+            try:
+                results.append(_release_sybil_hold(task_id))
+            except Exception as err:  # pragma: no cover - diagnostic
+                results.append(err)
+        t1 = threading.Thread(target=_release)
+        t2 = threading.Thread(target=_release)
+        t1.start()
+        t2.start()
+        t1.join(timeout=10)
+        t2.join(timeout=10)
+    finally:
+        mkt.stage_payout = real_stage
+
+    assert len(results) == 2
+    assert not any(isinstance(r, Exception) for r in results), results
+    noop = [r for r in results
+            if (r.get("sybil_hold") or {}).get("race_noop")]
+    paid = [r for r in results
+            if r.get("status") == "payout_staged" and not (
+                (r.get("sybil_hold") or {}).get("race_noop"))]
+    assert len(paid) == 1, results
+    assert len(noop) == 1, results
+    # The pool absorbed exactly one 100-AXM spend despite the race.
+    assert pool.status()["spent_axm"] == pytest.approx(spent_before + 100.0)
+    assert pool.allocations_for_task(task_id) == []

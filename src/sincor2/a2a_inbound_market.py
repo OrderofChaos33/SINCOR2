@@ -1634,6 +1634,23 @@ def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, An
             stake_ledger().release(agent_id, task_id)
         except Exception as err:
             logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        # Bounty-pool spend (W-99): the allocation backing this held
+        # task's bounty is consumed (allocated -> spent) now that the
+        # released payout staged — mirrors the submit_proof settlement
+        # tail. Without this the pool ledger drifts: money paid on
+        # release but the allocation stays "allocated" forever.
+        # Never bricks settlement on accounting. spend() is a terminal
+        # allocated->spent transition (raises unless allocated) and
+        # allocations_for_task() returns only live allocations, so a
+        # retry or a concurrent release cannot double-spend.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            pool = bounty_pool()
+            for alloc in pool.allocations_for_task(task_id):
+                pool.spend(alloc["allocation_id"])
+        except Exception as err:
+            logger.warning("pool spend failed for released held task %s: %s",
+                           task_id, err)
         try:
             from sincor2.onchain.stake_ledger import stake_ledger
             _task = get_fabric().tasks.get(task_id) or {}
