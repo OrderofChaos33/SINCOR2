@@ -1687,6 +1687,18 @@ def _reject_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, Any
         })
         fabric.proofs[proof_id] = proof
         snap = dict(proof)
+    # W-98: release the pool backing — rejected payout, no money moves,
+    # so the task's allocation returns to available unspent. Mirrors the
+    # expiry path exactly: only live ("allocated") allocations are picked
+    # up, so an already-released/spent allocation is never
+    # double-released. Fail-safe: never bricks the reject on accounting.
+    try:
+        from sincor2.a2a_bounty_pool import bounty_pool
+        for alloc in bounty_pool().allocations_for_task(task_id):
+            bounty_pool().release(alloc["allocation_id"])
+    except Exception as err:
+        logger.warning("pool release failed for rejected sybil hold %s: %s",
+                       task_id, err)
     logger.warning("sybil hold rejected: task %s payout to %s denied (by %s)",
                    task_id, hold.get("agent_id"), decided_by)
     fabric.publish("proof.rejected", tags, snap)
