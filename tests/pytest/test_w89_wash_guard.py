@@ -7,7 +7,9 @@ Covers, for real:
   3. Legit external competitive (multi-bidder, bare receipt) -> clean.
   4. Legit external with bound deliverable -> clean even sole+instant.
   5. Self-deal wallet (poster == winner wallet) flags alone.
-  6. Poster EIP-191 acceptance clears the flag.
+  6. Poster EIP-191 acceptance verifies (unit) and clears the flag via the
+     post-settle clear-wash-flag path; W-100 removed the unverifiable
+     settle-time acceptance parameter from assess_settlement/submit_proof.
   7. Pair concentration corroborates after repeated pair wins.
   8. Fee quarantine: flagged task books projected, never realized.
   9. False-positive analysis: realistic engine traffic -> zero flags.
@@ -163,34 +165,52 @@ def test_self_deal_wallet_flags_alone(iso):
     assert "self_deal_wallet" in {s["name"] for s in verdict["signals"]}
 
 
-def test_poster_acceptance_clears(iso):
+def test_poster_acceptance_verifies_directly(iso):
+    """verify_poster_acceptance — the unit behind the post-settle
+    clear-wash-flag path — accepts a valid poster EIP-191 signature over
+    the canonical message and rejects a bad one."""
     key = _mk_agent("ext-poster", origin="external")
     _mk_agent("ext-worker", origin="external")
     task_id = _mk_assigned_task("ext-poster", "ext-worker", assigned_ago_ms=5_000)
     _add_bid(task_id, "ext-worker")
     fabric = get_fabric()
     task = fabric.tasks[task_id]
-    # Direct unit check of the acceptance path.
     proof_id = "prf_testaccept"
     receipt = "0x" + "56" * 32
-    message = "\n".join([POSTER_ACCEPT_DOMAIN, task_id, proof_id, receipt])
-    sig = Account.sign_message(
-        encode_defunct(text=message), private_key=key.key).signature.hex()
+    sig = _sign_acceptance(key, task_id, proof_id, receipt)
     assert verify_poster_acceptance(task, proof_id, receipt, sig,
                                    fabric=fabric) is True
-    # And the full assessment clears with a valid acceptance.
+    assert verify_poster_acceptance(task, proof_id, receipt,
+                                   "0x" + "00" * 65,
+                                   fabric=fabric) is False
+
+
+def test_assess_settlement_no_acceptance_path_w100(iso):
+    """W-100 regression: the settle-time acceptance path is REMOVED.
+    assess_settlement no longer takes poster_acceptance_sig (or proof_id)
+    — passing them is a TypeError.  No settle-time acceptance can ever
+    clear a flag, by construction: proof_id is minted server-side from
+    uuid4 inside submit_proof, so a poster could never sign the canonical
+    message beforehand."""
+    _mk_agent("ext-poster", origin="external")
+    _mk_agent("ext-worker", origin="external")
+    task_id = _mk_assigned_task("ext-poster", "ext-worker", assigned_ago_ms=5_000)
+    _add_bid(task_id, "ext-worker")
+    fabric = get_fabric()
+    task = fabric.tasks[task_id]
+    receipt = "0x" + "56" * 32
+    with pytest.raises(TypeError):
+        assess_settlement(
+            task, "ext-worker", content_bound=False, receipt_hash=receipt,
+            proof_id="prf_never_existed",
+            poster_acceptance_sig="0x" + "00" * 65,
+            fabric=fabric, now_ms=_now_ms())
+    # And a flag with a forged sig is still flagged: no acceptance path.
     verdict = assess_settlement(
         task, "ext-worker", content_bound=False, receipt_hash=receipt,
-        proof_id=proof_id, poster_acceptance_sig=sig,
         fabric=fabric, now_ms=_now_ms())
-    assert verdict.get("anomalous") is False
-    assert verdict.get("cleared_by_acceptance") is True
-    # A bad signature does not clear.
-    bad = assess_settlement(
-        task, "ext-worker", content_bound=False, receipt_hash=receipt,
-        proof_id=proof_id, poster_acceptance_sig="0x" + "00" * 65,
-        fabric=fabric, now_ms=_now_ms())
-    assert bad.get("anomalous") is True
+    assert verdict.get("anomalous") is True
+    assert verdict.get("cleared_by_acceptance") is False
 
 
 def test_pair_concentration_corroborates(iso, monkeypatch):
@@ -270,9 +290,14 @@ def test_false_positive_analysis_engine_traffic(iso):
 
 
 # ---------------------------------------------------------------------------
-# Poster-acceptance clearance tests (fix-up: verify_poster_acceptance was
-# dead code — submit_proof never passed poster_acceptance_sig and no API
-# surface accepted one).
+# Poster-acceptance clearance tests.  History: verify_poster_acceptance was
+# once dead code (submit_proof never passed poster_acceptance_sig and no
+# API surface accepted one); the W-89 builder plumbed the kwarg through
+# submit_proof -> assess_settlement as the fix-up.  W-100 (red-team,
+# 2026-10-17) showed that plumbed path could never verify — proof_id is
+# minted server-side from uuid4 inside submit_proof, so no poster could
+# sign the canonical message beforehand — and removed it.  Clearance now
+# happens post-settle only, via clear_wash_anomaly.
 # ---------------------------------------------------------------------------
 
 def _sign_acceptance(key, task_id, proof_id, receipt):
@@ -418,22 +443,22 @@ def test_clearance_unknown_task_no_raise(iso):
     assert result["reason"] == "unknown task"
 
 
-def test_submit_proof_acceptance_sig_threaded(iso):
-    """submit_proof accepts the poster_acceptance_sig kwarg (new API surface)
-    and threads it to the guard without breaking existing callers.  A valid
-    pre-signed acceptance is impossible here (proof_id is server-generated),
-    so this asserts the kwarg flows without error; end-to-end valid
-    acceptance is covered by the clearance tests above and the existing
-    assess-level test."""
+def test_submit_proof_rejects_acceptance_kwarg_w100(iso):
+    """W-100: submit_proof no longer accepts poster_acceptance_sig —
+    passing it raises TypeError instead of threading an unverifiable
+    parameter through the wash guard.  (A valid pre-signed acceptance is
+    impossible: proof_id is server-generated from uuid4.)"""
     _mk_agent("ext-poster", origin="external")
     _mk_agent("ext-worker", origin="external")
     task_id = _mk_assigned_task("ext-poster", "ext-worker",
                                assigned_ago_ms=5_000)
     _add_bid(task_id, "ext-worker")
     receipt = "0x" + "ef" * 32
-    proof = submit_proof(task_id, "ext-worker", receipt,
-                         poster_acceptance_sig="0x" + "00" * 65)
-    # Invalid sig -> still assessed (flagged), never raises, kwarg accepted.
+    with pytest.raises(TypeError):
+        submit_proof(task_id, "ext-worker", receipt,
+                     poster_acceptance_sig="0x" + "00" * 65)
+    # Without the kwarg the settle still flags normally.
+    proof = submit_proof(task_id, "ext-worker", receipt)
     assert (proof.get("wash_anomaly") or {}).get("anomalous") is True
     assert proof["status"] in ("paid", "payout_staged", "rejected")
 
