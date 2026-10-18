@@ -34,6 +34,7 @@ if [ -d "$HOME/.venvs/sincor2" ]; then
     tests/pytest/test_sealed_bid_shim.py \
     tests/pytest/test_settlement_proofs.py \
     tests/pytest/test_stake_ledger.py \
+    tests/pytest/test_pool_invariants.py \
     tests/pytest/test_auction_bridge.py -q
   if [ $? -ne 0 ]; then
     echo "BLOCKED: smoke suite failed. Fix the code, not the tests."
