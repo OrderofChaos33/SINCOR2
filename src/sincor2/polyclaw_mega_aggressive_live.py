@@ -69,7 +69,10 @@ TREASURY_ADDRESS = os.getenv(
     "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 )
 
-MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.06"))          # raised for quality
+MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.04"))
+# NOTE: must stay <= forecasting_engine._MAX_MOMENTUM_ADJ (0.05). The old
+# default of 0.06 exceeded the engine's max achievable edge, so the loop
+# could never fire — it scanned and traded nothing, forever.
 MIN_CONFIDENCE = float(os.getenv("POLYCLAW_MIN_CONFIDENCE", "0.50"))
 KELLY_FRACTION = float(os.getenv("POLYCLAW_KELLY_FRACTION", "0.5"))  # half-Kelly
 # Wager floor = Polymarket's ≈$1 exchange minimum.
@@ -82,6 +85,12 @@ CYCLE_INTERVAL_SEC = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "90"))  # 90s 
 # keep working; enable for tighter risk control.
 TOA_GATE_ENABLED = os.getenv("POLYCLAW_TOA_GATE", "false").lower() == "true"
 TOA_GATE_MIN_CONFIDENCE = float(os.getenv("POLYCLAW_TOA_GATE_MIN_CONF", "0.60"))
+
+# Whale-flow strategy — mirror fresh entries from wallets with demonstrated
+# resolved-market edge. Default on; the registry starts empty and fills via
+# whale_flow.discover_whales().
+WHALE_FLOW_ENABLED = os.getenv("POLYCLAW_WHALE_FLOW", "true").lower() == "true"
+WHALE_MIN_WIN_RATE = float(os.getenv("POLYCLAW_WHALE_MIN_WIN_RATE", "0.55"))
 
 
 def _kelly_size(fc: Forecast, side: str, equity: float, cap: float) -> float:
@@ -301,16 +310,75 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         )
 
     final = bankroll.snapshot()
+
+    # Whale-flow strategy: mirror fresh entries from qualified wallets.
+    whale_trades = 0
+    if WHALE_FLOW_ENABLED:
+        try:
+            from sincor2 import whale_flow
+            from sincor2.execution_adapter import _book_ask
+            traded_markets = {t.get("question", "")[:60] for t in trades_taken}
+            for sig in whale_flow.fresh_entries()[:MAX_TRADES_PER_CYCLE]:
+                if sig.question[:60] in traded_markets:
+                    continue  # already traded this market via momentum signal
+                if sig.whale_win_rate < WHALE_MIN_WIN_RATE:
+                    continue
+                ask = _book_ask(sig.token_id)
+                if ask is None or ask <= 0.01 or ask >= 0.99:
+                    continue
+                # Kelly on the whale's historical win rate at the current ask.
+                b = (1.0 / ask) - 1.0
+                kelly = (sig.whale_win_rate * (b + 1.0) - 1.0) / b
+                if kelly <= 0:
+                    continue
+                size = round(min(
+                    snapshot["equity"] * kelly * KELLY_FRACTION,
+                    bankroll.max_position_size()), 2)
+                if size < MIN_WAGER_USD:
+                    continue
+                result = adapter.place_market_buy(sig.token_id, size)
+                if not result.success:
+                    logger.warning("whale order failed for %s: %s",
+                                   sig.question[:60], result.error)
+                    continue
+                trade_id = bankroll.record_trade(
+                    token_id=sig.token_id, side=sig.side, size_usd=size,
+                    price=ask, order_id=result.order_id,
+                    simulated=result.simulated, market_id=sig.market_id,
+                )
+                trades_taken.append({
+                    "trade_id": trade_id,
+                    "question": sig.question,
+                    "side": sig.side,
+                    "size_usd": size,
+                    "strategy": "whale_flow",
+                    "whale": sig.wallet[:12],
+                    "whale_pnl": sig.whale_pnl_usd,
+                    "whale_win_rate": sig.whale_win_rate,
+                    "simulated": result.simulated,
+                    "order_id": result.order_id,
+                })
+                whale_trades += 1
+                logger.info(
+                    "%s [WHALE] %s $%.2f on '%s' | whale=%s pnl=$%.0f wr=%.0f%%",
+                    "[DRY]" if result.simulated else "[LIVE]",
+                    sig.side, size, sig.question[:60], sig.wallet[:12],
+                    sig.whale_pnl_usd, sig.whale_win_rate * 100,
+                )
+        except Exception as exc:
+            logger.debug("whale-flow block failed: %s", exc)
+
     _cycle_duration = time.time() - _cycle_t0
     logger.info(
-        "[POLYCLAW] cycle complete in %.1fs | trades=%d opportunities=%d",
-        _cycle_duration, len(trades_taken), len(opportunities)
+        "[POLYCLAW] cycle complete in %.1fs | trades=%d opportunities=%d whale_trades=%d",
+        _cycle_duration, len(trades_taken), len(opportunities), whale_trades
     )
     return {
         "status": "ok",
         "live": adapter.is_live(),
         "opportunities": len(opportunities),
         "trades_taken": trades_taken,
+        "whale_trades": whale_trades,
         "toa_blocked": toa_blocked,
         "toa_gate_enabled": TOA_GATE_ENABLED,
         "bankroll": final,
