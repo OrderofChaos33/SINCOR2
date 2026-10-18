@@ -1,0 +1,45 @@
+#!/bin/bash
+# SINCOR2 pre-commit hook — installed via scripts/setup-hooks.sh
+# Runs the smoke suite and secret scan on every commit. No bypass.
+# To install: bash scripts/setup-hooks.sh
+
+set -e
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+echo "=== SINCOR pre-commit: secret scan ==="
+# Block common secret patterns in staged files
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -n "$STAGED" ]; then
+  LEAKS=$(echo "$STAGED" | xargs grep -nE \
+    'ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|sk-live-[A-Za-z0-9]+|sk_test_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' \
+    2>/dev/null || true)
+  if [ -n "$LEAKS" ]; then
+    echo "BLOCKED: possible secret in staged files:"
+    echo "$LEAKS" | cut -c1-120
+    echo "Remove the secret before committing."
+    exit 1
+  fi
+fi
+echo "Secret scan clean."
+
+echo "=== SINCOR pre-commit: smoke suite ==="
+if [ -d "$HOME/.venvs/sincor2" ]; then
+  PYTHONPATH=src:. FLASK_ENV=test \
+    SECRET_KEY=abcdefghijklmnopqrstuvwxyz123456 \
+    JWT_SECRET_KEY=abcdefghijklmnopqrstuvwxyz123456 \
+    ADMIN_USERNAME=precommit ADMIN_PASSWORD=precommit123 \
+    STRIPE_SECRET_KEY=sk_test_precommit \
+    "$HOME/.venvs/sincor2/bin/python" -m pytest \
+    tests/pytest/test_sealed_bid_shim.py \
+    tests/pytest/test_settlement_proofs.py \
+    tests/pytest/test_stake_ledger.py \
+    tests/pytest/test_auction_bridge.py -q
+  if [ $? -ne 0 ]; then
+    echo "BLOCKED: smoke suite failed. Fix the code, not the tests."
+    exit 1
+  fi
+else
+  echo "WARNING: venv not found, skipping smoke suite (CI will catch it)."
+fi
+echo "Pre-commit checks passed."
