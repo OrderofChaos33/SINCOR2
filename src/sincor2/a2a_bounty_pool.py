@@ -116,6 +116,13 @@ class BountyPool:
         self._spent_wei = 0
         self._allocations: Dict[str, Dict[str, Any]] = {}
         self._history: List[Dict[str, Any]] = []
+        # Total history records ever written (persists across restarts).
+        # _save() trims in-memory history to the last 500 entries, so
+        # len(self._history) < self._history_writes means the journal was
+        # trimmed and a full replay is impossible -> verify_ledger()
+        # reports inconclusive instead of a false pass.
+        self._history_writes = 0
+        self._history_maybe_trimmed = False
         self._load()
         if not self.path.is_file() and self.reserve_wei > 0:
             # Fresh disk (first boot, or a redeploy wiped the ephemeral
@@ -150,6 +157,17 @@ class BountyPool:
             hist = raw.get("history")
             if isinstance(hist, list):
                 self._history = hist
+            # Total-write counter lets verify_ledger() detect a trimmed
+            # journal. Files written before the counter existed carry a
+            # history but no counter -> treat as maybe-trimmed.
+            hw = raw.get("history_writes")
+            if hw is None:
+                self._history_maybe_trimmed = bool(self._history)
+            else:
+                try:
+                    self._history_writes = max(0, int(hw))
+                except (TypeError, ValueError):
+                    self._history_maybe_trimmed = bool(self._history)
         except (json.JSONDecodeError, OSError, ValueError) as exc:
             logger.warning("bounty pool load failed (%s); starting empty", exc)
 
@@ -165,6 +183,7 @@ class BountyPool:
                 for aid, a in self._allocations.items()
             },
             "history": self._history[-500:],
+            "history_writes": self._history_writes,
             "saved_at": _now_ms(),
         }
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -174,6 +193,66 @@ class BountyPool:
         entry = {"action": action, "amount_wei": str(amount_wei),
                  "at": _now_ms(), "detail": detail}
         self._history.append(entry)
+        self._history_writes += 1
+
+    def verify_ledger(self) -> Dict[str, Any]:
+        """Reconcile the append-only history journal against record state.
+
+        Genuine double-entry check (W-101 fix): the journal is replayed to
+        compute expected funded/allocated totals, which must match the
+        record-derived state. Catches record drift, phantom allocations,
+        and journal/record disagreement — the UNCX bug class — which the
+        derived identity ``available = funded - allocated`` cannot see
+        (it holds for corrupted books by construction).
+
+        Returns {"ok": bool, "discrepancies": [...], "inconclusive": str|None}.
+        ``inconclusive`` is set (instead of a false pass) when the
+        in-memory journal does not cover the pool's full lifetime, e.g.
+        after loading a file whose history was trimmed to the last 500
+        entries, or when an unknown action appears in the journal.
+        """
+        with self._lock:
+            discrepancies = []
+            inconclusive = None
+            if self._history_maybe_trimmed or (
+                    self._history_writes
+                    and len(self._history) < self._history_writes):
+                inconclusive = (
+                    "journal trimmed (loaded history shorter than total "
+                    "writes); replay cannot cover full lifetime")
+            else:
+                journal_funded = 0
+                journal_allocated = 0
+                for e in self._history:
+                    action = e.get("action")
+                    try:
+                        amt = int(e.get("amount_wei") or 0)
+                    except (TypeError, ValueError):
+                        amt = 0
+                    if action == "fund":
+                        journal_funded += amt
+                    elif action == "allocate":
+                        journal_allocated += amt
+                    elif action in ("release", "spend"):
+                        journal_allocated -= amt
+                    else:
+                        inconclusive = (
+                            f"unknown journal action {action!r}; "
+                            "replay incomplete")
+                        break
+                if inconclusive is None:
+                    if journal_funded != self._funded_wei:
+                        discrepancies.append(
+                            f"funded: journal={journal_funded} "
+                            f"records={self._funded_wei}")
+                    record_allocated = self._allocated_wei()
+                    if journal_allocated != record_allocated:
+                        discrepancies.append(
+                            f"allocated: journal={journal_allocated} "
+                            f"records={record_allocated}")
+            return {"ok": not discrepancies and inconclusive is None,
+                    "discrepancies": discrepancies,
+                    "inconclusive": inconclusive}
 
     def _allocated_wei(self) -> int:
         return sum(int(a.get("amount_wei") or 0)
