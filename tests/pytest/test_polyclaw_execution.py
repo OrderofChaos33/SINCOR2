@@ -88,7 +88,7 @@ def _mock_trades_yes_win():
     ]
 
 
-def _mock_resolution_yes_win(cid):
+def _mock_resolution_yes_win(cid, slug=None, event_slug=None):
     return {"yes_won": True, "token_id_yes": "YES_TOK",
             "token_id_no": "NO_TOK", "question": "Q", "market_id": "M1"}
 
@@ -109,7 +109,7 @@ def test_score_wallet_yes_win():
 
 def test_score_wallet_yes_loss():
     # Same trades, but NO won: 60 YES tokens -> 0. pnl = 0 - 28 = -28
-    def res_no(cid):
+    def res_no(cid, slug=None, event_slug=None):
         r = _mock_resolution_yes_win(cid)
         r["yes_won"] = False
         return r
