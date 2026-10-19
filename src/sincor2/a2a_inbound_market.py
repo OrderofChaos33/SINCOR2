@@ -485,6 +485,21 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
         except Exception as err:  # insufficient funds, ledger write failure, ...
             logger.warning("pool backing failed for task %s: %s", task_id, err)
             snap["pool_backed"] = False
+    # W-92: the pool-backing fields above were set on the returned snapshot
+    # only. The task was already persisted before allocation, so the stored
+    # record was missing pool_backed/pool_allocation_id (API said backed,
+    # DB said nothing). Write the result back to the persisted task and
+    # save again, mirroring the save pattern above (mutate under lock,
+    # _save_tasks outside the lock).
+    with fabric.lock:
+        stored_task = fabric.tasks.get(task_id)
+        if stored_task is not None:
+            stored_task["pool_backed"] = snap.get("pool_backed", False)
+            stored_task["pool_allocation_id"] = snap.get("pool_allocation_id")
+            if "pool_backing_skipped_reason" in snap:
+                stored_task["pool_backing_skipped_reason"] = snap[
+                    "pool_backing_skipped_reason"]
+    _save_tasks(fabric)
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
     return snap
 
@@ -1660,6 +1675,23 @@ def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, An
             stake_ledger().release(agent_id, task_id)
         except Exception as err:
             logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        # Bounty-pool spend (W-99): the allocation backing this held
+        # task's bounty is consumed (allocated -> spent) now that the
+        # released payout staged — mirrors the submit_proof settlement
+        # tail. Without this the pool ledger drifts: money paid on
+        # release but the allocation stays "allocated" forever.
+        # Never bricks settlement on accounting. spend() is a terminal
+        # allocated->spent transition (raises unless allocated) and
+        # allocations_for_task() returns only live allocations, so a
+        # retry or a concurrent release cannot double-spend.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            pool = bounty_pool()
+            for alloc in pool.allocations_for_task(task_id):
+                pool.spend(alloc["allocation_id"])
+        except Exception as err:
+            logger.warning("pool spend failed for released held task %s: %s",
+                           task_id, err)
         try:
             from sincor2.onchain.stake_ledger import stake_ledger
             _task = get_fabric().tasks.get(task_id) or {}
@@ -1713,6 +1745,18 @@ def _reject_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, Any
         })
         fabric.proofs[proof_id] = proof
         snap = dict(proof)
+    # W-98: release the pool backing — rejected payout, no money moves,
+    # so the task's allocation returns to available unspent. Mirrors the
+    # expiry path exactly: only live ("allocated") allocations are picked
+    # up, so an already-released/spent allocation is never
+    # double-released. Fail-safe: never bricks the reject on accounting.
+    try:
+        from sincor2.a2a_bounty_pool import bounty_pool
+        for alloc in bounty_pool().allocations_for_task(task_id):
+            bounty_pool().release(alloc["allocation_id"])
+    except Exception as err:
+        logger.warning("pool release failed for rejected sybil hold %s: %s",
+                       task_id, err)
     logger.warning("sybil hold rejected: task %s payout to %s denied (by %s)",
                    task_id, hold.get("agent_id"), decided_by)
     fabric.publish("proof.rejected", tags, snap)
