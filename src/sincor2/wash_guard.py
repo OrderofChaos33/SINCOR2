@@ -57,19 +57,23 @@ FALSE-POSITIVE ANALYSIS (why legitimate users don't trip this)
   projected rather than realized.  The poster can clear a NON-self-deal
   flag at any time with an EIP-191 acceptance over the canonical message
   (``SINCOR-POSTER-ACCEPT\\n{task_id}\\n{proof_id}\\n{receipt_hash}``),
-  verified against the poster's registered wallet — two wired paths:
-  (1) pass ``poster_acceptance_sig`` with ``submit_proof`` (clears at
-  settle time); (2) POST ``/v1/a2a/proofs/clear-wash-flag`` afterwards
+  verified against the poster's registered wallet — one wired path:
+  POST ``/v1/a2a/proofs/clear-wash-flag`` after settle
   (``clear_wash_anomaly``), which also re-books a quarantined fee as
   realized.  Invalid acceptances keep the flag and are logged loudly;
-  clearance never raises.
+  clearance never raises.  (W-100, 2026-10-17: the claimed settle-time
+  acceptance path — ``poster_acceptance_sig`` with ``submit_proof`` —
+  was removed.  ``proof_id`` is minted server-side from uuid4 inside
+  ``submit_proof``, so no poster could ever sign the canonical message
+  beforehand; the parameter was unverifiable dead code dressed as a
+  feature.  Clearance happens post-settle only, where proof_id is known.)
 * ``self_deal_wallet``: no legitimate FP — even "testing" self-payment is
   correctly labeled wash; the flag is informational, not blocking.  A
   self-deal flag can NEVER be cleared by poster acceptance — a colluding
-  poster's self-attestation proves nothing (C1).  Both the assess-time
-  acceptance path and ``clear_wash_anomaly`` refuse it (the latter with
-  ``{"cleared": False, "reason": "self-deal not clearable by poster"}``)
-  and the flag stays ``anomalous=True``.
+  poster's self-attestation proves nothing (C1).  ``clear_wash_anomaly``
+  refuses self-deal flags outright (``{"cleared": False, "reason":
+  "self-deal not clearable by poster"}``) and the flag stays
+  ``anomalous=True``.
 
 EVASION NOTES (adversarial review, 2026-10-14)
 ----------------------------------------------
@@ -229,8 +233,6 @@ def assess_settlement(task: Mapping[str, Any],
                       *,
                       content_bound: bool,
                       receipt_hash: str = "",
-                      poster_acceptance_sig: Optional[str] = None,
-                      proof_id: str = "",
                       fabric: Any = None,
                       now_ms: Optional[int] = None) -> Dict[str, Any]:
     """Assess one settlement for wash-anomaly.  Never raises.
@@ -238,6 +240,16 @@ def assess_settlement(task: Mapping[str, Any],
     Returns a verdict dict (see module docstring).  ``anomalous=True`` means
     "do not book this as genuine realized activity" — it never means "block
     the settlement".
+
+    W-100 (red-team, 2026-10-17): settle-time poster acceptance was removed
+    from this function.  ``proof_id`` is minted server-side from uuid4
+    inside ``submit_proof``, so no poster could sign the canonical
+    acceptance (which binds proof_id) before submitting — the
+    ``poster_acceptance_sig`` parameter was unverifiable dead code.
+    Clearance happens post-settle only via ``clear_wash_anomaly``.
+    The ``cleared_by_acceptance`` / ``acceptance_refused`` verdict keys are
+    retained (always False here) for schema stability — the post-settle
+    path writes them onto the stamp.
     """
     now_ms = int(now_ms) if now_ms is not None else _now_ms()
     verdict: Dict[str, Any] = {
@@ -276,19 +288,13 @@ def assess_settlement(task: Mapping[str, Any],
         task_id = str(task.get("task_id") or "")
         poster_id = task.get("poster_id")
 
-        # Poster acceptance is verified first but APPLIED last.  Signals are
-        # always computed, and a self_deal_wallet flag can never be cleared
-        # by the poster's own attestation (C1: a colluding poster clearing
-        # its own self-deal proves nothing).  Verifying before the signals
-        # keeps the (expensive, stateless) signature recovery out of the
-        # decision logic; the verdict below decides what the verification
-        # is allowed to do.
-        accepted = False
-        if poster_acceptance_sig:
-            accepted = verify_poster_acceptance(
-                task, proof_id, receipt_hash, poster_acceptance_sig,
-                fabric=fabric)
-
+        # W-100: no settle-time acceptance path.  Signals are always computed
+        # and the verdict is final here; a NON-self-deal flag can only be
+        # cleared post-settle via clear_wash_anomaly (where proof_id is
+        # known).  A self_deal_wallet flag can never be cleared by the
+        # poster's own attestation (C1: a colluding poster clearing its own
+        # self-deal proves nothing).
+        #
         # Signal: unbound receipt with no poster acceptance.
         if not content_bound:
             _signal("unbound_no_acceptance",
@@ -339,30 +345,16 @@ def assess_settlement(task: Mapping[str, Any],
             pass
 
         # Decision.  Signal precedence: self-deal first (never clearable),
-        # then valid acceptance, then the corroboration rule.
+        # then the corroboration rule.
         names = {s["name"] for s in verdict["signals"]}
         corroborating = ({"sole_bidder", "instant_settle",
                            "pair_concentration"} & names)
         if "self_deal_wallet" in names:
             # Self-deal is wash by definition and can NEVER be cleared by
             # the poster's own acceptance: self-attestation of self-dealing
-            # proves nothing (C1).  A valid acceptance is refused here;
-            # note it so the refusal is audit-visible.
+            # proves nothing (C1).  Clearance happens only post-settle via
+            # clear_wash_anomaly, which refuses self-deal before verifying.
             verdict["anomalous"] = True
-            if accepted:
-                verdict["acceptance_refused"] = True
-                verdict["acceptance_refused_reason"] = (
-                    "self-deal not clearable by poster")
-        elif accepted:
-            # Non-self-deal flag cleared by a valid poster acceptance.
-            # Ternary state: anomalous=False, but the wash_history marker
-            # retains the original signals + the clearance record (who,
-            # when, by what mechanism) so downstream consumers can tell
-            # "flagged-then-poster-accepted" apart from "never flagged".
-            verdict["cleared_by_acceptance"] = True
-            verdict["wash_history"] = [
-                _clearance_record(verdict["signals"], task, fabric, now_ms),
-            ]
         elif "unbound_no_acceptance" in names and len(corroborating) >= 2:
             verdict["anomalous"] = True
         return verdict

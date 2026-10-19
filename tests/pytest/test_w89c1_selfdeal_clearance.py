@@ -6,13 +6,15 @@ Self-attestation of self-dealing proves nothing.
 
 These tests reproduce the defect FIRST on the unmodified code (fail-before),
 then verify the fix:
-  (a) assess_settlement: signals computed BEFORE acceptance is applied; a
-      self_deal_wallet flag stays anomalous=True despite valid acceptance.
+  (a) W-100: the settle-time acceptance parameter was REMOVED from
+      assess_settlement (no poster could sign the canonical message before
+      proof_id is minted server-side) — passing it is now a TypeError, so a
+      self_deal_wallet flag is un-clearable at settle time by construction.
   (b) clear_wash_anomaly: refuses self-deal with the exact reason string;
       the flag stays anomalous=True.
-  (c) non-self-deal clearance (assess-time and post-settle) retains a
-      machine-readable wash_history marker: original signals + clearance
-      record (who cleared, when, by what mechanism).
+  (c) non-self-deal clearance (post-settle) retains a machine-readable
+      wash_history marker: original signals + clearance record (who
+      cleared, when, by what mechanism).
 """
 from __future__ import annotations
 
@@ -120,9 +122,11 @@ def test_poc_baseline_flags_self_deal(iso):
 
 
 def test_selfdeal_acceptance_cannot_clear_in_assess(iso):
-    """(a) A VALID poster EIP-191 acceptance must NOT clear a
-    self_deal_wallet flag in assess_settlement — the poster attesting to
-    their own self-dealing proves nothing."""
+    """(a) W-100: the settle-time acceptance path is REMOVED from
+    assess_settlement — passing poster_acceptance_sig is a TypeError, so a
+    self_deal_wallet flag is un-clearable at settle time by construction.
+    The signature itself still verifies (unit), which is what the
+    post-settle clear_wash_anomaly path relies on."""
     poster_key, task_id = _shared_wallet_poc()
     fabric = get_fabric()
     task = fabric.tasks[task_id]
@@ -131,16 +135,18 @@ def test_selfdeal_acceptance_cannot_clear_in_assess(iso):
     sig = _sign_acceptance(poster_key, task_id, proof_id, receipt)
     assert verify_poster_acceptance(task, proof_id, receipt, sig,
                                    fabric=fabric) is True  # valid sig
+    with pytest.raises(TypeError):
+        assess_settlement(
+            task, "c1-worker", content_bound=False, receipt_hash=receipt,
+            proof_id=proof_id, poster_acceptance_sig=sig,
+            fabric=fabric, now_ms=_now_ms())
+    # Without the (removed) acceptance path, self-deal still flags.
     verdict = assess_settlement(
         task, "c1-worker", content_bound=False, receipt_hash=receipt,
-        proof_id=proof_id, poster_acceptance_sig=sig,
         fabric=fabric, now_ms=_now_ms())
     assert verdict.get("anomalous") is True
     assert verdict.get("cleared_by_acceptance") is False
     assert "self_deal_wallet" in {s["name"] for s in verdict["signals"]}
-    assert verdict.get("acceptance_refused") is True
-    assert verdict.get("acceptance_refused_reason") == \
-        "self-deal not clearable by poster"
 
 
 def test_selfdeal_clearance_refused_post_settle(iso):
@@ -234,40 +240,6 @@ def test_non_selfdeal_clearance_keeps_wash_history(iso, tmp_path, monkeypatch):
         "poster_eip191_acceptance"
 
 
-def test_assess_time_acceptance_keeps_wash_history(iso):
-    """(c) The settle-time clearance path (poster_acceptance_sig through
-    assess_settlement) also retains wash_history — the ternary state holds
-    in both wired paths, not just the post-settle API."""
-    poster_key = _mk_agent("c1-as-poster", origin="external")
-    _mk_agent("c1-as-worker", origin="external")
-    task_id = _mk_assigned_task("c1-as-poster", "c1-as-worker",
-                               assigned_ago_ms=5_000)
-    _add_bid(task_id, "c1-as-worker")
-    fabric = get_fabric()
-    task = fabric.tasks[task_id]
-    proof_id = "prf_c1_assess"
-    receipt = "0x" + "34" * 32
-    sig = _sign_acceptance(poster_key, task_id, proof_id, receipt)
-    verdict = assess_settlement(
-        task, "c1-as-worker", content_bound=False, receipt_hash=receipt,
-        proof_id=proof_id, poster_acceptance_sig=sig,
-        fabric=fabric, now_ms=_now_ms())
-    assert verdict.get("anomalous") is False
-    assert verdict.get("cleared_by_acceptance") is True
-    history = verdict.get("wash_history") or []
-    assert len(history) == 1
-    entry = history[0]
-    names = [s["name"] for s in entry["original_signals"]]
-    assert "unbound_no_acceptance" in names
-    assert "sole_bidder" in names
-    assert "instant_settle" in names
-    rec = entry["clearance"]
-    assert rec["cleared_by"] == "c1-as-poster"
-    assert rec["cleared_by_wallet"]
-    assert isinstance(rec["cleared_at"], int) and rec["cleared_at"] > 0
-    assert rec["mechanism"] == "poster_eip191_acceptance"
-
-
 def test_clean_settlement_has_no_wash_history(iso):
     """A genuinely clean settlement (no flag, no clearance) carries no
     wash_history — the marker only exists for flagged-then-cleared."""
@@ -282,7 +254,7 @@ def test_clean_settlement_has_no_wash_history(iso):
     task = fabric.tasks[task_id]
     verdict = assess_settlement(
         task, "c1-cl-a", content_bound=False, receipt_hash="0x" + "56" * 32,
-        proof_id="prf_c1_clean", fabric=fabric, now_ms=_now_ms())
+        fabric=fabric, now_ms=_now_ms())
     assert verdict.get("anomalous") is False
     assert verdict.get("cleared_by_acceptance") is False
     assert verdict.get("wash_history") == []

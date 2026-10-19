@@ -1195,8 +1195,7 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
                  deliverable: Any = _UNSET,
                  evidence: Optional[Dict[str, Any]] = None,
                  deliverable_uri: str = "",
-                 content_binding_sig: str = "",
-                 poster_acceptance_sig: str = "") -> Dict[str, Any]:
+                 content_binding_sig: str = "") -> Dict[str, Any]:
     """Winner's proof of completion; stages the payout and settles the task.
 
     Receipt-content binding (dev-watch item 77): a receipt proves money
@@ -1395,8 +1394,6 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
             task, agent_id,
             content_bound=(bound is not None),
             receipt_hash=receipt_hash,
-            proof_id=proof_id,
-            poster_acceptance_sig=poster_acceptance_sig,
             fabric=fabric, now_ms=ts,
         )
         proof["wash_anomaly"] = _wash_verdict
@@ -2310,8 +2307,11 @@ def attach_market_routes(bp: Blueprint) -> None:
             kwargs["content_binding_sig"] = body.get("content_binding_sig") or ""
         if body.get("evidence") is not None:
             kwargs["evidence"] = body.get("evidence")
-        if body.get("poster_acceptance_sig"):
-            kwargs["poster_acceptance_sig"] = str(body.get("poster_acceptance_sig") or "")
+        # W-100: poster_acceptance_sig is NOT accepted here.  The
+        # proof_id is minted server-side inside submit_proof, so no poster
+        # could sign the canonical acceptance beforehand — the parameter
+        # was unverifiable dead code.  Clearance happens post-settle via
+        # POST /v1/a2a/proofs/clear-wash-flag.
         try:
             proof = submit_proof(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), str(body.get("receipt_hash") or ""), **kwargs)
             return jsonify(proof), 202
