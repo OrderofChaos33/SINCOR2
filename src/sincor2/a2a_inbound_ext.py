@@ -440,7 +440,14 @@ def register_agent_record(body: Dict[str, Any],
                 owner = ""
                 identity = "unverified"
         if _internal_reputation is not None:
-            reputation = float(_internal_reputation)
+            # W-97: the seed value is a floor for FRESH agents, never a
+            # reset. A re-registered agent keeps its already-earned
+            # reputation (this is max(existing, seed) in effect: reputation
+            # is clamped to [0, 1] by _apply_reputation and the seed is the
+            # ceiling, so max(existing, 1.0) would always be 1.0 and would
+            # silently promote unearned full reputation on every restart).
+            reputation = (float(existing.get("reputation") or 0.0)
+                          if existing else float(_internal_reputation))
         else:
             reputation = float(existing.get("reputation") or 0.0)
         # W-96 (transparency, not behavior change): seeded-reputation
