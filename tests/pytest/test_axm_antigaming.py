@@ -332,7 +332,9 @@ def test_honest_winner_settlement_releases_stake(iso):
     from sincor2.a2a_inbound_market import submit_proof
     proof = submit_proof(task_id, "honest",
                          receipt_hash="0x" + "ab" * 32)
-    assert proof["status"] in ("paid", "rejected")
+    # Honest-payout surface (PR #465): "paid" is only earned by a real
+    # onchain broadcast. In test env the payout is staged, not paid.
+    assert proof["status"] in ("payout_staged", "rejected")
     after = ledger.balance_of("honest")
     assert int(after["slashed_wei"]) == 0
 
