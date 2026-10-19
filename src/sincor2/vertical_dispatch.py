@@ -83,7 +83,20 @@ _SKILL_TASK_TYPE_MAP: Dict[str, str] = {
     "provider-credentialing": "credentialing_workflow",
     "healthcare-credential-check": "credentialing_workflow",
     "dental-ops": "appointment_scheduling",
+    # dental-practice-ops (dental pack): schedule-mix / recall / billing
+    # optimisation is served by the dental agent's appointment_scheduling
+    # task type (DentalAgent.execute).  Without this entry the advertised
+    # skill had no dispatch target.
+    "dental-practice-ops": "appointment_scheduling",
     "dental-compliance": "hipaa_compliance_check",
+    # yield-optimizer pack skills -> YieldOptimizerAgent.execute task types.
+    # Without these entries the skill ids fell through to the naive
+    # "-"-to-"_" fallback ("yield_evaluation", ...) which the agent does
+    # NOT handle — the advertised skills were unexecutable.
+    "yield-evaluation": "evaluate_yield",
+    "drawdown-proposal": "propose_drawdown",
+    "settlement-processing": "settle_position",
+    "loop-scan": "loop_scan",
     "dental-billing-scrub": "dental_billing_scrub",
     "regulatory-compliance": "sbom_generation",
     "n8n-workflow-bridge": "n8n_workflow_bridge",

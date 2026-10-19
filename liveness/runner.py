@@ -37,6 +37,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from net import HttpError, get_all_pages, get_json, post_json  # noqa: E402
 import fountain  # noqa: E402
 
+try:
+    import personas as _personas  # noqa: E402
+except Exception:  # pragma: no cover - personas.py must never break the runner
+    _personas = None
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_DIR = os.path.join(HERE, "state")
 COMMITS_PATH = os.path.join(STATE_DIR, "commits.json")
@@ -334,10 +339,34 @@ class Runner:
             for agent in eligible[:n]:
                 self._commit(task, agent, bounty)
 
+    def _bid_amount(self, task, agent, bounty):
+        """Choose this agent's bid amount (AXM) for one task.
+
+        OPT-IN personas: when ``SINCOR_LIVENESS_PERSONAS=1`` and the agent
+        record carries a recognised ``"persona"`` id, the persona's
+        ``decide()`` picks the amount — or returns None to skip the task
+        (skip propagates: the runner does not commit for this agent).
+        Every other case falls back to the EXACT legacy behaviour:
+        uniform random 85-98% of bounty.  Personas never change stake,
+        fee, or auth handling — those stay server-side.
+        """
+        if _personas is not None and _personas.enabled():
+            bid = _personas.persona_bid_amount(agent, task, bounty, self.now_ms,
+                                              random)
+            if bid is not None:
+                return bid
+            if _personas.get_persona(agent.get("persona") or "") is not None:
+                return None  # persona chose to sit this task out
+        return round(bounty * random.uniform(BID_FRACTION_LO, BID_FRACTION_HI), 6)
+
     def _commit(self, task, agent, bounty):
         aid = agent["agent_id"]
         task_id = task["task_id"]
-        bid_axm = round(bounty * random.uniform(BID_FRACTION_LO, BID_FRACTION_HI), 6)
+        bid_axm = self._bid_amount(task, agent, bounty)
+        if bid_axm is None:
+            log(f"  skip {aid} on {task_id}: persona "
+                f"{agent.get('persona')} sat out")
+            return
         price_wei = int(round(bid_axm * 1e18))
         salt = secrets.token_bytes(32)
         commitment = "0x" + sealed_commitment(price_wei, salt, aid).hex()

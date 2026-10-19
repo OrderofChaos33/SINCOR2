@@ -125,6 +125,20 @@ def _extend_a2a_skills_from_registry(registry: AgentCardRegistry) -> None:
             skill_id = skill.get("id")
             if not skill_id or skill_id in existing_ids:
                 continue
+            # Fixture quarantine: the registry file carries test-fixture
+            # records (e.g. "external-agent"/"testagent") whose skills have
+            # NO description and NO executor.  An advertised AgentCard skill
+            # with an empty description is never legitimate, so never let
+            # one into the live catalogue — real skills keep their
+            # descriptions and stay untouched.
+            if not (skill.get("description") or "").strip():
+                logger.warning(
+                    "Skipping description-less registry skill %r from %r: "
+                    "not advertised on the AgentCard",
+                    skill_id,
+                    getattr(record, "agent_id", "?"),
+                )
+                continue
             SINCOR_SKILLS.append(
                 AgentSkill(
                     id=skill_id,
