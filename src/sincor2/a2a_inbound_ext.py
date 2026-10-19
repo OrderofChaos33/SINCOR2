@@ -338,7 +338,10 @@ def register_agent_record(body: Dict[str, Any],
     in API responses). New agents start at 0.0 (probation); re-registration
     preserves already-earned reputation. The only path that assigns
     reputation at registration time is the internal platform seed, via
-    ``_internal_reputation`` — the HTTP route never passes it.
+    ``_internal_reputation`` — the HTTP route never passes it. Records
+    seeded this way carry ``reputation_seeded=True`` (server-assigned, never
+    read from the request body, and surfaced in API responses), so a seeded
+    1.0 is never mistaken for earned reputation (W-96).
 
     First-registration squatting control (wave 32):
 
@@ -440,6 +443,15 @@ def register_agent_record(body: Dict[str, Any],
             reputation = float(_internal_reputation)
         else:
             reputation = float(existing.get("reputation") or 0.0)
+        # W-96 (transparency, not behavior change): seeded-reputation
+        # disclosure. Whenever the internal platform seed assigns reputation
+        # via _internal_reputation, the record carries
+        # reputation_seeded=True so API consumers can distinguish a seeded
+        # 1.0 from earned reputation. Server-assigned only — never read from
+        # the request body (the body is ignored here entirely). Preserved
+        # across re-registrations, so a reseed never silently wipes it.
+        reputation_seeded = (_internal_reputation is not None
+                             or bool(existing.get("reputation_seeded")))
         agent = {
             "agent_id": agent_id,
             "name": parsed["name"],
@@ -467,6 +479,11 @@ def register_agent_record(body: Dict[str, Any],
             # here entirely).  Preserved across re-registrations like
             # registered_at.
             "origin": str(existing.get("origin") or ("internal" if (_internal_reputation is not None or agent_id == _PLATFORM_AGENT_ID) else "external")),
+            # W-96 seeded-reputation disclosure marker (see above): True when
+            # the record's reputation was assigned by the internal platform
+            # seed rather than earned. Surfaced in API responses via
+            # list_agents() (full-record copy) and the register endpoint.
+            "reputation_seeded": reputation_seeded,
         }
         # probation / requires_merit / status derive from the merit
         # threshold in one place (never declared, never KYA-derived).
@@ -810,6 +827,10 @@ def mount(app: Flask) -> bool:
             "kya_status": agent.get("kya_status"),
             "identity": agent.get("identity"),
             "owner_wallet": agent.get("owner_wallet"),
+            # W-96: seeded-reputation disclosure — True when the record's
+            # reputation was assigned by the internal platform seed rather
+            # than earned.
+            "reputation_seeded": bool(agent.get("reputation_seeded")),
             # Re-registration is proof-gated: any later update to this
             # record must carry registration_signature (EIP-191, by the
             # registered wallet) + registration_ts over the message built
