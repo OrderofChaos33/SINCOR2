@@ -181,3 +181,92 @@ class TestHelperLevelBinding:
             ch["challenge_id"], _tx("ff"), payer_wallet=VICTIM.upper())
         assert res["ok"] is True
         assert res["status"] == "fulfilled"
+
+
+# ---------------------------------------------------------------------------
+# W-102 round 2 — blank-recorded challenge bypass (adversarial rejection)
+# ---------------------------------------------------------------------------
+
+class TestBlankChallengeBypassKilled:
+    def test_blank_challenge_claim_rejected_at_route(
+            self, client, x402_db, mock_onchain):
+        """The reviewer's exact PoC: a blank-recorded challenge (as the old
+        public endpoints allowed) claimed via the route with the victim's
+        tx_hash and the victim's wallet must be rejected — the on-chain
+        payer check alone cannot stop it, because the attacker truthfully
+        names the victim's wallet."""
+        blank_ch = x402.create_challenge("agent_task", payer_wallet="")
+        tx = _tx("aa")
+        r = _verify(client, blank_ch["challenge_id"], tx, payer_wallet=VICTIM)
+        assert r.status_code == 400
+        body = r.get_json()
+        assert body["ok"] is False
+        assert body["error"] == "challenge_unbound"
+        # The blank challenge is NOT fulfilled and the tx is unclaimed:
+        # the victim can still claim it under their own bound challenge.
+        with x402._conn() as conn:
+            row = conn.execute(
+                "SELECT status, tx_hash FROM x402_challenges WHERE challenge_id=?",
+                (blank_ch["challenge_id"],)).fetchone()
+        assert row["status"] == "pending"
+        assert row["tx_hash"] is None
+        victim_ch = x402.create_challenge("agent_task", payer_wallet=VICTIM)
+        ok = _verify(client, victim_ch["challenge_id"], tx, payer_wallet=VICTIM)
+        assert ok.status_code == 200
+        assert ok.get_json()["ok"] is True
+
+    def test_helper_blank_challenge_behavior_preserved(self, x402_db, mock_onchain):
+        """Pinned blank-blank helper flows (test_auditp1_payments) bypass
+        the route: direct verify_challenge calls on blank-recorded
+        challenges keep the on-chain-only binding."""
+        ch = x402.create_challenge("agent_task", payer_wallet="")
+        res = x402.verify_challenge(ch["challenge_id"], _tx("bb"))
+        assert res["ok"] is True
+        assert res["status"] == "fulfilled"
+
+
+class TestChallengeCreationRequiresWallet:
+    def test_challenge_endpoint_rejects_missing_wallet(
+            self, client, x402_db, mock_onchain):
+        r = client.get("/x402/agent_task")
+        assert r.status_code == 400
+        assert r.get_json()["error"] == "payer_wallet_required"
+
+    def test_challenge_endpoint_rejects_malformed_wallet(
+            self, client, x402_db, mock_onchain):
+        r = client.get("/x402/agent_task?wallet=not-a-wallet")
+        assert r.status_code == 400
+        assert r.get_json()["error"] == "payer_wallet_required"
+
+    def test_challenge_endpoint_binds_wallet(
+            self, client, x402_db, mock_onchain):
+        r = client.get(f"/x402/agent_task?wallet={VICTIM}")
+        assert r.status_code == 402
+        body = r.get_json()
+        with x402._conn() as conn:
+            row = conn.execute(
+                "SELECT payer_wallet FROM x402_challenges WHERE challenge_id=?",
+                (body["challenge_id"],)).fetchone()
+        assert row["payer_wallet"] == VICTIM.lower()
+
+    def test_paid_fallback_rejects_missing_wallet(
+            self, client, x402_db, mock_onchain):
+        r = client.get("/api/paid/agent_task")
+        assert r.status_code == 400
+        assert r.get_json()["error"] == "payer_wallet_required"
+
+    def test_paid_fallback_binds_wallet(
+            self, client, x402_db, mock_onchain):
+        r = client.get(f"/api/paid/agent_task?wallet={VICTIM}")
+        assert r.status_code == 402
+        body = r.get_json()
+        with x402._conn() as conn:
+            row = conn.execute(
+                "SELECT payer_wallet FROM x402_challenges WHERE challenge_id=?",
+                (body["challenge_id"],)).fetchone()
+        assert row["payer_wallet"] == VICTIM.lower()
+        # ...and the bound challenge is redeemable through the route.
+        ok = _verify(client, body["challenge_id"], _tx("cc"),
+                     payer_wallet=VICTIM)
+        assert ok.status_code == 200
+        assert ok.get_json()["ok"] is True

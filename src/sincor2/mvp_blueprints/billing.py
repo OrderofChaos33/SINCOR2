@@ -362,8 +362,17 @@ def x402_challenge(resource_id):
     # The actual serve path (x402_paid_resource below) consumes it.
     if access_granted(token, resource_id, consume=False):
         return jsonify({'ok': True, 'resource_id': resource_id, 'access': 'granted'}), 200
-    wallet = validate_wallet(request.args.get('wallet', '')) or ''
-    challenge = create_challenge(resource_id, payer_wallet=wallet or '')
+    wallet = validate_wallet(request.args.get('wallet', ''))
+    # W-102 round 2: payer_wallet is mandatory at challenge creation. A
+    # challenge with no recorded payer is a bearer instrument — anyone
+    # observing a confirmed treasury transfer could claim the victim's
+    # tx_hash under it (first-claim-wins), even while truthfully naming the
+    # victim's wallet. Fail fast here instead of issuing a challenge that
+    # can never be redeemed at /api/x402/verify.
+    if not wallet:
+        return jsonify({'ok': False, 'error': 'payer_wallet_required',
+                        'note': 'Pass ?wallet=<your 0x address> to receive a payable challenge.'}), 400
+    challenge = create_challenge(resource_id, payer_wallet=wallet)
     return jsonify(challenge), 402
 
 
@@ -378,6 +387,9 @@ def x402_verify():
     # a confirmed treasury transfer could claim the victim's tx_hash under
     # their own challenge_id — first-claim-wins would grant the attacker the
     # victim's entitlement. Missing, blank, or malformed wallets are rejected.
+    # W-102 round 2: require_bound_challenge=True — a challenge with no
+    # recorded payer is a bearer instrument and can never be claimed through
+    # this route (error: challenge_unbound).
     payer_wallet = validate_wallet(data.get('payer_wallet', ''))
     if not payer_wallet:
         return jsonify({'ok': False, 'error': 'payer_wallet_required'}), 400
@@ -385,6 +397,7 @@ def x402_verify():
         sanitize_string(data.get('challenge_id', ''), max_length=64),
         sanitize_string(data.get('tx_hash', ''), max_length=66),
         payer_wallet=payer_wallet,
+        require_bound_challenge=True,
     )
     if not result.get('ok'):
         code = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
@@ -406,7 +419,19 @@ def x402_paid_resource(resource_id):
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
     if not access_granted(token, resource_id):
         from sincor2.x402_payments import create_challenge
-        ch = create_challenge(resource_id)
+        # W-102 round 2: bind the challenge at creation — a blank-recorded
+        # challenge is a bearer instrument and is unredeemable at
+        # /api/x402/verify (see x402_challenge). Accept the wallet from the
+        # query string or the JSON body; refuse to issue an unbound challenge.
+        body = request.get_json(silent=True) or {}
+        wallet = validate_wallet(
+            request.args.get('wallet', '')
+            or body.get('payer_wallet', '')
+            or body.get('wallet', ''))
+        if not wallet:
+            return jsonify({'ok': False, 'error': 'payer_wallet_required',
+                            'note': 'Pass ?wallet=<your 0x address> (or payer_wallet in the JSON body) to receive a payable challenge.'}), 400
+        ch = create_challenge(resource_id, payer_wallet=wallet)
         return jsonify(ch), 402
     if resource_id == 'hook_status':
         try:

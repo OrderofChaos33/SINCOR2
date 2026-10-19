@@ -346,6 +346,7 @@ def verify_challenge(
     tx_hash: str,
     *,
     payer_wallet: str = "",
+    require_bound_challenge: bool = False,
 ) -> dict[str, Any]:
     if not challenge_id or not tx_hash:
         return {"ok": False, "error": "challenge_id_and_tx_hash_required"}
@@ -379,13 +380,19 @@ def verify_challenge(
         # names the victim's wallet while claiming under their own
         # challenge_id. A claim with no wallet on a bound challenge is
         # likewise rejected (anonymous claim of someone else's challenge).
-        # NOTE (residual): challenges created with no recorded payer keep
-        # their previous behavior — the claim is bound only to the on-chain
-        # payer. Fully closing that hole requires a wallet at challenge
-        # creation, which changes behavior pinned by existing tests; flagged
-        # as follow-up, not done here.
+        #
+        # W-102 round 2: a challenge with no recorded payer is a bearer
+        # instrument — anyone observing a confirmed treasury transfer could
+        # claim the victim's tx_hash under it (first-claim-wins), even while
+        # truthfully naming the victim's wallet. Public verify callers pass
+        # require_bound_challenge=True, so such claims are rejected here,
+        # before any on-chain call. Helper-level callers (existing tests)
+        # keep the previous behavior: blank-recorded challenges are bound
+        # only to the on-chain payer.
         challenge_payer = (row["payer_wallet"] or "").strip().lower()
         supplied_payer = (payer_wallet or "").strip().lower()
+        if require_bound_challenge and not challenge_payer:
+            return {"ok": False, "error": "challenge_unbound"}
         if challenge_payer and supplied_payer != challenge_payer:
             return {"ok": False, "error": "challenge_payer_mismatch"}
 
