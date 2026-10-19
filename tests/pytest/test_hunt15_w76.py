@@ -181,11 +181,12 @@ def test_w76_verify_stake_admin_200_mutates(kya_client):
     assert _stake_of(kya, kya_id)[0] == "999999"
 
 
-def test_w76_verify_without_stake_fields_unchanged(kya_client):
-    """Plain /verify (no stake fields) keeps its pre-W-76 behavior:
-    no stake mutation, no new auth requirement."""
+def test_w76_verify_without_stake_fields_now_requires_auth(kya_client):
+    """Plain /verify (no stake fields) is now auth-gated (W-91 fix):
+    unauthenticated → 401, zero mutation. (Supersedes the pre-W-91
+    expectation of 400 from the unguarded base verify() call.)"""
     client, _, kya_id, kya = kya_client
     before = _stake_of(kya, kya_id)
     r = client.post("/v1/kya/verify", json={"kya_id": kya_id})
-    assert r.status_code == 400  # not bound → verify() business error
+    assert r.status_code == 401
     assert _stake_of(kya, kya_id) == before
