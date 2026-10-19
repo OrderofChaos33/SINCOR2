@@ -374,10 +374,17 @@ def x402_verify():
         return jsonify({'ok': False, 'error': 'x402_unavailable'}), 503
     from sincor2.x402_payments import finalize_challenge_payment, verify_challenge
     data = request.get_json(silent=True) or {}
+    # W-102: payer_wallet is mandatory on verify. Without it, an observer of
+    # a confirmed treasury transfer could claim the victim's tx_hash under
+    # their own challenge_id — first-claim-wins would grant the attacker the
+    # victim's entitlement. Missing, blank, or malformed wallets are rejected.
+    payer_wallet = validate_wallet(data.get('payer_wallet', ''))
+    if not payer_wallet:
+        return jsonify({'ok': False, 'error': 'payer_wallet_required'}), 400
     result = verify_challenge(
         sanitize_string(data.get('challenge_id', ''), max_length=64),
         sanitize_string(data.get('tx_hash', ''), max_length=66),
-        payer_wallet=validate_wallet(data.get('payer_wallet', '')) or '',
+        payer_wallet=payer_wallet,
     )
     if not result.get('ok'):
         code = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400

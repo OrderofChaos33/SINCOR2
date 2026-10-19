@@ -372,6 +372,23 @@ def verify_challenge(
         if expires and _parse_iso(expires) < datetime.now(timezone.utc):
             return {"ok": False, "error": "challenge_expired"}
 
+        # W-102: bind the claim to the challenge's recorded payer. The
+        # challenge row records payer_wallet at create_challenge time. A
+        # claim naming any other wallet is a front-run attempt: the on-chain
+        # payer check alone cannot stop it, because the attacker truthfully
+        # names the victim's wallet while claiming under their own
+        # challenge_id. A claim with no wallet on a bound challenge is
+        # likewise rejected (anonymous claim of someone else's challenge).
+        # NOTE (residual): challenges created with no recorded payer keep
+        # their previous behavior — the claim is bound only to the on-chain
+        # payer. Fully closing that hole requires a wallet at challenge
+        # creation, which changes behavior pinned by existing tests; flagged
+        # as follow-up, not done here.
+        challenge_payer = (row["payer_wallet"] or "").strip().lower()
+        supplied_payer = (payer_wallet or "").strip().lower()
+        if challenge_payer and supplied_payer != challenge_payer:
+            return {"ok": False, "error": "challenge_payer_mismatch"}
+
     resource = get_resource(str(row["resource_id"]))
     vr = verify_treasury_transfer(
         tx_hash,
