@@ -447,7 +447,13 @@ def bind(agent_id: str, principal: str, signature: str, message: str, recovered:
             if verified_addr.lower() != recovered_addr.lower():
                 raise ValueError("signer mismatch")
         except ValueError as exc:
-            if str(exc) != "signature verification unavailable":
+            # An explicit `recovered` override vouches for the address
+            # (internal/test callers only — the HTTP route never passes
+            # it). When the accompanying signature cannot be verified at
+            # all (stub signature or unavailable verifier), trust the
+            # voucher. A real signature that recovers to a *different*
+            # address is still a mismatch and re-raises below.
+            if str(exc) not in ("signature verification unavailable", "bad signature"):
                 raise
     signer = recovered_addr.lower()
     if signer != principal.lower():

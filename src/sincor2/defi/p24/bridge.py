@@ -52,31 +52,7 @@ class BridgeSimulationError(BridgeError):
 # Embedded ABI of onchain/src/p24/CreatorTokenFactory.sol (solc 0.8.24).
 # Kept in-module so the bridge needs no compiler at runtime.
 _FACTORY_ABI_JSON = (
-    '[{"inputs": [{"internalType": "address", "name": "_admin", "type": "address"}],'
-    '"stateMutability": "nonpayable", "type": "constructor"},'
-    '{"inputs": [], "name": "NotAdmin", "type": "error"},'
-    '{"inputs": [], "name": "NotScreened", "type": "error"},'
-    '{"inputs": [], "name": "SymbolTaken", "type": "error"},'
-    '{"anonymous": false, "inputs": ['
-    '{"indexed": true, "internalType": "address", "name": "token", "type": "address"},'
-    '{"indexed": false, "internalType": "string", "name": "symbol", "type": "string"},'
-    '{"indexed": true, "internalType": "address", "name": "creator", "type": "address"},'
-    '{"indexed": false, "internalType": "string", "name": "policyVersion", "type": "string"}],'
-    '"name": "TokenIssued", "type": "event"},'
-    '{"inputs": [], "name": "admin", "outputs": [{"internalType": "address", "name": "", "type": "address"}],'
-    '"stateMutability": "view", "type": "function"},'
-    '{"inputs": ['
-    '{"internalType": "string", "name": "name_", "type": "string"},'
-    '{"internalType": "string", "name": "symbol_", "type": "string"},'
-    '{"internalType": "address", "name": "creator", "type": "address"},'
-    '{"internalType": "address", "name": "curveInventory", "type": "address"},'
-    '{"internalType": "string", "name": "policyVersion", "type": "string"},'
-    '{"internalType": "bool", "name": "screened", "type": "bool"}],'
-    '"name": "issue", "outputs": [{"internalType": "address", "name": "token", "type": "address"}],'
-    '"stateMutability": "nonpayable", "type": "function"},'
-    '{"inputs": [{"internalType": "string", "name": "", "type": "string"}], "name": "tokenBySymbol",'
-    '"outputs": [{"internalType": "address", "name": "", "type": "address"}],'
-    '"stateMutability": "view", "type": "function"}]'
+    "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_admin\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"NotAdmin\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotScreened\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SymbolTaken\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroCreator\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"symbol\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"policyVersion\",\"type\":\"string\"}],\"name\":\"TokenIssued\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"admin\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"name_\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"symbol_\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"creator\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"curveInventory\",\"type\":\"address\"},{\"internalType\":\"string\",\"name\":\"policyVersion\",\"type\":\"string\"},{\"internalType\":\"bool\",\"name\":\"screened\",\"type\":\"bool\"}],\"name\":\"issue\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"name\":\"tokenBySymbol\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]"
 )
 
 
