@@ -181,19 +181,40 @@ def get_fabric() -> Fabric:
                 _FABRIC = Fabric()
                 agents_path = _persist_path()
                 agents_file_existed = bool(agents_path is not None and agents_path.is_file())
-                restored = _load_agents(_FABRIC)
+                restored, expected = _load_agents(_FABRIC)
                 _load_tasks(_FABRIC)
                 _FABRIC.registry_boot = _registry_persistence_check(restored)
+                restore_check = _registry_restore_integrity_check(restored, expected, agents_file_existed)
+                _FABRIC.registry_boot["restore_integrity"] = restore_check
                 if not _is_test_env():
                     if bool(os.environ.get("RAILWAY_ENVIRONMENT")) and not _FABRIC.registry_boot["persistent"]:
                         logger.error(
                             "[A2A] REGISTRY NOT PERSISTENT: %s — agent registry will NOT survive restarts; mount the /data volume",
                             _FABRIC.registry_boot["reason"],
                         )
-                    if agents_file_existed and restored == 0:
+                    alarm = restore_check["alarm"]
+                    if alarm == "empty":
                         logger.error(
                             "[A2A] REGISTRY RESTORE EMPTY: %s existed but 0 agents were restored — the registry may have been wiped",
                             agents_path,
+                        )
+                    elif alarm == "short":
+                        logger.error(
+                            "[A2A] REGISTRY RESTORE SHORT: %s held %d agents at last save but only %d restored (%d missing) — "
+                            "the registry may have been partially wiped; investigate before trusting it",
+                            agents_path,
+                            restore_check["expected"],
+                            restored,
+                            restore_check["missing"],
+                        )
+                    elif alarm == "collapse":
+                        logger.critical(
+                            "[A2A] REGISTRY RESTORE COLLAPSE: %s held %d agents at last save but only %d restored (%d missing) — "
+                            "over half the registry is gone; treat the registry as compromised until reviewed",
+                            agents_path,
+                            restore_check["expected"],
+                            restored,
+                            restore_check["missing"],
                         )
     return _FABRIC
 
@@ -217,6 +238,44 @@ def _is_test_env() -> bool:
     """True when running under a test harness (never log boot alarms there)."""
     env = (os.environ.get("FLASK_ENV") or os.environ.get("ENVIRONMENT") or "production").strip().lower()
     return env in {"test", "testing"}
+
+
+def _registry_restore_integrity_check(restored: int, expected: "int | None", file_existed: bool) -> Dict[str, Any]:
+    """Boot-time integrity check against a partial registry wipe (W-95).
+
+    The old check only alarmed when the restore was totally empty
+    (``restored == 0``); a wipe down to a single attacker-controlled record
+    restored silently. This compares the restored count against the
+    ``expected_agent_count`` persisted by :func:`_save_agents`.
+
+    Returns ``{"expected": int|None, "restored": int, "missing": int,
+    "alarm": None|"empty"|"short"|"collapse"}``. ``alarm`` is ``None`` on a
+    clean restore, on first boot (no file), and on files that carry no
+    expected count (can't compare — don't alarm on evidence we don't have).
+
+    Tolerance: a drop of up to ``max(1, expected // 10)`` agents is quiet
+    (covers legitimate churn between the last save and boot). Beyond that
+    the alarm is ``"short"``; losing more than half the registry is a
+    ``"collapse"`` (logged at CRITICAL and surfaced via health_snapshot).
+    Never raises.
+    """
+    try:
+        if not file_existed:
+            return {"expected": expected, "restored": restored, "missing": 0, "alarm": None}
+        if restored == 0:
+            # Preserves the pre-W-95 total-wipe behavior: any existing file
+            # that yields zero agents is loud, even with no expected count.
+            return {"expected": expected, "restored": 0, "missing": expected or 0, "alarm": "empty"}
+        if expected is None or restored >= expected:
+            return {"expected": expected, "restored": restored, "missing": 0, "alarm": None}
+        missing = expected - restored
+        tolerance = max(1, expected // 10)
+        if missing <= tolerance:
+            return {"expected": expected, "restored": restored, "missing": missing, "alarm": None}
+        alarm = "collapse" if restored * 2 < expected else "short"
+        return {"expected": expected, "restored": restored, "missing": missing, "alarm": alarm}
+    except Exception as err:  # never fatal at boot
+        return {"expected": expected, "restored": restored, "missing": 0, "alarm": None, "error": str(err)}
 
 
 def _registry_persistence_check(restored_count: int) -> Dict[str, Any]:
@@ -261,13 +320,25 @@ def _registry_persistence_check(restored_count: int) -> Dict[str, Any]:
         }
 
 
-def _load_agents(fabric: Fabric) -> int:
+def _load_agents(fabric: Fabric) -> "tuple":
+    """Restore agent records; returns ``(restored, expected)``.
+
+    ``expected`` is the agent count the registry file claims it holds
+    (``expected_agent_count``, written by :func:`_save_agents`); ``None``
+    when the file carries no count (first-boot / pre-W-95-format files) —
+    no integrity comparison is possible in that case.
+    """
     path = _persist_path()
     if path is None or not path.is_file():
-        return 0
+        return 0, None
     restored = 0
+    expected = None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            count = raw.get("expected_agent_count")
+            if isinstance(count, int) and count >= 0:
+                expected = count
         agents = raw.get("agents") if isinstance(raw, dict) else raw
         if isinstance(agents, list):
             for agent in agents:
@@ -276,7 +347,7 @@ def _load_agents(fabric: Fabric) -> int:
                     restored += 1
     except Exception as err:
         logger.warning("[A2A] restore failed: %s", err)
-    return restored
+    return restored, expected
 
 
 def _save_agents(fabric: Fabric) -> None:
@@ -285,7 +356,20 @@ def _save_agents(fabric: Fabric) -> None:
         return
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"agents": list(fabric.agents.values()), "saved_at": _now_ms()}), encoding="utf-8")
+        # W-95: persist the expected agent count alongside the registry so a
+        # partial wipe (file still parses, records silently dropped) trips the
+        # boot-time integrity check in get_fabric().
+        written = [a for a in fabric.agents.values() if isinstance(a, dict) and a.get("agent_id")]
+        path.write_text(
+            json.dumps(
+                {
+                    "agents": list(fabric.agents.values()),
+                    "saved_at": _now_ms(),
+                    "expected_agent_count": len(written),
+                }
+            ),
+            encoding="utf-8",
+        )
     except Exception as err:
         logger.warning("[A2A] persist failed: %s", err)
 
@@ -367,12 +451,15 @@ def health_snapshot() -> Dict[str, Any]:
     # get_fabric() on the boot path. Fabrics built via reset_fabric() (tests)
     # never ran the check — default to safe values.
     registry_boot = getattr(fabric, "registry_boot", None) or {}
+    restore = registry_boot.get("restore_integrity") or {}
     with fabric.lock:
         live = sum(1 for a in fabric.agents.values() if ts - int(a.get("last_heartbeat") or 0) <= ttl_ms)
         open_auctions = sum(1 for t in fabric.tasks.values() if t.get("state") in ("open", "auction"))
         return {
             "ready": True,
-            "critical": False,
+            # Flipped by the W-95 boot integrity check: a registry collapse
+            # (over half the agents missing vs. last save) is critical for ops.
+            "critical": restore.get("alarm") == "collapse",
             "detail": "inbound_register",
             "live_agents": live,
             "registered_agents": len(fabric.agents),
@@ -383,6 +470,9 @@ def health_snapshot() -> Dict[str, Any]:
             "base_chain_id": BASE_CHAIN_ID,
             "registry_persistent": registry_boot.get("persistent"),
             "registry_restored_agents": registry_boot.get("restored_agents", 0),
+            "registry_expected_agents": restore.get("expected"),
+            "registry_restore_missing": restore.get("missing", 0),
+            "registry_restore_alarm": restore.get("alarm"),
         }
 
 

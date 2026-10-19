@@ -149,3 +149,169 @@ def test_persistence_check_never_raises(monkeypatch):
     assert result["persistent"] is False
     assert result["restored_agents"] == 3
     assert "boom" in result["reason"]
+
+
+# ---------------------------------------------------------------------------
+# W-95: partial-wipe integrity check (expected_agent_count vs restored count)
+# ---------------------------------------------------------------------------
+
+
+def _write_agents_file_with_count(payload: dict):
+    path = _agents_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _agent(i):
+    return {"agent_id": "agent-%d" % i, "last_heartbeat": 0}
+
+
+def test_w95_total_wipe_still_alarms_empty(boot_env, monkeypatch, caplog):
+    """(a) Pre-W-95 behavior preserved: existing file, 0 restored -> EMPTY alarm."""
+    _write_agents_file_with_count({"agents": [], "expected_agent_count": 6})
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    assert len(fabric.agents) == 0
+    assert fabric.registry_boot["restore_integrity"]["alarm"] == "empty"
+    assert "REGISTRY RESTORE EMPTY" in caplog.text
+
+
+def test_w95_partial_wipe_six_to_one_alarms_collapse(boot_env, monkeypatch, caplog):
+    """(b) The W-95 hole: 6 agents -> 1 (attacker-controlled) must be loud."""
+    _write_agents_file_with_count(
+        {"agents": [{"agent_id": "attacker"}], "expected_agent_count": 6}
+    )
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    assert set(fabric.agents) == {"attacker"}
+    boot = fabric.registry_boot["restore_integrity"]
+    assert boot["alarm"] == "collapse"
+    assert boot["expected"] == 6
+    assert boot["missing"] == 5
+    assert "REGISTRY RESTORE COLLAPSE" in caplog.text
+    # Loud beyond the log line: health snapshot flips critical.
+    snap = health_snapshot()
+    assert snap["critical"] is True
+    assert snap["registry_expected_agents"] == 6
+    assert snap["registry_restore_missing"] == 5
+    assert snap["registry_restore_alarm"] == "collapse"
+
+
+def test_w95_partial_wipe_moderate_drop_alarms_short(boot_env, monkeypatch, caplog):
+    """A drop beyond tolerance but under half still alarms (error, not critical)."""
+    _write_agents_file_with_count(
+        {"agents": [_agent(i) for i in range(60)], "expected_agent_count": 100}
+    )
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    boot = fabric.registry_boot["restore_integrity"]
+    assert boot["alarm"] == "short"
+    assert "REGISTRY RESTORE SHORT" in caplog.text
+    assert "REGISTRY RESTORE COLLAPSE" not in caplog.text
+    assert health_snapshot()["critical"] is False
+
+
+def test_w95_normal_restore_no_alarm(boot_env, monkeypatch, caplog):
+    """(c) 6 -> 6 restores cleanly with no alarm."""
+    _write_agents_file_with_count(
+        {"agents": [_agent(i) for i in range(6)], "expected_agent_count": 6}
+    )
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    assert len(fabric.agents) == 6
+    assert fabric.registry_boot["restore_integrity"]["alarm"] is None
+    assert "REGISTRY RESTORE" not in caplog.text
+
+
+def test_w95_first_boot_no_file_no_alarm(boot_env, monkeypatch, caplog):
+    """(d) First boot with no prior registry file must not alarm."""
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    assert fabric.registry_boot["restore_integrity"]["alarm"] is None
+    assert "REGISTRY RESTORE" not in caplog.text
+
+
+def test_w95_legacy_file_without_expected_count_no_alarm(boot_env, monkeypatch, caplog):
+    """Files predating expected_agent_count can't be compared — stay quiet."""
+    _write_agents_file(json.dumps({"agents": [_agent(i) for i in range(3)]}))
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    assert len(fabric.agents) == 3
+    assert fabric.registry_boot["restore_integrity"]["alarm"] is None
+    assert "REGISTRY RESTORE" not in caplog.text
+
+
+def test_w95_small_churn_within_tolerance_no_alarm(boot_env, monkeypatch, caplog):
+    """A 100 -> 95 drop is within the 10% tolerance: no alarm."""
+    _write_agents_file_with_count(
+        {"agents": [_agent(i) for i in range(95)], "expected_agent_count": 100}
+    )
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    assert fabric.registry_boot["restore_integrity"]["alarm"] is None
+    assert "REGISTRY RESTORE" not in caplog.text
+
+
+def test_w95_save_persists_expected_agent_count(boot_env):
+    """_save_agents records the count that boot will compare against."""
+    from sincor2.a2a_inbound import _save_agents
+
+    fabric = reset_fabric()
+    for i in range(6):
+        fabric.agents["agent-%d" % i] = _agent(i)
+    fabric.agents["no-id"] = {"no_id": True}  # not restorable; must not count
+    _save_agents(fabric)
+    raw = json.loads(_agents_path().read_text(encoding="utf-8"))
+    assert raw["expected_agent_count"] == 6
+    assert len(raw["agents"]) == 7
+
+
+def test_w95_round_trip_save_then_boot_no_alarm(boot_env, monkeypatch, caplog):
+    """Save -> fresh boot with the same records: no alarm (no false positive)."""
+    from sincor2.a2a_inbound import _save_agents
+
+    fabric = reset_fabric()
+    for i in range(6):
+        fabric.agents["agent-%d" % i] = _agent(i)
+    _save_agents(fabric)
+    inbound._FABRIC = None  # fresh boot
+    _production_env(monkeypatch)
+    with caplog.at_level(logging.DEBUG):
+        fabric = get_fabric()
+    assert len(fabric.agents) == 6
+    assert fabric.registry_boot["restore_integrity"]["alarm"] is None
+    assert "REGISTRY RESTORE" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "restored,expected,file_existed,alarm",
+    [
+        (0, 6, True, "empty"),       # total wipe
+        (0, None, True, "empty"),    # corrupt/unparseable legacy path
+        (0, 0, False, None),         # no file at all (first boot)
+        (5, 6, True, None),          # within tolerance (max(1, 6//10)=1)
+        (4, 6, True, "short"),       # 2 missing > tol 1, not >50%
+        (3, 6, True, "short"),       # exactly half missing -> short, not collapse
+        (2, 6, True, "collapse"),    # >50% missing
+        (1, 6, True, "collapse"),    # the W-95 attack shape
+        (6, 6, True, None),          # clean restore
+        (7, 6, True, None),          # growth is fine
+        (3, None, True, None),       # legacy file: can't compare
+    ],
+)
+def test_w95_integrity_check_matrix(restored, expected, file_existed, alarm):
+    from sincor2.a2a_inbound import _registry_restore_integrity_check
+
+    result = _registry_restore_integrity_check(restored, expected, file_existed)
+    assert result["alarm"] == alarm
+    if alarm in ("short", "collapse"):
+        assert result["missing"] == expected - restored
+        assert result["missing"] > 0
