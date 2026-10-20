@@ -62,7 +62,7 @@ def _onboard(sdk, agent_id=AGENT, stake_axm=2.0, key=None):
     assert reg["status"] == "registered"
     hb = sdk.heartbeat(agent_id, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     assert hb["ok"] is True
-    dep = sdk.deposit_stake(agent_id, stake_axm)
+    dep = sdk.deposit_stake(agent_id, stake_axm, signer=key)
     assert dep["agent_id"] == agent_id
     return reg
 
