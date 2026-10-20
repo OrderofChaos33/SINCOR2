@@ -73,6 +73,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import math
 import os
 import threading
@@ -81,6 +82,8 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Deque, Dict, List, Protocol, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -546,8 +549,17 @@ def _get_enforcer() -> SharedSlidingWindowLimiter:
 
 
 def reset_a2a_limits() -> None:
-    """Clear all recorded hits. Test isolation hook — call between tests."""
-    _get_enforcer().reset()
+    """Clear all recorded hits. Test isolation hook — call between tests.
+
+    Best-effort: when the shared store is unreachable there is nothing to
+    clear for the next test, so the outage is logged instead of turning the
+    isolation hook itself into an error (e.g. a test that deliberately
+    points the enforcer at a dead store must not fail at teardown).
+    """
+    try:
+        _get_enforcer().reset()
+    except StateStoreUnavailable as exc:
+        logger.warning("reset_a2a_limits: shared store unreachable, skipping clear: %s", exc)
 
 
 def _client_ip() -> str:

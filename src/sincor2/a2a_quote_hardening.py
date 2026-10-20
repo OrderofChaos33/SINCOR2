@@ -13,10 +13,20 @@ Fee rules (canonical, do not diverge):
 import os
 from typing import Any, Dict, Optional
 
-TREASURY_WALLET = os.getenv("TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac")
+from sincor2.onchain.constants import (
+    AXIOM_TOKEN,
+    SINC_TOKEN,
+    TREASURY,
+    resolve_address,
+)
+
+# Canonical live pointers — env may override, but stale/malformed overrides
+# fall back to canonical so a forgotten .env cannot resurrect retired
+# contracts (see sincor2.onchain.constants.resolve_address).
+TREASURY_WALLET = resolve_address("TREASURY_ADDRESS", TREASURY)
 DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD"
-AXIOM_CONTRACT = os.getenv("AXIOM_CONTRACT_ADDRESS", "0xfF7aF6ffca25A9DC0FC990d998AcF24Cc60b7822")
-SINC_CONTRACT = os.getenv("SINC_CONTRACT_ADDRESS", "0x9C8cd8d3961F445D653713dE65C6578bE11668e7")
+AXIOM_CONTRACT = resolve_address("AXIOM_CONTRACT_ADDRESS", AXIOM_TOKEN)
+SINC_CONTRACT = resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN)
 CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
 A2A_PRIMARY_TOKEN = os.getenv("A2A_PRIMARY_TOKEN", "SINC").upper()
 SINC_PRICE_PER_TASK = int(os.getenv("SINC_PRICE_PER_TASK", "1"))
