@@ -2,7 +2,7 @@
 
 # SINCOR2: Universal Execution Layer for the Autonomous Machine Economy
 
-SINCOR2 is a production-hardened platform engineered to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. By combining decentralized identity, self-contained cognitive kernels, and automated on-chain financial clearing, the system provides the foundational infrastructure required for autonomous agent swarms to scale safely and reliably independent of human intervention.
+SINCOR2 is a production-hardened platform engineered to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. By combining decentralized identity, self-contained cognitive kernels, and automated on-chain financial clearing, the system provides the foundational infrastructure required for autonomous agent swarms to scale safely and reliably with minimal human intervention.
 
 The platform is architected with autonomy compliance and security as core infrastructure pillars.
 
@@ -34,7 +34,7 @@ When coordinating distributed swarms against complex, shifting environments, age
 **Production-targeted A2A marketplace and multi-agent orchestration for interoperable, revenue-generating agents.**
 
 SINCOR2 is a production-targeted, full-stack autonomous agent platform designed to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. Engineered to operate with minimal human intervention (target state), the system provides a comprehensive infrastructure for autonomous agent swarms to scale, generate revenue, and self-optimize.
-The platforms sovereign asynchronous A2A billing via the x402 financial standard  and multi-objective convergence via the Temporal Optimization Agent (TOA).
+The platform's automated asynchronous A2A billing via the x402 financial standard and multi-objective convergence via the Temporal Optimization Agent (TOA).
 TOA (Agent 44) functions as a predictive timeline navigator. It runs a forecast → simulate → collapse pipeline to determine the most high-utility execution route.
  Operating on the Base blockchain (Chain 8453), SINCOR2 utilizes a dual-token economy comprising SINC for governance and AXIOM (AXM) for task settlement. With 43 specialized agent skills, designed for continuous operation, the platform enables businesses to deploy a coordinated AI workforce for tasks ranging from clinical operations and trading to automated web development and lead generation.
 
@@ -84,9 +84,9 @@ SINCOR2 is built for operators who need autonomous agents that generate real rev
 - **dozens of agent skills** — from healthcare revenue cycle management and trading signal generation to compliance filing and lead enrichment — all routable through a single JSON-RPC endpoint.
 - **Self-improving swarm.** Agents bid on tasks through a contract-net market, self-evaluate with evidence→claim→confidence chains, accumulate reputation, and earn Soulbound Token (SBT) promotions as they prove performance.
 - **Cortex memory, settlement, and merit.** Episodic scratchpads are purged on task close; the semantic vault only accepts high-merit traces and ranks them with Ebbinghaus decay. Micro-tasks settle off-chain and post one Merkle root to Base with a 300-block challenge window and hash-committed bids. EigenTrust plus honeypot auditors stop sybil 10/10 cliques from farming rank.
-- **Autonomous revenue pipeline.** Dynamic pricing, Stripe and PayPal checkout, webhook-driven fulfillment, revenue ledger tracking, and partnership frameworks operate continuously without human intervention.
+- **Autonomous revenue pipeline.** Dynamic pricing, Stripe and PayPal checkout, webhook-driven fulfillment, revenue ledger tracking, and partnership frameworks operate continuously with minimal human oversight.
 - **Real-time intelligence.** Live feeds from financial markets, news, social media, competitor websites, job postings, and patent filings let agents detect opportunities and threats in minutes, not days.
-- **On-chain economic coordination.** SINC governs utility and staking mechanics; AXIOM (AXM) settles every agent-to-agent payment on Base with built-in deflationary burn mechanics and a Uniswap V4 limit-order hook that protects against sandwich attacks.
+- **On-chain economic coordination.** SINC governs utility and staking mechanics; AXIOM (AXM) settles agent-to-agent payments on Base.
 - **SINAX proof navigation.** A geometric layer that learns proof-space topology, accelerates formal verification with Lean, and discovers lemmas from clusters of hard proof states.
 - **Production-ready runtime.** Flask app factory with JWT auth, rate limiting, security headers, structured logging, health monitoring, and one-command Railway / Docker deployment.
 
