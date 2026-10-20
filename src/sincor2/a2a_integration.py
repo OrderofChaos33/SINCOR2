@@ -27,9 +27,12 @@ Legacy    : POST /api/a2a/tasks/send   GET /api/a2a/tasks/<id>
             POST /api/a2a/tasks/cancel GET /api/a2a/agents  POST /api/a2a/quote
 
 The AgentCard advertises the SINCOR skill catalogue as individual skills
-(16 base skills plus registry-backed vertical skills — 32 total against the
-current marketplace/agent_cards.json registry; the count grows as vertical
-packs are registered).
+(17 entries in SINCOR_SKILLS at import — 16 cross-cutting skills plus the
+P24 creator-token issuance skill — and further registry-backed vertical
+skills appended at platform bootstrap: 14 against the current
+marketplace/agent_cards.json registry, 31 total advertised; description-less
+fixture records are quarantined and never advertised.  The count grows as
+vertical packs are registered).
 External agents select the skill they need and submit a task with their
 AXIOM payment commitment.  SINCOR validates the on-chain payment (or an
 off-chain signed intent), routes the task through the swarm, and returns
@@ -1094,6 +1097,44 @@ def refresh_skill_schemas() -> None:
     """Recompile after vertical skills are appended to SINCOR_SKILLS."""
     global _SCHEMA_CACHE
     _SCHEMA_CACHE = compile_skill_schemas(SINCOR_SKILLS)
+
+
+def skill_implementation_ref(skill_id: str) -> Optional[str]:
+    """Return a resolvable implementation reference for an advertised skill.
+
+    Format ``"module:qualname"`` — the module must import cleanly and the
+    qualname (when non-empty) must resolve to a real attribute/callable.
+    Returns None when the skill id has no known implementation — callers
+    treat that as a registry defect, never as a silent pass.
+
+    Resolution order:
+      1. P24 creator-token issuance -> sincor2.defi.p24.skill (the skill's
+         advertised contract lives next to its caller).
+      2. AgencyKernel task-type map (sincor2.vertical_dispatch
+         _KERNEL_SKILL_MAP) -> the kernel task type.
+      3. Vertical-dispatch task-type map (sincor2.vertical_dispatch
+         _SKILL_TASK_TYPE_MAP) -> the dispatch task type.
+    """
+    sid = str(skill_id or "").strip()
+    if not sid:
+        return None
+    try:
+        from sincor2.defi.p24 import skill as _p24_skill
+        if sid == _p24_skill.SKILL_ID:
+            return "sincor2.defi.p24.skill:SKILL_ID"
+    except Exception:
+        pass
+    try:
+        from sincor2 import vertical_dispatch as _vd
+        kernel = getattr(_vd, "_KERNEL_SKILL_MAP", {})
+        task_map = getattr(_vd, "_SKILL_TASK_TYPE_MAP", {})
+        if sid in kernel:
+            return f"sincor2.vertical_dispatch:_KERNEL_SKILL_MAP[{sid}]"
+        if sid in task_map:
+            return f"sincor2.vertical_dispatch:_SKILL_TASK_TYPE_MAP[{sid}]"
+    except Exception:
+        pass
+    return None
 
 
 # ---------------------------------------------------------------------------

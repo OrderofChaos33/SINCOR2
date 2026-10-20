@@ -36,6 +36,9 @@ SKILL_VERTICAL_MAP: Dict[str, str] = {
     "provider-credentialing": "healthcare_rcm_agent",
     "healthcare-credential-check": "healthcare_rcm_agent",
     "dental-ops": "dental_ops_agent",
+    # dental-practice-ops is the dental pack's advertised schedule-mix /
+    # recall skill; it resolves to the same dental agent as dental-ops.
+    "dental-practice-ops": "dental_ops_agent",
     "dental-compliance": "dental_ops_agent",
     "regulatory-compliance": "compliance_automation_agent",
     "n8n-workflow-bridge": "compliance_automation_agent",
