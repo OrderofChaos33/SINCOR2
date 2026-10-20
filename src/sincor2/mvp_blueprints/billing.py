@@ -393,11 +393,28 @@ def x402_verify():
     payer_wallet = validate_wallet(data.get('payer_wallet', ''))
     if not payer_wallet:
         return jsonify({'ok': False, 'error': 'payer_wallet_required'}), 400
+    # W-103: replay credentials for re-issuing an already-fulfilled
+    # challenge's token. Sanitized like the existing body fields and passed
+    # through into verify_challenge(); replay_ts_ms parses to int or None
+    # (malformed -> rejected as replay_auth_failed downstream). Accepts a
+    # JSON number or a numeric string for replay_ts_ms.
+    replay_ts_in = data.get('replay_ts_ms', '')
+    if isinstance(replay_ts_in, int) and not isinstance(replay_ts_in, bool):
+        replay_ts_ms = replay_ts_in
+    else:
+        replay_ts_raw = sanitize_string(replay_ts_in, max_length=16)
+        try:
+            replay_ts_ms = int(replay_ts_raw)
+        except (TypeError, ValueError):
+            replay_ts_ms = None
     result = verify_challenge(
         sanitize_string(data.get('challenge_id', ''), max_length=64),
         sanitize_string(data.get('tx_hash', ''), max_length=66),
         payer_wallet=payer_wallet,
         require_bound_challenge=True,
+        replay_signature=sanitize_string(
+            data.get('replay_signature', ''), max_length=140),
+        replay_ts_ms=replay_ts_ms,
     )
     if not result.get('ok'):
         code = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400

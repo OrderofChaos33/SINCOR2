@@ -341,12 +341,72 @@ def _parse_iso(ts: str) -> datetime:
     return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
 
 
+# W-103: fulfilled-challenge replay must be authenticated. A re-issue of an
+# already-fulfilled challenge's entitlement token requires a fresh EIP-191
+# signature over the canonical replay message from the wallet recorded on
+# the original challenge. Mirrors the heartbeat proof convention
+# (SINCOR-HEARTBEAT\n<agent_id>\n<ts_ms>) in a2a_inbound_ext.py.
+REPLAY_PROOF_DOMAIN = "SINCOR-X402-REPLAY"
+REPLAY_MAX_SKEW_MS = 600_000  # 10-minute freshness window
+REPLAY_AUTH_FAILED = {"ok": False, "error": "replay_auth_failed"}
+
+
+def build_replay_message(challenge_id: str, ts_ms: int) -> str:
+    """Canonical EIP-191 message a payer signs to re-issue a fulfilled
+    challenge's token. Binds the canonical challenge_id and a millisecond
+    timestamp so the signature cannot be reused for another challenge or
+    outside the freshness window."""
+    return f"{REPLAY_PROOF_DOMAIN}\n{challenge_id}\n{int(ts_ms)}"
+
+
+def _replay_auth_ok(
+    recorded_wallet: str,
+    challenge_id: str,
+    replay_signature: str,
+    replay_ts_ms: Any,
+) -> bool:
+    """W-103 gate for BOTH fulfilled paths of verify_challenge.
+
+    Checks, in order: (1) signature and timestamp present and well-formed;
+    (2) |now_ms - ts_ms| <= 10 minutes; (3) signer recovered via
+    encode_defunct; (4) recorded payer_wallet non-blank and matching the
+    recovered address case-insensitively. ANY failure returns False — the
+    caller maps every failure to the same generic replay_auth_failed error
+    so no existence oracle or distinguishing behavior exists."""
+    if not replay_signature or replay_ts_ms is None:
+        return False
+    try:
+        ts_ms = int(str(replay_ts_ms).strip())
+    except (TypeError, ValueError):
+        return False
+    if ts_ms < 0:
+        return False
+    if abs(int(time.time() * 1000) - ts_ms) > REPLAY_MAX_SKEW_MS:
+        return False
+    wallet = (recorded_wallet or "").strip()
+    if not wallet:
+        return False
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
+        require_low_s(replay_signature)  # reject (r, n-s) malleation twins
+        signer = str(Account.recover_message(
+            encode_defunct(text=build_replay_message(challenge_id, ts_ms)),
+            signature=replay_signature))
+    except Exception:
+        return False
+    return signer.lower() == wallet.lower()
+
+
 def verify_challenge(
     challenge_id: str,
     tx_hash: str,
     *,
     payer_wallet: str = "",
     require_bound_challenge: bool = False,
+    replay_signature: str = "",
+    replay_ts_ms: Any = None,
 ) -> dict[str, Any]:
     if not challenge_id or not tx_hash:
         return {"ok": False, "error": "challenge_id_and_tx_hash_required"}
@@ -360,8 +420,23 @@ def verify_challenge(
             "SELECT * FROM x402_challenges WHERE challenge_id=?", (challenge_id,)
         ).fetchone()
         if not row:
+            # W-103: no existence oracle on the replay path. A caller that
+            # supplied replay credentials gets the same generic failure as
+            # any other replay-auth failure, whether or not the challenge
+            # exists.
+            if replay_signature or replay_ts_ms is not None:
+                return dict(REPLAY_AUTH_FAILED)
             return {"ok": False, "error": "challenge_not_found"}
         if row["status"] == "fulfilled":
+            # W-103: the victim's live token is re-issued ONLY with a valid
+            # EIP-191 replay signature from the recorded payer wallet.
+            if not _replay_auth_ok(
+                str(row["payer_wallet"] or ""),
+                str(row["challenge_id"]),
+                replay_signature,
+                replay_ts_ms,
+            ):
+                return dict(REPLAY_AUTH_FAILED)
             return {
                 "ok": True,
                 "status": "already_fulfilled",
@@ -432,9 +507,23 @@ def verify_challenge(
             ).fetchone()
             if not fresh:
                 conn.rollback()
+                # W-103: no existence oracle on the replay path (mirrors the
+                # pre-transaction branch above).
+                if replay_signature or replay_ts_ms is not None:
+                    return dict(REPLAY_AUTH_FAILED)
                 return {"ok": False, "error": "challenge_not_found"}
             if fresh["status"] == "fulfilled":
                 conn.rollback()
+                # W-103: the lost-the-race branch must authenticate the
+                # replayer too — this is where the W-102 bypass used to
+                # re-mint the victim's live token with zero auth.
+                if not _replay_auth_ok(
+                    str(fresh["payer_wallet"] or ""),
+                    str(fresh["challenge_id"]),
+                    replay_signature,
+                    replay_ts_ms,
+                ):
+                    return dict(REPLAY_AUTH_FAILED)
                 return {
                     "ok": True,
                     "status": "already_fulfilled",
