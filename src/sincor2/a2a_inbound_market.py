@@ -2689,9 +2689,12 @@ def attach_market_routes(bp: Blueprint) -> None:
             # W-40: normalize the signature to canonical bytes BEFORE
             # hashing. eth_account recovery accepts the same 65 signature
             # bytes in many encodings (lower/UPPER hex, with/without the
-            # 0x prefix), and hashing the raw caller-supplied string let
-            # one signing operation credit stake N times. require_low_s
-            # parses every encoding eth_account accepts, enforces low-s,
+            # 0x prefix), and the v byte itself is malleable: v in
+            # {0, 1, 27, 28} with 0==27 and 1==28 recover to the identical
+            # signer. Hashing the raw caller-supplied string (or the raw
+            # 65 bytes) let one signing operation credit stake N times.
+            # require_low_s parses every encoding eth_account accepts,
+            # enforces low-s, maps v 0->27 and 1->28, rejects any other v,
             # and returns the single canonical 65 bytes. It already ran
             # inside _recover_eip191 above, so this cannot raise here.
             sig_hash = hashlib.sha256(

@@ -26,7 +26,16 @@ These tests prove:
       cannot double-credit the same signature hash (cross-process race
       closed);
   (h) ledger level: threads racing the same signature hash credit
-      exactly once.
+      exactly once;
+  (i) round 2: v-variant replay, native-first order (v=27/28 deposit
+      -> 201, then same (r, s) re-encoded as v-27 -> 403);
+  (j) round 2: v-variant replay, flipped-first order (v=0/1 deposit
+      -> 201, then native v=27/28 -> 403).
+
+eth_account accepts v in {0, 1, 27, 28} with 0==27 and 1==28 recovering
+to the SAME signer, so the same signing operation could previously
+double-credit by re-encoding the v byte. require_low_s now maps 0->27
+and 1->28 (rejecting any other v), closing the bypass.
 """
 
 from __future__ import annotations
@@ -247,3 +256,46 @@ def test_concurrent_same_signature_hash_credits_once(tmp_path):
     assert outcomes.count("credited") == 1, outcomes
     assert outcomes.count("rejected") == 7, outcomes
     assert int(ledger.balance_of("w41-race")["deposited_wei"]) == ONE_AXM
+
+
+# -- W-40 round 2: v-byte variants -----------------------------------------------
+
+def _flip_v(signature_hex):
+    """Re-encode the same (r, s) with the alternate v encoding:
+    27 -> 0, 28 -> 1. eth_account recovers both to the same signer."""
+    raw = bytes.fromhex(signature_hex[2:]
+                        if signature_hex[:2].lower() == "0x"
+                        else signature_hex)
+    v = raw[64]
+    flipped = (v - 27) if v in (27, 28) else (v + 27)
+    return (raw[:64] + bytes([flipped])).hex()
+
+
+def test_v_flip_replay_after_native_deposit_rejected(client):
+    """Round-2 bypass PoC (native-first): deposit with the native
+    v=27/28 signature -> 201; the same (r, s) re-encoded with v-27
+    must 403, crediting nothing further."""
+    acct = _register(client, "w40-vflip")
+    payload = _payload("w40-vflip", acct, 5)
+    assert _post(client, payload).status_code == 201
+
+    replay = dict(payload)
+    replay["signature"] = _flip_v(payload["signature"])
+    r = _post(client, replay)
+    assert r.status_code == 403, r.get_json()
+    assert _deposited(client, "w40-vflip") == 5 * ONE_AXM
+
+
+def test_native_replay_after_v_flip_deposit_rejected(client):
+    """Round-2 bypass PoC (flipped-first): deposit with the v=0/1
+    encoding -> 201; the native v=27/28 encoding of the same (r, s)
+    must 403, crediting nothing further."""
+    acct = _register(client, "w40-vflip-rev")
+    payload = _payload("w40-vflip-rev", acct, 5)
+    flipped = dict(payload)
+    flipped["signature"] = _flip_v(payload["signature"])
+    assert _post(client, flipped).status_code == 201
+
+    r = _post(client, dict(payload))
+    assert r.status_code == 403, r.get_json()
+    assert _deposited(client, "w40-vflip-rev") == 5 * ONE_AXM
