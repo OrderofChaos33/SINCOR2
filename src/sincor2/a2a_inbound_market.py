@@ -75,6 +75,7 @@ from sincor2.dispute_evidence import (
 # Canonical money path is marketplace.contract_net — see
 # docs/architecture/CANONICAL_PATHS.md §1.
 from sincor2.contract_net import calculate_bid_score, payout_broadcast_status, stage_payout
+from sincor2.sig_canonical import require_low_s
 
 # Anti-gaming guards for the AXM Activity Engine loop (Stream B):
 # self-bid rejection, participation rate limits, and anti-collusion
@@ -284,8 +285,6 @@ _recover_dispute_signer = _recover_eip191
 # deposit event (stake_ledger.signature_hash) and rejected on replay, so
 # each authorization credits stake exactly once inside the expiry window.
 STAKE_DEPOSIT_MAX_SKEW_MS = DISPUTE_MAX_SKEW_MS  # 15 minutes
-
-_DEPOSIT_LOCK = threading.Lock()
 
 
 def stake_deposit_message(agent_id: str, amount_wei: int,
@@ -2687,16 +2686,26 @@ def attach_market_routes(bp: Blueprint) -> None:
                 # Deliberately opaque: do not reveal which check failed.
                 raise PermissionError(
                     "deposit not authorized by the registered wallet")
+            # W-40: normalize the signature to canonical bytes BEFORE
+            # hashing. eth_account recovery accepts the same 65 signature
+            # bytes in many encodings (lower/UPPER hex, with/without the
+            # 0x prefix), and hashing the raw caller-supplied string let
+            # one signing operation credit stake N times. require_low_s
+            # parses every encoding eth_account accepts, enforces low-s,
+            # and returns the single canonical 65 bytes. It already ran
+            # inside _recover_eip191 above, so this cannot raise here.
             sig_hash = hashlib.sha256(
-                signature.encode("utf-8")).hexdigest()
+                require_low_s(signature)).hexdigest()
             from sincor2.onchain.stake_ledger import stake_ledger
             ledger = stake_ledger()
-            with _DEPOSIT_LOCK:
-                if ledger.signature_hash_used(sig_hash):
-                    raise PermissionError("deposit signature already used")
-                summary = ledger.deposit(
-                    agent_id, amount_wei, reference=tx_hash,
-                    signature_hash=sig_hash)
+            # W-41: the single-use check-and-record is atomic inside
+            # ledger.deposit() (instance lock + POSIX exclusive file
+            # lock, after a fresh reload). The old route-level pre-check
+            # raced across worker processes (in-memory scan under a
+            # process-local lock), so it is gone: the ledger owns it.
+            summary = ledger.deposit(
+                agent_id, amount_wei, reference=tx_hash,
+                signature_hash=sig_hash)
             result = dict(summary)
             result["deposit_wei"] = summary["credited_wei"]
             result["tx_hash"] = tx_hash
