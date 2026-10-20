@@ -12,6 +12,10 @@ Only ADDED lines (``git diff --cached``) are inspected — pre-existing
 copy never blocks a commit. Rendered prose is extracted the same way
 src/sincor2/claim_scan.py does (tags/scripts/comments stripped), so the
 word "audit" in code never triggers — only customer-visible copy counts.
+``<meta>`` tag ``content`` attributes (description, og:description,
+twitter:description, ...) are scanned as customer-visible copy too:
+search engines and social cards render them, so a banned claim hidden
+in a meta description blocks the same as one in the body.
 
 Scan paths: README.md, templates/**/*.html (repo-relative).
 Exempt by path (never scanned): data/, docs/, tests/, anything under
@@ -168,6 +172,31 @@ def prose_of_line(raw, path):
     return ""
 
 
+_META_CONTENT_RES = (
+    re.compile(r'<meta\b[^>]*\bcontent\s*=\s*"([^"]*)"', re.I),
+    re.compile(r"<meta\b[^>]*\bcontent\s*=\s*'([^']*)'", re.I),
+)
+
+
+def meta_prose_of_line(raw):
+    """Yield ``content``-attribute values of <meta> tags on a raw line."""
+    for rx in _META_CONTENT_RES:
+        for m in rx.finditer(raw):
+            val = m.group(1).strip()
+            if val:
+                yield val
+
+
+def snippets_of_raw(raw, path):
+    """All scannable text on a raw line: visible prose + <meta> contents."""
+    out = []
+    prose = prose_of_line(raw, path)
+    if prose:
+        out.append(prose)
+    out.extend(meta_prose_of_line(raw))
+    return out
+
+
 def prose_lines(text, path):
     """Yield (lineno, prose) using the repo's own extraction when available."""
     try:
@@ -219,21 +248,21 @@ def main():
             # Phrases already present in the hunk's removed lines are
             # pre-existing copy, not introduced by this commit.
             removed_norm = " ".join(
-                normalize(prose_of_line(r, path)) for r in removed_raw
+                normalize(s)
+                for r in removed_raw
+                for s in snippets_of_raw(r, path)
             )
             for lineno, raw in added:
-                prose = prose_of_line(raw, path)
-                if not prose:
-                    continue
-                norm = normalize(prose)
-                for name, rx in patterns:
-                    if not rx.search(norm):
-                        continue
-                    if rx.search(removed_norm):
-                        continue  # pre-existing in this hunk, not introduced
-                    if covered_by_register(register_idx, path, name):
-                        continue  # substantiated disclaimer/policy/roadmap
-                    violations.append((path, lineno, name, prose[:160]))
+                for prose in snippets_of_raw(raw, path):
+                    norm = normalize(prose)
+                    for name, rx in patterns:
+                        if not rx.search(norm):
+                            continue
+                        if rx.search(removed_norm):
+                            continue  # pre-existing in this hunk, not introduced
+                        if covered_by_register(register_idx, path, name):
+                            continue  # substantiated disclaimer/policy/roadmap
+                        violations.append((path, lineno, name, prose[:160]))
 
     if violations:
         print("BLOCKED: staged changes introduce a blocklisted marketing claim:")

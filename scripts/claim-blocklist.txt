@@ -24,10 +24,13 @@
 #
 # SCOPE: the scanner only inspects rendered prose of staged public-copy
 # files (HTML tags, <script>/<style> bodies and comments are stripped),
-# so the word "audit" in code comments or docs never triggers — only
-# customer-visible copy counts. Compliance artifacts are exempt by path:
-# data/ (claim_register.json), docs/, tests/ (fixtures may contain the
-# words), and anything under your_files/ or hidden_files/.
+# PLUS <meta> tag content attributes (name="description", og:description,
+# twitter:description, ...) — search engines and social cards render them,
+# so a banned claim in a meta description blocks the same as one in the
+# body. Only customer-visible copy counts: the word "audit" in code
+# comments or docs never triggers. Compliance artifacts are exempt by
+# path: data/ (claim_register.json), docs/, tests/ (fixtures may contain
+# the words), and anything under your_files/ or hidden_files/.
 #
 # ADDING A RULE: add one "name: regex" line below with a trailing
 # "  # reason" comment naming the claim class. Keep patterns narrow:
