@@ -2956,8 +2956,19 @@ _AUTH_BID_DOMAIN_FMT = "SINCOR-A2A-MARKET bid-{purpose}"  # commit | reveal
 _AUTH_MAX_SKEW_S = 600      # signature freshness window, seconds
 _AUTH_REPLAY_MAX = 8192     # bounded replay cache (per-process)
 
-_auth_seen: Dict[str, float] = {}  # sha256(message + signature).hex -> expiry epoch
+# Sentinel replay-digest for the (unreachable) _auth_digest ValueError path.
+# It is not valid hex, so no genuine sha256 digest can ever collide with it.
+_AUTH_DIGEST_MALFORMED = "auth-digest:malformed-signature"
+
+_auth_seen: Dict[str, float] = {}  # sha256(message + canonical sig bytes).hex -> expiry epoch
 _auth_lock = threading.Lock()
+
+# Poison the sentinel: a require_low_s failure inside _auth_digest maps here,
+# so _auth_replay_seen() reports it as already consumed and the caller gets
+# the existing "Signature already used (replay rejected)." payload —
+# fail closed, no 500, no new error oracle. float("inf") expiry keeps the
+# periodic eviction from ever clearing it.
+_auth_seen[_AUTH_DIGEST_MALFORMED] = float("inf")
 
 
 def _auth_create_message(agent_label: str, skill_id: str, timestamp: int,
@@ -3016,8 +3027,28 @@ def _canonical_signature_hex(signature: str) -> str:
 
 
 def _auth_digest(message: str, signature: str) -> str:
-    """Replay-cache key: canonical message + canonical signature bytes."""
-    return hashlib.sha256((message + _canonical_signature_hex(signature)).encode()).hexdigest()
+    """Replay-cache key: canonical message + canonical signature bytes.
+
+    Digests the 65 canonical bytes returned by ``require_low_s`` (low-s
+    enforced, v normalized 0->27 / 1->28), so every re-encoding of the same
+    signing operation — v 27<->0 / 28<->1 flips, hex case, 0x prefix,
+    surrounding whitespace — hashes to one canonical key. ``message`` stays
+    in the digest to bind the signature to the specific signed message.
+
+    ``require_low_s`` raising ValueError here is unreachable: every call
+    site runs ``_recover_eip191_signer`` (which applies the same guard) on
+    the same signature first and bails on failure. Fail closed anyway: the
+    malformed input maps to the pre-poisoned ``_AUTH_DIGEST_MALFORMED``
+    sentinel, which the replay guard rejects with the existing
+    "Signature already used (replay rejected)." payload — no 500, no new
+    error oracle.
+    """
+    from sincor2.sig_canonical import require_low_s
+    try:
+        raw = require_low_s(signature)
+    except ValueError:
+        return _AUTH_DIGEST_MALFORMED
+    return hashlib.sha256(message.encode() + raw).hexdigest()
 
 
 def _recover_eip191_signer(message: str, signature: str) -> Optional[str]:
@@ -3078,7 +3109,11 @@ def _auth_replay_seen(digest: str) -> bool:
             for key in [k for k, exp in _auth_seen.items() if exp <= now]:
                 _auth_seen.pop(key, None)
             while len(_auth_seen) > _AUTH_REPLAY_MAX:
-                _auth_seen.pop(next(iter(_auth_seen)), None)
+                # Never evict the malformed-signature sentinel: it must stay
+                # consumed so the fail-closed path in _auth_digest keeps
+                # rejecting with the existing replay payload.
+                victim = next(k for k in _auth_seen if k != _AUTH_DIGEST_MALFORMED)
+                _auth_seen.pop(victim, None)
         if digest in _auth_seen:
             return True
         _auth_seen[digest] = now + _AUTH_MAX_SKEW_S
