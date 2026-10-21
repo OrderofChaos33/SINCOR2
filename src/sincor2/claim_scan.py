@@ -9,7 +9,10 @@ blocking test can never disagree about what was found.
 Design notes:
   * Only *rendered prose* is scanned: <script>/<style> bodies, HTML
     comments, tags, and CSS are excluded, because claims must be
-    customer-visible to count.
+    customer-visible to count. Comment bodies stay excluded, but inline
+    comments are stripped to the empty string (not a space) so a banned
+    phrase split by a comment ("zer<!-- -->o risk") matches exactly as
+    the browser renders it ("zero risk").
   * Normalization is adversarial: NFKC, case-folded, separator
     canonicalization (dashes, slashes, zero-width chars -> space), and
     digit-grouping commas removed, so "24/7", "24-7", "24 7", "24⁄7"
@@ -93,7 +96,10 @@ def html_prose_lines(text: str) -> Iterator[Tuple[int, str]]:
                 continue
             line = line[end + 3:]
             in_skip = None
-        # strip inline comments
+        # strip inline comments to "": browsers drop comments entirely, so
+        # prose on either side renders joined ("zer<!-- -->o risk" reads
+        # "zero risk"). Replacing with a space would let comment-split
+        # banned phrases evade matching (red-team #496 bypass 2).
         while "<!--" in line:
             start = line.find("<!--")
             end = line.find("-->", start)
@@ -101,7 +107,7 @@ def html_prose_lines(text: str) -> Iterator[Tuple[int, str]]:
                 line = line[:start]
                 in_skip = "comment"
                 break
-            line = line[:start] + " " + line[end + 3:]
+            line = line[:start] + line[end + 3:]
         if in_skip in ("script", "style"):
             low = line.lower()
             close = f"</{in_skip}"
