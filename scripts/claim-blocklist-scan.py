@@ -10,8 +10,12 @@ truth; disclaimed or policy-backed language does not block).
 
 Only ADDED lines (``git diff --cached``) are inspected — pre-existing
 copy never blocks a commit. Rendered prose is extracted the same way
-src/sincor2/claim_scan.py does (tags/scripts/comments stripped), so the
-word "audit" in code never triggers — only customer-visible copy counts.
+src/sincor2/claim_scan.py does (tags/scripts/comments stripped; inline
+comments strip to "", so comment-split words scan as the browser renders
+them), so the word "audit" in code never triggers — only customer-visible
+copy counts. Each hunk is scanned per-line AND as joined added-lines text
+(space-joined and glue-joined), so a banned phrase split across source
+lines still blocks.
 ``<meta>`` tag ``content`` attributes (description, og:description,
 twitter:description, ...) are scanned as customer-visible copy too:
 search engines and social cards render them, so a banned claim hidden
@@ -197,6 +201,23 @@ def snippets_of_raw(raw, path):
     return out
 
 
+def joined_norms(added, path):
+    """Normalized joined text of a hunk's added lines, two ways.
+
+    The per-line scan misses banned phrases broken across source lines
+    (browsers collapse the newline, visitors read the claim — red-team
+    #496 bypass 1). So every hunk is also scanned as:
+      * space-joined: catches inter-word splits ("zero\\nrisk" -> "zero risk");
+      * glue-joined (no separator): catches mid-word splits
+        ("guaran\\nteed" -> "guaranteed").
+    Returns None when the hunk has no scannable added text.
+    """
+    snippets = [s for _, raw in added for s in snippets_of_raw(raw, path)]
+    if not snippets:
+        return None
+    return normalize(" ".join(snippets)), normalize("".join(snippets))
+
+
 def prose_lines(text, path):
     """Yield (lineno, prose) using the repo's own extraction when available."""
     try:
@@ -252,6 +273,7 @@ def main():
                 for r in removed_raw
                 for s in snippets_of_raw(r, path)
             )
+            flagged = set()  # pattern names already reported in this hunk
             for lineno, raw in added:
                 for prose in snippets_of_raw(raw, path):
                     norm = normalize(prose)
@@ -263,6 +285,28 @@ def main():
                         if covered_by_register(register_idx, path, name):
                             continue  # substantiated disclaimer/policy/roadmap
                         violations.append((path, lineno, name, prose[:160]))
+                        flagged.add(name)
+            # Joined pass: catch banned phrases split across added lines
+            # (red-team #496 bypass 1). Report at the hunk's first added
+            # line; skip names the per-line pass already flagged to avoid
+            # duplicate reports.
+            joined = joined_norms(added, path)
+            if joined:
+                report_lineno = added[0][0] if added else _new_start
+                for joined_norm in joined:
+                    for name, rx in patterns:
+                        if name in flagged:
+                            continue
+                        if not rx.search(joined_norm):
+                            continue
+                        if rx.search(removed_norm):
+                            continue  # pre-existing in this hunk, not introduced
+                        if covered_by_register(register_idx, path, name):
+                            continue  # substantiated disclaimer/policy/roadmap
+                        violations.append(
+                            (path, report_lineno, name,
+                             f"[cross-line] {joined_norm[:150]}"))
+                        flagged.add(name)
 
     if violations:
         print("BLOCKED: staged changes introduce a blocklisted marketing claim:")
