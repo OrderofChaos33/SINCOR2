@@ -1,0 +1,406 @@
+"""Swarm Command MCP server (Streamable HTTP, stdlib only).
+
+Speaks JSON-RPC 2.0 over HTTP POST at ``/mcp`` — the transport Manus 2.0
+custom MCP servers and Gemini Spark custom apps consume. Bearer-token
+auth on every ``POST /mcp``; fail-closed 503 when no token is configured.
+
+Never touches money paths, auth systems, ledgers, or production.
+
+Configuration:
+    SWARM_MCP_BEARER_TOKEN   required; if unset/empty the server refuses
+                             every /mcp POST with 503 (never open)
+    SWARM_BOARD_PATH         board JSON file (default data/swarm_board.json)
+    SWARM_MCP_PORT           local dev port for __main__ (default 8899)
+    SWARM_MCP_CORS_ORIGINS   comma-separated; exact-match or "*"
+
+Run locally:  python -m sincor2.swarm_command_mcp
+"""
+
+from __future__ import annotations
+
+import hmac
+import json
+import os
+from typing import Any, Dict, Iterable, List, Tuple
+
+from sincor2.swarm_command_board import BoardStore, LANES
+
+SERVER_NAME = "swarm-command"
+SERVER_VERSION = "0.1.0"
+PROTOCOL_VERSION = "2025-06-18"
+
+_JSON = "application/json"
+
+# -- tool catalogue -------------------------------------------------------
+# Each entry: name -> (required args, schema, handler-name on the dispatcher)
+
+
+def _tool_defs() -> List[Dict[str, Any]]:
+    def obj(**props):
+        return {"type": "object", "properties": props}
+
+    required = lambda *names: list(names)
+
+    lane_desc = "lane name: one of " + ", ".join(LANES)
+    return [
+        {
+            "name": "board_lanes_read",
+            "description": "Read the Swarm Command board: cards grouped by lane.",
+            "inputSchema": obj(),
+        },
+        {
+            "name": "board_card_add",
+            "description": "Add a card to a lane.",
+            "inputSchema": {
+                **obj(
+                    lane={"type": "string", "description": lane_desc},
+                    title={"type": "string"},
+                    body={"type": "string"},
+                    owner={"type": "string", "description": "Founder, Muse, Manus, Gemini, or any free name"},
+                ),
+                "required": required("lane", "title", "body", "owner"),
+            },
+        },
+        {
+            "name": "board_card_move",
+            "description": "Move a card to another lane.",
+            "inputSchema": {
+                **obj(
+                    card_id={"type": "string"},
+                    to_lane={"type": "string", "description": lane_desc},
+                ),
+                "required": required("card_id", "to_lane"),
+            },
+        },
+        {
+            "name": "board_card_comment",
+            "description": "Append a comment to a card.",
+            "inputSchema": {
+                **obj(
+                    card_id={"type": "string"},
+                    author={"type": "string"},
+                    text={"type": "string"},
+                ),
+                "required": required("card_id", "author", "text"),
+            },
+        },
+        {
+            "name": "stack_propose",
+            "description": "Propose a daily work stack of items.",
+            "inputSchema": {
+                **obj(
+                    items={
+                        "type": "array",
+                        "description": "non-empty list of {title, detail, owner}",
+                    },
+                    proposed_by={"type": "string"},
+                ),
+                "required": required("items", "proposed_by"),
+            },
+        },
+        {
+            "name": "stack_approve",
+            "description": "Approve a proposed stack (one-shot).",
+            "inputSchema": {
+                **obj(
+                    stack_id={"type": "string"},
+                    approver={"type": "string"},
+                ),
+                "required": required("stack_id", "approver"),
+            },
+        },
+        {
+            "name": "dispatch_assign",
+            "description": "Dispatch an approved stack: one assignment per item.",
+            "inputSchema": {
+                **obj(stack_id={"type": "string"}),
+                "required": required("stack_id"),
+            },
+        },
+        {
+            "name": "results_loopback",
+            "description": "Record a result on an assignment and mark it done.",
+            "inputSchema": {
+                **obj(
+                    assignment_id={"type": "string"},
+                    result={"type": "string"},
+                ),
+                "required": required("assignment_id", "result"),
+            },
+        },
+        {
+            "name": "discussion_post",
+            "description": "Post to a discussion thread.",
+            "inputSchema": {
+                **obj(
+                    topic={"type": "string"},
+                    author={"type": "string"},
+                    text={"type": "string"},
+                ),
+                "required": required("topic", "author", "text"),
+            },
+        },
+        {
+            "name": "discussion_read",
+            "description": "Read a discussion thread (all threads when topic omitted).",
+            "inputSchema": obj(topic={"type": "string"}),
+        },
+    ]
+
+
+def _store() -> BoardStore:
+    return BoardStore()
+
+
+def _dispatch_tool(name: str, args: Dict[str, Any], store: BoardStore) -> Any:
+    if name == "board_lanes_read":
+        return store.lanes_read()
+    if name == "board_card_add":
+        return store.card_add(args["lane"], args["title"], args["body"], args["owner"])
+    if name == "board_card_move":
+        return store.card_move(args["card_id"], args["to_lane"])
+    if name == "board_card_comment":
+        return store.card_comment(args["card_id"], args["author"], args["text"])
+    if name == "stack_propose":
+        return store.stack_propose(args["items"], args["proposed_by"])
+    if name == "stack_approve":
+        return store.stack_approve(args["stack_id"], args["approver"])
+    if name == "dispatch_assign":
+        return store.dispatch_assign(args["stack_id"])
+    if name == "results_loopback":
+        return store.results_loopback(args["assignment_id"], args["result"])
+    if name == "discussion_post":
+        return store.discussion_post(args["topic"], args["author"], args["text"])
+    if name == "discussion_read":
+        return store.discussion_read(args.get("topic"))
+    raise ValueError("unknown tool %r" % (name,))
+
+
+# -- HTTP plumbing --------------------------------------------------------
+
+
+def _configured_token() -> str:
+    return os.environ.get("SWARM_MCP_BEARER_TOKEN", "")
+
+
+def _cors_origins() -> List[str]:
+    raw = os.environ.get("SWARM_MCP_CORS_ORIGINS", "")
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+def _cors_origin_for(request_origin: str) -> str | None:
+    origins = _cors_origins()
+    if not origins:
+        return None
+    if "*" in origins:
+        return "*"
+    if request_origin and request_origin in origins:
+        return request_origin
+    return None
+
+
+def _json_response(status: str, payload: Any, extra: List[Tuple[str, str]] = ()):
+    body = json.dumps(payload).encode("utf-8")
+    headers = [("Content-Type", _JSON), ("Content-Length", str(len(body)))]
+    headers.extend(extra)
+    return status, headers, [body]
+
+
+def _error(id_: Any, code: int, message: str):
+    return {"jsonrpc": "2.0", "id": id_, "error": {"code": code, "message": message}}
+
+
+# -- the WSGI app ----------------------------------------------------------
+
+
+def app(environ, start_response):
+    """WSGI callable. Routes: POST /mcp, GET /healthz, OPTIONS /mcp."""
+    method = environ.get("REQUEST_METHOD", "GET").upper()
+    path = environ.get("PATH_INFO", "/") or "/"
+    request_origin = environ.get("HTTP_ORIGIN", "")
+
+    cors_headers: List[Tuple[str, str]] = []
+    matched = _cors_origin_for(request_origin)
+    if matched:
+        cors_headers.append(("Access-Control-Allow-Origin", matched))
+        cors_headers.append(("Vary", "Origin"))
+
+    if method == "OPTIONS" and path == "/mcp":
+        if matched:
+            cors_headers += [
+                ("Access-Control-Allow-Methods", "POST, OPTIONS"),
+                ("Access-Control-Allow-Headers", "Authorization, Content-Type"),
+                ("Access-Control-Max-Age", "86400"),
+            ]
+        status, headers, body = _json_response("204 No Content", {}, cors_headers)
+        start_response(status, headers)
+        return body
+
+    if method == "GET" and path == "/healthz":
+        status, headers, body = _json_response("200 OK", {"ok": True}, cors_headers)
+        start_response(status, headers)
+        return body
+
+    if not (method == "POST" and path == "/mcp"):
+        status, headers, body = _json_response("404 Not Found", {"error": "not found"}, cors_headers)
+        start_response(status, headers)
+        return body
+
+    # -- /mcp POST: content type --------------------------------------------
+    ctype = environ.get("CONTENT_TYPE", "")
+    if "application/json" not in ctype:
+        status, headers, body = _json_response(
+            "415 Unsupported Media Type",
+            {"error": "content type must be application/json"},
+            cors_headers,
+        )
+        start_response(status, headers)
+        return body
+
+    # -- /mcp POST: auth -----------------------------------------------------
+    expected = _configured_token()
+    if not expected:
+        status, headers, body = _json_response(
+            "503 Service Unavailable", {"error": "not configured"}, cors_headers
+        )
+        start_response(status, headers)
+        return body
+    auth = environ.get("HTTP_AUTHORIZATION", "")
+    scheme, _, supplied = auth.partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied, expected):
+        status, headers, body = _json_response(
+            "401 Unauthorized", {"error": "unauthorized"}, cors_headers
+        )
+        start_response(status, headers)
+        return body
+
+    # -- /mcp POST: JSON-RPC -------------------------------------------------
+    try:
+        length = int(environ.get("CONTENT_LENGTH", "") or 0)
+    except (TypeError, ValueError):
+        length = 0
+    raw = environ.get("wsgi.input").read(length) if length > 0 else b""
+    try:
+        request = json.loads(raw.decode("utf-8") if raw else "")
+    except (ValueError, UnicodeDecodeError):
+        status, headers, body = _json_response(
+            "200 OK", _error(None, -32700, "Parse error"), cors_headers
+        )
+        start_response(status, headers)
+        return body
+
+    if not isinstance(request, dict) or request.get("jsonrpc") != "2.0":
+        status, headers, body = _json_response(
+            "200 OK", _error(None, -32600, "Invalid Request"), cors_headers
+        )
+        start_response(status, headers)
+        return body
+
+    method_name = request.get("method")
+    msg_id = request.get("id")
+    params = request.get("params") or {}
+    if not isinstance(params, dict):
+        status, headers, body = _json_response(
+            "200 OK", _error(msg_id, -32602, "params must be an object"), cors_headers
+        )
+        start_response(status, headers)
+        return body
+
+    if method_name == "notifications/initialized":
+        start_response("202 Accepted", [("Content-Length", "0")] + cors_headers)
+        return [b""]
+
+    def ok(result):
+        return {"jsonrpc": "2.0", "id": msg_id, "result": result}
+
+    store = None
+
+    try:
+        if method_name == "initialize":
+            result = {
+                "protocolVersion": PROTOCOL_VERSION,
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
+            }
+            status, headers, body = _json_response("200 OK", ok(result), cors_headers)
+            start_response(status, headers)
+            return body
+
+        if method_name == "ping":
+            status, headers, body = _json_response("200 OK", ok({"pong": True}), cors_headers)
+            start_response(status, headers)
+            return body
+
+        if method_name == "tools/list":
+            status, headers, body = _json_response(
+                "200 OK", ok({"tools": _tool_defs()}), cors_headers
+            )
+            start_response(status, headers)
+            return body
+
+        if method_name == "tools/call":
+            tool_name = params.get("name")
+            args = params.get("arguments", {})
+            if not isinstance(args, dict):
+                raise _JsonRpcParamsError("arguments must be an object")
+            store = _store()
+            known = {t["name"] for t in _tool_defs()}
+            if tool_name not in known:
+                raise _JsonRpcParamsError("unknown tool %r" % (tool_name,))
+            result = _dispatch_tool(tool_name, args, store)
+            content = [{"type": "text", "text": json.dumps(result)}]
+            status, headers, body = _json_response(
+                "200 OK", ok({"content": content}), cors_headers
+            )
+            start_response(status, headers)
+            return body
+
+        # unknown method
+        status, headers, body = _json_response(
+            "200 OK", _error(msg_id, -32601, "Method not found: %r" % (method_name,)), cors_headers
+        )
+        start_response(status, headers)
+        return body
+
+    except _JsonRpcParamsError as e:
+        status, headers, body = _json_response(
+            "200 OK", _error(msg_id, -32602, str(e)), cors_headers
+        )
+        start_response(status, headers)
+        return body
+    except ValueError as e:
+        # BoardStore validation / missing required args
+        status, headers, body = _json_response(
+            "200 OK", _error(msg_id, -32602, str(e)), cors_headers
+        )
+        start_response(status, headers)
+        return body
+    except KeyError as e:
+        status, headers, body = _json_response(
+            "200 OK", _error(msg_id, -32602, "missing required argument %s" % (e,)), cors_headers
+        )
+        start_response(status, headers)
+        return body
+    except Exception as e:  # never leak tracebacks; code error, not client error
+        status, headers, body = _json_response(
+            "200 OK", _error(msg_id, -32603, "Internal error"), cors_headers
+        )
+        start_response(status, headers)
+        return body
+
+
+class _JsonRpcParamsError(ValueError):
+    """Invalid params / unknown tool: maps to -32602."""
+
+
+def _main() -> None:
+    from wsgiref.simple_server import make_server
+
+    port = int(os.environ.get("SWARM_MCP_PORT", "8899"))
+    httpd = make_server("127.0.0.1", port, app)
+    print("swarm-command MCP on http://127.0.0.1:%d" % port, flush=True)
+    httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    _main()
