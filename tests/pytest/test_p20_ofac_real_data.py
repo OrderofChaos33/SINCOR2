@@ -25,7 +25,7 @@ from sincor2.defi.ofac_sdn import (
     snapshot_path,
 )
 
-# Entries verified present in the vendored snapshot (OFAC SDN, pub 10/15/2026).
+# Entries verified present in the vendored snapshot (OFAC SDN, pub 10/21/2026).
 KNOWN_EVM_ADDR = "0x252a8bd2319d8a555b872990601221b3a2053bce"  # MESRI, Behzad
 KNOWN_TRX_ADDR = "TNiq9AXBp9EjUqhDhrwrfvAA8U3GUQZH81"  # BANK MARKAZI (uid 4632)
 KNOWN_NAME = "BANK MARKAZI JOMHOURI ISLAMI IRAN"
@@ -54,7 +54,7 @@ def test_snapshot_loads_with_provenance():
     assert snap["source"] == "OFAC SDN List"
     assert snap["source_url"] == \
         "https://www.treasury.gov/ofac/downloads/sdn.xml"
-    assert snap["publication_date"] == "10/15/2026"
+    assert snap["publication_date"] == "10/21/2026"
     assert snap["entry_count"] == len(snap["entries"]) >= 15000
     assert snap["fetched_at"]  # ISO timestamp present
 
@@ -123,7 +123,7 @@ def test_clean_name_and_address_pass(oracle):
 
 def test_oracle_carries_provenance_not_reference_only(oracle):
     assert oracle.reference_only is False
-    assert oracle.ofac_publication_date == "10/15/2026"
+    assert oracle.ofac_publication_date == "10/21/2026"
     assert oracle.ofac_entry_count >= 15000
     assert oracle.ofac_screening_addresses >= 1000
 
@@ -165,7 +165,7 @@ def _patch_fetch(monkeypatch, payload: bytes):
 
 
 def test_updater_idempotent_on_same_publication_date(workdir, monkeypatch):
-    _patch_fetch(monkeypatch, _fake_sdn_xml("10/15/2026"))
+    _patch_fetch(monkeypatch, _fake_sdn_xml("10/21/2026"))
     before = os.path.getmtime(workdir)
     result = ofac_sdn_updater.update_snapshot(out_path=workdir)
     assert result["status"] == "unchanged"
@@ -177,7 +177,7 @@ def test_updater_installs_new_publication(workdir, monkeypatch):
     result = ofac_sdn_updater.update_snapshot(out_path=workdir)
     assert result["status"] == "updated"
     assert result["publication_date"] == "10/16/2026"
-    assert result["previous_publication_date"] == "10/15/2026"
+    assert result["previous_publication_date"] == "10/21/2026"
     assert load_snapshot(workdir)["publication_date"] == "10/16/2026"
 
 
