@@ -356,24 +356,71 @@ def x402_challenge(resource_id):
     """HTTP 402 Payment Required — token micropayment challenge."""
     if not X402_AVAILABLE:
         return jsonify({'error': 'x402_unavailable'}), 503
-    from sincor2.x402_payments import access_granted, create_challenge
+    from sincor2.x402_payments import (
+        access_granted, challenge_bind_message, create_challenge)
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
     # Informational status check: must not burn the single-use token.
     # The actual serve path (x402_paid_resource below) consumes it.
     if access_granted(token, resource_id, consume=False):
         return jsonify({'ok': True, 'resource_id': resource_id, 'access': 'granted'}), 200
     wallet = validate_wallet(request.args.get('wallet', ''))
-    # W-102 round 2: payer_wallet is mandatory at challenge creation. A
-    # challenge with no recorded payer is a bearer instrument — anyone
-    # observing a confirmed treasury transfer could claim the victim's
-    # tx_hash under it (first-claim-wins), even while truthfully naming the
-    # victim's wallet. Fail fast here instead of issuing a challenge that
-    # can never be redeemed at /api/x402/verify.
+    # W-102 round 3: a bare address string is no longer a capability.
+    # create_challenge mints an UNBOUND draft only; the payer must prove
+    # wallet ownership by signing the bind message (EIP-191 personal_sign
+    # over challenge_id | resource_id | payer_wallet) and POSTing it to
+    # /api/x402/challenge-bind. The draft can never be fulfilled before
+    # that (verify rejects unbound challenges as challenge_unbound).
     if not wallet:
         return jsonify({'ok': False, 'error': 'payer_wallet_required',
                         'note': 'Pass ?wallet=<your 0x address> to receive a payable challenge.'}), 400
-    challenge = create_challenge(resource_id, payer_wallet=wallet)
+    challenge = create_challenge(resource_id)
+    if challenge.get('challenge_id'):
+        challenge['sign_message'] = challenge_bind_message(
+            challenge['challenge_id'], resource_id, wallet)
+        challenge['payer_wallet_hint'] = wallet
     return jsonify(challenge), 402
+
+
+@bp.route('/api/x402/challenge-bind', methods=['POST'])
+@limiter.limit("120 per hour")
+def x402_challenge_bind():
+    """Bind a payer wallet to a challenge draft after ownership proof.
+
+    Body: {challenge_id, payer_wallet, signature} where signature is an
+    EIP-191 personal_sign by payer_wallet over
+    SINCOR-X402-CHALLENGE-BIND|<challenge_id>|<resource_id>|<payer_wallet>.
+    Without the wallet's private key the binding cannot be created — this
+    is what stops the W-102 round-3 front-run (an attacker could mint a
+    challenge naming the victim's wallet and claim the victim's payment
+    under it, because the binding was a bare unverified string).
+    """
+    if not X402_AVAILABLE:
+        return jsonify({'error': 'x402_unavailable'}), 503
+    from sincor2.x402_payments import bind_challenge_payer
+    data = request.get_json(silent=True) or {}
+    payer_wallet = validate_wallet(data.get('payer_wallet', ''))
+    if not payer_wallet:
+        return jsonify({'ok': False, 'error': 'payer_wallet_required'}), 400
+    challenge_id = sanitize_string(data.get('challenge_id', ''), max_length=64)
+    if not challenge_id:
+        return jsonify({'ok': False, 'error': 'challenge_id_required'}), 400
+    signature = data.get('signature', '')
+    if not signature:
+        return jsonify({'ok': False, 'error': 'ownership_signature_required'}), 400
+    result = bind_challenge_payer(challenge_id, payer_wallet, signature)
+    if result.get('error') == 'payment_required':
+        return jsonify(result), 402
+    status = {
+        'challenge_not_found': 404,
+        'challenge_expired': 410,
+        'challenge_already_bound': 409,
+        'ownership_proof_failed': 403,
+        'ownership_signature_required': 400,
+        'payer_wallet_required': 400,
+        'challenge_id_required': 400,
+        'unknown_resource': 404,
+    }.get(result.get('error'), 400)
+    return jsonify(result), status
 
 
 @bp.route('/api/x402/verify', methods=['POST'])
@@ -418,11 +465,12 @@ def x402_paid_resource(resource_id):
     from sincor2.x402_payments import access_granted, execute_paid_resource
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
     if not access_granted(token, resource_id):
-        from sincor2.x402_payments import create_challenge
-        # W-102 round 2: bind the challenge at creation — a blank-recorded
-        # challenge is a bearer instrument and is unredeemable at
-        # /api/x402/verify (see x402_challenge). Accept the wallet from the
-        # query string or the JSON body; refuse to issue an unbound challenge.
+        from sincor2.x402_payments import challenge_bind_message, create_challenge
+        # W-102 round 3: mint an unbound draft; the payer proves wallet
+        # ownership by signing the bind message and POSTing it to
+        # /api/x402/challenge-bind (see x402_challenge). Accept the wallet
+        # from the query string or the JSON body to build the exact
+        # sign_message; refuse to issue a draft with no wallet hint.
         body = request.get_json(silent=True) or {}
         wallet = validate_wallet(
             request.args.get('wallet', '')
@@ -431,7 +479,11 @@ def x402_paid_resource(resource_id):
         if not wallet:
             return jsonify({'ok': False, 'error': 'payer_wallet_required',
                             'note': 'Pass ?wallet=<your 0x address> (or payer_wallet in the JSON body) to receive a payable challenge.'}), 400
-        ch = create_challenge(resource_id, payer_wallet=wallet)
+        ch = create_challenge(resource_id)
+        if ch.get('challenge_id'):
+            ch['sign_message'] = challenge_bind_message(
+                ch['challenge_id'], resource_id, wallet)
+            ch['payer_wallet_hint'] = wallet
         return jsonify(ch), 402
     if resource_id == 'hook_status':
         try:

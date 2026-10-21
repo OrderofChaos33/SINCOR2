@@ -100,7 +100,10 @@ def _pad(addr: str) -> str:
 
 def _fulfill(resource_id: str = "agent_task", tx_hash: str | None = None,
              payer_wallet: str = "") -> dict:
-    ch = x402.create_challenge(resource_id, payer_wallet=payer_wallet)
+    # W-102 round 3: create_challenge mints an unbound draft; the pinned
+    # blank-blank helper flow (on-chain-only binding at verify) is
+    # preserved for these audit tests.
+    ch = x402.create_challenge(resource_id)
     assert ch["ok"] is False and ch["http_status"] == 402, ch  # challenge shape
     return x402.verify_challenge(
         ch["challenge_id"], tx_hash or _real_hash(), payer_wallet=payer_wallet)
