@@ -3246,6 +3246,344 @@
         "note": "fork_sim not applicable: NFT collection / floor-oracle contracts not pinned in the repo. Blocked until oracle + collection addresses are pinned.",
         "branch": "xioix/buildout-57-defi-forksim-record"
       }
+    },
+    {
+      "entry_id": "ev_35a0f6d5c8ba",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "note",
+      "timestamp": 1792447034.7930083,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion test -> audit (bossup wave4 defi-promo)",
+        "from_stage": "test",
+        "to_stage": "audit",
+        "gate": "test->audit",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "invariant_test": "ev_92a361a13585",
+          "fork_sim": "ev_ca355ae68495"
+        },
+        "invariant_tests_reverified_on_worktree": true,
+        "fork_sim_verified_real_run": true,
+        "not_a_third_party_audit": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_58175f24d174",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "note",
+      "timestamp": 1792447034.8364913,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion audit -> product (bossup wave4 defi-promo)",
+        "from_stage": "audit",
+        "to_stage": "product",
+        "gate": "audit->product",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "audit_report": "ev_501e58c685c6",
+          "open_critical": 0,
+          "live_blocked": false
+        },
+        "not_a_third_party_audit": true,
+        "internal_review_only": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_c42fd9afd64d",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "note",
+      "timestamp": 1792447034.8815377,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion test -> audit (bossup wave4 defi-promo)",
+        "from_stage": "test",
+        "to_stage": "audit",
+        "gate": "test->audit",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "invariant_test": "ev_5999d785a84e",
+          "fork_sim": "ev_80cd38582c82"
+        },
+        "invariant_tests_reverified_on_worktree": true,
+        "fork_sim_verified_real_run": true,
+        "not_a_third_party_audit": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_2ca6a57931dc",
+      "sku": "SINCOR-DEFI-P15-LEND",
+      "kind": "note",
+      "timestamp": 1792447034.9300277,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion audit -> product (bossup wave4 defi-promo)",
+        "from_stage": "audit",
+        "to_stage": "product",
+        "gate": "audit->product",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "audit_report": "ev_669ed4d28045",
+          "open_critical": 0,
+          "live_blocked": false
+        },
+        "not_a_third_party_audit": true,
+        "internal_review_only": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_df2862e63e5f",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "note",
+      "timestamp": 1792447034.9517384,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion test -> audit (bossup wave4 defi-promo)",
+        "from_stage": "test",
+        "to_stage": "audit",
+        "gate": "test->audit",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "invariant_test": "ev_e6d2ffdf8fa3",
+          "fork_sim": "ev_ffc35113cf84"
+        },
+        "invariant_tests_reverified_on_worktree": true,
+        "fork_sim_verified_real_run": true,
+        "not_a_third_party_audit": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_f023a0c3d7fe",
+      "sku": "SINCOR-DEFI-P21-TREASURY",
+      "kind": "note",
+      "timestamp": 1792447034.9732478,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion audit -> product (bossup wave4 defi-promo)",
+        "from_stage": "audit",
+        "to_stage": "product",
+        "gate": "audit->product",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "audit_report": "ev_ef6fc29c76fa",
+          "open_critical": 0,
+          "live_blocked": false
+        },
+        "not_a_third_party_audit": true,
+        "internal_review_only": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_b645bf13a960",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "note",
+      "timestamp": 1792447035.0035064,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion test -> audit (bossup wave4 defi-promo)",
+        "from_stage": "test",
+        "to_stage": "audit",
+        "gate": "test->audit",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "invariant_test": "ev_3a96964a1d65",
+          "fork_sim": "ev_dc10717015c3"
+        },
+        "invariant_tests_reverified_on_worktree": true,
+        "fork_sim_verified_real_run": true,
+        "not_a_third_party_audit": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_b827194cda4c",
+      "sku": "SINCOR-DEFI-P22-STABLEYIELD",
+      "kind": "note",
+      "timestamp": 1792447035.0332828,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion audit -> product (bossup wave4 defi-promo)",
+        "from_stage": "audit",
+        "to_stage": "product",
+        "gate": "audit->product",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "audit_report": "ev_db5337afe7b8",
+          "open_critical": 0,
+          "live_blocked": false
+        },
+        "not_a_third_party_audit": true,
+        "internal_review_only": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_8f738db44f57",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "note",
+      "timestamp": 1792447035.0804262,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion test -> audit (bossup wave4 defi-promo)",
+        "from_stage": "test",
+        "to_stage": "audit",
+        "gate": "test->audit",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "invariant_test": "ev_649681686cae",
+          "fork_sim": "ev_0b982f3a6554"
+        },
+        "invariant_tests_reverified_on_worktree": true,
+        "fork_sim_verified_real_run": true,
+        "not_a_third_party_audit": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_f8695a5f1b36",
+      "sku": "SINCOR-DEFI-P25-PORTFOLIO",
+      "kind": "note",
+      "timestamp": 1792447035.109956,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion audit -> product (bossup wave4 defi-promo)",
+        "from_stage": "audit",
+        "to_stage": "product",
+        "gate": "audit->product",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "audit_report": "ev_09b4baa6bc92",
+          "open_critical": 0,
+          "live_blocked": false
+        },
+        "not_a_third_party_audit": true,
+        "internal_review_only": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_b85ed68d16ab",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "note",
+      "timestamp": 1792447035.1323593,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion test -> audit (bossup wave4 defi-promo)",
+        "from_stage": "test",
+        "to_stage": "audit",
+        "gate": "test->audit",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "invariant_test": "ev_aa6d167668d0",
+          "fork_sim": "ev_abf2c49e3440"
+        },
+        "invariant_tests_reverified_on_worktree": true,
+        "fork_sim_verified_real_run": true,
+        "not_a_third_party_audit": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_2005b50e5354",
+      "sku": "SINCOR-DEFI-P26-DEFIOS",
+      "kind": "note",
+      "timestamp": 1792447035.1745641,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "stage promotion audit -> product (bossup wave4 defi-promo)",
+        "from_stage": "audit",
+        "to_stage": "product",
+        "gate": "audit->product",
+        "promoted_at": "2026-10-19T21:57:14.782264+00:00",
+        "base_commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+        "evidence": {
+          "audit_report": "ev_521d8811cf00",
+          "open_critical": 0,
+          "live_blocked": false
+        },
+        "not_a_third_party_audit": true,
+        "internal_review_only": true,
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_b11d052cef1e",
+      "sku": "SINCOR-DEFI-P01-VAULT",
+      "kind": "note",
+      "timestamp": 1792447035.2054565,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "SKU key migration: stale ledger entries under 'SINCOR-DEFI-P01-YIELD' are status=superseded (they do not count toward any gate); canonical key is 'SINCOR-DEFI-P01-VAULT'. Migration recorded 2026-10-19, wave4.",
+        "migration": {
+          "from": "SINCOR-DEFI-P01-YIELD",
+          "to": "SINCOR-DEFI-P01-VAULT"
+        },
+        "stale_entry_ids": [
+          "ev_11b1b596f771",
+          "ev_56a90bcd033a"
+        ],
+        "stale_entry_statuses": {
+          "ev_11b1b596f771": "superseded",
+          "ev_56a90bcd033a": null
+        },
+        "recorded_by": "wave4-builder"
+      }
+    },
+    {
+      "entry_id": "ev_ce465a41a1d7",
+      "sku": "SINCOR-DEFI-P05-MUTUAL",
+      "kind": "note",
+      "timestamp": 1792447035.2378578,
+      "commit": "d5557c9282cfeecdd941407b544ae4f23829224b",
+      "recorded_by": "wave4-builder",
+      "details": {
+        "note": "SKU key migration: stale ledger entries under 'SINCOR-DEFI-P05-INSURANCE' are status=superseded (they do not count toward any gate); canonical key is 'SINCOR-DEFI-P05-MUTUAL'. Migration recorded 2026-10-19, wave4.",
+        "migration": {
+          "from": "SINCOR-DEFI-P05-INSURANCE",
+          "to": "SINCOR-DEFI-P05-MUTUAL"
+        },
+        "stale_entry_ids": [
+          "ev_e27e4f64ef46",
+          "ev_0adf75900649",
+          "ev_7d0e2500be32"
+        ],
+        "stale_entry_statuses": {
+          "ev_e27e4f64ef46": "superseded",
+          "ev_0adf75900649": "superseded",
+          "ev_7d0e2500be32": null
+        },
+        "recorded_by": "wave4-builder"
+      }
     }
   ]
 }
