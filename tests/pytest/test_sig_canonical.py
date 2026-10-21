@@ -157,3 +157,65 @@ def test_site5_quota_signer_rejects_twin():
     assert _recover_quota_signer("quota-test", sig.hex()) == addr
     with pytest.raises(ValueError, match="bad signature"):
         _recover_quota_signer("quota-test", _malleate(sig).hex())
+
+
+# --- Round 2: v-byte normalization (W-40 v-bypass) -------------------------------
+#
+# eth_account accepts v in {0, 1, 27, 28} with 0==27 and 1==28 recovering
+# to the same signer. require_low_s must map 0->27 and 1->28 so the
+# returned bytes are the single canonical 65 bytes per signing operation
+# (replay hashes key on them), and reject every other v value.
+
+
+def _with_v(sig: bytes, v: int) -> bytes:
+    return sig[:64] + bytes([v])
+
+
+def test_v0_normalized_to_27(sig_pair):
+    out = require_low_s(_with_v(sig_pair["original"], 0))
+    assert out == sig_pair["original"][:64] + b"\x1b"
+    assert out[64] == 27
+
+
+def test_v1_normalized_to_28(sig_pair):
+    out = require_low_s(_with_v(sig_pair["original"], 1))
+    assert out == sig_pair["original"][:64] + b"\x1c"
+    assert out[64] == 28
+
+
+def test_v27_v28_passthrough(sig_pair):
+    raw = sig_pair["original"]
+    assert raw[64] in (27, 28)
+    assert require_low_s(raw) == raw
+
+
+@pytest.mark.parametrize("v", [2, 3, 26, 29, 30, 127, 255])
+def test_reject_invalid_v(sig_pair, v):
+    with pytest.raises(ValueError):
+        require_low_s(_with_v(sig_pair["original"], v))
+
+
+def test_high_s_still_rejected_with_v0(sig_pair):
+    # v normalization must not weaken low-s enforcement: the twin is
+    # high-s with a now-valid v, and must still raise on the s value.
+    with pytest.raises(ValueError, match="non-canonical high-s"):
+        require_low_s(_with_v(sig_pair["twin"], 0))
+
+
+def test_v_variants_recover_same_signer(sig_pair):
+    """0==27 / 1==28 recover to the identical signer (parity-preserving
+    flip only): only the byte representation changes, which is exactly
+    what replay hashes key on -- so normalization is safe for every
+    recovery site."""
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    msg = encode_defunct(text=sig_pair["message"])
+    native = sig_pair["original"]
+    # Parity-preserving flip: 27->0, 28->1. (The opposite parity, like
+    # the s-twin's v^1 flip, recovers a DIFFERENT address, as expected.)
+    flipped_v = 0 if native[64] == 27 else 1
+    variant = _with_v(native, flipped_v)
+    assert Account.recover_message(msg, signature=variant) == sig_pair["address"]
+    assert Account.recover_message(
+        msg, signature=require_low_s(variant)) == sig_pair["address"]

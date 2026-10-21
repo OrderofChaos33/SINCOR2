@@ -396,8 +396,12 @@ class StakeLedger:
 
         ``signature_hash`` is an optional hex digest identifying the
         deposit authorization (EIP-191 signature) the HTTP route verified.
-        Stored on the deposit event so each authorization is single-use:
-        ``signature_hash_used`` lets the route reject in-window replays.
+        The route normalizes the signature to canonical bytes before
+        hashing (W-40), and ``_deposit_locked`` rejects an already-consumed
+        hash atomically (W-41) with the same opaque 403 the old route
+        pre-check returned.  The hash is stored on the deposit event.
+        ``signature_hash_used`` remains a public inspection helper, but
+        the route no longer depends on it for correctness.
         """
         if amount_wei <= 0:
             raise ValueError("deposit must be positive")
@@ -434,6 +438,15 @@ class StakeLedger:
                         tx_hash: Optional[str],
                         signature_hash: Optional[str] = None) -> Dict[str, Any]:
         """deposit() body: call with self._lock held (and file locked)."""
+        # W-40/W-41: each deposit authorization is single-use.  This check
+        # runs under the instance lock plus the POSIX exclusive file
+        # lock, AFTER _reload_under_lock(), so check-and-record is atomic
+        # both in-process and across worker processes.  It runs before
+        # the tx-hash idempotency path below: a reused authorization is
+        # rejected (403, opaque) exactly as the old route-level pre-check
+        # did, honest tx_hash retries (fresh signature) are unaffected.
+        if signature_hash and self.signature_hash_used(signature_hash):
+            raise PermissionError("deposit signature already used")
         tx_hashes = self._data.setdefault("tx_hashes", {})
         if tx_hash is not None:
             seen = tx_hashes.get(tx_hash)
@@ -488,10 +501,12 @@ class StakeLedger:
     def signature_hash_used(self, signature_hash: str) -> bool:
         """True when a deposit event already consumed this signature hash.
 
-        Used by the HTTP deposit route to make each deposit authorization
-        single-use: a signature that verifies is still rejected if an
-        earlier deposit already consumed it.  Legacy deposits recorded
-        without a signature hash never collide.
+        Public inspection helper (kept for tests and audit tooling).  The
+        live single-use guard is the atomic check in ``_deposit_locked``;
+        this method must NOT be relied on as a pre-check: it scans the
+        in-memory view without reloading, so it can miss writes made by
+        another worker process.  Legacy deposits recorded without a
+        signature hash never collide.
         """
         sig = str(signature_hash or "").strip()
         if not sig:
