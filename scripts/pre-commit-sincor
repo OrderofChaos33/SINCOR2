@@ -23,6 +23,18 @@ if [ -n "$STAGED" ]; then
 fi
 echo "Secret scan clean."
 
+echo "=== SINCOR pre-commit: claim-blocklist scan ==="
+# Block unproven marketing claims in staged public copy (README.md, templates/).
+# See scripts/claim-blocklist.txt for the list and rationale.
+if [ -f "$REPO_ROOT/scripts/claim-blocklist-scan.py" ]; then
+  PYTHONPATH=src:. python3 "$REPO_ROOT/scripts/claim-blocklist-scan.py"
+  if [ $? -ne 0 ]; then
+    exit 1
+  fi
+else
+  echo "WARNING: claim-blocklist-scan.py not found, skipping (CI runs test_marketing_claims.py)."
+fi
+
 echo "=== SINCOR pre-commit: smoke suite ==="
 if [ -d "$HOME/.venvs/sincor2" ]; then
   PYTHONPATH=src:. FLASK_ENV=test \

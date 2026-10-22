@@ -322,8 +322,19 @@ class TestOfacScreening:
         assert "ofac_unavailable_failopen" in events
 
     def test_stale_list_treated_as_unavailable(self, pp_db, monkeypatch):
-        # The vendored snapshot is older than 48h -> the oracle itself
-        # reports STALE; strict mode must fail closed, never trust it.
+        # Force the oracle's list age past the 48h fail-closed threshold so
+        # the test is deterministic regardless of the vendored snapshot's
+        # real age; strict mode must fail closed, never trust it.
+        _real_get_oracle = pp._get_ofac_oracle
+
+        def _stale_oracle():
+            oracle = _real_get_oracle()
+            oracle.aml.list_updated_at = (
+                datetime.now(timezone.utc) - timedelta(hours=49)
+            ).timestamp()
+            return oracle
+
+        monkeypatch.setattr(pp, "_get_ofac_oracle", _stale_oracle)
         _insert_checkout("PLAT-B2-5")
         self._finalize_rpc(monkeypatch, CLEAN_ADDR)
         r = pp.verify_checkout("PLAT-B2-5", TX_A)

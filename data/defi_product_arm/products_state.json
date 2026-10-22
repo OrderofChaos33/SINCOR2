@@ -1,7 +1,7 @@
 {
   "SINCOR-DEFI-P01-VAULT": {
-    "stage": "test",
-    "version": "0.1.1"
+    "stage": "product",
+    "version": "0.1.3"
   },
   "SINCOR-DEFI-P02-CLMM": {
     "stage": "test",
@@ -68,8 +68,8 @@
     "version": "0.1.1"
   },
   "SINCOR-DEFI-P15-LEND": {
-    "stage": "test",
-    "version": "0.1.2"
+    "stage": "product",
+    "version": "0.1.4"
   },
   "SINCOR-DEFI-P18-STRUCTURED": {
     "stage": "test",
@@ -80,12 +80,12 @@
     "version": "0.1.2"
   },
   "SINCOR-DEFI-P21-TREASURY": {
-    "stage": "test",
-    "version": "0.1.2"
+    "stage": "product",
+    "version": "0.1.4"
   },
   "SINCOR-DEFI-P22-STABLEYIELD": {
-    "stage": "test",
-    "version": "0.1.2"
+    "stage": "product",
+    "version": "0.1.4"
   },
   "SINCOR-DEFI-P23-NFTFI": {
     "stage": "test",
@@ -96,11 +96,11 @@
     "version": "0.1.2"
   },
   "SINCOR-DEFI-P25-PORTFOLIO": {
-    "stage": "test",
-    "version": "0.1.2"
+    "stage": "product",
+    "version": "0.1.4"
   },
   "SINCOR-DEFI-P26-DEFIOS": {
-    "stage": "test",
-    "version": "0.1.2"
+    "stage": "product",
+    "version": "0.1.4"
   }
 }

@@ -293,7 +293,108 @@ def build_payment_payload(
     }
 
 
-def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, Any]:
+# ---------------------------------------------------------------------------
+# W-102 round 3 — creation-time wallet-ownership proof.
+#
+# Round 2 bound every challenge to a payer_wallet, but the binding itself
+# was a bare address string: create_challenge() accepted ANY payer_wallet
+# with no proof the caller owned it. The red-team r3 PoC minted a challenge
+# naming the VICTIM's wallet, watched the public treasury for the victim's
+# payment, and front-ran /api/x402/verify — binding check and on-chain
+# payer check both passed truthfully, and UNIQUE(tx_hash) first-claim-wins
+# handed the attacker's challenge the victim's entitlement (access_token),
+# leaving the victim's own verify to fail tx_hash_already_used. Cost: zero.
+#
+# Fix: a bare address string is no longer a capability. Challenge creation
+# is now two-phase:
+#   1. create_challenge(resource_id) mints an UNBOUND draft (payer_wallet="").
+#      An unbound draft can never be fulfilled through the public verify
+#      route (require_bound_challenge=True -> challenge_unbound), so minting
+#      is harmless.
+#   2. bind_challenge_payer(challenge_id, payer_wallet, signature) verifies
+#      an EIP-191 personal_sign signature by payer_wallet over
+#      challenge_bind_message() — (challenge_id | resource_id | payer_wallet)
+#      — with require_low_s canonicality, and only then writes the binding.
+#      Without the wallet's private key, an attacker cannot bind the
+#      victim's wallet to their own challenge.
+#
+# Why creation-time binding (not a verify-time fresh signature, the listed
+# alternative): the signature covers the SERVER-MINTED challenge_id, so it
+# authorizes exactly one binding on exactly one challenge — no
+# consumed-signature/replay database is needed, and a leaked signature can
+# never be replayed onto a different challenge. Binding at creation also
+# kills the front-run race at mint instead of at verify: under the
+# verify-time design the attacker could still mint unlimited victim-named
+# challenges for free and race the victim's verify call; here the attacker
+# can mint only unbound drafts, which are unredeemable and unclaimable.
+# ---------------------------------------------------------------------------
+
+#: EIP-191 personal_sign domain for challenge-ownership binding.
+X402_BIND_DOMAIN = "SINCOR-X402-CHALLENGE-BIND"
+
+
+def challenge_bind_message(
+    challenge_id: str, resource_id: str, payer_wallet: str
+) -> str:
+    """Canonical message the payer signs to prove wallet ownership.
+
+    Public so clients/SDKs can build byte-identical messages; the server
+    always rebuilds it from its own stored challenge_id/resource_id, so a
+    caller cannot substitute a different challenge, resource, or wallet
+    into a signature obtained elsewhere.
+    """
+    return "|".join(
+        [
+            X402_BIND_DOMAIN,
+            str(challenge_id),
+            str(resource_id),
+            str(payer_wallet).strip().lower(),
+        ]
+    )
+
+
+def _recover_bind_signer(message: str, signature: str) -> str:
+    """Recover the signer address of a challenge-binding signature.
+
+    Mirrors a2a_inbound_market._recover_eip191: require_low_s canonicality
+    first (high-s twins are rejected even though they recover to the same
+    address — the codebase standard), then eth_account EIP-191 recovery.
+    Raises ValueError on any failure; callers fail closed.
+    """
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        raw = require_low_s(signature)
+        return str(
+            Account.recover_message(encode_defunct(text=message), signature=raw)
+        )
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
+
+
+def _valid_wallet_format(wallet: str) -> bool:
+    """Format-only 0x-address check (mirrors mvp_app.validate_wallet)."""
+    import re
+
+    return bool(
+        isinstance(wallet, str) and re.match(r"^0x[a-fA-F0-9]{40}$", wallet.strip())
+    )
+
+
+def create_challenge(resource_id: str) -> dict[str, Any]:
+    """Mint an UNBOUND challenge draft (W-102 round 3).
+
+    The draft records NO payer binding — a bare address string is no longer
+    accepted at creation. The caller must complete
+    bind_challenge_payer() with an EIP-191 ownership signature before the
+    challenge can be fulfilled through the public verify route
+    (require_bound_challenge=True rejects unbound drafts as
+    challenge_unbound).
+    """
     resource = get_resource(resource_id)
     if not resource:
         return {"ok": False, "error": "unknown_resource"}
@@ -307,13 +408,12 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
             """INSERT INTO x402_challenges
                (challenge_id, resource_id, amount_atomic, amount_display, payer_wallet,
                 status, created_at, expires_at)
-               VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)""",
+               VALUES (?, ?, ?, ?, '', 'pending', ?, ?)""",
             (
                 challenge_id,
                 resource_id,
                 resource["amount_atomic"],
                 resource["amount_display"],
-                payer_wallet.lower() if payer_wallet else "",
                 now.isoformat(),
                 expires.isoformat(),
             ),
@@ -325,9 +425,117 @@ def create_challenge(resource_id: str, *, payer_wallet: str = "") -> dict[str, A
     return {
         "ok": False,
         "http_status": 402,
-        "error": "payment_required",
+        "error": "ownership_proof_required",
         "challenge_id": challenge_id,
+        "resource_id": resource_id,
         "expires_at": expires.isoformat(),
+        "payment": payload,
+        "bind": {
+            "bind_url": "/api/x402/challenge-bind",
+            "sign_message_format": (
+                "SINCOR-X402-CHALLENGE-BIND|<challenge_id>|<resource_id>|"
+                "<payer_wallet_lowercase> — sign with EIP-191 personal_sign "
+                "using the payer wallet, then POST "
+                "{challenge_id, payer_wallet, signature} to /api/x402/challenge-bind"
+            ),
+        },
+        "message": (
+            f"Send {resource['amount_display']} {resource['token']} "
+            f"to {resource['treasury']} on Base after binding your wallet"
+        ),
+        "note": (
+            "Ownership proof required: this challenge is unbound and cannot "
+            "be fulfilled until the payer wallet signs the bind message. "
+            "The minting route returns the exact 'sign_message' for the "
+            "wallet you supplied."
+        ),
+    }
+
+
+def bind_challenge_payer(
+    challenge_id: str, payer_wallet: str, signature: str
+) -> dict[str, Any]:
+    """Bind a payer wallet to a challenge draft after ownership proof.
+
+    Verifies the EIP-191 personal_sign signature over
+    challenge_bind_message(challenge_id, resource_id, payer_wallet) BEFORE
+    the binding is written; any unsigned, malformed, high-s, or
+    wrong-signer signature is rejected and the row is left unbound.
+    A draft can be bound exactly once (challenge_already_bound).
+    """
+    cid = (challenge_id or "").strip()
+    if not cid:
+        return {"ok": False, "error": "challenge_id_required"}
+    wallet = (payer_wallet or "").strip().lower()
+    if not _valid_wallet_format(wallet):
+        return {"ok": False, "error": "payer_wallet_required"}
+    if not signature:
+        return {"ok": False, "error": "ownership_signature_required"}
+
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM x402_challenges WHERE challenge_id=?", (cid,)
+        ).fetchone()
+        if not row:
+            return {"ok": False, "error": "challenge_not_found"}
+        if row["status"] == "fulfilled":
+            return {"ok": False, "error": "challenge_already_bound"}
+        expires = row["expires_at"]
+        if expires and _parse_iso(expires) < datetime.now(timezone.utc):
+            return {"ok": False, "error": "challenge_expired"}
+        if (row["payer_wallet"] or "").strip():
+            return {"ok": False, "error": "challenge_already_bound"}
+
+        resource_id = str(row["resource_id"])
+        resource = get_resource(resource_id)
+        if not resource:
+            return {"ok": False, "error": "unknown_resource"}
+        message = challenge_bind_message(cid, resource_id, wallet)
+        try:
+            recovered = _recover_bind_signer(message, signature)
+        except ValueError:
+            logger.warning(
+                "x402: bind rejected for challenge %s: bad ownership signature",
+                cid,
+            )
+            return {"ok": False, "error": "ownership_proof_failed"}
+        if recovered.lower() != wallet:
+            logger.warning(
+                "x402: bind rejected for challenge %s: signature recovers to "
+                "%s, not the claimed payer",
+                cid,
+                recovered,
+            )
+            return {"ok": False, "error": "ownership_proof_failed"}
+
+        # Atomic bind: the UPDATE itself is the claim. The conditional
+        # WHERE closes the race between the SELECT above and this write —
+        # two concurrent binds cannot both succeed; the loser sees
+        # rowcount 0 and gets challenge_already_bound.
+        cur = conn.execute(
+            "UPDATE x402_challenges SET payer_wallet=? WHERE challenge_id=? "
+            "AND status='pending' AND (payer_wallet='' OR payer_wallet IS NULL)",
+            (wallet, cid),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            logger.warning(
+                "x402: bind lost race for challenge %s; already bound", cid
+            )
+            return {"ok": False, "error": "challenge_already_bound"}
+        conn.commit()
+
+    payload = build_payment_payload(resource, resource_id, cid)
+
+    return {
+        "ok": False,
+        "http_status": 402,
+        "error": "payment_required",
+        "challenge_id": cid,
+        "resource_id": resource_id,
+        "payer_wallet": wallet,
+        "ownership_proven": True,
+        "expires_at": row["expires_at"],
         "payment": payload,
         "message": (
             f"Send {resource['amount_display']} {resource['token']} "
@@ -341,12 +549,72 @@ def _parse_iso(ts: str) -> datetime:
     return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
 
 
+# W-103: fulfilled-challenge replay must be authenticated. A re-issue of an
+# already-fulfilled challenge's entitlement token requires a fresh EIP-191
+# signature over the canonical replay message from the wallet recorded on
+# the original challenge. Mirrors the heartbeat proof convention
+# (SINCOR-HEARTBEAT\n<agent_id>\n<ts_ms>) in a2a_inbound_ext.py.
+REPLAY_PROOF_DOMAIN = "SINCOR-X402-REPLAY"
+REPLAY_MAX_SKEW_MS = 600_000  # 10-minute freshness window
+REPLAY_AUTH_FAILED = {"ok": False, "error": "replay_auth_failed"}
+
+
+def build_replay_message(challenge_id: str, ts_ms: int) -> str:
+    """Canonical EIP-191 message a payer signs to re-issue a fulfilled
+    challenge's token. Binds the canonical challenge_id and a millisecond
+    timestamp so the signature cannot be reused for another challenge or
+    outside the freshness window."""
+    return f"{REPLAY_PROOF_DOMAIN}\n{challenge_id}\n{int(ts_ms)}"
+
+
+def _replay_auth_ok(
+    recorded_wallet: str,
+    challenge_id: str,
+    replay_signature: str,
+    replay_ts_ms: Any,
+) -> bool:
+    """W-103 gate for BOTH fulfilled paths of verify_challenge.
+
+    Checks, in order: (1) signature and timestamp present and well-formed;
+    (2) |now_ms - ts_ms| <= 10 minutes; (3) signer recovered via
+    encode_defunct; (4) recorded payer_wallet non-blank and matching the
+    recovered address case-insensitively. ANY failure returns False — the
+    caller maps every failure to the same generic replay_auth_failed error
+    so no existence oracle or distinguishing behavior exists."""
+    if not replay_signature or replay_ts_ms is None:
+        return False
+    try:
+        ts_ms = int(str(replay_ts_ms).strip())
+    except (TypeError, ValueError):
+        return False
+    if ts_ms < 0:
+        return False
+    if abs(int(time.time() * 1000) - ts_ms) > REPLAY_MAX_SKEW_MS:
+        return False
+    wallet = (recorded_wallet or "").strip()
+    if not wallet:
+        return False
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
+        require_low_s(replay_signature)  # reject (r, n-s) malleation twins
+        signer = str(Account.recover_message(
+            encode_defunct(text=build_replay_message(challenge_id, ts_ms)),
+            signature=replay_signature))
+    except Exception:
+        return False
+    return signer.lower() == wallet.lower()
+
+
 def verify_challenge(
     challenge_id: str,
     tx_hash: str,
     *,
     payer_wallet: str = "",
     require_bound_challenge: bool = False,
+    replay_signature: str = "",
+    replay_ts_ms: Any = None,
 ) -> dict[str, Any]:
     if not challenge_id or not tx_hash:
         return {"ok": False, "error": "challenge_id_and_tx_hash_required"}
@@ -360,8 +628,23 @@ def verify_challenge(
             "SELECT * FROM x402_challenges WHERE challenge_id=?", (challenge_id,)
         ).fetchone()
         if not row:
+            # W-103: no existence oracle on the replay path. A caller that
+            # supplied replay credentials gets the same generic failure as
+            # any other replay-auth failure, whether or not the challenge
+            # exists.
+            if replay_signature or replay_ts_ms is not None:
+                return dict(REPLAY_AUTH_FAILED)
             return {"ok": False, "error": "challenge_not_found"}
         if row["status"] == "fulfilled":
+            # W-103: the victim's live token is re-issued ONLY with a valid
+            # EIP-191 replay signature from the recorded payer wallet.
+            if not _replay_auth_ok(
+                str(row["payer_wallet"] or ""),
+                str(row["challenge_id"]),
+                replay_signature,
+                replay_ts_ms,
+            ):
+                return dict(REPLAY_AUTH_FAILED)
             return {
                 "ok": True,
                 "status": "already_fulfilled",
@@ -374,7 +657,9 @@ def verify_challenge(
             return {"ok": False, "error": "challenge_expired"}
 
         # W-102: bind the claim to the challenge's recorded payer. The
-        # challenge row records payer_wallet at create_challenge time. A
+        # challenge row records payer_wallet at bind_challenge_payer time
+        # (W-102 round 3: only after an EIP-191 ownership signature by that
+        # wallet — a bare address string is no longer a capability). A
         # claim naming any other wallet is a front-run attempt: the on-chain
         # payer check alone cannot stop it, because the attacker truthfully
         # names the victim's wallet while claiming under their own
@@ -432,9 +717,23 @@ def verify_challenge(
             ).fetchone()
             if not fresh:
                 conn.rollback()
+                # W-103: no existence oracle on the replay path (mirrors the
+                # pre-transaction branch above).
+                if replay_signature or replay_ts_ms is not None:
+                    return dict(REPLAY_AUTH_FAILED)
                 return {"ok": False, "error": "challenge_not_found"}
             if fresh["status"] == "fulfilled":
                 conn.rollback()
+                # W-103: the lost-the-race branch must authenticate the
+                # replayer too — this is where the W-102 bypass used to
+                # re-mint the victim's live token with zero auth.
+                if not _replay_auth_ok(
+                    str(fresh["payer_wallet"] or ""),
+                    str(fresh["challenge_id"]),
+                    replay_signature,
+                    replay_ts_ms,
+                ):
+                    return dict(REPLAY_AUTH_FAILED)
                 return {
                     "ok": True,
                     "status": "already_fulfilled",

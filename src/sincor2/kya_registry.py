@@ -438,23 +438,14 @@ def bind(agent_id: str, principal: str, signature: str, message: str, recovered:
         raise KeyError("unknown agent")
     if rec.get("revoked"):
         raise ValueError("revoked")
-    if recovered is None:
-        recovered_addr = _recover_eip191(message=message, signature=signature)
-    else:
-        recovered_addr = str(recovered)
-        try:
-            verified_addr = _recover_eip191(message=message, signature=signature)
-            if verified_addr.lower() != recovered_addr.lower():
-                raise ValueError("signer mismatch")
-        except ValueError as exc:
-            # An explicit `recovered` override vouches for the address
-            # (internal/test callers only — the HTTP route never passes
-            # it). When the accompanying signature cannot be verified at
-            # all (stub signature or unavailable verifier), trust the
-            # voucher. A real signature that recovers to a *different*
-            # address is still a mismatch and re-raises below.
-            if str(exc) not in ("signature verification unavailable", "bad signature"):
-                raise
+    # Fail closed: a caller-supplied `recovered` address is only an
+    # assertion. The signature must cryptographically verify, and the
+    # recovered signer must match the assertion; a malformed signature
+    # rejects the bind outright instead of trusting the voucher.
+    verified_addr = _recover_eip191(message=message, signature=signature)
+    if recovered is not None and str(recovered).lower() != verified_addr.lower():
+        raise ValueError("signer mismatch")
+    recovered_addr = verified_addr
     signer = recovered_addr.lower()
     if signer != principal.lower():
         raise ValueError("signer mismatch")
