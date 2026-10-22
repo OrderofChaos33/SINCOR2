@@ -36,6 +36,7 @@ lead-enrichment, competitor-intel, outreach-sequence, healthcare-credential-chec
 dental-billing-scrub, compliance-sbom, market-forecast, deal-scoring,
 content-blog, cashflow-recovery, local-business-site-builder, toa-decision,
 contract-negotiation, quality-audit, agent-lifecycle, axiom-payment,
+issue-creator-token,
 (+ vertical pack cards — see GET /v1/a2a/cards)
 
 Five skills offer a free quota (5 free executions per caller) for new
