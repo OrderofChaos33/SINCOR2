@@ -33,6 +33,29 @@ SAFETY (fail-closed):
 
 Tested against MACH Base (https://api.mach.gallery) x402 v2 flow.
 No real network calls in tests — everything is mocked.
+
+DESIGN CONSTRAINT (dev-watch item 263 / x402 #3866, OPEN):
+Never run wrapFetchWithPayment — or any x402 buyer client — with defaults.
+The official client signs EIP-3009 for ANY server-declared accepts[].amount
+(a x10 overcharge was captured 3/3: no price-expectation check anywhere in
+the loop). Every paid call through THIS client must wire the pre-payment
+policy hook: ``X402Buyer(..., expected_price_usd=<quoted price>,
+price_tolerance_bps=<tolerance>)``. An adversarial 402 declaring an amount
+outside expected*(1+tolerance) is refused with PricePolicyViolation BEFORE
+any signature is produced. The absolute ``max_payment_usd`` cap is NOT a
+substitute — a x10-inflated quote can still fit under the cap.
+
+UPSTREAM DEPENDENCY PIN (dev-watch item 261 / x402 PR #3795):
+Any integration using the official JS packages MUST pin @x402/core and
+@x402/express to >= the first release containing PR #3795 (merged
+2026-10-22; the changeset marked both packages for a patch release —
+check the x402 changelog for the exact patch version, published after
+2026-10-22). Before #3795 the 402 JSON body was a literal {} and the
+rejection reason travelled ONLY in the base64 PAYMENT-REQUIRED header;
+after #3795 the body is {"error": <reason>} and the @x402/express
+settlement catch-all answers {"error": "settlement_failed"}. This client
+reads the refusal reason from the BODY (the guaranteed channel) and
+surfaces it as a typed PaymentRefusedError.
 """
 
 from __future__ import annotations
@@ -127,11 +150,150 @@ class StaleChallenge(X402BuyerError):
     """validBefore is in the past or unreasonably far in the future."""
 
 
+class PricePolicyViolation(X402BuyerError):
+    """402 demands a price outside the declared expectation.
+
+    Raised by the pre-payment price policy (expected price + tolerance)
+    BEFORE any signature is produced. Distinct from PaymentCapExceeded:
+    the cap is an ABSOLUTE per-call ceiling, while the price policy is a
+    RELATIVE expectation — a x10-inflated quote that still fits under the
+    cap is refused here (x402 #3866 / scenario S-BS-06).
+    """
+
+
+class PaymentRefusedError(AmbiguousPayment):
+    """Server refused AFTER the signed payment was sent (402 on the paid leg).
+
+    A subclass of AmbiguousPayment: the payment MAY have settled
+    server-side, so the no-blind-retry contract is preserved. The server's
+    rejection reason — carried in the 402 JSON BODY since x402 PR #3795
+    (``{"error": ...}``), not only in the base64 PAYMENT-REQUIRED header —
+    is exposed as ``.reason`` so callers can distinguish an unfunded wallet
+    from a bad signature from a settlement failure instead of treating
+    every refusal as identical.
+    """
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
+class InsufficientFundsError(PaymentRefusedError):
+    """Paid-leg 402 with body error ``insufficient_funds`` (unfunded wallet)."""
+
+
+class InvalidSignatureError(PaymentRefusedError):
+    """Paid-leg 402 with body error ``invalid_signature`` (bad signature)."""
+
+
+class SettlementFailedError(PaymentRefusedError):
+    """Paid-leg 402 with body error ``settlement_failed`` (settle catch-all)."""
+
+
 # URLError reasons that prove the TCP connection was never established,
 # hence no request bytes (and no payment) could have left this machine.
 # Anything else (timeouts, resets, TLS errors, mid-stream failures) is
 # treated as possibly-post-send: ambiguous on the paid leg.
 _PROVABLY_PRE_SEND_REASONS = (ConnectionRefusedError, socket.gaierror)
+
+
+# ---------------------------------------------------------------------------
+# Pre-payment price policy (dev-watch item 263 / scenario S-BS-06)
+# ---------------------------------------------------------------------------
+
+#: Default price tolerance: 5% over the expected price.
+DEFAULT_PRICE_TOLERANCE_BPS = 500
+
+
+def check_price_expectation(
+    expected_price_usd: float,
+    req: "PaymentRequirements",
+    *,
+    tolerance_bps: int = DEFAULT_PRICE_TOLERANCE_BPS,
+) -> None:
+    """Pure pre-payment price policy: expected price + tolerance -> accept/reject.
+
+    Raises :class:`PricePolicyViolation` when ``req.amount_usd`` exceeds
+    ``expected_price_usd * (1 + tolerance_bps/10000)``. Accepts when the
+    402 demand is at or under the expected price or within tolerance.
+    Raises ValueError on a non-positive expected price or negative
+    tolerance. Pure: no I/O, no signing — wire it (or construct
+    ``X402Buyer(expected_price_usd=...)``) anywhere a client is about to
+    sign for a server-declared amount.
+    """
+    if expected_price_usd is None or expected_price_usd <= 0:
+        raise ValueError("expected_price_usd must be positive")
+    if tolerance_bps < 0:
+        raise ValueError("tolerance_bps must be non-negative")
+    ceiling = expected_price_usd * (1 + tolerance_bps / 10000)
+    if req.amount_usd > ceiling:
+        raise PricePolicyViolation(
+            f"402 demands ${req.amount_usd:.4f} > expected "
+            f"${expected_price_usd:.4f} + {tolerance_bps}bps tolerance "
+            f"(ceiling ${ceiling:.4f}); no signature produced"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Paid-leg 402 refusal classification (dev-watch item 261 / x402 PR #3795)
+# ---------------------------------------------------------------------------
+
+#: Body-error strings (normalized: lowercased, spaces/hyphens -> _) that
+#: map to typed refusal errors. Anything else non-empty becomes a plain
+#: PaymentRefusedError with the raw reason preserved; an empty/absent
+#: error (pre-#3795 servers) stays a plain AmbiguousPayment.
+_REFUSAL_REASON_MAP: dict[str, type[PaymentRefusedError]] = {
+    "insufficient_funds": InsufficientFundsError,
+    "insufficient_amount": InsufficientFundsError,
+    "insufficient_balance": InsufficientFundsError,
+    "invalid_signature": InvalidSignatureError,
+    "signature_invalid": InvalidSignatureError,
+    "bad_signature": InvalidSignatureError,
+    "settlement_failed": SettlementFailedError,
+    "settle_failed": SettlementFailedError,
+}
+
+
+def _normalize_refusal_reason(raw: object) -> str:
+    return (
+        str(raw or "")
+        .strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+
+def classify_retry_refusal(raw_body: bytes) -> AmbiguousPayment:
+    """Build the typed error for a 402 received AFTER the signed payment.
+
+    Parses the 402 JSON BODY (the guaranteed channel since x402 PR #3795)
+    for ``error`` and returns a typed :class:`PaymentRefusedError`
+    (which IS an AmbiguousPayment — the payment may have settled, so the
+    no-blind-retry contract holds) when a reason is present, else a plain
+    AmbiguousPayment for pre-patch servers that still answer ``{}``.
+    """
+    reason = ""
+    try:
+        parsed = json.loads(raw_body or b"{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        parsed = {}
+    if isinstance(parsed, dict):
+        reason = _normalize_refusal_reason(parsed.get("error"))
+    message = (
+        "server returned 402 after signed payment; refusing to retry "
+        "(could double-pay). Investigate manually."
+    )
+    if not reason:
+        return AmbiguousPayment(message)
+    cls = _REFUSAL_REASON_MAP.get(reason, PaymentRefusedError)
+    return cls(
+        reason,
+        message.replace(
+            "after signed payment;",
+            f"after signed payment (reason: {reason});",
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -183,15 +345,28 @@ class X402Buyer:
         *,
         max_payment_usd: float = 0.10,
         timeout_seconds: int = 30,
+        expected_price_usd: float | None = None,
+        price_tolerance_bps: int = DEFAULT_PRICE_TOLERANCE_BPS,
     ) -> None:
         if not wallet_address or not wallet_address.startswith("0x"):
             raise ValueError("wallet_address must be a 0x address")
         if max_payment_usd <= 0:
             raise ValueError("max_payment_usd must be positive")
+        if expected_price_usd is not None and expected_price_usd <= 0:
+            raise ValueError("expected_price_usd must be positive")
+        if price_tolerance_bps < 0:
+            raise ValueError("price_tolerance_bps must be non-negative")
         self.wallet_address = wallet_address
         self._signer_fn = signer_fn
         self.max_payment_usd = max_payment_usd
         self.timeout_seconds = timeout_seconds
+        # Pre-payment price policy (item 263 / S-BS-06): the expected price
+        # for this call site plus tolerance. When set, any 402 declaring a
+        # higher amount is refused BEFORE signing. None = policy disabled
+        # (cap only) — integrators must always wire this; see the module
+        # docstring design constraint.
+        self.expected_price_usd = expected_price_usd
+        self.price_tolerance_bps = price_tolerance_bps
         # W-75: payment-attempt journal.  Maps a resource URL to the
         # (requirements, signed authorization) of the last attempt whose
         # outcome was ambiguous (or transport-failed after signing).  A
@@ -287,6 +462,14 @@ class X402Buyer:
             raise PaymentCapExceeded(
                 f"402 demands ${req.amount_usd:.4f} > cap ${self.max_payment_usd:.2f}; "
                 "no signature produced"
+            )
+        # Item 263 / S-BS-06: the price policy is RELATIVE (expected price +
+        # tolerance), so a x10-inflated quote that still fits under the
+        # absolute cap is refused here. Enforced at the signing gate itself
+        # so every signing path (fetch, direct sign_authorization) is covered.
+        if self.expected_price_usd is not None:
+            check_price_expectation(
+                self.expected_price_usd, req, tolerance_bps=self.price_tolerance_bps
             )
         if req.amount_atomic <= 0:
             raise MalformedChallenge("non-positive payment amount")
@@ -435,8 +618,10 @@ class X402Buyer:
 
         Returns the parsed JSON response body on success.
         Raises PaymentCapExceeded / UnsupportedPayment / MalformedChallenge /
-        AmbiguousPayment / StaleChallenge / PaymentTransportError (all
-        fail-closed, no payment made unless stated).
+        AmbiguousPayment (incl. typed PaymentRefusedError subclasses carrying
+        the server's 402 body reason, x402 PR #3795) / PricePolicyViolation /
+        StaleChallenge / PaymentTransportError (all fail-closed, no payment
+        made unless stated).
 
         Retry contract:
         - :class:`PaymentTransportError`: safe to retry — no payment was
@@ -538,10 +723,12 @@ class X402Buyer:
             }
         if status2 == 402:
             # Server still wants payment after our signed retry: do NOT loop.
-            raise AmbiguousPayment(
-                "server returned 402 after signed payment; refusing to retry "
-                "(could double-pay). Investigate manually."
-            )
+            # Classify the refusal from the 402 BODY (x402 PR #3795 carries
+            # the reason there) into a typed PaymentRefusedError so callers
+            # can distinguish unfunded-wallet from bad-signature from
+            # settlement failure. Every variant IS an AmbiguousPayment: the
+            # payment may have settled, so blind retry stays forbidden.
+            raise classify_retry_refusal(raw2)
         raise AmbiguousPayment(
             f"ambiguous retry status {status2}; refusing to retry blindly"
         )
