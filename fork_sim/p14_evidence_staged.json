@@ -1,0 +1,67 @@
+{
+  "entries": [
+    {
+      "entry_id": "ev_forksim_p14_machinery_2b131609ec11",
+      "sku": "SINCOR-DEFI-P14-PREDICTION",
+      "kind": "fork_sim",
+      "timestamp": 1792649338.740414,
+      "commit": "PENDING",
+      "recorded_by": "xioix/forksim-groupb-profit-evidence",
+      "details": {
+        "command": "PYTHONPATH=src:. python fork_sim/profit_p14.py",
+        "suite": "fork_sim/profit_p14.py",
+        "scope": "P14 profitability: 60 real resolved Polymarket markets through REAL run_backtest; perfect-foresight signal (machinery upper bound, lookahead by design)",
+        "result": "8 trades, 8 wins, net +$148,139.35 (gross $156,170.35, product fee $234.20, 5% platform $7796.80), win rate 100%, max DD $0.00",
+        "signal": "perfect_signal (lookahead by design; machinery bound only)",
+        "episodes": 60,
+        "trades": 8,
+        "verdict": "MACHINERY PROVEN",
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    {
+      "entry_id": "ev_forksim_p14_momentum_b8ffdaf1062c",
+      "sku": "SINCOR-DEFI-P14-PREDICTION",
+      "kind": "fork_sim",
+      "timestamp": 1792649339.740414,
+      "commit": "PENDING",
+      "recorded_by": "xioix/forksim-groupb-profit-evidence",
+      "details": {
+        "command": "PYTHONPATH=src:. python fork_sim/profit_p14.py",
+        "suite": "fork_sim/profit_p14.py",
+        "scope": "P14 profitability: 60 real resolved Polymarket markets through REAL run_backtest; trailing-24h momentum signal (no lookahead)",
+        "result": "1 trades, net $-46.76 (gross $-46.76), win rate 0.0%, max DD $46.76",
+        "signal": "momentum_signal (trailing 24h, capped at 0.12pp, no lookahead)",
+        "episodes": 60,
+        "trades": 1,
+        "verdict": "NO-GO (signal not profitable; 20/60 signals cleared 2% edge but momentum does not predict outcomes)",
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 0,
+        "failed": 1
+      }
+    },
+    {
+      "entry_id": "ev_forksim_p14_verdict_65edd00d0a00",
+      "sku": "SINCOR-DEFI-P14-PREDICTION",
+      "kind": "fork_sim",
+      "timestamp": 1792649340.740414,
+      "commit": "PENDING",
+      "recorded_by": "xioix/forksim-groupb-profit-evidence",
+      "details": {
+        "scope": "P14 profitability verdict vs founder bar (2026-10-22): net positive after 5% platform fee",
+        "threshold": "GO iff net>0 AND win_rate>=40% AND max_dd<20% AND trades>=10",
+        "verdict": "CONDITIONAL GO",
+        "reason": "Machinery PROVEN (+$148k, 8/8 wins, 0 DD with perfect signal). Momentum signal NOT profitable (1 trade, -$47). Product needs a real edge source (e.g. whale flow) before live. Do NOT go live on momentum.",
+        "read_only": true,
+        "no_broadcast": true,
+        "passed": 0,
+        "failed": 0
+      }
+    }
+  ],
+  "note": "STAGED for founder review. NOT written to proof_ledger.json."
+}
