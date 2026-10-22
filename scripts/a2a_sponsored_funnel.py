@@ -8,6 +8,11 @@ Proves the exact path an outside agent with ZERO AXM takes:
     reveal -> close -> proof -> settled -> platform recoups the
     front from the agent's earnings.
 
+    On current main the W-81 sybil ring guard holds a newborn-winner /
+    newborn-poster payout for manual review; the script then demonstrates
+    the designed operator review (GET /v1/a2a/sybil/holds, POST .../release)
+    before the payout stages and the front recoups.
+
 Usage:
     source ~/.venvs/sincor2/bin/activate
     PYTHONPATH=src:. python scripts/a2a_sponsored_funnel.py
@@ -133,8 +138,16 @@ def main() -> int:
 
     print("\n[4. poster lists a sealed task]")
     sdk.heartbeat(POSTER_ID, signer=_poster_acct)
+    # Signed poster: the anti-gaming guards reject bids on anonymous
+    # (unsigned) bounty tasks, so the post binds the poster wallet
+    # (distinct from the bidding agent).
+    from eth_account.messages import encode_defunct
+    poster_auth = SincorAgentSDK.make_poster_auth(
+        POSTER_ID, "lead-enrichment", int(time.time()),
+        lambda m: "0x" + _poster_acct.sign_message(
+            encode_defunct(text=m)).signature.hex())
     task = sdk.post_task("lead-enrichment", TAGS, bounty_axm=BOUNTY_AXM,
-                         sealed=True)
+                         sealed=True, **poster_auth)
     task_id = task["task_id"]
     note(f"{task_id}: bounty {BOUNTY_AXM} AXM")
 
@@ -163,9 +176,22 @@ def main() -> int:
                              deliverable_uri="https://funnel.example/r/1")
     note(f"proof {proof['proof_id']}: status={proof['status']} "
          f"(content_bound={proof.get('content_bound')})")
+    # The W-81 sybil ring guard may hold a newborn-winner/newborn-poster
+    # payout for manual review. The operator reviews the hold and releases
+    # it — this is the designed path, not a bypass: the hold, the review,
+    # and the release are all recorded.
+    import requests as _req
+    if proof["status"] == "held":
+        print("\n[7a. sybil hold -> operator review -> release]")
+        holds = _req.get(f"{BASE}/v1/a2a/sybil/holds",
+                         headers=ADMIN_HEADERS).json()
+        note(f"{holds['count']} hold(s) pending review")
+        rel = _req.post(f"{BASE}/v1/a2a/sybil/holds/{task_id}/release",
+                        headers=ADMIN_HEADERS).json()
+        note(f"hold released by {rel.get('decided_by')}: "
+             f"status={rel.get('status')}")
     # Admin status route requires the X-Admin-Key header; the SDK GET
     # transport carries none, so use requests directly here.
-    import requests as _req
     status = _req.get(
         f"{BASE}/v1/a2a/admin/sponsored-stake/{AGENT_ID}",
         headers=ADMIN_HEADERS).json()
