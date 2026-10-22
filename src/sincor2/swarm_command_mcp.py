@@ -31,6 +31,21 @@ PROTOCOL_VERSION = "2025-06-18"
 
 _JSON = "application/json"
 
+# -- request/tool-input limits (dev-watch item 269: MCP SDK Oct-20 advisories)
+#
+# Defaults left permissive are a finding; these protections are
+# explicitly ENABLED here (not default-off):
+#  * bodies larger than MAX_REQUEST_BODY_BYTES are rejected with 413
+#    BEFORE they are buffered  (advisory b: unbounded request bodies,
+#    High 7.5, fixed in SDK 1.30.1)
+#  * tool arguments are bounded by MAX_TOOL_INPUT_ELEMENTS elements and
+#    MAX_TOOL_INPUT_DEPTH nesting (advisory a: validation memory
+#    exhaustion, High 7.5, fixed by default-off maxToolInputElements)
+#  * JSON-RPC batches are rejected outright, never partially executed
+MAX_REQUEST_BODY_BYTES = 1_048_576  # 1 MiB
+MAX_TOOL_INPUT_ELEMENTS = 1_000
+MAX_TOOL_INPUT_DEPTH = 32
+
 # -- tool catalogue -------------------------------------------------------
 # Each entry: name -> (required args, schema, handler-name on the dispatcher)
 
@@ -268,6 +283,40 @@ def _error(id_: Any, code: int, message: str):
     return {"jsonrpc": "2.0", "id": id_, "error": {"code": code, "message": message}}
 
 
+def _validate_tool_input_size(arguments: Any) -> None:
+    """Bound tool arguments by element count and nesting depth.
+
+    Raises _JsonRpcParamsError (maps to JSON-RPC -32602) when the arguments
+    exceed MAX_TOOL_INPUT_ELEMENTS elements or MAX_TOOL_INPUT_DEPTH nesting.
+    Every dict, list, scalar, and dict key counts as one element; the walk
+    is iterative so a hostile payload cannot blow the Python call stack.
+    """
+    count = 0
+    stack = [(arguments, 0)]
+    while stack:
+        value, depth = stack.pop()
+        if depth > MAX_TOOL_INPUT_DEPTH:
+            raise _JsonRpcParamsError(
+                "arguments exceed maximum nesting depth (%d)"
+                % MAX_TOOL_INPUT_DEPTH
+            )
+        count += 1  # this node
+        if isinstance(value, dict):
+            count += len(value)  # keys
+            if count > MAX_TOOL_INPUT_ELEMENTS:
+                break
+            stack.extend((v, depth + 1) for v in value.values())
+        elif isinstance(value, (list, tuple)):
+            stack.extend((v, depth + 1) for v in value)
+        if count > MAX_TOOL_INPUT_ELEMENTS:
+            break
+    if count > MAX_TOOL_INPUT_ELEMENTS:
+        raise _JsonRpcParamsError(
+            "arguments exceed maximum input size (%d elements)"
+            % MAX_TOOL_INPUT_ELEMENTS
+        )
+
+
 # -- the WSGI app ----------------------------------------------------------
 
 
@@ -315,6 +364,25 @@ def app(environ, start_response):
         start_response(status, headers)
         return body
 
+    # -- /mcp POST: request body size cap (dev-watch 269) --------------------
+    # Reject BEFORE buffering: declared or actual size over the cap gets
+    # 413 without ever reading the full body into memory. The read is
+    # capped at cap+1 bytes so a spoofed/missing Content-Length cannot
+    # bypass the limit either.
+    try:
+        length = int(environ.get("CONTENT_LENGTH", "") or 0)
+    except (TypeError, ValueError):
+        length = 0
+    if length > MAX_REQUEST_BODY_BYTES:
+        status, headers, body = _json_response(
+            "413 Content Too Large",
+            {"error": "request body too large (max %d bytes)"
+                      % MAX_REQUEST_BODY_BYTES},
+            cors_headers,
+        )
+        start_response(status, headers)
+        return body
+
     # -- /mcp POST: auth -----------------------------------------------------
     expected = _configured_token()
     if not expected:
@@ -333,11 +401,19 @@ def app(environ, start_response):
         return body
 
     # -- /mcp POST: JSON-RPC -------------------------------------------------
-    try:
-        length = int(environ.get("CONTENT_LENGTH", "") or 0)
-    except (TypeError, ValueError):
-        length = 0
-    raw = environ.get("wsgi.input").read(length) if length > 0 else b""
+    # (length was parsed and capped against MAX_REQUEST_BODY_BYTES above)
+    to_read = MAX_REQUEST_BODY_BYTES + 1 if length <= 0 else min(
+        length, MAX_REQUEST_BODY_BYTES + 1)
+    raw = environ.get("wsgi.input").read(to_read)
+    if len(raw) > MAX_REQUEST_BODY_BYTES:
+        status, headers, body = _json_response(
+            "413 Content Too Large",
+            {"error": "request body too large (max %d bytes)"
+                      % MAX_REQUEST_BODY_BYTES},
+            cors_headers,
+        )
+        start_response(status, headers)
+        return body
     try:
         request = json.loads(raw.decode("utf-8") if raw else "")
     except (ValueError, UnicodeDecodeError):
@@ -401,6 +477,7 @@ def app(environ, start_response):
             args = params.get("arguments", {})
             if not isinstance(args, dict):
                 raise _JsonRpcParamsError("arguments must be an object")
+            _validate_tool_input_size(args)
             store = _store()
             known = {t["name"] for t in _tool_defs()}
             if tool_name not in known:
