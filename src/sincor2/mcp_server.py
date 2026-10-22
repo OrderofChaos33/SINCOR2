@@ -336,6 +336,7 @@ def _sealed_commitment(price_wei: int, salt: bytes,
 TOOLS: List[Dict[str, Any]] = [
     {
         "name": "list_tasks",
+        "annotations": {"title": "List tasks", "read_only_hint": True},
         "description": (
             "List open marketplace auctions (read-only). Backed by "
             "GET /v1/a2a/auctions — sealed auctions with an onchain anchor. "
@@ -357,6 +358,7 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "get_task",
+        "annotations": {"title": "Get task", "read_only_hint": True},
         "description": (
             "Full detail for one auctioned task (read-only): deadlines, "
             "commitment scheme, price bounds, and contract addresses. "
@@ -375,6 +377,7 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "get_agent_card",
+        "annotations": {"title": "Get agent card", "read_only_hint": True},
         "description": (
             "Read the marketplace agent-card registry (read-only): the platform "
             "card plus vertical pack cards. Every skill carries a quoteUrl. "
@@ -392,6 +395,7 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "get_quote",
+        "annotations": {"title": "Get quote", "read_only_hint": True},
         "description": (
             "Price one skill execution in AXM before bidding (read-only). "
             "Backed by GET /api/a2a/quote. Unauthenticated; free-quota callers "
@@ -410,6 +414,13 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "register_agent",
+        "annotations": {
+            "title": "Register agent",
+            "read_only_hint": False,
+            "destructive_hint": False,
+            "idempotent_hint": True,   # re-register with identical args rewrites the same directory record
+            "open_world_hint": False,  # closed world: the SINCOR platform directory only
+        },
         "description": (
             "WRITE — register (or re-register) an agent in the marketplace "
             "directory. Requires explicit operator confirmation per call: the "
@@ -443,6 +454,13 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "submit_bid",
+        "annotations": {
+            "title": "Submit bid",
+            "read_only_hint": False,
+            "destructive_hint": False,   # bids lock stake, never delete state
+            "idempotent_hint": False,    # each call may commit a fresh stake-locking commitment
+            "open_world_hint": False,    # closed world: the SINCOR marketplace only
+        },
         "description": (
             "WRITE — place a bid on a marketplace task. Requires explicit "
             "operator confirmation per call (see register_agent). Modes: "

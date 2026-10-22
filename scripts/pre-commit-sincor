@@ -55,4 +55,16 @@ if [ -d "$HOME/.venvs/sincor2" ]; then
 else
   echo "WARNING: venv not found, skipping smoke suite (CI will catch it)."
 fi
+echo "=== SINCOR pre-commit: MCP ToolAnnotations scan ==="
+# Every MCP tool with real-world side effects must declare load-bearing
+# ToolAnnotations (destructive_hint / idempotent_hint / open_world_hint).
+if [ -f "$REPO_ROOT/scripts/mcp_tool_annotations_scan.py" ]; then
+  PYTHONPATH=src:. python3 "$REPO_ROOT/scripts/mcp_tool_annotations_scan.py"
+  if [ $? -ne 0 ]; then
+    echo "BLOCKED: annotate side-effecting MCP tools before committing."
+    exit 1
+  fi
+else
+  echo "WARNING: mcp_tool_annotations_scan.py not found, skipping."
+fi
 echo "Pre-commit checks passed."

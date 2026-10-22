@@ -45,11 +45,19 @@ def _tool_defs() -> List[Dict[str, Any]]:
     return [
         {
             "name": "board_lanes_read",
+            "annotations": {"title": "Board lanes read", "read_only_hint": True},
             "description": "Read the Swarm Command board: cards grouped by lane.",
             "inputSchema": obj(),
         },
         {
             "name": "board_card_add",
+            "annotations": {
+                "title": "Board card add",
+                "read_only_hint": False,
+                "destructive_hint": False,   # appends a card; deletes nothing
+                "idempotent_hint": False,    # each call mints a new card id
+                "open_world_hint": False,    # closed world: the local swarm board file only
+            },
             "description": "Add a card to a lane.",
             "inputSchema": {
                 **obj(
@@ -63,6 +71,13 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "board_card_move",
+            "annotations": {
+                "title": "Board card move",
+                "read_only_hint": False,
+                "destructive_hint": False,   # relocates; deletes nothing
+                "idempotent_hint": True,     # repeat with identical args leaves the card in the same lane
+                "open_world_hint": False,
+            },
             "description": "Move a card to another lane.",
             "inputSchema": {
                 **obj(
@@ -74,6 +89,13 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "board_card_comment",
+            "annotations": {
+                "title": "Board card comment",
+                "read_only_hint": False,
+                "destructive_hint": False,   # appends a comment; deletes nothing
+                "idempotent_hint": False,    # each call appends another comment
+                "open_world_hint": False,
+            },
             "description": "Append a comment to a card.",
             "inputSchema": {
                 **obj(
@@ -86,6 +108,13 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "stack_propose",
+            "annotations": {
+                "title": "Stack propose",
+                "read_only_hint": False,
+                "destructive_hint": False,   # appends a proposal; deletes nothing
+                "idempotent_hint": False,    # each call mints a new stack id
+                "open_world_hint": False,
+            },
             "description": "Propose a daily work stack of items.",
             "inputSchema": {
                 **obj(
@@ -100,6 +129,13 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "stack_approve",
+            "annotations": {
+                "title": "Stack approve",
+                "read_only_hint": False,
+                "destructive_hint": False,   # flips status; deletes nothing
+                "idempotent_hint": True,     # one-shot: a repeat is rejected, no additional effect
+                "open_world_hint": False,
+            },
             "description": "Approve a proposed stack (one-shot).",
             "inputSchema": {
                 **obj(
@@ -111,6 +147,13 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "dispatch_assign",
+            "annotations": {
+                "title": "Dispatch assign",
+                "read_only_hint": False,
+                "destructive_hint": False,   # creates assignments; deletes nothing
+                "idempotent_hint": False,    # each call mints fresh assignment ids
+                "open_world_hint": False,
+            },
             "description": "Dispatch an approved stack: one assignment per item.",
             "inputSchema": {
                 **obj(stack_id={"type": "string"}),
@@ -119,6 +162,13 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "results_loopback",
+            "annotations": {
+                "title": "Results loopback",
+                "read_only_hint": False,
+                "destructive_hint": False,   # marks done; deletes nothing
+                "idempotent_hint": True,     # repeat with identical args leaves identical state
+                "open_world_hint": False,
+            },
             "description": "Record a result on an assignment and mark it done.",
             "inputSchema": {
                 **obj(
@@ -130,6 +180,13 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "discussion_post",
+            "annotations": {
+                "title": "Discussion post",
+                "read_only_hint": False,
+                "destructive_hint": False,   # appends a post; deletes nothing
+                "idempotent_hint": False,    # each call appends another post
+                "open_world_hint": False,
+            },
             "description": "Post to a discussion thread.",
             "inputSchema": {
                 **obj(
@@ -142,6 +199,7 @@ def _tool_defs() -> List[Dict[str, Any]]:
         },
         {
             "name": "discussion_read",
+            "annotations": {"title": "Discussion read", "read_only_hint": True},
             "description": "Read a discussion thread (all threads when topic omitted).",
             "inputSchema": obj(topic={"type": "string"}),
         },
