@@ -73,9 +73,82 @@ No parameter was tuned to results. Whatever the sim says is the verdict.
   events (only one outcome wins per event); the product's YES-first-outcome
   EV check vetoes these, same as the momentum run.
 
-## Results
+## Results — PHASE 2 POST-FIX RE-RUN (2026-10-23, CORRECTED)
 
-Live run 2026-10-22/23 (real APIs, real `run_backtest`; evidence, not a test):
+**Fix under test:** `xioix/green-settlement-unit-fix` @ f0d6bca —
+`resolve()` now computes shares in cents/cents (was cents/dollars) +
+fail-closed timestamp filter; Builder-B CONFIRMED. Pre-committed
+parameters (Step 0, verified by grep, frozen before any sim ran):
+
+| Parameter | Value (verified) |
+|---|---|
+| `whale_edge_p14.py` N_EPISODES | 60 |
+| `whale_edge_p14.py` MIN_VOLUME_USD | 10_000 |
+| `whale_edge_p14.py` SIGNAL_CAP | 0.12 |
+| `whale_edge_p14.py` WHALE_SEED_LIMIT | 50 |
+| `profit_p14.py` BANKROLL_CENTS | 100_000 ($1,000) |
+| `profit_p14.py` MIN_VOLUME_USD | 10_000 |
+| `prediction_markets.py` FEE_BPS | 15 (0.15% of settled PnL) |
+| 5% platform fee | on net profit only (`apply_fees`) |
+
+### Whale-edge (corrected)
+
+Live run 2026-10-23 (real APIs, real `run_backtest` through the FIXED
+`resolve()`; results → `fork_sim/whale_edge_results.json`):
+
+| Bar | Value | Pass? |
+|---|---|---|
+| Net P&L | **+$43.43** (gross +$45.77 − product fee $0.06 − 5% platform $2.28) | ✅ > 0 |
+| Win rate | 100% (1/1) | ✅ ≥ 40% |
+| Max drawdown | $0.00 | ✅ < 20% of $1,000 bankroll |
+| Trades | **1** | ❌ < 10 |
+
+**Verdict: NO-GO** — "only 1 trades (< 10; not trading != profit)."
+**The verdict did not change** (NO-GO pre-fix → NO-GO post-fix); only the
+honest magnitude did: **+$10,564.72 → +$43.43**.
+
+The single whale-signal trade is the SAME market as the pre-fix run:
+558934 ("Will Spain win the 2026 FIFA World Cup?", resolved YES),
+qualifier `0xf0318c32…` buying YES pre-T. Machinery health unchanged:
+brier 0.083 vs naive 0.167, fee ledger reconciles. **Coverage: 1/60**
+(59 zero-signal, vetoed — no signal, no trade). Qualifiers reused from
+the persistent registry (5 qualified, scored within 7 days, no
+re-discovery needed).
+
+### Perfect-signal machinery check (corrected)
+
+Live run 2026-10-23, same mechanical episode selection
+(`fetch_episodes(60, 10_000)`), REAL `run_backtest` through the FIXED
+`resolve()`, `episode_perfect` foresight on all 60 episodes:
+
+| Bar | Value | Pass? |
+|---|---|---|
+| Net P&L | **+$737.67** (gross +$777.61 − product fee $1.12 − 5% platform $38.82) | ✅ > 0 |
+| Win rate | 100% (8/8) | ✅ ≥ 40% |
+| Max drawdown | $0.00 | ✅ < 20% of $1,000 bankroll |
+| Trades | **8** | ❌ < 10 |
+
+**The machinery check passes on profitability** — the previously cited
+pre-fix figure (~+$148,139) was inflated by the same settlement bug;
+the honest magnitude is **+$737.67 net**. The settle math is now sane
+(cent-denominated shares, fees reconcile) and the pipeline runs clean
+end-to-end through `run_backtest`.
+
+CAVEAT: even with perfect foresight on all 60 episodes, the product's
+own edge/Kelly vetoes admitted only 8 trades. The ≥10-trade bar fails
+at 8. This is a coverage/veto-tightness observation, not a machinery
+failure — the 8 admitted trades were all winners at +$737.67 net.
+(Whether the vetoes are too tight is a separate scope decision for the
+coordinator; no code was changed for either sim.)
+
+## Results — PRE-FIX (SUPERSEDED 2026-10-23 — do not cite)
+
+The figures below were produced through the BUGGY `resolve()` in
+`src/sincor2/defi/prediction_markets.py` (pre-existing settlement-unit bug:
+`resolve()` computed `shares = pos.size_cents / pos.entry_price`, i.e.
+cents / dollars, inflating every winning payout ~100x; losses unaffected).
+Every dollar figure in this section is SUPERSEDED by the post-fix re-run
+below. Kept here for the audit trail only.
 
 | Bar | Value | Pass? |
 |---|---|---|
@@ -112,7 +185,19 @@ intermittently times out. Skipped wallets are listed in
 `discovery_scored.json`; a retry pass confirmed the flakiness is
 persistent for those lookups. No whale data was fabricated.
 
-## Verdict
+## Verdict (post-fix, 2026-10-23)
+
+**NO-GO — unchanged.** The hypothesis is not disproven — the one
+whale-signal trade won (+$43.43 net corrected) — but it is untested at
+scale: 1/60 coverage cannot clear the ≥10-trade bar. The bottleneck is
+coverage (whale flow overlap with the episode set inside the committed
+pull window), not the machinery (which is proven, now on fixed settle
+math) and not signal direction (1/1 correct). Per the mission rules,
+parameters were committed before the run and were not tuned; widening
+the pull window or the seed set would be a follow-up experiment, not a
+revision of this result.
+
+## Verdict — pre-fix run (superseded figures, verdict itself unchanged)
 
 **NO-GO.** The hypothesis is not disproven — the one whale-signal trade
 won decisively — but it is untested at scale: 1/60 coverage cannot clear
@@ -136,5 +221,9 @@ before the run.
 - `fork_sim/whale_edge_p14.py` — the wired edge (new module)
 - `tests/pytest/test_whale_edge_p14.py` — wiring tests, synthetic only
 - `fork_sim/whale_edge_results.json` — full stats from the live run
+  (REGENERATED 2026-10-23 on the fixed settlement; old pre-fix copy kept
+  only in the superseded section above)
+- `/tmp/perfect_signal_rerun.py` — throwaway perfect-signal driver (never
+  committed; re-run with: `python /tmp/perfect_signal_rerun.py`)
 - `/home/hatch/workspace/green-mission1a/` — persistent whale registry,
   resolution cache, token-ID cache, trade cache, run log

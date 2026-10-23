@@ -3,10 +3,10 @@
   "trades": 1,
   "wins": 1,
   "win_rate": 1.0,
-  "gross_pnl_cents": 1113745,
-  "product_fee_cents": 1670,
-  "platform_fee_cents": 55603,
-  "net_pnl_cents": 1056472,
+  "gross_pnl_cents": 4577,
+  "product_fee_cents": 6,
+  "platform_fee_cents": 228,
+  "net_pnl_cents": 4343,
   "max_dd_cents": 0,
   "bankroll_cents": 100000,
   "brier": 0.08323225,
@@ -25,6 +25,48 @@
     "0xb52e8b3afd9f0f0d502a5a76494b42816d67285c",
     "0x5268527977f700f9bf9b6d5cd843859e4e70135d",
     "0xce937f66d91dc6fd78e2b0e405f703a7d208ab2c"
+  ],
+  "scored": [
+    {
+      "wallet": "0xf0318c32136c2db7fec88b84869aee6a1106c80c",
+      "resolved_trades": 371,
+      "resolved_markets": 238,
+      "realized_pnl_usd": 1219718.7,
+      "win_rate": 0.412,
+      "qualifies": true
+    },
+    {
+      "wallet": "0x1f3a646ce5cbe2c70270e7a46161d89b7c7b895d",
+      "resolved_trades": 1917,
+      "resolved_markets": 146,
+      "realized_pnl_usd": 351114.58,
+      "win_rate": 0.473,
+      "qualifies": true
+    },
+    {
+      "wallet": "0xb52e8b3afd9f0f0d502a5a76494b42816d67285c",
+      "resolved_trades": 412,
+      "resolved_markets": 246,
+      "realized_pnl_usd": 169959.61,
+      "win_rate": 0.516,
+      "qualifies": true
+    },
+    {
+      "wallet": "0x5268527977f700f9bf9b6d5cd843859e4e70135d",
+      "resolved_trades": 1293,
+      "resolved_markets": 190,
+      "realized_pnl_usd": 1277.88,
+      "win_rate": 0.553,
+      "qualifies": true
+    },
+    {
+      "wallet": "0xce937f66d91dc6fd78e2b0e405f703a7d208ab2c",
+      "resolved_trades": 51,
+      "resolved_markets": 13,
+      "realized_pnl_usd": 61127.58,
+      "win_rate": 0.538,
+      "qualifies": true
+    }
   ],
   "net_notional_by_market": {
     "558934": 33618.98292214148,
@@ -65,6 +107,7 @@
     "253725": 0.0,
     "253724": 0.0,
     "253729": 0.0,
+    "253731": 0.0,
     "253733": 0.0,
     "253734": 0.0,
     "253732": 0.0,
@@ -85,7 +128,6 @@
     "1273610": 0.0,
     "1294617": 0.0,
     "1294626": 0.0,
-    "1294627": 0.0,
-    "1294628": 0.0
+    "1294627": 0.0
   }
 }
