@@ -364,9 +364,10 @@ class OrderLifecycleManager:
             raise ValueError("already resolved")
         won = (pos.side == "YES") == outcome_yes
         if won:
-            # shares bought = size / entry_price, each redeeming 100 cents
-            shares = pos.size_cents / pos.entry_price
-            payout = int(round(shares * 100))
+            # CTF: 1 winning share redeems exactly 100 cents.
+            # shares bought = (size_cents / 100) / entry_price, so
+            # payout_cents = shares * 100 = size_cents / entry_price.
+            payout = int(round(pos.size_cents / pos.entry_price))
         else:
             payout = 0
         pos.resolved = True
