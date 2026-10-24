@@ -12,7 +12,8 @@
     "OBS-03",
     "AUD-01",
     "AUD-02",
-    "OBS-ENT"
+    "OBS-ENT",
+    "WEB-01"
   ],
   "packaging": {
     "note": "Packages existing audit, monitoring, quality-scoring, and compliance surfaces as SKUs; readiness flags call out where customer-facing productization is still missing.",

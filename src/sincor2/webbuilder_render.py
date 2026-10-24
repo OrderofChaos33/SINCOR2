@@ -46,6 +46,19 @@ def build_site_html(project: dict, discovery: dict[str, Any], lane: str = "draft
 
     noindex_tag = '<meta name="robots" content="noindex, nofollow">' if is_preview else ""
 
+    # JSON-LD is embedded raw inside a <script> block: json.dumps does NOT
+    # escape `</script`, so a hostile name/phone/address could break out of
+    # the block (stored XSS on the built site). Neutralize the closing
+    # sequence — `\/` decodes back to `/` in every JSON parser, so the
+    # payload round-trips while `</script` can never appear literally.
+    _json_ld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": name,
+        "telephone": phone,
+        "address": address,
+        "description": snippet[:300],
+    }).replace("</", "<\\/")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,14 +69,7 @@ def build_site_html(project: dict, discovery: dict[str, Any], lane: str = "draft
   {noindex_tag}
   <meta property="og:title" content="{_esc(name)}">
   <meta property="og:description" content="{_esc(snippet[:160])}">
-  <script type="application/ld+json">{json.dumps({
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      "name": name,
-      "telephone": phone,
-      "address": address,
-      "description": snippet[:300],
-  })}</script>
+  <script type="application/ld+json">{_json_ld}</script>
   <style>
     *{{box-sizing:border-box;margin:0;padding:0}}
     body{{font-family:system-ui,-apple-system,sans-serif;color:#0f172a;background:#f8fafc;line-height:1.6}}
