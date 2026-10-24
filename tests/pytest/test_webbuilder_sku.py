@@ -396,3 +396,102 @@ def test_webbuilder_fulfillment_failure_marks_failed_and_alerts(
     assert _db_counts(db_path) == (1, 1)
     log_lines = (rail_env["tmp"] / "platform_payments.jsonl").read_text().splitlines()
     assert len(log_lines) == 1  # still exactly one payment record
+
+
+# ---------------------------------------------------------------------------
+# Adversarial-review regressions (w4a builder fixes)
+# ---------------------------------------------------------------------------
+
+def test_jsonld_script_breakout_neutralized(rail_env):
+    """Break 1 — stored XSS: json.dumps does not escape </script.
+
+    A hostile business_name (arriving unauthenticated via the settle body)
+    must be unable to break out of the JSON-LD <script> block — the payload
+    may appear only in escaped (<\\/ ) form, and the block must still parse
+    with the full business name intact.
+    """
+    import json as _json
+    import re as _re
+
+    from sincor2 import webbuilder_render
+
+    hostile = "Acme </script><script>alert(document.domain)</script>"
+    project = {"id": "pid-xss-1", "name": hostile, "niche": "dental",
+               "territory": "Clinton, IA", "prompt": "Website for Acme"}
+    html = webbuilder_render.build_site_html(
+        project, {"name": hostile, "phone": "(555) 123-4567"}, "draft")
+    # the JSON-LD block itself may never contain a literal closer — that is
+    # what would break out of the <script> element
+    m = _re.search(r'<script type="application/ld\+json">(.*?)</script>',
+                   html, _re.S)
+    assert m, "JSON-LD block must be present"
+    assert "</script" not in m.group(1)
+    # the attacker's breakout pair never appears as raw HTML anywhere
+    assert "</script><script>" not in html
+    # the payload survives only in JSON-escaped form
+    assert "<\\/script>" in html
+    payload = _json.loads(m.group(1))
+    assert payload["name"] == hostile
+
+
+def test_retry_after_partial_build_resumes_single_project(
+        rail_app, rail_env, mock_comms, monkeypatch):
+    """Break 2 — idempotency across settle retries.
+
+    The first settle fails AFTER create_project succeeded but before
+    completion (webbuilder_crm.record_contact raises). The retry must
+    resume from the existing project instead of building a second bundle:
+    exactly 1 project, 1 site dir, 1 CRM contact, 1 thank-you email, and
+    exactly 1 payment record.
+    """
+    from sincor2 import webbuilder_crm as crm
+    from sincor2 import webbuilder_studio as wb
+
+    orig_record_contact = crm.record_contact
+
+    def _boom(*a, **k):
+        raise RuntimeError("crm unavailable")
+
+    monkeypatch.setattr(crm, "record_contact", _boom)
+
+    client = rail_app.test_client()
+    cid = _checkout_challenge(client)
+    first = _settle(client, cid)
+    first_body = first.get_json()
+    assert first.status_code == 402
+    assert first_body["ok"] is False
+    assert "crm unavailable" in first_body["fulfillment"]["error"]
+
+    # the project was created before the CRM failure, but the event failed
+    projects = wb.list_projects()
+    assert len(projects) == 1
+    partial_project = projects[0]
+    event = rr._get_rail_event(f"rail-{cid}")
+    assert event["fulfillment_status"] == "failed"
+
+    # restore CRM and retry: must resume, not rebuild (restore only the CRM
+    # patch — monkeypatch.undo() would drop the RPC stub, env isolation,
+    # and comms mocks)
+    monkeypatch.setattr(crm, "record_contact", orig_record_contact)
+    retry = _settle(client, cid)
+    retry_body = retry.get_json()
+    assert retry.status_code == 200
+    assert retry_body["ok"] is True
+    assert retry_body["status"] == "fulfilled"
+    assert retry_body["fulfillment"]["status"] == "delivered"
+
+    # exactly one of everything — and the SAME project, resumed
+    project = _wb_project()
+    assert project["id"] == partial_project["id"]
+    site_dirs = list((wb.data_dir() / "sites").iterdir())
+    assert len(site_dirs) == 1  # exactly one site dir
+    assert (site_dirs[0] / "draft" / "index.html").is_file()
+    contacts = crm.list_contacts(wb.data_dir(), project["id"])
+    assert len(contacts) == 1  # exactly one CRM record
+    assert retry_body["fulfillment"]["webbuilder"]["contact_id"] == contacts[0]["id"]
+    assert len(mock_comms["sent"]) == 1  # thank-you email not re-sent
+
+    db_path = rail_env["tmp"] / "revenue.db"
+    assert _db_counts(db_path) == (1, 1)
+    log_lines = (rail_env["tmp"] / "platform_payments.jsonl").read_text().splitlines()
+    assert len(log_lines) == 1  # payment recorded exactly once

@@ -356,25 +356,19 @@ class RevenueOrchestrator:
         return result
 
     @staticmethod
-    def _build_webbuilder_bundle(*, intake_id: str, customer_email: str,
-                                 customer_name: str,
-                                 order: Dict[str, Any]) -> Dict[str, Any]:
-        """Produce the zero-to-revenue 4.1 WebBuilder deliverable.
+    def _create_webbuilder_project(*, customer_email: str,
+                                   customer_name: str,
+                                   order: Dict[str, Any]) -> Dict[str, Any]:
+        """Create the WebBuilder studio project (the non-idempotent half).
 
-        Ported verbatim from xioix/z2r2-w4-webbuilder-sku (the Stripe-based
-        branch) — reuses the webbuilder modules (no reimplementation):
-        creates a WebBuilder studio project for the buyer, renders the
-        static HTML site bundle carrying the business name / phone CTA /
-        contact CTA, and writes a webbuilder_crm record for the project.
-
-        A staticmethod (the body never used ``self``): the x402 rail calls
-        it from ``sincor2.rail_routes._fulfill_rail_pack`` without
-        constructing the Stripe-era orchestrator.
+        Creates the project, stamps the buyer's phone into the stored
+        discovery record, and rebuilds the draft lane. The caller persists
+        the returned ``project_id`` before running the completion half so
+        a settle retry can resume instead of building a second project.
 
         Raises on any failure so the caller marks the revenue event
-        ``failed`` and records an alert — exactly like the other packs.
+        ``failed`` and records an alert.
         """
-        from sincor2 import webbuilder_crm as _crm
         from sincor2 import webbuilder_studio as _wb
 
         details = order.get("details") or {}
@@ -415,23 +409,56 @@ class RevenueOrchestrator:
                     f"webbuilder draft rebuild failed: {rebuilt.get('error')}"
                 )
 
-        contact = _crm.record_contact(
-            _wb.data_dir(),
-            project_id=project_id,
-            project_name=project.get("name", ""),
-            owner_email=customer_email,
-            name=customer_name,
-            email=customer_email,
-            phone=phone,
-            message=f"WebBuilder Site purchase (intake {intake_id})",
-            source="pack_purchase",
-        )
+        return {
+            "project_id": project_id,
+            "project_name": project.get("name", ""),
+            "slug": project.get("slug", ""),
+            "preview_url": project.get("preview_url", ""),
+            "phone": phone,
+        }
+
+    @staticmethod
+    def _complete_webbuilder_bundle(*, project: Dict[str, Any], phone: str,
+                                    intake_id: str, customer_email: str,
+                                    customer_name: str) -> Dict[str, Any]:
+        """Finish the WebBuilder deliverable (idempotent across retries).
+
+        Records the webbuilder_crm contact and builds the receipt. The CRM
+        record is idempotent per project: an existing ``pack_purchase``
+        contact (from a partially-completed earlier attempt) is reused
+        instead of inserted twice.
+        """
+        from sincor2 import webbuilder_crm as _crm
+        from sincor2 import webbuilder_studio as _wb
+
+        project_id = project["id"]
+        existing = [c for c in _crm.list_contacts(_wb.data_dir(), project_id)
+                    if c.get("source") == "pack_purchase"]
+        if existing:
+            contact = existing[0]
+            contact_id = contact.get("id") or contact.get("contact_id")
+            logger.info(
+                "[FULFILLMENT] WebBuilder CRM record already exists for "
+                "project=%s — reusing contact=%s", project_id, contact_id)
+        else:
+            contact = _crm.record_contact(
+                _wb.data_dir(),
+                project_id=project_id,
+                project_name=project.get("name", ""),
+                owner_email=customer_email,
+                name=customer_name,
+                email=customer_email,
+                phone=phone,
+                message=f"WebBuilder Site purchase (intake {intake_id})",
+                source="pack_purchase",
+            )
+            contact_id = contact.get("contact_id")
 
         site_dir = _wb._site_dir(project["slug"])
         draft_html = site_dir / "draft" / "index.html"
         logger.info(
             "[FULFILLMENT] WebBuilder bundle built: project=%s html=%s contact=%s",
-            project_id, draft_html, contact.get("contact_id"),
+            project_id, draft_html, contact_id,
         )
         return {
             "project_id": project_id,
@@ -439,9 +466,48 @@ class RevenueOrchestrator:
             "slug": project.get("slug", ""),
             "preview_url": project.get("preview_url", ""),
             "html_path": str(draft_html),
-            "contact_id": contact.get("contact_id"),
+            "contact_id": contact_id,
             "phone": phone,
         }
+
+    @staticmethod
+    def _build_webbuilder_bundle(*, intake_id: str, customer_email: str,
+                                 customer_name: str,
+                                 order: Dict[str, Any]) -> Dict[str, Any]:
+        """Produce the zero-to-revenue 4.1 WebBuilder deliverable.
+
+        Ported verbatim from xioix/z2r2-w4-webbuilder-sku (the Stripe-based
+        branch) — reuses the webbuilder modules (no reimplementation):
+        creates a WebBuilder studio project for the buyer, renders the
+        static HTML site bundle carrying the business name / phone CTA /
+        contact CTA, and writes a webbuilder_crm record for the project.
+
+        A staticmethod (the body never used ``self``): the x402 rail calls
+        it from ``sincor2.rail_routes._fulfill_rail_pack`` without
+        constructing the Stripe-era orchestrator.
+
+        Raises on any failure so the caller marks the revenue event
+        ``failed`` and records an alert — exactly like the other packs.
+        """
+        created = RevenueOrchestrator._create_webbuilder_project(
+            customer_email=customer_email,
+            customer_name=customer_name,
+            order=order,
+        )
+        from sincor2 import webbuilder_studio as _wb
+        project = _wb.get_project(created["project_id"]) or {
+            "id": created["project_id"], "slug": created.get("slug"),
+            "name": created.get("project_name", ""),
+            "preview_url": created.get("preview_url", ""),
+        }
+        return RevenueOrchestrator._complete_webbuilder_bundle(
+            project=project,
+            phone=created.get("phone", ""),
+            intake_id=intake_id,
+            customer_email=customer_email,
+            customer_name=customer_name,
+        )
+
 
 
 # Initialize the orchestrator (lazy-loaded to avoid import-time failures)

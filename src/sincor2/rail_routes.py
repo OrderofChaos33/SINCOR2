@@ -301,6 +301,21 @@ def _get_rail_event(event_id: str) -> Optional[Dict[str, Any]]:
     finally:
         conn.close()
 
+# --- Event details (idempotency state for fulfillment retries) ----------------
+def _rail_event_details(event_id: str) -> Dict[str, Any]:
+    """Read the rail event's JSON details column ({} when absent/corrupt)."""
+    event = _get_rail_event(event_id) or {}
+    try:
+        return json.loads(event.get("details") or "{}") or {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def _rail_event_merge_details(event_id: str, updates: Dict[str, Any]) -> None:
+    """Merge ``updates`` into the rail event's JSON details column."""
+    merged = _rail_event_details(event_id)
+    merged.update(updates)
+    _update_rail_event(event_id, details=json.dumps(merged))
 
 # --- Money gate --------------------------------------------------------------
 def _rail_money_gate_allows(*, event_id: str, challenge_id: str,
@@ -540,14 +555,19 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
         logger.info("[FULFILLMENT] Intake record: %s", intake.intake_id)
 
         # 2. Buyer email with the intake link (wallet-native buyers skip).
+        # Idempotent per event: the sent flag survives a failed fulfillment,
+        # so a settle retry never re-sends the thank-you email.
         if customer_email:
-            _send_pack_email(
-                to_email=customer_email,
-                customer_name=customer_name,
-                pack_name=pack_name,
-                intake_url=intake_url,
-                order_id=intake.intake_id,
-            )
+            if not _rail_event_details(event_id).get("thank_you_email_sent"):
+                _send_pack_email(
+                    to_email=customer_email,
+                    customer_name=customer_name,
+                    pack_name=pack_name,
+                    intake_url=intake_url,
+                    order_id=intake.intake_id,
+                )
+                _rail_event_merge_details(
+                    event_id, {"thank_you_email_sent": True})
         else:
             logger.info(
                 "[FULFILLMENT] no buyer email for %s — intake link returned "
@@ -560,9 +580,10 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
             # bundle (static HTML site via the webbuilder modules) plus a
             # webbuilder_crm record — built synchronously here, not via
             # the vertical-agent Celery job (that worker raises for packs
-            # with no vertical-agent binding).
-            from sincor2.revenue_orchestrator import RevenueOrchestrator
-            webbuilder_receipt = RevenueOrchestrator._build_webbuilder_bundle(
+            # with no vertical-agent binding). Resume-safe: a retry of a
+            # failed event continues from the already-created project.
+            webbuilder_receipt = _fulfill_webbuilder_site(
+                event_id=event_id,
                 intake_id=intake.intake_id,
                 customer_email=customer_email or payer_wallet,
                 customer_name=customer_name,
@@ -593,6 +614,55 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
         "job_id": job_id,
         "webbuilder": webbuilder_receipt,
     }
+
+
+def _fulfill_webbuilder_site(*, event_id: str, intake_id: str,
+                             customer_email: str, customer_name: str,
+                             order: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the WebBuilder site bundle, idempotent across settle retries.
+
+    The studio project is the non-idempotent half: it is persisted to the
+    rail event's details the moment it exists, so a retry of a failed event
+    resumes from the recorded project_id (CRM record + deliverable receipt)
+    instead of building a second project, site dir, and thank-you bundle.
+    A recorded project that no longer exists in the studio store (operator
+    deleted it) is treated as fresh — rebuild is the safe failover.
+    """
+    from sincor2.revenue_orchestrator import RevenueOrchestrator
+    from sincor2 import webbuilder_studio as _wb
+
+    wb_state = dict(_rail_event_details(event_id).get("webbuilder") or {})
+    project = None
+    project_id = wb_state.get("project_id")
+    if project_id:
+        project = _wb.get_project(project_id)
+
+    phone = ((order.get("details") or {}).get("phone") or "").strip()
+    if project is None:
+        created = RevenueOrchestrator._create_webbuilder_project(
+            customer_email=customer_email,
+            customer_name=customer_name,
+            order=order,
+        )
+        project_id = created["project_id"]
+        phone = created.get("phone", phone)
+        wb_state.update({"project_id": project_id,
+                         "slug": created.get("slug"),
+                         "name": created.get("name", "")})
+        _rail_event_merge_details(event_id, {"webbuilder": wb_state})
+        project = _wb.get_project(project_id) or {
+            "id": project_id, "slug": created.get("slug"),
+            "name": created.get("name", ""),
+            "preview_url": created.get("preview_url", ""),
+        }
+
+    return RevenueOrchestrator._complete_webbuilder_bundle(
+        project=project,
+        phone=phone,
+        intake_id=intake_id,
+        customer_email=customer_email,
+        customer_name=customer_name,
+    )
 
 
 # --- Settle pipeline ----------------------------------------------------------
