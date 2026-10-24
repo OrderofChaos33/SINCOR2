@@ -58,6 +58,70 @@ def genesis_count() -> int:
         return 0
 
 
+def get_member(email: str) -> dict | None:
+    """Read-only lookup: return the genesis cohort record for an email, or None.
+
+    Never raises — callers on the payment path must not fail a payment
+    because the attribution lookup hit a snag.
+    """
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+    try:
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT id, email, wallet, created_at FROM genesis_cohort WHERE email = ?",
+                (email,),
+            ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    return {
+        "email": row["email"],
+        "allocation": f"{int(row['id']):05d}",
+        "wallet": row["wallet"] or "",
+        "created_at": row["created_at"],
+    }
+
+
+def get_member_by_wallet(wallet: str) -> dict | None:
+    """Read-only lookup: return the genesis cohort record for a registered
+    wallet address, or None.
+
+    The wallet is the secondary attribution key on the x402 rail: a member
+    who pays from a wallet with no buyer_email is still attributable when
+    the wallet was registered to their claim. Comparison is
+    case-insensitive (wallets are stored as submitted at claim time).
+    Never raises — same no-fail-attribution rule as get_member().
+    """
+    wallet = (wallet or "").strip().lower()
+    if not wallet:
+        return None
+    try:
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT id, email, wallet, created_at FROM genesis_cohort "
+                "WHERE LOWER(wallet) = ?",
+                (wallet,),
+            ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    return {
+        "email": row["email"],
+        "allocation": f"{int(row['id']):05d}",
+        "wallet": row["wallet"] or "",
+        "created_at": row["created_at"],
+    }
+
+
+def is_genesis_member(email: str) -> bool:
+    """Read-only: True if the email belongs to a claimed genesis cohort member."""
+    return get_member(email) is not None
+
+
 def claim(email: str, password: str, wallet: str = "") -> dict:
     email = (email or "").strip().lower()
     password = password or ""
