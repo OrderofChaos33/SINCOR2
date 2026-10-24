@@ -1115,7 +1115,8 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
                 challenge_id=challenge_id, pack_sku=pack_sku,
                 payer_wallet=str(verify.get("payer_wallet") or payer_wallet),
                 tx_hash=tx_hash,
-                amount_usdc=pack["price_cents"] / 100)
+                amount_usdc=pack["price_cents"] / 100,
+                buyer_email=buyer_email)
             _update_rail_event(event_id, verified=1)
             verify_result = verify
         elif plan_id:
