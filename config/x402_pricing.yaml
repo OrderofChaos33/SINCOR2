@@ -55,6 +55,26 @@ resources:
     amount_usdc: 2997.0
     description: "B2B skill pack: SADAS Execution — x402 USDC payment on Base"
 
+  # Subscription plans (rail rework of the parked Stripe subscriptions):
+  # bought via periodic x402 re-auth — one challenge per 30-day period.
+  # amount_usdc MUST equal SUB_PLANS[plan].price_cents / 100 in
+  # src/sincor2/rail_subscriptions.py — the subscription checkout refuses
+  # to mint a challenge when the two disagree (fail closed on drift).
+  rail-sub-starter:
+    label: "SINCOR Starter (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 297.0
+    description: "SINCOR Starter plan — one 30-day billing period, x402 USDC payment on Base"
+  rail-sub-professional:
+    label: "SINCOR Professional (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 997.0
+    description: "SINCOR Professional plan — one 30-day billing period, x402 USDC payment on Base"
+  rail-sub-enterprise:
+    label: "SINCOR Enterprise (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 2997.0
+    description: "SINCOR Enterprise plan — one 30-day billing period, x402 USDC payment on Base"
   # Digital packs (zero-to-revenue rail rework w4): token-gated downloads
   # via GET /download/<intake_id>. amount_usdc MUST equal
   # DIGITAL_SKUS[sku].price_cents / 100 in
@@ -90,3 +110,12 @@ resources:
     token: USDC
     amount_usdc: 0.015
     description: "Single-read KYA agent trust score with auditable component breakdown from the SINCOR registry, stake ledger, and settlement history on Base with x402 settlement. Use when you need to decide whether to transact with an agent wallet."
+  # Wallet Sanctions Screen (skills gap G1): single-read OFAC SDN screen
+  # served by src/sincor2/sanctions_screen.py after x402 settlement.
+  # Price hypothesis anchored to the advertised OFAC-screen market point
+  # ($0.005/call, Verilex — skills-gap-map-2026-10-24 §2.5).
+  wallet-sanctions-screen:
+    label: "Wallet sanctions screen (single read)"
+    token: USDC
+    amount_usdc: 0.005
+    description: "Single-read OFAC SDN sanctions screen for one wallet address on Base with x402 settlement. Use when you need a pre-transaction sanctions check on an unknown wallet."
