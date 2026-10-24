@@ -164,7 +164,9 @@ def test_pack_resources_match_pack_skus():
             f"${resource['amount_usdc']}")
         assert resource["amount_display"] == expected_usdc
     assert set(rr.PACK_SKUS) == {
-        "credentialing_launch", "chroma_compliance", "sadas_execution"}
+        "credentialing_launch", "chroma_compliance", "sadas_execution",
+        "digital_bi_template_pack", "digital_ai_agent_bundle",
+        "digital_growth_forecast"}
 
 
 def test_pack_agent_task_registered_on_sincor_long():

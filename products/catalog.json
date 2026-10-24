@@ -62,5 +62,37 @@
         "AUD-02 setup"
       ]
     }
-  }
+  },
+  "digital_products": [
+    {
+      "code": "DIG-BI",
+      "slug": "instant-bi-template-pack",
+      "name": "Instant BI Template Pack",
+      "price_cents": 9700,
+      "price_display": "$97",
+      "asset": "money_assets/instant_bi_template_pack.md",
+      "delivery": "platform-native x402/USDC rail checkout; token-gated download link bound to the pack intake record",
+      "pack_sku": "digital_bi_template_pack"
+    },
+    {
+      "code": "DIG-AGENTS",
+      "slug": "ai-agent-bundle",
+      "name": "AI Agent Bundle",
+      "price_cents": 29700,
+      "price_display": "$297",
+      "asset": "money_assets/ai_agent_bundle.md",
+      "delivery": "platform-native x402/USDC rail checkout; token-gated download link bound to the pack intake record",
+      "pack_sku": "digital_ai_agent_bundle"
+    },
+    {
+      "code": "DIG-FORECAST",
+      "slug": "growth-forecast-template",
+      "name": "Growth Forecast Template",
+      "price_cents": 14700,
+      "price_display": "$147",
+      "asset": "money_assets/growth_forecast_template.md",
+      "delivery": "platform-native x402/USDC rail checkout; token-gated download link bound to the pack intake record",
+      "pack_sku": "digital_growth_forecast"
+    }
+  ]
 }
