@@ -80,3 +80,14 @@ resources:
     token: USDC
     amount_usdc: 497.0
     description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"
+
+  # Market-Data Single Read (skills gap G6): one Chainlink price read
+  # served by src/sincor2/market_data_read.py after x402 settlement.
+  # Price is AsterPay's published market-data price point ($0.0075,
+  # skills-gap-map-2026-10-24 §2.4). OHLCV/trending at $0.015 is NOT
+  # registered: the repo has no OHLCV source, so none is invented.
+  market-data-read:
+    label: "Market data price read (single Chainlink round)"
+    token: USDC
+    amount_usdc: 0.0075
+    description: "Single Chainlink price read with round provenance and staleness flag on Base with x402 settlement. Use when you need one current price with its round id and timestamp inside a larger workflow."
