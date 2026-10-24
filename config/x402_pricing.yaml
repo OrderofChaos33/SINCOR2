@@ -34,3 +34,23 @@ resources:
     amount_usdc: 5.0
     description: "Paid healthcare credential verification on Base with AgentKit/x402 settlement"
     skill_id: healthcare-credential-check
+
+  # B2B skill packs (zero-to-revenue rail rework): bought via x402 USDC on
+  # Base. amount_usdc MUST equal PACK_SKUS[sku].price_cents / 100 in
+  # src/sincor2/rail_routes.py — the rail checkout route refuses to mint a
+  # challenge when the two disagree (fail closed on price config drift).
+  rail-pack-credentialing_launch:
+    label: "Credentialing Launch (B2B skill pack)"
+    token: USDC
+    amount_usdc: 297.0
+    description: "B2B skill pack: Credentialing Launch — x402 USDC payment on Base"
+  rail-pack-chroma_compliance:
+    label: "Compliance Operations (B2B skill pack)"
+    token: USDC
+    amount_usdc: 997.0
+    description: "B2B skill pack: Compliance Operations — x402 USDC payment on Base"
+  rail-pack-sadas_execution:
+    label: "SADAS Execution (B2B skill pack)"
+    token: USDC
+    amount_usdc: 2997.0
+    description: "B2B skill pack: SADAS Execution — x402 USDC payment on Base"

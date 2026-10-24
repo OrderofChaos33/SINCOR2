@@ -1502,6 +1502,11 @@ def create_app():
         register_a2a_inbound(app)
     except Exception as e:
         print(f"A2A inbound not available: {e}")
+    try:
+        from sincor2.rail_routes import init_rail_routes
+        init_rail_routes(app)
+    except Exception as e:
+        print(f"Rail routes not available: {e}")
     return app
 
 
