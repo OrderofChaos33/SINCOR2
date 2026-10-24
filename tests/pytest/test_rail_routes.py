@@ -168,7 +168,6 @@ def test_pack_resources_match_pack_skus():
         "digital_bi_template_pack", "digital_ai_agent_bundle",
         "digital_growth_forecast"}
 
-
 def test_pack_agent_task_registered_on_sincor_long():
     assert rr.fulfill_pack_agent.name == "sincor2.fulfill_pack_agent"
     assert rr.PACK_AGENT_QUEUE == "sincor.long"
