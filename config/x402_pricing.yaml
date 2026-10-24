@@ -100,3 +100,13 @@ resources:
     token: USDC
     amount_usdc: 497.0
     description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"
+
+  # Wallet Sanctions Screen (skills gap G1): single-read OFAC SDN screen
+  # served by src/sincor2/sanctions_screen.py after x402 settlement.
+  # Price hypothesis anchored to the advertised OFAC-screen market point
+  # ($0.005/call, Verilex — skills-gap-map-2026-10-24 §2.5).
+  wallet-sanctions-screen:
+    label: "Wallet sanctions screen (single read)"
+    token: USDC
+    amount_usdc: 0.005
+    description: "Single-read OFAC SDN sanctions screen for one wallet address on Base with x402 settlement. Use when you need a pre-transaction sanctions check on an unknown wallet."
