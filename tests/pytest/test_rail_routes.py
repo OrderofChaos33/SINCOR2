@@ -167,7 +167,6 @@ def test_pack_resources_match_pack_skus():
         "credentialing_launch", "chroma_compliance", "sadas_execution",
         "webbuilder_site"}
 
-
 def test_pack_agent_task_registered_on_sincor_long():
     assert rr.fulfill_pack_agent.name == "sincor2.fulfill_pack_agent"
     assert rr.PACK_AGENT_QUEUE == "sincor.long"
