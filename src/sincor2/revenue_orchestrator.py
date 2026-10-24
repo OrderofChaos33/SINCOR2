@@ -36,7 +36,8 @@ except ImportError as e:
 logger = logging.getLogger("revenue_orchestrator")
 # The file handler below is created at import time: make sure its directory
 # exists first so importing this module never crashes on a missing logs/
-# dir (e.g. the x402 rail imports it lazily during pack fulfillment).Path("logs").mkdir(parents=True, exist_ok=True)
+# dir (e.g. the x402 rail imports it lazily during pack fulfillment).
+Path("logs").mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
