@@ -80,3 +80,13 @@ resources:
     token: USDC
     amount_usdc: 497.0
     description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"
+
+  # KYA Trust Score (skills gap G2): single-read agent trust score
+  # served by src/sincor2/kya_trust_score.py after x402 settlement.
+  # Price hypothesis anchored to the published KYA deep-analysis
+  # point ($0.015/call, AsterPay — skills-gap-map-2026-10-24 §2.4).
+  kya-trust-score:
+    label: "KYA agent trust score (deep read)"
+    token: USDC
+    amount_usdc: 0.015
+    description: "Single-read KYA agent trust score with auditable component breakdown from the SINCOR registry, stake ledger, and settlement history on Base with x402 settlement. Use when you need to decide whether to transact with an agent wallet."
