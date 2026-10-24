@@ -80,3 +80,15 @@ resources:
     token: USDC
     amount_usdc: 497.0
     description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"
+
+  # Polymarket Whale Signal (skills gap G3): single-read fresh tracked-
+  # whale entries served by src/sincor2/whale_signal.py after x402
+  # settlement. Price anchored to the published single-question
+  # Polymarket snapshot point ($0.02/call, Botsmith — skills-gap-map
+  # 2026-10-24 §2.5). Data read only — no profitability claim (Mission
+  # 1A whale-flow trading verdict was NO-GO).
+  polymarket-whale-signal:
+    label: "Polymarket whale signal (single read)"
+    token: USDC
+    amount_usdc: 0.02
+    description: "Single-read fresh entries from tracked Polymarket whale wallets with per-wallet resolved-market track record on Base with x402 settlement. Use when you need current tracked-whale flow as data; historical statistics only, no claim about future results."

@@ -502,6 +502,18 @@ def x402_paid_resource(resource_id):
                 ch['challenge_id'], resource_id, wallet)
             ch['payer_wallet_hint'] = wallet
         return jsonify(ch), 402
+    if resource_id == 'polymarket-whale-signal':
+        # Polymarket whale signal single read (G3). The access token
+        # was consumed by access_granted above (settle-before-serve,
+        # single-use); optional wallet/market filters come from the
+        # request payload.
+        from sincor2.whale_signal import serve_whale_signal
+        signal_payload = request.get_json(silent=True)
+        if signal_payload is None:
+            signal_payload = request.args.to_dict(flat=True)
+            signal_payload.pop('access_token', None)
+        status, body = serve_whale_signal(signal_payload)
+        return jsonify(body), status
     if resource_id == 'hook_status':
         try:
             from sincor2.hook_stats import fetch_hook_status
