@@ -55,6 +55,26 @@ resources:
     amount_usdc: 2997.0
     description: "B2B skill pack: SADAS Execution — x402 USDC payment on Base"
 
+  # Subscription plans (rail rework of the parked Stripe subscriptions):
+  # bought via periodic x402 re-auth — one challenge per 30-day period.
+  # amount_usdc MUST equal SUB_PLANS[plan].price_cents / 100 in
+  # src/sincor2/rail_subscriptions.py — the subscription checkout refuses
+  # to mint a challenge when the two disagree (fail closed on drift).
+  rail-sub-starter:
+    label: "SINCOR Starter (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 297.0
+    description: "SINCOR Starter plan — one 30-day billing period, x402 USDC payment on Base"
+  rail-sub-professional:
+    label: "SINCOR Professional (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 997.0
+    description: "SINCOR Professional plan — one 30-day billing period, x402 USDC payment on Base"
+  rail-sub-enterprise:
+    label: "SINCOR Enterprise (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 2997.0
+    description: "SINCOR Enterprise plan — one 30-day billing period, x402 USDC payment on Base"
   # Digital packs (zero-to-revenue rail rework w4): token-gated downloads
   # via GET /download/<intake_id>. amount_usdc MUST equal
   # DIGITAL_SKUS[sku].price_cents / 100 in
