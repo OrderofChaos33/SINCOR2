@@ -309,6 +309,110 @@ def test_two_identical_transfers_in_one_tx_record_two_obligations(tmp_path):
 # --- no keys, no broadcast -------------------------------------------------------
 
 
+# --- regression: web3.py v8 checksum enforcement at the RPC boundary --------
+#
+# Bug (found live 2026-10-24): the in-repo AXIOM_TOKEN constant is lowercase
+# and was passed straight into eth_getLogs.  web3.py v8 validates EIP-55
+# checksums on the filter address BEFORE any network I/O and raises
+# InvalidAddress for non-checksum input, so run_once() failed closed on
+# every cycle against a real client (the plain _FakeEth above never
+# enforced this, which is why the suite missed it).  The fakes below run
+# the REAL web3.py v8 validation: _ChecksumEnforcingEth calls
+# web3._utils.validation.validate_address — the exact check
+# Eth.get_logs applies — and one test drives a real Web3 client backed
+# by a stub provider end to end.
+
+from web3 import Web3
+from web3.providers import BaseProvider
+from web3.types import RPCResponse
+
+
+class _ChecksumEnforcingEth(_FakeEth):
+    """_FakeEth + the address validation web3.py v8 applies in get_logs."""
+
+    def __init__(self):
+        super().__init__()
+        self.seen_filters = []
+
+    def get_logs(self, f):
+        from web3._utils.validation import validate_address
+
+        validate_address(f["address"])  # raises InvalidAddress if not checksummed
+        self.seen_filters.append(dict(f))
+        return super().get_logs(f)
+
+
+class _ChecksumW3:
+    def __init__(self):
+        self.eth = _ChecksumEnforcingEth()
+
+
+class _StubProvider(BaseProvider):
+    """Answers every RPC with an empty result; validation happens in web3."""
+
+    def make_request(self, method, params):
+        return RPCResponse(id=0, jsonrpc="2.0", result=[])
+
+
+def test_real_web3_v8_rejects_lowercase_filter_address():
+    # Sanity anchor for the regression tests: the real client really does
+    # reject the lowercase in-repo token and accept its checksum form.
+    w3 = Web3(provider=_StubProvider())
+    with pytest.raises(Exception):
+        w3.eth.get_logs({"fromBlock": 1, "toBlock": 2, "address": TOKEN})
+    assert w3.eth.get_logs(
+        {"fromBlock": 1, "toBlock": 2,
+         "address": Web3.to_checksum_address(TOKEN)}
+    ) == []
+
+
+def test_lowercase_token_and_recipient_survive_checksum_enforcing_rpc(tmp_path):
+    w3 = _ChecksumW3()
+    _chain(w3, 10)
+    w3.eth.logs = [_log("0xtx01", 5, 0, 1_000 * 10**18,
+                        to=RECIPIENT.lower(), token=TOKEN)]
+    # TOKEN is the lowercase in-repo AXIOM_TOKEN value; pass the recipient
+    # lowercase too (e.g. a lowercase SINCOR_FEE_RECIPIENT env value).
+    L = _listener(w3, tmp_path, backfill_blocks=10)
+    L.config.fee_recipient = RECIPIENT.lower()
+    out = L.run_once()
+    assert out["ok"] is True
+    assert out["recorded_count"] == 1
+    # What actually reached the RPC boundary must be checksummed.
+    assert w3.eth.seen_filters, "get_logs was never called"
+    sent = w3.eth.seen_filters[0]["address"]
+    assert sent == Web3.to_checksum_address(TOKEN)
+    # And that exact filter passes a REAL web3 v8 client untouched.
+    real = Web3(provider=_StubProvider())
+    assert real.eth.get_logs(w3.eth.seen_filters[0]) == []
+
+
+def test_checksummed_config_is_idempotent_at_rpc_boundary(tmp_path):
+    # Production workaround compatibility: the running service already
+    # passes a checksummed FEE_LISTENER_TOKEN — normalization must leave
+    # checksummed token AND recipient byte-identical.
+    w3 = _ChecksumW3()
+    _chain(w3, 10)
+    checksum_token = Web3.to_checksum_address(TOKEN)
+    w3.eth.logs = [_log("0xtx01", 5, 0, 1_000 * 10**18,
+                        token=checksum_token)]
+    cfg = FeeListenerConfig(
+        rpc_url="https://example.invalid",
+        token=checksum_token,
+        fee_recipient=RECIPIENT,  # already checksummed
+        confirmations=2,
+        poll_interval_secs=1,
+        cursor_path=str(tmp_path / "cursor.json"),
+        backfill_blocks=10,
+    )
+    ledger = ConversionLedger(str(tmp_path / "ledger.json"))
+    L = FeeEventListener(config=cfg, ledger=ledger, w3_factory=lambda: w3)
+    out = L.run_once()
+    assert out["ok"] is True
+    assert out["recorded_count"] == 1
+    assert w3.eth.seen_filters[0]["address"] == checksum_token
+
+
 def test_module_handles_no_key_material():
     import src.sincor2.onchain.fee_event_listener as mod
 
