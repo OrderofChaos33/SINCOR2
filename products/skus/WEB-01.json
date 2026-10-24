@@ -1,0 +1,79 @@
+{
+  "buyer": "Local businesses (trades, dental, clinics) with a missing, dead, or embarrassing website — the same ICP the WebBuilder scouts target.",
+  "code": "WEB-01",
+  "conversion": {
+    "feeds": [
+      "underwriting_engine"
+    ],
+    "from": [],
+    "to": []
+  },
+  "deliverables": [
+    "Rendered static HTML site bundle (draft lane)",
+    "Preview URL",
+    "webbuilder_crm buyer record",
+    "Intake link for refinement and go-live"
+  ],
+  "description": "WebBuilder Site is the zero-to-revenue 4.2 SKU. On purchase, the fulfillment pipeline creates a WebBuilder studio project from the buyer's business details, renders the 4.1 static HTML site bundle (business name, tel: phone CTA, 'Book a consultation' CTA, lead-capture form), publishes the preview lane, and records the buyer in webbuilder_crm as a pack_purchase contact. The revenue event is marked delivered only when the bundle and the CRM record both exist; any failure marks it failed and raises an alert. Price is $497 (49700 cents), decided by TOA decision z2r-webbuilder-price-20261023 and enforced server-side from PACK_SKUS — client-supplied prices are ignored.",
+  "family": "WEB",
+  "features": [
+    {
+      "detail": "Studio project created from the buyer's business details; discovery, draft, and preview phases run automatically.",
+      "name": "Automated site build"
+    },
+    {
+      "detail": "Single-page production-ready site: business name, tel: phone CTA, 'Book a consultation' CTA, services, reviews, and lead-capture contact form.",
+      "name": "Static HTML bundle"
+    },
+    {
+      "detail": "Staging preview lane published at purchase so the buyer can see the site before approving go-live.",
+      "name": "Preview URL"
+    },
+    {
+      "detail": "Buyer written to webbuilder_crm as a pack_purchase contact on the project, so the lead form and owner notifications are wired from day one.",
+      "name": "CRM record"
+    }
+  ],
+  "funnel_role": "wedge",
+  "includes": [],
+  "name": "WebBuilder Site",
+  "positioning": {
+    "friction": "low",
+    "impulse": true,
+    "sale_difficulty": "wedge"
+  },
+  "pricing": {
+    "amount_usd": 497,
+    "display": "$497 one-time",
+    "interval": null,
+    "model": "one_time",
+    "setup_usd": 0,
+    "unit": "per_engagement",
+    "unit_label": "per engagement"
+  },
+  "readiness": {
+    "blocker": null,
+    "next_action": "Sell via the pack checkout flow; fulfillment is automatic through _fulfill_pack.",
+    "sellable_today": true
+  },
+  "sellable_today": true,
+  "slug": "webbuilder-site",
+  "source_components": [
+    {
+      "id": "webbuilder_studio",
+      "maps_to": "src/sincor2/webbuilder_studio.py — project lifecycle, discovery, draft/preview lanes."
+    },
+    {
+      "id": "webbuilder_render",
+      "maps_to": "src/sincor2/webbuilder_render.py — static HTML site bundle generation."
+    },
+    {
+      "id": "webbuilder_crm",
+      "maps_to": "src/sincor2/webbuilder_crm.py — buyer contact record on the project."
+    }
+  ],
+  "status": "sellable",
+  "summary": "WebBuilder builds a complete static business website for the buyer: discovery of the business profile, a drafted site with the business name, phone CTA and contact capture, a preview URL, and a webbuilder_crm record wired to the lead form. Delivered automatically on purchase; the buyer refines it through intake.",
+  "tagline": "A done-for-you business website, generated and published by SINCOR agents.",
+  "this_week_play": false
+}
