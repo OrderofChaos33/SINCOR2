@@ -53,6 +53,84 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 REVENUE_DB = DATA_DIR / "revenue_ledger.db"
 
 
+# --- Digital packs (ported from the parked Stripe branch, reworked onto the
+# x402/USDC rail) ------------------------------------------------------------
+# money_assets/ digital products sold through SINCOR's own x402 checkout
+# (platform-native; the founder rejected Gumroad AND Stripe). Prices from
+# money_assets/HOW_TO_MAKE_MONEY_NOW.md — server-side source of truth, the
+# checkout route ignores client prices. A digital pack is delivered as a
+# token-gated download link (unguessable delivery token bound to the intake
+# record); no vertical-agent job is queued for digital packs. The rail
+# (src/sincor2/rail_routes.py) merges this table into its PACK_SKUS so
+# digital packs ride the same checkout/settle/idempotency machinery.
+DIGITAL_SKUS: Dict[str, Dict[str, Any]] = {
+    "digital_bi_template_pack": {
+        "name": "Instant BI Template Pack",
+        "asset": "money_assets/instant_bi_template_pack.md",
+        "price_cents": 9700,
+        "digital": True,
+    },
+    "digital_ai_agent_bundle": {
+        "name": "AI Agent Bundle",
+        "asset": "money_assets/ai_agent_bundle.md",
+        "price_cents": 29700,
+        "digital": True,
+    },
+    "digital_growth_forecast": {
+        "name": "Growth Forecast Template",
+        "asset": "money_assets/growth_forecast_template.md",
+        "price_cents": 14700,
+        "digital": True,
+    },
+}
+
+
+def _digital_intake_db_path() -> Path:
+    return Path(os.environ.get("SINCOR_REVENUE_DB") or REVENUE_DB)
+
+
+def issue_delivery_token() -> str:
+    """Mint an unguessable delivery token for a digital-pack purchase.
+
+    32 bytes via secrets.token_urlsafe (43 chars) — bound to the intake
+    record at fulfillment time. The download link is intake-gated AND
+    token-gated: the intake id alone is never enough to fetch the asset.
+    """
+    import secrets as _secrets
+    return _secrets.token_urlsafe(32)
+
+
+def verify_digital_delivery(intake_id: str, token: str,
+                            db_path: Optional[Path] = None) -> str:
+    """Verify a token-gated digital download and return the asset path.
+
+    The download link is intake-gated AND token-gated: the intake id alone
+    is not enough. The token must match the unguessable delivery token
+    bound to the intake record at fulfillment time, and the asset must be
+    one of the known digital pack assets (no path games). Raises
+    ValueError on any mismatch — the download route turns this into a 404.
+    """
+    import hmac as _hmac
+
+    from sincor2.payment_ledger import get_pack_intake
+
+    intake = get_pack_intake(
+        db_path or _digital_intake_db_path(), intake_id or "")
+    if intake is None:
+        raise ValueError("unknown download")
+    details = intake.details or {}
+    expected = str(details.get("delivery_token") or "")
+    if not expected or not _hmac.compare_digest(expected, str(token or "")):
+        raise ValueError("invalid download token")
+    asset = str(details.get("asset") or "")
+    known_assets = {
+        sku["asset"] for sku in DIGITAL_SKUS.values() if sku.get("asset")
+    }
+    if asset not in known_assets:
+        raise ValueError("no digital asset bound to this download")
+    return asset
+
+
 class RevenueOrchestrator:
     """Orchestrates the entire revenue pipeline"""
     
