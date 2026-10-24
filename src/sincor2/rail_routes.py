@@ -1,21 +1,26 @@
-"""x402/USDC rail for B2B skill-pack fulfillment (zero-to-revenue rail rework).
+"""x402/USDC rail for B2B skill-pack fulfillment and plan subscriptions
+(zero-to-revenue rail rework).
 
-Replaces the Stripe checkout/webhook path of the parked branch
-``xioix/z2r-w1-pack-fulfillment`` with the x402 rail: a pack is bought via a
-402 challenge paying USDC on Base into the treasury; the on-chain transfer
-is verified, the payment is recorded, the treasury kill-switch money gate
-is consulted (fail closed), and only then is the pack fulfilled (intake
-record + buyer email + vertical-agent deployment job).
+Replaces the Stripe checkout/webhook path of the parked branches
+``xioix/z2r-w1-pack-fulfillment`` and ``xioix/z2r2-w3-subscriptions``
+with the x402 rail: a pack or a subscription period is bought via a
+402 challenge paying USDC on Base into the treasury; the on-chain
+transfer is verified, the payment is recorded, the treasury kill-switch
+money gate is consulted (fail closed), and only then is the pack
+fulfilled (intake record + buyer email + vertical-agent deployment job)
+or the subscription period extended (wallet <-> plan binding in
+rail_subscriptions.py).
 
 Routes (registered by :func:`init_rail_routes`):
   POST /rail/checkout  {pack_sku, payer_wallet?, buyer_email?}
+                       or {subscription_plan, payer_wallet}
     -> 402 with the x402 challenge (challenge_id, payment payload, bind info)
   POST /rail/settle    {challenge_id, tx_hash, payer_wallet?, buyer_email?,
                         buyer_name?, business_name?, phone?, niche?,
-                        territory?, prompt?, replay_signature?, replay_ts_ms?}
-    -> verify onchain USDC transfer -> finalize payment -> money gate ->
-       fulfill pack. Idempotent: re-settling an already-fulfilled challenge
-       returns the existing result without double-provisioning.
+                        territory?, prompt?, replay_signature?, replay_ts_ms?}    -> verify onchain USDC transfer -> finalize payment -> money gate ->
+       fulfill pack / extend subscription. Idempotent: re-settling an
+       already-fulfilled challenge returns the existing result without
+       double-provisioning or double-extending.
 
 STRIPE BOUNDARY: this module never touches ``stripe_routes.py`` or
 ``stripe_checkout.py``. The global excise-vs-dormant decision for the
@@ -781,8 +786,13 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
     only the narrow crash window between the x402 fulfill and the
     verified-flag write needs the W-103 replay signature, which is
     accepted here and forwarded to verify_challenge.
+
+    Subscription challenges (rail-sub-* resources) are routed to
+    rail_subscriptions.settle_renewal, which extends the wallet's
+    subscription exactly one period instead of fulfilling a pack.
     """
     from sincor2 import x402_payments as x402
+    from sincor2 import rail_subscriptions as rs
 
     challenge_id = (challenge_id or "").strip()
     tx_hash = (tx_hash or "").strip()
@@ -792,6 +802,8 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
 
     event_id = f"rail-{challenge_id}"
     event = _get_rail_event(event_id)
+    sub_settle_id = f"railsub-{challenge_id}"
+    sub_settle = rs._get_sub_settle(sub_settle_id)
     verify_result: Optional[Dict[str, Any]] = None
 
     if event is not None:
@@ -827,7 +839,21 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
             _update_rail_event(event_id, verified=1,
                                payer_wallet=str(verify.get("payer_wallet") or ""))
             verify_result = verify
+    elif sub_settle is not None:
+        # Subscription retry/duplicate: the subscription pipeline owns
+        # its claim — settle_renewal acks duplicates without touching
+        # the chain and retries claimed-but-incomplete settles.
+        return rs.settle_renewal(
+            challenge_id, tx_hash, payer_wallet,
+            replay_signature=replay_signature, replay_ts_ms=replay_ts_ms)
     else:
+        # Subscription fast path: a challenge this module issued is
+        # wallet-bound — a different wallet is refused BEFORE any chain
+        # call (the x402 payer check below is the second layer).
+        issued = rs._get_issued(challenge_id)
+        if issued is not None and issued["wallet"] != payer_wallet:
+            return {"ok": False, "error": "wallet_mismatch",
+                    "settle_id": sub_settle_id}
         # First attempt: verify the on-chain transfer, then claim.
         verify = x402.verify_challenge(
             challenge_id, tx_hash, payer_wallet=payer_wallet,
@@ -835,22 +861,33 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
         if not verify.get("ok"):
             return _verify_fail(verify)
 
-        # This settle path only serves pack challenges — a challenge for
-        # any other resource is refused (no silent cross-provisioning).
+        # Route by resource: pack challenges provision packs, subscription
+        # challenges extend subscriptions — never cross-provisioned.
         resource_id = str(verify.get("resource_id") or "")
         pack_sku = _sku_for_resource(resource_id)
-        if not pack_sku:
+        plan_id = rs._plan_for_resource(resource_id)
+        if pack_sku:
+            pack = PACK_SKUS[pack_sku]
+            event, _is_new = _claim_rail_event(
+                challenge_id=challenge_id, pack_sku=pack_sku,
+                payer_wallet=str(verify.get("payer_wallet") or payer_wallet),
+                tx_hash=tx_hash,
+                amount_usdc=pack["price_cents"] / 100)
+            _update_rail_event(event_id, verified=1)
+            verify_result = verify
+        elif plan_id:
+            # Subscription pipeline: the verify above is the single
+            # on-chain check — forward it so settle_renewal does not
+            # re-verify (which would hit the x402 already_fulfilled
+            # replay wall).
+            return rs.settle_renewal(
+                challenge_id, tx_hash, payer_wallet,
+                replay_signature=replay_signature,
+                replay_ts_ms=replay_ts_ms,
+                _preverified=verify)
+        else:
             return {"ok": False, "error": "not_a_pack_challenge",
                     "resource_id": resource_id}
-        pack = PACK_SKUS[pack_sku]
-
-        event, _is_new = _claim_rail_event(
-            challenge_id=challenge_id, pack_sku=pack_sku,
-            payer_wallet=str(verify.get("payer_wallet") or payer_wallet),
-            tx_hash=tx_hash,
-            amount_usdc=pack["price_cents"] / 100)
-        _update_rail_event(event_id, verified=1)
-        verify_result = verify
 
     amount_usdc = pack["price_cents"] / 100
 
@@ -911,18 +948,73 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
 rail_bp = Blueprint("rail", __name__, url_prefix="/rail")
 
 
+def _rail_subscription_checkout(data: Dict[str, Any], plan_id: str):
+    """Mint an x402 challenge for one subscription billing period.
+
+    Body: {subscription_plan, payer_wallet}. The price is derived from
+    SUB_PLANS on the server — a client-supplied price is never trusted.
+    Unknown plan -> 400 (fail-closed allowlist). A subscription must
+    attach to a wallet, so payer_wallet is required here (unlike packs).
+    """
+    from sincor2 import rail_subscriptions as rs
+
+    if plan_id not in rs.SUB_PLANS:
+        return jsonify({"ok": False,
+                        "error": f"Unknown subscription_plan: {plan_id}"}), 400
+
+    payer_wallet = str(data.get("payer_wallet") or "").strip().lower()
+    if not payer_wallet:
+        return jsonify({"ok": False,
+                        "error": "subscription_wallet_required"}), 400
+    if not _valid_wallet(payer_wallet):
+        return jsonify({"ok": False, "error": "invalid_payer_wallet"}), 400
+
+    try:
+        challenge = rs.issue_renewal_challenge(payer_wallet, plan_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        logger.error("[RAIL] subscription checkout failed: %s", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+    http_status = int(challenge.get("http_status") or 402)
+    return jsonify({
+        "ok": challenge.get("ok", False),
+        "plan_id": challenge["plan_id"],
+        "plan_name": challenge["plan_name"],
+        "amount_usdc": challenge["amount_usdc"],
+        "challenge_id": challenge.get("challenge_id"),
+        "resource_id": challenge.get("resource_id"),
+        "expires_at": challenge.get("expires_at"),
+        "payment": challenge.get("payment"),
+        "bind": challenge.get("bind"),
+        "message": challenge.get("message"),
+        "payer_wallet": payer_wallet,
+    }), http_status
+
+
 @rail_bp.post("/checkout")
 def rail_checkout():
-    """Mint an x402 challenge for a pack purchase.
+    """Mint an x402 challenge for a pack purchase or a subscription period.
 
-    Body: {pack_sku, payer_wallet?, buyer_email?}. The price is derived
-    from PACK_SKUS on the server — a client-supplied price is never
-    trusted. Unknown SKU -> 400.
+    Body: {pack_sku, payer_wallet?, buyer_email?} for packs, or
+    {subscription_plan, payer_wallet} for subscriptions (mutually
+    exclusive). Prices are derived from server-side tables — a
+    client-supplied price is never trusted. Unknown SKU/plan -> 400.
     """
     from sincor2 import x402_payments as x402
 
     data = request.get_json(force=True, silent=True) or {}
     pack_sku = str(data.get("pack_sku") or "").strip()
+    plan_id = str(data.get("subscription_plan") or "").strip().lower()
+    if pack_sku and plan_id:
+        return jsonify(
+            {"ok": False,
+             "error": "pack_sku_and_subscription_plan_mutually_exclusive"}
+        ), 400
+    if plan_id:
+        return _rail_subscription_checkout(data, plan_id)
+
     pack = PACK_SKUS.get(pack_sku)
     if not pack:
         return jsonify({"ok": False,
@@ -970,7 +1062,8 @@ def rail_checkout():
 
 @rail_bp.post("/settle")
 def rail_settle():
-    """Verify the on-chain USDC transfer and fulfill the pack.
+    """Verify the on-chain USDC transfer and fulfill the pack — or extend
+    a subscription when the challenge is for a rail-sub-* resource.
 
     Body: {challenge_id, tx_hash, payer_wallet?, buyer_email?,
            replay_signature?, replay_ts_ms?, business_name?, phone?,
@@ -1004,12 +1097,19 @@ def rail_settle():
                                "not_a_pack_challenge",
                                "tx_hash_mismatch",
                                "payer_wallet_mismatch",
-                               "unknown_pack_sku"):
+                               "unknown_pack_sku",
+                               # subscription pipeline client errors
+                               "invalid_wallet",
+                               "challenge_not_issued",
+                               "wallet_mismatch",
+                               "not_a_subscription_challenge",
+                               "downgrade_at_renewal"):
         status = 400
     return jsonify(result), status
 
 
 def init_rail_routes(app) -> None:
-    """Mount the x402 pack-rail blueprint on a Flask app."""
+    """Mount the x402 pack + subscription rail blueprint on a Flask app."""
     app.register_blueprint(rail_bp)
-    logger.info("[RAIL] registered /rail/checkout and /rail/settle")
+    logger.info("[RAIL] registered /rail/checkout and /rail/settle "
+                "(packs + subscription plans)")
