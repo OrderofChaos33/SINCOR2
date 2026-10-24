@@ -448,6 +448,14 @@ app.register_blueprint(_defi_catalog_bp)
 if limiter:
     limiter.exempt(_defi_catalog_bp)
 
+# Human payment rail: GET /rail/pay/<sku> + GET /rail/onramp (read-only page;
+# the money movement happens client-side via the x402 challenge endpoints).
+from sincor2.blueprints.rail_pay import rail_pay_bp as _rail_pay_bp
+
+app.register_blueprint(_rail_pay_bp)
+if limiter:
+    limiter.exempt(_rail_pay_bp)
+
 
 @app.route('/health')
 @limiter.exempt if limiter else lambda f: f
