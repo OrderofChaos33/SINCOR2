@@ -83,6 +83,18 @@ PACK_SKUS: Dict[str, Dict[str, Any]] = {
 # Revenue stream label used for pack purchases.
 PACK_REVENUE_STREAM = "B2B_PACK"
 
+# --- Digital packs (reworked from the parked Stripe branch) ------------------
+# Digital SKUs are pack SKUs too: they ride the same /rail/checkout,
+# /rail/settle, event-claim idempotency, and money-gate machinery as the
+# B2B packs. Only fulfillment differs: a token-gated download link
+# (issue_delivery_token, bound to the intake record) instead of a
+# vertical-agent deployment job. The canonical table lives in
+# revenue_orchestrator next to verify_digital_delivery's asset allowlist
+# so the two can never drift; the rail merges it here at import time.
+from sincor2.revenue_orchestrator import DIGITAL_SKUS as _DIGITAL_SKUS
+
+PACK_SKUS.update(_DIGITAL_SKUS)
+
 # x402 resource naming: each pack SKU is registered as rail-pack-<sku> in
 # config/x402_pricing.yaml with amount_usdc.
 RAIL_RESOURCE_PREFIX = "rail-pack-"
@@ -250,6 +262,15 @@ def _valid_tx_hash(tx_hash: str) -> bool:
     return bool(_TX_HASH_RE.match((tx_hash or "").strip()))
 
 
+def _download_url(intake_id: str, delivery_token: str) -> str:
+    """Buyer-facing token-gated download link for a digital pack.
+
+    Served by GET /download/<intake_id>?token=<token> (rail_delivery).
+    """
+    return (f"https://getsincor.com/download/{intake_id}"
+            f"?token={delivery_token}")
+
+
 # --- Event claim (settle idempotency) ----------------------------------------
 def _claim_rail_event(*, challenge_id: str, pack_sku: str,
                       payer_wallet: str = "", tx_hash: str = "",
@@ -400,7 +421,8 @@ def _fail_pack(event_id: str, order: Dict[str, Any], reason: str) -> Dict[str, A
 
 def _render_pack_email(*, customer_name: str, pack_name: str,
                        customer_email: str, intake_url: str,
-                       order_id: str) -> str:
+                       order_id: str, digital: bool = False,
+                       download_url: str = "") -> str:
     """Render templates/thank_you_purchase_email.html for a pack buyer."""
     from jinja2 import Template
 
@@ -410,14 +432,26 @@ def _render_pack_email(*, customer_name: str, pack_name: str,
             f"pack email template missing: {template_path}"
         )
     html = template_path.read_text(encoding="utf-8-sig")
+    if digital:
+        agent_count = "instant digital download"
+        feature_list = (
+            f"Your {pack_name} is ready — download it here: {download_url}"
+        )
+        quickstart = download_url
+    else:
+        agent_count = "dedicated vertical agent"
+        feature_list = (
+            f"{pack_name} deployment kickoff — vertical agent queued. "
+            f"Complete your intake here: {intake_url}"
+        )
+        quickstart = (
+            f"https://getsincor.com/files/guides/quickstart-{order_id}.pdf"
+        )
     body = Template(html).render(
         CUSTOMER_NAME=customer_name,
         TIER_NAME=pack_name,
-        AGENT_COUNT="dedicated vertical agent",
-        FEATURE_LIST=(
-            f"{pack_name} deployment kickoff — vertical agent queued. "
-            f"Complete your intake here: {intake_url}"
-        ),
+        AGENT_COUNT=agent_count,
+        FEATURE_LIST=feature_list,
         ACTIVATION_DATE=datetime.now(timezone.utc).date().isoformat(),
         CUSTOMER_EMAIL=customer_email,
         DASHBOARD_URL="https://getsincor.com/",
@@ -425,27 +459,39 @@ def _render_pack_email(*, customer_name: str, pack_name: str,
         STATUS_URL="https://getsincor.com/status",
         COMPANY_ADDRESS="SINCOR Business Solutions",
         UNSUBSCRIBE="https://getsincor.com/unsubscribe",
-        DOWNLOAD_QUICKSTART=(
-            f"https://getsincor.com/files/guides/quickstart-{order_id}.pdf"
-        ),
+        DOWNLOAD_QUICKSTART=quickstart,
         STARTER_SELECTED=False,
         PROFESSIONAL_SELECTED=False,
         ENTERPRISE_SELECTED=False,
     )
-    # Intake call-to-action banner (template file itself is not modified).
-    banner = (
-        '<div style="background:#eef2ff;border-left:4px solid #667eea;'
-        'padding:20px;border-radius:8px;margin:30px 0;">'
-        '<h4 style="margin:0 0 10px 0;color:#667eea;">Next step: '
-        'complete your intake</h4>'
-        '<p style="margin:0 0 12px 0;font-size:14px;color:#4a5568;">'
-        'Your vertical agent is queued. Tell us about your operation so '
-        'it can start your first paid workflow:</p>'
-        f'<a href="{intake_url}" style="display:inline-block;background:'
-        '#667eea;color:white;padding:12px 24px;border-radius:6px;'
-        'text-decoration:none;font-weight:600;">Complete intake →</a>'
-        '</div>'
-    )
+    if digital:
+        banner = (
+            '<div style="background:#eef7ee;border-left:4px solid #22a355;'
+            'padding:20px;border-radius:8px;margin:30px 0;">'
+            '<h4 style="margin:0 0 10px 0;color:#22a355;">Your download '
+            'is ready</h4>'
+            '<p style="margin:0 0 12px 0;font-size:14px;color:#4a5568;">'
+            'This link is unique to your purchase — keep it private:</p>'
+            f'<a href="{download_url}" style="display:inline-block;background:'
+            '#22a355;color:white;padding:12px 24px;border-radius:6px;'
+            'text-decoration:none;font-weight:600;">Download your pack →</a>'
+            '</div>'
+        )
+    else:
+        # Intake call-to-action banner (template file itself is not modified).
+        banner = (
+            '<div style="background:#eef2ff;border-left:4px solid #667eea;'
+            'padding:20px;border-radius:8px;margin:30px 0;">'
+            '<h4 style="margin:0 0 10px 0;color:#667eea;">Next step: '
+            'complete your intake</h4>'
+            '<p style="margin:0 0 12px 0;font-size:14px;color:#4a5568;">'
+            'Your vertical agent is queued. Tell us about your operation so '
+            'it can start your first paid workflow:</p>'
+            f'<a href="{intake_url}" style="display:inline-block;background:'
+            '#667eea;color:white;padding:12px 24px;border-radius:6px;'
+            'text-decoration:none;font-weight:600;">Complete intake →</a>'
+            '</div>'
+        )
     anchor = "<!-- Dashboard Access -->"
     if anchor in body:
         body = body.replace(anchor, anchor + "\n" + banner, 1)
@@ -455,8 +501,10 @@ def _render_pack_email(*, customer_name: str, pack_name: str,
 
 
 def _send_pack_email(*, to_email: str, customer_name: str,
-                     pack_name: str, intake_url: str, order_id: str) -> Dict[str, str]:
-    """Email the buyer their pack confirmation + intake link.
+                     pack_name: str, intake_url: str, order_id: str,
+                     digital: bool = False,
+                     download_url: str = "") -> Dict[str, str]:
+    """Email the buyer their pack confirmation + intake/download link.
 
     Raises unless the provider confirms the send — a silent stub is a
     fulfillment failure, not a delivery.
@@ -469,17 +517,29 @@ def _send_pack_email(*, to_email: str, customer_name: str,
         customer_email=to_email,
         intake_url=intake_url,
         order_id=order_id,
+        digital=digital,
+        download_url=download_url,
     )
-    text = (
-        f"Thank you for purchasing SINCOR {pack_name}!\n\n"
-        f"Your vertical agent deployment is queued.\n"
-        f"Next step — complete your intake: {intake_url}\n\n"
-        f"Order: {order_id}\nSupport: support@getsincor.com\n"
-    )
+    if digital:
+        subject = f"Your SINCOR {pack_name} — download your pack"
+        text = (
+            f"Thank you for purchasing SINCOR {pack_name}!\n\n"
+            f"Your download is ready (this link is unique to your "
+            f"purchase — keep it private):\n{download_url}\n\n"
+            f"Order: {order_id}\nSupport: support@getsincor.com\n"
+        )
+    else:
+        subject = f"Your SINCOR {pack_name} pack — complete your intake"
+        text = (
+            f"Thank you for purchasing SINCOR {pack_name}!\n\n"
+            f"Your vertical agent deployment is queued.\n"
+            f"Next step — complete your intake: {intake_url}\n\n"
+            f"Order: {order_id}\nSupport: support@getsincor.com\n"
+        )
     result = EmailSender().send_email(
         to_email=to_email,
         to_name=customer_name,
-        subject=f"Your SINCOR {pack_name} pack — complete your intake",
+        subject=subject,
         html_content=html,
         text_content=text,
         metadata={"order_id": order_id, "pack": pack_name,
@@ -510,7 +570,17 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
 
 
 def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
-    """Fulfill a B2B skill-pack order paid over the x402 rail.
+    """Fulfill a pack order paid over the x402 rail.
+
+    B2B skill packs: intake record + buyer email with the intake link +
+    vertical-agent deployment job on the ``sincor.long`` queue.
+
+    Digital packs: bind an unguessable delivery token to the intake
+    record and email the buyer a token-gated download link
+    (GET /download/<intake_id>?token=<token>); NO vertical-agent job is
+    queued. Token issuance is idempotent per purchase: on a retry
+    redelivery the intake row already holds the original token and it is
+    reused — a second token is never minted.
 
     Steps, in order:
       1. create an intake record (idempotent on the event id),
@@ -520,8 +590,7 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
          bundle (static HTML site via the webbuilder modules) plus a
          webbuilder_crm record is built synchronously here; every other
          pack queues the vertical-agent job on the ``sincor.long`` Celery
-         queue,
-      4. mark the rail event ``delivered`` — only when every step above
+         queue,      4. mark the rail event ``delivered`` — only when every step above
          succeeded. Any failure marks the event ``failed`` and records an
          alert.
     """
@@ -537,39 +606,85 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
     if pack_sku and pack is None:
         return _fail_pack(event_id, order, f"unknown pack_sku {pack_sku!r}")
 
+    is_digital = bool(pack and pack.get("digital"))
     pack_name = pack["name"] if pack else "Agent Services"
     try:
+        # Digital packs: bind an unguessable delivery token to the intake
+        # record. The download link is intake-gated AND token-gated — the
+        # intake id alone is not enough to fetch the asset.
+        delivery_token = ""
+        asset = ""
+        if is_digital:
+            from sincor2.revenue_orchestrator import issue_delivery_token
+            asset = (pack or {}).get("asset", "")
+            if not asset:
+                raise ValueError(
+                    f"digital pack {pack_sku!r} has no asset bound")
+            if asset != _DIGITAL_SKUS.get(pack_sku, {}).get("asset"):
+                raise ValueError(
+                    f"digital pack {pack_sku!r} asset mismatch")
+            delivery_token = issue_delivery_token()
+
         # 1. Intake record (idempotent: same event -> same single row).
         intake_id = f"intake-{event_id}" if event_id else None
         if not intake_id:
             import uuid as _uuid
             intake_id = f"intake-{_uuid.uuid4().hex}"
-        intake_url = f"https://getsincor.com/intake/{intake_id}"
+        if is_digital:
+            details = {
+                "pack_name": pack_name,
+                "asset": asset,
+                "delivery_token": delivery_token,
+                "digital": True,
+                "payer_wallet": payer_wallet,
+                "rail": True,
+            }
+            access_url = ""  # derived from the intake row below
+        else:
+            access_url = f"https://getsincor.com/intake/{intake_id}"
+            details = {
+                "pack_name": pack_name,
+                "module": (pack or {}).get("module", ""),
+                "payer_wallet": payer_wallet,
+                "rail": True,
+            }
         intake, _is_new = record_pack_intake(
             _rail_db_path(),
             intake_id=intake_id,
             customer_email=customer_email or payer_wallet or "wallet-buyer",
             pack_sku=pack_sku or "agent_services",
             event_id=event_id,
-            intake_url=intake_url,
-            details={"pack_name": pack_name,
-                     "module": (pack or {}).get("module", ""),
-                     "payer_wallet": payer_wallet,
-                     "rail": True},
+            intake_url=access_url or _download_url(intake_id, delivery_token),
+            details=details,
         )
+        if is_digital:
+            # The intake row is authoritative: on a retry redelivery
+            # (INSERT OR IGNORE kept the first row) the buyer must get
+            # the ORIGINAL token, not a fresh one.
+            delivery_token = str(
+                (intake.details or {}).get("delivery_token") or "")
+            if not delivery_token:
+                raise ValueError(
+                    f"digital intake {intake.intake_id} has no delivery token")
+            access_url = _download_url(intake.intake_id, delivery_token)
         logger.info("[FULFILLMENT] Intake record: %s", intake.intake_id)
 
-        # 2. Buyer email with the intake link (wallet-native buyers skip).
-        # Idempotent per event: the sent flag survives a failed fulfillment,
-        # so a settle retry never re-sends the thank-you email.
+        # 2. Buyer email with the intake link (B2B) or the token-gated
+        #    download link (digital). Wallet-native buyers skip email —
+        #    the link is returned in the settle response instead.
+        #    Idempotent per event: the sent flag survives a failed
+        #    fulfillment, so a settle retry never re-sends the thank-you
+        #    email.
         if customer_email:
             if not _rail_event_details(event_id).get("thank_you_email_sent"):
                 _send_pack_email(
                     to_email=customer_email,
                     customer_name=customer_name,
                     pack_name=pack_name,
-                    intake_url=intake_url,
+                    intake_url=access_url,
                     order_id=intake.intake_id,
+                    digital=is_digital,
+                    download_url=access_url if is_digital else "",
                 )
                 _rail_event_merge_details(
                     event_id, {"thank_you_email_sent": True})
@@ -595,6 +710,9 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
                 order=order,
             )
             job_id = webbuilder_receipt["project_id"]
+        elif is_digital:
+            # Digital packs have nothing to deploy.
+            job_id = None
         else:
             # Vertical-agent deployment job on the sincor.long queue.
             job_id = _queue_pack_agent_job(
@@ -610,15 +728,19 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
     # 4. Delivered — only on full success.
     _update_rail_event(event_id, fulfillment_status="delivered",
                        intake_id=intake.intake_id)
-    return {
+    result: Dict[str, Any] = {
         "status": "delivered",
         "type": "pack",
         "pack_sku": pack_sku,
         "intake_id": intake.intake_id,
-        "intake_url": intake_url,
+        "intake_url": access_url,
         "job_id": job_id,
         "webbuilder": webbuilder_receipt,
     }
+    if is_digital:
+        result["digital"] = True
+        result["download_url"] = access_url
+    return result
 
 
 def _fulfill_webbuilder_site(*, event_id: str, intake_id: str,
@@ -722,17 +844,26 @@ def _existing_result(event: Dict[str, Any]) -> Dict[str, Any]:
             intake = get_pack_intake(_rail_db_path(), event["intake_id"])
         except Exception:
             intake = None
+    fulfillment: Dict[str, Any] = {
+        "status": event.get("fulfillment_status"),
+        "intake_id": event.get("intake_id"),
+        "intake_url": intake.intake_url if intake else "",
+    }
+    if intake is not None:
+        # Digital packs: the ack carries the ORIGINAL download URL —
+        # re-derived from the stored delivery token, never re-minted.
+        details = intake.details or {}
+        token = str(details.get("delivery_token") or "")
+        if details.get("digital") and token:
+            fulfillment["download_url"] = _download_url(
+                event.get("intake_id") or "", token)
     return {
         "ok": True,
         "status": "already_fulfilled",
         "duplicate": True,
         "pack_sku": event.get("pack_sku"),
         "challenge_id": event.get("challenge_id"),
-        "fulfillment": {
-            "status": event.get("fulfillment_status"),
-            "intake_id": event.get("intake_id"),
-            "intake_url": intake.intake_url if intake else "",
-        },
+        "fulfillment": fulfillment,
     }
 
 

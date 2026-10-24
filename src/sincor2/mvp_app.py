@@ -540,6 +540,15 @@ try:
 except Exception as e:
     logger.warning('[RAIL] %s', e)
 
+# Token-gated digital-pack downloads (rail rework w4) — mounted next to
+# the rail routes; this is the route the buyer email's download link
+# points at.
+try:
+    from sincor2.rail_delivery import init_rail_delivery_routes
+    init_rail_delivery_routes(app)
+except Exception as e:
+    logger.warning('[RAIL-DELIVERY] %s', e)
+
 pdf_guides_dir = str(data_dir() / 'files' / 'guides')
 try:
     pdf_generator = get_pdf_generator(pdf_guides_dir)

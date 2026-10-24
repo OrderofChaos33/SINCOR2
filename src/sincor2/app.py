@@ -1515,6 +1515,11 @@ def create_app():
         init_rail_routes(app)
     except Exception as e:
         print(f"Rail routes not available: {e}")
+    try:
+        from sincor2.rail_delivery import init_rail_delivery_routes
+        init_rail_delivery_routes(app)
+    except Exception as e:
+        print(f"Rail delivery routes not available: {e}")
     return app
 
 
