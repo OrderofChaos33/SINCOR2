@@ -515,6 +515,17 @@ def x402_paid_resource(resource_id):
             md_payload.pop('access_token', None)
         status, body = serve_market_data_read(md_payload)
         return jsonify(body), status
+    if resource_id == 'wallet-sanctions-screen':
+        # Single-read OFAC screen (G1). The access token was consumed by
+        # access_granted above (settle-before-serve, single-use); the
+        # address to screen comes from the request payload.
+        from sincor2.sanctions_screen import serve_sanctions_screen
+        screen_payload = request.get_json(silent=True)
+        if screen_payload is None:
+            screen_payload = request.args.to_dict(flat=True)
+            screen_payload.pop('access_token', None)
+        status, body = serve_sanctions_screen(screen_payload)
+        return jsonify(body), status
     if resource_id == 'hook_status':
         try:
             from sincor2.hook_stats import fetch_hook_status
