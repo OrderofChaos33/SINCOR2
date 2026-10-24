@@ -75,3 +75,8 @@ resources:
     token: USDC
     amount_usdc: 2997.0
     description: "SINCOR Enterprise plan — one 30-day billing period, x402 USDC payment on Base"
+  rail-pack-webbuilder_site:
+    label: "WebBuilder Site (B2B skill pack)"
+    token: USDC
+    amount_usdc: 497.0
+    description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"

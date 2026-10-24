@@ -15,8 +15,9 @@ Routes (registered by :func:`init_rail_routes`):
   POST /rail/checkout  {pack_sku, payer_wallet?, buyer_email?}
                        or {subscription_plan, payer_wallet}
     -> 402 with the x402 challenge (challenge_id, payment payload, bind info)
-  POST /rail/settle    {challenge_id, tx_hash, payer_wallet?, buyer_email?, ...}
-    -> verify onchain USDC transfer -> finalize payment -> money gate ->
+  POST /rail/settle    {challenge_id, tx_hash, payer_wallet?, buyer_email?,
+                        buyer_name?, business_name?, phone?, niche?,
+                        territory?, prompt?, replay_signature?, replay_ts_ms?}    -> verify onchain USDC transfer -> finalize payment -> money gate ->
        fulfill pack / extend subscription. Idempotent: re-settling an
        already-fulfilled challenge returns the existing result without
        double-provisioning or double-extending.
@@ -67,6 +68,15 @@ PACK_SKUS: Dict[str, Dict[str, Any]] = {
         "name": "SADAS Execution",
         "module": "sadas_orchestrator.py",
         "price_cents": 299700,
+    },
+    # Zero-to-revenue 4.2: WebBuilder site-builder SKU. Price $497 (49700c)
+    # was decided by TOA decision z2r-webbuilder-price-20261023 (confidence
+    # 0.72) — do not change it here; the checkout route takes the price from
+    # this table, never from the client.
+    "webbuilder_site": {
+        "name": "WebBuilder Site",
+        "module": "webbuilder_studio.py",
+        "price_cents": 49700,
     },
 }
 
@@ -296,6 +306,21 @@ def _get_rail_event(event_id: str) -> Optional[Dict[str, Any]]:
     finally:
         conn.close()
 
+# --- Event details (idempotency state for fulfillment retries) ----------------
+def _rail_event_details(event_id: str) -> Dict[str, Any]:
+    """Read the rail event's JSON details column ({} when absent/corrupt)."""
+    event = _get_rail_event(event_id) or {}
+    try:
+        return json.loads(event.get("details") or "{}") or {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def _rail_event_merge_details(event_id: str, updates: Dict[str, Any]) -> None:
+    """Merge ``updates`` into the rail event's JSON details column."""
+    merged = _rail_event_details(event_id)
+    merged.update(updates)
+    _update_rail_event(event_id, details=json.dumps(merged))
 
 # --- Money gate --------------------------------------------------------------
 def _rail_money_gate_allows(*, event_id: str, challenge_id: str,
@@ -491,7 +516,11 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
       1. create an intake record (idempotent on the event id),
       2. email the buyer (skipped for wallet-native buyers with no email —
          the intake link is returned in the settle response instead),
-      3. queue the vertical-agent job on the ``sincor.long`` Celery queue,
+      3. fulfillment work: for the webbuilder_site SKU the 4.1 WebBuilder
+         bundle (static HTML site via the webbuilder modules) plus a
+         webbuilder_crm record is built synchronously here; every other
+         pack queues the vertical-agent job on the ``sincor.long`` Celery
+         queue,
       4. mark the rail event ``delivered`` — only when every step above
          succeeded. Any failure marks the event ``failed`` and records an
          alert.
@@ -531,25 +560,48 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
         logger.info("[FULFILLMENT] Intake record: %s", intake.intake_id)
 
         # 2. Buyer email with the intake link (wallet-native buyers skip).
+        # Idempotent per event: the sent flag survives a failed fulfillment,
+        # so a settle retry never re-sends the thank-you email.
         if customer_email:
-            _send_pack_email(
-                to_email=customer_email,
-                customer_name=customer_name,
-                pack_name=pack_name,
-                intake_url=intake_url,
-                order_id=intake.intake_id,
-            )
+            if not _rail_event_details(event_id).get("thank_you_email_sent"):
+                _send_pack_email(
+                    to_email=customer_email,
+                    customer_name=customer_name,
+                    pack_name=pack_name,
+                    intake_url=intake_url,
+                    order_id=intake.intake_id,
+                )
+                _rail_event_merge_details(
+                    event_id, {"thank_you_email_sent": True})
         else:
             logger.info(
                 "[FULFILLMENT] no buyer email for %s — intake link returned "
                 "in the settle response", event_id)
 
-        # 3. Vertical-agent deployment job on the sincor.long queue.
-        job_id = _queue_pack_agent_job(
-            intake_id=intake.intake_id,
-            pack_sku=pack_sku or "agent_services",
-            customer_email=customer_email or payer_wallet,
-        )
+        # 3. Fulfillment work.
+        webbuilder_receipt: Optional[Dict[str, Any]] = None
+        if pack_sku == "webbuilder_site":
+            # Zero-to-revenue 4.2: the deliverable is the 4.1 WebBuilder
+            # bundle (static HTML site via the webbuilder modules) plus a
+            # webbuilder_crm record — built synchronously here, not via
+            # the vertical-agent Celery job (that worker raises for packs
+            # with no vertical-agent binding). Resume-safe: a retry of a
+            # failed event continues from the already-created project.
+            webbuilder_receipt = _fulfill_webbuilder_site(
+                event_id=event_id,
+                intake_id=intake.intake_id,
+                customer_email=customer_email or payer_wallet,
+                customer_name=customer_name,
+                order=order,
+            )
+            job_id = webbuilder_receipt["project_id"]
+        else:
+            # Vertical-agent deployment job on the sincor.long queue.
+            job_id = _queue_pack_agent_job(
+                intake_id=intake.intake_id,
+                pack_sku=pack_sku or "agent_services",
+                customer_email=customer_email or payer_wallet,
+            )
 
     except Exception as exc:
         logger.exception("[FULFILLMENT] Pack fulfillment failed for %s", event_id)
@@ -565,7 +617,57 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
         "intake_id": intake.intake_id,
         "intake_url": intake_url,
         "job_id": job_id,
+        "webbuilder": webbuilder_receipt,
     }
+
+
+def _fulfill_webbuilder_site(*, event_id: str, intake_id: str,
+                             customer_email: str, customer_name: str,
+                             order: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the WebBuilder site bundle, idempotent across settle retries.
+
+    The studio project is the non-idempotent half: it is persisted to the
+    rail event's details the moment it exists, so a retry of a failed event
+    resumes from the recorded project_id (CRM record + deliverable receipt)
+    instead of building a second project, site dir, and thank-you bundle.
+    A recorded project that no longer exists in the studio store (operator
+    deleted it) is treated as fresh — rebuild is the safe failover.
+    """
+    from sincor2.revenue_orchestrator import RevenueOrchestrator
+    from sincor2 import webbuilder_studio as _wb
+
+    wb_state = dict(_rail_event_details(event_id).get("webbuilder") or {})
+    project = None
+    project_id = wb_state.get("project_id")
+    if project_id:
+        project = _wb.get_project(project_id)
+
+    phone = ((order.get("details") or {}).get("phone") or "").strip()
+    if project is None:
+        created = RevenueOrchestrator._create_webbuilder_project(
+            customer_email=customer_email,
+            customer_name=customer_name,
+            order=order,
+        )
+        project_id = created["project_id"]
+        phone = created.get("phone", phone)
+        wb_state.update({"project_id": project_id,
+                         "slug": created.get("slug"),
+                         "name": created.get("name", "")})
+        _rail_event_merge_details(event_id, {"webbuilder": wb_state})
+        project = _wb.get_project(project_id) or {
+            "id": project_id, "slug": created.get("slug"),
+            "name": created.get("name", ""),
+            "preview_url": created.get("preview_url", ""),
+        }
+
+    return RevenueOrchestrator._complete_webbuilder_bundle(
+        project=project,
+        phone=phone,
+        intake_id=intake_id,
+        customer_email=customer_email,
+        customer_name=customer_name,
+    )
 
 
 # --- Settle pipeline ----------------------------------------------------------
@@ -659,13 +761,23 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
                       buyer_email: str = "",
                       buyer_name: str = "",
                       replay_signature: str = "",
-                      replay_ts_ms: Any = None) -> Dict[str, Any]:
+                      replay_ts_ms: Any = None,
+                      business_name: str = "",
+                      phone: str = "",
+                      niche: str = "",
+                      territory: str = "",
+                      prompt: str = "") -> Dict[str, Any]:
     """Run the rail settle pipeline for one x402 challenge.
 
     claim event (idempotent) -> verify onchain USDC transfer (fail-closed
     on rpc_failed/tx_pending) -> finalize payment once -> money gate
     (fail-closed, gate-denial alert) -> fulfill pack (intake + email +
-    agent job).
+    agent job, or the synchronous WebBuilder bundle for webbuilder_site).
+
+    The business_* fields are optional order details for the
+    webbuilder_site SKU (business name / phone / niche / territory /
+    prompt flow into the WebBuilder project); a client-supplied price is
+    never accepted anywhere on this path.
 
     A re-settle of an already-fulfilled challenge returns the existing
     result without touching the chain or double-provisioning. A retry of a
@@ -808,6 +920,15 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
             "amount": amount_usdc,
             "tx_hash": tx_hash,
             "challenge_id": challenge_id,
+            # Order details (e.g. business_name/phone for the
+            # webbuilder_site SKU) flow to fulfillment.
+            "details": {
+                "business_name": business_name,
+                "phone": phone,
+                "niche": niche,
+                "territory": territory,
+                "prompt": prompt,
+            },
         }
         fulfillment = _fulfill_rail_pack(order)
         if fulfillment.get("status") != "delivered":
@@ -945,14 +1066,16 @@ def rail_settle():
     a subscription when the challenge is for a rail-sub-* resource.
 
     Body: {challenge_id, tx_hash, payer_wallet?, buyer_email?,
-           replay_signature?, replay_ts_ms?}.
+           replay_signature?, replay_ts_ms?, business_name?, phone?,
+           niche?, territory?, prompt?}.
     Fail-closed: rpc_failed/tx_pending from the RPC layer are returned as
     errors, never as payment. Idempotent on re-settle. replay_signature +
     replay_ts_ms are the W-103 recovery path: an EIP-191 personal_sign of
     build_replay_message(challenge_id, ts_ms) by the payer wallet, needed
     only when the challenge was fulfilled outside this settle (narrow
     crash window between the x402 fulfill and the rail verified-flag
-    write).
+    write). business_name/phone/niche/territory/prompt are optional order
+    details for the webbuilder_site SKU.
     """
     data = request.get_json(force=True, silent=True) or {}
     result = settle_rail_order(
@@ -963,6 +1086,11 @@ def rail_settle():
         buyer_name=str(data.get("buyer_name") or "").strip(),
         replay_signature=str(data.get("replay_signature") or ""),
         replay_ts_ms=data.get("replay_ts_ms"),
+        business_name=str(data.get("business_name") or "").strip(),
+        phone=str(data.get("phone") or "").strip(),
+        niche=str(data.get("niche") or "").strip(),
+        territory=str(data.get("territory") or "").strip(),
+        prompt=str(data.get("prompt") or "").strip(),
     )
     status = 200 if result.get("ok") else 402
     if result.get("error") in ("challenge_id_and_tx_hash_required",
