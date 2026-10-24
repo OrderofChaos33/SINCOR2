@@ -532,6 +532,14 @@ if fiat_payments_enabled():
         logger.warning('[STRIPE] %s', e)
         STRIPE_AVAILABLE = False
 
+# x402/USDC pack rail (B2B skill packs) — always mounted; the rail is the
+# human-payments rail, independent of the Stripe fiat path above.
+try:
+    from sincor2.rail_routes import init_rail_routes
+    init_rail_routes(app)
+except Exception as e:
+    logger.warning('[RAIL] %s', e)
+
 pdf_guides_dir = str(data_dir() / 'files' / 'guides')
 try:
     pdf_generator = get_pdf_generator(pdf_guides_dir)

@@ -1557,6 +1557,161 @@ def list_alerts(
         conn.close()
 
 
+# ---------------------------------------------------------------------------
+# B2B skill-pack intake records (zero-to-revenue 1.2)
+# ---------------------------------------------------------------------------
+# A pack purchase must leave exactly one intake record even when Stripe
+# redelivers the webhook: the intake_id is derived from the revenue event id
+# and both intake_id and event_id carry UNIQUE constraints, so a duplicate
+# delivery resolves to the existing row instead of creating a second one.
+
+
+@dataclass
+class PackIntake:
+    """Buyer intake record for a fulfilled B2B skill pack."""
+
+    intake_id: str
+    customer_email: str
+    pack_sku: str
+    event_id: str
+    status: str
+    intake_url: str
+    created_at: str = field(default_factory=_utc_now_iso)
+    details: dict[str, Any] = field(default_factory=dict)
+
+
+_PACK_INTAKE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS pack_intakes (
+    intake_id      TEXT PRIMARY KEY,
+    customer_email TEXT NOT NULL,
+    pack_sku       TEXT NOT NULL,
+    event_id       TEXT NOT NULL UNIQUE,
+    status         TEXT NOT NULL DEFAULT 'created',
+    intake_url     TEXT NOT NULL DEFAULT '',
+    created_at     TEXT NOT NULL,
+    details        TEXT NOT NULL DEFAULT '{}'
+);
+"""
+
+
+def _pack_intake_db_path(store_or_db: PaymentLedgerStore | str | Path) -> Path:
+    return (
+        store_or_db.db_path
+        if isinstance(store_or_db, PaymentLedgerStore)
+        else Path(store_or_db)
+    )
+
+
+def _pack_intake_from_row(r: sqlite3.Row) -> PackIntake:
+    return PackIntake(
+        intake_id=r["intake_id"],
+        customer_email=r["customer_email"],
+        pack_sku=r["pack_sku"],
+        event_id=r["event_id"],
+        status=r["status"],
+        intake_url=r["intake_url"],
+        created_at=r["created_at"],
+        details=json.loads(r["details"] or "{}"),
+    )
+
+
+def record_pack_intake(
+    store_or_db: PaymentLedgerStore | str | Path,
+    *,
+    intake_id: str,
+    customer_email: str,
+    pack_sku: str,
+    event_id: str,
+    intake_url: str = "",
+    details: Optional[dict[str, Any]] = None,
+) -> tuple[PackIntake, bool]:
+    """Persist a pack intake record, idempotently.
+
+    Returns ``(intake, is_new)``: on a duplicate delivery (same intake_id or
+    same event_id) the existing row is returned with ``is_new=False`` and no
+    second row is created.
+    """
+    db_path = _pack_intake_db_path(store_or_db)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), timeout=30.0)
+    try:
+        conn.executescript(_PACK_INTAKE_SCHEMA)
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO pack_intakes "
+            "(intake_id, customer_email, pack_sku, event_id, status, "
+            " intake_url, created_at, details)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (
+                intake_id,
+                customer_email,
+                pack_sku,
+                event_id,
+                "created",
+                intake_url,
+                _utc_now_iso(),
+                json.dumps(details or {}),
+            ),
+        )
+        # INSERT OR IGNORE: rowcount == 1 means this call created the row;
+        # rowcount == 0 means a duplicate delivery hit an existing row.
+        is_new = cur.rowcount == 1
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM pack_intakes WHERE intake_id=? OR event_id=?",
+            (intake_id, event_id),
+        ).fetchone()
+        if row is None:  # defensive; cannot happen without a deleter
+            raise PaymentLedgerError(f"pack intake {intake_id} vanished after insert")
+        return _pack_intake_from_row(row), is_new
+    finally:
+        conn.close()
+
+
+def get_pack_intake(
+    store_or_db: PaymentLedgerStore | str | Path,
+    intake_id: str,
+) -> Optional[PackIntake]:
+    """Fetch a pack intake record by id, or None."""
+    db_path = _pack_intake_db_path(store_or_db)
+    conn = sqlite3.connect(str(db_path), timeout=30.0)
+    try:
+        conn.executescript(_PACK_INTAKE_SCHEMA)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM pack_intakes WHERE intake_id=?", (intake_id,)
+        ).fetchone()
+        return _pack_intake_from_row(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_pack_intake_status(
+    store_or_db: PaymentLedgerStore | str | Path,
+    intake_id: str,
+    status: str,
+    details: Optional[dict[str, Any]] = None,
+) -> None:
+    """Transition a pack intake's status (e.g. created -> agent_kickoff)."""
+    db_path = _pack_intake_db_path(store_or_db)
+    conn = sqlite3.connect(str(db_path), timeout=30.0)
+    try:
+        conn.executescript(_PACK_INTAKE_SCHEMA)
+        if details is None:
+            conn.execute(
+                "UPDATE pack_intakes SET status=? WHERE intake_id=?",
+                (status, intake_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE pack_intakes SET status=?, details=? WHERE intake_id=?",
+                (status, json.dumps(details), intake_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def allowed_transitions() -> dict[str, list[str]]:
     """Return the legal transition table as plain strings (for docs/UIs)."""
     return {s.value: sorted(t.value for t in targets) for s, targets in _ALLOWED_TRANSITIONS.items()}
