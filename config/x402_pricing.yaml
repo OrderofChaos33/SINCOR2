@@ -54,6 +54,27 @@ resources:
     token: USDC
     amount_usdc: 2997.0
     description: "B2B skill pack: SADAS Execution — x402 USDC payment on Base"
+
+  # Digital packs (zero-to-revenue rail rework w4): token-gated downloads
+  # via GET /download/<intake_id>. amount_usdc MUST equal
+  # DIGITAL_SKUS[sku].price_cents / 100 in
+  # src/sincor2/revenue_orchestrator.py — the rail checkout route refuses
+  # to mint a challenge when the two disagree (fail closed on price drift).
+  rail-pack-digital_bi_template_pack:
+    label: "Instant BI Template Pack (digital download)"
+    token: USDC
+    amount_usdc: 97.0
+    description: "Digital pack: Instant BI Template Pack — x402 USDC payment on Base; token-gated download"
+  rail-pack-digital_ai_agent_bundle:
+    label: "AI Agent Bundle (digital download)"
+    token: USDC
+    amount_usdc: 297.0
+    description: "Digital pack: AI Agent Bundle — x402 USDC payment on Base; token-gated download"
+  rail-pack-digital_growth_forecast:
+    label: "Growth Forecast Template (digital download)"
+    token: USDC
+    amount_usdc: 147.0
+    description: "Digital pack: Growth Forecast Template — x402 USDC payment on Base; token-gated download"
   rail-pack-webbuilder_site:
     label: "WebBuilder Site (B2B skill pack)"
     token: USDC
