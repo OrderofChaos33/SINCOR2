@@ -80,3 +80,15 @@ resources:
     token: USDC
     amount_usdc: 497.0
     description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"
+
+  # Web Search + Page Read (skills gap G5): one sourced,
+  # timestamped search or page read served by
+  # src/sincor2/web_search_read.py after x402 settlement.
+  # Price is the winning resellers' point ($0.01, skills-gap-map
+  # 2026-10-24 §2.1/§4 item 8); the module's margin guard refuses
+  # to serve if the documented Exa provider cost reaches it.
+  web-search-read:
+    label: "Web search + page read (single read)"
+    token: USDC
+    amount_usdc: 0.01
+    description: "Single web search or page read with source URLs and fetch timestamps on Base with x402 settlement. Use when you need current web results or the extracted text of one page inside a larger workflow."
