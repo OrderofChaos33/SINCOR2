@@ -22,7 +22,7 @@
   "properties": {
     "code": {
       "type": "string",
-      "pattern": "^(OBS|AUD)-[A-Z0-9]+$"
+      "pattern": "^(OBS|AUD|WEB)-[A-Z0-9]+$"
     },
     "slug": {
       "type": "string"
@@ -34,7 +34,8 @@
       "type": "string",
       "enum": [
         "OBS",
-        "AUD"
+        "AUD",
+        "WEB"
       ]
     },
     "status": {
