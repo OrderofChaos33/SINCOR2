@@ -112,6 +112,16 @@ resources:
     token: USDC
     amount_usdc: 0.01
     description: "Single web search or page read with source URLs and fetch timestamps on Base with x402 settlement. Use when you need current web results or the extracted text of one page inside a larger workflow."
+  # TOA Micro-Decision (skills gap G7): single ranked-choice call
+  # served by src/sincor2/toa_micro_decision.py after x402 settlement.
+  # Price hypothesis labelled [inference] in skills-gap-map-2026-10-24
+  # §4 item 4 — no direct TOA comparator exists; anchored above a
+  # $0.005 probability read because TOA runs a Monte Carlo per call.
+  toa-micro-decision:
+    label: "TOA micro-decision (single ranked choice)"
+    token: USDC
+    amount_usdc: 0.05
+    description: "Single TOA ranked-choice decision with confidence, escalate-below-threshold, and hard-gate refusal on Base with x402 settlement. Use when you need one ranked choice with a confidence number inside a larger workflow."
   # Polymarket Whale Signal (skills gap G3): single-read fresh tracked-
   # whale entries served by src/sincor2/whale_signal.py after x402
   # settlement. Price anchored to the published single-question
