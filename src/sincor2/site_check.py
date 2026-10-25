@@ -61,10 +61,12 @@ sibling paid resources).
 
 from __future__ import annotations
 
+import ipaddress
+import socket
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 RESOURCE_ID = "local-business-site-check"
 
@@ -88,6 +90,81 @@ class SiteFetch:
 
 
 # ---------------------------------------------------------------------------
+# SSRF guard (audit P1-2): the buyer's URL is attacker-controlled, so
+# every target — the initial URL and EVERY redirect hop — must pass the
+# same strict check BEFORE any connection is attempted:
+#   * scheme http/https, a real hostname, ports 80/443 only;
+#   * no internal hostnames (localhost, *.local, *.internal — which
+#     covers *.railway.internal);
+#   * the hostname is resolved via socket.getaddrinfo and rejected if
+#     ANY resolved address is private, loopback, link-local, multicast,
+#     reserved, or unspecified (IP literals are checked directly).
+# A name that does not resolve at all is NOT rejected here: nothing
+# can connect to it, so the fetch fails honestly as unreachable. The
+# fetcher re-runs this check immediately before connecting, which is
+# the enforcement point; validate_payload runs it early so a bad
+# target is a 400 before any fetch is attempted.
+# ---------------------------------------------------------------------------
+
+_ALLOWED_PORTS = {80, 443}
+_REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+_MAX_REDIRECTS = 5
+
+
+class InvalidTargetHostError(Exception):
+    """A fetch target failed the SSRF check (see _target_error)."""
+
+
+def _target_error(url: str) -> Optional[str]:
+    """Return ``"invalid_target_host"`` if ``url`` must not be fetched,
+    else ``None``. Pure check — never opens a connection."""
+    parts = urlparse(url)
+    if parts.scheme not in ("http", "https"):
+        return "invalid_target_host"
+    host = (parts.hostname or "").strip().lower().rstrip(".")
+    if not host:
+        return "invalid_target_host"
+    if (host == "localhost" or host.endswith(".localhost")
+            or host.endswith(".local") or host.endswith(".internal")):
+        return "invalid_target_host"
+    try:
+        port = parts.port
+    except ValueError:
+        return "invalid_target_host"
+    if port is not None and port not in _ALLOWED_PORTS:
+        return "invalid_target_host"
+
+    try:
+        ips: List[ipaddress._BaseAddress] = [ipaddress.ip_address(host)]
+    except ValueError:
+        ips = []
+        default_port = port or (443 if parts.scheme == "https" else 80)
+        try:
+            infos = socket.getaddrinfo(host, default_port,
+                                       proto=socket.IPPROTO_TCP)
+        except (OSError, UnicodeError):
+            # Unresolvable: no address exists to connect to, so there
+            # is nothing to judge — the fetch itself will fail and the
+            # serve layer reports an honest "unknown".
+            return None
+        for info in infos:
+            try:
+                ips.append(ipaddress.ip_address(info[4][0]))
+            except ValueError:
+                continue
+    for ip in ips:
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved
+                or ip.is_unspecified):
+            return "invalid_target_host"
+    return None
+
+
+def _target_allowed(url: str) -> bool:
+    return _target_error(url) is None
+
+
+# ---------------------------------------------------------------------------
 # Fetch seam (tests stub this with fixtures — no network)
 # ---------------------------------------------------------------------------
 
@@ -98,21 +175,51 @@ def fetch_site_page(url: str) -> Optional[SiteFetch]:
     ``webbuilder_discover._meta_scrape`` (same UA family, bounded
     body). Returns ``None`` on ANY transport failure — the serve
     layer turns that into an honest ``unknown``, never a guess.
+
+    SSRF: automatic redirects are DISABLED; hops are followed
+    manually (max ``_MAX_REDIRECTS``) and every hop's target must
+    pass :func:`_target_error` before connecting. A forbidden target
+    raises :class:`InvalidTargetHostError` — the serve layer turns
+    that into a 400, never an ``unknown``.
     """
     import requests
 
-    try:
-        resp = requests.get(
-            url,
-            timeout=12,
-            headers={"User-Agent": "SINCOR-SiteCheck/1.0 "
-                                  "(+https://getsincor.com)"},
-        )
-    except Exception:
-        return None
-    return SiteFetch(status_code=resp.status_code,
-                     url=str(resp.url or url),
-                     html=(resp.text or "")[:200_000])
+    current = url
+    for _hop in range(_MAX_REDIRECTS + 1):
+        if not _target_allowed(current):
+            raise InvalidTargetHostError(current)
+        try:
+            resp = requests.get(
+                current,
+                timeout=12,
+                headers={"User-Agent": "SINCOR-SiteCheck/1.0 "
+                                      "(+https://getsincor.com)"},
+                allow_redirects=False,
+            )
+        except Exception:
+            return None
+        if resp.status_code in _REDIRECT_STATUSES:
+            location = ""
+            headers = getattr(resp, "headers", None) or {}
+            try:
+                location = (headers.get("Location") or "").strip()
+            except Exception:
+                location = ""
+            if not location:
+                # A redirect status with nowhere to go is the final
+                # response, same as the old auto-follow behaviour of
+                # handing back whatever was served.
+                return SiteFetch(status_code=resp.status_code,
+                                 url=str(resp.url or current),
+                                 html=(resp.text or "")[:200_000])
+            current = urljoin(current, location)
+            continue
+        return SiteFetch(status_code=resp.status_code,
+                         url=str(resp.url or current),
+                         html=(resp.text or "")[:200_000])
+    # Redirect chain longer than the hop budget: unreachable in
+    # practice for a real business site — honest failure.
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +312,11 @@ def validate_payload(
         parts = urlparse(url)
         if parts.scheme not in ("http", "https") or not parts.netloc:
             return None, _err("url_invalid")
+        # SSRF guard (audit P1-2): internal hostnames, non-80/443
+        # ports, and loopback/private/link-local/metadata targets
+        # are refused before any fetch is attempted.
+        if _target_error(url) is not None:
+            return None, _err("invalid_target_host")
 
     name = payload.get("business_name") or ""
     if not isinstance(name, str):
@@ -282,6 +394,11 @@ def serve_site_check(
     fetch_fn = fetch if fetch is not None else fetch_site_page
     try:
         page = fetch_fn(url)
+    except InvalidTargetHostError:
+        # A redirect hop (or the target itself, re-checked at fetch
+        # time) failed the SSRF guard: that is a client error about
+        # the requested target — a 400, never an "unknown" verdict.
+        return _err("invalid_target_host")
     except Exception:
         page = None
 
