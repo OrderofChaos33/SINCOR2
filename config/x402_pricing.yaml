@@ -101,6 +101,16 @@ resources:
     amount_usdc: 497.0
     description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"
 
+  # Local-Business Site Check (skills gap G8): one honest site-quality
+  # read served by src/sincor2/site_check.py after x402 settlement.
+  # Price is the Bazaar median ($0.01, skills-gap-map-2026-10-24 §2.1);
+  # the read feeds the $497 rail webbuilder pack above, but returns
+  # "no build needed" — with no upsell — when the site is good.
+  local-business-site-check:
+    label: "Local business site check (single read)"
+    token: USDC
+    amount_usdc: 0.01
+    description: "Single honest site-quality read for a local business: build_recommended with evidenced deficiencies, no_build_needed, or unknown on Base with x402 settlement. Use when prospecting a local business and you need to know whether its site needs a rebuild before pitching one."
   # Market-Data Single Read (skills gap G6): one Chainlink price read
   # served by src/sincor2/market_data_read.py after x402 settlement.
   # Price is AsterPay's published market-data price point ($0.0075,
