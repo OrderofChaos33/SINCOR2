@@ -111,6 +111,17 @@ resources:
     token: USDC
     amount_usdc: 0.0075
     description: "Single Chainlink price read with round provenance and staleness flag on Base with x402 settlement. Use when you need one current price with its round id and timestamp inside a larger workflow."
+  # Polymarket Whale Signal (skills gap G3): single-read fresh tracked-
+  # whale entries served by src/sincor2/whale_signal.py after x402
+  # settlement. Price anchored to the published single-question
+  # Polymarket snapshot point ($0.02/call, Botsmith — skills-gap-map
+  # 2026-10-24 §2.5). Data read only — no profitability claim (Mission
+  # 1A whale-flow trading verdict was NO-GO).
+  polymarket-whale-signal:
+    label: "Polymarket whale signal (single read)"
+    token: USDC
+    amount_usdc: 0.02
+    description: "Single-read fresh entries from tracked Polymarket whale wallets with per-wallet resolved-market track record on Base with x402 settlement. Use when you need current tracked-whale flow as data; historical statistics only, no claim about future results."
   # KYA Trust Score (skills gap G2): single-read agent trust score
   # served by src/sincor2/kya_trust_score.py after x402 settlement.
   # Price hypothesis anchored to the published KYA deep-analysis
