@@ -350,6 +350,19 @@ def x402_resources():
     return jsonify({'ok': True, 'resources': list_resources()})
 
 
+@bp.route('/api/kya/verify', methods=['GET'])
+def kya_verify():
+    """Free KYA verify tier (G2): known/status/verified/tier only.
+
+    The deep read (score + component breakdown) is the paid
+    ``kya-trust-score`` x402 resource; this route never returns it.
+    """
+    from sincor2.kya_trust_score import serve_kya_verify
+    status, body = serve_kya_verify(
+        request.args.get('agent_id', ''), request.args.get('wallet', ''))
+    return jsonify(body), status
+
+
 @bp.route('/x402/<resource_id>', methods=['GET'])
 @limiter.limit("200 per hour")
 def x402_challenge(resource_id):
@@ -514,6 +527,17 @@ def x402_paid_resource(resource_id):
             sc_payload = request.args.to_dict(flat=True)
             sc_payload.pop('access_token', None)
         status, body = serve_site_check(sc_payload)
+        return jsonify(body), status
+    if resource_id == 'kya-trust-score':
+        # KYA trust score deep read (G2). The access token was consumed
+        # by access_granted above (settle-before-serve, single-use);
+        # the agent to score comes from the request payload.
+        from sincor2.kya_trust_score import serve_kya_trust_score
+        score_payload = request.get_json(silent=True)
+        if score_payload is None:
+            score_payload = request.args.to_dict(flat=True)
+            score_payload.pop('access_token', None)
+        status, body = serve_kya_trust_score(score_payload)
         return jsonify(body), status
     if resource_id == 'wallet-sanctions-screen':
         # Single-read OFAC screen (G1). The access token was consumed by
