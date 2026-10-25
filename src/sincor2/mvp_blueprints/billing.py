@@ -515,6 +515,19 @@ def x402_paid_resource(resource_id):
                 ch['challenge_id'], resource_id, wallet)
             ch['payer_wallet_hint'] = wallet
         return jsonify(ch), 402
+    if resource_id == 'web-search-read':
+        # Web search + page read (G5). The access token was
+        # consumed by access_granted above (settle-before-serve,
+        # single-use); the buyer's {mode, query|url} payload is
+        # validated after payment. Stateless: every call re-runs
+        # through the module's provider seam.
+        from sincor2.web_search_read import serve_web_search_read
+        wsr_payload = request.get_json(silent=True)
+        if wsr_payload is None:
+            wsr_payload = request.args.to_dict(flat=True)
+            wsr_payload.pop('access_token', None)
+        status, body = serve_web_search_read(wsr_payload)
+        return jsonify(body), status
     if resource_id == 'local-business-site-check':
         # Local-business site check (G8). The access token was
         # consumed by access_granted above (settle-before-serve,
