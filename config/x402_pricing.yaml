@@ -112,6 +112,15 @@ resources:
     token: USDC
     amount_usdc: 0.01
     description: "Single web search or page read with source URLs and fetch timestamps on Base with x402 settlement. Use when you need current web results or the extracted text of one page inside a larger workflow."
+  # KYA Trust Score (skills gap G2): single-read agent trust score
+  # served by src/sincor2/kya_trust_score.py after x402 settlement.
+  # Price hypothesis anchored to the published KYA deep-analysis
+  # point ($0.015/call, AsterPay — skills-gap-map-2026-10-24 §2.4).
+  kya-trust-score:
+    label: "KYA agent trust score (deep read)"
+    token: USDC
+    amount_usdc: 0.015
+    description: "Single-read KYA agent trust score with auditable component breakdown from the SINCOR registry, stake ledger, and settlement history on Base with x402 settlement. Use when you need to decide whether to transact with an agent wallet."
   # Wallet Sanctions Screen (skills gap G1): single-read OFAC SDN screen
   # served by src/sincor2/sanctions_screen.py after x402 settlement.
   # Price hypothesis anchored to the advertised OFAC-screen market point
