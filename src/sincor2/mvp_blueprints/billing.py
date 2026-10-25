@@ -528,6 +528,19 @@ def x402_paid_resource(resource_id):
             wsr_payload.pop('access_token', None)
         status, body = serve_web_search_read(wsr_payload)
         return jsonify(body), status
+    if resource_id == 'market-data-read':
+        # Market-data single price read (G6). The access token was
+        # consumed by access_granted above (settle-before-serve,
+        # single-use); the pair/mode arrive in the request payload,
+        # validated after payment. Stateless: every call re-reads
+        # the Chainlink feed seam.
+        from sincor2.market_data_read import serve_market_data_read
+        md_payload = request.get_json(silent=True)
+        if md_payload is None:
+            md_payload = request.args.to_dict(flat=True)
+            md_payload.pop('access_token', None)
+        status, body = serve_market_data_read(md_payload)
+        return jsonify(body), status
     if resource_id == 'polymarket-whale-signal':
         # Polymarket whale signal single read (G3). The access token
         # was consumed by access_granted above (settle-before-serve,
