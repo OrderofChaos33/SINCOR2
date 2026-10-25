@@ -124,6 +124,50 @@
     return data;
   }
 
+  // Checkout is special: /rail/checkout answers a successful challenge
+  // mint with HTTP 402 (x402 Payment Required) and the challenge in the
+  // JSON body. That is NOT an error — parse and return the body. Any
+  // other non-2xx keeps postJSON's throw-on-error behavior.
+  async function postCheckoutJSON(url, body) {
+    var r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    var data = null;
+    try { data = await r.json(); } catch (e) { /* non-JSON: fall through */ }
+    if (r.status === 402 && data && (data.payment || data.accepts)) {
+      return data;
+    }
+    if (!r.ok) {
+      var err = (data && data.error) ? String(data.error) : ("HTTP " + r.status);
+      throw new Error(err);
+    }
+    return data;
+  }
+
+  // Map the page's resource id to the checkout payload the server
+  // expects. /rail/pay/<id> is addressed by x402 resource id
+  // (rail-pack-<sku> / rail-sub-<plan>), but /rail/checkout keys packs by
+  // bare SKU (PACK_SKUS.get(raw)) and subscriptions by plan + wallet —
+  // sending the resource id verbatim as pack_sku 400s.
+  function checkoutBody() {
+    if (resourceId.indexOf("rail-sub-") === 0) {
+      var sub = { subscription_plan: resourceId.slice("rail-sub-".length) };
+      if (wallet) sub.payer_wallet = wallet;
+      return sub;
+    }
+    if (resourceId.indexOf("rail-pack-") === 0) {
+      return { pack_sku: resourceId.slice("rail-pack-".length) };
+    }
+    return { pack_sku: resourceId };
+  }
+
+  function isValidAddress(a) {
+    return typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a) &&
+      a.toLowerCase() !== "0x0000000000000000000000000000000000000000";
+  }
+
   function provider() { return window.ethereum || null; }
 
   async function ensureBase() {
@@ -175,8 +219,17 @@
   async function loadCheckout() {
     setMsg("");
     try {
-      challenge = await postJSON("/rail/checkout", { pack_sku: resourceId });
+      challenge = await postCheckoutJSON("/rail/checkout", checkoutBody());
     } catch (e) {
+      if (String(e.message).indexOf("subscription_wallet_required") !== -1) {
+        // Subscriptions bind the challenge to the buyer's wallet, so the
+        // mint cannot happen before connect: reveal the connect step and
+        // re-mint once a wallet is connected (see the connect handler).
+        checkoutArea.innerHTML = "";
+        payArea.hidden = false;
+        setMsg("Connect your wallet to start the subscription.");
+        return;
+      }
       checkoutArea.innerHTML = "";
       setMsg("Could not start the payment: " + e.message, "err");
       return;
@@ -227,7 +280,12 @@
       if (!accounts || !accounts.length) throw new Error("no accounts returned");
       wallet = accounts[0];
       $("walletLine").textContent = "Connected: " + trunc(wallet);
-      setMsg("Wallet connected.", "ok");
+      if (!challenge) {
+        // Subscription challenges are wallet-bound and could not be
+        // minted before connect; mint now that the wallet is known.
+        await loadCheckout();
+      }
+      if (challenge) setMsg("Wallet connected.", "ok");
       refreshButtons();
     } catch (e) {
       if (e && e.code === 4001) setMsg("Connection rejected in wallet.", "err");
@@ -287,7 +345,18 @@
     setMsg("");
     try {
       await ensureBase();
-      var data = erc20TransferData(payment.asset, payment.maxAmountRequired);
+      // Guard: the transfer recipient is the treasury (payment.payTo),
+      // NEVER the token contract (payment.asset) — tokens sent to the
+      // USDC contract itself are locked there forever. Abort before
+      // eth_sendTransaction if the challenge's addresses look wrong.
+      var recipientSafe = isValidAddress(payment.payTo) &&
+        isValidAddress(payment.asset) &&
+        (payment.payTo.toLowerCase() !== payment.asset.toLowerCase());
+      if (!recipientSafe) {
+        throw new Error("invalid payment addresses in the challenge " +
+          "(payTo must be a valid address distinct from the token contract)");
+      }
+      var data = erc20TransferData(payment.payTo, payment.maxAmountRequired);
       setMsg("Confirm the USDC transfer in your wallet\u2026");
       var txHash = await eth.request({
         method: "eth_sendTransaction",

@@ -679,3 +679,88 @@ def test_rail_routes_mounted_on_create_app(rail_env):
     rules = {str(r) for r in app.url_map.iter_rules()}
     assert "/rail/checkout" in rules
     assert "/rail/settle" in rules
+
+
+# ---------------------------------------------------------------------------
+# P0-1: revenue_orchestrator import must never raise on an unwritable fs.
+#
+# In production the app runs as appuser under a root-owned /app, so the
+# import-time Path("logs").mkdir(...) raised PermissionError; because
+# rail_routes imports revenue_orchestrator at top level, mvp_app's rail
+# mount then failed and the whole rail was silently absent. The import is
+# exercised in a subprocess with pathlib.Path.mkdir guarded to deny any
+# directory creation outside SINCOR_DATA_DIR (a faithful read-only-cwd
+# simulation: mkdir on an already-existing path still succeeds, exactly
+# like mkdir(2) returning EEXIST on a read-only filesystem).
+# ---------------------------------------------------------------------------
+
+_IMPORT_DRIVER = r"""
+import os, pathlib
+_real_mkdir = pathlib.Path.mkdir
+
+def _guarded_mkdir(self, mode=0o777, parents=False, exist_ok=False):
+    if self.exists():
+        if exist_ok:
+            return None
+        raise FileExistsError(str(self))
+    _allowed = os.environ.get("SINCOR_DATA_DIR", "")
+    if _allowed and str(self).startswith(_allowed):
+        return _real_mkdir(self, mode, parents, exist_ok)
+    raise PermissionError(13, "Permission denied: %s" % self)
+
+pathlib.Path.mkdir = _guarded_mkdir
+
+import sincor2.revenue_orchestrator as ro
+print("orchestrator import OK")
+
+from flask import Flask
+from sincor2.rail_routes import init_rail_routes
+_app = Flask(__name__)
+init_rail_routes(_app)
+_rules = {str(r) for r in _app.url_map.iter_rules()}
+assert "/rail/checkout" in _rules and "/rail/settle" in _rules, _rules
+print("RAIL IMPORT OK")
+"""
+
+
+def _run_import_driver(tmp_path, data_dir):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(repo_root / "src"), str(repo_root)])
+    env["ORDERS_DB_PATH"] = str(tmp_path / "orders.db")
+    if data_dir is None:
+        env.pop("SINCOR_DATA_DIR", None)
+    else:
+        env["SINCOR_DATA_DIR"] = str(data_dir)
+    return subprocess.run(
+        [sys.executable, "-c", _IMPORT_DRIVER],
+        cwd=str(tmp_path), env=env, capture_output=True, text=True,
+        timeout=180)
+
+
+def test_revenue_orchestrator_import_survives_unwritable_cwd(tmp_path):
+    # SINCOR_DATA_DIR set (the Railway layout): logs + revenue data root
+    # there, and creating anything outside it is denied.
+    data_dir = tmp_path / "sdata"
+    data_dir.mkdir()
+    proc = _run_import_driver(tmp_path, data_dir)
+    assert proc.returncode == 0, proc.stderr
+    assert "RAIL IMPORT OK" in proc.stdout
+    assert (data_dir / "logs").is_dir()
+    assert (data_dir / "revenue").is_dir()
+
+
+def test_revenue_orchestrator_import_survives_unwritable_cwd_no_data_dir(
+        tmp_path):
+    # SINCOR_DATA_DIR unset and NOTHING may be created: import must still
+    # succeed (logging degrades to stream-only; ledger dir setup is
+    # best-effort) and the rail must still mount.
+    proc = _run_import_driver(tmp_path, None)
+    assert proc.returncode == 0, proc.stderr
+    assert "RAIL IMPORT OK" in proc.stdout

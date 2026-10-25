@@ -534,11 +534,22 @@ if fiat_payments_enabled():
 
 # x402/USDC pack rail (B2B skill packs) — always mounted; the rail is the
 # human-payments rail, independent of the Stripe fiat path above.
+# Mount outcomes are tracked in RAIL_MOUNT_STATUS and surfaced on /health
+# (see _expose_rail_mount_status below): a failed mount must be loud —
+# full traceback in the boot log AND visible in the health payload —
+# never a one-line warning that leaves the rail silently absent.
+RAIL_MOUNT_STATUS = {
+    'rail_routes': False,
+    'rail_delivery': False,
+    'rail_pay': False,
+}
 try:
     from sincor2.rail_routes import init_rail_routes
     init_rail_routes(app)
-except Exception as e:
-    logger.warning('[RAIL] %s', e)
+    RAIL_MOUNT_STATUS['rail_routes'] = True
+except Exception:
+    logger.exception('[RAIL] init_rail_routes failed — /rail/checkout and '
+                     '/rail/settle are NOT mounted')
 
 # Token-gated digital-pack downloads (rail rework w4) — mounted next to
 # the rail routes; this is the route the buyer email's download link
@@ -546,8 +557,44 @@ except Exception as e:
 try:
     from sincor2.rail_delivery import init_rail_delivery_routes
     init_rail_delivery_routes(app)
-except Exception as e:
-    logger.warning('[RAIL-DELIVERY] %s', e)
+    RAIL_MOUNT_STATUS['rail_delivery'] = True
+except Exception:
+    logger.exception('[RAIL-DELIVERY] init_rail_delivery_routes failed — '
+                     'token-gated /download/<id> is NOT mounted')
+
+# Human payment pages: GET /rail/pay/<resource_id> + GET /rail/onramp.
+# This blueprint was previously registered only in the legacy
+# sincor2.app module, so the production app never served the pay pages
+# that the checkout flow depends on.
+try:
+    from sincor2.blueprints.rail_pay import rail_pay_bp
+    app.register_blueprint(rail_pay_bp)
+    RAIL_MOUNT_STATUS['rail_pay'] = True
+except Exception:
+    logger.exception('[RAIL-PAY] rail_pay_bp failed to mount — '
+                     '/rail/pay/<id> pages are NOT served')
+
+
+@app.after_request
+def _expose_rail_mount_status(response):
+    """Attach the rail mount status to the /health payload.
+
+    /health itself is served by sincor2.mvp_blueprints.health; this hook,
+    registered where the rail mounts happen, adds a 'rail' section so an
+    unmounted rail is visible in the health surface, not only in logs.
+    """
+    if request.path == '/health' and response.is_json:
+        try:
+            payload = json.loads(response.get_data(as_text=True))
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            payload['rail'] = {
+                'mounted': all(RAIL_MOUNT_STATUS.values()),
+                **RAIL_MOUNT_STATUS,
+            }
+            response.set_data(json.dumps(payload))
+    return response
 
 pdf_guides_dir = str(data_dir() / 'files' / 'guides')
 try:
