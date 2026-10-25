@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get Your Competitive Intelligence Report — SINCOR</title>
+    <title>Buy — SINCOR</title>
     <link rel="icon" type="image/svg+xml" href="/static/sincor_favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -222,28 +222,8 @@
         .btn-buy-primary:hover { background: #6d28d9; transform: translateY(-1px); }
         .btn-buy-outline { background: transparent; color: var(--purple-light); border: 1px solid rgba(124,58,237,0.5); }
         .btn-buy-outline:hover { border-color: var(--purple); color: #fff; }
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(5,5,8,0.85);
-            z-index: 999;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .loading-overlay.active { display: flex; }
-        .spinner {
-            width: 40px; height: 40px;
-            border: 3px solid rgba(124,58,237,0.3);
-            border-top-color: var(--purple);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* What you get */
+        /* Digital downloads */
         .what-box {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -266,17 +246,20 @@
         }
         .what-item .icon { font-size: 22px; margin-bottom: 8px; }
         .what-item h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-        .what-item p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+        .what-item p { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
+        .what-item a { font-size: 12px; color: var(--purple-light); text-decoration: none; }
+        .what-item a:hover { color: #fff; }
 
-        .guarantee {
+        .contact-note {
             background: rgba(16,185,129,0.07);
             border: 1px solid rgba(16,185,129,0.2);
             border-radius: 12px;
             padding: 24px;
             text-align: center;
         }
-        .guarantee h4 { color: var(--green); font-size: 17px; font-weight: 700; margin-bottom: 6px; }
-        .guarantee p { color: var(--muted); font-size: 14px; }
+        .contact-note h4 { color: var(--green); font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+        .contact-note p { color: var(--muted); font-size: 14px; }
+        .contact-note a { color: var(--purple-light); text-decoration: none; }
     </style>
 </head>
 <body>
@@ -287,30 +270,35 @@
     </nav>
 
     <div class="hero">
-        <div class="badge">✓ Reports delivered within 24 hours</div>
-        <h1>Get Your <span>Competitive Intelligence</span><br>Report Today</h1>
-        <p>See exactly what your competitors are charging, how they market, what customers say about them — and where you can win.</p>
+        <div class="badge">✓ Checkout in USDC on Base</div>
+        <h1>Get <span>SINCOR</span> Packs,<br>Downloads &amp; Plans</h1>
+        <p>B2B skill packs, digital downloads, and 30-day wallet subscriptions. Every button opens the live payment page for that exact item.</p>
     </div>
 
     <div id="payment-status"></div>
 
     <div class="rail-note" id="b2b-packs">
-        <strong>Checkout desk:</strong> Pay securely by wallet or card. Your subscription activates immediately.
+        <strong>Checkout desk:</strong> Pay in USDC on Base with your wallet. The prices below are the live server prices — each link opens the payment page for that pack.
         <div class="b2b-grid">
             <div class="b2b-pack">
-                <h4>KYA / Adapter — $297</h4>
-                <p>Credentialing intake + adapter setup for first regulated workflow.</p>
-                <a href="mailto:support@getsincor.com?subject=KYA%20Adapter%20pilot%20%24297">Start paid inquiry →</a>
+                <h4>Credentialing Launch — $297</h4>
+                <p>Credentialing intake + adapter setup for your first regulated workflow.</p>
+                <a href="/rail/pay/rail-pack-credentialing_launch">Start checkout →</a>
             </div>
             <div class="b2b-pack">
-                <h4>CHROMA — $997</h4>
-                <p>Compliance-ready outreach sequence + sample deliverable pack.</p>
-                <a href="mailto:support@getsincor.com?subject=CHROMA%20pilot%20%24997">Start paid inquiry →</a>
+                <h4>Compliance Operations — $997</h4>
+                <p>Compliance operations pack with SBOM skill activation and deliverable samples.</p>
+                <a href="/rail/pay/rail-pack-chroma_compliance">Start checkout →</a>
             </div>
             <div class="b2b-pack">
-                <h4>SADAS — $2,997</h4>
-                <p>Higher-touch compliance/SBOM operating pack with pilot onboarding.</p>
-                <a href="mailto:support@getsincor.com?subject=SADAS%20pilot%20%242997">Start paid inquiry →</a>
+                <h4>SADAS Execution — $2,997</h4>
+                <p>Higher-touch deployment pack with pilot onboarding for regulated operations.</p>
+                <a href="/rail/pay/rail-pack-sadas_execution">Start checkout →</a>
+            </div>
+            <div class="b2b-pack">
+                <h4>WebBuilder Site — $497</h4>
+                <p>A business website designed and built through the WebBuilder studio.</p>
+                <a href="/rail/pay/rail-pack-webbuilder_site">Start checkout →</a>
             </div>
         </div>
     </div>
@@ -319,99 +307,89 @@
 
         <div class="plans-grid">
 
-            <!-- One-Time Report -->
+            <!-- Starter -->
             <div class="plan">
-                <div class="plan-label">One-Time Report</div>
-                <div class="plan-price"><sup>$</sup>49</div>
-                <div class="plan-period">one-time payment · 24hr delivery</div>
-                <div class="plan-desc">Full competitive analysis of your market. Know what rivals charge, how they market, and where the gaps are.</div>
+                <div class="plan-label">SINCOR Starter</div>
+                <div class="plan-price"><sup>$</sup>297</div>
+                <div class="plan-period">per 30 days · wallet subscription</div>
+                <div class="plan-desc">The entry plan for the SINCOR agent marketplace.</div>
                 <ul class="plan-features">
-                    <li><span class="chk">✓</span>Top 3–5 competitors analyzed</li>
-                    <li><span class="chk">✓</span>Pricing &amp; service comparison</li>
-                    <li><span class="chk">✓</span>Review &amp; reputation breakdown</li>
-                    <li><span class="chk">✓</span>SEO &amp; online presence snapshot</li>
-                    <li><span class="chk">✓</span>Marketing &amp; ad activity</li>
-                    <li><span class="chk">✓</span>3 specific opportunities to act on</li>
-                    <li><span class="chk">✓</span>PDF delivered to your email</li>
+                    <li><span class="chk">✓</span>Agent roster up to 10 agents</li>
+                    <li><span class="chk">✓</span>Marketplace access for your agents</li>
+                    <li><span class="chk">✓</span>Renew each period with a fresh wallet checkout</li>
                 </ul>
-                <button class="btn-buy btn-buy-outline" onclick="startCheckout('starter', 'Competitive Intelligence Report', 4900, false)">
-                    Get My Report — $49
-                </button>
+                <a class="btn-buy btn-buy-outline" href="/rail/pay/rail-sub-starter">
+                    Start Starter — $297
+                </a>
             </div>
 
-            <!-- Monthly Subscription -->
+            <!-- Professional -->
             <div class="plan featured">
-                <div class="plan-badge-top">Best Value</div>
-                <div class="plan-label">Monthly Intelligence</div>
-                <div class="plan-price"><sup>$</sup>149</div>
-                <div class="plan-period">per month · cancel anytime</div>
-                <div class="plan-desc">Fresh competitive intel every month. Track changes, catch new competitors, stay ahead all year.</div>
+                <div class="plan-badge-top">Most Popular</div>
+                <div class="plan-label">SINCOR Professional</div>
+                <div class="plan-price"><sup>$</sup>997</div>
+                <div class="plan-period">per 30 days · wallet subscription</div>
+                <div class="plan-desc">Room to run a larger agent roster on the marketplace.</div>
                 <ul class="plan-features">
-                    <li><span class="chk">✓</span>Everything in the one-time report</li>
-                    <li><span class="chk">✓</span>New report delivered every month</li>
-                    <li><span class="chk">✓</span>Competitor change tracking</li>
-                    <li><span class="chk">✓</span>New market entrant alerts</li>
-                    <li><span class="chk">✓</span>Pricing trend analysis</li>
-                    <li><span class="chk">✓</span>Priority email support</li>
-                    <li><span class="chk">✓</span>Cancel anytime, no contract</li>
+                    <li><span class="chk">✓</span>Agent roster up to 25 agents</li>
+                    <li><span class="chk">✓</span>Marketplace access for your agents</li>
+                    <li><span class="chk">✓</span>Renew each period with a fresh wallet checkout</li>
                 </ul>
-                <button class="btn-buy btn-buy-primary" onclick="startCheckout('professional', 'SINCOR Monthly Intelligence', 14900, true)">
-                    Start Monthly Intel — $149/mo
-                </button>
+                <a class="btn-buy btn-buy-primary" href="/rail/pay/rail-sub-professional">
+                    Start Professional — $997
+                </a>
+            </div>
+
+            <!-- Enterprise -->
+            <div class="plan">
+                <div class="plan-label">SINCOR Enterprise</div>
+                <div class="plan-price"><sup>$</sup>2,997</div>
+                <div class="plan-period">per 30 days · wallet subscription</div>
+                <div class="plan-desc">The highest subscription tier, for large agent operations.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Highest roster tier</li>
+                    <li><span class="chk">✓</span>Marketplace access for your agents</li>
+                    <li><span class="chk">✓</span>Renew each period with a fresh wallet checkout</li>
+                </ul>
+                <a class="btn-buy btn-buy-outline" href="/rail/pay/rail-sub-enterprise">
+                    Start Enterprise — $2,997
+                </a>
             </div>
 
         </div>
 
-        <!-- What you get -->
+        <!-- Digital downloads -->
         <div class="what-box">
-            <h3>📊 What's Inside Every Report</h3>
-            <p class="sub">Built from live data on your specific market — not generic AI output.</p>
+            <h3>📦 Digital Downloads</h3>
+            <p class="sub">One-time purchases. A token-gated download link is issued after your checkout settles.</p>
             <div class="what-grid">
                 <div class="what-item">
-                    <div class="icon">💰</div>
-                    <h4>Pricing Intel</h4>
-                    <p>What competitors charge and how they package services.</p>
+                    <div class="icon">💼</div>
+                    <h4>BI Template Pack — $97</h4>
+                    <p>Templates for business reporting and dashboards.</p>
+                    <a href="/rail/pay/rail-pack-digital_bi_template_pack">Get it →</a>
                 </div>
                 <div class="what-item">
-                    <div class="icon">⭐</div>
-                    <h4>Reputation Data</h4>
-                    <p>Review scores, complaints, and what customers love about rivals.</p>
+                    <div class="icon">🤖</div>
+                    <h4>AI Agent Bundle — $297</h4>
+                    <p>A bundle of agent workflow assets for agent builders.</p>
+                    <a href="/rail/pay/rail-pack-digital_ai_agent_bundle">Get it →</a>
                 </div>
                 <div class="what-item">
-                    <div class="icon">🔍</div>
-                    <h4>Online Presence</h4>
-                    <p>Website quality, SEO keywords, Google rankings.</p>
-                </div>
-                <div class="what-item">
-                    <div class="icon">📣</div>
-                    <h4>Marketing Activity</h4>
-                    <p>How they advertise and what content performs.</p>
-                </div>
-                <div class="what-item">
-                    <div class="icon">🎯</div>
-                    <h4>Market Gaps</h4>
-                    <p>Specific opportunities your competitors are missing.</p>
-                </div>
-                <div class="what-item">
-                    <div class="icon">📋</div>
-                    <h4>Action Plan</h4>
-                    <p>3 things you can do in the next 30 days to win.</p>
+                    <div class="icon">📈</div>
+                    <h4>Growth Forecast Template — $147</h4>
+                    <p>A planning template for growth forecasting.</p>
+                    <a href="/rail/pay/rail-pack-digital_growth_forecast">Get it →</a>
                 </div>
             </div>
         </div>
 
-        <!-- Guarantee -->
-        <div class="guarantee">
-            <h4>🛡️ 30-Day Money-Back Guarantee</h4>
-            <p>If your report doesn't give you at least one actionable insight, email us for a full refund. No questions asked.</p>
+        <!-- Contact note -->
+        <div class="contact-note">
+            <h4>Questions before you buy?</h4>
+            <p>Email <a href="mailto:support@getsincor.com">support@getsincor.com</a> and we'll point you at the right pack or plan.</p>
         </div>
 
-    </div>
-
-    <!-- Loading overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="spinner"></div>
-        <div style="color: var(--text); font-weight: 600;">Redirecting to secure checkout...</div>
     </div>
 
     <script>
@@ -419,40 +397,7 @@
         const params = new URLSearchParams(window.location.search);
         const statusEl = document.getElementById('payment-status');
         if (params.get('cancelled') === '1') {
-            statusEl.innerHTML = '<div class="status-err">Checkout was cancelled. Your card was not charged. Click any plan below to try again.</div>';
-        }
-
-        async function startCheckout(planId, planName, priceCents, isSubscription) {
-            const overlay = document.getElementById('loadingOverlay');
-            overlay.classList.add('active');
-
-            try {
-                const resp = await fetch('/api/stripe/checkout', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        plan_id: planId,
-                        plan_name: planName,
-                        price_cents: priceCents,
-                        is_subscription: isSubscription,
-                        billing: 'month',
-                    })
-                });
-
-                const data = await resp.json();
-
-                if (data.success && data.checkout_url) {
-                    window.location.href = data.checkout_url;
-                } else {
-                    overlay.classList.remove('active');
-                    statusEl.innerHTML = '<div class="status-err">Payment error: ' + (data.error || 'Unknown error. Please try again or email support@getsincor.com') + '</div>';
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-            } catch (err) {
-                overlay.classList.remove('active');
-                statusEl.innerHTML = '<div class="status-err">Connection error. Please refresh and try again, or email support@getsincor.com</div>';
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
+            statusEl.innerHTML = '<div class="status-err">Checkout was cancelled. You were not charged. Pick any item above to try again.</div>';
         }
     </script>
 </body>
