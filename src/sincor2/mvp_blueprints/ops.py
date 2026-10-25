@@ -248,3 +248,32 @@ def outreach_run_now():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@bp.route('/v1/ops/rail-revenue', methods=['GET'])
+def ops_rail_revenue_summary():
+    """Rail revenue summary with genesis-cohort attribution (admin, read-only).
+
+    Reads the x402/USDC rail payment ledger (rail_events); payments from
+    claimed genesis cohort members are tagged at settle-log time (see
+    sincor2.rail_routes) and surface here under the ``genesis`` key —
+    attributed revenue, transaction count, and the tagged events themselves.
+    Untagged payments appear only in the aggregate totals. Pure read path:
+    no state is written and no Stripe code is touched.
+    """
+    denied = _require_admin(request)
+    if denied:
+        return denied
+    try:
+        from sincor2 import rail_routes
+        days = request.args.get('days', default=30, type=int)
+        days = max(1, min(int(days or 30), 365))
+        summary = rail_routes.get_rail_revenue_summary(days=days)
+        return jsonify({
+            'ok': True,
+            'summary': summary,
+            'timestamp': datetime.utcnow().isoformat(),
+        }), 200
+    except Exception as e:
+        logger.error('[OPS/RAIL-REVENUE] Summary failed: %s', e)
+        return jsonify({'error': str(e)}), 500
+
