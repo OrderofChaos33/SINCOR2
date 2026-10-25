@@ -528,6 +528,19 @@ def x402_paid_resource(resource_id):
             wsr_payload.pop('access_token', None)
         status, body = serve_web_search_read(wsr_payload)
         return jsonify(body), status
+    if resource_id == 'local-business-site-check':
+        # Local-business site check (G8). The access token was
+        # consumed by access_granted above (settle-before-serve,
+        # single-use); the business URL/name arrive in the request
+        # payload, validated after payment. Stateless: every call
+        # re-fetches through the module's fetch seam.
+        from sincor2.site_check import serve_site_check
+        sc_payload = request.get_json(silent=True)
+        if sc_payload is None:
+            sc_payload = request.args.to_dict(flat=True)
+            sc_payload.pop('access_token', None)
+        status, body = serve_site_check(sc_payload)
+        return jsonify(body), status
     if resource_id == 'market-data-read':
         # Market-data single price read (G6). The access token was
         # consumed by access_granted above (settle-before-serve,
