@@ -555,6 +555,18 @@ def x402_paid_resource(resource_id):
             return jsonify({'ok': True, 'resource': resource_id, 'data': fetch_hook_status()}), 200
         except Exception as e:
             return jsonify({'ok': False, 'error': str(e)}), 500
+    if resource_id == 'toa-micro-decision':
+        # TOA micro-decision (G7). The access token was consumed by
+        # access_granted above (settle-before-serve, single-use); the
+        # decision question arrives as structured options+signals in
+        # the request payload, validated after payment.
+        from sincor2.toa_micro_decision import serve_toa_micro_decision
+        toa_payload = request.get_json(silent=True)
+        if toa_payload is None:
+            toa_payload = request.args.to_dict(flat=True)
+            toa_payload.pop('access_token', None)
+        status, body = serve_toa_micro_decision(toa_payload)
+        return jsonify(body), status
     payload = request.get_json(silent=True)
     if payload is None:
         payload = request.args.to_dict(flat=True)
