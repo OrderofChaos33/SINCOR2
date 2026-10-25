@@ -213,9 +213,28 @@ CREATE TABLE IF NOT EXISTS rail_events (
     fulfillment_status TEXT NOT NULL DEFAULT 'pending',
     intake_id          TEXT NOT NULL DEFAULT '',
     created_at         TEXT NOT NULL,
-    details            TEXT NOT NULL DEFAULT '{}'
+    details            TEXT NOT NULL DEFAULT '{}',
+    genesis_member     INTEGER NOT NULL DEFAULT 0,
+    genesis_allocation TEXT NOT NULL DEFAULT ''
 );
 """
+
+
+def _ensure_genesis_attribution_columns(conn: sqlite3.Connection) -> None:
+    """Migration-safe: add the genesis-attribution columns only when a
+    legacy rail_events table lacks them. Fresh tables already carry them in
+    _RAIL_EVENT_SCHEMA; this path covers databases written before the
+    columns existed. Existing rows default to untagged."""
+    existing = {row[1] for row in
+                conn.execute("PRAGMA table_info(rail_events)")}
+    if "genesis_member" not in existing:
+        conn.execute(
+            "ALTER TABLE rail_events ADD COLUMN "
+            "genesis_member INTEGER NOT NULL DEFAULT 0")
+    if "genesis_allocation" not in existing:
+        conn.execute(
+            "ALTER TABLE rail_events ADD COLUMN "
+            "genesis_allocation TEXT NOT NULL DEFAULT ''")
 
 
 def _rail_db_path() -> Path:
@@ -233,6 +252,7 @@ def _connect_rail() -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), timeout=30.0)
     conn.executescript(_RAIL_EVENT_SCHEMA)
+    _ensure_genesis_attribution_columns(conn)
     try:
         from sincor2.payment_ledger import _PACK_INTAKE_SCHEMA
         conn.executescript(_PACK_INTAKE_SCHEMA)
@@ -241,6 +261,34 @@ def _connect_rail() -> sqlite3.Connection:
     conn.commit()
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# --- Genesis-cohort attribution -----------------------------------------------
+def _resolve_genesis_attribution(buyer_email: str,
+                                payer_wallet: str) -> Tuple[int, str]:
+    """Resolve (genesis_member, genesis_allocation) for a settle at log time.
+
+    The buyer_email is the primary key: when it matches a claimed genesis
+    cohort member, the payment is attributed to that member. The payer
+    wallet is the secondary key: a member who pays from a wallet with no
+    buyer_email is still attributable when the wallet was registered to
+    their claim (``genesis_cohort.get_member_by_wallet``). Email takes
+    precedence — the wallet is consulted only when the email does not match.
+
+    Never raises: attribution must never break payment logging, so any
+    lookup failure degrades to "untagged". Attribution never changes
+    amounts — it only records who paid.
+    """
+    try:
+        from sincor2 import genesis_cohort as _gc
+        member = _gc.get_member(buyer_email)
+        if member is None:
+            member = _gc.get_member_by_wallet(payer_wallet)
+        if member is not None:
+            return 1, member["allocation"]
+    except Exception:
+        logger.debug("[RAIL] genesis attribution lookup failed", exc_info=True)
+    return 0, ""
 
 
 def _resource_id_for(sku: str) -> str:
@@ -274,23 +322,33 @@ def _download_url(intake_id: str, delivery_token: str) -> str:
 # --- Event claim (settle idempotency) ----------------------------------------
 def _claim_rail_event(*, challenge_id: str, pack_sku: str,
                       payer_wallet: str = "", tx_hash: str = "",
-                      amount_usdc: float = 0.0) -> Tuple[Dict[str, Any], bool]:
+                      amount_usdc: float = 0.0,
+                      buyer_email: str = "") -> Tuple[Dict[str, Any], bool]:
     """Claim the settle event for a challenge, idempotently.
 
     Returns ``(event, is_new)``: the first claim wins (``is_new=True``);
     a repeat claim returns the existing row with ``is_new=False`` so the
     caller can ack the duplicate instead of re-fulfilling.
+
+    Genesis attribution is resolved once, at this log-time claim: a
+    buyer_email matching a claimed cohort member (or, with no email, the
+    registered payer wallet) tags the row. Retries keep the first claim's
+    attribution — attribution is written at log time, never backfilled.
     """
     event_id = f"rail-{challenge_id}"
+    genesis_member, genesis_allocation = _resolve_genesis_attribution(
+        buyer_email, payer_wallet)
     conn = _connect_rail()
     try:
         cur = conn.execute(
             "INSERT OR IGNORE INTO rail_events "
             "(event_id, challenge_id, pack_sku, payer_wallet, tx_hash, "
-            " amount_usdc, finalized, fulfillment_status, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            " amount_usdc, finalized, fulfillment_status, created_at, "
+            " genesis_member, genesis_allocation) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (event_id, challenge_id, pack_sku, payer_wallet, tx_hash,
-             amount_usdc, 0, "pending", _utc_now_iso()),
+             amount_usdc, 0, "pending", _utc_now_iso(),
+             genesis_member, genesis_allocation),
         )
         is_new = cur.rowcount == 1
         conn.commit()
@@ -327,6 +385,59 @@ def _get_rail_event(event_id: str) -> Optional[Dict[str, Any]]:
     finally:
         conn.close()
 
+
+def get_rail_revenue_summary(days: int = 30) -> Dict[str, Any]:
+    """Read-only rail revenue summary with genesis-cohort attribution.
+
+    Revenue counts rail events that are both payment-finalized AND
+    delivered inside the window. The ``genesis`` key carries the
+    attributed subset: payments tagged at settle-log time with a claimed
+    genesis cohort member. Untagged payments count only in the aggregate
+    totals. Attribution never changed the amounts — it only recorded who.
+    """
+    from datetime import timedelta
+
+    days = max(1, min(int(days or 30), 365))
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    conn = _connect_rail()
+    try:
+        rows = conn.execute(
+            "SELECT event_id, pack_sku, payer_wallet, tx_hash, amount_usdc, "
+            "       genesis_member, genesis_allocation, created_at "
+            "FROM rail_events "
+            "WHERE finalized = 1 AND fulfillment_status = 'delivered' "
+            "  AND created_at > ? "
+            "ORDER BY created_at DESC",
+            (cutoff,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    genesis_events = [r for r in rows if int(r["genesis_member"] or 0) == 1]
+    return {
+        "total_revenue": round(sum(float(r["amount_usdc"] or 0) for r in rows), 2),
+        "transaction_count": len(rows),
+        "genesis": {
+            "attributed_revenue": round(
+                sum(float(r["amount_usdc"] or 0) for r in genesis_events), 2),
+            "attributed_transactions": len(genesis_events),
+            "attributed_events": [
+                {
+                    "event_id": r["event_id"],
+                    "pack_sku": r["pack_sku"],
+                    "payer_wallet": r["payer_wallet"],
+                    "tx_hash": r["tx_hash"],
+                    "genesis_allocation": r["genesis_allocation"],
+                    "amount_usdc": r["amount_usdc"],
+                    "created_at": r["created_at"],
+                }
+                for r in genesis_events
+            ],
+        },
+        "period_days": days,
+    }
+
+
 # --- Event details (idempotency state for fulfillment retries) ----------------
 def _rail_event_details(event_id: str) -> Dict[str, Any]:
     """Read the rail event's JSON details column ({} when absent/corrupt)."""
@@ -342,6 +453,7 @@ def _rail_event_merge_details(event_id: str, updates: Dict[str, Any]) -> None:
     merged = _rail_event_details(event_id)
     merged.update(updates)
     _update_rail_event(event_id, details=json.dumps(merged))
+
 
 # --- Money gate --------------------------------------------------------------
 def _rail_money_gate_allows(*, event_id: str, challenge_id: str,
@@ -1003,7 +1115,8 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
                 challenge_id=challenge_id, pack_sku=pack_sku,
                 payer_wallet=str(verify.get("payer_wallet") or payer_wallet),
                 tx_hash=tx_hash,
-                amount_usdc=pack["price_cents"] / 100)
+                amount_usdc=pack["price_cents"] / 100,
+                buyer_email=buyer_email)
             _update_rail_event(event_id, verified=1)
             verify_result = verify
         elif plan_id:
